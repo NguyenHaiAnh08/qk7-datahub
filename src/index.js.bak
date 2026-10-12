@@ -1,0 +1,284 @@
+// src/index.js
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const { sql, getPool, closePool, testConnection } = require('./db');
+require('dotenv').config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// ─── Phục vụ frontend ───
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// ─── Middleware: lấy user hiện tại (tạm mock) ───
+// Trong tương lai thay bằng verify JWT
+app.use((req, res, next) => {
+  req.user = {
+    user_id: req.headers['x-user-id'] || 'USR-001',
+    clearance_level_id: parseInt(req.headers['x-clearance'] || '4', 10)
+  };
+  next();
+});
+
+// ─── Ghi log truy cập ───
+async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
+  try {
+    const pool = await getPool();
+    const logId = 'LOG-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    await pool.request()
+      .input('log_id',    sql.VarChar(50),  logId)
+      .input('user_id',   sql.VarChar(50),  userId)
+      .input('file_id',   sql.VarChar(50),  fileId)
+      .input('action',    sql.VarChar(50),  action)
+      .input('ip',        sql.VarChar(50),  ip)
+      .input('note',      sql.NVarChar(255), note)
+      .query(`
+        INSERT INTO ACCESS_LOG (log_id, user_id, file_id, [action], ip, note)
+        VALUES (@log_id, @user_id, @file_id, @action, @ip, @note)
+      `);
+  } catch (err) {
+    // Không nên chặn request chính vì log lỗi
+    console.error('[writeAccessLog]', err.message);
+  }
+}
+
+// ============================================================
+// 1. HEALTH CHECK
+// ============================================================
+app.get('/api/health', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(
+      `SELECT DB_NAME() AS db, SUSER_SNAME() AS login_name, GETDATE() AS now`
+    );
+    res.json({ ok: true, ...r.recordset[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ============================================================
+// 2. DANH MỤC CHO DROPDOWN
+// ============================================================
+app.get('/api/meta', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const [types, units, levels] = await Promise.all([
+      pool.request().query(`SELECT type_id, name FROM DOCUMENT_TYPE ORDER BY name`),
+      pool.request().query(`SELECT unit_id, name FROM UNIT ORDER BY name`),
+      pool.request().query(`SELECT level_id, name FROM SECURITY_LEVEL ORDER BY level_id`)
+    ]);
+    res.json({
+      types:  types.recordset,
+      units:  units.recordset,
+      levels: levels.recordset
+    });
+  } catch (e) {
+    console.error('[GET /api/meta]', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================
+// 3. TÌM KIẾM TÀI LIỆU
+// ============================================================
+app.get('/api/documents', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = pool.request();
+
+    let query = `
+      SELECT d.file_id, d.document_code, d.title,
+             d.doc_type_id, dt.name AS doc_type_name,
+             d.issued_date,
+             d.issuing_unit_id, u.name AS unit_name,
+             d.signer, d.file_size,
+             d.security_level_id, sl.name AS security_name
+      FROM DOCUMENT d
+      LEFT JOIN DOCUMENT_TYPE dt ON dt.type_id  = d.doc_type_id
+      LEFT JOIN UNIT u          ON u.unit_id   = d.issuing_unit_id
+      JOIN SECURITY_LEVEL sl    ON sl.level_id = d.security_level_id
+      WHERE 1 = 1
+    `;
+
+    // Lọc theo mức bảo mật: chỉ trả về tài liệu có mức <= clearance user
+    query += ` AND d.security_level_id <= @clearance`;
+    r.input('clearance', sql.Int, req.user.clearance_level_id);
+
+    if (req.query.code) {
+      query += ` AND d.document_code LIKE '%' + @code + '%'`;
+      r.input('code', sql.NVarChar(100), req.query.code);
+    }
+    if (req.query.title) {
+      query += ` AND d.title LIKE N'%' + @title + N'%'`;
+      r.input('title', sql.NVarChar(500), req.query.title);
+    }
+    if (req.query.type) {
+      query += ` AND d.doc_type_id = @type`;
+      r.input('type', sql.VarChar(20), req.query.type);
+    }
+    if (req.query.unit) {
+      query += ` AND d.issuing_unit_id = @unit`;
+      r.input('unit', sql.VarChar(50), req.query.unit);
+    }
+    if (req.query.from) {
+      query += ` AND d.issued_date >= @from`;
+      r.input('from', sql.Date, req.query.from);
+    }
+    if (req.query.to) {
+      query += ` AND d.issued_date <= @to`;
+      r.input('to', sql.Date, req.query.to);
+    }
+    // Nếu user chọn mức tối đa nhỏ hơn clearance → thắt chặt thêm
+    if (req.query.lv) {
+      const maxAllowed = Math.min(parseInt(req.query.lv, 10), req.user.clearance_level_id);
+      query += ` AND d.security_level_id <= @lv`;
+      r.input('lv', sql.Int, maxAllowed);
+    }
+
+    query += ` ORDER BY d.issued_date DESC, d.document_code`;
+
+    const result = await r.query(query);
+    res.json({ total: result.recordset.length, items: result.recordset });
+
+  } catch (err) {
+    console.error('[GET /api/documents]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 4. XEM / TẢI PDF — có ghi ACCESS_LOG
+// ============================================================
+app.get('/api/files/:fileId/view', async (req, res) => {
+  const ip = req.ip || req.connection?.remoteAddress || '';
+  let fileId = req.params.fileId;
+
+  try {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('file_id', sql.VarChar(50), fileId)
+      .query(`
+        SELECT stored_path, original_name, mime_type, security_level_id
+        FROM DOCUMENT WHERE file_id = @file_id
+      `);
+
+    if (result.recordset.length === 0) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId,
+        action: 'DENIED', ip, note: 'Không tìm thấy tài liệu'
+      });
+      return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    }
+
+    const doc = result.recordset[0];
+
+    // Kiểm tra quyền theo mức bảo mật
+    if (doc.security_level_id > req.user.clearance_level_id) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId,
+        action: 'DENIED', ip,
+        note: `Cần mức ${doc.security_level_id}, user có mức ${req.user.clearance_level_id}`
+      });
+      return res.status(403).json({ error: 'Không có quyền truy cập tài liệu này' });
+    }
+
+    const filePath = path.resolve(__dirname, '..', doc.stored_path);
+
+    if (!fs.existsSync(filePath)) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId,
+        action: 'ERROR', ip, note: 'File không tồn tại trên ổ đĩa'
+      });
+      return res.status(404).json({ error: 'File không tồn tại: ' + doc.stored_path });
+    }
+
+    // Ghi log truy cập thành công
+    await writeAccessLog({
+      userId: req.user.user_id, fileId,
+      action: req.query.download === '1' ? 'DOWNLOAD' : 'VIEW',
+      ip
+    });
+
+    // Set header rồi stream
+    res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
+    const disposition = req.query.download === '1' ? 'attachment' : 'inline';
+    res.setHeader('Content-Disposition',
+      `${disposition}; filename="${encodeURIComponent(doc.original_name)}"`);
+
+    fs.createReadStream(filePath).pipe(res);
+
+  } catch (err) {
+    console.error('[GET /api/files/:id/view]', err);
+    try {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId,
+        action: 'ERROR', ip, note: err.message
+      });
+    } catch (_) {}
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 5. NHẬT KÝ TRUY CẬP (cho quản trị viên)
+// ============================================================
+app.get('/api/access-logs', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request();
+
+    let query = `
+      SELECT TOP 200
+        l.log_id, l.user_id, u.full_name,
+        l.file_id, d.title AS doc_title,
+        l.[action], l.[timestamp], l.ip, l.note
+      FROM ACCESS_LOG l
+      LEFT JOIN [USER] u    ON u.user_id = l.user_id
+      LEFT JOIN DOCUMENT d  ON d.file_id = l.file_id
+      WHERE 1 = 1
+    `;
+
+    if (req.query.user) {
+      query += ` AND l.user_id = @user`;
+      r.input('user', sql.VarChar(50), req.query.user);
+    }
+    if (req.query.action) {
+      query += ` AND l.[action] = @action`;
+      r.input('action', sql.VarChar(50), req.query.action);
+    }
+
+    query += ` ORDER BY l.[timestamp] DESC`;
+
+    const result = await r.query(query);
+    res.json({ total: result.recordset.length, items: result.recordset });
+  } catch (err) {
+    console.error('[GET /api/access-logs]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// KHỞI ĐỘNG
+// ============================================================
+const PORT = process.env.PORT || 3000;
+
+async function start() {
+  const ok = await testConnection();
+  if (!ok) {
+    console.error('⛔ Không thể kết nối database. Kiểm tra .env và SQL Server.');
+    process.exit(1);
+  }
+  app.listen(PORT, () => {
+    console.log(`🚀 QK7 DATAHUB chạy tại http://localhost:${PORT}`);
+    console.log(`   Mở trình duyệt: http://localhost:${PORT}`);
+  });
+}
+
+start();
+
+process.on('SIGINT',  async () => { await closePool(); process.exit(0); });
+process.on('SIGTERM', async () => { await closePool(); process.exit(0); });

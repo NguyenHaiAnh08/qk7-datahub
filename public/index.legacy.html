@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QK7 DATAHUB — Trạm Trung Gian LAN</title>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* ============ RESET & BASE ============ */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --primary: #1e40af;
+            --primary-hover: #1e3a8a;
+            --accent: #d4af37;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* ============ HEADER ============ */
+        .app-header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            padding: 24px 0;
+            box-shadow: var(--shadow-md);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: #0f172a;
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+        }
+
+        .brand-text h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(90deg, #ffffff 0%, #d4af37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .brand-text p {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 2px;
+            letter-spacing: 0.5px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 20px;
+            font-size: 13px;
+            color: #86efac;
+        }
+
+        .status-badge .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        /* ============ MAIN CONTAINER ============ */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 28px 24px 60px;
+        }
+
+        /* ============ TOOLBAR ============ */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .search-bar {
+            flex: 1;
+            min-width: 280px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0 16px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .search-bar:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(30, 64, 175, 0.1);
+        }
+
+        .search-bar i.fa-magnifying-glass {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-right: 10px;
+        }
+
+        .search-bar input {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 14px 0;
+            font-size: 14px;
+            background: transparent;
+            color: var(--text);
+            font-family: inherit;
+        }
+
+        .search-bar input::placeholder {
+            color: #94a3b8;
+        }
+
+        /* Nút X trong search bar (app.js gọi #btnClearSearch) */
+        .search-bar button#btnClearSearch {
+            background: #f1f5f9;
+            border: none;
+            color: var(--text-muted);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: all 0.15s;
+            margin-left: 8px;
+        }
+
+        .search-bar button#btnClearSearch:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 22px;
+            background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);
+            font-family: inherit;
+            white-space: nowrap;
+        }
+
+        .btn-refresh:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(30, 64, 175, 0.35);
+        }
+
+        .btn-refresh:active {
+            transform: translateY(0);
+        }
+
+        .btn-refresh i {
+            font-size: 14px;
+        }
+
+        /* ============ SERVER GRID ============ */
+        .server-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+        }
+
+        .server-card {
+            background: var(--surface);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            padding: 0;
+            overflow: hidden;
+            transition: all 0.25s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .server-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+            border-color: #cbd5e1;
+        }
+
+        /* Server header */
+        .server-card h3 {
+            font-size: 16px;
+            font-weight: 700;
+            padding: 18px 20px 8px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .server-card h3::before {
+            content: '\f233';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            color: var(--primary);
+            font-size: 18px;
+        }
+
+        /* IP line */
+        .server-card > p {
+            padding: 0 20px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        /* Status line */
+        .server-card > p:nth-of-type(2) {
+            display: flex;
+            align-items: center;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            margin-right: 8px;
+            position: relative;
+        }
+
+        .status-dot.online {
+            background: var(--success);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+        }
+
+        .status-dot.offline {
+            background: var(--danger);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+        }
+
+        /* Section label */
+        .server-card h4 {
+            padding: 0 20px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        /* Horizontal rule (app.js có thể render <hr>, style lại) */
+        .server-card hr {
+            display: none;
+        }
+
+        /* File tree */
+        .file-tree {
+            list-style: none;
+            padding: 0 20px 20px;
+            margin: 0;
+            max-height: 380px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .file-tree::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .file-tree::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .file-tree::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .file-tree::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .file-tree ul {
+            list-style: none;
+            padding-left: 18px;
+            margin: 2px 0;
+            border-left: 1px dashed #e2e8f0;
+        }
+
+        .file-item,
+        .folder-item {
+            padding: 6px 0;
+            font-size: 14px;
+            line-height: 1.5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #f8fafc;
+            flex-wrap: wrap;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-item a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.15s;
+            word-break: break-word;
+        }
+
+        .file-item a:hover {
+            color: var(--primary-hover);
+            text-decoration: underline;
+        }
+
+        /* Folder */
+        .folder-item {
+            display: block;
+            padding: 0;
+            border-bottom: none;
+        }
+
+        .folder-item details {
+            padding: 2px 0;
+        }
+
+        .folder-item summary {
+            cursor: pointer;
+            padding: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            list-style: none;
+            font-size: 14px;
+            border-radius: 6px;
+            transition: background 0.15s;
+            user-select: none;
+        }
+
+        .folder-item summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .folder-item summary::before {
+            content: '\f105';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            color: var(--text-muted);
+            font-size: 12px;
+            transition: transform 0.2s;
+            display: inline-block;
+            width: 12px;
+        }
+
+        .folder-item details[open] > summary::before {
+            transform: rotate(90deg);
+        }
+
+        .folder-item summary:hover {
+            background: #f8fafc;
+            padding-left: 6px;
+            padding-right: 6px;
+        }
+
+        .folder-item summary b {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .sub-folder {
+            margin-top: 2px;
+        }
+
+        /* Empty state */
+        .empty-item {
+            padding: 12px 0;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-style: italic;
+        }
+
+        /* File path (search results) */
+        .file-path {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-left: 4px;
+        }
+
+        /* File size */
+        .file-size {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-left: 4px;
+            padding: 1px 6px;
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+
+        /* Highlight */
+        mark {
+            background: #fef08a;
+            color: var(--text);
+            padding: 1px 3px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        /* ============ FOOTER ============ */
+        .app-footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 12px;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+
+        /* ============ RESPONSIVE ============ */
+        @media (max-width: 768px) {
+            .header-inner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                width: 100%;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-bar {
+                min-width: auto;
+            }
+
+            .btn-refresh {
+                justify-content: center;
+            }
+
+            .server-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============ HEADER ============ -->
+    <header class="app-header">
+        <div class="header-inner">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-building-columns"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>QK7 DATAHUB</h1>
+                    <p>TRẠM TRUNG GIAN KẾT NỐI MẠNG LAN</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <div class="status-badge">
+                    <span class="pulse"></span>
+                    <span>Hệ thống hoạt động</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============ MAIN ============ -->
+    <main class="main-container">
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="search-bar">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="searchInput" placeholder="Tìm file hoặc thư mục (từ 2 ký tự)...">
+                <button id="btnClearSearch" title="Xóa tìm kiếm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <button class="btn-refresh" id="btnRefresh">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Cập nhật trạng thái</span>
+            </button>
+        </div>
+
+        <!-- Server List (JS đổ dữ liệu vào) -->
+        <div class="server-container" id="serverList">
+            <div class="server-card" style="grid-column: 1 / -1; text-align: center; padding: 40px;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 28px; color: #1e40af;"></i>
+                <p style="margin-top: 12px; color: #64748b;">Đang kết nối tới các máy chủ...</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="app-footer">
+        © 2026 QK7 DataHub — Hệ thống trung gian kết nối LAN nội bộ
+    </footer>
+
+    <!-- JS logic (KHÔNG SỬA) -->
+    <script src="app.js"></script>
+</body>
+</html>

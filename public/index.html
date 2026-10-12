@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QK7 DATAHUB — Quản Trị Tài Liệu</title>
+
+    <!-- =====================================================
+         CDN LIBRARIES
+         - Tailwind: CSS utility-first
+         - FontAwesome: icon
+         - Inter: font chữ
+         ===================================================== -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Config Tailwind: bật dark mode theo class, thêm font Inter -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* =====================================================
+           CUSTOM STYLES
+           - Scrollbar mảnh cho danh sách tài liệu
+           - Giới hạn chiều cao khung danh sách (desktop)
+           ===================================================== */
+        body { font-family: 'Inter', sans-serif; }
+
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: rgba(0,0,0,.05); }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,.2); border-radius: 3px; }
+
+        /* Khung danh sách cuộn riêng trên desktop; mobile thì tự do */
+        .doc-list-scroll { max-height: calc(100vh - 400px); min-height: 400px; overflow-y: auto; }
+        @media (max-width: 1024px) {
+            .doc-list-scroll { max-height: none; min-height: auto; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 flex flex-col min-h-full transition-colors duration-200">
+
+<!-- ============================================================
+     HEADER — Sticky trên cùng
+     - Logo + tiêu đề
+     - Ô search desktop (hiển thị từ md trở lên)
+     - Nút search mobile (mở ô search ẩn)
+     - Nút dark mode
+     - Avatar + dropdown user
+     ============================================================ -->
+<header class="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16 gap-4">
+
+            <!-- Logo + tiêu đề -->
+            <div class="flex items-center space-x-3 shrink-0">
+                <div class="w-10 h-10 rounded-lg bg-emerald-700 flex items-center justify-center text-white shadow-inner border border-emerald-500/30">
+                    <i class="fa-solid fa-cloud-arrow-up text-xl text-yellow-400"></i>
+                </div>
+                <div>
+                    <span class="font-bold text-lg tracking-wider bg-gradient-to-r from-white via-slate-200 to-yellow-400 bg-clip-text text-transparent">QK7 DATAHUB</span>
+                    <span class="block text-[10px] text-slate-400 font-medium -mt-1 tracking-widest uppercase">Quản Trị Tài Liệu — Văn Thư</span>
+                </div>
+            </div>
+
+            <!-- Ô search desktop -->
+            <!-- oninput gọi debounceSearch(false) — false = ô desktop -->
+            <div class="flex-1 max-w-md hidden md:block">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </div>
+                    <input type="text" id="searchInput" oninput="debounceSearch(false)" placeholder="Tìm theo mã hoặc trích yếu..."
+                        class="w-full pl-10 pr-4 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
+                </div>
+            </div>
+
+            <!-- Nhóm nút bên phải -->
+            <div class="flex items-center space-x-3">
+                <!-- Nút mở ô search mobile -->
+                <button onclick="toggleMobileSearch()" class="md:hidden p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800">
+                    <i class="fa-solid fa-magnifying-glass text-lg"></i>
+                </button>
+
+                <!-- Nút đổi dark/light mode -->
+                <button onclick="toggleDarkMode()" class="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition">
+                    <i id="themeIcon" class="fa-solid fa-moon"></i>
+                </button>
+
+                <!-- Avatar + dropdown user -->
+                <div class="relative">
+                    <button id="userMenuBtn" onclick="toggleUserDropdown()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700/80 text-slate-200 px-3 py-2 rounded-lg border border-slate-700 transition">
+                        <div id="userAvatar" class="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">B</div>
+                        <span id="userNameLabel" class="text-sm font-medium">Thư ký</span>
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                    </button>
+
+                    <!-- Dropdown menu user -->
+                    <div id="userDropdown" class="hidden absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-2 z-50 text-slate-700 dark:text-slate-200">
+                        <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Đang đăng nhập với tư cách</p>
+                            <p id="dropdownUserRole" class="text-sm font-semibold text-slate-900 dark:text-white">Thư ký (Mức 4)</p>
+                        </div>
+                        <div class="py-1">
+                            <a href="javascript:void(0)" onclick="showSecurityInfo()" class="flex items-center px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700/50">
+                                <i class="fa-solid fa-shield-halved w-5 text-blue-500"></i>
+                                <span>Chính sách bảo mật</span>
+                            </a>
+                            <a href="qk7_datahub_portal.html" class="flex items-center px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700/50 sm:hidden">
+                                <i class="fa-solid fa-book-open w-5 text-emerald-500"></i>
+                                <span>Xem Portal</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ô search mobile (ẩn mặc định, mở khi bấm icon search) -->
+        <div id="mobileSearchBar" class="hidden pb-3 md:hidden">
+            <input type="text" id="mobileSearchInput" oninput="debounceSearch(true)" placeholder="Tìm kiếm..."
+                class="w-full pl-4 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none">
+        </div>
+    </div>
+</header>
+
+<main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
+
+    <!-- =====================================================
+         BANNER VAI TRÒ — Giải thích trang này dành cho ai
+         ===================================================== -->
+    <div class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl p-3 shadow-sm mb-4">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-emerald-100 dark:bg-emerald-900/60 rounded-lg text-emerald-700 dark:text-emerald-300 shrink-0">
+                <i class="fa-solid fa-user-tie"></i>
+            </div>
+            <div>
+                <h2 class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                    🔐 Trang quản trị — Văn thư / Thư ký / Cơ yếu
+                </h2>
+                <p class="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
+                    Upload, sửa metadata và xóa tài liệu. Mọi thao tác đều được ghi nhật ký.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         LAYOUT 2 CỘT
+         - lg:grid-cols-3 → cột trái 1/3, cột phải 2/3
+         - mobile: 1 cột duy nhất
+         ===================================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        <!-- ==================================================
+             CỘT TRÁI — FORM UPLOAD
+             Sticky trên desktop, luôn hiển thị khi scroll
+             ================================================== -->
+        <div class="lg:col-span-1">
+            <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm lg:sticky lg:top-20">
+                <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-700/60 flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up text-emerald-600 dark:text-emerald-400"></i>
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm">Upload tài liệu mới</h3>
+                </div>
+
+                <div class="p-4">
+
+                    <!-- Dropzone — Click hoặc kéo thả file vào -->
+                    <div id="dropzone" class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-5 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition mb-3">
+                        <i class="fa-solid fa-file-pdf text-3xl text-slate-400 mb-2"></i>
+                        <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">Kéo thả file PDF</div>
+                        <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">hoặc click để chọn (tối đa 50MB)</div>
+                    </div>
+                    <!-- Input file ẩn — kích hoạt bằng cách click dropzone -->
+                    <input type="file" id="fileInput" accept="application/pdf" hidden>
+
+                    <!-- Khung hiển thị file đã chọn (ẩn cho đến khi chọn file) -->
+                    <div id="fileSelected" class="hidden items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg mb-3 text-sm">
+                        <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                        <div class="flex-1 min-w-0">
+                            <div id="fileName" class="font-semibold truncate text-xs">file.pdf</div>
+                            <div id="fileSize" class="text-[10px] text-slate-500">0 KB</div>
+                        </div>
+                        <button type="button" onclick="clearFile()" class="text-red-500 hover:text-red-700 p-1">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <!-- ==========================================
+                         FORM METADATA — Thông tin về tài liệu
+                         Các field có * là bắt buộc
+                         ========================================== -->
+                    <form id="uploadForm" class="space-y-3">
+
+                        <!-- Mã/số ký hiệu (không bắt buộc) -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Mã / số ký hiệu</label>
+                            <input id="up-code" placeholder="VD: 123/QĐ-BGH"
+                                class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+
+                        <!-- Trích yếu — BẮT BUỘC -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Trích yếu <span class="text-red-500">*</span></label>
+                            <input id="up-title" required placeholder="VD: Quyết định bổ nhiệm..."
+                                class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+
+                        <!-- Loại văn bản — BẮT BUỘC, dropdown tự đổ từ /api/meta -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Loại văn bản <span class="text-red-500">*</span></label>
+                            <select id="up-type" required
+                                class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="">-- Chọn --</option>
+                            </select>
+                        </div>
+
+                        <!-- Đơn vị ban hành -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Đơn vị ban hành</label>
+                            <select id="up-unit"
+                                class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="">-- Chọn --</option>
+                            </select>
+                        </div>
+
+                        <!-- Ngày ban hành + Mức bảo mật (2 cột) -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Ngày ban hành</label>
+                                <input id="up-date" type="date"
+                                    class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Mức bảo mật <span class="text-red-500">*</span></label>
+                                <select id="up-lv" required
+                                    class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <option value="">--</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Người ký -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Người ký</label>
+                            <input id="up-signer" placeholder="VD: Đại tá Nguyễn Văn A"
+                                class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+
+                        <!-- Tóm tắt -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Tóm tắt nội dung</label>
+                            <textarea id="up-summary" rows="2" placeholder="Tóm tắt ngắn..."
+                                class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"></textarea>
+                        </div>
+
+                        <!-- Nút Upload — Disable cho đến khi chọn file -->
+                        <button type="submit" id="btnUpload" disabled
+                            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <span id="btnUploadText">Chọn file để upload</span>
+                        </button>
+
+                        <!-- Progress bar — chỉ hiện khi upload -->
+                        <div id="progressBar" class="hidden w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div id="progressFill" class="h-full bg-emerald-600 transition-all duration-300" style="width:0%"></div>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================================================
+             CỘT PHẢI — BỘ LỌC + DANH SÁCH + PHÂN TRANG
+             ================================================== -->
+        <div class="lg:col-span-2 space-y-4">
+
+            <!-- ==============================================
+                 BỘ LỌC — Mã, Loại, Đơn vị, Mức, Ngày
+                 Mọi thay đổi đều gọi debounceSearch()
+                 ============================================== -->
+            <section class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-filter text-emerald-600 dark:text-emerald-400 text-sm"></i>
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm">Bộ lọc</h3>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Mã / số ký hiệu</label>
+                        <input id="f-code" oninput="debounceSearch()" placeholder="VD: 123/QĐ-BGH"
+                            class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Loại văn bản</label>
+                        <select id="f-type" onchange="debounceSearch()"
+                            class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="">-- Tất cả --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Đơn vị</label>
+                        <select id="f-unit" onchange="debounceSearch()"
+                            class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="">-- Tất cả --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Mức bảo mật tối đa</label>
+                        <select id="f-lv" onchange="debounceSearch()"
+                            class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Từ ngày</label>
+                        <input id="f-from" type="date" onchange="debounceSearch()"
+                            class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Đến ngày</label>
+                        <input id="f-to" type="date" onchange="debounceSearch()"
+                            class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 mt-3">
+                    <button onclick="resetFilters()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg transition">
+                        <i class="fa-solid fa-eraser mr-1"></i> Xóa lọc
+                    </button>
+                </div>
+            </section>
+
+            <!-- ==============================================
+                 DANH SÁCH TÀI LIỆU — Render bằng JS
+                 ============================================== -->
+            <section class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden">
+
+                <!-- Header: badge đếm + info phân trang + nút refresh -->
+                <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-regular fa-folder-open text-emerald-600 dark:text-emerald-400"></i>
+                        <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm">Tài liệu trong hệ thống</h3>
+                        <span id="docCountBadge" class="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-300/40">Đang tải...</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="paginationInfo" class="text-xs text-slate-500 dark:text-slate-400 hidden">
+                            Trang <span id="currentPageLabel" class="font-bold">1</span> / <span id="totalPagesLabel" class="font-bold">1</span>
+                        </span>
+                        <button onclick="loadDocuments()" class="text-xs text-slate-500 hover:text-emerald-600 flex items-center gap-1 transition px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50">
+                            <i class="fa-solid fa-rotate-right"></i> Làm mới
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Danh sách card — JS đổ vào đây -->
+                <div id="docList" class="doc-list-scroll scrollbar-thin p-4 space-y-3"></div>
+
+                <!-- Footer phân trang — ẩn khi chỉ có 1 trang -->
+                <div id="paginationFooter" class="px-4 py-3 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30 hidden">
+                    <div class="flex items-center justify-between gap-4 flex-wrap">
+                        <button id="btnPrevPage" onclick="changePage(-1)"
+                            class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:border-emerald-500 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="fa-solid fa-chevron-left"></i> Trang trước
+                        </button>
+                        <div id="pageNumbers" class="flex items-center gap-1 flex-wrap justify-center"></div>
+                        <button id="btnNextPage" onclick="changePage(1)"
+                            class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:border-emerald-500 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                            Trang sau <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</main>
+
+<footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center">
+        <p class="font-medium text-slate-300">🏛️ QK7 DATAHUB — TRANG QUẢN TRỊ TÀI LIỆU</p>
+        <p class="mt-1">© 2026 Bộ Tư Lệnh Quân Khu 7. Bảo lưu mọi quyền.</p>
+    </div>
+</footer>
+
+<!-- ============================================================
+     TOAST — Thông báo nổi góc phải dưới
+     ============================================================ -->
+<div id="toast" class="fixed bottom-5 right-5 z-[60] hidden bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl items-center space-x-3 border border-slate-700 transition-all duration-300">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+    <span id="toastMessage" class="text-xs font-medium">Thao tác thành công</span>
+</div>
+
+<!-- ============================================================
+     MODAL SỬA — Form chỉnh sửa metadata tài liệu
+     Mở khi bấm nút "Sửa" trên card
+     ============================================================ -->
+<div id="editModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+
+        <!-- Header modal -->
+        <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square text-emerald-600"></i> Sửa tài liệu
+            </h3>
+            <button onclick="closeEditModal()" class="text-slate-400 hover:text-red-500 text-xl p-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Body modal — các field giống form upload nhưng prefix "ed-" -->
+        <div class="p-5 overflow-y-auto scrollbar-thin flex-1 space-y-3">
+            <input type="hidden" id="ed-file-id">
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Mã / số ký hiệu</label>
+                <input id="ed-code"
+                    class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Trích yếu <span class="text-red-500">*</span></label>
+                <input id="ed-title" required
+                    class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Loại văn bản</label>
+                    <select id="ed-type"
+                        class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Đơn vị</label>
+                    <select id="ed-unit"
+                        class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Ngày ban hành</label>
+                    <input id="ed-date" type="date"
+                        class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Mức bảo mật</label>
+                    <select id="ed-lv"
+                        class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Người ký</label>
+                <input id="ed-signer"
+                    class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Tóm tắt</label>
+                <textarea id="ed-summary" rows="3"
+                    class="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"></textarea>
+            </div>
+
+            <!-- Thay file PDF (tùy chọn) -->
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Thay file PDF (tùy chọn — bỏ trống để giữ file cũ)</label>
+
+                <!-- Khung hiển thị file mới đã chọn -->
+                <div id="ed-file-selected" class="hidden items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg mb-2 text-sm">
+                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                    <div class="flex-1 min-w-0">
+                        <div id="ed-file-name" class="font-semibold truncate text-xs">file.pdf</div>
+                        <div id="ed-file-size" class="text-[10px] text-slate-500">0 KB</div>
+                    </div>
+                    <button type="button" onclick="clearEditFile()" class="text-red-500 hover:text-red-700 p-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div id="ed-dropzone" class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-3 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/40 transition">
+                    <i class="fa-solid fa-file-pdf text-xl text-slate-400"></i>
+                    <div class="text-xs text-slate-600 dark:text-slate-300 mt-1">Click để chọn file PDF mới</div>
+                </div>
+                <input type="file" id="ed-file-input" accept="application/pdf" hidden>
+            </div>
+        </div>
+
+        <!-- Footer modal -->
+        <div class="px-5 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 flex justify-end gap-2 rounded-b-xl">
+            <button onclick="closeEditModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg transition">
+                Hủy
+            </button>
+            <button id="btnSaveEdit" onclick="submitEdit()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// 1. CẤU HÌNH — Hằng số toàn cục
+// ============================================================
+const API_BASE = '';          // Rỗng vì frontend cùng domain với backend
+const ITEMS_PER_PAGE = 8;     // Số tài liệu mỗi trang
+
+// ============================================================
+// USER HIỆN TẠI — Đọc từ sessionStorage
+// ============================================================
+// Login page ghi vào sessionStorage:
+//   qk7_username = user_id
+//   qk7_name     = full_name
+//   qk7_level    = clearance_level_id
+// Nếu chưa login, dùng giá trị mặc định (USR-002 = Thư ký)
+const CURRENT_USER = {
+    user_id: sessionStorage.getItem('qk7_username') || 'USR-002',
+    full_name: sessionStorage.getItem('qk7_name') || 'Trần Thị B',
+    clearance_level_id: parseInt(sessionStorage.getItem('qk7_level') || '5', 10)
+};
+
+// ============================================================
+// 2. STATE — Biến toàn cục cho trang
+// ============================================================
+let TYPES = {}, UNITS = {}, LEVELS = {};   // Cache danh mục từ /api/meta
+let allDocuments = [];                      // Danh sách tài liệu hiện tại
+let currentPage = 1, totalPages = 1;        // Trạng thái phân trang
+let searchTimer = null;                     // Timer cho debounce search
+let selectedUploadFile = null;              // File đang chờ upload (form chính)
+let selectedEditFile = null;                // File đang chờ upload (modal sửa)
+
+// ============================================================
+// 3. API HEADERS — Header xác thực gửi kèm mọi request
+// ============================================================
+// Backend đọc 2 header này để biết user là ai và clearance level
+// Sau này thay bằng JWT token
+function apiHeaders(extra = {}) {
+    return {
+        'X-User-Id': CURRENT_USER.user_id || 'USR-002',
+        'X-Clearance': String(CURRENT_USER.clearance_level_id || 5),
+        ...extra
+    };
+}
+
+// ============================================================
+// 4. TOAST — Thông báo nổi góc phải dưới
+// ============================================================
+// type: 'success' (xanh) | 'error' (đỏ) | 'info' (xanh dương)
+function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    document.getElementById('toastMessage').textContent = msg;
+    const ic = document.getElementById('toastIcon');
+    ic.className = type === 'success' ? 'fa-solid fa-circle-check text-emerald-400 text-lg'
+                 : type === 'error'   ? 'fa-solid fa-circle-xmark text-red-400 text-lg'
+                 : 'fa-solid fa-circle-info text-blue-400 text-lg';
+    t.classList.remove('hidden');
+    t.classList.add('flex');
+    setTimeout(() => { t.classList.add('hidden'); t.classList.remove('flex'); }, 3000);
+}
+
+// ============================================================
+// 5. HELPERS — Format dữ liệu
+// ============================================================
+
+// Định dạng dung lượng file: B → KB → MB
+function fmtSize(b) {
+    if (!b || b <= 0) return '0 B';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
+}
+
+// Định dạng ngày ISO → dd/mm/yyyy
+function fmtDate(iso) {
+    if (!iso) return '';
+    const d = String(iso).split('T')[0];
+    const [y, m, day] = d.split('-');
+    return y && m && day ? `${day}/${m}/${y}` : iso;
+}
+
+// Escape HTML — chống XSS khi render dữ liệu từ DB
+function escapeHTML(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Escape cho giá trị trong onclick="..." — tránh vỡ chuỗi
+function escapeAttr(s) {
+    return String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// 6. LOAD META — Tải danh mục cho dropdown
+// ============================================================
+// Gọi /api/meta để lấy:
+//   - types: loại văn bản (CV, QĐ, BC...)
+//   - units: đơn vị (U-BGH, U-TM...)
+//   - levels: mức bảo mật (1..5)
+// Cache vào biến toàn cục để không phải gọi lại
+async function loadMeta() {
+    try {
+        const res = await fetch(`${API_BASE}/api/meta`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        // Reset cache
+        TYPES = {}; UNITS = {}; LEVELS = {};
+        data.types.forEach(t => TYPES[t.type_id] = t.name);
+        data.units.forEach(u => UNITS[u.unit_id] = u.name);
+        data.levels.forEach(l => LEVELS[l.level_id] = l.name);
+
+        // Đổ vào các select
+        // Form upload
+        fillOptions('up-type',  TYPES,  '-- Chọn loại --');
+        fillOptions('up-unit',  UNITS,  '-- Chọn đơn vị --');
+        fillOptions('up-lv',    LEVELS, '-- Chọn mức --', true);  // sortDesc=true
+
+        // Bộ lọc
+        fillOptions('f-type',   TYPES,  '-- Tất cả --');
+        fillOptions('f-unit',   UNITS,  '-- Tất cả --');
+        fillOptions('f-lv',     LEVELS, null, true);
+
+        // Mặc định form upload: mức "Nội bộ" (2) — an toàn nhất
+        document.getElementById('up-lv').value = 2;
+        // Mặc định bộ lọc: mức của user hiện tại
+        document.getElementById('f-lv').value = CURRENT_USER.clearance_level_id;
+
+    } catch (err) {
+        console.error('[loadMeta]', err);
+        showToast('Không tải được danh mục', 'error');
+    }
+}
+
+// Đổ dữ liệu vào một thẻ <select>
+// - id: id của select
+// - map: { value: label }
+// - placeholder: text của option đầu (rỗng), null nếu không cần
+// - sortDesc: true nếu muốn sort giảm dần theo số (cho level_id)
+function fillOptions(id, map, placeholder, sortDesc = false) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '';
+
+    // Thêm option placeholder (nếu có)
+    if (placeholder !== null) {
+        const o = document.createElement('option');
+        o.value = '';
+        o.textContent = placeholder;
+        sel.appendChild(o);
+    }
+
+    // Sắp xếp entry
+    let entries = Object.entries(map);
+    if (sortDesc) {
+        entries.sort((a, b) => Number(b[0]) - Number(a[0]));
+    } else {
+        entries.sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'vi'));
+    }
+
+    // Thêm từng option
+    entries.forEach(([val, name]) => {
+        const o = document.createElement('option');
+        o.value = val;
+        o.textContent = name;
+        sel.appendChild(o);
+    });
+}
+
+// ============================================================
+// 7. LOAD DOCUMENTS — Tải danh sách tài liệu từ API
+// ============================================================
+// Gom các bộ lọc thành query params, gọi /api/documents
+// Backend tự động lọc theo clearance của user (từ header X-Clearance)
+async function loadDocuments() {
+    showLoadingState();
+
+    // Gom tham số
+    const params = new URLSearchParams();
+    const code  = document.getElementById('f-code').value.trim();
+    const title = (document.getElementById('searchInput')?.value || '').trim();
+    const type  = document.getElementById('f-type').value;
+    const unit  = document.getElementById('f-unit').value;
+    const from  = document.getElementById('f-from').value;
+    const to    = document.getElementById('f-to').value;
+    const lv    = document.getElementById('f-lv').value;
+
+    if (code)  params.set('code', code);
+    if (title) params.set('title', title);
+    if (type)  params.set('type', type);
+    if (unit)  params.set('unit', unit);
+    if (from)  params.set('from', from);
+    if (to)    params.set('to', to);
+    if (lv)    params.set('lv', lv);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/documents?${params}`, {
+            headers: apiHeaders()  // Gửi kèm X-User-Id và X-Clearance
+        });
+        if (!res.ok) {
+            const e = await res.json().catch(() => ({}));
+            throw new Error(e.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        allDocuments = data.items || [];
+        currentPage = 1;
+        totalPages = Math.max(1, Math.ceil(allDocuments.length / ITEMS_PER_PAGE));
+        renderDocuments();
+        renderPagination();
+    } catch (err) {
+        console.error('[loadDocuments]', err);
+        showErrorState('Không thể kết nối máy chủ: ' + err.message);
+    }
+}
+
+// ============================================================
+// 8. RENDER — Vẽ danh sách và phân trang
+// ============================================================
+
+// Vẽ danh sách card tài liệu
+// Chỉ vẽ trang hiện tại (currentPage), không vẽ hết
+function renderDocuments() {
+    const container = document.getElementById('docList');
+    const badge = document.getElementById('docCountBadge');
+    if (badge) badge.textContent = `${allDocuments.length} tài liệu`;
+
+    // Trường hợp rỗng
+    if (allDocuments.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12">
+                <i class="fa-solid fa-folder-open text-3xl text-slate-400 mb-2"></i>
+                <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Không có tài liệu phù hợp.</p>
+            </div>`;
+        return;
+    }
+
+    // Cắt lấy trang hiện tại
+    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+    const pageDocs = allDocuments.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+    // Render từng card
+    container.innerHTML = pageDocs.map(d => {
+        const secLv = d.security_level_id || 1;
+
+        // Màu badge theo mức bảo mật
+        const lvClass = {
+            1: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+            2: 'bg-blue-100 text-blue-800 border-blue-300',
+            3: 'bg-amber-100 text-amber-800 border-amber-300',
+            4: 'bg-red-100 text-red-800 border-red-300',
+            5: 'bg-purple-100 text-purple-800 border-purple-300'
+        }[secLv] || 'bg-slate-100 text-slate-700 border-slate-300';
+
+        // Escape trước khi nhét vào onclick để tránh vỡ chuỗi
+        const fid = escapeAttr(d.file_id);
+        const title = escapeAttr(d.title || '');
+
+        return `
+            <div class="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700 hover:shadow-md transition">
+
+                <!-- Hàng trên: icon + mã + tiêu đề + badge mức -->
+                <div class="flex items-start gap-3">
+                    <div class="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0">
+                        <i class="fa-solid fa-file-pdf text-red-500 text-lg"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 mb-0.5">
+                                    ${escapeHTML(d.document_code || '')}
+                                </div>
+                                <h4 class="font-semibold text-slate-800 dark:text-slate-100 text-sm">
+                                    ${escapeHTML(d.title || '')}
+                                </h4>
+                            </div>
+                            <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${lvClass}">
+                                ${escapeHTML(d.security_name || '')}
+                            </span>
+                        </div>
+
+                        <!-- Hàng metadata: loại, ngày, đơn vị, người ký -->
+                        <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-600 dark:text-slate-400 mt-2">
+                            <div class="truncate"><i class="fa-solid fa-tag text-[9px] mr-1 text-slate-400"></i>${escapeHTML(d.doc_type_name || '—')}</div>
+                            <div class="truncate"><i class="fa-solid fa-calendar text-[9px] mr-1 text-slate-400"></i>${fmtDate(d.issued_date) || '—'}</div>
+                            <div class="truncate"><i class="fa-solid fa-building text-[9px] mr-1 text-slate-400"></i>${escapeHTML(d.unit_name || '—')}</div>
+                            <div class="truncate"><i class="fa-solid fa-pen-nib text-[9px] mr-1 text-slate-400"></i>${escapeHTML(d.signer || '—')}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hàng dưới: dung lượng + 4 nút thao tác -->
+                <div class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
+                    <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">${fmtSize(d.file_size)}</span>
+                    <div class="flex-1 flex items-center gap-2 justify-end flex-wrap">
+
+                        <!-- Nút Xem — mở PDF trong tab mới, truyền uid+clr qua query -->
+                        <button onclick="openPdf('${fid}')"
+                                class="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-md transition border border-slate-200 dark:border-slate-600 flex items-center gap-1.5">
+                            <i class="fa-solid fa-eye text-[10px]"></i> Xem
+                        </button>
+
+                        <!-- Nút Tải về — thẻ <a download> không gửi được header, phải truyền qua query -->
+                        <a href="${API_BASE}/api/files/${encodeURIComponent(d.file_id)}/view?download=1&uid=${encodeURIComponent(CURRENT_USER.user_id)}&clr=${CURRENT_USER.clearance_level_id}"
+                           class="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-md transition border border-slate-200 dark:border-slate-600 flex items-center gap-1.5">
+                            <i class="fa-solid fa-download text-[10px]"></i> Tải
+                        </a>
+
+                        <!-- Nút Sửa — mở modal -->
+                        <button onclick="openEditModal('${fid}')"
+                                class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-medium rounded-md transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-pen-to-square text-[10px]"></i> Sửa
+                        </button>
+
+                        <!-- Nút Xóa — confirm trước khi xóa -->
+                        <button onclick="deleteDoc('${fid}', '${title}')"
+                                class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-medium rounded-md transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-trash text-[10px]"></i> Xóa
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// Vẽ thanh phân trang
+// - Ẩn nếu chỉ có 1 trang
+// - Hiện tối đa 5 nút số trang, có "..." nếu nhiều hơn
+function renderPagination() {
+    const footer = document.getElementById('paginationFooter');
+    const info = document.getElementById('paginationInfo');
+
+    if (totalPages <= 1) {
+        footer.classList.add('hidden');
+        info.classList.add('hidden');
+        return;
+    }
+    footer.classList.remove('hidden');
+    info.classList.remove('hidden');
+
+    document.getElementById('currentPageLabel').textContent = currentPage;
+    document.getElementById('totalPagesLabel').textContent = totalPages;
+    document.getElementById('btnPrevPage').disabled = currentPage === 1;
+    document.getElementById('btnNextPage').disabled = currentPage === totalPages;
+
+    const pn = document.getElementById('pageNumbers');
+    pn.innerHTML = '';
+    const maxButtons = 5;
+
+    // Tính khoảng trang hiển thị
+    let s = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+    let e = Math.min(totalPages, s + maxButtons - 1);
+    if (e - s + 1 < maxButtons) s = Math.max(1, e - maxButtons + 1);
+
+    // Nút trang đầu + "..."
+    if (s > 1) {
+        pn.innerHTML += pageBtn(1);
+        if (s > 2) pn.innerHTML += `<span class="text-slate-400 text-xs px-1">...</span>`;
+    }
+
+    // Các nút giữa
+    for (let i = s; i <= e; i++) pn.innerHTML += pageBtn(i);
+
+    // "..." + nút trang cuối
+    if (e < totalPages) {
+        if (e < totalPages - 1) pn.innerHTML += `<span class="text-slate-400 text-xs px-1">...</span>`;
+        pn.innerHTML += pageBtn(totalPages);
+    }
+}
+
+// Tạo HTML 1 nút số trang
+function pageBtn(i) {
+    const act = i === currentPage;
+    return `<button onclick="goToPage(${i})" class="w-8 h-8 rounded-md text-xs font-medium transition ${
+        act ? 'bg-emerald-600 text-white border border-emerald-600 shadow-sm'
+            : 'bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-emerald-500'
+    }">${i}</button>`;
+}
+
+// Chuyển trang ±1
+function changePage(d) {
+    const np = currentPage + d;
+    if (np < 1 || np > totalPages) return;
+    goToPage(np);
+}
+
+// Nhảy đến trang cụ thể
+function goToPage(p) {
+    if (p < 1 || p > totalPages) return;
+    currentPage = p;
+    renderDocuments();
+    renderPagination();
+    document.getElementById('docList').scrollTop = 0;  // Cuộn lên đầu
+}
+
+// ============================================================
+// 9. SEARCH & FILTER — Tìm kiếm, xóa lọc
+// ============================================================
+
+// Debounce search — chờ 400ms sau khi user ngừng gõ mới gọi API
+// isMobile: true nếu gõ ở ô mobile, false nếu ở ô desktop
+//
+// QUAN TRỌNG: chỉ sync 1 chiều (từ ô đang gõ → ô kia)
+// Tránh bug cũ: dùng `||` để sync 2 chiều khiến chữ tự mọc lại khi xóa
+function debounceSearch(isMobile = false) {
+    // Sync ngay lập tức (không chờ debounce)
+    const sourceId = isMobile ? 'mobileSearchInput' : 'searchInput';
+    const targetId = isMobile ? 'searchInput'       : 'mobileSearchInput';
+    const source = document.getElementById(sourceId);
+    const target = document.getElementById(targetId);
+    if (source && target) target.value = source.value;
+
+    // Debounce phần gọi API
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        loadDocuments();
+    }, 400);
+}
+
+// Xóa tất cả bộ lọc và tải lại danh sách
+function resetFilters() {
+    ['f-code','f-from','f-to'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['searchInput','mobileSearchInput'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('f-type').value = '';
+    document.getElementById('f-unit').value = '';
+    document.getElementById('f-lv').value = CURRENT_USER.clearance_level_id;
+    loadDocuments();
+    showToast('Đã xóa bộ lọc', 'info');
+}
+
+// ============================================================
+// 10. UPLOAD — Chọn file và submit form
+// ============================================================
+
+const dz = document.getElementById('dropzone');
+const fi = document.getElementById('fileInput');
+
+// Click dropzone → mở dialog chọn file
+dz.addEventListener('click', () => fi.click());
+
+// Kéo file vào dropzone → highlight
+dz.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dz.classList.add('border-emerald-500','bg-emerald-50/40');
+});
+
+// Rời chuột khỏi dropzone → bỏ highlight
+dz.addEventListener('dragleave', () => dz.classList.remove('border-emerald-500','bg-emerald-50/40'));
+
+// Thả file vào dropzone → xử lý
+dz.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dz.classList.remove('border-emerald-500','bg-emerald-50/40');
+    if (e.dataTransfer.files[0]) setUploadFile(e.dataTransfer.files[0]);
+});
+
+// Chọn file qua dialog → xử lý
+fi.addEventListener('change', () => { if (fi.files[0]) setUploadFile(fi.files[0]); });
+
+// Xử lý file được chọn
+function setUploadFile(f) {
+    // Validate: chỉ PDF, <= 50MB
+    if (f.type !== 'application/pdf') { showToast('Chỉ chấp nhận file PDF', 'error'); return; }
+    if (f.size > 50 * 1024 * 1024) { showToast('File vượt quá 50MB', 'error'); return; }
+
+    selectedUploadFile = f;
+    document.getElementById('fileName').textContent = f.name;
+    document.getElementById('fileSize').textContent = fmtSize(f.size);
+    document.getElementById('fileSelected').classList.remove('hidden');
+    document.getElementById('fileSelected').classList.add('flex');
+    updateUploadBtn();
+}
+
+// Hủy chọn file
+function clearFile() {
+    selectedUploadFile = null;
+    fi.value = '';
+    document.getElementById('fileSelected').classList.add('hidden');
+    document.getElementById('fileSelected').classList.remove('flex');
+    updateUploadBtn();
+}
+
+// Cập nhật trạng thái nút Upload (enabled/disabled)
+function updateUploadBtn() {
+    const b = document.getElementById('btnUpload');
+    const t = document.getElementById('btnUploadText');
+    if (selectedUploadFile) {
+        b.disabled = false;
+        t.textContent = 'Upload lên hệ thống';
+    } else {
+        b.disabled = true;
+        t.textContent = 'Chọn file để upload';
+    }
+}
+
+// Submit form upload
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Validate
+    if (!selectedUploadFile) { showToast('Vui lòng chọn file PDF', 'error'); return; }
+    const title = document.getElementById('up-title').value.trim();
+    const type  = document.getElementById('up-type').value;
+    const lv    = document.getElementById('up-lv').value;
+    if (!title) { showToast('Thiếu trích yếu', 'error'); return; }
+    if (!type)  { showToast('Chưa chọn loại văn bản', 'error'); return; }
+    if (!lv)    { showToast('Chưa chọn mức bảo mật', 'error'); return; }
+
+    // Đóng gói FormData
+    const fd = new FormData();
+    fd.append('file',              selectedUploadFile);
+    fd.append('document_code',     document.getElementById('up-code').value.trim());
+    fd.append('title',             title);
+    fd.append('doc_type_id',       type);
+    fd.append('issued_date',       document.getElementById('up-date').value);
+    fd.append('issuing_unit_id',   document.getElementById('up-unit').value);
+    fd.append('signer',            document.getElementById('up-signer').value.trim());
+    fd.append('summary',           document.getElementById('up-summary').value.trim());
+    fd.append('security_level_id', lv);
+
+    // UI: hiện progress
+    const btn = document.getElementById('btnUpload');
+    const txt = document.getElementById('btnUploadText');
+    const pbar = document.getElementById('progressBar');
+    const pfill = document.getElementById('progressFill');
+
+    btn.disabled = true;
+    txt.textContent = 'Đang upload...';
+    pbar.classList.remove('hidden');
+    pfill.style.width = '30%';
+
+    try {
+        const res = await fetch(`${API_BASE}/api/documents/upload`, {
+            method: 'POST',
+            headers: apiHeaders(),  // Chỉ gửi X-User-Id + X-Clearance, KHÔNG set Content-Type (để browser tự set boundary)
+            body: fd
+        });
+        pfill.style.width = '90%';
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        pfill.style.width = '100%';
+        showToast(`Upload thành công: ${data.file_id}`, 'success');
+
+        // Reset form
+        clearFile();
+        document.getElementById('uploadForm').reset();
+        document.getElementById('up-lv').value = 2;
+
+        // Đợi 600ms cho user thấy progress 100% rồi mới tải lại
+        setTimeout(() => {
+            loadDocuments();
+            pbar.classList.add('hidden');
+            pfill.style.width = '0%';
+        }, 600);
+    } catch (err) {
+        console.error('[upload]', err);
+        showToast('Lỗi: ' + err.message, 'error');
+        pbar.classList.add('hidden');
+        pfill.style.width = '0%';
+    } finally {
+        updateUploadBtn();
+    }
+});
+
+// ============================================================
+// 11. XEM PDF — Mở file trong tab mới
+// ============================================================
+// window.open KHÔNG gửi được custom header
+// → phải truyền uid + clr qua query string
+// Backend đọc từ req.query nếu không có header
+function openPdf(fileId) {
+    const url = `${API_BASE}/api/files/${encodeURIComponent(fileId)}/view`
+              + `?uid=${encodeURIComponent(CURRENT_USER.user_id)}`
+              + `&clr=${CURRENT_USER.clearance_level_id}`;
+    window.open(url, '_blank');
+}
+
+// ============================================================
+// 12. MODAL SỬA — Chỉnh sửa metadata tài liệu
+// ============================================================
+
+// Mở modal sửa — điền sẵn dữ liệu hiện tại của tài liệu
+function openEditModal(fileId) {
+    const doc = allDocuments.find(d => d.file_id === fileId);
+    if (!doc) { showToast('Không tìm thấy tài liệu', 'error'); return; }
+
+    // Điền vào form
+    document.getElementById('ed-file-id').value = doc.file_id;
+    document.getElementById('ed-code').value = doc.document_code || '';
+    document.getElementById('ed-title').value = doc.title || '';
+    document.getElementById('ed-signer').value = doc.signer || '';
+    document.getElementById('ed-summary').value = doc.summary || '';
+    document.getElementById('ed-date').value = doc.issued_date ? String(doc.issued_date).split('T')[0] : '';
+
+    // Đổ dropdown (không có placeholder, chọn sẵn giá trị hiện tại)
+    fillOptions('ed-type', TYPES, null);
+    fillOptions('ed-unit', UNITS, null);
+    fillOptions('ed-lv',   LEVELS, null, true);
+
+    document.getElementById('ed-type').value = doc.doc_type_id || '';
+    document.getElementById('ed-unit').value = doc.issuing_unit_id || '';
+    document.getElementById('ed-lv').value   = doc.security_level_id || 1;
+
+    // Reset file
+    clearEditFile();
+
+    // Mở modal
+    document.getElementById('editModal').classList.remove('hidden');
+    document.getElementById('editModal').classList.add('flex');
+    document.body.style.overflow = 'hidden';  // Chặn scroll body khi modal mở
+}
+
+// Đóng modal
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+    document.getElementById('editModal').classList.remove('flex');
+    document.body.style.overflow = '';
+    clearEditFile();
+}
+
+// Sự kiện chọn file trong modal
+const edDz = document.getElementById('ed-dropzone');
+const edFi = document.getElementById('ed-file-input');
+edDz.addEventListener('click', () => edFi.click());
+edFi.addEventListener('change', () => { if (edFi.files[0]) setEditFile(edFi.files[0]); });
+
+// Xử lý file mới trong modal (thay thế file cũ nếu có)
+function setEditFile(f) {
+    if (f.type !== 'application/pdf') { showToast('Chỉ chấp nhận file PDF', 'error'); return; }
+    if (f.size > 50 * 1024 * 1024) { showToast('File vượt quá 50MB', 'error'); return; }
+    selectedEditFile = f;
+    document.getElementById('ed-file-name').textContent = f.name;
+    document.getElementById('ed-file-size').textContent = fmtSize(f.size);
+    document.getElementById('ed-file-selected').classList.remove('hidden');
+    document.getElementById('ed-file-selected').classList.add('flex');
+}
+
+// Hủy file mới (giữ file cũ)
+function clearEditFile() {
+    selectedEditFile = null;
+    edFi.value = '';
+    document.getElementById('ed-file-selected').classList.add('hidden');
+    document.getElementById('ed-file-selected').classList.remove('flex');
+}
+
+// Submit sửa — gửi PUT lên server
+async function submitEdit() {
+    const fileId = document.getElementById('ed-file-id').value;
+    const title = document.getElementById('ed-title').value.trim();
+    const type  = document.getElementById('ed-type').value;
+    const lv    = document.getElementById('ed-lv').value;
+    if (!title) { showToast('Thiếu trích yếu', 'error'); return; }
+    if (!type)  { showToast('Chưa chọn loại văn bản', 'error'); return; }
+    if (!lv)    { showToast('Chưa chọn mức bảo mật', 'error'); return; }
+
+    // Đóng gói FormData
+    const fd = new FormData();
+    fd.append('document_code',     document.getElementById('ed-code').value.trim());
+    fd.append('title',             title);
+    fd.append('doc_type_id',       type);
+    fd.append('issued_date',       document.getElementById('ed-date').value);
+    fd.append('issuing_unit_id',   document.getElementById('ed-unit').value);
+    fd.append('signer',            document.getElementById('ed-signer').value.trim());
+    fd.append('summary',           document.getElementById('ed-summary').value.trim());
+    fd.append('security_level_id', lv);
+    // Chỉ gửi 'file' nếu user có chọn file mới
+    if (selectedEditFile) fd.append('file', selectedEditFile);
+
+    const btn = document.getElementById('btnSaveEdit');
+    btn.disabled = true;
+    const old = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+
+    try {
+        const res = await fetch(`${API_BASE}/api/documents/${encodeURIComponent(fileId)}`, {
+            method: 'PUT',
+            headers: apiHeaders(),
+            body: fd
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        showToast('Đã lưu thay đổi', 'success');
+        closeEditModal();
+        loadDocuments();
+    } catch (err) {
+        console.error('[submitEdit]', err);
+        showToast('Lỗi: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = old;
+    }
+}
+
+// ============================================================
+// 13. XÓA — Xóa tài liệu
+// ============================================================
+// Hỏi xác nhận rồi gọi DELETE lên server
+// Backend sẽ xóa cả file trên ổ đĩa và record trong DB
+async function deleteDoc(fileId, title) {
+    if (!confirm(`Xóa tài liệu?\n\n${title}\n\nHành động này không thể hoàn tác.`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/api/documents/${encodeURIComponent(fileId)}`, {
+            method: 'DELETE',
+            headers: apiHeaders()
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        showToast('Đã xóa tài liệu', 'success');
+        loadDocuments();
+    } catch (err) {
+        console.error('[delete]', err);
+        showToast('Lỗi xóa: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// 14. UI STATE — Cập nhật giao diện theo user
+// ============================================================
+
+// Cập nhật avatar + tên + mức bảo mật ở header/dropdown
+function updateUserUI() {
+    document.getElementById('userAvatar').textContent =
+        (CURRENT_USER.full_name || 'K').charAt(0).toUpperCase();
+    document.getElementById('userNameLabel').textContent = CURRENT_USER.full_name;
+    document.getElementById('dropdownUserRole').textContent =
+        `Mức ${CURRENT_USER.clearance_level_id} — ${LEVELS[CURRENT_USER.clearance_level_id] || ''}`;
+}
+
+// Đổi dark/light mode
+function toggleDarkMode() {
+    const h = document.documentElement;
+    h.classList.toggle('dark');
+    document.getElementById('themeIcon').className = h.classList.contains('dark')
+        ? 'fa-solid fa-sun text-yellow-400'
+        : 'fa-solid fa-moon';
+}
+
+// Mở/đóng dropdown user
+function toggleUserDropdown() {
+    document.getElementById('userDropdown').classList.toggle('hidden');
+}
+
+// Click ngoài dropdown → đóng
+window.addEventListener('click', (e) => {
+    const btn = document.getElementById('userMenuBtn');
+    const dd  = document.getElementById('userDropdown');
+    if (btn && dd && !btn.contains(e.target) && !dd.contains(e.target)) {
+        dd.classList.add('hidden');
+    }
+});
+
+// Mở/đóng thanh search mobile
+function toggleMobileSearch() {
+    document.getElementById('mobileSearchBar').classList.toggle('hidden');
+}
+
+// Hiện thông tin phân cấp bảo mật
+function showSecurityInfo() {
+    document.getElementById('userDropdown').classList.add('hidden');
+    alert("Phân cấp bảo mật QK7:\n- Cấp 1: Công khai\n- Cấp 2: Nội bộ\n- Cấp 3: Mật\n- Cấp 4: Tối mật\n- Cấp 5: Tuyệt mật");
+}
+
+// Hiện trạng thái "Đang tải" trong khung danh sách
+function showLoadingState() {
+    const c = document.getElementById('docList');
+    const b = document.getElementById('docCountBadge');
+    if (b) b.textContent = 'Đang tải...';
+    c.innerHTML = `
+        <div class="text-center py-12">
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-emerald-600 mb-3"></i>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Đang tải dữ liệu...</p>
+        </div>`;
+    document.getElementById('paginationFooter').classList.add('hidden');
+}
+
+// Hiện trạng thái lỗi trong khung danh sách
+function showErrorState(msg) {
+    const c = document.getElementById('docList');
+    const b = document.getElementById('docCountBadge');
+    if (b) b.textContent = '0 tài liệu';
+    c.innerHTML = `
+        <div class="text-center py-12">
+            <i class="fa-solid fa-circle-exclamation text-3xl text-red-600 mb-3"></i>
+            <p class="text-sm text-red-700 dark:text-red-300 font-medium">${escapeHTML(msg)}</p>
+            <button onclick="loadDocuments()" class="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg font-medium">
+                <i class="fa-solid fa-rotate-right mr-1"></i>Thử lại
+            </button>
+        </div>`;
+    document.getElementById('paginationFooter').classList.add('hidden');
+}
+
+// ============================================================
+// 15. INIT — Chạy khi DOM đã load xong
+// ============================================================
+// Thứ tự:
+//   1. loadMeta — tải danh mục cho dropdown
+//   2. updateUserUI — cập nhật avatar/tên
+//   3. loadDocuments — tải danh sách tài liệu
+window.addEventListener('DOMContentLoaded', async () => {
+    await loadMeta();
+    updateUserUI();
+    await loadDocuments();
+});
+</script>
+</body>
+</html>

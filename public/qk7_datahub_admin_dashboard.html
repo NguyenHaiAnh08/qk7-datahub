@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QK7 DATAHUB — Quản Trị Hệ Thống</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+}
+</script>
+<style>
+body { font-family: 'Inter', sans-serif; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0b1329; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
+.glass { background: rgba(15,23,42,.75); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.08); }
+</style>
+</head>
+<body class="h-full flex flex-col overflow-hidden bg-slate-950 text-slate-100">
+
+<!-- HEADER -->
+<header class="h-16 bg-slate-900/90 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30">
+    <div class="flex items-center space-x-3">
+        <button onclick="toggleSidebar()" class="lg:hidden text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-800">
+            <i class="fa-solid fa-bars text-lg"></i>
+        </button>
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('overview')">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center border border-emerald-400/30">
+                <i class="fa-solid fa-building-columns text-yellow-400 text-lg"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="font-extrabold text-base sm:text-lg tracking-wider bg-gradient-to-r from-white to-amber-400 bg-clip-text text-transparent">QK7 DATAHUB</span>
+                    <span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">ADMIN</span>
+                </div>
+                <span class="hidden sm:block text-[10px] text-slate-400 -mt-0.5">Trung tâm Quản trị Hệ thống</span>
+            </div>
+        </div>
+    </div>
+    <div class="flex items-center space-x-3">
+        <div class="hidden xl:flex items-center space-x-2 text-xs font-mono text-slate-400 bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+            <i class="fa-regular fa-clock text-amber-400"></i>
+            <span id="liveClock">--:--:--</span>
+        </div>
+        <a href="index.html" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs text-slate-300 border border-slate-700">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+        </a>
+        <a href="qk7_datahub_portal.html" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs text-slate-300 border border-slate-700">
+            <i class="fa-solid fa-book-open"></i> Portal
+        </a>
+        <div class="flex items-center space-x-2 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl">
+            <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center">
+                <i class="fa-solid fa-user-shield text-xs"></i>
+            </div>
+            <div class="text-left hidden sm:block">
+                <span class="block text-xs font-bold text-slate-200 leading-tight">admin</span>
+                <span class="block text-[10px] text-red-400 leading-tight">Mức 5</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- BODY -->
+<div class="flex-1 flex overflow-hidden relative">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col justify-between shrink-0 absolute lg:relative inset-y-0 left-0 z-20 transform -translate-x-full lg:translate-x-0 transition-transform duration-200">
+        <div class="p-3 space-y-1 overflow-y-auto">
+            <div class="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">Quản lý</div>
+
+            <button onclick="switchTab('overview')" data-tab="overview" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                <span class="flex items-center space-x-3"><i class="fa-solid fa-chart-pie w-5 text-center"></i><span>Tổng quan</span></span>
+            </button>
+            <button onclick="switchTab('users')" data-tab="users" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                <span class="flex items-center space-x-3"><i class="fa-solid fa-users w-5 text-center"></i><span>Người dùng</span></span>
+                <span id="count-users" class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">0</span>
+            </button>
+            <button onclick="switchTab('roles')" data-tab="roles" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                <span class="flex items-center space-x-3"><i class="fa-solid fa-user-tag w-5 text-center"></i><span>Vai trò</span></span>
+                <span id="count-roles" class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">0</span>
+            </button>
+            <button onclick="switchTab('permissions')" data-tab="permissions" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                <span class="flex items-center space-x-3"><i class="fa-solid fa-key w-5 text-center"></i><span>Quyền</span></span>
+                <span id="count-perms" class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">0</span>
+            </button>
+            <button onclick="switchTab('units')" data-tab="units" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                <span class="flex items-center space-x-3"><i class="fa-solid fa-building w-5 text-center"></i><span>Đơn vị</span></span>
+                <span id="count-units" class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">0</span>
+            </button>
+            <button onclick="switchTab('doctypes')" data-tab="doctypes" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                <span class="flex items-center space-x-3"><i class="fa-solid fa-file-lines w-5 text-center"></i><span>Loại văn bản</span></span>
+                <span id="count-doctypes" class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">0</span>
+            </button>
+            <button onclick="switchTab('levels')" data-tab="levels" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                <span class="flex items-center space-x-3"><i class="fa-solid fa-shield-halved w-5 text-center"></i><span>Mức bảo mật</span></span>
+                <span id="count-levels" class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">0</span>
+            </button>
+            <button onclick="switchTab('logs')" data-tab="logs" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                <span class="flex items-center space-x-3"><i class="fa-solid fa-list-check w-5 text-center"></i><span>Nhật ký</span></span>
+            </button>
+        </div>
+        <div class="p-3 border-t border-slate-800 bg-slate-950/60">
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px]">
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="flex items-center gap-1.5 font-medium">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Backend
+                    </span>
+                    <span id="backend-status" class="text-emerald-400 font-bold">OK</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950">
+
+        <!-- OVERVIEW -->
+        <div id="tab-overview" class="tab-content">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-amber-400"></i> Tổng quan hệ thống
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Thống kê dữ liệu thời gian thực</p>
+                </div>
+                <button onclick="loadStats()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-right"></i> Làm mới
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="glass p-4 rounded-2xl border-l-4 border-l-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400">Người dùng</span>
+                            <h3 id="stat-users" class="text-2xl font-extrabold text-white mt-1">—</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass p-4 rounded-2xl border-l-4 border-l-emerald-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400">Tài liệu</span>
+                            <h3 id="stat-docs" class="text-2xl font-extrabold text-white mt-1">—</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass p-4 rounded-2xl border-l-4 border-l-purple-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400">Dung lượng</span>
+                            <h3 id="stat-size" class="text-2xl font-extrabold text-white mt-1">—</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-database"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass p-4 rounded-2xl border-l-4 border-l-red-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400">Log 24h</span>
+                            <h3 id="stat-logs" class="text-2xl font-extrabold text-red-400 mt-1">—</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-list-check"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="glass p-5 rounded-2xl">
+                    <h3 class="text-sm font-bold text-white mb-3"><i class="fa-solid fa-layer-group text-amber-400 mr-2"></i>Tài liệu theo mức bảo mật</h3>
+                    <div id="chart-levels" class="space-y-2 text-xs"></div>
+                </div>
+                <div class="glass p-5 rounded-2xl">
+                    <h3 class="text-sm font-bold text-white mb-3"><i class="fa-solid fa-tags text-amber-400 mr-2"></i>Tài liệu theo loại</h3>
+                    <div id="chart-types" class="space-y-2 text-xs"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- USERS -->
+        <div id="tab-users" class="tab-content hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-users text-amber-400"></i> Người dùng</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Quản lý tài khoản cán bộ và cấp độ truy cập</p>
+                </div>
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
+                        <input type="text" id="userSearch" oninput="filterUsers()"
+                               placeholder="Tìm theo mã, tên, đơn vị..."
+                               class="w-full sm:w-72 pl-9 pr-8 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition">
+                        <button onclick="clearUserSearch()" id="btnClearUserSearch" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-1">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                    <button onclick="openModal('users')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 whitespace-nowrap">
+                        <i class="fa-solid fa-user-plus"></i> Thêm người dùng
+                    </button>
+                </div>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-900/80 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                            <tr>
+                                <th class="py-3 px-4">Mã</th>
+                                <th class="py-3 px-4">Họ tên</th>
+                                <th class="py-3 px-4">Cấp bậc / Chức vụ</th>
+                                <th class="py-3 px-4">Đơn vị</th>
+                                <th class="py-3 px-4">Mức</th>
+                                <th class="py-3 px-4">Trạng thái</th>
+                                <th class="py-3 px-4 text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-users" class="divide-y divide-slate-800/60"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROLES -->
+        <div id="tab-roles" class="tab-content hidden">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-user-tag text-amber-400"></i> Vai trò</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Vai trò hệ thống và quyền gán kèm</p>
+                </div>
+                <button onclick="openModal('roles')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Thêm vai trò
+                </button>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                        <tr>
+                            <th class="py-3 px-4">Mã</th>
+                            <th class="py-3 px-4">Tên vai trò</th>
+                            <th class="py-3 px-4 text-right">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-roles" class="divide-y divide-slate-800/60"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PERMISSIONS -->
+        <div id="tab-permissions" class="tab-content hidden">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-key text-amber-400"></i> Quyền</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Danh mục quyền chi tiết</p>
+                </div>
+                <button onclick="openModal('permissions')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Thêm quyền
+                </button>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                        <tr>
+                            <th class="py-3 px-4">Mã</th>
+                            <th class="py-3 px-4">Code</th>
+                            <th class="py-3 px-4">Mô tả</th>
+                            <th class="py-3 px-4 text-right">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-permissions" class="divide-y divide-slate-800/60"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- UNITS -->
+        <div id="tab-units" class="tab-content hidden">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-building text-amber-400"></i> Đơn vị</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Cơ cấu đơn vị phân cấp</p>
+                </div>
+                <button onclick="openModal('units')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Thêm đơn vị
+                </button>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                        <tr>
+                            <th class="py-3 px-4">Mã</th>
+                            <th class="py-3 px-4">Tên đơn vị</th>
+                            <th class="py-3 px-4">Cấp trên</th>
+                            <th class="py-3 px-4 text-right">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-units" class="divide-y divide-slate-800/60"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- DOCUMENT TYPES -->
+        <div id="tab-doctypes" class="tab-content hidden">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-file-lines text-amber-400"></i> Loại văn bản</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Danh mục loại văn bản</p>
+                </div>
+                <button onclick="openModal('doctypes')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Thêm loại
+                </button>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                        <tr>
+                            <th class="py-3 px-4">Mã</th>
+                            <th class="py-3 px-4">Tên</th>
+                            <th class="py-3 px-4">Mô tả</th>
+                            <th class="py-3 px-4 text-right">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-doctypes" class="divide-y divide-slate-800/60"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- LEVELS -->
+        <div id="tab-levels" class="tab-content hidden">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-shield-halved text-amber-400"></i> Mức bảo mật</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Cấp độ phân loại tài liệu</p>
+                </div>
+                <button onclick="openModal('levels')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Thêm mức
+                </button>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                        <tr>
+                            <th class="py-3 px-4">ID</th>
+                            <th class="py-3 px-4">Code</th>
+                            <th class="py-3 px-4">Tên</th>
+                            <th class="py-3 px-4 text-right">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-levels" class="divide-y divide-slate-800/60"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div id="tab-logs" class="tab-content hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-amber-400"></i> Nhật ký truy cập</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">200 sự kiện gần nhất</p>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <div class="relative flex-1 sm:flex-initial">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
+                        <input type="text" id="logSearch" oninput="filterLogs()"
+                               placeholder="Tìm user, tài liệu, IP..."
+                               class="w-full sm:w-64 pl-9 pr-8 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition">
+                        <button onclick="clearLogSearch()" id="btnClearLogSearch" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-1">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                    <select id="log-filter" onchange="loadLogs()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300">
+                        <option value="">Tất cả hành động</option>
+                        <option value="VIEW">VIEW</option>
+                        <option value="DOWNLOAD">DOWNLOAD</option>
+                        <option value="UPLOAD">UPLOAD</option>
+                        <option value="UPDATE">UPDATE</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="DENIED">DENIED</option>
+                        <option value="LOGIN">LOGIN</option>
+                        <option value="LOGIN_FAIL">LOGIN_FAIL</option>
+                    </select>
+                    <button onclick="loadLogs()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-xs">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-900/80 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                            <tr>
+                                <th class="py-3 px-4">Thời gian</th>
+                                <th class="py-3 px-4">User</th>
+                                <th class="py-3 px-4">Hành động</th>
+                                <th class="py-3 px-4">Tài liệu</th>
+                                <th class="py-3 px-4">IP</th>
+                                <th class="py-3 px-4">Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-logs" class="divide-y divide-slate-800/60"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- ============================================================
+     MODAL CHUNG — config-driven (users, roles, permissions, units, doctypes, levels)
+     ============================================================ -->
+<div id="modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl">
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+            <h3 id="modal-title" class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-pen text-amber-400"></i> <span>Tiêu đề</span>
+            </h3>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="modal-form" onsubmit="submitModal(event)" class="p-5 space-y-3 text-xs">
+            <div id="modal-fields" class="space-y-3"></div>
+            <div class="pt-3 flex justify-end gap-2 border-t border-slate-800">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700">Hủy</button>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl">Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================
+     MODAL CẤP TÀI KHOẢN — username + password (hash bcrypt)
+     Tách riêng khỏi modal chung, dùng cho nút 🔑
+     ============================================================ -->
+<div id="credentialsModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl">
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-key text-amber-400"></i>
+                <span>Cập nhật tài khoản</span>
+            </h3>
+            <button onclick="closeCredentialsModal()" class="text-slate-400 hover:text-white p-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="credentialsForm" onsubmit="submitCredentials(event)" class="p-5 space-y-3 text-xs">
+            <input type="hidden" id="cred-user-id">
+
+            <!-- Hiển thị đang cấp cho ai -->
+            <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                <div class="text-[10px] text-slate-500 uppercase mb-1">Cấp tài khoản cho</div>
+                <div id="cred-user-label" class="font-mono text-amber-400 font-bold">—</div>
+            </div>
+
+            <!-- Username -->
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">
+                    Tên đăng nhập <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="cred-username" required
+                       placeholder="VD: nguyenvana"
+                       class="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-amber-500">
+                <p class="text-[10px] text-slate-500 mt-1">Chỉ chữ, số, ., _, -</p>
+            </div>
+
+            <!-- Password -->
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">
+                    Mật khẩu mới
+                </label>
+                <div class="relative">
+                    <input type="text" id="cred-password"
+                           placeholder="Để trống nếu chỉ đổi username"
+                           class="w-full p-2.5 pr-20 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono focus:outline-none focus:border-amber-500">
+                    <button type="button" onclick="genRandomPassword()"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-amber-900/40 hover:bg-amber-900/60 text-amber-300 text-[10px] rounded font-semibold"
+                            title="Sinh mật khẩu ngẫu nhiên">
+                        🎲 Random
+                    </button>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-1">
+                    Ít nhất 8 ký tự. Backend hash bcrypt trước khi lưu.
+                </p>
+            </div>
+
+            <!-- Cảnh báo -->
+            <div class="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 flex items-start gap-2">
+                <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0"></i>
+                <span>Sau khi lưu, mật khẩu không hiển thị lại được. Ghi lại và gửi user qua kênh bảo mật.</span>
+            </div>
+
+            <!-- Nút -->
+            <div class="pt-3 flex justify-end gap-2 border-t border-slate-800">
+                <button type="button" onclick="closeCredentialsModal()"
+                        class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700">
+                    Hủy
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl flex items-center gap-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i> Lưu tài khoản
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="fixed bottom-6 right-6 z-[60] hidden bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl items-center space-x-3 border border-slate-700">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+    <span id="toastMsg" class="text-xs font-medium">Thông báo</span>
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const API = '';
+const USER = { user_id: 'USR-001', clearance: 5 };
+
+function headers() {
+    return { 'X-User-Id': USER.user_id, 'X-Clearance': String(USER.clearance) };
+}
+
+async function api(path, opts = {}) {
+    const res = await fetch(`${API}${path}`, {
+        ...opts,
+        headers: { ...headers(), ...(opts.headers || {}) }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function toast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    const i = document.getElementById('toastIcon');
+    document.getElementById('toastMsg').textContent = msg;
+    i.className = type === 'error' ? 'fa-solid fa-circle-xmark text-red-400 text-lg'
+                : type === 'info'  ? 'fa-solid fa-circle-info text-amber-400 text-lg'
+                : 'fa-solid fa-circle-check text-emerald-400 text-lg';
+    t.classList.remove('hidden'); t.classList.add('flex');
+    setTimeout(() => { t.classList.add('hidden'); t.classList.remove('flex'); }, 2800);
+}
+function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleString('vi-VN', { hour12: false });
+}
+function fmtSize(b) {
+    if (!b) return '0 B';
+    b = Number(b);
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    if (b < 1073741824) return (b / 1048576).toFixed(2) + ' MB';
+    return (b / 1073741824).toFixed(2) + ' GB';
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('-translate-x-full');
+}
+const TAB_LOADERS = {
+    overview: loadStats,
+    users: loadUsers,
+    roles: loadRoles,
+    permissions: loadPermissions,
+    units: loadUnits,
+    doctypes: loadDocTypes,
+    levels: loadLevels,
+    logs: loadLogs
+};
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    const target = document.getElementById(`tab-${tab}`);
+    if (target) target.classList.remove('hidden');
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        const isActive = btn.dataset.tab === tab;
+        btn.className = isActive
+            ? 'nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition bg-amber-500/10 text-amber-400 border border-amber-500/30'
+            : 'nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition';
+    });
+
+    if (window.innerWidth < 1024) document.getElementById('sidebar').classList.add('-translate-x-full');
+    if (TAB_LOADERS[tab]) TAB_LOADERS[tab]();
+}
+
+// ============================================================
+// STATS
+// ============================================================
+async function loadStats() {
+    try {
+        const s = await api('/api/admin/stats');
+        document.getElementById('stat-users').textContent = s.users;
+        document.getElementById('stat-docs').textContent = s.documents;
+        document.getElementById('stat-size').textContent = fmtSize(s.totalSize);
+        document.getElementById('stat-logs').textContent = s.logs24h;
+        document.getElementById('count-users').textContent = s.users;
+
+        document.getElementById('chart-levels').innerHTML = s.byLevel.map(x => `
+            <div class="flex items-center justify-between">
+                <span class="text-slate-300">${esc(x.lvName)}</span>
+                <div class="flex items-center gap-2">
+                    <div class="w-32 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-amber-500" style="width:${Math.min(100, x.n*20)}%"></div>
+                    </div>
+                    <span class="text-amber-400 font-bold w-8 text-right">${x.n}</span>
+                </div>
+            </div>`).join('');
+
+        const maxType = Math.max(...s.byType.map(t => t.n), 1);
+        document.getElementById('chart-types').innerHTML = s.byType.map(t => `
+            <div class="flex items-center justify-between">
+                <span class="text-slate-300 truncate max-w-[140px]">${esc(t.name)}</span>
+                <div class="flex items-center gap-2">
+                    <div class="w-32 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-emerald-500" style="width:${(t.n/maxType)*100}%"></div>
+                    </div>
+                    <span class="text-emerald-400 font-bold w-8 text-right">${t.n}</span>
+                </div>
+            </div>`).join('');
+    } catch (e) { toast('Lỗi tải thống kê: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// USERS
+// ============================================================
+let cache = { users: [], roles: [], perms: [], units: [], doctypes: [], levels: [] };
+
+async function loadUsers() {
+    try {
+        const d = await api('/api/admin/users');
+        cache.users = d.items || [];
+        document.getElementById('count-users').textContent = d.total;
+        renderUsers();
+    } catch (e) {
+        toast('Lỗi tải users: ' + e.message, 'error');
+    }
+}
+
+function renderUsers() {
+    const kw = (document.getElementById('userSearch')?.value || '').toLowerCase().trim();
+    const list = kw
+        ? cache.users.filter(u =>
+            (u.user_id    || '').toLowerCase().includes(kw) ||
+            (u.username   || '').toLowerCase().includes(kw) ||
+            (u.full_name  || '').toLowerCase().includes(kw) ||
+            (u.rank_name  || '').toLowerCase().includes(kw) ||
+            (u.position   || '').toLowerCase().includes(kw) ||
+            (u.unit_name  || '').toLowerCase().includes(kw)
+        )
+        : cache.users;
+
+    document.getElementById('tbody-users').innerHTML = list.map(u => `
+        <tr class="hover:bg-slate-900/40">
+            <td class="py-3 px-4 font-mono text-amber-400">${esc(u.user_id)}</td>
+            <td class="py-3 px-4 font-semibold text-white">${esc(u.full_name)}</td>
+            <td class="py-3 px-4 text-slate-300">${esc(u.rank_name || '')}${u.position ? ' — ' + esc(u.position) : ''}</td>
+            <td class="py-3 px-4 text-slate-300">${esc(u.unit_name || '—')}</td>
+            <td class="py-3 px-4"><span class="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-bold px-2 py-0.5 rounded">${esc(u.clearance_name || '')}</span></td>
+            <td class="py-3 px-4"><span class="${u.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-300'} text-[10px] font-bold px-2 py-0.5 rounded">${esc(u.status || '')}</span></td>
+            <td class="py-3 px-4 text-right whitespace-nowrap">
+                <button onclick="openModal('users', ${JSON.stringify(u).replace(/"/g, '&quot;')})"
+                        class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded mr-1"
+                        title="Sửa thông tin">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+                <button onclick="openCredentialsModal('${u.user_id}', '${esc(u.username || '')}')"
+                        class="p-1.5 bg-amber-900/40 hover:bg-amber-900/60 text-amber-300 rounded mr-1"
+                        title="Cập nhật tài khoản">
+                    <i class="fa-solid fa-key"></i>
+                </button>
+                <button onclick="delUser('${u.user_id}')"
+                        class="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded"
+                        title="Xóa">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </td>
+        </tr>`).join('') || `<tr><td colspan="8" class="py-8 text-center text-slate-500">${kw ? 'Không tìm thấy user phù hợp' : 'Chưa có dữ liệu'}</td></tr>`;
+}
+
+function filterUsers() {
+    const el = document.getElementById('userSearch');
+    const btn = document.getElementById('btnClearUserSearch');
+    if (el && btn) btn.classList.toggle('hidden', !el.value);
+    renderUsers();
+}
+
+function clearUserSearch() {
+    const el = document.getElementById('userSearch');
+    if (el) el.value = '';
+    filterUsers();
+}
+
+async function delUser(id) {
+    if (!confirm(`Xóa user ${id}?`)) return;
+    try {
+        await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+        toast('Đã xóa user'); loadUsers(); loadStats();
+    } catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// ROLES
+// ============================================================
+async function loadRoles() {
+    try {
+        const d = await api('/api/admin/roles');
+        cache.roles = d.items;
+        document.getElementById('count-roles').textContent = d.items.length;
+        document.getElementById('tbody-roles').innerHTML = d.items.map(r => `
+            <tr class="hover:bg-slate-900/40">
+                <td class="py-3 px-4 font-mono text-amber-400">${esc(r.role_id)}</td>
+                <td class="py-3 px-4 font-semibold text-white">${esc(r.name)}</td>
+                <td class="py-3 px-4 text-right">
+                    <button onclick="openModal('roles', ${JSON.stringify(r).replace(/"/g, '&quot;')})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded mr-1"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="delRole('${r.role_id}')" class="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>`).join('') || '<tr><td colspan="3" class="py-8 text-center text-slate-500">Chưa có dữ liệu</td></tr>';
+    } catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+async function delRole(id) {
+    if (!confirm(`Xóa role ${id}? (cũng xóa USER_ROLE và ROLE_PERMISSION liên quan)`)) return;
+    try { await api(`/api/admin/roles/${id}`, { method: 'DELETE' }); toast('Đã xóa role'); loadRoles(); }
+    catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// PERMISSIONS
+// ============================================================
+async function loadPermissions() {
+    try {
+        const d = await api('/api/admin/permissions');
+        cache.perms = d.items;
+        document.getElementById('count-perms').textContent = d.items.length;
+        document.getElementById('tbody-permissions').innerHTML = d.items.map(p => `
+            <tr class="hover:bg-slate-900/40">
+                <td class="py-3 px-4 font-mono text-amber-400">${esc(p.permission_id)}</td>
+                <td class="py-3 px-4"><code class="text-emerald-400 text-xs">${esc(p.code)}</code></td>
+                <td class="py-3 px-4 text-slate-300">${esc(p.description || '')}</td>
+                <td class="py-3 px-4 text-right">
+                    <button onclick="delPerm('${p.permission_id}')" class="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>`).join('') || '<tr><td colspan="4" class="py-8 text-center text-slate-500">Chưa có dữ liệu</td></tr>';
+    } catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+async function delPerm(id) {
+    if (!confirm(`Xóa quyền ${id}?`)) return;
+    try { await api(`/api/admin/permissions/${id}`, { method: 'DELETE' }); toast('Đã xóa'); loadPermissions(); }
+    catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// UNITS
+// ============================================================
+async function loadUnits() {
+    try {
+        const d = await api('/api/admin/units');
+        cache.units = d.items;
+        document.getElementById('count-units').textContent = d.items.length;
+        document.getElementById('tbody-units').innerHTML = d.items.map(u => `
+            <tr class="hover:bg-slate-900/40">
+                <td class="py-3 px-4 font-mono text-amber-400">${esc(u.unit_id)}</td>
+                <td class="py-3 px-4 font-semibold text-white">${esc(u.name)}</td>
+                <td class="py-3 px-4 text-slate-400">${esc(u.parent_name || '—')}</td>
+                <td class="py-3 px-4 text-right">
+                    <button onclick="openModal('units', ${JSON.stringify(u).replace(/"/g, '&quot;')})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded mr-1"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="delUnit('${u.unit_id}')" class="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>`).join('') || '<tr><td colspan="4" class="py-8 text-center text-slate-500">Chưa có dữ liệu</td></tr>';
+    } catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+async function delUnit(id) {
+    if (!confirm(`Xóa đơn vị ${id}?`)) return;
+    try { await api(`/api/admin/units/${id}`, { method: 'DELETE' }); toast('Đã xóa'); loadUnits(); }
+    catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// DOC TYPES
+// ============================================================
+async function loadDocTypes() {
+    try {
+        const d = await api('/api/admin/document-types');
+        cache.doctypes = d.items;
+        document.getElementById('count-doctypes').textContent = d.items.length;
+        document.getElementById('tbody-doctypes').innerHTML = d.items.map(t => `
+            <tr class="hover:bg-slate-900/40">
+                <td class="py-3 px-4 font-mono text-amber-400">${esc(t.type_id)}</td>
+                <td class="py-3 px-4 font-semibold text-white">${esc(t.name)}</td>
+                <td class="py-3 px-4 text-slate-300">${esc(t.description || '')}</td>
+                <td class="py-3 px-4 text-right">
+                    <button onclick="openModal('doctypes', ${JSON.stringify(t).replace(/"/g, '&quot;')})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded mr-1"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="delDocType('${t.type_id}')" class="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>`).join('') || '<tr><td colspan="4" class="py-8 text-center text-slate-500">Chưa có dữ liệu</td></tr>';
+    } catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+async function delDocType(id) {
+    if (!confirm(`Xóa loại ${id}?`)) return;
+    try { await api(`/api/admin/document-types/${id}`, { method: 'DELETE' }); toast('Đã xóa'); loadDocTypes(); }
+    catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// LEVELS
+// ============================================================
+async function loadLevels() {
+    try {
+        const d = await api('/api/admin/security-levels');
+        cache.levels = d.items;
+        document.getElementById('count-levels').textContent = d.items.length;
+        document.getElementById('tbody-levels').innerHTML = d.items.map(l => `
+            <tr class="hover:bg-slate-900/40">
+                <td class="py-3 px-4 font-mono text-amber-400">${l.level_id}</td>
+                <td class="py-3 px-4"><code class="text-emerald-400 text-xs">${esc(l.code)}</code></td>
+                <td class="py-3 px-4 font-semibold text-white">${esc(l.name)}</td>
+                <td class="py-3 px-4 text-right">
+                    <button onclick="openModal('levels', ${JSON.stringify(l).replace(/"/g, '&quot;')})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded mr-1"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="delLevel(${l.level_id})" class="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>`).join('') || '<tr><td colspan="4" class="py-8 text-center text-slate-500">Chưa có dữ liệu</td></tr>';
+    } catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+async function delLevel(id) {
+    if (!confirm(`Xóa mức ${id}?`)) return;
+    try { await api(`/api/admin/security-levels/${id}`, { method: 'DELETE' }); toast('Đã xóa'); loadLevels(); }
+    catch (e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// LOGS
+// ============================================================
+let logsCache = [];
+
+async function loadLogs() {
+    try {
+        const action = document.getElementById('log-filter').value;
+        const q = action ? `?action=${action}` : '';
+        const d = await api(`/api/access-logs${q}`);
+        logsCache = d.items || [];
+        renderLogs();
+    } catch (e) {
+        toast('Lỗi tải logs: ' + e.message, 'error');
+    }
+}
+
+function renderLogs() {
+    const kw = (document.getElementById('logSearch')?.value || '').toLowerCase().trim();
+    const list = kw
+        ? logsCache.filter(l =>
+            (l.user_id   || '').toLowerCase().includes(kw) ||
+            (l.full_name || '').toLowerCase().includes(kw) ||
+            (l.action    || '').toLowerCase().includes(kw) ||
+            (l.doc_title || '').toLowerCase().includes(kw) ||
+            (l.file_id   || '').toLowerCase().includes(kw) ||
+            (l.ip        || '').toLowerCase().includes(kw) ||
+            (l.note      || '').toLowerCase().includes(kw)
+        )
+        : logsCache;
+
+    document.getElementById('tbody-logs').innerHTML = list.map(l => {
+        const actionColor = {
+            VIEW: 'text-blue-400', DOWNLOAD: 'text-emerald-400',
+            UPLOAD: 'text-amber-400', UPDATE: 'text-purple-400',
+            DELETE: 'text-red-400', DENIED: 'text-red-500',
+            LOGIN: 'text-emerald-400', LOGIN_FAIL: 'text-red-500',
+            CREATE_USER: 'text-amber-400', UPDATE_CREDENTIALS: 'text-amber-400',
+            RESET_CREDENTIALS: 'text-amber-400'
+        }[l.action] || 'text-slate-300';
+        return `
+        <tr class="hover:bg-slate-900/40">
+            <td class="py-3 px-4 font-mono text-slate-400 text-[11px]">${fmtDate(l.timestamp)}</td>
+            <td class="py-3 px-4 text-slate-200">${esc(l.full_name || l.user_id || '—')}</td>
+            <td class="py-3 px-4 font-bold ${actionColor}">${esc(l.action)}</td>
+            <td class="py-3 px-4 text-slate-300 truncate max-w-[200px]">${esc(l.doc_title || l.file_id || '—')}</td>
+            <td class="py-3 px-4 font-mono text-slate-400 text-[11px]">${esc(l.ip || '')}</td>
+            <td class="py-3 px-4 text-slate-400 truncate max-w-[200px]">${esc(l.note || '')}</td>
+        </tr>`;
+    }).join('') || `<tr><td colspan="6" class="py-8 text-center text-slate-500">${kw ? 'Không tìm thấy log phù hợp' : 'Chưa có log'}</td></tr>`;
+}
+
+function filterLogs() {
+    const el = document.getElementById('logSearch');
+    const btn = document.getElementById('btnClearLogSearch');
+    if (el && btn) btn.classList.toggle('hidden', !el.value);
+    renderLogs();
+}
+
+function clearLogSearch() {
+    const el = document.getElementById('logSearch');
+    if (el) el.value = '';
+    filterLogs();
+}
+
+// ============================================================
+// MODAL — config-driven
+// ============================================================
+const SCHEMAS = {
+    users: {
+        title: 'Người dùng',
+        endpoint: '/api/admin/users',
+        idField: 'user_id',
+        fields: [
+            { name: 'user_id', label: 'Mã nội bộ (VD: USR-005)', required: true, readonlyOnEdit: true },
+
+            // Username chỉ hiển thị khi TẠO mới
+            {
+                name: 'username',
+                label: 'Tên đăng nhập (VD: nguyenvana)',
+                required: true,
+                hiddenOnEdit: true,
+                validate: v => /^[a-zA-Z0-9._-]+$/.test(v) || 'Chỉ chữ, số, ., _, -'
+            },
+
+            // Password chỉ hiển thị khi TẠO mới
+            {
+                name: 'password',
+                label: 'Mật khẩu ban đầu (≥ 8 ký tự)',
+                type: 'password',
+                required: true,
+                hiddenOnEdit: true
+            },
+
+            { name: 'full_name', label: 'Họ và tên', required: true },
+            { name: 'rank_name', label: 'Cấp bậc' },
+            { name: 'position',  label: 'Chức vụ' },
+            { name: 'unit_id',   label: 'Đơn vị', type: 'select',
+              options: () => cache.units.map(u => ({ v: u.unit_id, t: u.name })) },
+            { name: 'clearance_level_id', label: 'Mức bảo mật', type: 'select', required: true,
+              options: () => cache.levels.map(l => ({ v: l.level_id, t: `${l.name} (${l.level_id})` })) },
+            { name: 'status', label: 'Trạng thái', type: 'select',
+              options: () => [{ v: 'active', t: 'active' }, { v: 'locked', t: 'locked' }, { v: 'inactive', t: 'inactive' }] }
+        ],
+        beforeOpen: async () => {
+            if (!cache.units.length) await loadUnits();
+            if (!cache.levels.length) await loadLevels();
+        }
+    },
+    roles: {
+        title: 'Vai trò',
+        endpoint: '/api/admin/roles',
+        idField: 'role_id',
+        fields: [
+            { name: 'role_id', label: 'Mã role', required: true, readonlyOnEdit: true },
+            { name: 'name', label: 'Tên vai trò', required: true }
+        ]
+    },
+    permissions: {
+        title: 'Quyền',
+        endpoint: '/api/admin/permissions',
+        idField: 'permission_id',
+        fields: [
+            { name: 'permission_id', label: 'Mã quyền', required: true, readonlyOnEdit: true },
+            { name: 'code', label: 'Code', required: true },
+            { name: 'description', label: 'Mô tả' }
+        ]
+    },
+    units: {
+        title: 'Đơn vị',
+        endpoint: '/api/admin/units',
+        idField: 'unit_id',
+        fields: [
+            { name: 'unit_id', label: 'Mã đơn vị', required: true, readonlyOnEdit: true },
+            { name: 'name', label: 'Tên đơn vị', required: true },
+            { name: 'parent_id', label: 'Đơn vị cấp trên', type: 'select', options: () => [{ v: '', t: '— Không —' }, ...cache.units.map(u => ({ v: u.unit_id, t: u.name }))] }
+        ]
+    },
+    doctypes: {
+        title: 'Loại văn bản',
+        endpoint: '/api/admin/document-types',
+        idField: 'type_id',
+        fields: [
+            { name: 'type_id', label: 'Mã loại', required: true, readonlyOnEdit: true },
+            { name: 'name', label: 'Tên', required: true },
+            { name: 'description', label: 'Mô tả' }
+        ]
+    },
+    levels: {
+        title: 'Mức bảo mật',
+        endpoint: '/api/admin/security-levels',
+        idField: 'level_id',
+        fields: [
+            { name: 'level_id', label: 'ID (số)', required: true, readonlyOnEdit: true, type: 'number' },
+            { name: 'code', label: 'Code', required: true },
+            { name: 'name', label: 'Tên', required: true }
+        ]
+    }
+};
+
+let modalState = { type: null, isEdit: false, id: null };
+
+async function openModal(type, data = null) {
+    const schema = SCHEMAS[type];
+    if (!schema) return;
+
+    if (schema.beforeOpen) await schema.beforeOpen();
+
+    modalState = { type, isEdit: !!data, id: data ? data[schema.idField] : null };
+
+    document.getElementById('modal-title').querySelector('span').textContent =
+        (data ? 'Sửa ' : 'Thêm ') + schema.title;
+
+    const fieldsHtml = schema.fields
+        .filter(f => !(data && f.hiddenOnEdit))
+        .map(f => {
+            const val = data ? (data[f.name] ?? '') : '';
+            const readonly = data && f.readonlyOnEdit ? 'readonly' : '';
+            const required = f.required ? 'required' : '';
+            const readonlyCls = data && f.readonlyOnEdit ? 'opacity-50' : '';
+
+            if (f.type === 'select') {
+                const opts = f.options();
+                return `
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">${esc(f.label)}${f.required ? ' *' : ''}</label>
+                        <select name="${f.name}" ${required} class="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-amber-500 ${readonlyCls}">
+                            ${opts.map(o => `<option value="${esc(o.v)}" ${String(o.v) === String(val) ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}
+                        </select>
+                    </div>`;
+            }
+            return `
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">${esc(f.label)}${f.required ? ' *' : ''}</label>
+                    <input type="${f.type || 'text'}" name="${f.name}" value="${esc(val)}" ${required} ${readonly} class="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-amber-500 ${readonlyCls}">
+                </div>`;
+        }).join('');
+
+    document.getElementById('modal-fields').innerHTML = fieldsHtml;
+    document.getElementById('modal').classList.remove('hidden');
+    document.getElementById('modal').classList.add('flex');
+}
+function closeModal() {
+    document.getElementById('modal').classList.add('hidden');
+    document.getElementById('modal').classList.remove('flex');
+}
+
+async function submitModal(e) {
+    e.preventDefault();
+    const schema = SCHEMAS[modalState.type];
+    if (!schema) return;
+
+    try {
+        const fd = new FormData(e.target);
+        const body = {};
+
+        schema.fields
+            .filter(f => !(modalState.isEdit && f.hiddenOnEdit))
+            .forEach(f => {
+                let val = fd.get(f.name);
+
+                if (f.type === 'number') {
+                    val = val === '' ? null : Number(val);
+                } else if (f.name === 'clearance_level_id' || f.name === 'level_id') {
+                    val = Number(val);
+                }
+
+                if (f.validate && val) {
+                    const result = f.validate(val);
+                    if (result !== true) throw new Error(result);
+                }
+
+                body[f.name] = val === '' ? null : val;
+            });
+
+        if (!modalState.isEdit && modalState.type === 'users') {
+            if (!body.password || body.password.length < 8) {
+                throw new Error('Mật khẩu cần ít nhất 8 ký tự');
+            }
+        }
+
+        const url = modalState.isEdit
+            ? `${schema.endpoint}/${encodeURIComponent(modalState.id)}`
+            : schema.endpoint;
+        const method = modalState.isEdit ? 'PUT' : 'POST';
+
+        await api(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        toast(modalState.isEdit ? 'Đã cập nhật' : 'Đã tạo mới');
+        closeModal();
+
+        const reloadMap = {
+            users: loadUsers, roles: loadRoles, permissions: loadPermissions,
+            units: loadUnits, doctypes: loadDocTypes, levels: loadLevels
+        };
+        if (reloadMap[modalState.type]) reloadMap[modalState.type]();
+        loadStats();
+
+    } catch (err) {
+        toast('Lỗi: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// CẤP TÀI KHOẢN — username + password (bcrypt hash phía backend)
+// ============================================================
+
+function openCredentialsModal(userId, currentUsername) {
+    document.getElementById('cred-user-id').value = userId;
+    document.getElementById('cred-user-label').textContent = userId;
+    document.getElementById('cred-username').value = currentUsername || '';
+    document.getElementById('cred-password').value = '';
+
+    document.getElementById('credentialsModal').classList.remove('hidden');
+    document.getElementById('credentialsModal').classList.add('flex');
+
+    setTimeout(() => {
+        if (currentUsername) {
+            document.getElementById('cred-password').focus();
+        } else {
+            document.getElementById('cred-username').focus();
+        }
+    }, 100);
+}
+
+function closeCredentialsModal() {
+    document.getElementById('credentialsModal').classList.add('hidden');
+    document.getElementById('credentialsModal').classList.remove('flex');
+}
+
+// Sinh mật khẩu ngẫu nhiên 12 ký tự (bỏ ký tự dễ nhầm: 0/O, 1/l/I)
+function genRandomPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+    let pwd = '';
+    for (let i = 0; i < 12; i++) {
+        pwd += chars[Math.floor(Math.random() * chars.length)];
+    }
+    document.getElementById('cred-password').value = pwd;
+
+    navigator.clipboard.writeText(pwd).then(
+        () => toast('Đã sinh và copy mật khẩu', 'success'),
+        () => toast('Đã sinh: ' + pwd, 'info')
+    );
+}
+
+async function submitCredentials(e) {
+    e.preventDefault();
+
+    const userId   = document.getElementById('cred-user-id').value;
+    const username = document.getElementById('cred-username').value.trim();
+    const password = document.getElementById('cred-password').value;
+
+    if (!username) {
+        toast('Thiếu username', 'error');
+        return;
+    }
+    if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+        toast('Username chỉ cho phép chữ, số, ., _, -', 'error');
+        return;
+    }
+    if (password && password.length < 8) {
+        toast('Mật khẩu cần ít nhất 8 ký tự', 'error');
+        return;
+    }
+
+    try {
+        await api(`/api/admin/users/${encodeURIComponent(userId)}/credentials`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: username.toLowerCase(),
+                password: password || null
+            })
+        });
+
+        toast('Đã cập nhật tài khoản');
+        closeCredentialsModal();
+        loadUsers();
+    } catch (err) {
+        toast('Lỗi: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// CLOCK + INIT
+// ============================================================
+function updateClock() {
+    document.getElementById('liveClock').textContent =
+        new Date().toLocaleTimeString('vi-VN');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+window.addEventListener('DOMContentLoaded', () => {
+    fetch(`${API}/api/health`).then(r => {
+        document.getElementById('backend-status').textContent = r.ok ? 'OK' : 'LỖI';
+        document.getElementById('backend-status').className = r.ok ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold';
+    }).catch(() => {
+        document.getElementById('backend-status').textContent = 'LỖI';
+        document.getElementById('backend-status').className = 'text-red-400 font-bold';
+    });
+
+    switchTab('overview');
+});
+
+// Đóng modal chung khi click ngoài
+document.getElementById('modal').addEventListener('click', (e) => {
+    if (e.target.id === 'modal') closeModal();
+});
+
+// Đóng modal credentials khi click ngoài
+document.getElementById('credentialsModal').addEventListener('click', (e) => {
+    if (e.target.id === 'credentialsModal') closeCredentialsModal();
+});
+</script>
+</body>
+</html>

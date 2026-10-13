@@ -1,0 +1,1 @@
+import{R as e,j as t,a as o}from"./index-Cre6-boy.js";import{D as r}from"./DocumentDeskPage-DdFdGV7Z.js";import"./formatFileSize-BUPe725u.js";import"./ConfirmDialog-DtTt-DL2.js";import"./DocumentPreviewModal-DADQNoUs.js";import"./lock-C-l7dG72.js";e.createRoot(document.getElementById("root")).render(t.jsx(o.StrictMode,{children:t.jsx(r,{})}));

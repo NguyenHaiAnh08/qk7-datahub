@@ -143,7 +143,7 @@ export const DocumentDeskPage: React.FC = () => {
   }, [documents, currentPage]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
       {/* Header */}
       <Header
         activeNav="desk"
@@ -156,11 +156,11 @@ export const DocumentDeskPage: React.FC = () => {
         {/* Top Action & Title Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2.5">
-              <FileCheck className="w-6 h-6 text-emerald-400" />
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
+              <FileCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               <span>Bàn Làm Việc Văn Thư Quân Khu</span>
             </h1>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Tiếp nhận, xử lý, phân loại và lưu trữ văn bản quân sự tuyệt mật & công khai
             </p>
           </div>

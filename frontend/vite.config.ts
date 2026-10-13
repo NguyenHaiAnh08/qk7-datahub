@@ -19,7 +19,7 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: resolve(__dirname, '../public'),
+    outDir: resolve(__dirname, '../backend/public'),
     emptyOutDir: false,
     rollupOptions: {
       input: {

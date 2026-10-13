@@ -13,28 +13,28 @@ export interface StatCardProps {
 const colorMap = {
   blue: {
     border: 'border-l-blue-500',
-    iconBg: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-    valueText: 'text-white'
+    iconBg: 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400',
+    valueText: 'text-slate-900 dark:text-white'
   },
   emerald: {
     border: 'border-l-emerald-500',
-    iconBg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-    valueText: 'text-white'
+    iconBg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400',
+    valueText: 'text-slate-900 dark:text-white'
   },
   purple: {
     border: 'border-l-purple-500',
-    iconBg: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
-    valueText: 'text-white'
+    iconBg: 'bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400',
+    valueText: 'text-slate-900 dark:text-white'
   },
   red: {
     border: 'border-l-red-500',
-    iconBg: 'bg-red-500/10 border-red-500/30 text-red-400',
-    valueText: 'text-rose-400'
+    iconBg: 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400',
+    valueText: 'text-rose-600 dark:text-rose-400'
   },
   amber: {
     border: 'border-l-amber-500',
-    iconBg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-    valueText: 'text-amber-400'
+    iconBg: 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400',
+    valueText: 'text-amber-600 dark:text-amber-400'
   }
 };
 
@@ -53,17 +53,23 @@ export const StatCard: React.FC<StatCardProps> = ({
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className={`bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-slate-800 shadow-sm border-l-4 ${scheme.border} transition-all hover:border-slate-700`}
+      className={`bg-white dark:bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm border-l-4 ${scheme.border} transition-all hover:border-slate-300 dark:hover:border-slate-700`}
     >
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-xs text-slate-400 font-medium tracking-wide uppercase">{label}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium tracking-wide uppercase">
+            {label}
+          </span>
           <h3 className={`text-2xl font-extrabold mt-1 tracking-tight ${scheme.valueText}`}>
             {value}
           </h3>
-          {subtext && <p className="text-[11px] text-slate-500 mt-0.5">{subtext}</p>}
+          {subtext && (
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{subtext}</p>
+          )}
         </div>
-        <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${scheme.iconBg}`}>
+        <div
+          className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${scheme.iconBg}`}
+        >
           {icon}
         </div>
       </div>

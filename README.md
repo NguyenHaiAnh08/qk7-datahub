@@ -21,33 +21,78 @@ Nội dung tài liệu bao gồm:
 
 ---
 
+## 📁 Cấu Trúc Dự Án (Sau Khi Tách Backend & Frontend)
+
+```text
+qk7-datahub/
+├── backend/                       # 🟢 Máy chủ Backend Express & Cơ sở dữ liệu
+│   ├── src/                       # db.js (SQL Server connection) & admin-routes.js
+│   ├── uploads/                   # Kho lưu trữ file PDF thật (2026/..., Mat/, ToiMat/, TuyetMat/)
+│   ├── public/                    # Thư mục chứa sản phẩm build từ frontend (phục vụ tĩnh)
+│   ├── server.js                  # Entry point Express API Gateway (:8000)
+│   ├── swagger.js                 # Đặc tả OpenAPI Swagger Spec
+│   ├── setup-passwords.js         # Script đồng bộ mật khẩu tài khoản
+│   ├── .env                       # Cấu hình kết nối SQL Server và PORT
+│   └── package.json               # Dependencies & scripts riêng cho Backend
+├── frontend/                      # 🔵 Giao diện người dùng React + TypeScript + Vite
+│   ├── src/                       # Components, pages, hooks, services, contexts
+│   ├── vite.config.ts             # Config build xuất sang ../backend/public, proxy :8000
+│   └── package.json               # Dependencies & scripts riêng cho Frontend
+├── package.json                   # Scripts tiện ích chạy từ thư mục gốc
+├── .gitignore                     # Cấu hình bỏ qua node_modules, .env, uploads PDF
+└── README.md
+```
+
+---
+
 ## 🚀 Khởi Động Nhanh
 
 ### 1. Cài đặt thư viện (lần đầu)
 ```bash
-# Cài đặt backend
-npm install
+# Cách 1: Chạy từ thư mục gốc
+npm run backend:install
+npm run frontend:install
 
-# Cài đặt frontend
-cd frontend && npm install && cd ..
+# Cách 2: Chạy trực tiếp từng thư mục
+cd backend && npm install
+cd ../frontend && npm install
 ```
 
-### 2. Chạy máy chủ chính thức (Express :8000)
+### 2. Chạy máy chủ Backend (Express :8000)
 ```bash
+# Cách 1: Chạy từ gốc
+npm run backend:start
+
+# Cách 2: Chạy từ thư mục backend
+cd backend
 npm start
 ```
-Truy cập: [http://localhost:8000/login.html](http://localhost:8000/login.html)
+* **Cổng API & Web:** [http://localhost:8000](http://localhost:8000)
+* **API Health Check:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
+* **Tài liệu Swagger API:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
 
-### 3. Chạy môi trường phát triển Hot-Reload (Vite :5173)
+### 3. Chạy môi trường phát triển Frontend (Hot-Reload Vite :5173)
 ```bash
+# Cách 1: Chạy từ gốc
+npm run frontend:dev
+
+# Cách 2: Chạy từ thư mục frontend
+cd frontend
 npm run dev
 ```
-Truy cập: [http://localhost:5173/login.html](http://localhost:5173/login.html)
+* Truy cập giao diện: [http://localhost:5173/login.html](http://localhost:5173/login.html)
+*(Dev server tự động proxy toàn bộ request `/api` và `/uploads` sang `http://localhost:8000`)*
 
-### 4. Đóng gói sản phẩm (Production Build sang `public/`)
+### 4. Đóng gói sản phẩm (Production Build xuất sang `backend/public/`)
 ```bash
+# Cách 1: Chạy từ gốc
+npm run frontend:build
+
+# Cách 2: Chạy từ thư mục frontend
+cd frontend
 npm run build
 ```
+Bản build tĩnh sẽ tự động được ghi vào `backend/public/` để `backend/server.js` phục vụ trực tiếp qua `express.static`.
 
 ---
 

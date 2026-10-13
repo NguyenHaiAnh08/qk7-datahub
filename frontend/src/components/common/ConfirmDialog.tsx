@@ -38,18 +38,22 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="w-full max-w-sm bg-slate-900 rounded-2xl p-6 border border-slate-700 shadow-2xl relative text-left"
+            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-2xl relative text-left"
           >
             <div className="flex items-center space-x-3 mb-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                isDanger ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'
-              }`}>
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  isDanger
+                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                }`}
+              >
                 {isDanger ? <Trash2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
               </div>
-              <h3 className="font-bold text-sm text-white">{title}</h3>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">{title}</h3>
             </div>
 
-            <p className="text-xs text-slate-300 mb-5 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-300 mb-5 leading-relaxed">
               {displayText}
             </p>
 
@@ -57,17 +61,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-3.5 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs hover:bg-slate-700 transition cursor-pointer"
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs transition cursor-pointer"
               >
                 {cancelText}
               </button>
               <button
                 type="button"
                 onClick={onConfirm}
-                className={`px-3.5 py-2 text-white font-bold rounded-xl text-xs transition cursor-pointer ${
+                className={`px-3.5 py-2 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-md ${
                   isDanger
-                    ? 'bg-rose-600 hover:bg-rose-500'
-                    : 'bg-amber-600 hover:bg-amber-500'
+                    ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
+                    : 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
                 }`}
               >
                 {confirmText}

@@ -34,8 +34,14 @@ export async function http<T>(url: string, options: RequestInit = {}): Promise<T
   }
 
   if (!response.ok) {
-    const errorMsg =
-      typeof data === 'object' && data?.error ? data.error : `Lỗi HTTP ${response.status}`;
+    let errorMsg = `Lỗi HTTP ${response.status}`;
+    if (typeof data === 'object' && data?.error) {
+      errorMsg = data.error;
+    } else if (typeof data === 'string' && data.trim()) {
+      errorMsg = data.trim();
+    } else if (response.status === 500 || response.status === 502 || response.status === 504) {
+      errorMsg = 'Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend (npm start) đang chạy!';
+    }
     throw new Error(errorMsg);
   }
 

@@ -139,35 +139,38 @@ graph LR
 
 ### 3.2. Cây Thư Mục Chi Tiết Toàn Bộ Hệ Thống
 
-```
 d:/QK7_DataHub/qk7-datahub/
 │
-├── .env                                    # Biến môi trường (DB_SERVER, DB_DATABASE, DB_USER, PORT...)
-├── server.js                               # Máy chủ Express: API Gateway, xác thực, upload, tải tệp
-├── swagger.js                              # Cấu hình tài liệu giao diện Swagger API (/api-docs)
-├── setup-passwords.js                      # Tiện ích mã hóa bcrypt mật khẩu tài khoản mẫu
-├── package.json                            # Scripts vận hành gốc (start, dev, build)
-├── package-lock.json                       # Lockfile dependencies của backend
+├── package.json                            # Scripts tiện ích điều phối toàn bộ dự án
+├── .gitignore                              # Cấu hình bỏ qua node_modules, .env, uploads PDF
+├── SYSTEM_ARCHITECTURE.md                  # Tài liệu kiến trúc toàn diện hệ thống
+├── README.md                               # Hướng dẫn khởi động nhanh
 │
-├── uploads/                                # KHO LƯU TRỮ VẬT LÝ (Dữ liệu văn bản PDF quân sự thật)
-│   ├── Mat/                                # Tài liệu cấp Mật
-│   ├── ToiMat/                             # Tài liệu cấp Tối Mật
-│   └── TuyetMat/                           # Tài liệu cấp Tuyệt Mật
-│
-├── src/                                    # LOGIC MÁY CHỦ BACKEND
-│   ├── db.js                               # Quản lý Connection Pool kết nối Microsoft SQL Server
-│   └── admin-routes.js                     # Toàn bộ API nghiệp vụ quản trị CRUD (Users, Roles, Units...)
-│
-├── public/                                 # THƯ MỤC PHÂN PHỐI TĨNH (Sản phẩm build của Vite)
-│   ├── index.html                          # Trang chuyển hướng trung tâm
-│   ├── login.html                          # Trang đăng nhập xác thực
-│   ├── admin-dashboard.html                # Trang quản trị hệ thống
-│   ├── document-desk.html                  # Trang bàn làm việc văn thư
-│   ├── portal.html                         # Trang cổng tra cứu văn bản
-│   ├── qk7_datahub_login_page.html         # Trang login tương thích ngược
-│   ├── qk7_datahub_admin_dashboard.html    # Trang admin tương thích ngược
-│   ├── qk7_datahub_portal.html             # Trang portal tương thích ngược
-│   └── assets/                             # JS Bundles, CSS tailwind tối ưu hóa & code-splitting
+├── backend/                                # 🟢 HỆ THỐNG MÁY CHỦ VÀ DỮ LIỆU BACKEND
+│   ├── .env                                # Biến môi trường kết nối SQL Server và PORT
+│   ├── server.js                           # Máy chủ Express: API Gateway, xác thực, upload, tải tệp
+│   ├── swagger.js                          # Cấu hình tài liệu giao diện Swagger API (/api-docs)
+│   ├── setup-passwords.js                  # Tiện ích mã hóa bcrypt mật khẩu tài khoản mẫu
+│   ├── package.json                        # Scripts và dependencies riêng cho backend
+│   ├── package-lock.json                   # Lockfile dependencies của backend
+│   │
+│   ├── src/                                # LOGIC MÁY CHỦ BACKEND
+│   │   ├── db.js                           # Quản lý Connection Pool kết nối Microsoft SQL Server
+│   │   └── admin-routes.js                 # Toàn bộ API nghiệp vụ quản trị CRUD (Users, Roles, Units...)
+│   │
+│   ├── uploads/                            # KHO LƯU TRỮ VẬT LÝ (Dữ liệu văn bản PDF quân sự thật)
+│   │   ├── 2026/10/                        # Lưu trữ văn bản theo năm/tháng & mã băm SHA-256
+│   │   ├── Mat/                            # Thư mục phân loại cấp Mật
+│   │   ├── ToiMat/                         # Thư mục phân loại cấp Tối Mật
+│   │   └── TuyetMat/                       # Thư mục phân loại cấp Tuyệt Mật
+│   │
+│   └── public/                             # THƯ MỤC PHÂN PHỐI TĨNH (Sản phẩm build của Vite)
+│       ├── index.html                      # Trang chuyển hướng trung tâm
+│       ├── login.html                      # Trang đăng nhập xác thực
+│       ├── admin-dashboard.html            # Trang quản trị hệ thống
+│       ├── document-desk.html              # Trang bàn làm việc văn thư
+│       ├── portal.html                     # Trang cổng tra cứu văn bản
+│       └── assets/                         # JS Bundles, CSS tailwind tối ưu hóa & code-splitting
 │
 ├── _archive/                               # THƯ MỤC LƯU TRỮ AN TOÀN (Mã nguồn cũ không xóa)
 │   ├── public_app.js                       # Logic JS thuần cũ

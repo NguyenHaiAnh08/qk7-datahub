@@ -1,10 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    "./index.html",
-    "./qk7_datahub_login_page.html",
-    "./qk7_datahub_admin_dashboard.html",
-    "./qk7_datahub_portal.html",
+    "./*.html",
     "./src/**/*.{js,ts,jsx,tsx}"
   ],
   darkMode: 'class',

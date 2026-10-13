@@ -44,23 +44,23 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   const getLevelBadgeClass = (lv: number) => {
     switch (lv) {
       case 5:
-        return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+        return 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30';
       case 4:
-        return 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+        return 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
       case 3:
-        return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30';
       case 2:
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+        return 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30';
       default:
-        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30';
     }
   };
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-800 shadow-sm flex flex-col">
+    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col transition-colors duration-200">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-300">
-          <thead className="bg-slate-900/90 text-slate-400 text-[11px] uppercase border-b border-slate-800 tracking-wider">
+        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+          <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 text-[11px] uppercase border-b border-slate-200 dark:border-slate-800 tracking-wider">
             <tr>
               <th className="py-3 px-4">Số hiệu</th>
               <th className="py-3 px-4">Trích yếu nội dung</th>
@@ -72,16 +72,16 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 font-medium">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400">
+                <td colSpan={8} className="py-12 text-center text-slate-500 dark:text-slate-400">
                   Đang tải danh sách tài liệu...
                 </td>
               </tr>
             ) : documents.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-500">
+                <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
                   Không tìm thấy tài liệu nào phù hợp với bộ lọc
                 </td>
               </tr>
@@ -92,28 +92,28 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                 return (
                   <tr
                     key={doc.file_id}
-                    className="hover:bg-slate-800/40 transition-colors"
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                   >
-                    <td className="py-3 px-4 font-mono font-semibold text-emerald-400 whitespace-nowrap">
+                    <td className="py-3 px-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                       {doc.document_code || '—'}
                     </td>
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-white max-w-xs sm:max-w-md line-clamp-2">
+                      <div className="font-semibold text-slate-900 dark:text-white max-w-xs sm:max-w-md line-clamp-2">
                         {doc.title}
                       </div>
                       {doc.summary && (
-                        <div className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
                           {doc.summary}
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-4 whitespace-nowrap text-slate-300">
+                    <td className="py-3 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
                       {doc.type_name || '—'}
                     </td>
-                    <td className="py-3 px-4 whitespace-nowrap text-slate-300">
+                    <td className="py-3 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
                       {doc.unit_name || '—'}
                     </td>
-                    <td className="py-3 px-4 whitespace-nowrap text-slate-400">
+                    <td className="py-3 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
                       {formatDate(doc.issue_date)}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
@@ -125,9 +125,9 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                         {doc.security_level_name || `Cấp ${doc.security_level_id}`}
                       </span>
                     </td>
-                    <td className="py-3 px-4 whitespace-nowrap text-slate-400">
+                    <td className="py-3 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
                       <div className="flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-slate-500" />
+                        <FileText className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                         <span className="text-[11px]">
                           {formatFileSize(doc.file_size_bytes)}
                         </span>
@@ -136,7 +136,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       {isRestricted ? (
                         <span
-                          className="inline-flex items-center gap-1 text-[11px] text-rose-400 bg-rose-500/10 px-2 py-1 rounded"
+                          className="inline-flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-1 rounded"
                           title="Vượt cấp độ mật cho phép"
                         >
                           <Lock className="w-3 h-3" /> Giới hạn
@@ -145,14 +145,14 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                         <div className="inline-flex items-center space-x-1">
                           <button
                             onClick={() => onPreview(doc)}
-                            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition cursor-pointer"
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg transition cursor-pointer"
                             title="Xem trước tài liệu"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => onDownload(doc)}
-                            className="p-1.5 bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-400 rounded transition cursor-pointer"
+                            className="p-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-400 dark:border-transparent rounded-lg transition cursor-pointer"
                             title="Tải về tệp gốc"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -160,7 +160,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                           {onEdit && (
                             <button
                               onClick={() => onEdit(doc)}
-                              className="p-1.5 bg-blue-950/50 hover:bg-blue-900/60 text-blue-400 rounded transition cursor-pointer"
+                              className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 dark:text-blue-400 dark:border-transparent rounded-lg transition cursor-pointer"
                               title="Chỉnh sửa văn bản"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -169,7 +169,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                           {onDelete && (
                             <button
                               onClick={() => onDelete(doc)}
-                              className="p-1.5 bg-rose-950/50 hover:bg-rose-900/60 text-rose-400 rounded transition cursor-pointer"
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
                               title="Xóa văn bản"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -187,17 +187,18 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       </div>
 
       {totalPages > 1 && (
-        <div className="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 bg-slate-900/60">
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60">
           <div>
-            Hiển thị trang <span className="font-semibold text-white">{currentPage}</span> /{' '}
-            <span className="font-semibold text-white">{totalPages}</span> (Tổng{' '}
-            <span className="font-semibold text-white">{totalItems}</span> tài liệu)
+            Hiển thị trang{' '}
+            <span className="font-semibold text-slate-900 dark:text-white">{currentPage}</span> /{' '}
+            <span className="font-semibold text-slate-900 dark:text-white">{totalPages}</span> (Tổng{' '}
+            <span className="font-semibold text-slate-900 dark:text-white">{totalItems}</span> tài liệu)
           </div>
           <div className="flex items-center space-x-1">
             <button
               onClick={() => onPageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage <= 1}
-              className="px-2.5 py-1 rounded bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition"
+              className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
@@ -208,13 +209,13 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                 const showEllipsis = prev && p - prev > 1;
                 return (
                   <React.Fragment key={p}>
-                    {showEllipsis && <span className="px-1 text-slate-600">...</span>}
+                    {showEllipsis && <span className="px-1 text-slate-400">...</span>}
                     <button
                       onClick={() => onPageChange(p)}
                       className={`px-2.5 py-1 rounded transition text-xs ${
                         currentPage === p
                           ? 'bg-emerald-600 text-white font-bold'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       {p}
@@ -225,7 +226,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
             <button
               onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage >= totalPages}
-              className="px-2.5 py-1 rounded bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition"
+              className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>

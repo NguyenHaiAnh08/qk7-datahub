@@ -35,21 +35,21 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
   }[barColor];
 
   const countColorClasses = {
-    amber: 'text-amber-400',
-    emerald: 'text-emerald-400',
-    blue: 'text-blue-400',
-    purple: 'text-purple-400',
+    amber: 'text-amber-600 dark:text-amber-400',
+    emerald: 'text-emerald-600 dark:text-emerald-400',
+    blue: 'text-blue-600 dark:text-blue-400',
+    purple: 'text-purple-600 dark:text-purple-400',
   }[barColor];
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-slate-800 shadow-sm">
-      <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+      <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
         {icon}
         <span>{title}</span>
       </h3>
 
       {items.length === 0 ? (
-        <div className="py-8 text-center text-xs text-slate-500">
+        <div className="py-8 text-center text-xs text-slate-400 dark:text-slate-500">
           {emptyMessage}
         </div>
       ) : (
@@ -58,11 +58,14 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
             const percentage = calculatedMax > 0 ? (item.count / calculatedMax) * 100 : 0;
             return (
               <div key={item.id} className="flex items-center justify-between gap-3">
-                <span className="text-slate-300 truncate max-w-[180px] sm:max-w-[220px]" title={item.label}>
+                <span
+                  className="text-slate-700 dark:text-slate-300 truncate max-w-[180px] sm:max-w-[220px]"
+                  title={item.label}
+                >
                   {item.label}
                 </span>
                 <div className="flex items-center gap-3 shrink-0">
-                  <div className="w-28 sm:w-36 h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-28 sm:w-36 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.min(100, Math.max(4, percentage))}%` }}

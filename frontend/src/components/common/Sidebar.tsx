@@ -68,9 +68,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <div className="h-full flex flex-col justify-between">
+    <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-colors duration-200">
       <div className="p-3 space-y-1 overflow-y-auto">
-        <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="px-3 py-2 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
           Danh mục Quản trị
         </div>
 
@@ -83,8 +83,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => handleSelect(item.id)}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition cursor-pointer ${
                 isActive
-                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 font-semibold'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80 font-medium'
+                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium'
               }`}
             >
               <span className="flex items-center space-x-3">
@@ -92,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>{item.label}</span>
               </span>
               {item.count !== undefined && (
-                <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">
                   {item.count}
                 </span>
               )}
@@ -102,9 +102,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Backend Status Widget */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/60">
-        <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px]">
-          <div className="flex items-center justify-between text-slate-300">
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60">
+        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] shadow-sm">
+          <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
             <span className="flex items-center gap-1.5 font-medium">
               <span
                 className={`w-2 h-2 rounded-full ${
@@ -115,7 +115,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
             <span
               className={`font-bold ${
-                backendStatus === 'OK' ? 'text-emerald-400' : 'text-red-400'
+                backendStatus === 'OK'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-red-500 dark:text-red-400'
               }`}
             >
               {backendStatus}

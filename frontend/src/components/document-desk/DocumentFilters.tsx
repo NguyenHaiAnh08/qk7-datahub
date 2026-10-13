@@ -42,17 +42,17 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   onRefresh,
 }) => {
   return (
-    <div className="bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-3.5 shadow-sm">
+    <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3.5 shadow-sm transition-colors duration-200">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Search Input */}
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Tìm theo số hiệu, trích yếu..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
           />
         </div>
 
@@ -61,7 +61,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <select
             value={selectedType}
             onChange={(e) => onTypeChange(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
           >
             <option value="">Tất cả loại văn bản</option>
             {types.map((t) => (
@@ -77,7 +77,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <select
             value={selectedUnit}
             onChange={(e) => onUnitChange(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
           >
             <option value="">Tất cả đơn vị ban hành</option>
             {units.map((u) => (
@@ -93,7 +93,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <select
             value={selectedLevel}
             onChange={(e) => onLevelChange(Number(e.target.value))}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
           >
             <option value={5}>Mọi mức bảo mật (≤ Cấp 5)</option>
             {levels.map((l) => (
@@ -106,22 +106,22 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
       </div>
 
       {/* Date Filters & Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800/80">
         <div className="flex items-center space-x-2 text-xs">
-          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span className="text-slate-400 text-[11px]">Từ ngày:</span>
+          <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+          <span className="text-slate-600 dark:text-slate-400 text-[11px]">Từ ngày:</span>
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => onDateFromChange(e.target.value)}
-            className="px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+            className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
           />
-          <span className="text-slate-400 text-[11px]">Đến:</span>
+          <span className="text-slate-600 dark:text-slate-400 text-[11px]">Đến:</span>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => onDateToChange(e.target.value)}
-            className="px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+            className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
           />
         </div>
 
@@ -129,7 +129,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <button
             type="button"
             onClick={onReset}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
           >
             <Eraser className="w-3.5 h-3.5" />
             <span>Xóa bộ lọc</span>
@@ -137,7 +137,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <button
             type="button"
             onClick={onRefresh}
-            className="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-600/20 hover:bg-emerald-100 dark:hover:bg-emerald-600/30 border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Làm mới</span>

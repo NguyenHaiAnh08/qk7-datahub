@@ -42,14 +42,37 @@ app.use((req, res, next) => {
 app.use(express.static(publicDir));
 
 // ─── Swagger ───
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'QK7 DataHub API'
-}));
-app.get('/api-docs.json', (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.send(swaggerSpec);
-});
+// Bật/tắt qua biến ENABLE_SWAGGER trong .env
+// Mặc định: bật (nếu không set hoặc set khác 'false')
+const ENABLE_SWAGGER = (process.env.ENABLE_SWAGGER || 'true').toLowerCase() === 'true';
+
+if (ENABLE_SWAGGER) {
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+        customCss: `
+            .swagger-ui .topbar { display: none }
+            .swagger-ui .info { margin: 20px 0 }
+            .swagger-ui .info .title { font-size: 28px }
+        `,
+        customSiteTitle: 'QK7 DataHub API',
+        swaggerOptions: {
+            persistAuthorization: true,
+            displayRequestDuration: true,
+            filter: true,
+            tryItOutEnabled: true,
+            docExpansion: 'list',
+            defaultModelsExpandDepth: 1,
+            defaultModelExpandDepth: 1,
+            deepLinking: true
+        }
+    }));
+    app.get('/api-docs.json', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.send(swaggerSpec);
+    });
+    console.log('[SWAGGER] Enabled at /api-docs');
+} else {
+    console.log('[SWAGGER] Disabled (ENABLE_SWAGGER=false)');
+}
 
 // ─── Trang chủ ───
 app.get('/', (req, res) => {

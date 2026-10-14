@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User } from '../types/user';
 import { authService } from '../services/authService';
+import { ROUTE_PATHS } from '../routes/routePaths';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => authService.getCurrentSession());
+  const navigate = useNavigate();
 
   useEffect(() => {
     setUser(authService.getCurrentSession());
@@ -41,8 +44,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = useCallback(() => {
     authService.clearSession();
     setUser(null);
-    window.location.href = 'login.html';
-  }, []);
+    navigate(ROUTE_PATHS.LOGIN);
+  }, [navigate]);
 
   const continueAsGuest = useCallback(() => {
     authService.clearSession();
@@ -53,8 +56,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clearance_name: 'Công khai',
     };
     setUser(guestUser);
-    window.location.href = 'portal.html';
-  }, []);
+    navigate(ROUTE_PATHS.PORTAL);
+  }, [navigate]);
 
   const isAuthenticated = !!user && user.user_id !== 'GUEST';
   const isAdmin = !!user && user.clearance_level_id >= 4;
@@ -97,11 +100,11 @@ export function useAuthContext(): AuthContextType {
       login: async (u, p) => (await authService.login(u, p)).user,
       logout: () => {
         authService.clearSession();
-        window.location.href = 'login.html';
+        window.location.href = ROUTE_PATHS.LOGIN;
       },
       continueAsGuest: () => {
         authService.clearSession();
-        window.location.href = 'portal.html';
+        window.location.href = ROUTE_PATHS.PORTAL;
       },
       saveUserSession: authService.saveSession,
     };

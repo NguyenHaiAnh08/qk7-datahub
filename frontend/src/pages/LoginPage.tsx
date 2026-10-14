@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, HelpCircle, Building2, Server, X } from 'lucide-react';
 import { LoginForm } from '../components/auth/LoginForm';
 import { Toast, ToastState } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { User } from '../types/user';
+import { ROUTE_PATHS } from '../routes/routePaths';
 
 export const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [toast, setToast] = useState<ToastState>({
     show: false,
@@ -25,11 +28,11 @@ export const LoginPage: React.FC = () => {
     // If admin or clearance >= 4, can go to admin or desk or portal
     setTimeout(() => {
       if (user.clearance_level_id >= 5) {
-        window.location.href = 'admin-dashboard.html';
+        navigate(ROUTE_PATHS.ADMIN);
       } else if (user.clearance_level_id >= 3) {
-        window.location.href = 'document-desk.html';
+        navigate(ROUTE_PATHS.DESK);
       } else {
-        window.location.href = 'portal.html';
+        navigate(ROUTE_PATHS.PORTAL);
       }
     }, 700);
   };
@@ -43,19 +46,13 @@ export const LoginPage: React.FC = () => {
 
       {/* Top Bar */}
       <div className="relative z-10 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md">
-        <div
-          className="flex items-center space-x-3 cursor-pointer group"
-          onClick={() => (window.location.href = 'portal.html')}
-        >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center border border-emerald-400/30 shadow-md group-hover:scale-105 transition-transform">
+        <div className="flex items-center space-x-3 select-none">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center border border-emerald-400/30 shadow-md">
             <Building2 className="w-5 h-5 text-amber-400" />
           </div>
           <div>
             <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:to-amber-400 bg-clip-text text-transparent">
               QK7 DATAHUB
-            </span>
-            <span className="hidden sm:inline-block text-[10px] text-slate-500 dark:text-slate-400 ml-2 font-mono">
-              SECURE ACCESS GATEWAY
             </span>
           </div>
         </div>
@@ -131,19 +128,16 @@ export const LoginPage: React.FC = () => {
                 </button>
               </div>
               <p>
-                Trường hợp quên mật khẩu, thẻ nhận dạng hỏng hoặc cần nâng cấp phân quyền truy cập,
+                Trường hợp quên mật khẩu, không nhận dạng vân tay hoặc cần nâng cấp phân quyền truy cập,
                 vui lòng liên hệ:
               </p>
               <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-1.5 font-mono text-[11px]">
-                <div>• Ban Cơ Yếu — Bộ Tham Mưu Quân Khu 7</div>
+                <div>Tổ CNTT, Tham mưu - Hành Chính </div>
                 <div>
                   • Đường dây nóng nội bộ:{' '}
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">789-2244</span>
                 </div>
-                <div>
-                  • Trực ban tác chiến:{' '}
-                  <span className="text-amber-600 dark:text-amber-400 font-bold">028.3844.xxxx</span>
-                </div>
+                
               </div>
               <button
                 onClick={() => setShowSupportModal(false)}

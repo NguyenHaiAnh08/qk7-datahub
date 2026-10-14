@@ -14,6 +14,8 @@ import {
 import { authService } from '../../services/authService';
 import { useAuth } from '../../hooks/useAuth';
 import { User } from '../../types/user';
+import { useNavigate } from 'react-router-dom';
+import { ROUTE_PATHS } from '../../routes/routePaths';
 
 export interface LoginFormProps {
   onSuccess?: (user: User) => void;
@@ -21,6 +23,7 @@ export interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast }) => {
+  const navigate = useNavigate();
   const { saveUserSession } = useAuth();
   const [username, setUsername] = useState('USR-004');
   const [password, setPassword] = useState('123456789');
@@ -70,7 +73,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast }) => {
         onSuccess(res.user);
       } else {
         setTimeout(() => {
-          window.location.href = 'portal.html';
+          navigate(ROUTE_PATHS.PORTAL);
         }, 800);
       }
     } catch (err: any) {
@@ -85,7 +88,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast }) => {
     authService.clearSession();
     if (onToast) onToast('Đang chuyển hướng chế độ Khách tra cứu...', 'info');
     setTimeout(() => {
-      window.location.href = 'portal.html';
+      navigate(ROUTE_PATHS.PORTAL);
     }, 600);
   };
 

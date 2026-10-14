@@ -737,6 +737,20 @@ app.use((err, req, res, next) => {
 // ─── Admin CRUD routes ───
 require('./src/admin-routes')(app, { sql, getPool, writeAccessLog });
 
+// ─── SPA Fallback: mọi request GET điều hướng giao diện trả về index.html ───
+app.use((req, res, next) => {
+    if (req.method !== 'GET') return next();
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs')) {
+        return next();
+    }
+    const indexPath = path.join(publicDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send('Không tìm thấy public/index.html. Vui lòng chạy npm run frontend:build.');
+    }
+});
+
 // ─── KHỞI ĐỘNG ───
 async function start() {
     if (!fs.existsSync(PDF_ROOT)) {

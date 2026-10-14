@@ -1,5 +1,6 @@
 import React from 'react';
-import { Navigate, RouteObject } from 'react-router-dom';
+import { RouteObject } from 'react-router-dom';
+import { HttpErrorPage } from '../../pages/HttpErrorPage';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
 
@@ -9,7 +10,7 @@ const fallbackRoutes: RouteModuleExport = {
   routes: [
     {
       path: ROUTE_PATHS.NOT_FOUND,
-      element: <Navigate to={ROUTE_PATHS.PORTAL} replace />,
+      element: <HttpErrorPage code={404} />,
     },
   ],
 };

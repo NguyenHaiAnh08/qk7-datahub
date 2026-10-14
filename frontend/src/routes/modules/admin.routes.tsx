@@ -1,7 +1,8 @@
 import React from 'react';
-import { Navigate, RouteObject } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { AdminDashboardPage } from '../../pages/AdminDashboardPage';
 import { UsersPage } from '../../pages/UsersPage';
+import { ProtectedRoute } from '../../components/common/ProtectedRoute';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
 
@@ -11,7 +12,11 @@ const adminRoutes: RouteModuleExport = {
   routes: [
     {
       path: ROUTE_PATHS.ADMIN,
-      element: <AdminDashboardPage />,
+      element: (
+        <ProtectedRoute minClearance={4}>
+          <AdminDashboardPage />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/admin-dashboard.html',
@@ -23,7 +28,11 @@ const adminRoutes: RouteModuleExport = {
     },
     {
       path: ROUTE_PATHS.USERS,
-      element: <UsersPage />,
+      element: (
+        <ProtectedRoute minClearance={4}>
+          <UsersPage />
+        </ProtectedRoute>
+      ),
     },
   ],
 };

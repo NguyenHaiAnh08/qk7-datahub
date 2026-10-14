@@ -21,21 +21,33 @@ Nội dung tài liệu bao gồm:
 
 ---
 
-## 📁 Cấu Trúc Dự Án (Sau Khi Tách Backend & Frontend)
+## 📁 Cấu Trúc Dự Án (Chuẩn SPA React + Vite + Express Gateway)
 
 ```text
 qk7-datahub/
 ├── backend/                       # 🟢 Máy chủ Backend Express & Cơ sở dữ liệu
 │   ├── src/                       # db.js (SQL Server connection) & admin-routes.js
 │   ├── uploads/                   # Kho lưu trữ file PDF thật (2026/..., Mat/, ToiMat/, TuyetMat/)
-│   ├── public/                    # Thư mục chứa sản phẩm build từ frontend (phục vụ tĩnh)
-│   ├── server.js                  # Entry point Express API Gateway (:8000)
+│   ├── public/                    # Thư mục chứa sản phẩm build từ frontend (index.html, assets/ js/css)
+│   ├── server.js                  # Entry point Express API Gateway (:8000) & SPA Fallback Middleware
 │   ├── swagger.js                 # Đặc tả OpenAPI Swagger Spec
 │   ├── setup-passwords.js         # Script đồng bộ mật khẩu tài khoản
 │   ├── .env                       # Cấu hình kết nối SQL Server và PORT
-│   └── package.json               # Dependencies & scripts riêng cho Backend
-├── frontend/                      # 🔵 Giao diện người dùng React + TypeScript + Vite
-│   ├── src/                       # Components, pages, hooks, services, contexts
+│   └── package.json               # Dependencies & scripts riêng cho Backend (Express 5)
+├── frontend/                      # 🔵 Giao diện người dùng Single Page Application (SPA)
+│   ├── index.html                 # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
+│   ├── src/
+│   │   ├── App.tsx                # Setup Root Provider (BrowserRouter, ThemeProvider, AuthProvider)
+│   │   ├── main.tsx               # Entry point React 18 createRoot
+│   │   ├── routes/                # Hệ thống Auto-Discovery Routing (React Router)
+│   │   │   ├── routePaths.ts      # Danh mục đường dẫn chuẩn (/login, /portal, /document-desk...)
+│   │   │   ├── getAppRoutes.tsx   # Tự động quét modules/*.routes.tsx qua import.meta.glob
+│   │   │   ├── RouterProvider.tsx # Component điều hướng useRoutes hook
+│   │   │   └── modules/           # Định nghĩa routes theo từng nghiệp vụ (auth, portal, desk, admin...)
+│   │   ├── pages/                 # Màn hình TSX (LoginPage, PortalPage, AdminDashboardPage...)
+│   │   ├── components/            # Giao diện thành phần (Header, Sidebar, LoginForm...)
+│   │   ├── contexts/              # Quản lý trạng thái toàn cục (AuthContext, ThemeContext)
+│   │   └── services/              # Kết nối REST API Backend (/api)
 │   ├── vite.config.ts             # Config build xuất sang ../backend/public, proxy :8000
 │   └── package.json               # Dependencies & scripts riêng cho Frontend
 ├── package.json                   # Scripts tiện ích chạy từ thư mục gốc
@@ -80,7 +92,7 @@ npm run frontend:dev
 cd frontend
 npm run dev
 ```
-* Truy cập giao diện: [http://localhost:5173/login.html](http://localhost:5173/login.html)
+* Truy cập giao diện: [http://localhost:5173/login](http://localhost:5173/login) hoặc [http://localhost:5173/portal](http://localhost:5173/portal)
 *(Dev server tự động proxy toàn bộ request `/api` và `/uploads` sang `http://localhost:8000`)*
 
 ### 4. Đóng gói sản phẩm (Production Build xuất sang `backend/public/`)
@@ -92,7 +104,7 @@ npm run frontend:build
 cd frontend
 npm run build
 ```
-Bản build tĩnh sẽ tự động được ghi vào `backend/public/` để `backend/server.js` phục vụ trực tiếp qua `express.static`.
+Bản build tĩnh (gồm `index.html` và thư mục `assets/`) sẽ tự động được xuất sang `backend/public/`. Máy chủ `backend/server.js` sẽ tự động phục vụ các trang thông qua SPA Fallback Middleware khi F5 ở bất kỳ URL nào.
 
 ---
 

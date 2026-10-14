@@ -117,10 +117,10 @@ graph LR
 
     subgraph FRONTEND_SRC ["CẤU TRÚC CHI TIẾT FRONTEND"]
         F_Entry["index.html<br/>(1 Entry HTML Duy Nhất)"]
-        F_Routes["src/routes/<br/>- routePaths.ts<br/>- getAppRoutes.tsx<br/>- RouterProvider.tsx<br/>- modules/*.routes.tsx"]
-        F_Pages["src/pages/<br/>- LoginPage<br/>- AdminDashboardPage<br/>- DocumentDeskPage<br/>- PortalPage<br/>- UsersPage"]
-        F_Components["src/components/<br/>- common/ (Header, Sidebar...)<br/>- auth/ (LoginForm)<br/>- portal/ (Banner, Card, List)<br/>- document-desk/ (Dropzone...)<br/>- users/ (UserTable, FormModal...)"]
-        F_Services["src/services/<br/>- http.ts (Client API)<br/>- authService.ts<br/>- documentsApi.ts<br/>- usersApi.ts<br/>- dashboardApi.ts"]
+        F_Routes["src/routes/<br/>- routePaths.ts<br/>- routeAccess.ts<br/>- getAppRoutes.ts<br/>- RouterProvider.tsx<br/>- modules/*.routes.tsx"]
+        F_Pages["src/pages/<br/>- LoginPage<br/>- AdminDashboardPage<br/>- DocumentDeskPage<br/>- PortalPage<br/>- UsersPage<br/>- HttpErrorPage"]
+        F_Components["src/components/<br/>- common/ (Header, Sidebar, ProtectedRoute, HttpErrorListener...)<br/>- auth/ (LoginForm)<br/>- portal/ (Banner, Card, List)<br/>- document-desk/ (Dropzone...)<br/>- users/ (UserTable, FormModal...)"]
+        F_Services["src/services/<br/>- http.ts (Client API & Interceptor)<br/>- Domain Services (auth, document, user, role...)"]
         F_State["src/contexts/ & src/hooks/<br/>- AuthContext.tsx<br/>- ThemeContext.tsx<br/>- useAuth.ts"]
         F_Types["src/types/<br/>- document.ts<br/>- user.ts"]
     end
@@ -154,7 +154,7 @@ d:/QK7_DataHub/qk7-datahub/
 │
 ├── backend/                                # 🟢 HỆ THỐNG MÁY CHỦ VÀ DỮ LIỆU BACKEND
 │   ├── .env                                # Biến môi trường kết nối SQL Server và PORT
-│   ├── server.js                           # Máy chủ Express: API Gateway, xác thực, upload, tải tệp
+│   ├── server.js                           # Máy chủ Express: API Gateway, xác thực, upload, tải tệp, SPA Fallback
 │   ├── swagger.js                          # Cấu hình tài liệu giao diện Swagger API (/api-docs)
 │   ├── setup-passwords.js                  # Tiện ích mã hóa bcrypt mật khẩu tài khoản mẫu
 │   ├── package.json                        # Scripts và dependencies riêng cho backend
@@ -172,7 +172,7 @@ d:/QK7_DataHub/qk7-datahub/
 │   │
 │   └── public/                             # THƯ MỤC PHÂN PHỐI TĨNH (Sản phẩm build của Vite)
 │       ├── index.html                      # Vỏ nạp ứng dụng duy nhất
-│       └── assets/                         # JS Bundles, CSS tailwind tối ưu hóa & code-splitting
+│       └── assets/                         # JS Bundles, CSS tối ưu hóa & code-splitting
 │
 ├── _archive/                               # THƯ MỤC LƯU TRỮ AN TOÀN (Mã nguồn cũ không xóa)
 │   ├── public_app.js                       # Logic JS thuần cũ
@@ -181,36 +181,39 @@ d:/QK7_DataHub/qk7-datahub/
 │   ├── public_style.css                    # CSS thuần cũ
 │   └── src_index.js.bak                    # Bản backup index.js cũ
 │
-└── frontend/                               # MÃ NGUỒN FRONTEND HIỆN ĐẠI (React 18 + TS + Vite + Tailwind)
+└── frontend/                               # 🔵 MÃ NGUỒN FRONTEND (React 18 + TS + Vite + Ant Design + Tailwind)
     ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
-    ├── package.json                        # Cấu hình dependencies Frontend (react-router-dom...)
+    ├── package.json                        # Cấu hình dependencies Frontend (antd, react-router-dom...)
     ├── tsconfig.json                       # Cấu hình TypeScript compiler
     ├── tailwind.config.js                  # Cấu hình giao diện TailwindCSS
     ├── vite.config.ts                      # Cấu hình Vite SPA build sang ../backend/public & Proxy :8000
     │
     └── src/
         ├── index.css                       # Design System, biến màu quân sự, glass-panel
-        ├── App.tsx                         # Khởi tạo BrowserRouter, ThemeProvider, AuthProvider, RouterProvider
+        ├── App.tsx                         # Khởi tạo Ant Design ConfigProvider (Màu Tím #722ED1), Auth, Theme, Router
         ├── main.tsx                        # Điểm gắn kết ReactDOM createRoot vào #root
         ├── vite-env.d.ts                   # Định nghĩa kiểu Vite Client (import.meta.glob)
         │
-        ├── routes/                         # BỘ ĐỊNH TUYẾN TỰ ĐỘNG (AUTO-DISCOVERY ROUTER)
-        │   ├── routePaths.ts               # Single source of truth cho URL (/login, /portal, /document-desk...)
-        │   ├── getAppRoutes.tsx            # Tự động gom & sort route modules bằng import.meta.glob
-        │   ├── RouterProvider.tsx          # Render router bằng useRoutes hook
-        │   └── modules/                    # Phân module route theo tính năng
-        │       ├── auth.routes.tsx         # Route /login + điều hướng backward compatibility
+        ├── routes/                         # BỘ ĐỊNH TUYẾN TỰ ĐỘNG & BẢO VỆ TUYẾN ĐƯỜNG
+        │   ├── routePaths.ts               # Single source of truth cho URL (/login, /portal, /403, /404, /500...)
+        │   ├── routeAccess.ts              # Ma trận phân quyền kiểm soát Clearance Level & Login Guard (.ts)
+        │   ├── getAppRoutes.ts             # Tự động gom & sort route modules bằng import.meta.glob (.ts)
+        │   ├── RouterProvider.tsx          # Render router bằng useRoutes hook (.tsx)
+        │   └── modules/                    # Phân module route theo tính năng (.routes.tsx)
+        │       ├── auth.routes.tsx         # Route /login + điều hướng tương thích
         │       ├── portal.routes.tsx       # Route / và /portal
-        │       ├── desk.routes.tsx         # Route /document-desk
-        │       ├── admin.routes.tsx        # Route /admin-dashboard và /users
-        │       └── fallback.routes.tsx     # Bắt URL không hợp lệ về /portal
+        │       ├── desk.routes.tsx         # Route /document-desk (Bảo vệ bởi ProtectedRoute minClearance 3)
+        │       ├── admin.routes.tsx        # Route /admin-dashboard và /users (Bảo vệ bởi ProtectedRoute minClearance 4)
+        │       ├── error.routes.tsx        # Route các mã lỗi HTTP (/400, /401, /403, /404, /500, /502, /503, /error/:code)
+        │       └── fallback.routes.tsx     # Bắt URL không hợp lệ (*) hiển thị HttpErrorPage 404
         │
         ├── pages/                          # CÁC MÀN HÌNH CHỨC NĂNG (TSX)
         │   ├── LoginPage.tsx               # Màn hình đăng nhập xác thực quân nhân
         │   ├── PortalPage.tsx              # Cổng tra cứu tài liệu quân sự
         │   ├── DocumentDeskPage.tsx        # Bàn làm việc số hóa văn thư
         │   ├── AdminDashboardPage.tsx      # Bảng điều khiển quản trị trung tâm
-        │   └── UsersPage.tsx               # Quản lý danh sách quân nhân & phân quyền
+        │   ├── UsersPage.tsx               # Quản lý danh sách quân nhân & phân quyền
+        │   └── HttpErrorPage.tsx           # Trang hiển thị mã trạng thái HTTP chuẩn Ant Design
         │
         ├── constants/                      # HẰNG SỐ HỆ THỐNG
         │   └── apiEndpoints.ts             # Danh bạ toàn bộ URL API backend
@@ -224,16 +227,27 @@ d:/QK7_DataHub/qk7-datahub/
         │   ├── dateUtils.ts                # Định dạng ngày giờ chuẩn VN (DD/MM/YYYY, HH:mm:ss)
         │   └── formatFileSize.ts           # Chuyển đổi byte sang B, KB, MB, GB chuẩn xác
         │
-        ├── services/                       # TẦNG DỊCH VỤ MẠNG & GỌI API (HTTP)
-        │   ├── http.ts                     # Fetch client chuẩn hóa lỗi & tự động thêm Token/Clearance
-        │   ├── authService.ts              # Đăng nhập, lưu/xóa/đọc Session Storage
-        │   ├── documentsApi.ts             # Danh sách, chi tiết, upload, update, delete văn bản
-        │   ├── usersApi.ts                 # Quản trị tài khoản quân nhân & đổi mật khẩu
-        │   ├── dashboardApi.ts             # Thống kê KPI, danh mục, vai trò, kiểm toán an ninh
-        │   └── index.ts                    # Export tập trung
+        ├── services/                       # TẦNG DỊCH VỤ MẠNG & DOMAIN SERVICES
+        │   ├── http.ts                     # HTTP Client Wrapper (HttpError, bắt lỗi toàn cục 401/403/500)
+        │   ├── authService.ts              # Dịch vụ đăng nhập, lấy thông tin cá nhân & session
+        │   ├── documentService.ts          # Dịch vụ quản lý tìm kiếm, upload, sửa, xóa văn bản
+        │   ├── userService.ts              # Dịch vụ quản lý tài khoản quân nhân
+        │   ├── roleService.ts              # Dịch vụ quản lý vai trò người dùng (Roles)
+        │   ├── permissionService.ts        # Dịch vụ quản lý phân quyền (Permissions)
+        │   ├── unitService.ts              # Dịch vụ quản lý đơn vị quân khu
+        │   ├── documentTypeService.ts      # Dịch vụ quản lý danh mục loại văn bản
+        │   ├── securityLevelService.ts     # Dịch vụ quản lý 5 cấp độ bảo mật
+        │   ├── logService.ts               # Dịch vụ nhật ký kiểm toán an ninh (ACCESS_LOG)
+        │   ├── systemService.ts            # Dịch vụ kiểm tra kết nối /api/health và metadata
+        │   ├── documentsApi.ts             # Compatibility alias trỏ về documentService
+        │   ├── usersApi.ts                 # Compatibility alias trỏ về userService
+        │   ├── dashboardApi.ts             # Aggregator Service phục vụ Admin Dashboard
+        │   ├── api.ts                      # Legacy Facade hợp nhất tất cả services
+        │   └── index.ts                    # Điểm xuất khẩu chung (Barrel export)
         │
         ├── contexts/                       # QUẢN LÝ TRẠNG THÁI TOÀN CỤC (STATE)
-        │   └── AuthContext.tsx             # Cung cấp User session, isAdmin, isStaff, login, logout
+        │   ├── AuthContext.tsx             # Cung cấp User session, isAdmin, isStaff, login, logout
+        │   └── ThemeContext.tsx            # Đồng bộ Dark/Light theme toàn hệ thống
         │
         ├── hooks/                          # CUSTOM HOOKS TIỆN ÍCH
         │   └── useAuth.ts                  # Hook truy xuất dữ liệu từ AuthContext
@@ -241,18 +255,22 @@ d:/QK7_DataHub/qk7-datahub/
         ├── components/                     # CÁC THÀNH PHẦN GIAO DIỆN (COMPONENTS)
         │   ├── common/                     # Component dùng chung toàn hệ thống
         │   │   ├── Header.tsx              # Thanh tiêu đề, đồng hồ trực tiếp, menu người dùng
-        │   │   ├── Sidebar.tsx             # Thanh điều hướng quản trị có đo lường Backend Status
+        │   │   ├── Sidebar.tsx             # Thanh điều hướng quản trị
         │   │   ├── Layout.tsx              # Khung bố cục chuẩn mực
+        │   │   ├── ProtectedRoute.tsx      # Bộ gác cổng bảo vệ URL theo Cấp độ mật (.tsx)
+        │   │   ├── HttpErrorListener.tsx   # Lắng nghe sự kiện lỗi HTTP và thông báo qua Ant Design
+        │   │   ├── ThemeToggle.tsx         # Nút chuyển đổi giao diện sáng/tối
         │   │   ├── DataTable.tsx           # Bảng dữ liệu hỗ trợ tìm kiếm, loading, phân trang
         │   │   ├── ConfirmDialog.tsx       # Hộp thoại xác nhận thao tác nguy hiểm
         │   │   └── Toast.tsx               # Thông báo nổi (success, error, info)
         │   │
         │   ├── auth/                       # Phục vụ xác thực đăng nhập
-        │   │   └── LoginForm.tsx           # Form đăng nhập, chuyển đổi tài khoản demo tự động
+        │   │   └── LoginForm.tsx           # Form đăng nhập tài khoản quân nhân
         │   │
-        │   ├── dashboard/                  # Phục vụ trang quản trị trung tâm
-        │   │   ├── StatCard.tsx            # Thẻ KPI 4 chỉ số lớn (Người dùng, Tệp, Dung lượng, Log)
-        │   │   └── DistributionChart.tsx   # Biểu đồ thanh ngang phân bố văn bản theo cấp mật/thể loại
+        │   ├── portal/                     # Phục vụ Cổng tra cứu cán bộ
+        │   │   ├── SecurityBanner.tsx      # Biểu ngữ cam kết bảo mật & thông báo cấp quyền
+        │   │   ├── DocumentCard.tsx        # Thẻ văn bản hiển thị dạng lưới
+        │   │   └── PortalDocumentList.tsx  # Lưới văn bản kèm kiểm soát khóa quyền truy cập
         │   │
         │   ├── document-desk/              # Phục vụ bàn làm việc văn thư
         │   │   ├── Dropzone.tsx            # Vùng kéo thả tệp văn bản đính kèm
@@ -261,22 +279,14 @@ d:/QK7_DataHub/qk7-datahub/
         │   │   ├── DocumentUploadModal.tsx # Hộp thoại tiếp nhận & cập nhật văn bản
         │   │   └── DocumentPreviewModal.tsx# Hộp thoại nhúng PDF viewer trực quan
         │   │
-        │   ├── users/                      # Phục vụ quản trị quân nhân
-        │   │   ├── UserTable.tsx           # Bảng danh sách quân nhân & cấp bậc
-        │   │   ├── UserFormModal.tsx       # Hộp thoại tạo mới & cập nhật thông tin quân nhân
-        │   │   └── UserCredentialsModal.tsx# Hộp thoại sinh mật khẩu ngẫu nhiên & đổi mật khẩu
+        │   ├── dashboard/                  # Phục vụ trang quản trị trung tâm
+        │   │   ├── StatCard.tsx            # Thẻ KPI 4 chỉ số lớn (Người dùng, Tệp, Dung lượng, Log)
+        │   │   └── DistributionChart.tsx   # Biểu đồ thanh ngang phân bố văn bản theo cấp mật/thể loại
         │   │
-        │   └── portal/                     # Phục vụ cổng tra cứu cán bộ
-        │       ├── SecurityBanner.tsx      # Biểu ngữ cam kết bảo mật & thông báo cấp quyền
-        │       ├── DocumentCard.tsx        # Thẻ văn bản hiển thị dạng lưới
-        │       └── PortalDocumentList.tsx  # Lưới văn bản kèm kiểm soát khóa quyền truy cập
-        │
-        └── pages/                          # CÁC TRANG ỨNG DỤNG HOÀN CHỈNH
-            ├── LoginPage.tsx               # Trang đăng nhập xác thực quân sự
-            ├── AdminDashboardPage.tsx      # Trang quản trị hệ thống trung tâm
-            ├── DocumentDeskPage.tsx        # Trang bàn làm việc văn thư
-            ├── PortalPage.tsx              # Trang cổng tra cứu cán bộ
-            └── UsersPage.tsx               # Trang chuyên biệt quản trị quân nhân
+        │   └── users/                      # Phục vụ quản trị quân nhân
+        │       ├── UserTable.tsx           # Bảng danh sách quân nhân & cấp bậc
+        │       ├── UserFormModal.tsx       # Hộp thoại tạo mới & cập nhật thông tin quân nhân
+        │       └── UserCredentialsModal.tsx# Hộp thoại sinh mật khẩu ngẫu nhiên & đổi mật khẩu
 ```
 
 ---
@@ -316,7 +326,7 @@ d:/QK7_DataHub/qk7-datahub/
 sequenceDiagram
     autonumber
     actor Officer as Quân Nhân
-    participant UI as Giao Diện (login.html)
+    participant UI as Giao Diện (LoginPage /login)
     participant Server as Express Server (:8000)
     participant DB as SQL Server (QK7_ThuVienSo)
 
@@ -344,7 +354,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Clerk as Văn Thư Quân Khu
-    participant Desk as Bàn Làm Việc (document-desk.html)
+    participant Desk as Bàn Làm Việc (DocumentDeskPage /document-desk)
     participant Server as Express Gateway (:8000)
     participant Disk as Ổ Đĩa Vật Lý (uploads/)
     participant DB as SQL Server (QK7_ThuVienSo)
@@ -369,7 +379,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor User as Cán Bộ Tra Cứu
-    participant Portal as Cổng Tra Cứu (portal.html)
+    participant Portal as Cổng Tra Cứu (PortalPage /portal)
     participant Server as Express Gateway (:8000)
     participant DB as SQL Server (QK7_ThuVienSo)
     participant Disk as Kho Tệp (uploads/)

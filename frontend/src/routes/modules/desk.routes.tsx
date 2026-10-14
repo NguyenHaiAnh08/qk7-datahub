@@ -1,6 +1,7 @@
 import React from 'react';
-import { Navigate, RouteObject } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { DocumentDeskPage } from '../../pages/DocumentDeskPage';
+import { ProtectedRoute } from '../../components/common/ProtectedRoute';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
 
@@ -10,7 +11,11 @@ const deskRoutes: RouteModuleExport = {
   routes: [
     {
       path: ROUTE_PATHS.DESK,
-      element: <DocumentDeskPage />,
+      element: (
+        <ProtectedRoute minClearance={3}>
+          <DocumentDeskPage />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/document-desk.html',

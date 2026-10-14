@@ -111,3 +111,6 @@ export function useAuthContext(): AuthContextType {
   }
   return context;
 }
+
+export const useAuth = useAuthContext;
+

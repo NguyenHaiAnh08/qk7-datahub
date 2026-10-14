@@ -485,31 +485,90 @@ erDiagram
 
 ---
 
-## 7. Danh Mục API Endpoints
+## 7. Danh Mục API Endpoints (Chuẩn OpenAPI 3.0 / Swagger)
 
-| Nhóm Nghiệp Vụ | Phương Thức | Đường Dẫn API | Tham Số / Body | Mô Tả Chức Năng |
+Hệ thống tích hợp tài liệu đặc tả API chuẩn quốc tế **OpenAPI 3.0 (Swagger)** được khai báo tập trung tại [`backend/swagger.js`](file:///d:/QK7_DataHub/qk7-datahub/backend/swagger.js).
+
+* **Giao diện trực quan Swagger UI:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **Tệp đặc tả JSON thô:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
+* **Kiểm soát bật/tắt:** Cấu hình biến môi trường `ENABLE_SWAGGER=true` (hoặc `false`) trong file `backend/.env`.
+
+### 7.1. Cơ Chế Xác Thực & Phân Quyền (Security Schemes)
+
+Toàn bộ API (ngoại trừ endpoint công khai `/api/auth/login`) yêu cầu gửi kèm các Custom Headers để xác định danh tính và kiểm soát độ mật:
+* **`X-User-Id` (String):** Mã quân nhân/người dùng (ví dụ: `USR-001`, `USR-004`).
+* **`X-Clearance` (Integer):** Mức độ bảo mật được cấp phép (Giá trị từ `1` đến `5`).
+
+---
+
+### 7.2. Danh Mục Chi Tiết Các Nhóm API
+
+#### 1. Nhóm Xác Thực & Danh Tính (Auth)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `POST` | `/api/auth/login` | Công khai | `{ user_id, password }` | Xác thực đăng nhập bằng `username` hoặc `user_id` + mật khẩu (kiểm tra hash bcrypt). Trả về thông tin quân nhân kèm danh sách vai trò (`UserFull`). |
+| `GET` | `/api/auth/me` | Mọi cấp (≥ 1) | Header: `X-User-Id` | Tra cứu hồ sơ thông tin và danh sách quyền của quân nhân đang đăng nhập. |
+
+#### 2. Nhóm Trạng Thái & Danh Mục Hệ Thống (System)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/health` | Mọi cấp | — | Kiểm tra trạng thái máy chủ, kết nối cơ sở dữ liệu SQL Server (`db`, `login_name`, `now`). |
+| `GET` | `/api/meta` | Mọi cấp (≥ 1) | — | Lấy toàn bộ danh mục tham chiếu: Loại văn bản (`types`), Đơn vị quân sự (`units`), Cấp độ bảo mật (`levels`). |
+
+#### 3. Nhóm Quản Lý Tài Liệu Văn Bản (Documents)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/documents` | Theo cấp (1 - 5) | Query: `code`, `title`, `type`, `unit`, `from`, `to`, `lv` | Tra cứu và liệt kê danh sách văn bản. Hệ thống tự động lọc các tài liệu có độ mật $\le$ Clearance của người dùng (ngăn chặn thấy văn bản vượt cấp). |
+| `POST` | `/api/documents/upload` | Cán bộ văn thư | `multipart/form-data`: `file`, `document_code`, `title`, `doc_type_id`, `issued_date`, `issuing_unit_id`, `signer`, `summary`, `security_level_id` | Tải lên tệp PDF mới (giới hạn $\le$ 50MB). Tự động sinh mã băm SHA-256, lưu tệp vào `uploads/YYYY/MM/` và ghi nhật ký kiểm toán `UPLOAD`. |
+| `GET` | `/api/documents/{fileId}` | Theo cấp mật | Path: `fileId` | Lấy chi tiết thông tin metadata của 1 văn bản cụ thể. |
+| `PUT` | `/api/documents/{fileId}` | Cán bộ văn thư | `multipart/form-data`: `file` (tùy chọn), các trường metadata | Cập nhật thông tin văn bản hoặc thay thế bằng file PDF mới. |
+| `DELETE` | `/api/documents/{fileId}` | Cán bộ văn thư | Path: `fileId` | Xóa văn bản (xóa cả bản ghi trong SQL Server và file PDF vật lý trên ổ đĩa), ghi nhật ký `DELETE`. |
+
+#### 4. Nhóm Xem & Tải Tệp Tin PDF (Files)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/files/{fileId}/view` | Kiểm tra độ mật $\ge$ cấp tài liệu | Path: `fileId`<br/>Query: `download` (`0` = xem inline, `1` = tải về) | Stream trực tiếp tệp PDF an toàn qua giao thức nhị phân. Kiểm tra nghiêm ngặt quyền truy cập và tự động ghi nhật ký `VIEW` hoặc `DOWNLOAD` vào `ACCESS_LOG`. Trả về `403` nếu vi phạm độ mật. |
+
+#### 5. Nhóm Nhật Ký Kiểm Toán An Ninh (Logs)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/access-logs` | Mức 4+ (Tối mật / Tuyệt mật) | Query: `user`, `action` (`LOGIN`, `VIEW`, `DOWNLOAD`, `UPLOAD`, `UPDATE`, `DELETE`, `DENIED`, `ERROR`) | Lấy danh sách 200 bản ghi nhật ký kiểm toán gần nhất phục vụ giám sát an ninh mạng quân sự. |
+
+#### 6. Nhóm Quản Trị Hệ Thống Nâng Cao (Admin — Yêu Cầu Cấp Độ Mật $\ge$ 4)
+| Phân Nhóm | Phương Thức | Đường Dẫn API | Tham Số / Body | Mô Tả Chức Năng |
 | :--- | :---: | :--- | :--- | :--- |
-| **Xác thực** | `POST` | `/api/auth/login` | `{ user_id, password }` | Đăng nhập hệ thống, kiểm tra bcrypt & tạo log |
-| **Xác thực** | `GET` | `/api/auth/me` | *Header:* `X-User-Id` | Lấy thông tin chi tiết quân nhân đang đăng nhập |
-| **Danh mục** | `GET` | `/api/meta` | — | Lấy đồng thời danh mục Types, Units, Security Levels |
-| **Trạng thái** | `GET` | `/api/health` | — | Kiểm tra kết nối SQL Server & trạng thái máy chủ |
-| **Văn bản** | `GET` | `/api/documents` | `?code=&type=&unit=&lv=&from=&to=` | Lấy danh sách văn bản (lọc theo cấp bảo mật) |
-| **Văn bản** | `GET` | `/api/documents/:id` | `id: file_id` | Lấy thông tin chi tiết của một văn bản |
-| **Văn bản** | `POST` | `/api/documents` | `multipart/form-data` | Tải lên văn bản mới (tính toán SHA-256) |
-| **Văn bản** | `PUT` | `/api/documents/:id` | `multipart/form-data` | Hiệu chỉnh thông tin hoặc thay thế tệp văn bản |
-| **Văn bản** | `DELETE` | `/api/documents/:id` | `id: file_id` | Xóa văn bản khỏi cơ sở dữ liệu và lưu log |
-| **Xem / Tải** | `GET` | `/api/documents/:id/view` | `?download=true/false` | Stream trực tiếp tệp PDF xem trước hoặc tải về |
-| **Quản trị** | `GET` | `/api/admin/stats` | — | Lấy 4 chỉ số KPI lớn & biểu đồ phân bố văn bản |
-| **Quản trị** | `GET` | `/api/admin/users` | — | Lấy toàn bộ danh sách quân nhân & quyền hạn |
-| **Quản trị** | `POST` | `/api/admin/users` | `{ user_id, full_name, rank_name... }` | Tạo mới tài khoản quân nhân |
-| **Quản trị** | `PUT` | `/api/admin/users/:id` | `{ full_name, unit_id, status... }` | Cập nhật hồ sơ thông tin quân nhân |
-| **Quản trị** | `PUT` | `/api/admin/users/:id/credentials` | `{ username, password }` | Cập nhật tài khoản đăng nhập & mật khẩu mới |
-| **Quản trị** | `DELETE` | `/api/admin/users/:id` | `id: user_id` | Xóa tài khoản quân nhân khỏi hệ thống |
-| **Quản trị** | `GET` | `/api/admin/roles` | — | Quản lý danh mục các vai trò (CRUD) |
-| **Quản trị** | `GET` | `/api/admin/units` | — | Quản lý danh mục đơn vị quân khu (CRUD) |
-| **Quản trị** | `GET` | `/api/admin/document-types` | — | Quản lý danh mục thể loại văn bản (CRUD) |
-| **Quản trị** | `GET` | `/api/admin/security-levels`| — | Quản lý định nghĩa 5 mức bảo mật (CRUD) |
-| **Kiểm toán** | `GET` | `/api/admin/logs` | `?user=&action=` | Xem nhật ký kiểm toán truy xuất an ninh 24/7 |
+| **Thống kê** | `GET` | `/api/admin/stats` | — | Lấy số liệu 4 thẻ KPI lớn (users, documents, totalSize, logs24h) và phân bố văn bản theo mức mật, thể loại, đơn vị. |
+| **Người dùng** | `GET` | `/api/admin/users` | — | Lấy toàn bộ danh sách tài khoản quân nhân và quyền hạn trong đơn vị. |
+| **Người dùng** | `POST` | `/api/admin/users` | JSON: `user_id`, `username`, `password`, `full_name`, `rank_name`, `position`, `unit_id`, `status`, `clearance_level_id` | Tạo mới tài khoản quân nhân, tự động hash mật khẩu bcrypt. |
+| **Người dùng** | `PUT` | `/api/admin/users/{id}` | JSON: `full_name`, `rank_name`, `position`, `unit_id`, `status`, `clearance_level_id` | Hiệu chỉnh thông tin hồ sơ quân nhân (không đổi username/password). |
+| **Người dùng** | `DELETE` | `/api/admin/users/{id}` | Path: `id` | Xóa tài khoản quân nhân (có kiểm tra ràng buộc toàn vẹn dữ liệu). |
+| **Bảo mật user**| `PUT` | `/api/admin/users/{id}/credentials` | JSON: `username`, `password` (tùy chọn) | Cập nhật lại tên đăng nhập hoặc đặt lại mật khẩu mới cho quân nhân. |
+| **Gán vai trò** | `GET` | `/api/admin/users/{id}/roles` | Path: `id` | Xem danh sách các vai trò đã cấp cho quân nhân. |
+| **Gán vai trò** | `POST` | `/api/admin/users/{id}/roles` | JSON: `role_id` | Gán vai trò mới cho quân nhân. |
+| **Gán vai trò** | `DELETE`| `/api/admin/users/{id}/roles/{roleId}` | Path: `id`, `roleId` | Thu hồi vai trò đã cấp cho quân nhân. |
+| **Vai trò** | `GET` | `/api/admin/roles` | — | Danh sách các vai trò quản trị trong hệ thống. |
+| **Vai trò** | `POST` | `/api/admin/roles` | JSON: `role_id`, `name` | Tạo mới vai trò phân quyền. |
+| **Vai trò** | `PUT` | `/api/admin/roles/{id}` | JSON: `name` | Đổi tên vai trò. |
+| **Vai trò** | `DELETE`| `/api/admin/roles/{id}` | Path: `id` | Xóa vai trò (tự động xóa liên kết USER_ROLE và ROLE_PERMISSION). |
+| **Quyền hạn** | `GET` | `/api/admin/permissions` | — | Danh mục các quyền thao tác trong hệ thống. |
+| **Quyền hạn** | `POST` | `/api/admin/permissions` | JSON: `permission_id`, `code`, `description` | Khai báo quyền thao tác mới. |
+| **Quyền hạn** | `DELETE`| `/api/admin/permissions/{id}` | Path: `id` | Xóa quyền thao tác. |
+| **Quyền-Vai trò**| `GET` | `/api/admin/roles/{id}/permissions` | Path: `id` | Xem danh sách quyền gắn liền với vai trò. |
+| **Quyền-Vai trò**| `POST` | `/api/admin/roles/{id}/permissions` | JSON: `permission_id` | Gán quyền thao tác vào vai trò. |
+| **Quyền-Vai trò**| `DELETE`| `/api/admin/roles/{id}/permissions/{permId}` | Path: `id`, `permId` | Bỏ quyền thao tác khỏi vai trò. |
+| **Đơn vị** | `GET` | `/api/admin/units` | — | Danh sách các đơn vị, cơ quan quân khu. |
+| **Đơn vị** | `POST` | `/api/admin/units` | JSON: `unit_id`, `name`, `parent_id` | Khai báo cơ quan / đơn vị mới. |
+| **Đơn vị** | `PUT` | `/api/admin/units/{id}` | JSON: `name`, `parent_id` | Cập nhật tên đơn vị hoặc đơn vị cấp trên. |
+| **Đơn vị** | `DELETE`| `/api/admin/units/{id}` | Path: `id` | Xóa đơn vị khỏi hệ thống (kiểm tra tài liệu/user trực thuộc). |
+| **Loại văn bản**| `GET` | `/api/admin/document-types` | — | Danh mục thể loại văn bản (Nghị quyết, Chỉ thị, Quyết định...). |
+| **Loại văn bản**| `POST` | `/api/admin/document-types` | JSON: `type_id`, `name`, `description` | Thêm mới loại văn bản. |
+| **Loại văn bản**| `PUT` | `/api/admin/document-types/{id}` | JSON: `name`, `description` | Sửa thông tin thể loại văn bản. |
+| **Loại văn bản**| `DELETE`| `/api/admin/document-types/{id}` | Path: `id` | Xóa thể loại văn bản khỏi hệ thống. |
+| **Độ mật** | `GET` | `/api/admin/security-levels` | — | Danh sách 5 cấp độ bảo mật quân sự. |
+| **Độ mật** | `POST` | `/api/admin/security-levels` | JSON: `level_id`, `code`, `name` | Khai báo mức độ bảo mật. |
+| **Độ mật** | `PUT` | `/api/admin/security-levels/{id}` | JSON: `code`, `name` | Hiệu chỉnh thông tin độ mật. |
+| **Độ mật** | `DELETE`| `/api/admin/security-levels/{id}` | Path: `id` | Xóa cấp độ bảo mật (có kiểm tra ràng buộc). |
+| **Dọn dẹp Log** | `DELETE`| `/api/admin/access-logs/clear` | — | Thao tác đặc biệt: Xóa toàn bộ nhật ký truy cập (Yêu cầu mức Tuyệt mật). |
 
 ---
 
@@ -538,11 +597,13 @@ npm run build
 
 ### 8.3. Địa Chỉ Truy Cập Trực Tiếp Trên Trình Duyệt
 
-* **Cổng xác thực đăng nhập:** [http://localhost:8000/login.html](http://localhost:8000/login.html)
-* **Bàn làm việc văn thư:** [http://localhost:8000/document-desk.html](http://localhost:8000/document-desk.html)
-* **Cổng tra cứu tài liệu:** [http://localhost:8000/portal.html](http://localhost:8000/portal.html)
-* **Trang quản trị hệ thống:** [http://localhost:8000/admin-dashboard.html](http://localhost:8000/admin-dashboard.html)
-* **Tài liệu đặc tả API Swagger:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **Cổng xác thực đăng nhập:** [http://localhost:8000/login](http://localhost:8000/login)
+* **Cổng tra cứu tài liệu:** [http://localhost:8000/portal](http://localhost:8000/portal) (hoặc [http://localhost:8000/](http://localhost:8000/))
+* **Bàn làm việc văn thư số:** [http://localhost:8000/document-desk](http://localhost:8000/document-desk)
+* **Trung tâm quản trị hệ thống:** [http://localhost:8000/admin-dashboard](http://localhost:8000/admin-dashboard)
+* **Quản lý quân nhân & tài khoản:** [http://localhost:8000/users](http://localhost:8000/users)
+* **Tài liệu Swagger API (OpenAPI 3.0):** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **Đặc tả API JSON:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
 
 ---
 *Bản tài liệu kiến trúc này được lưu trữ chính thức tại `SYSTEM_ARCHITECTURE.md` thuộc kho lưu trữ dự án QK7 DataHub.*

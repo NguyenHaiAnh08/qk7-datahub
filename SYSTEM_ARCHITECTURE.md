@@ -117,10 +117,10 @@ graph LR
 
     subgraph FRONTEND_SRC ["CẤU TRÚC CHI TIẾT FRONTEND"]
         F_Entry["index.html<br/>(1 Entry HTML Duy Nhất)"]
-        F_Routes["src/routes/<br/>- routePaths.ts<br/>- getAppRoutes.tsx<br/>- RouterProvider.tsx<br/>- modules/*.routes.tsx"]
-        F_Pages["src/pages/<br/>- LoginPage<br/>- AdminDashboardPage<br/>- DocumentDeskPage<br/>- PortalPage<br/>- UsersPage"]
-        F_Components["src/components/<br/>- common/ (Header, Sidebar...)<br/>- auth/ (LoginForm)<br/>- portal/ (Banner, Card, List)<br/>- document-desk/ (Dropzone...)<br/>- users/ (UserTable, FormModal...)"]
-        F_Services["src/services/<br/>- http.ts (Client API)<br/>- authService.ts<br/>- documentsApi.ts<br/>- usersApi.ts<br/>- dashboardApi.ts"]
+        F_Routes["src/routes/<br/>- routePaths.ts<br/>- routeAccess.ts<br/>- getAppRoutes.ts<br/>- RouterProvider.tsx<br/>- modules/*.routes.tsx"]
+        F_Pages["src/pages/<br/>- LoginPage<br/>- AdminDashboardPage<br/>- DocumentDeskPage<br/>- PortalPage<br/>- UsersPage<br/>- HttpErrorPage"]
+        F_Components["src/components/<br/>- common/ (Header, Sidebar, ProtectedRoute, HttpErrorListener...)<br/>- auth/ (LoginForm)<br/>- portal/ (Banner, Card, List)<br/>- document-desk/ (Dropzone...)<br/>- users/ (UserTable, FormModal...)"]
+        F_Services["src/services/<br/>- http.ts (Client API & Interceptor)<br/>- Domain Services (auth, document, user, role...)"]
         F_State["src/contexts/ & src/hooks/<br/>- AuthContext.tsx<br/>- ThemeContext.tsx<br/>- useAuth.ts"]
         F_Types["src/types/<br/>- document.ts<br/>- user.ts"]
     end
@@ -154,7 +154,7 @@ d:/QK7_DataHub/qk7-datahub/
 │
 ├── backend/                                # 🟢 HỆ THỐNG MÁY CHỦ VÀ DỮ LIỆU BACKEND
 │   ├── .env                                # Biến môi trường kết nối SQL Server và PORT
-│   ├── server.js                           # Máy chủ Express: API Gateway, xác thực, upload, tải tệp
+│   ├── server.js                           # Máy chủ Express: API Gateway, xác thực, upload, tải tệp, SPA Fallback
 │   ├── swagger.js                          # Cấu hình tài liệu giao diện Swagger API (/api-docs)
 │   ├── setup-passwords.js                  # Tiện ích mã hóa bcrypt mật khẩu tài khoản mẫu
 │   ├── package.json                        # Scripts và dependencies riêng cho backend
@@ -172,7 +172,7 @@ d:/QK7_DataHub/qk7-datahub/
 │   │
 │   └── public/                             # THƯ MỤC PHÂN PHỐI TĨNH (Sản phẩm build của Vite)
 │       ├── index.html                      # Vỏ nạp ứng dụng duy nhất
-│       └── assets/                         # JS Bundles, CSS tailwind tối ưu hóa & code-splitting
+│       └── assets/                         # JS Bundles, CSS tối ưu hóa & code-splitting
 │
 ├── _archive/                               # THƯ MỤC LƯU TRỮ AN TOÀN (Mã nguồn cũ không xóa)
 │   ├── public_app.js                       # Logic JS thuần cũ
@@ -181,36 +181,39 @@ d:/QK7_DataHub/qk7-datahub/
 │   ├── public_style.css                    # CSS thuần cũ
 │   └── src_index.js.bak                    # Bản backup index.js cũ
 │
-└── frontend/                               # MÃ NGUỒN FRONTEND HIỆN ĐẠI (React 18 + TS + Vite + Tailwind)
+└── frontend/                               # 🔵 MÃ NGUỒN FRONTEND (React 18 + TS + Vite + Ant Design + Tailwind)
     ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
-    ├── package.json                        # Cấu hình dependencies Frontend (react-router-dom...)
+    ├── package.json                        # Cấu hình dependencies Frontend (antd, react-router-dom...)
     ├── tsconfig.json                       # Cấu hình TypeScript compiler
     ├── tailwind.config.js                  # Cấu hình giao diện TailwindCSS
     ├── vite.config.ts                      # Cấu hình Vite SPA build sang ../backend/public & Proxy :8000
     │
     └── src/
         ├── index.css                       # Design System, biến màu quân sự, glass-panel
-        ├── App.tsx                         # Khởi tạo BrowserRouter, ThemeProvider, AuthProvider, RouterProvider
+        ├── App.tsx                         # Khởi tạo Ant Design ConfigProvider (Màu Tím #722ED1), Auth, Theme, Router
         ├── main.tsx                        # Điểm gắn kết ReactDOM createRoot vào #root
         ├── vite-env.d.ts                   # Định nghĩa kiểu Vite Client (import.meta.glob)
         │
-        ├── routes/                         # BỘ ĐỊNH TUYẾN TỰ ĐỘNG (AUTO-DISCOVERY ROUTER)
-        │   ├── routePaths.ts               # Single source of truth cho URL (/login, /portal, /document-desk...)
-        │   ├── getAppRoutes.tsx            # Tự động gom & sort route modules bằng import.meta.glob
-        │   ├── RouterProvider.tsx          # Render router bằng useRoutes hook
-        │   └── modules/                    # Phân module route theo tính năng
-        │       ├── auth.routes.tsx         # Route /login + điều hướng backward compatibility
+        ├── routes/                         # BỘ ĐỊNH TUYẾN TỰ ĐỘNG & BẢO VỆ TUYẾN ĐƯỜNG
+        │   ├── routePaths.ts               # Single source of truth cho URL (/login, /portal, /403, /404, /500...)
+        │   ├── routeAccess.ts              # Ma trận phân quyền kiểm soát Clearance Level & Login Guard (.ts)
+        │   ├── getAppRoutes.ts             # Tự động gom & sort route modules bằng import.meta.glob (.ts)
+        │   ├── RouterProvider.tsx          # Render router bằng useRoutes hook (.tsx)
+        │   └── modules/                    # Phân module route theo tính năng (.routes.tsx)
+        │       ├── auth.routes.tsx         # Route /login + điều hướng tương thích
         │       ├── portal.routes.tsx       # Route / và /portal
-        │       ├── desk.routes.tsx         # Route /document-desk
-        │       ├── admin.routes.tsx        # Route /admin-dashboard và /users
-        │       └── fallback.routes.tsx     # Bắt URL không hợp lệ về /portal
+        │       ├── desk.routes.tsx         # Route /document-desk (Bảo vệ bởi ProtectedRoute minClearance 3)
+        │       ├── admin.routes.tsx        # Route /admin-dashboard và /users (Bảo vệ bởi ProtectedRoute minClearance 4)
+        │       ├── error.routes.tsx        # Route các mã lỗi HTTP (/400, /401, /403, /404, /500, /502, /503, /error/:code)
+        │       └── fallback.routes.tsx     # Bắt URL không hợp lệ (*) hiển thị HttpErrorPage 404
         │
         ├── pages/                          # CÁC MÀN HÌNH CHỨC NĂNG (TSX)
         │   ├── LoginPage.tsx               # Màn hình đăng nhập xác thực quân nhân
         │   ├── PortalPage.tsx              # Cổng tra cứu tài liệu quân sự
         │   ├── DocumentDeskPage.tsx        # Bàn làm việc số hóa văn thư
         │   ├── AdminDashboardPage.tsx      # Bảng điều khiển quản trị trung tâm
-        │   └── UsersPage.tsx               # Quản lý danh sách quân nhân & phân quyền
+        │   ├── UsersPage.tsx               # Quản lý danh sách quân nhân & phân quyền
+        │   └── HttpErrorPage.tsx           # Trang hiển thị mã trạng thái HTTP chuẩn Ant Design
         │
         ├── constants/                      # HẰNG SỐ HỆ THỐNG
         │   └── apiEndpoints.ts             # Danh bạ toàn bộ URL API backend
@@ -224,16 +227,27 @@ d:/QK7_DataHub/qk7-datahub/
         │   ├── dateUtils.ts                # Định dạng ngày giờ chuẩn VN (DD/MM/YYYY, HH:mm:ss)
         │   └── formatFileSize.ts           # Chuyển đổi byte sang B, KB, MB, GB chuẩn xác
         │
-        ├── services/                       # TẦNG DỊCH VỤ MẠNG & GỌI API (HTTP)
-        │   ├── http.ts                     # Fetch client chuẩn hóa lỗi & tự động thêm Token/Clearance
-        │   ├── authService.ts              # Đăng nhập, lưu/xóa/đọc Session Storage
-        │   ├── documentsApi.ts             # Danh sách, chi tiết, upload, update, delete văn bản
-        │   ├── usersApi.ts                 # Quản trị tài khoản quân nhân & đổi mật khẩu
-        │   ├── dashboardApi.ts             # Thống kê KPI, danh mục, vai trò, kiểm toán an ninh
-        │   └── index.ts                    # Export tập trung
+        ├── services/                       # TẦNG DỊCH VỤ MẠNG & DOMAIN SERVICES
+        │   ├── http.ts                     # HTTP Client Wrapper (HttpError, bắt lỗi toàn cục 401/403/500)
+        │   ├── authService.ts              # Dịch vụ đăng nhập, lấy thông tin cá nhân & session
+        │   ├── documentService.ts          # Dịch vụ quản lý tìm kiếm, upload, sửa, xóa văn bản
+        │   ├── userService.ts              # Dịch vụ quản lý tài khoản quân nhân
+        │   ├── roleService.ts              # Dịch vụ quản lý vai trò người dùng (Roles)
+        │   ├── permissionService.ts        # Dịch vụ quản lý phân quyền (Permissions)
+        │   ├── unitService.ts              # Dịch vụ quản lý đơn vị quân khu
+        │   ├── documentTypeService.ts      # Dịch vụ quản lý danh mục loại văn bản
+        │   ├── securityLevelService.ts     # Dịch vụ quản lý 5 cấp độ bảo mật
+        │   ├── logService.ts               # Dịch vụ nhật ký kiểm toán an ninh (ACCESS_LOG)
+        │   ├── systemService.ts            # Dịch vụ kiểm tra kết nối /api/health và metadata
+        │   ├── documentsApi.ts             # Compatibility alias trỏ về documentService
+        │   ├── usersApi.ts                 # Compatibility alias trỏ về userService
+        │   ├── dashboardApi.ts             # Aggregator Service phục vụ Admin Dashboard
+        │   ├── api.ts                      # Legacy Facade hợp nhất tất cả services
+        │   └── index.ts                    # Điểm xuất khẩu chung (Barrel export)
         │
         ├── contexts/                       # QUẢN LÝ TRẠNG THÁI TOÀN CỤC (STATE)
-        │   └── AuthContext.tsx             # Cung cấp User session, isAdmin, isStaff, login, logout
+        │   ├── AuthContext.tsx             # Cung cấp User session, isAdmin, isStaff, login, logout
+        │   └── ThemeContext.tsx            # Đồng bộ Dark/Light theme toàn hệ thống
         │
         ├── hooks/                          # CUSTOM HOOKS TIỆN ÍCH
         │   └── useAuth.ts                  # Hook truy xuất dữ liệu từ AuthContext
@@ -241,18 +255,22 @@ d:/QK7_DataHub/qk7-datahub/
         ├── components/                     # CÁC THÀNH PHẦN GIAO DIỆN (COMPONENTS)
         │   ├── common/                     # Component dùng chung toàn hệ thống
         │   │   ├── Header.tsx              # Thanh tiêu đề, đồng hồ trực tiếp, menu người dùng
-        │   │   ├── Sidebar.tsx             # Thanh điều hướng quản trị có đo lường Backend Status
+        │   │   ├── Sidebar.tsx             # Thanh điều hướng quản trị
         │   │   ├── Layout.tsx              # Khung bố cục chuẩn mực
+        │   │   ├── ProtectedRoute.tsx      # Bộ gác cổng bảo vệ URL theo Cấp độ mật (.tsx)
+        │   │   ├── HttpErrorListener.tsx   # Lắng nghe sự kiện lỗi HTTP và thông báo qua Ant Design
+        │   │   ├── ThemeToggle.tsx         # Nút chuyển đổi giao diện sáng/tối
         │   │   ├── DataTable.tsx           # Bảng dữ liệu hỗ trợ tìm kiếm, loading, phân trang
         │   │   ├── ConfirmDialog.tsx       # Hộp thoại xác nhận thao tác nguy hiểm
         │   │   └── Toast.tsx               # Thông báo nổi (success, error, info)
         │   │
         │   ├── auth/                       # Phục vụ xác thực đăng nhập
-        │   │   └── LoginForm.tsx           # Form đăng nhập, chuyển đổi tài khoản demo tự động
+        │   │   └── LoginForm.tsx           # Form đăng nhập tài khoản quân nhân
         │   │
-        │   ├── dashboard/                  # Phục vụ trang quản trị trung tâm
-        │   │   ├── StatCard.tsx            # Thẻ KPI 4 chỉ số lớn (Người dùng, Tệp, Dung lượng, Log)
-        │   │   └── DistributionChart.tsx   # Biểu đồ thanh ngang phân bố văn bản theo cấp mật/thể loại
+        │   ├── portal/                     # Phục vụ Cổng tra cứu cán bộ
+        │   │   ├── SecurityBanner.tsx      # Biểu ngữ cam kết bảo mật & thông báo cấp quyền
+        │   │   ├── DocumentCard.tsx        # Thẻ văn bản hiển thị dạng lưới
+        │   │   └── PortalDocumentList.tsx  # Lưới văn bản kèm kiểm soát khóa quyền truy cập
         │   │
         │   ├── document-desk/              # Phục vụ bàn làm việc văn thư
         │   │   ├── Dropzone.tsx            # Vùng kéo thả tệp văn bản đính kèm
@@ -261,22 +279,14 @@ d:/QK7_DataHub/qk7-datahub/
         │   │   ├── DocumentUploadModal.tsx # Hộp thoại tiếp nhận & cập nhật văn bản
         │   │   └── DocumentPreviewModal.tsx# Hộp thoại nhúng PDF viewer trực quan
         │   │
-        │   ├── users/                      # Phục vụ quản trị quân nhân
-        │   │   ├── UserTable.tsx           # Bảng danh sách quân nhân & cấp bậc
-        │   │   ├── UserFormModal.tsx       # Hộp thoại tạo mới & cập nhật thông tin quân nhân
-        │   │   └── UserCredentialsModal.tsx# Hộp thoại sinh mật khẩu ngẫu nhiên & đổi mật khẩu
+        │   ├── dashboard/                  # Phục vụ trang quản trị trung tâm
+        │   │   ├── StatCard.tsx            # Thẻ KPI 4 chỉ số lớn (Người dùng, Tệp, Dung lượng, Log)
+        │   │   └── DistributionChart.tsx   # Biểu đồ thanh ngang phân bố văn bản theo cấp mật/thể loại
         │   │
-        │   └── portal/                     # Phục vụ cổng tra cứu cán bộ
-        │       ├── SecurityBanner.tsx      # Biểu ngữ cam kết bảo mật & thông báo cấp quyền
-        │       ├── DocumentCard.tsx        # Thẻ văn bản hiển thị dạng lưới
-        │       └── PortalDocumentList.tsx  # Lưới văn bản kèm kiểm soát khóa quyền truy cập
-        │
-        └── pages/                          # CÁC TRANG ỨNG DỤNG HOÀN CHỈNH
-            ├── LoginPage.tsx               # Trang đăng nhập xác thực quân sự
-            ├── AdminDashboardPage.tsx      # Trang quản trị hệ thống trung tâm
-            ├── DocumentDeskPage.tsx        # Trang bàn làm việc văn thư
-            ├── PortalPage.tsx              # Trang cổng tra cứu cán bộ
-            └── UsersPage.tsx               # Trang chuyên biệt quản trị quân nhân
+        │   └── users/                      # Phục vụ quản trị quân nhân
+        │       ├── UserTable.tsx           # Bảng danh sách quân nhân & cấp bậc
+        │       ├── UserFormModal.tsx       # Hộp thoại tạo mới & cập nhật thông tin quân nhân
+        │       └── UserCredentialsModal.tsx# Hộp thoại sinh mật khẩu ngẫu nhiên & đổi mật khẩu
 ```
 
 ---
@@ -316,7 +326,7 @@ d:/QK7_DataHub/qk7-datahub/
 sequenceDiagram
     autonumber
     actor Officer as Quân Nhân
-    participant UI as Giao Diện (login.html)
+    participant UI as Giao Diện (LoginPage /login)
     participant Server as Express Server (:8000)
     participant DB as SQL Server (QK7_ThuVienSo)
 
@@ -344,7 +354,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Clerk as Văn Thư Quân Khu
-    participant Desk as Bàn Làm Việc (document-desk.html)
+    participant Desk as Bàn Làm Việc (DocumentDeskPage /document-desk)
     participant Server as Express Gateway (:8000)
     participant Disk as Ổ Đĩa Vật Lý (uploads/)
     participant DB as SQL Server (QK7_ThuVienSo)
@@ -369,7 +379,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor User as Cán Bộ Tra Cứu
-    participant Portal as Cổng Tra Cứu (portal.html)
+    participant Portal as Cổng Tra Cứu (PortalPage /portal)
     participant Server as Express Gateway (:8000)
     participant DB as SQL Server (QK7_ThuVienSo)
     participant Disk as Kho Tệp (uploads/)
@@ -485,31 +495,90 @@ erDiagram
 
 ---
 
-## 7. Danh Mục API Endpoints
+## 7. Danh Mục API Endpoints (Chuẩn OpenAPI 3.0 / Swagger)
 
-| Nhóm Nghiệp Vụ | Phương Thức | Đường Dẫn API | Tham Số / Body | Mô Tả Chức Năng |
+Hệ thống tích hợp tài liệu đặc tả API chuẩn quốc tế **OpenAPI 3.0 (Swagger)** được khai báo tập trung tại [`backend/swagger.js`](file:///d:/QK7_DataHub/qk7-datahub/backend/swagger.js).
+
+* **Giao diện trực quan Swagger UI:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **Tệp đặc tả JSON thô:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
+* **Kiểm soát bật/tắt:** Cấu hình biến môi trường `ENABLE_SWAGGER=true` (hoặc `false`) trong file `backend/.env`.
+
+### 7.1. Cơ Chế Xác Thực & Phân Quyền (Security Schemes)
+
+Toàn bộ API (ngoại trừ endpoint công khai `/api/auth/login`) yêu cầu gửi kèm các Custom Headers để xác định danh tính và kiểm soát độ mật:
+* **`X-User-Id` (String):** Mã quân nhân/người dùng (ví dụ: `USR-001`, `USR-004`).
+* **`X-Clearance` (Integer):** Mức độ bảo mật được cấp phép (Giá trị từ `1` đến `5`).
+
+---
+
+### 7.2. Danh Mục Chi Tiết Các Nhóm API
+
+#### 1. Nhóm Xác Thực & Danh Tính (Auth)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `POST` | `/api/auth/login` | Công khai | `{ user_id, password }` | Xác thực đăng nhập bằng `username` hoặc `user_id` + mật khẩu (kiểm tra hash bcrypt). Trả về thông tin quân nhân kèm danh sách vai trò (`UserFull`). |
+| `GET` | `/api/auth/me` | Mọi cấp (≥ 1) | Header: `X-User-Id` | Tra cứu hồ sơ thông tin và danh sách quyền của quân nhân đang đăng nhập. |
+
+#### 2. Nhóm Trạng Thái & Danh Mục Hệ Thống (System)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/health` | Mọi cấp | — | Kiểm tra trạng thái máy chủ, kết nối cơ sở dữ liệu SQL Server (`db`, `login_name`, `now`). |
+| `GET` | `/api/meta` | Mọi cấp (≥ 1) | — | Lấy toàn bộ danh mục tham chiếu: Loại văn bản (`types`), Đơn vị quân sự (`units`), Cấp độ bảo mật (`levels`). |
+
+#### 3. Nhóm Quản Lý Tài Liệu Văn Bản (Documents)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/documents` | Theo cấp (1 - 5) | Query: `code`, `title`, `type`, `unit`, `from`, `to`, `lv` | Tra cứu và liệt kê danh sách văn bản. Hệ thống tự động lọc các tài liệu có độ mật $\le$ Clearance của người dùng (ngăn chặn thấy văn bản vượt cấp). |
+| `POST` | `/api/documents/upload` | Cán bộ văn thư | `multipart/form-data`: `file`, `document_code`, `title`, `doc_type_id`, `issued_date`, `issuing_unit_id`, `signer`, `summary`, `security_level_id` | Tải lên tệp PDF mới (giới hạn $\le$ 50MB). Tự động sinh mã băm SHA-256, lưu tệp vào `uploads/YYYY/MM/` và ghi nhật ký kiểm toán `UPLOAD`. |
+| `GET` | `/api/documents/{fileId}` | Theo cấp mật | Path: `fileId` | Lấy chi tiết thông tin metadata của 1 văn bản cụ thể. |
+| `PUT` | `/api/documents/{fileId}` | Cán bộ văn thư | `multipart/form-data`: `file` (tùy chọn), các trường metadata | Cập nhật thông tin văn bản hoặc thay thế bằng file PDF mới. |
+| `DELETE` | `/api/documents/{fileId}` | Cán bộ văn thư | Path: `fileId` | Xóa văn bản (xóa cả bản ghi trong SQL Server và file PDF vật lý trên ổ đĩa), ghi nhật ký `DELETE`. |
+
+#### 4. Nhóm Xem & Tải Tệp Tin PDF (Files)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/files/{fileId}/view` | Kiểm tra độ mật $\ge$ cấp tài liệu | Path: `fileId`<br/>Query: `download` (`0` = xem inline, `1` = tải về) | Stream trực tiếp tệp PDF an toàn qua giao thức nhị phân. Kiểm tra nghiêm ngặt quyền truy cập và tự động ghi nhật ký `VIEW` hoặc `DOWNLOAD` vào `ACCESS_LOG`. Trả về `403` nếu vi phạm độ mật. |
+
+#### 5. Nhóm Nhật Ký Kiểm Toán An Ninh (Logs)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/access-logs` | Mức 4+ (Tối mật / Tuyệt mật) | Query: `user`, `action` (`LOGIN`, `VIEW`, `DOWNLOAD`, `UPLOAD`, `UPDATE`, `DELETE`, `DENIED`, `ERROR`) | Lấy danh sách 200 bản ghi nhật ký kiểm toán gần nhất phục vụ giám sát an ninh mạng quân sự. |
+
+#### 6. Nhóm Quản Trị Hệ Thống Nâng Cao (Admin — Yêu Cầu Cấp Độ Mật $\ge$ 4)
+| Phân Nhóm | Phương Thức | Đường Dẫn API | Tham Số / Body | Mô Tả Chức Năng |
 | :--- | :---: | :--- | :--- | :--- |
-| **Xác thực** | `POST` | `/api/auth/login` | `{ user_id, password }` | Đăng nhập hệ thống, kiểm tra bcrypt & tạo log |
-| **Xác thực** | `GET` | `/api/auth/me` | *Header:* `X-User-Id` | Lấy thông tin chi tiết quân nhân đang đăng nhập |
-| **Danh mục** | `GET` | `/api/meta` | — | Lấy đồng thời danh mục Types, Units, Security Levels |
-| **Trạng thái** | `GET` | `/api/health` | — | Kiểm tra kết nối SQL Server & trạng thái máy chủ |
-| **Văn bản** | `GET` | `/api/documents` | `?code=&type=&unit=&lv=&from=&to=` | Lấy danh sách văn bản (lọc theo cấp bảo mật) |
-| **Văn bản** | `GET` | `/api/documents/:id` | `id: file_id` | Lấy thông tin chi tiết của một văn bản |
-| **Văn bản** | `POST` | `/api/documents` | `multipart/form-data` | Tải lên văn bản mới (tính toán SHA-256) |
-| **Văn bản** | `PUT` | `/api/documents/:id` | `multipart/form-data` | Hiệu chỉnh thông tin hoặc thay thế tệp văn bản |
-| **Văn bản** | `DELETE` | `/api/documents/:id` | `id: file_id` | Xóa văn bản khỏi cơ sở dữ liệu và lưu log |
-| **Xem / Tải** | `GET` | `/api/documents/:id/view` | `?download=true/false` | Stream trực tiếp tệp PDF xem trước hoặc tải về |
-| **Quản trị** | `GET` | `/api/admin/stats` | — | Lấy 4 chỉ số KPI lớn & biểu đồ phân bố văn bản |
-| **Quản trị** | `GET` | `/api/admin/users` | — | Lấy toàn bộ danh sách quân nhân & quyền hạn |
-| **Quản trị** | `POST` | `/api/admin/users` | `{ user_id, full_name, rank_name... }` | Tạo mới tài khoản quân nhân |
-| **Quản trị** | `PUT` | `/api/admin/users/:id` | `{ full_name, unit_id, status... }` | Cập nhật hồ sơ thông tin quân nhân |
-| **Quản trị** | `PUT` | `/api/admin/users/:id/credentials` | `{ username, password }` | Cập nhật tài khoản đăng nhập & mật khẩu mới |
-| **Quản trị** | `DELETE` | `/api/admin/users/:id` | `id: user_id` | Xóa tài khoản quân nhân khỏi hệ thống |
-| **Quản trị** | `GET` | `/api/admin/roles` | — | Quản lý danh mục các vai trò (CRUD) |
-| **Quản trị** | `GET` | `/api/admin/units` | — | Quản lý danh mục đơn vị quân khu (CRUD) |
-| **Quản trị** | `GET` | `/api/admin/document-types` | — | Quản lý danh mục thể loại văn bản (CRUD) |
-| **Quản trị** | `GET` | `/api/admin/security-levels`| — | Quản lý định nghĩa 5 mức bảo mật (CRUD) |
-| **Kiểm toán** | `GET` | `/api/admin/logs` | `?user=&action=` | Xem nhật ký kiểm toán truy xuất an ninh 24/7 |
+| **Thống kê** | `GET` | `/api/admin/stats` | — | Lấy số liệu 4 thẻ KPI lớn (users, documents, totalSize, logs24h) và phân bố văn bản theo mức mật, thể loại, đơn vị. |
+| **Người dùng** | `GET` | `/api/admin/users` | — | Lấy toàn bộ danh sách tài khoản quân nhân và quyền hạn trong đơn vị. |
+| **Người dùng** | `POST` | `/api/admin/users` | JSON: `user_id`, `username`, `password`, `full_name`, `rank_name`, `position`, `unit_id`, `status`, `clearance_level_id` | Tạo mới tài khoản quân nhân, tự động hash mật khẩu bcrypt. |
+| **Người dùng** | `PUT` | `/api/admin/users/{id}` | JSON: `full_name`, `rank_name`, `position`, `unit_id`, `status`, `clearance_level_id` | Hiệu chỉnh thông tin hồ sơ quân nhân (không đổi username/password). |
+| **Người dùng** | `DELETE` | `/api/admin/users/{id}` | Path: `id` | Xóa tài khoản quân nhân (có kiểm tra ràng buộc toàn vẹn dữ liệu). |
+| **Bảo mật user**| `PUT` | `/api/admin/users/{id}/credentials` | JSON: `username`, `password` (tùy chọn) | Cập nhật lại tên đăng nhập hoặc đặt lại mật khẩu mới cho quân nhân. |
+| **Gán vai trò** | `GET` | `/api/admin/users/{id}/roles` | Path: `id` | Xem danh sách các vai trò đã cấp cho quân nhân. |
+| **Gán vai trò** | `POST` | `/api/admin/users/{id}/roles` | JSON: `role_id` | Gán vai trò mới cho quân nhân. |
+| **Gán vai trò** | `DELETE`| `/api/admin/users/{id}/roles/{roleId}` | Path: `id`, `roleId` | Thu hồi vai trò đã cấp cho quân nhân. |
+| **Vai trò** | `GET` | `/api/admin/roles` | — | Danh sách các vai trò quản trị trong hệ thống. |
+| **Vai trò** | `POST` | `/api/admin/roles` | JSON: `role_id`, `name` | Tạo mới vai trò phân quyền. |
+| **Vai trò** | `PUT` | `/api/admin/roles/{id}` | JSON: `name` | Đổi tên vai trò. |
+| **Vai trò** | `DELETE`| `/api/admin/roles/{id}` | Path: `id` | Xóa vai trò (tự động xóa liên kết USER_ROLE và ROLE_PERMISSION). |
+| **Quyền hạn** | `GET` | `/api/admin/permissions` | — | Danh mục các quyền thao tác trong hệ thống. |
+| **Quyền hạn** | `POST` | `/api/admin/permissions` | JSON: `permission_id`, `code`, `description` | Khai báo quyền thao tác mới. |
+| **Quyền hạn** | `DELETE`| `/api/admin/permissions/{id}` | Path: `id` | Xóa quyền thao tác. |
+| **Quyền-Vai trò**| `GET` | `/api/admin/roles/{id}/permissions` | Path: `id` | Xem danh sách quyền gắn liền với vai trò. |
+| **Quyền-Vai trò**| `POST` | `/api/admin/roles/{id}/permissions` | JSON: `permission_id` | Gán quyền thao tác vào vai trò. |
+| **Quyền-Vai trò**| `DELETE`| `/api/admin/roles/{id}/permissions/{permId}` | Path: `id`, `permId` | Bỏ quyền thao tác khỏi vai trò. |
+| **Đơn vị** | `GET` | `/api/admin/units` | — | Danh sách các đơn vị, cơ quan quân khu. |
+| **Đơn vị** | `POST` | `/api/admin/units` | JSON: `unit_id`, `name`, `parent_id` | Khai báo cơ quan / đơn vị mới. |
+| **Đơn vị** | `PUT` | `/api/admin/units/{id}` | JSON: `name`, `parent_id` | Cập nhật tên đơn vị hoặc đơn vị cấp trên. |
+| **Đơn vị** | `DELETE`| `/api/admin/units/{id}` | Path: `id` | Xóa đơn vị khỏi hệ thống (kiểm tra tài liệu/user trực thuộc). |
+| **Loại văn bản**| `GET` | `/api/admin/document-types` | — | Danh mục thể loại văn bản (Nghị quyết, Chỉ thị, Quyết định...). |
+| **Loại văn bản**| `POST` | `/api/admin/document-types` | JSON: `type_id`, `name`, `description` | Thêm mới loại văn bản. |
+| **Loại văn bản**| `PUT` | `/api/admin/document-types/{id}` | JSON: `name`, `description` | Sửa thông tin thể loại văn bản. |
+| **Loại văn bản**| `DELETE`| `/api/admin/document-types/{id}` | Path: `id` | Xóa thể loại văn bản khỏi hệ thống. |
+| **Độ mật** | `GET` | `/api/admin/security-levels` | — | Danh sách 5 cấp độ bảo mật quân sự. |
+| **Độ mật** | `POST` | `/api/admin/security-levels` | JSON: `level_id`, `code`, `name` | Khai báo mức độ bảo mật. |
+| **Độ mật** | `PUT` | `/api/admin/security-levels/{id}` | JSON: `code`, `name` | Hiệu chỉnh thông tin độ mật. |
+| **Độ mật** | `DELETE`| `/api/admin/security-levels/{id}` | Path: `id` | Xóa cấp độ bảo mật (có kiểm tra ràng buộc). |
+| **Dọn dẹp Log** | `DELETE`| `/api/admin/access-logs/clear` | — | Thao tác đặc biệt: Xóa toàn bộ nhật ký truy cập (Yêu cầu mức Tuyệt mật). |
 
 ---
 
@@ -538,11 +607,13 @@ npm run build
 
 ### 8.3. Địa Chỉ Truy Cập Trực Tiếp Trên Trình Duyệt
 
-* **Cổng xác thực đăng nhập:** [http://localhost:8000/login.html](http://localhost:8000/login.html)
-* **Bàn làm việc văn thư:** [http://localhost:8000/document-desk.html](http://localhost:8000/document-desk.html)
-* **Cổng tra cứu tài liệu:** [http://localhost:8000/portal.html](http://localhost:8000/portal.html)
-* **Trang quản trị hệ thống:** [http://localhost:8000/admin-dashboard.html](http://localhost:8000/admin-dashboard.html)
-* **Tài liệu đặc tả API Swagger:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **Cổng xác thực đăng nhập:** [http://localhost:8000/login](http://localhost:8000/login)
+* **Cổng tra cứu tài liệu:** [http://localhost:8000/portal](http://localhost:8000/portal) (hoặc [http://localhost:8000/](http://localhost:8000/))
+* **Bàn làm việc văn thư số:** [http://localhost:8000/document-desk](http://localhost:8000/document-desk)
+* **Trung tâm quản trị hệ thống:** [http://localhost:8000/admin-dashboard](http://localhost:8000/admin-dashboard)
+* **Quản lý quân nhân & tài khoản:** [http://localhost:8000/users](http://localhost:8000/users)
+* **Tài liệu Swagger API (OpenAPI 3.0):** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **Đặc tả API JSON:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
 
 ---
 *Bản tài liệu kiến trúc này được lưu trữ chính thức tại `SYSTEM_ARCHITECTURE.md` thuộc kho lưu trữ dự án QK7 DataHub.*

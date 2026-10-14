@@ -248,6 +248,21 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ============================================================
+// 1.1 HTTP STATUS TEST & SIMULATION
+// ============================================================
+app.get('/api/test-http-error/:code', (req, res) => {
+    const code = parseInt(req.params.code, 10) || 500;
+    const msg = req.query.msg || `Mô phỏng phản hồi mã lỗi HTTP ${code} từ máy chủ Backend QK7 DataHub`;
+    return res.status(code).json({
+        ok: false,
+        code,
+        error: msg,
+        timestamp: new Date().toISOString()
+    });
+});
+
+
+// ============================================================
 // 2. DANH MỤC
 // ============================================================
 app.get('/api/meta', async (req, res) => {
@@ -760,9 +775,9 @@ app.use((err, req, res, next) => {
 // ─── Admin CRUD routes ───
 require('./src/admin-routes')(app, { sql, getPool, writeAccessLog });
 
-// ─── SPA Fallback: mọi request GET điều hướng giao diện trả về index.html ───
+// ─── SPA Fallback: mọi request GET/HEAD điều hướng giao diện trả về index.html ───
 app.use((req, res, next) => {
-    if (req.method !== 'GET') return next();
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs')) {
         return next();
     }

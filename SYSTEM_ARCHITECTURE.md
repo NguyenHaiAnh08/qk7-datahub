@@ -1,8 +1,8 @@
 # KIẾN TRÚC TOÀN BỘ HỆ THỐNG — QK7 DATAHUB
 
 > **Bảo mật:** Cấp Bộ Tư Lệnh Quân Khu 7  
-> **Phiên bản kiến trúc:** v2.5-PROD (React + TypeScript MPA & Express + SQL Server)  
-> **Ngày cập nhật:** 13/10/2026  
+> **Phiên bản kiến trúc:** v3.0-PROD (React + TypeScript SPA with React Router & Express 5 + SQL Server)  
+> **Ngày cập nhật:** 14/10/2026  
 
 ---
 
@@ -22,7 +22,7 @@
 
 **QK7 DataHub** là nền tảng quản trị và lưu trữ tài liệu số tập trung, phục vụ công tác chỉ huy, tham mưu và văn thư hành chính trong toàn Quân Khu 7. Hệ thống được thiết kế theo các nguyên tắc cốt lõi:
 
-* **Mô hình đa trang (Multi-Page Application - MPA):** Phân tách rạch ròi 5 không gian làm việc độc lập (Đăng nhập, Bàn làm việc văn thư, Cổng tra cứu cán bộ, Quản trị hệ thống, Trang điều hướng trung tâm).
+* **Mô hình Ứng dụng đơn trang chuẩn (Single-Page Application - SPA):** Sử dụng React 18, TypeScript và React Router với cơ chế Auto-Discovery Routing qua `import.meta.glob`. Toàn bộ giao diện được nạp qua duy nhất 1 vỏ bọc `index.html`, chuyển trang mượt mà không tải lại trang và giữ nguyên trạng thái xác thực.
 * **Kiểm soát độ mật 5 cấp nghiêm ngặt:** Ngăn chặn tuyệt đối việc rò rỉ văn bản vượt cấp bảo mật (từ Cấp 1 - Công khai đến Cấp 5 - Tuyệt mật).
 * **Toàn vẹn tệp & vân tay số:** Mọi tài liệu PDF/văn bản tải lên đều được tính toán mã băm SHA-256 lưu trữ song song với ổ đĩa vật lý an toàn.
 * **Kiểm toán an ninh 24/7:** Ghi vết đầy đủ mọi hành động truy xuất (Đăng nhập, Xem, Tải về, Sửa, Xóa) kèm địa chỉ IP quân sự và dấu thời gian.
@@ -44,18 +44,22 @@ graph TB
         UserAdmin --> Browser
     end
 
-    subgraph PRESENTATION_TIER ["2. TẦNG GIAO DIỆN REACT + TS (MPA BUILT IN /public)"]
-        LoginPage["login.html<br/>Xác thực danh tính"]
-        DeskPage["document-desk.html<br/>Bàn làm việc văn thư"]
-        PortalPage["portal.html<br/>Cổng tra cứu tài liệu"]
-        AdminPage["admin-dashboard.html<br/>Quản trị trung tâm"]
-        IndexPage["index.html<br/>Điều hướng tổng"]
+    subgraph PRESENTATION_TIER ["2. TẦNG GIAO DIỆN REACT + TS (SPA CLIENT ROUTING)"]
+        SingleHTML["index.html<br/>Vỏ nạp duy nhất"]
+        AppRouter["React Router (useRoutes)<br/>Auto-Discovery Routing"]
+        LoginPage["Route: /login<br/>Xác thực danh tính"]
+        DeskPage["Route: /document-desk<br/>Bàn làm việc văn thư"]
+        PortalPage["Route: /portal (hoặc /)<br/>Cổng tra cứu tài liệu"]
+        AdminPage["Route: /admin-dashboard<br/>Quản trị trung tâm"]
+        UsersPage["Route: /users<br/>Quản lý quân nhân"]
 
-        Browser -->|GET /login.html| LoginPage
-        Browser -->|GET /document-desk.html| DeskPage
-        Browser -->|GET /portal.html| PortalPage
-        Browser -->|GET /admin-dashboard.html| AdminPage
-        Browser -->|GET /| IndexPage
+        Browser -->|GET / (hoặc bất kỳ URL nào)| SingleHTML
+        SingleHTML --> AppRouter
+        AppRouter --> LoginPage
+        AppRouter --> DeskPage
+        AppRouter --> PortalPage
+        AppRouter --> AdminPage
+        AppRouter --> UsersPage
     end
 
     subgraph GATEWAY_TIER ["3. TẦNG MÁY CHỦ EXPRESS GATEWAY (:8000)"]
@@ -102,39 +106,41 @@ graph TB
 ```mermaid
 graph LR
     subgraph ROOT ["THƯ MỤC DỰ ÁN GỐC"]
-        ServerJS["server.js<br/>(Cổng API & Static Server)"]
+        ServerJS["server.js<br/>(Cổng API & SPA Fallback Gateway)"]
         SwaggerJS["swagger.js<br/>(OpenAPI Spec)"]
         SrcBackend["src/<br/>- db.js (Kết nối MSSQL)<br/>- admin-routes.js (Router QTV)"]
-        PublicDir["public/<br/>(Sản phẩm build HTML/Assets)"]
+        PublicDir["public/<br/>(Sản phẩm build: index.html & assets/)"]
         UploadsDir["uploads/<br/>(Kho tài liệu PDF thật)"]
         ArchiveDir["_archive/<br/>(Mã nguồn di sản lưu trữ)"]
-        FrontendDir["frontend/<br/>(Mã nguồn chuẩn React + TS)"]
+        FrontendDir["frontend/<br/>(Mã nguồn chuẩn React + TS SPA)"]
     end
 
     subgraph FRONTEND_SRC ["CẤU TRÚC CHI TIẾT FRONTEND"]
-        F_Entry["5 Entry HTML<br/>(index, login, desk, portal, admin)"]
+        F_Entry["index.html<br/>(1 Entry HTML Duy Nhất)"]
+        F_Routes["src/routes/<br/>- routePaths.ts<br/>- getAppRoutes.tsx<br/>- RouterProvider.tsx<br/>- modules/*.routes.tsx"]
         F_Pages["src/pages/<br/>- LoginPage<br/>- AdminDashboardPage<br/>- DocumentDeskPage<br/>- PortalPage<br/>- UsersPage"]
-        F_Components["src/components/<br/>- common/ (Header, Sidebar, Dialog...)<br/>- auth/ (LoginForm)<br/>- dashboard/ (StatCard, Chart)<br/>- document-desk/ (Dropzone, Filters, Table...)<br/>- users/ (UserTable, FormModal...)<br/>- portal/ (Banner, Card, List)"]
+        F_Components["src/components/<br/>- common/ (Header, Sidebar...)<br/>- auth/ (LoginForm)<br/>- portal/ (Banner, Card, List)<br/>- document-desk/ (Dropzone...)<br/>- users/ (UserTable, FormModal...)"]
         F_Services["src/services/<br/>- http.ts (Client API)<br/>- authService.ts<br/>- documentsApi.ts<br/>- usersApi.ts<br/>- dashboardApi.ts"]
-        F_State["src/contexts/ & src/hooks/<br/>- AuthContext.tsx<br/>- useAuth.ts"]
+        F_State["src/contexts/ & src/hooks/<br/>- AuthContext.tsx<br/>- ThemeContext.tsx<br/>- useAuth.ts"]
         F_Types["src/types/<br/>- document.ts<br/>- user.ts"]
     end
 
     FrontendDir --> F_Entry
+    FrontendDir --> F_Routes
     FrontendDir --> F_Pages
     FrontendDir --> F_Components
     FrontendDir --> F_Services
     FrontendDir --> F_State
     FrontendDir --> F_Types
     FrontendDir -->|npm run build| PublicDir
-    ServerJS -->|Serve Static| PublicDir
+    ServerJS -->|SPA Static Fallback| PublicDir
     ServerJS -->|Require| SrcBackend
     ServerJS -->|Read/Write File| UploadsDir
 
     classDef rootBox fill:#1e1b4b,stroke:#6366f1,stroke-width:2px,color:#fff;
     classDef feBox fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;
     class ServerJS,SwaggerJS,SrcBackend,PublicDir,UploadsDir,ArchiveDir,FrontendDir rootBox;
-    class F_Entry,F_Pages,F_Components,F_Services,F_State,F_Types feBox;
+    class F_Entry,F_Routes,F_Pages,F_Components,F_Services,F_State,F_Types feBox;
 ```
 
 ### 3.2. Cây Thư Mục Chi Tiết Toàn Bộ Hệ Thống
@@ -165,11 +171,7 @@ d:/QK7_DataHub/qk7-datahub/
 │   │   └── TuyetMat/                       # Thư mục phân loại cấp Tuyệt Mật
 │   │
 │   └── public/                             # THƯ MỤC PHÂN PHỐI TĨNH (Sản phẩm build của Vite)
-│       ├── index.html                      # Trang chuyển hướng trung tâm
-│       ├── login.html                      # Trang đăng nhập xác thực
-│       ├── admin-dashboard.html            # Trang quản trị hệ thống
-│       ├── document-desk.html              # Trang bàn làm việc văn thư
-│       ├── portal.html                     # Trang cổng tra cứu văn bản
+│       ├── index.html                      # Vỏ nạp ứng dụng duy nhất
 │       └── assets/                         # JS Bundles, CSS tailwind tối ưu hóa & code-splitting
 │
 ├── _archive/                               # THƯ MỤC LƯU TRỮ AN TOÀN (Mã nguồn cũ không xóa)
@@ -180,23 +182,35 @@ d:/QK7_DataHub/qk7-datahub/
 │   └── src_index.js.bak                    # Bản backup index.js cũ
 │
 └── frontend/                               # MÃ NGUỒN FRONTEND HIỆN ĐẠI (React 18 + TS + Vite + Tailwind)
-    ├── index.html                          # Entry HTML cho trang chủ
-    ├── login.html                          # Entry HTML cho trang đăng nhập
-    ├── admin-dashboard.html                # Entry HTML cho trang quản trị
-    ├── document-desk.html                  # Entry HTML cho trang văn thư
-    ├── portal.html                         # Entry HTML cho trang tra cứu
-    ├── package.json                        # Cấu hình dependencies Frontend
+    ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
+    ├── package.json                        # Cấu hình dependencies Frontend (react-router-dom...)
     ├── tsconfig.json                       # Cấu hình TypeScript compiler
     ├── tailwind.config.js                  # Cấu hình giao diện TailwindCSS
-    ├── vite.config.ts                      # Cấu hình Rollup 5 MPA inputs & Proxy sang cổng 8000
+    ├── vite.config.ts                      # Cấu hình Vite SPA build sang ../backend/public & Proxy :8000
     │
     └── src/
         ├── index.css                       # Design System, biến màu quân sự, glass-panel
-        ├── main-index.tsx                  # Mount script cho index.html
-        ├── main-login.tsx                  # Mount script cho login.html
-        ├── main-dashboard.tsx              # Mount script cho admin-dashboard.html
-        ├── main-document-desk.tsx          # Mount script cho document-desk.html
-        ├── main-portal.tsx                 # Mount script cho portal.html
+        ├── App.tsx                         # Khởi tạo BrowserRouter, ThemeProvider, AuthProvider, RouterProvider
+        ├── main.tsx                        # Điểm gắn kết ReactDOM createRoot vào #root
+        ├── vite-env.d.ts                   # Định nghĩa kiểu Vite Client (import.meta.glob)
+        │
+        ├── routes/                         # BỘ ĐỊNH TUYẾN TỰ ĐỘNG (AUTO-DISCOVERY ROUTER)
+        │   ├── routePaths.ts               # Single source of truth cho URL (/login, /portal, /document-desk...)
+        │   ├── getAppRoutes.tsx            # Tự động gom & sort route modules bằng import.meta.glob
+        │   ├── RouterProvider.tsx          # Render router bằng useRoutes hook
+        │   └── modules/                    # Phân module route theo tính năng
+        │       ├── auth.routes.tsx         # Route /login + điều hướng backward compatibility
+        │       ├── portal.routes.tsx       # Route / và /portal
+        │       ├── desk.routes.tsx         # Route /document-desk
+        │       ├── admin.routes.tsx        # Route /admin-dashboard và /users
+        │       └── fallback.routes.tsx     # Bắt URL không hợp lệ về /portal
+        │
+        ├── pages/                          # CÁC MÀN HÌNH CHỨC NĂNG (TSX)
+        │   ├── LoginPage.tsx               # Màn hình đăng nhập xác thực quân nhân
+        │   ├── PortalPage.tsx              # Cổng tra cứu tài liệu quân sự
+        │   ├── DocumentDeskPage.tsx        # Bàn làm việc số hóa văn thư
+        │   ├── AdminDashboardPage.tsx      # Bảng điều khiển quản trị trung tâm
+        │   └── UsersPage.tsx               # Quản lý danh sách quân nhân & phân quyền
         │
         ├── constants/                      # HẰNG SỐ HỆ THỐNG
         │   └── apiEndpoints.ts             # Danh bạ toàn bộ URL API backend

@@ -81,7 +81,8 @@ npm start
 ```
 * **Cổng API & Web:** [http://localhost:8000](http://localhost:8000)
 * **API Health Check:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
-* **Tài liệu Swagger API:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **Tài liệu Swagger API (UI):** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **Đặc tả OpenAPI JSON:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
 
 ### 3. Chạy môi trường phát triển Frontend (Hot-Reload Vite :5173)
 ```bash
@@ -108,8 +109,42 @@ Bản build tĩnh (gồm `index.html` và thư mục `assets/`) sẽ tự độn
 
 ---
 
+## 📜 Tài Liệu API & Swagger UI (OpenAPI 3.0)
+
+Hệ thống tích hợp sẵn cổng tương tác API trực tiếp qua **Swagger UI** chuẩn OpenAPI 3.0:
+
+* **URL Swagger UI:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **OpenAPI 3.0 Spec JSON:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
+* **File cấu hình:** [`backend/swagger.js`](file:///d:/QK7_DataHub/qk7-datahub/backend/swagger.js)
+* **Cấu hình môi trường:** Biến `ENABLE_SWAGGER=true` (trong file `backend/.env`)
+
+### Các Nhóm Endpoint Chính (Tags)
+1. **`Auth`**: Xác thực đăng nhập (`POST /api/auth/login`) và lấy hồ sơ hiện tại (`GET /api/auth/me`).
+2. **`System`**: Kiểm tra kết nối SQL Server (`GET /api/health`) và lấy danh mục dùng chung (`GET /api/meta`).
+3. **`Documents`**: Quản lý tài liệu PDF — Tìm kiếm (`GET /api/documents`), Tải lên có hash SHA-256 (`POST /api/documents/upload`), Xem chi tiết, Cập nhật, Xóa.
+4. **`Files`**: Stream xem inline hoặc tải về tệp PDF đính kèm (`GET /api/files/{fileId}/view`).
+5. **`Logs`**: Tra cứu 200 bản ghi nhật ký kiểm toán an ninh (`GET /api/access-logs`).
+6. **`Admin` (Cần Clearance $\ge$ 4)**: 
+   - Thống kê KPI tổng quan (`/api/admin/stats`).
+   - CRUD Người dùng & Cấp mật khẩu (`/api/admin/users`, `/api/admin/users/{id}/credentials`).
+   - Gán & Quản lý Vai trò (`/api/admin/roles`, `/api/admin/users/{id}/roles`).
+   - Khai báo & Phân quyền (`/api/admin/permissions`, `/api/admin/roles/{id}/permissions`).
+   - CRUD Đơn vị, Loại văn bản & 5 Mức bảo mật (`/api/admin/units`, `/api/admin/document-types`, `/api/admin/security-levels`).
+   - Dọn dẹp nhật ký an ninh (`/api/admin/access-logs/clear`).
+
+### Hướng Dẫn Thử Nghiệm API Trên Swagger UI
+1. Mở trình duyệt truy cập: [http://localhost:8000/api-docs](http://localhost:8000/api-docs).
+2. Nhấn nút **Authorize 🔓** ở góc trên bên phải.
+3. Nhập giá trị xác thực:
+   - `UserHeader` (`X-User-Id`): ví dụ `USR-004` (Quản trị viên) hoặc `USR-001`.
+   - `ClearanceHeader` (`X-Clearance`): ví dụ `5` (Mức Tuyệt Mật) hoặc `4` (Tối Mật).
+4. Nhấn **Authorize** và bắt đầu bấm **Try it out** trực tiếp trên từng endpoint.
+
+---
+
 ## 🔐 Tài Khoản Kiểm Thử Mẫu (Mật khẩu: `123456789`)
 
 * **Quản trị viên / Thủ trưởng (Cấp 5 - Tuyệt Mật):** `USR-004`
 * **Trưởng phòng / Chỉ huy (Cấp 4 - Tối Mật):** `USR-001`
 * **Cán bộ / Sĩ quan (Cấp 3 - Mật):** `USR-002`
+

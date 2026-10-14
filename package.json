@@ -1,27 +1,16 @@
 {
-  "name": "paperless-gateway",
+  "name": "qk7-datahub",
   "version": "1.0.0",
-  "description": "Paperless Meeting Document Gateway",
-  "main": "server.js",
-  "bin": "server.js",
-  "type": "commonjs",
+  "private": true,
+  "description": "QK7 DataHub Monorepo — Paperless Meeting Gateway",
   "scripts": {
-    "start": "node server.js",
-    "build": "pkg . --targets node18-win-x64 --output PaperlessGateway.exe"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^1.20.0",
-    "bcrypt": "^6.0.0",
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^18.0.7",
-    "express": "^5.2.1",
-    "mssql": "^12.7.4",
-    "multer": "^2.4.0",
-    "swagger-jsdoc": "^6.3.0",
-    "swagger-ui-express": "^5.0.1"
+    "backend:install": "cd backend && npm install",
+    "backend:start": "cd backend && npm start",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:install": "cd frontend && npm install",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build"
   }
 }

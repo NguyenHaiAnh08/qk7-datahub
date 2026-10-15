@@ -196,6 +196,7 @@ export const AdminDashboardPage: React.FC = () => {
         loadUsers();
         if (!unitsList.length) loadUnits();
         if (!levelsList.length) loadLevels();
+        if (!rolesList.length) loadRoles();
         break;
       case 'roles':
         loadRoles();
@@ -343,7 +344,8 @@ export const AdminDashboardPage: React.FC = () => {
         (u.full_name || '').toLowerCase().includes(q) ||
         (u.rank_name || '').toLowerCase().includes(q) ||
         (u.position || '').toLowerCase().includes(q) ||
-        (u.unit_name || '').toLowerCase().includes(q)
+        (u.unit_name || '').toLowerCase().includes(q) ||
+        (u.role_names || []).some((rn) => rn.toLowerCase().includes(q))
     );
   }, [usersList, userSearch]);
 
@@ -963,6 +965,7 @@ export const AdminDashboardPage: React.FC = () => {
         user={selectedUser}
         units={unitsList}
         securityLevels={levelsList}
+        roles={rolesList}
         existingUsers={usersList}
         onClose={() => {
           setUserModalOpen(false);

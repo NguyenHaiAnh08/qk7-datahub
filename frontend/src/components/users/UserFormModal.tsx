@@ -11,17 +11,19 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { User } from '../../types/user';
-import { Unit, SecurityLevel } from '../../types';
+import { Unit, SecurityLevel, Role } from '../../types';
 import { usersApi } from '../../services/usersApi';
+import { dashboardApi } from '../../services/dashboardApi';
 
 export interface UserFormModalProps {
   open: boolean;
   user?: User | null;
   units: Unit[];
   securityLevels: SecurityLevel[];
+  roles?: Role[];
   existingUsers?: User[];
   onClose: () => void;
-  onSave: (userData: Partial<User> & { username?: string; password?: string }) => Promise<void>;
+  onSave: (userData: Partial<User> & { username?: string; password?: string; role_id?: string }) => Promise<void>;
   onToast?: (msg: string, type?: 'success' | 'error') => void;
 }
 
@@ -46,11 +48,56 @@ export const getNextUserId = (users: Array<{ user_id?: string }>): string => {
 
 export const DEFAULT_USER_PASSWORD = 'Abc@12345';
 
+export const MILITARY_RANKS = [
+  'Đại tá',
+  'Thượng tá',
+  'Trung tá',
+  'Thiếu tá',
+  'Thượng tá QNCN',
+  'Trung tá QNCN',
+  'Thiếu tá QNCN',
+  'Đại úy',
+  'Thượng úy',
+  'Trung úy',
+  'Thiếu úy',
+  'Đại úy QNCN',
+  'Thượng úy QNCN',
+  'Trung úy QNCN',
+  'Thiếu úy QNCN',
+  'Thượng sĩ',
+  'Trung sĩ',
+  'Hạ sĩ',
+  'Binh nhất',
+  'Binh nhì',
+];
+
+export const MILITARY_POSITIONS = [
+  'Hiệu trưởng',
+  'Phó Hiệu trưởng',
+  'Chính ủy',
+  'Phó Chính ủy',
+  'Trưởng phòng Tham mưu - Hành chính',
+  'Trưởng phòng Chính trị',
+  'Trưởng phòng Hậu cần - Kỹ thuật',
+  'Quản trị viên hệ thống',
+  'Cán bộ Văn thư',
+  'Thư ký tổng hợp',
+  'Cán bộ tuyên huấn',
+  'Cán bộ tác chiến',
+  'Trợ lý tham mưu',
+  'Trợ lý chính trị',
+  'Trợ lý hậu cần',
+  'Trợ lý kỹ thuật',
+  'Nhân viên IT / Kỹ thuật',
+  'Nhân viên văn thư lưu trữ',
+];
+
 export const UserFormModal: React.FC<UserFormModalProps> = ({
   open,
   user,
   units,
   securityLevels,
+  roles,
   existingUsers,
   onClose,
   onSave,
@@ -58,7 +105,17 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 }) => {
   const isEdit = Boolean(user);
 
-  const [formData, setFormData] = useState<Partial<User> & { username?: string; password?: string }>({
+  const [availableRoles, setAvailableRoles] = useState<Role[]>(roles || []);
+
+  useEffect(() => {
+    if (roles && roles.length > 0) {
+      setAvailableRoles(roles);
+    } else if (open) {
+      dashboardApi.getRoles().then((res) => setAvailableRoles(res.items || [])).catch(() => {});
+    }
+  }, [roles, open]);
+
+  const [formData, setFormData] = useState<Partial<User> & { username?: string; password?: string; role_id?: string }>({
     user_id: '',
     username: '',
     password: DEFAULT_USER_PASSWORD,
@@ -66,8 +123,9 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     rank_name: '',
     position: '',
     unit_id: '',
-    clearance_level_id: 1,
+    clearance_level_id: undefined,
     status: 'active',
+    role_id: '',
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -92,8 +150,9 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         rank_name: user.rank_name || '',
         position: user.position || '',
         unit_id: user.unit_id || '',
-        clearance_level_id: user.clearance_level_id || 1,
+        clearance_level_id: user.clearance_level_id,
         status: user.status || 'active',
+        role_id: user.roles && user.roles.length > 0 ? user.roles[0] : '',
       });
     } else if (open) {
       const calculateAndSet = (list: User[]) => {
@@ -105,9 +164,10 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           full_name: '',
           rank_name: '',
           position: '',
-          unit_id: units[0]?.unit_id || '',
-          clearance_level_id: 1,
+          unit_id: '',
+          clearance_level_id: undefined,
           status: 'active',
+          role_id: '',
         });
       };
 
@@ -136,6 +196,11 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       return;
     }
 
+    if (!formData.clearance_level_id) {
+      setError('Vui lòng chọn độ bảo mật!');
+      return;
+    }
+
     if (!isEdit) {
       if (!formData.username || !formData.username.trim()) {
         setError('Tên đăng nhập (Username) không được để trống!');
@@ -145,21 +210,18 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         setError('Mật khẩu cần ít nhất 8 ký tự!');
         return;
       }
-      if (!formData.clearance_level_id) {
-        setError('Vui lòng chọn mức bảo mật!');
-        return;
-      }
     }
 
     setSubmitting(true);
     try {
-      const payload: Partial<User> & { username?: string; password?: string } = {
+      const payload: Partial<User> & { username?: string; password?: string; role_id?: string } = {
         ...formData,
         user_id: formData.user_id?.trim(),
         full_name: formData.full_name?.trim(),
         username: formData.username?.trim().toLowerCase(),
         password: formData.password ? formData.password : undefined,
-        clearance_level_id: Number(formData.clearance_level_id || 1),
+        clearance_level_id: Number(formData.clearance_level_id),
+        role_id: formData.role_id || undefined,
       };
 
       await onSave(payload);
@@ -316,24 +378,40 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Cấp bậc</label>
-                <input
-                  type="text"
+                <select
                   value={formData.rank_name || ''}
                   onChange={(e) => setFormData({ ...formData, rank_name: e.target.value })}
-                  placeholder="Trung tá, Thượng úy..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500"
-                />
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+                >
+                  <option value="">-- Chọn cấp bậc --</option>
+                  {formData.rank_name && !MILITARY_RANKS.includes(formData.rank_name) && (
+                    <option value={formData.rank_name}>{formData.rank_name}</option>
+                  )}
+                  {MILITARY_RANKS.map((rank) => (
+                    <option key={rank} value={rank}>
+                      {rank}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Chức vụ</label>
-                <input
-                  type="text"
+                <select
                   value={formData.position || ''}
                   onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  placeholder="Trưởng phòng, Trợ lý..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500"
-                />
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+                >
+                  <option value="">-- Chọn chức vụ --</option>
+                  {formData.position && !MILITARY_POSITIONS.includes(formData.position) && (
+                    <option value={formData.position}>{formData.position}</option>
+                  )}
+                  {MILITARY_POSITIONS.map((pos) => (
+                    <option key={pos} value={pos}>
+                      {pos}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -343,7 +421,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 <select
                   value={formData.unit_id || ''}
                   onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
                   <option value="">-- Chọn đơn vị --</option>
                   {units.map((u) => (
@@ -356,16 +434,17 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  Mức bảo mật / Clearance *
+                  Độ bảo mật *
                 </label>
                 <select
-                  value={formData.clearance_level_id || 1}
+                  value={formData.clearance_level_id || ''}
                   onChange={(e) =>
-                    setFormData({ ...formData, clearance_level_id: Number(e.target.value) })
+                    setFormData({ ...formData, clearance_level_id: e.target.value ? Number(e.target.value) : undefined })
                   }
                   required
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
+                  <option value="">-- Chọn độ bảo mật --</option>
                   {securityLevels.map((lvl) => (
                     <option key={lvl.level_id} value={lvl.level_id}>
                       {lvl.name} (Cấp {lvl.level_id})
@@ -375,17 +454,35 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               </div>
             </div>
 
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Trạng thái tài khoản</label>
-              <select
-                value={formData.status || 'active'}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500"
-              >
-                <option value="active">Hoạt động (active)</option>
-                <option value="locked">Khóa tạm thời (locked)</option>
-                <option value="inactive">Ngừng sử dụng (inactive)</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Vai trò hệ thống</label>
+                <select
+                  value={formData.role_id || ''}
+                  onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+                >
+                  <option value="">-- Chọn vai trò (Role) --</option>
+                  {availableRoles.map((r) => (
+                    <option key={r.role_id} value={r.role_id}>
+                      {r.name} ({r.role_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Trạng thái tài khoản</label>
+                <select
+                  value={formData.status || 'active'}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 text-xs"
+                >
+                  <option value="active">Hoạt động (active)</option>
+                  <option value="locked">Khóa tạm thời (locked)</option>
+                  <option value="inactive">Ngừng sử dụng (inactive)</option>
+                </select>
+              </div>
             </div>
 
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-2">

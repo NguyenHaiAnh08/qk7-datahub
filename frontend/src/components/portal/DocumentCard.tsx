@@ -34,7 +34,10 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     }
   };
 
-  const canDownload = (document.security_level_id || 1) < 3;
+  const docLevel = document.security_level_id || 1;
+  // Cấp 1, 2: được tải về nếu clearance >= docLevel. Từ cấp 3 trở đi (Cấp 3, 4, 5): CHỈ ĐƯỢC XEM, KHÔNG ĐƯỢC TẢI VỀ
+  const canDownload = docLevel <= 2 && docLevel <= userClearanceLevel;
+  const isSecretLevel = docLevel >= 3;
 
   return (
     <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all duration-200 group">
@@ -49,7 +52,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               document.security_level_id || 1
             )}`}
           >
-            {document.security_level_name || `Cấp ${document.security_level_id}`}
+            {document.security_name || document.security_level_name || `Cấp ${document.security_level_id}`}
           </span>
         </div>
 
@@ -70,7 +73,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-slate-400 dark:text-slate-500">Thể loại:</span>
             <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[140px]">
-              {document.type_name || '—'}
+              {document.doc_type_name || document.type_name || '—'}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -82,13 +85,13 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-slate-400 dark:text-slate-500">Ngày BH:</span>
             <span className="text-slate-700 dark:text-slate-300 font-medium">
-              {formatDate(document.issue_date)}
+              {formatDate(document.issued_date || document.issue_date)}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-400 dark:text-slate-500">Dung lượng:</span>
             <span className="text-slate-700 dark:text-slate-300 font-medium">
-              {formatFileSize(document.file_size_bytes)}
+              {formatFileSize(document.file_size ?? document.file_size_bytes)}
             </span>
           </div>
         </div>
@@ -121,8 +124,12 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             ) : (
               <button
                 disabled
-                className="py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed"
-                title="Tài liệu từ Cấp 3 trở lên chỉ cho phép xem trực tiếp"
+                className="py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed opacity-60"
+                title={
+                  isSecretLevel
+                    ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
+                    : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
+                }
               >
                 <Download className="w-3.5 h-3.5" />
               </button>

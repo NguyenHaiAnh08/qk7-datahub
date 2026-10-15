@@ -34,12 +34,14 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     }
   };
 
+  const canDownload = (document.security_level_id || 1) < 3;
+
   return (
     <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all duration-200 group">
       <div>
         {/* Top Badges */}
         <div className="flex items-center justify-between gap-2 mb-2.5">
-          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold text-xs tracking-wide truncate">
+          <span className="font-mono text-purple-600 dark:text-purple-400 font-semibold text-xs tracking-wide truncate">
             {document.document_code}
           </span>
           <span
@@ -52,7 +54,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         </div>
 
         {/* Title */}
-        <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-2 mb-2">
+        <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors line-clamp-2 mb-2">
           {document.title}
         </h4>
 
@@ -108,13 +110,23 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               <Eye className="w-3.5 h-3.5" />
               <span>Xem trước</span>
             </button>
-            <button
-              onClick={() => onDownload(document)}
-              className="py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 dark:bg-emerald-600/20 dark:hover:bg-emerald-600/30 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-              title="Tải về máy"
-            >
-              <Download className="w-3.5 h-3.5" />
-            </button>
+            {canDownload ? (
+              <button
+                onClick={() => onDownload(document)}
+                className="py-1.5 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                title="Tải về máy"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                disabled
+                className="py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed"
+                title="Tài liệu từ Cấp 3 trở lên chỉ cho phép xem trực tiếp"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+            )}
           </>
         )}
       </div>

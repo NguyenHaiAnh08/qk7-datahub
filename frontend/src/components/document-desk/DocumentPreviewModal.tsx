@@ -72,7 +72,10 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   if (!open || !document) return null;
 
+  const canDownload = (document.security_level_id || 1) < 3;
+
   const handleDownload = async () => {
+    if (!canDownload) return;
     try {
       setDownloading(true);
       if (blobUrl) {
@@ -97,9 +100,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const handleOpenNewTab = () => {
     if (blobUrl) {
-      window.open(blobUrl, '_blank');
+      window.open(`${blobUrl}#toolbar=0&navpanes=0`, '_blank');
     } else {
-      window.open(documentService.getViewUrl(document.file_id, false), '_blank');
+      window.open(`${documentService.getViewUrl(document.file_id, false)}#toolbar=0&navpanes=0`, '_blank');
     }
   };
 
@@ -141,6 +144,11 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                     <Shield className="w-3 h-3 text-amber-500" />
                     {document.security_level_name || `Cấp ${document.security_level_id}`}
                   </span>
+                  {!canDownload && (
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.2 rounded">
+                      Chỉ xem trực tiếp
+                    </span>
+                  )}
                   <span>{formatFileSize(document.file_size_bytes)}</span>
                 </div>
               </div>
@@ -154,19 +162,30 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               >
                 <ExternalLink className="w-4 h-4" />
               </button>
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="p-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50"
-                title="Tải về máy"
-              >
-                {downloading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Tải về</span>
-              </button>
+              {canDownload ? (
+                <button
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="p-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50"
+                  title="Tải về máy"
+                >
+                  {downloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline">Tải về</span>
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-not-allowed opacity-75 shadow-none"
+                  title="Tài liệu từ Cấp 3 trở lên chỉ cho phép xem trực tiếp"
+                >
+                  <Download className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                  <span className="hidden sm:inline">Tải về</span>
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
@@ -208,7 +227,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
             {!loading && !error && blobUrl && (
               <iframe
-                src={blobUrl}
+                src={`${blobUrl}#toolbar=0&navpanes=0`}
                 title={document.title}
                 className="w-full h-full border-none"
               />

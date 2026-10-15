@@ -131,6 +131,10 @@ export const DocumentDeskPage: React.FC = () => {
 
   // Download Handler
   const handleDownload = async (doc: DocumentItem) => {
+    if ((doc.security_level_id || 1) >= 3) {
+      showToast('Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được tải về (không đủ điều kiện cấp bậc)', 'error');
+      return;
+    }
     try {
       showToast(`Đang tải văn bản ${doc.document_code}...`, 'info');
       await documentsApi.downloadDocument(doc.file_id, doc.original_name || `${doc.document_code}.pdf`);

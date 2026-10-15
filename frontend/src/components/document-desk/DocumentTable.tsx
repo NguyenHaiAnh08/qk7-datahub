@@ -150,13 +150,23 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => onDownload(doc)}
-                            className="p-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                            title="Tải về tệp gốc"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
+                          {((doc.security_level_id || 1) < 3) ? (
+                            <button
+                              onClick={() => onDownload(doc)}
+                              className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800/60 rounded-lg transition cursor-pointer"
+                              title="Tải về tệp gốc"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="p-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 rounded-lg cursor-not-allowed"
+                              title="Tài liệu từ Cấp 3 trở lên chỉ cho phép xem trực tiếp"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {onEdit && (
                             <button
                               onClick={() => onEdit(doc)}

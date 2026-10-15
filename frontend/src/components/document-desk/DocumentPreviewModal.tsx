@@ -1,8 +1,19 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, ExternalLink, FileText, Calendar, Building, Shield } from 'lucide-react';
+import {
+  X,
+  Download,
+  ExternalLink,
+  FileText,
+  Calendar,
+  Building,
+  Shield,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+} from 'lucide-react';
 import { DocumentItem } from '../../types';
-import { documentsApi } from '../../services/documentsApi';
+import { documentService } from '../../services/documentService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 
@@ -17,10 +28,80 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   document,
   onClose,
 }) => {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<boolean>(false);
+
+  const loadPdfBlob = async (docId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const blob = await documentService.fetchDocumentBlob(docId, false);
+      const url = URL.createObjectURL(blob);
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+    } catch (err: any) {
+      setError(err.message || 'Không thể tải tệp văn bản. Vui lòng kiểm tra quyền truy cập.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open && document) {
+      loadPdfBlob(document.file_id);
+    } else {
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setError(null);
+      setLoading(false);
+    }
+
+    return () => {
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [open, document?.file_id]);
+
   if (!open || !document) return null;
 
-  const viewUrl = documentsApi.getViewUrl(document.file_id, false);
-  const downloadUrl = documentsApi.getViewUrl(document.file_id, true);
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+      if (blobUrl) {
+        const a = window.document.createElement('a');
+        a.href = blobUrl;
+        a.download = document.original_name || `${document.document_code}.pdf`;
+        window.document.body.appendChild(a);
+        a.click();
+        window.document.body.removeChild(a);
+      } else {
+        await documentService.downloadDocument(
+          document.file_id,
+          document.original_name || `${document.document_code}.pdf`
+        );
+      }
+    } catch (err: any) {
+      setError(err.message || 'Lỗi khi tải tệp');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleOpenNewTab = () => {
+    if (blobUrl) {
+      window.open(blobUrl, '_blank');
+    } else {
+      window.open(documentService.getViewUrl(document.file_id, false), '_blank');
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -34,12 +115,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           {/* Header */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-3 overflow-hidden">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
                 <FileText className="w-5 h-5" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center space-x-2">
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                  <span className="font-mono text-purple-600 dark:text-purple-400 text-xs font-semibold">
                     {document.document_code}
                   </span>
                   <span className="text-slate-400 text-xs">•</span>
@@ -66,24 +147,26 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
-              <a
-                href={viewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:hover:text-white transition"
+              <button
+                onClick={handleOpenNewTab}
+                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:hover:text-white transition cursor-pointer"
                 title="Mở trong tab mới"
               >
                 <ExternalLink className="w-4 h-4" />
-              </a>
-              <a
-                href={downloadUrl}
-                download
-                className="p-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1.5 transition shadow-sm"
+              </button>
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="p-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50"
                 title="Tải về máy"
               >
-                <Download className="w-4 h-4" />
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
                 <span className="hidden sm:inline">Tải về</span>
-              </a>
+              </button>
               <button
                 onClick={onClose}
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
@@ -94,15 +177,46 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           </div>
 
           {/* PDF Viewer Body */}
-          <div className="flex-1 bg-slate-100 dark:bg-slate-950 overflow-hidden relative">
-            <iframe
-              src={viewUrl}
-              title={document.title}
-              className="w-full h-full border-none"
-            />
+          <div className="flex-1 bg-slate-100 dark:bg-slate-950 overflow-hidden relative flex items-center justify-center">
+            {loading && (
+              <div className="flex flex-col items-center justify-center space-y-3 p-6 text-slate-600 dark:text-slate-300">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-600 dark:text-purple-400" />
+                <p className="text-sm font-medium">Đang xác thực và tải văn bản PDF bảo mật...</p>
+              </div>
+            )}
+
+            {!loading && error && (
+              <div className="p-6 max-w-md mx-auto text-center space-y-4 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/50 rounded-2xl shadow-lg">
+                <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-500">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                    Không thể hiển thị văn bản
+                  </h4>
+                  <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
+                </div>
+                <button
+                  onClick={() => loadPdfBlob(document.file_id)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-sm"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Thử lại</span>
+                </button>
+              </div>
+            )}
+
+            {!loading && !error && blobUrl && (
+              <iframe
+                src={blobUrl}
+                title={document.title}
+                className="w-full h-full border-none"
+              />
+            )}
           </div>
         </motion.div>
       </div>
     </AnimatePresence>
   );
 };
+

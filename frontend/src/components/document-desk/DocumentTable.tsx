@@ -108,13 +108,13 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                       )}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                      {doc.type_name || '—'}
+                      {doc.doc_type_name || doc.type_name || '—'}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
                       {doc.unit_name || '—'}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
-                      {formatDate(doc.issue_date)}
+                      {formatDate(doc.issued_date || doc.issue_date)}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span
@@ -122,14 +122,14 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                           doc.security_level_id || 1
                         )}`}
                       >
-                        {doc.security_level_name || `Cấp ${doc.security_level_id}`}
+                        {doc.security_name || doc.security_level_name || `Cấp ${doc.security_level_id}`}
                       </span>
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
                       <div className="flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                         <span className="text-[11px]">
-                          {formatFileSize(doc.file_size_bytes)}
+                          {formatFileSize(doc.file_size ?? doc.file_size_bytes)}
                         </span>
                       </div>
                     </td>
@@ -150,13 +150,37 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => onDownload(doc)}
-                            className="p-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                            title="Tải về tệp gốc"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
+                          {(() => {
+                            const docLevel = doc.security_level_id || 1;
+                            const canDownload = docLevel <= 2 && docLevel <= userClearanceLevel;
+                            const isSecretLevel = docLevel >= 3;
+
+                            if (canDownload) {
+                              return (
+                                <button
+                                  onClick={() => onDownload(doc)}
+                                  className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800/60 rounded-lg transition cursor-pointer"
+                                  title="Tải về tệp gốc"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              );
+                            }
+
+                            return (
+                              <button
+                                disabled
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 rounded-lg cursor-not-allowed opacity-60"
+                                title={
+                                  isSecretLevel
+                                    ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
+                                    : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
+                                }
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                            );
+                          })()}
                           {onEdit && (
                             <button
                               onClick={() => onEdit(doc)}

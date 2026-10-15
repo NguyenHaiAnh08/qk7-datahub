@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { ThemeToggle } from './ThemeToggle';
+import { ROUTE_PATHS } from '../../routes/routePaths';
 
 interface HeaderProps {
   title?: string;
@@ -26,7 +28,8 @@ export const Header: React.FC<HeaderProps> = ({
   showClock = true,
   activeNav
 }) => {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isStaff, logout } = useAuth();
+  const navigate = useNavigate();
   const [liveClock, setLiveClock] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -43,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Brand */}
       <div
         className="flex items-center space-x-3 cursor-pointer group"
-        onClick={() => (window.location.href = 'portal.html')}
+        onClick={() => navigate(isAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
       >
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white border border-emerald-400/40 shadow-md group-hover:scale-105 transition-transform">
           <Building2 className="w-5 h-5 text-amber-400" />
@@ -71,20 +74,22 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Quick Nav Links */}
-        <a
-          href="document-desk.html"
-          className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-            activeNav === 'desk'
-              ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
-              : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-          }`}
-        >
-          <UploadCloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span>Văn thư</span>
-        </a>
+        {(isStaff || isAdmin) && (
+          <Link
+            to={ROUTE_PATHS.DESK}
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+              activeNav === 'desk'
+                ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
+                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Văn thư</span>
+          </Link>
+        )}
 
-        <a
-          href="portal.html"
+        <Link
+          to={ROUTE_PATHS.PORTAL}
           className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
             activeNav === 'portal'
               ? 'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-500/50 shadow-sm'
@@ -93,11 +98,11 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           <span>Portal</span>
-        </a>
+        </Link>
 
         {isAdmin && (
-          <a
-            href="admin-dashboard.html"
+          <Link
+            to={ROUTE_PATHS.ADMIN}
             className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
               activeNav === 'admin'
                 ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/50 shadow-sm'
@@ -106,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span>Quản trị</span>
-          </a>
+          </Link>
         )}
 
         {/* Dark / Light Mode Animated Toggle */}
@@ -153,28 +158,33 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="py-1">
-                  <a
-                    href="portal.html"
+                  <Link
+                    to={ROUTE_PATHS.PORTAL}
+                    onClick={() => setDropdownOpen(false)}
                     className="flex items-center px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                   >
                     <BookOpen className="w-4 h-4 text-blue-500 dark:text-blue-400 mr-2.5" />
                     <span>Cổng tra cứu tài liệu</span>
-                  </a>
-                  <a
-                    href="document-desk.html"
-                    className="flex items-center px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                  >
-                    <UploadCloud className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mr-2.5" />
-                    <span>Bàn làm việc văn thư</span>
-                  </a>
+                  </Link>
+                  {(isStaff || isAdmin) && (
+                    <Link
+                      to={ROUTE_PATHS.DESK}
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                    >
+                      <UploadCloud className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mr-2.5" />
+                      <span>Bàn làm việc văn thư</span>
+                    </Link>
+                  )}
                   {isAdmin && (
-                    <a
-                      href="admin-dashboard.html"
+                    <Link
+                      to={ROUTE_PATHS.ADMIN}
+                      onClick={() => setDropdownOpen(false)}
                       className="flex items-center px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                     >
                       <ShieldAlert className="w-4 h-4 text-amber-500 dark:text-amber-400 mr-2.5" />
                       <span>Trung tâm quản trị hệ thống</span>
-                    </a>
+                    </Link>
                   )}
                 </div>
 

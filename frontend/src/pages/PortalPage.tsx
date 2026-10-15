@@ -82,7 +82,7 @@ export const PortalPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await documentsApi.getDocuments({
-        code: searchQuery || undefined,
+        q: searchQuery || undefined,
         type: selectedType || undefined,
         unit: selectedUnit || undefined,
         lv: selectedLevel || undefined,
@@ -117,9 +117,30 @@ export const PortalPage: React.FC = () => {
   };
 
   // Download Handler
-  const handleDownload = (doc: DocumentItem) => {
-    const url = documentsApi.getViewUrl(doc.file_id, true);
-    window.location.href = url;
+  const handleDownload = async (doc: DocumentItem) => {
+    const userClearance = user?.clearance_level_id || 1;
+    const docLevel = doc.security_level_id || 1;
+
+    // Quy định bảo mật: Từ Cấp 3 trở đi chỉ duy nhất cho phép xem, không được tải về
+    if (docLevel >= 3) {
+      showToast('Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy.', 'info');
+      return;
+    }
+
+    if (docLevel > userClearance) {
+      showToast(
+        `Cấp độ bảo mật hiện tại của bạn (Cấp ${userClearance}) không đủ để tải văn bản Cấp ${docLevel}`,
+        'error'
+      );
+      return;
+    }
+    try {
+      showToast(`Đang tải văn bản ${doc.document_code}...`, 'info');
+      await documentsApi.downloadDocument(doc.file_id, doc.original_name || `${doc.document_code}.pdf`);
+      showToast(`Đã tải xuống văn bản ${doc.document_code}`, 'success');
+    } catch (err: any) {
+      showToast('Lỗi tải văn bản: ' + (err.message || 'Không có quyền truy cập'), 'error');
+    }
   };
 
   // Pagination calculation
@@ -309,6 +330,7 @@ export const PortalPage: React.FC = () => {
       <DocumentPreviewModal
         open={Boolean(previewDoc)}
         document={previewDoc}
+        userClearanceLevel={user?.clearance_level_id || 1}
         onClose={() => setPreviewDoc(null)}
       />
 

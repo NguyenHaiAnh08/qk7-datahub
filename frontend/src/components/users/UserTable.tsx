@@ -25,9 +25,11 @@ export const UserTable: React.FC<UserTableProps> = ({
             <tr>
               <th className="py-3 px-4">Mã</th>
               <th className="py-3 px-4">Họ tên</th>
-              <th className="py-3 px-4">Cấp bậc / Chức vụ</th>
+              <th className="py-3 px-4">Cấp bậc</th>
+              <th className="py-3 px-4">Chức vụ</th>
+              <th className="py-3 px-4">Vai trò</th>
               <th className="py-3 px-4">Đơn vị</th>
-              <th className="py-3 px-4">Mức bảo mật</th>
+              <th className="py-3 px-4">Độ bảo mật</th>
               <th className="py-3 px-4">Trạng thái</th>
               <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
@@ -35,13 +37,13 @@ export const UserTable: React.FC<UserTableProps> = ({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                <td colSpan={9} className="py-12 text-center text-slate-500 dark:text-slate-400">
                   Đang tải danh sách người dùng...
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                <td colSpan={9} className="py-12 text-center text-slate-400 dark:text-slate-500">
                   Không tìm thấy người dùng nào phù hợp
                 </td>
               </tr>
@@ -58,7 +60,26 @@ export const UserTable: React.FC<UserTableProps> = ({
                     {u.full_name}
                   </td>
                   <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                    {u.rank_name || ''} {u.position ? `— ${u.position}` : ''}
+                    {u.rank_name || '—'}
+                  </td>
+                  <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                    {u.position || '—'}
+                  </td>
+                  <td className="py-3 px-4">
+                    {u.role_names && u.role_names.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {u.role_names.map((rn, idx) => (
+                          <span
+                            key={idx}
+                            className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded"
+                          >
+                            {rn}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-500 text-xs">—</span>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
                     {u.unit_name || '—'}

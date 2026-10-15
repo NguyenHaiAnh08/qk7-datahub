@@ -20,19 +20,6 @@ export default defineConfig({
   },
   build: {
     outDir: resolve(__dirname, '../backend/public'),
-    emptyOutDir: false,
-    rollupOptions: {
-      input: {
-        index: resolve(__dirname, 'index.html'),
-        login: resolve(__dirname, 'login.html'),
-        admin: resolve(__dirname, 'admin-dashboard.html'),
-        desk: resolve(__dirname, 'document-desk.html'),
-        portal: resolve(__dirname, 'portal.html'),
-        // Backward compatibility entries
-        legacyLogin: resolve(__dirname, 'qk7_datahub_login_page.html'),
-        legacyAdmin: resolve(__dirname, 'qk7_datahub_admin_dashboard.html'),
-        legacyPortal: resolve(__dirname, 'qk7_datahub_portal.html'),
-      }
-    }
+    emptyOutDir: true,
   }
 });

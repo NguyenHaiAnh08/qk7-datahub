@@ -1,6 +1,8 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ShieldCheck, ShieldAlert, Lock, AlertTriangle } from 'lucide-react';
 import { User } from '../../types';
+import { ROUTE_PATHS } from '../../routes/routePaths';
 
 export interface SecurityBannerProps {
   user: User | null;
@@ -77,12 +79,12 @@ export const SecurityBanner: React.FC<SecurityBannerProps> = ({ user, onOpenPoli
 
       <div className="flex items-center space-x-2 self-end md:self-auto shrink-0">
         {isGuest ? (
-          <a
-            href="login.html"
+          <Link
+            to={ROUTE_PATHS.LOGIN}
             className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm"
           >
             <span>Đăng nhập nâng cấp quyền</span>
-          </a>
+          </Link>
         ) : (
           onOpenPolicy && (
             <button

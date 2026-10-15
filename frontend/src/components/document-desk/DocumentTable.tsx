@@ -150,23 +150,37 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          {((doc.security_level_id || 1) < 3) ? (
-                            <button
-                              onClick={() => onDownload(doc)}
-                              className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800/60 rounded-lg transition cursor-pointer"
-                              title="Tải về tệp gốc"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              className="p-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 rounded-lg cursor-not-allowed"
-                              title="Tài liệu từ Cấp 3 trở lên chỉ cho phép xem trực tiếp"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          {(() => {
+                            const docLevel = doc.security_level_id || 1;
+                            const canDownload = docLevel <= 2 && docLevel <= userClearanceLevel;
+                            const isSecretLevel = docLevel >= 3;
+
+                            if (canDownload) {
+                              return (
+                                <button
+                                  onClick={() => onDownload(doc)}
+                                  className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800/60 rounded-lg transition cursor-pointer"
+                                  title="Tải về tệp gốc"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              );
+                            }
+
+                            return (
+                              <button
+                                disabled
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 rounded-lg cursor-not-allowed opacity-60"
+                                title={
+                                  isSecretLevel
+                                    ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
+                                    : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
+                                }
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                            );
+                          })()}
                           {onEdit && (
                             <button
                               onClick={() => onEdit(doc)}

@@ -35,8 +35,16 @@ export interface DocumentType {
 
 export interface SecurityLevel {
   level_id: number;
-  code: string;
+  code?: string;
   name: string;
+}
+
+export interface SystemHealth {
+  ok: boolean;
+  db?: string;
+  login_name?: string;
+  now?: string;
+  error?: string;
 }
 
 export interface MetaData {

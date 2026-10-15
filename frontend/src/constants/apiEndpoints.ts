@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   SYSTEM: {
     HEALTH: '/api/health',
     META: '/api/meta',
+    TEST_HTTP_ERROR: (code: number) => `/api/test-http-error/${code}`,
   },
 
   // Documents

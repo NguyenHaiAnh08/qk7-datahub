@@ -1,14 +1,16 @@
 import { ROUTE_PATHS } from './routePaths';
 import { User } from '../types/user';
+import { isUserAdmin } from '../contexts/AuthContext';
 
 /**
- * Route Access Control — Phân quyền truy cập các màn hình theo Cấp độ bảo mật quân sự (Clearance Level)
+ * Route Access Control — Phân quyền truy cập các màn hình theo Role và Trạng thái xác thực
  * Source of truth cho việc bảo vệ các tuyến đường ở phía Frontend (Client Route Guard)
  */
 
 export interface RouteAccessConfig {
   path: string;
   requiresAuth: boolean;
+  requiredRole?: 'admin' | string;
   minClearance?: number;
   description?: string;
 }
@@ -23,39 +25,35 @@ export const ROUTE_ACCESS: Record<string, RouteAccessConfig> = {
   [ROUTE_PATHS.INDEX]: {
     path: ROUTE_PATHS.INDEX,
     requiresAuth: false,
-    minClearance: 1,
     description: 'Cổng tra cứu tài liệu công khai',
   },
   [ROUTE_PATHS.PORTAL]: {
     path: ROUTE_PATHS.PORTAL,
     requiresAuth: false,
-    minClearance: 1,
     description: 'Cổng tra cứu tài liệu quân sự',
   },
 
-  // Protected - Yêu cầu đăng nhập & Cấp độ mật tối thiểu
-  // Cấp 3 (Mật): Sĩ quan, trợ lý tác chiến, văn thư phụ trách số hóa
+  // Protected - Bàn làm việc văn thư
   [ROUTE_PATHS.DESK]: {
     path: ROUTE_PATHS.DESK,
     requiresAuth: true,
-    minClearance: 3,
-    description: 'Bàn làm việc văn thư và số hóa văn bản (Yêu cầu Mức 3 - Mật)',
+    description: 'Bàn làm việc văn thư và số hóa văn bản',
   },
 
-  // Cấp 4 (Tối mật): Chỉ huy đơn vị, ban tham mưu
+  // Protected - Quản trị trung tâm (BẮT BUỘC ROLE ADMIN)
   [ROUTE_PATHS.ADMIN]: {
     path: ROUTE_PATHS.ADMIN,
     requiresAuth: true,
-    minClearance: 4,
-    description: 'Bảng điều khiển quản trị trung tâm (Yêu cầu Mức 4 - Tối Mật)',
+    requiredRole: 'admin',
+    description: 'Bảng điều khiển quản trị trung tâm (Chỉ dành cho Quản trị viên)',
   },
 
-  // Cấp 4+ (Tối mật / Tuyệt mật): Quản lý quân nhân và cấp phát mật khẩu
+  // Protected - Quản trị tài khoản & phân quyền (BẮT BUỘC ROLE ADMIN)
   [ROUTE_PATHS.USERS]: {
     path: ROUTE_PATHS.USERS,
     requiresAuth: true,
-    minClearance: 4,
-    description: 'Quản trị tài khoản quân nhân & phân quyền (Yêu cầu Mức 4+)',
+    requiredRole: 'admin',
+    description: 'Quản trị tài khoản quân nhân & phân quyền (Chỉ dành cho Quản trị viên)',
   },
 
   // Error Pages - Luôn cho phép truy cập để hiển thị phản hồi lỗi
@@ -96,7 +94,7 @@ export function canAccessRoute(
   user: User | null,
   isAuthenticated: boolean,
   pathname: string
-): { allowed: boolean; reason?: 'UNAUTHENTICATED' | 'INSUFFICIENT_CLEARANCE' } {
+): { allowed: boolean; reason?: 'UNAUTHENTICATED' | 'FORBIDDEN' | 'INSUFFICIENT_CLEARANCE' } {
   const config = getRouteAccess(pathname);
 
   // Không có cấu hình đặc biệt -> cho phép truy cập
@@ -107,7 +105,12 @@ export function canAccessRoute(
     return { allowed: false, reason: 'UNAUTHENTICATED' };
   }
 
-  // Cấp độ bảo mật (Clearance Level) chưa đủ điều kiện
+  // Trang yêu cầu Role Admin cụ thể
+  if (config.requiredRole === 'admin' && !isUserAdmin(user)) {
+    return { allowed: false, reason: 'FORBIDDEN' };
+  }
+
+  // Cấp độ bảo mật (Clearance Level) chỉ áp dụng nếu có chỉ định rõ ràng
   if (config.minClearance && (!user || (user.clearance_level_id || 1) < config.minClearance)) {
     return { allowed: false, reason: 'INSUFFICIENT_CLEARANCE' };
   }

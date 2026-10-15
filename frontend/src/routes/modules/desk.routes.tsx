@@ -12,7 +12,7 @@ const deskRoutes: RouteModuleExport = {
     {
       path: ROUTE_PATHS.DESK,
       element: (
-        <ProtectedRoute minClearance={3}>
+        <ProtectedRoute staffOnly>
           <DocumentDeskPage />
         </ProtectedRoute>
       ),

@@ -108,13 +108,13 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                       )}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                      {doc.type_name || '—'}
+                      {doc.doc_type_name || doc.type_name || '—'}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
                       {doc.unit_name || '—'}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
-                      {formatDate(doc.issue_date)}
+                      {formatDate(doc.issued_date || doc.issue_date)}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span
@@ -122,14 +122,14 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                           doc.security_level_id || 1
                         )}`}
                       >
-                        {doc.security_level_name || `Cấp ${doc.security_level_id}`}
+                        {doc.security_name || doc.security_level_name || `Cấp ${doc.security_level_id}`}
                       </span>
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
                       <div className="flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                         <span className="text-[11px]">
-                          {formatFileSize(doc.file_size_bytes)}
+                          {formatFileSize(doc.file_size ?? doc.file_size_bytes)}
                         </span>
                       </div>
                     </td>

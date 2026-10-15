@@ -25,6 +25,10 @@ export interface DocumentItem {
   original_name?: string;
   stored_path?: string;
   sha256?: string;
+  folder_id?: string;
+  category_id?: string;
+  uploaded_by?: string;
+  mime_type?: string;
 }
 
 export interface DocumentType {
@@ -54,11 +58,15 @@ export interface MetaData {
 }
 
 export interface DocumentFilterParams {
+  q?: string;
   code?: string;
   title?: string;
   type?: string;
+  doc_type_id?: string;
   unit?: string;
+  issuing_unit_id?: string;
   from?: string;
   to?: string;
   lv?: number | string;
+  security_level_id?: number | string;
 }

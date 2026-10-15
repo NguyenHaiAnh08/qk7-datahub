@@ -52,7 +52,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               document.security_level_id || 1
             )}`}
           >
-            {document.security_level_name || `Cấp ${document.security_level_id}`}
+            {document.security_name || document.security_level_name || `Cấp ${document.security_level_id}`}
           </span>
         </div>
 
@@ -73,7 +73,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-slate-400 dark:text-slate-500">Thể loại:</span>
             <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[140px]">
-              {document.type_name || '—'}
+              {document.doc_type_name || document.type_name || '—'}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -85,13 +85,13 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-slate-400 dark:text-slate-500">Ngày BH:</span>
             <span className="text-slate-700 dark:text-slate-300 font-medium">
-              {formatDate(document.issue_date)}
+              {formatDate(document.issued_date || document.issue_date)}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-400 dark:text-slate-500">Dung lượng:</span>
             <span className="text-slate-700 dark:text-slate-300 font-medium">
-              {formatFileSize(document.file_size_bytes)}
+              {formatFileSize(document.file_size ?? document.file_size_bytes)}
             </span>
           </div>
         </div>

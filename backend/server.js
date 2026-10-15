@@ -110,13 +110,14 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
     try {
         const pool = await getPool();
         const logId = 'LOG-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        const validUserId = (userId && userId !== 'GUEST') ? userId : null;
         await pool.request()
             .input('log_id',  sql.VarChar(50),   logId)
-            .input('user_id', sql.VarChar(50),   userId)
-            .input('file_id', sql.VarChar(50),   fileId)
+            .input('user_id', sql.VarChar(50),   validUserId)
+            .input('file_id', sql.VarChar(50),   fileId || null)
             .input('action',  sql.VarChar(50),   action)
-            .input('ip',      sql.VarChar(50),   ip)
-            .input('note',    sql.NVarChar(255), note)
+            .input('ip',      sql.VarChar(50),   ip || '')
+            .input('note',    sql.NVarChar(255), note || null)
             .query(`
                 INSERT INTO ACCESS_LOG (log_id, user_id, file_id, [action], ip, note)
                 VALUES (@log_id, @user_id, @file_id, @action, @ip, @note)
@@ -332,10 +333,14 @@ app.get('/api/documents', async (req, res) => {
         let query = `
             SELECT d.file_id, d.document_code, d.title,
                    d.doc_type_id, dt.name AS doc_type_name,
-                   d.issued_date,
+                   d.doc_type_id AS type_id, dt.name AS type_name,
+                   d.issued_date, d.issued_date AS issue_date,
                    d.issuing_unit_id, u.name AS unit_name,
-                   d.signer, d.file_size, d.summary,
+                   d.issuing_unit_id AS unit_id,
+                   d.signer, d.file_size, d.file_size AS file_size_bytes,
+                   d.summary,
                    d.security_level_id, sl.name AS security_name,
+                   sl.name AS security_level_name,
                    d.created_at, d.updated_at
             FROM DOCUMENT d
             LEFT JOIN DOCUMENT_TYPE dt ON dt.type_id  = d.doc_type_id
@@ -345,32 +350,46 @@ app.get('/api/documents', async (req, res) => {
         `;
         r.input('clearance', sql.Int, req.user.clearance_level_id);
 
-        if (req.query.code) {
-            query += ` AND d.document_code LIKE '%' + @code + '%'`;
-            r.input('code', sql.NVarChar(100), req.query.code);
+        if (req.query.q) {
+            query += ` AND (d.document_code LIKE '%' + @q + '%' OR d.title LIKE N'%' + @q + N'%' OR d.summary LIKE N'%' + @q + N'%')`;
+            r.input('q', sql.NVarChar(500), req.query.q);
+        } else {
+            if (req.query.code) {
+                query += ` AND d.document_code LIKE '%' + @code + '%'`;
+                r.input('code', sql.NVarChar(100), req.query.code);
+            }
+            if (req.query.title) {
+                query += ` AND d.title LIKE N'%' + @title + N'%'`;
+                r.input('title', sql.NVarChar(500), req.query.title);
+            }
         }
-        if (req.query.title) {
-            query += ` AND d.title LIKE N'%' + @title + N'%'`;
-            r.input('title', sql.NVarChar(500), req.query.title);
-        }
-        if (req.query.type) {
+        const typeParam = req.query.type || req.query.doc_type_id;
+        if (typeParam) {
             query += ` AND d.doc_type_id = @type`;
-            r.input('type', sql.VarChar(20), req.query.type);
+            r.input('type', sql.VarChar(20), typeParam);
         }
-        if (req.query.unit) {
+        const unitParam = req.query.unit || req.query.issuing_unit_id;
+        if (unitParam) {
             query += ` AND d.issuing_unit_id = @unit`;
-            r.input('unit', sql.VarChar(50), req.query.unit);
+            r.input('unit', sql.VarChar(50), unitParam);
         }
         if (req.query.from) {
-            query += ` AND d.issued_date >= @from`;
-            r.input('from', sql.Date, req.query.from);
+            const fromDate = new Date(req.query.from);
+            if (!isNaN(fromDate.getTime())) {
+                query += ` AND d.issued_date >= @from`;
+                r.input('from', sql.Date, fromDate);
+            }
         }
         if (req.query.to) {
-            query += ` AND d.issued_date <= @to`;
-            r.input('to', sql.Date, req.query.to);
+            const toDate = new Date(req.query.to);
+            if (!isNaN(toDate.getTime())) {
+                query += ` AND d.issued_date <= @to`;
+                r.input('to', sql.Date, toDate);
+            }
         }
-        if (req.query.lv) {
-            const maxAllowed = Math.min(parseInt(req.query.lv, 10), req.user.clearance_level_id);
+        const lvParam = req.query.lv || req.query.security_level_id;
+        if (lvParam) {
+            const maxAllowed = Math.min(parseInt(lvParam, 10), req.user.clearance_level_id);
             query += ` AND d.security_level_id <= @lv`;
             r.input('lv', sql.Int, maxAllowed);
         }
@@ -394,8 +413,16 @@ app.get('/api/documents/:fileId', async (req, res) => {
         const r = await pool.request()
             .input('file_id', sql.VarChar(50), req.params.fileId)
             .query(`
-                SELECT d.*, dt.name AS doc_type_name, u.name AS unit_name,
-                       sl.name AS security_name
+                SELECT d.*,
+                       d.doc_type_id AS type_id,
+                       dt.name AS doc_type_name,
+                       dt.name AS type_name,
+                       u.name AS unit_name,
+                       d.issuing_unit_id AS unit_id,
+                       d.issued_date AS issue_date,
+                       d.file_size AS file_size_bytes,
+                       sl.name AS security_name,
+                       sl.name AS security_level_name
                 FROM DOCUMENT d
                 LEFT JOIN DOCUMENT_TYPE dt ON dt.type_id  = d.doc_type_id
                 LEFT JOIN UNIT u          ON u.unit_id   = d.issuing_unit_id
@@ -421,15 +448,19 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'Thiếu file PDF' });
         }
 
-        const {
-            document_code, title, doc_type_id, issued_date,
-            issuing_unit_id, signer, summary, security_level_id
-        } = req.body;
+        const docTypeId = req.body.doc_type_id || req.body.type_id || null;
+        const issuingUnitId = req.body.issuing_unit_id || req.body.unit_id || null;
+        const issuedDate = req.body.issued_date || req.body.issue_date || null;
+        const securityLevelId = req.body.security_level_id || req.body.level_id;
+        const documentCode = req.body.document_code || req.body.code || null;
+        const title = req.body.title;
+        const signer = req.body.signer || null;
+        const summary = req.body.summary || null;
 
         if (!title || !title.trim()) {
             return res.status(400).json({ error: 'Thiếu trích yếu' });
         }
-        if (!security_level_id) {
+        if (!securityLevelId) {
             return res.status(400).json({ error: 'Thiếu mức bảo mật' });
         }
 
@@ -440,7 +471,7 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
             .update(req.file.buffer).digest('hex');
 
         const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } =
-            buildStoredPath({ docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId });
+            buildStoredPath({ docTypeId, documentCode, fallbackId: fileId });
 
         const sha8 = sha256.slice(0, 8);
         const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
@@ -453,14 +484,14 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
         const pool = await getPool();
         await pool.request()
             .input('file_id',           sql.VarChar(50),       fileId)
-            .input('document_code',     sql.NVarChar(100),     document_code || null)
+            .input('document_code',     sql.NVarChar(100),     documentCode)
             .input('title',             sql.NVarChar(500),     title.trim())
-            .input('doc_type_id',       sql.VarChar(20),       doc_type_id || null)
-            .input('issued_date',       sql.Date,              issued_date || null)
-            .input('issuing_unit_id',   sql.VarChar(50),       issuing_unit_id || null)
-            .input('signer',            sql.NVarChar(100),     signer || null)
-            .input('summary',           sql.NVarChar(sql.MAX), summary || null)
-            .input('security_level_id', sql.Int,               parseInt(security_level_id, 10))
+            .input('doc_type_id',       sql.VarChar(20),       docTypeId)
+            .input('issued_date',       sql.Date,              issuedDate)
+            .input('issuing_unit_id',   sql.VarChar(50),       issuingUnitId)
+            .input('signer',            sql.NVarChar(100),     signer)
+            .input('summary',           sql.NVarChar(sql.MAX), summary)
+            .input('security_level_id', sql.Int,               parseInt(securityLevelId, 10))
             .input('original_name',     sql.NVarChar(255),     req.file.originalname)
             .input('stored_path',       sql.NVarChar(500),     relPath)
             .input('mime_type',         sql.VarChar(100),      req.file.mimetype)
@@ -520,15 +551,19 @@ app.put('/api/documents/:fileId',
 
         const oldDoc = exist.recordset[0];
 
-        const {
-            document_code, title, doc_type_id, issued_date,
-            issuing_unit_id, signer, summary, security_level_id
-        } = req.body;
+        const docTypeId = req.body.doc_type_id || req.body.type_id || null;
+        const issuingUnitId = req.body.issuing_unit_id || req.body.unit_id || null;
+        const issuedDate = req.body.issued_date || req.body.issue_date || null;
+        const securityLevelId = req.body.security_level_id || req.body.level_id;
+        const documentCode = req.body.document_code || req.body.code || null;
+        const title = req.body.title;
+        const signer = req.body.signer || null;
+        const summary = req.body.summary || null;
 
         if (!title || !title.trim()) {
             return res.status(400).json({ error: 'Thiếu trích yếu' });
         }
-        if (!security_level_id) {
+        if (!securityLevelId) {
             return res.status(400).json({ error: 'Thiếu mức bảo mật' });
         }
 
@@ -541,7 +576,7 @@ app.put('/api/documents/:fileId',
 
         if (req.file) {
             const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } =
-                buildStoredPath({ docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId });
+                buildStoredPath({ docTypeId, documentCode, fallbackId: fileId });
 
             sha256 = crypto.createHash('sha256')
                 .update(req.file.buffer).digest('hex');
@@ -571,14 +606,14 @@ app.put('/api/documents/:fileId',
 
         const reqUpdate = pool.request()
             .input('file_id',           sql.VarChar(50),       fileId)
-            .input('document_code',     sql.NVarChar(100),     document_code || null)
+            .input('document_code',     sql.NVarChar(100),     documentCode)
             .input('title',             sql.NVarChar(500),     title.trim())
-            .input('doc_type_id',       sql.VarChar(20),       doc_type_id || null)
-            .input('issued_date',       sql.Date,              issued_date || null)
-            .input('issuing_unit_id',   sql.VarChar(50),       issuing_unit_id || null)
-            .input('signer',            sql.NVarChar(100),     signer || null)
-            .input('summary',           sql.NVarChar(sql.MAX), summary || null)
-            .input('security_level_id', sql.Int,               parseInt(security_level_id, 10))
+            .input('doc_type_id',       sql.VarChar(20),       docTypeId)
+            .input('issued_date',       sql.Date,              issuedDate)
+            .input('issuing_unit_id',   sql.VarChar(50),       issuingUnitId)
+            .input('signer',            sql.NVarChar(100),     signer)
+            .input('summary',           sql.NVarChar(sql.MAX), summary)
+            .input('security_level_id', sql.Int,               parseInt(securityLevelId, 10))
             .input('stored_path',       sql.NVarChar(500),     storedPath)
             .input('original_name',     sql.NVarChar(255),     originalName)
             .input('mime_type',         sql.VarChar(100),      mimeType);

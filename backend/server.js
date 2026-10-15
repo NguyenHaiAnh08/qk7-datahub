@@ -683,6 +683,15 @@ app.get('/api/files/:fileId/view', async (req, res) => {
             return res.status(403).json({ error: 'Không có quyền truy cập' });
         }
 
+        if (isDownload && doc.security_level_id >= 3) {
+            await writeAccessLog({
+                userId: req.user.user_id, fileId,
+                action: 'DENIED', ip,
+                note: `Tu cap 3 tro len khong duoc phep tai ve (doc level: ${doc.security_level_id})`
+            });
+            return res.status(403).json({ error: 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được tải về.' });
+        }
+
         const filePath = path.join(ROOT_DIR, doc.stored_path);
 
         if (!filePath.startsWith(PDF_ROOT)) {

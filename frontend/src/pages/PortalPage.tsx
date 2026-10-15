@@ -82,7 +82,7 @@ export const PortalPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await documentsApi.getDocuments({
-        code: searchQuery || undefined,
+        q: searchQuery || undefined,
         type: selectedType || undefined,
         unit: selectedUnit || undefined,
         lv: selectedLevel || undefined,

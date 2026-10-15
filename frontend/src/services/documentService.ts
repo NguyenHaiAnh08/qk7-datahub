@@ -1,6 +1,7 @@
-import { http, getAuthHeaders } from './http';
+import { http } from './http';
 import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { DocumentItem, DocumentFilterParams } from '../types/document';
+import { fileService } from './fileService';
 
 /**
  * Document Service — Quản lý tìm kiếm, tra cứu, tải lên và số hóa văn bản
@@ -10,13 +11,17 @@ export const documentService = {
     params: DocumentFilterParams = {}
   ): Promise<{ total: number; items: DocumentItem[] }> => {
     const searchParams = new URLSearchParams();
+    if (params.q) searchParams.append('q', params.q);
     if (params.code) searchParams.append('code', params.code);
     if (params.title) searchParams.append('title', params.title);
-    if (params.type) searchParams.append('type', params.type);
-    if (params.unit) searchParams.append('unit', params.unit);
+    const type = params.type || params.doc_type_id;
+    if (type) searchParams.append('type', type);
+    const unit = params.unit || params.issuing_unit_id;
+    if (unit) searchParams.append('unit', unit);
     if (params.from) searchParams.append('from', params.from);
     if (params.to) searchParams.append('to', params.to);
-    if (params.lv) searchParams.append('lv', String(params.lv));
+    const lv = params.lv ?? params.security_level_id;
+    if (lv !== undefined && lv !== null && lv !== '') searchParams.append('lv', String(lv));
 
     const qs = searchParams.toString();
     return http<{ total: number; items: DocumentItem[] }>(
@@ -53,52 +58,8 @@ export const documentService = {
     });
   },
 
-  getViewUrl: (fileId: string, download = false): string => {
-    const userId = sessionStorage.getItem('qk7_username') || 'GUEST';
-    const clearance = sessionStorage.getItem('qk7_level') || '1';
-    const base = API_ENDPOINTS.DOCUMENTS.VIEW(fileId, download);
-    const sep = base.includes('?') ? '&' : '?';
-    return `${base}${sep}uid=${encodeURIComponent(userId)}&clr=${encodeURIComponent(clearance)}`;
-  },
-
-  /**
-   * Tải blob tài liệu với đầy đủ custom headers xác thực (X-User-Id, X-Clearance)
-   */
-  fetchDocumentBlob: async (fileId: string, download = false): Promise<Blob> => {
-    const url = documentService.getViewUrl(fileId, download);
-    const headers = getAuthHeaders();
-    const response = await fetch(url, { headers });
-
-    if (!response.ok) {
-      let errorMsg = `Lỗi HTTP ${response.status}`;
-      try {
-        const json = await response.json();
-        if (json.error) errorMsg = json.error;
-      } catch (_) {
-        const text = await response.text();
-        if (text) errorMsg = text;
-      }
-      throw new Error(errorMsg);
-    }
-
-    return await response.blob();
-  },
-
-  /**
-   * Tải file PDF về máy với custom headers an toàn và tên file chuẩn
-   */
-  downloadDocument: async (fileId: string, filename?: string): Promise<void> => {
-    const blob = await documentService.fetchDocumentBlob(fileId, true);
-    const blobUrl = URL.createObjectURL(blob);
-    const a = window.document.createElement('a');
-    a.href = blobUrl;
-    a.download = filename || `${fileId}.pdf`;
-    window.document.body.appendChild(a);
-    a.click();
-    window.document.body.removeChild(a);
-    setTimeout(() => {
-      URL.revokeObjectURL(blobUrl);
-    }, 1500);
-  },
+  getViewUrl: fileService.getViewUrl,
+  fetchDocumentBlob: fileService.fetchFileBlob,
+  downloadDocument: fileService.downloadFile,
 };
 

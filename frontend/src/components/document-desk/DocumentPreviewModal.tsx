@@ -13,7 +13,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { DocumentItem } from '../../types';
-import { documentService } from '../../services/documentService';
+import { fileService } from '../../services/fileService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { useAuth } from '../../hooks/useAuth';
@@ -54,7 +54,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const blob = await documentService.fetchDocumentBlob(docId, false);
+      const blob = await fileService.fetchFileBlob(docId, '0');
       const url = URL.createObjectURL(blob);
       setBlobUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -101,7 +101,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         a.click();
         window.document.body.removeChild(a);
       } else {
-        await documentService.downloadDocument(
+        await fileService.downloadFile(
           document.file_id,
           document.original_name || `${document.document_code}.pdf`
         );
@@ -117,7 +117,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     if (blobUrl) {
       window.open(`${blobUrl}#toolbar=0&navpanes=0`, '_blank');
     } else {
-      window.open(`${documentService.getViewUrl(document.file_id, false)}#toolbar=0&navpanes=0`, '_blank');
+      window.open(`${fileService.getViewUrl(document.file_id, '0')}#toolbar=0&navpanes=0`, '_blank');
     }
   };
 
@@ -153,11 +153,11 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   </span>
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-slate-400" />
-                    {formatDate(document.issue_date)}
+                    {formatDate(document.issued_date || document.issue_date)}
                   </span>
                   <span className="flex items-center gap-1">
                     <Shield className="w-3 h-3 text-amber-500" />
-                    {document.security_level_name || `Cấp ${document.security_level_id}`}
+                    {document.security_name || document.security_level_name || `Cấp ${document.security_level_id}`}
                   </span>
                   {isSecretLevel ? (
                     <span className="text-[10px] text-purple-700 dark:text-purple-400 font-semibold bg-purple-500/15 border border-purple-500/30 px-1.5 py-0.5 rounded">
@@ -168,7 +168,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                       Chưa đủ quyền tải về
                     </span>
                   ) : null}
-                  <span>{formatFileSize(document.file_size_bytes)}</span>
+                  <span>{formatFileSize(document.file_size ?? document.file_size_bytes)}</span>
                 </div>
               </div>
             </div>

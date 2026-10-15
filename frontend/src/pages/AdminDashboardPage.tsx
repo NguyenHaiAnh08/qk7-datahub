@@ -19,7 +19,9 @@ import {
   HardDrive,
   History,
   Save,
-  Menu
+  Menu,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
 import { Sidebar } from '../components/common/Sidebar';
@@ -66,6 +68,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [userSearch, setUserSearch] = useState('');
   const [logSearch, setLogSearch] = useState('');
   const [logFilterAction, setLogFilterAction] = useState('');
+  const [logCurrentPage, setLogCurrentPage] = useState(1);
+  const LOGS_PER_PAGE = 20;
 
   // Modals
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -220,8 +224,15 @@ export const AdminDashboardPage: React.FC = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'logs') loadLogs();
+    if (activeTab === 'logs') {
+      setLogCurrentPage(1);
+      loadLogs();
+    }
   }, [logFilterAction]);
+
+  useEffect(() => {
+    setLogCurrentPage(1);
+  }, [logSearch]);
 
   // Save User
   const handleSaveUser = async (userData: Partial<User>) => {
@@ -362,6 +373,13 @@ export const AdminDashboardPage: React.FC = () => {
         (l.ip || '').toLowerCase().includes(q)
     );
   }, [logsList, logSearch]);
+
+  const totalLogPages = Math.max(1, Math.ceil(filteredLogs.length / LOGS_PER_PAGE));
+
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (logCurrentPage - 1) * LOGS_PER_PAGE;
+    return filteredLogs.slice(startIndex, startIndex + LOGS_PER_PAGE);
+  }, [filteredLogs, logCurrentPage, LOGS_PER_PAGE]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
@@ -920,7 +938,7 @@ export const AdminDashboardPage: React.FC = () => {
                           </td>
                         </tr>
                       ) : (
-                        filteredLogs.map((l, idx) => (
+                        paginatedLogs.map((l, idx) => (
                           <tr key={l.log_id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                             <td className="py-3 px-4 text-slate-500 dark:text-slate-400 whitespace-nowrap font-mono text-[11px]">
                               {(l.created_at || l.timestamp) ? new Date(l.created_at || l.timestamp || '').toLocaleString('vi-VN') : '—'}
@@ -953,6 +971,59 @@ export const AdminDashboardPage: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Phân trang: 20 bản ghi/trang */}
+                {totalLogPages > 1 && (
+                  <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60">
+                    <div>
+                      Hiển thị bản ghi{' '}
+                      <span className="font-semibold text-slate-900 dark:text-white">
+                        {(logCurrentPage - 1) * LOGS_PER_PAGE + 1} - {Math.min(logCurrentPage * LOGS_PER_PAGE, filteredLogs.length)}
+                      </span>{' '}
+                      / Tổng{' '}
+                      <span className="font-semibold text-slate-900 dark:text-white">{filteredLogs.length}</span> (Trang{' '}
+                      <span className="font-semibold text-slate-900 dark:text-white">{logCurrentPage}</span> /{' '}
+                      <span className="font-semibold text-slate-900 dark:text-white">{totalLogPages}</span>)
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => setLogCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={logCurrentPage <= 1}
+                        className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      {Array.from({ length: totalLogPages }, (_, i) => i + 1)
+                        .filter((p) => p === 1 || p === totalLogPages || Math.abs(p - logCurrentPage) <= 1)
+                        .map((p, idx, arr) => {
+                          const prev = arr[idx - 1];
+                          const showEllipsis = prev && p - prev > 1;
+                          return (
+                            <React.Fragment key={p}>
+                              {showEllipsis && <span className="px-1 text-slate-400">...</span>}
+                              <button
+                                onClick={() => setLogCurrentPage(p)}
+                                className={`px-2.5 py-1 rounded transition text-xs ${
+                                  logCurrentPage === p
+                                    ? 'bg-purple-600 text-white font-bold'
+                                    : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            </React.Fragment>
+                          );
+                        })}
+                      <button
+                        onClick={() => setLogCurrentPage((p) => Math.min(totalLogPages, p + 1))}
+                        disabled={logCurrentPage >= totalLogPages}
+                        className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

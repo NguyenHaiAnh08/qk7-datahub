@@ -1,4 +1,4 @@
-import { http } from './http';
+import { http, getAuthHeaders } from './http';
 import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { DocumentItem, DocumentFilterParams } from '../types/document';
 
@@ -54,6 +54,51 @@ export const documentService = {
   },
 
   getViewUrl: (fileId: string, download = false): string => {
-    return API_ENDPOINTS.DOCUMENTS.VIEW(fileId, download);
+    const userId = sessionStorage.getItem('qk7_username') || 'GUEST';
+    const clearance = sessionStorage.getItem('qk7_level') || '1';
+    const base = API_ENDPOINTS.DOCUMENTS.VIEW(fileId, download);
+    const sep = base.includes('?') ? '&' : '?';
+    return `${base}${sep}uid=${encodeURIComponent(userId)}&clr=${encodeURIComponent(clearance)}`;
+  },
+
+  /**
+   * Tải blob tài liệu với đầy đủ custom headers xác thực (X-User-Id, X-Clearance)
+   */
+  fetchDocumentBlob: async (fileId: string, download = false): Promise<Blob> => {
+    const url = documentService.getViewUrl(fileId, download);
+    const headers = getAuthHeaders();
+    const response = await fetch(url, { headers });
+
+    if (!response.ok) {
+      let errorMsg = `Lỗi HTTP ${response.status}`;
+      try {
+        const json = await response.json();
+        if (json.error) errorMsg = json.error;
+      } catch (_) {
+        const text = await response.text();
+        if (text) errorMsg = text;
+      }
+      throw new Error(errorMsg);
+    }
+
+    return await response.blob();
+  },
+
+  /**
+   * Tải file PDF về máy với custom headers an toàn và tên file chuẩn
+   */
+  downloadDocument: async (fileId: string, filename?: string): Promise<void> => {
+    const blob = await documentService.fetchDocumentBlob(fileId, true);
+    const blobUrl = URL.createObjectURL(blob);
+    const a = window.document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename || `${fileId}.pdf`;
+    window.document.body.appendChild(a);
+    a.click();
+    window.document.body.removeChild(a);
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 1500);
   },
 };
+

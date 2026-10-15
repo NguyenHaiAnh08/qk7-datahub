@@ -963,6 +963,7 @@ export const AdminDashboardPage: React.FC = () => {
         user={selectedUser}
         units={unitsList}
         securityLevels={levelsList}
+        existingUsers={usersList}
         onClose={() => {
           setUserModalOpen(false);
           setSelectedUser(null);

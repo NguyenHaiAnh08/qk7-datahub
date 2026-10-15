@@ -117,9 +117,14 @@ export const PortalPage: React.FC = () => {
   };
 
   // Download Handler
-  const handleDownload = (doc: DocumentItem) => {
-    const url = documentsApi.getViewUrl(doc.file_id, true);
-    window.location.href = url;
+  const handleDownload = async (doc: DocumentItem) => {
+    try {
+      showToast(`Đang tải văn bản ${doc.document_code}...`, 'info');
+      await documentsApi.downloadDocument(doc.file_id, doc.original_name || `${doc.document_code}.pdf`);
+      showToast(`Đã tải xuống văn bản ${doc.document_code}`, 'success');
+    } catch (err: any) {
+      showToast('Lỗi tải văn bản: ' + (err.message || 'Không có quyền truy cập'), 'error');
+    }
   };
 
   // Pagination calculation

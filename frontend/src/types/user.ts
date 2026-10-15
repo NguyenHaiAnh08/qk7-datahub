@@ -1,6 +1,7 @@
 export interface User {
   user_id: string;
   username?: string;
+  password?: string;
   full_name: string;
   rank_name?: string;
   position?: string;

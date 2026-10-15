@@ -13,7 +13,7 @@ const adminRoutes: RouteModuleExport = {
     {
       path: ROUTE_PATHS.ADMIN,
       element: (
-        <ProtectedRoute minClearance={4}>
+        <ProtectedRoute adminOnly>
           <AdminDashboardPage />
         </ProtectedRoute>
       ),
@@ -29,7 +29,7 @@ const adminRoutes: RouteModuleExport = {
     {
       path: ROUTE_PATHS.USERS,
       element: (
-        <ProtectedRoute minClearance={4}>
+        <ProtectedRoute adminOnly>
           <UsersPage />
         </ProtectedRoute>
       ),

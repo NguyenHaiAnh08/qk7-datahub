@@ -201,6 +201,18 @@ app.post('/api/auth/login', async (req, res) => {
         delete user.password_hash;
         delete user.pin_hash;
 
+        // Bổ sung roles & role_names theo schema UserFull của Swagger
+        const rolesRes = await pool.request()
+            .input('u', sql.VarChar(50), user.user_id)
+            .query(`
+                SELECT r.role_id, r.name
+                FROM USER_ROLE ur
+                JOIN [ROLE] r ON r.role_id = ur.role_id
+                WHERE ur.user_id = @u
+            `);
+        user.roles = rolesRes.recordset.map(x => x.role_id);
+        user.role_names = rolesRes.recordset.map(x => x.name);
+
         res.json({ success: true, user });
 
     } catch (err) {
@@ -211,13 +223,18 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/me', async (req, res) => {
     try {
+        const userId = req.user?.user_id;
+        if (!userId || userId === 'GUEST') {
+            return res.status(401).json({ error: 'Chưa xác thực thông tin user (thiếu header X-User-Id)' });
+        }
+
         const pool = await getPool();
         const r = await pool.request()
-            .input('u', sql.VarChar(50), req.user.user_id)
+            .input('u', sql.VarChar(50), userId)
             .query(`
-                SELECT u.user_id, u.full_name, u.[rank] AS rank_name, u.[position],
-                       u.unit_id, un.name AS unit_name,
-                       u.clearance_level_id, sl.name AS clearance_name
+                SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name, u.[position],
+                       u.unit_id, un.name AS unit_name, u.status,
+                       u.clearance_level_id, sl.name AS clearance_name, sl.code AS clearance_code
                 FROM [USER] u
                 LEFT JOIN UNIT un           ON un.unit_id  = u.unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
@@ -226,7 +243,22 @@ app.get('/api/auth/me', async (req, res) => {
         if (r.recordset.length === 0) {
             return res.status(404).json({ error: 'Không tìm thấy user' });
         }
-        res.json(r.recordset[0]);
+
+        const user = r.recordset[0];
+
+        // Bổ sung roles & role_names theo schema UserFull của Swagger
+        const rolesRes = await pool.request()
+            .input('u', sql.VarChar(50), user.user_id)
+            .query(`
+                SELECT r.role_id, r.name
+                FROM USER_ROLE ur
+                JOIN [ROLE] r ON r.role_id = ur.role_id
+                WHERE ur.user_id = @u
+            `);
+        user.roles = rolesRes.recordset.map(x => x.role_id);
+        user.role_names = rolesRes.recordset.map(x => x.name);
+
+        res.json(user);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -269,9 +301,14 @@ app.get('/api/meta', async (req, res) => {
     try {
         const pool = await getPool();
         const [types, units, levels] = await Promise.all([
-            pool.request().query(`SELECT type_id, name FROM DOCUMENT_TYPE ORDER BY name`),
-            pool.request().query(`SELECT unit_id, name FROM UNIT ORDER BY name`),
-            pool.request().query(`SELECT level_id, name FROM SECURITY_LEVEL ORDER BY level_id`)
+            pool.request().query(`SELECT type_id, name, description FROM DOCUMENT_TYPE ORDER BY name`),
+            pool.request().query(`
+                SELECT u.unit_id, u.name, u.parent_id, p.name AS parent_name
+                FROM UNIT u
+                LEFT JOIN UNIT p ON p.unit_id = u.parent_id
+                ORDER BY u.name
+            `),
+            pool.request().query(`SELECT level_id, code, name FROM SECURITY_LEVEL ORDER BY level_id`)
         ]);
         res.json({
             types:  types.recordset,
@@ -674,22 +711,27 @@ app.get('/api/files/:fileId/view', async (req, res) => {
 
         const doc = result.recordset[0];
 
+        // Quyền xem và tải tệp được kiểm soát theo Cấp độ bảo mật (Clearance Level vs doc.security_level_id)
         if (doc.security_level_id > req.user.clearance_level_id) {
             await writeAccessLog({
                 userId: req.user.user_id, fileId,
                 action: 'DENIED', ip,
-                note: `Can muc ${doc.security_level_id}, user co muc ${req.user.clearance_level_id}`
+                note: `Can muc ${doc.security_level_id}${isDownload ? ' de tai ve' : ' de xem'}, user co muc ${req.user.clearance_level_id}`
             });
-            return res.status(403).json({ error: 'Không có quyền truy cập' });
+            return res.status(403).json({ error: `Cấp độ bảo mật của bạn không đủ để ${isDownload ? 'tải về' : 'xem'} tài liệu này` });
         }
 
+        // Quy định bảo mật: Từ cấp 3 trở đi (gồm Cấp 3, Cấp 4, Cấp 5) chỉ duy nhất cho phép xem, KHÔNG được tải về.
+        // Chỉ cấp 1 và cấp 2 được phép tải về máy.
         if (isDownload && doc.security_level_id >= 3) {
             await writeAccessLog({
                 userId: req.user.user_id, fileId,
                 action: 'DENIED', ip,
-                note: `Tu cap 3 tro len khong duoc phep tai ve (doc level: ${doc.security_level_id})`
+                note: `Tu choi tai ve: Tai lieu Cap ${doc.security_level_id} chi duy nhat cho phep xem truc tiep`
             });
-            return res.status(403).json({ error: 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được tải về.' });
+            return res.status(403).json({
+                error: 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp trên hệ thống, không được phép tải về máy.'
+            });
         }
 
         const filePath = path.join(ROOT_DIR, doc.stored_path);

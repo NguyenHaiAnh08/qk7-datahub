@@ -118,8 +118,20 @@ export const PortalPage: React.FC = () => {
 
   // Download Handler
   const handleDownload = async (doc: DocumentItem) => {
-    if ((doc.security_level_id || 1) >= 3) {
-      showToast('Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được tải về (không đủ điều kiện cấp bậc)', 'error');
+    const userClearance = user?.clearance_level_id || 1;
+    const docLevel = doc.security_level_id || 1;
+
+    // Quy định bảo mật: Từ Cấp 3 trở đi chỉ duy nhất cho phép xem, không được tải về
+    if (docLevel >= 3) {
+      showToast('Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy.', 'info');
+      return;
+    }
+
+    if (docLevel > userClearance) {
+      showToast(
+        `Cấp độ bảo mật hiện tại của bạn (Cấp ${userClearance}) không đủ để tải văn bản Cấp ${docLevel}`,
+        'error'
+      );
       return;
     }
     try {
@@ -318,6 +330,7 @@ export const PortalPage: React.FC = () => {
       <DocumentPreviewModal
         open={Boolean(previewDoc)}
         document={previewDoc}
+        userClearanceLevel={user?.clearance_level_id || 1}
         onClose={() => setPreviewDoc(null)}
       />
 

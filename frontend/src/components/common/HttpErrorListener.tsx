@@ -1,12 +1,11 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { App as AntApp, Button, Space } from 'antd';
+import { App as AntApp } from 'antd';
 import {
   WarningOutlined,
   StopOutlined,
   ApiOutlined,
   ExclamationCircleOutlined,
-  RightOutlined,
 } from '@ant-design/icons';
 import { HttpErrorDetail } from '../../services/http';
 import { ROUTE_PATHS } from '../../routes/routePaths';
@@ -45,65 +44,31 @@ export const HttpErrorListener: React.FC = () => {
       switch (status) {
         case 401:
           notification.warning({
-            message: 'Phiên Làm Việc Hết Hạn (401)',
+            title: 'Phiên Làm Việc Hết Hạn',
             description: message || 'Bạn cần đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
             icon: <WarningOutlined className="text-amber-500" />,
-            duration: 6,
-            btn: (
-              <Space>
-                <Button
-                  size="small"
-                  onClick={() => navigate(ROUTE_PATHS.ERROR_401, { state: { message, code: 401, url } })}
-                >
-                  Chi Tiết
-                </Button>
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={() => navigate(ROUTE_PATHS.LOGIN)}
-                  className="bg-purple-600 hover:bg-purple-500"
-                >
-                  Đăng Nhập
-                </Button>
-              </Space>
-            ),
+            duration: 4.5,
+            closeIcon: null,
           });
           break;
 
         case 403:
           notification.error({
-            message: 'Truy Cập Bị Từ Chối (403)',
+            title: 'Truy Cập Bị Từ Chối',
             description:
               message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
             icon: <StopOutlined className="text-red-500" />,
-            duration: 8,
-            btn: (
-              <Button
-                type="primary"
-                danger
-                size="small"
-                icon={<RightOutlined />}
-                onClick={() => navigate(ROUTE_PATHS.ERROR_403, { state: { message, code: 403, url } })}
-              >
-                Xem Trang Lỗi 403
-              </Button>
-            ),
+            duration: 4.5,
+            closeIcon: null,
           });
           break;
 
         case 404:
           notification.info({
-            message: 'Không Tìm Thấy Tài Nguyên (404)',
+            title: 'Không Tìm Thấy Tài Nguyên',
             description: message || `Không tìm thấy endpoint hoặc tài liệu yêu cầu: ${url}`,
-            duration: 5,
-            btn: (
-              <Button
-                size="small"
-                onClick={() => navigate(ROUTE_PATHS.ERROR_404, { state: { message, code: 404, url } })}
-              >
-                Trang Lỗi 404
-              </Button>
-            ),
+            duration: 4.5,
+            closeIcon: null,
           });
           break;
 
@@ -112,38 +77,22 @@ export const HttpErrorListener: React.FC = () => {
         case 503:
         case 504:
           notification.error({
-            message: `Sự Cố Máy Chủ Backend (${status})`,
+            title: 'Sự Cố Máy Chủ',
             description:
               message || 'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
             icon: <ApiOutlined className="text-red-500" />,
-            duration: 8,
-            btn: (
-              <Button
-                type="primary"
-                size="small"
-                className="bg-purple-600 hover:bg-purple-500"
-                onClick={() => navigate(ROUTE_PATHS.ERROR_500, { state: { message, code: status, url } })}
-              >
-                Chuyển Đến Trang 500
-              </Button>
-            ),
+            duration: 5,
+            closeIcon: null,
           });
           break;
 
         default:
           notification.warning({
-            message: `Lỗi Phản Hồi HTTP ${status}`,
+            title: 'Lỗi Phản Hồi Hệ Thống',
             description: message,
             icon: <ExclamationCircleOutlined className="text-amber-500" />,
-            duration: 6,
-            btn: (
-              <Button
-                size="small"
-                onClick={() => navigate(`/error/${status}`, { state: { message, code: status, url } })}
-              >
-                Xem Chi Tiết
-              </Button>
-            ),
+            duration: 4.5,
+            closeIcon: null,
           });
           break;
       }

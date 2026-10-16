@@ -4,6 +4,8 @@ import { Result, Button, Typography, Tag, Card } from 'antd';
 import { HomeOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { ROUTE_PATHS } from '../routes/routePaths';
 import { ThemeToggle } from '../components/common/ThemeToggle';
+import { useAuth } from '../hooks/useAuth';
+import { getDestinationByRole } from '../contexts/AuthContext';
 
 const { Paragraph } = Typography;
 
@@ -82,6 +84,7 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { code: paramCode } = useParams<{ code?: string }>();
 
   // Xác định mã lỗi từ props -> params -> route path -> query string -> location state -> fallback 404
@@ -104,6 +107,17 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
 
     return '404';
   }, [propCode, paramCode, location.pathname, location.search, location.state]);
+
+  // Nếu người dùng đã đăng nhập mà rơi vào trang 403: Tự động điều hướng về khu vực làm việc theo vai trò
+  React.useEffect(() => {
+    if (statusCode === '403' && user && user.user_id !== 'GUEST') {
+      const dest = getDestinationByRole(user);
+      const timer = setTimeout(() => {
+        navigate(dest, { replace: true });
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [statusCode, user, navigate]);
 
   const config = useMemo(() => {
     return (
@@ -175,10 +189,10 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
                   type="primary"
                   icon={<HomeOutlined />}
                   size="large"
-                  onClick={() => navigate(ROUTE_PATHS.PORTAL)}
+                  onClick={() => navigate(getDestinationByRole(user))}
                   className="font-semibold shadow-md shadow-purple-600/25 bg-purple-600 hover:bg-purple-500 px-6 h-11 rounded-xl"
                 >
-                  Về Trang Chủ
+                  Về Khu Vực Làm Việc
                 </Button>
 
                 {statusCode.startsWith('5') && (

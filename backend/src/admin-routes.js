@@ -64,7 +64,7 @@ module.exports = function (app, deps) {
         try {
             const pool = await getPool();
             const r = await pool.request().query(`
-                SELECT u.user_id, u.full_name, u.[rank] AS rank_name, u.[position],
+                SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name, u.[position],
                        u.unit_id, un.name AS unit_name,
                        u.status, u.clearance_level_id,
                        sl.name AS clearance_name, sl.code AS clearance_code
@@ -73,7 +73,27 @@ module.exports = function (app, deps) {
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
                 ORDER BY u.user_id
             `);
-            res.json({ total: r.recordset.length, items: r.recordset });
+
+            const rolesRes = await pool.request().query(`
+                SELECT ur.user_id, r.role_id, r.name
+                FROM USER_ROLE ur
+                JOIN [ROLE] r ON r.role_id = ur.role_id
+            `);
+            const rolesByUser = {};
+            const roleNamesByUser = {};
+            for (const row of rolesRes.recordset) {
+                if (!rolesByUser[row.user_id]) rolesByUser[row.user_id] = [];
+                if (!roleNamesByUser[row.user_id]) roleNamesByUser[row.user_id] = [];
+                rolesByUser[row.user_id].push(row.role_id);
+                roleNamesByUser[row.user_id].push(row.name);
+            }
+            const items = r.recordset.map(u => ({
+                ...u,
+                roles: rolesByUser[u.user_id] || [],
+                role_names: roleNamesByUser[u.user_id] || []
+            }));
+
+            res.json({ total: items.length, items });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
@@ -87,7 +107,8 @@ app.post('/api/admin/users', async (req, res) => {
     try {
         const {
             user_id, username, password, full_name,
-            rank_name, position, unit_id, status, clearance_level_id
+            rank_name, position, unit_id, status, clearance_level_id,
+            role_id, roles
         } = req.body;
 
         // Validate
@@ -127,6 +148,25 @@ app.post('/api/admin/users', async (req, res) => {
                    @status, @clearance_level_id, @password_hash)
             `);
 
+        // Gán vai trò (role) nếu có
+        if (role_id) {
+            await pool.request()
+                .input('u', sql.VarChar(50), user_id.trim())
+                .input('r', sql.VarChar(50), role_id)
+                .query(`IF NOT EXISTS (SELECT 1 FROM USER_ROLE WHERE user_id = @u AND role_id = @r)
+                        INSERT INTO USER_ROLE (user_id, role_id) VALUES (@u, @r)`);
+        } else if (Array.isArray(roles)) {
+            for (const rId of roles) {
+                if (rId) {
+                    await pool.request()
+                        .input('u', sql.VarChar(50), user_id.trim())
+                        .input('r', sql.VarChar(50), rId)
+                        .query(`IF NOT EXISTS (SELECT 1 FROM USER_ROLE WHERE user_id = @u AND role_id = @r)
+                                INSERT INTO USER_ROLE (user_id, role_id) VALUES (@u, @r)`);
+                }
+            }
+        }
+
         await log(req, 'CREATE_USER', `Tạo user ${user_id} (${username})`);
 
         res.json({
@@ -149,7 +189,7 @@ app.post('/api/admin/users', async (req, res) => {
 });
     app.put('/api/admin/users/:id', async (req, res) => {
         try {
-            const { full_name, rank_name, position, unit_id, status, clearance_level_id } = req.body;
+            const { full_name, rank_name, position, unit_id, status, clearance_level_id, role_id, roles } = req.body;
             const pool = await getPool();
             const r = await pool.request()
                 .input('user_id', sql.VarChar(50), req.params.id)
@@ -163,6 +203,22 @@ app.post('/api/admin/users', async (req, res) => {
                         unit_id=@unit_id, status=@status, clearance_level_id=@clearance_level_id
                         WHERE user_id=@user_id`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+            if (role_id !== undefined || roles !== undefined) {
+                await pool.request()
+                    .input('u', sql.VarChar(50), req.params.id)
+                    .query(`DELETE FROM USER_ROLE WHERE user_id = @u`);
+                const targetRoles = role_id ? [role_id] : (Array.isArray(roles) ? roles : []);
+                for (const rId of targetRoles) {
+                    if (rId) {
+                        await pool.request()
+                            .input('u', sql.VarChar(50), req.params.id)
+                            .input('r', sql.VarChar(50), rId)
+                            .query(`INSERT INTO USER_ROLE (user_id, role_id) VALUES (@u, @r)`);
+                    }
+                }
+            }
+
             await log(req, 'UPDATE_USER', `Sửa user ${req.params.id}`);
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }

@@ -83,6 +83,19 @@ const swaggerSpec = {
                 tags: ['Auth'],
                 summary: 'Lấy thông tin user đang đăng nhập',
                 description: 'Dựa vào header `X-User-Id` để tra thông tin user + roles.',
+                security: [
+                    { UserHeader: [], ClearanceHeader: [] }
+                ],
+                parameters: [
+                    {
+                        in: 'header',
+                        name: 'X-User-Id',
+                        required: false,
+                        schema: { type: 'string' },
+                        description: 'Mã quân nhân / user (VD: USR-001, USR-004)',
+                        example: 'USR-001'
+                    }
+                ],
                 responses: {
                     200: {
                         description: 'Thành công',
@@ -149,6 +162,48 @@ const swaggerSpec = {
                         }
                     },
                     500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+
+        '/api/test-http-error/{code}': {
+            get: {
+                tags: ['System'],
+                summary: 'Kiểm thử mã lỗi HTTP (400, 401, 403, 404, 500, 502, 503)',
+                parameters: [
+                    {
+                        in: 'path',
+                        name: 'code',
+                        required: true,
+                        schema: { type: 'integer' },
+                        description: 'Mã HTTP trạng thái cần mô phỏng (VD: 400, 401, 403, 404, 500, 502, 503)',
+                        example: 403
+                    },
+                    {
+                        in: 'query',
+                        name: 'msg',
+                        required: false,
+                        schema: { type: 'string' },
+                        description: 'Nội dung thông điệp lỗi tùy chỉnh'
+                    }
+                ],
+                responses: {
+                    'default': {
+                        description: 'Phản hồi mã trạng thái theo yêu cầu',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    properties: {
+                                        ok: { type: 'boolean', example: false },
+                                        code: { type: 'integer', example: 403 },
+                                        error: { type: 'string', example: 'Mô phỏng lỗi từ server' },
+                                        timestamp: { type: 'string', format: 'date-time' }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -1027,9 +1082,10 @@ const swaggerSpec = {
             Unit: {
                 type: 'object',
                 properties: {
-                    unit_id:   { type: 'string' },
-                    name:      { type: 'string' },
-                    parent_id: { type: 'string', nullable: true }
+                    unit_id:     { type: 'string' },
+                    name:        { type: 'string' },
+                    parent_id:   { type: 'string', nullable: true },
+                    parent_name: { type: 'string', nullable: true }
                 }
             },
 

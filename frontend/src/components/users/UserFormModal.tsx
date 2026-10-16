@@ -10,7 +10,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { User } from '../../types/user';
+import { User, MilitaryRank, MilitaryPosition } from '../../types/user';
 import { Unit, SecurityLevel, Role } from '../../types';
 import { usersApi } from '../../services/usersApi';
 import { dashboardApi } from '../../services/dashboardApi';
@@ -21,6 +21,8 @@ export interface UserFormModalProps {
   units: Unit[];
   securityLevels: SecurityLevel[];
   roles?: Role[];
+  ranks?: MilitaryRank[];
+  positions?: MilitaryPosition[];
   existingUsers?: User[];
   onClose: () => void;
   onSave: (userData: Partial<User> & { username?: string; password?: string; role_id?: string }) => Promise<void>;
@@ -48,56 +50,14 @@ export const getNextUserId = (users: Array<{ user_id?: string }>): string => {
 
 export const DEFAULT_USER_PASSWORD = 'Abc@12345';
 
-export const MILITARY_RANKS = [
-  'Đại tá',
-  'Thượng tá',
-  'Trung tá',
-  'Thiếu tá',
-  'Thượng tá QNCN',
-  'Trung tá QNCN',
-  'Thiếu tá QNCN',
-  'Đại úy',
-  'Thượng úy',
-  'Trung úy',
-  'Thiếu úy',
-  'Đại úy QNCN',
-  'Thượng úy QNCN',
-  'Trung úy QNCN',
-  'Thiếu úy QNCN',
-  'Thượng sĩ',
-  'Trung sĩ',
-  'Hạ sĩ',
-  'Binh nhất',
-  'Binh nhì',
-];
-
-export const MILITARY_POSITIONS = [
-  'Hiệu trưởng',
-  'Phó Hiệu trưởng',
-  'Chính ủy',
-  'Phó Chính ủy',
-  'Trưởng phòng Tham mưu - Hành chính',
-  'Trưởng phòng Chính trị',
-  'Trưởng phòng Hậu cần - Kỹ thuật',
-  'Quản trị viên hệ thống',
-  'Cán bộ Văn thư',
-  'Thư ký tổng hợp',
-  'Cán bộ tuyên huấn',
-  'Cán bộ tác chiến',
-  'Trợ lý tham mưu',
-  'Trợ lý chính trị',
-  'Trợ lý hậu cần',
-  'Trợ lý kỹ thuật',
-  'Nhân viên IT / Kỹ thuật',
-  'Nhân viên văn thư lưu trữ',
-];
-
 export const UserFormModal: React.FC<UserFormModalProps> = ({
   open,
   user,
   units,
   securityLevels,
   roles,
+  ranks,
+  positions,
   existingUsers,
   onClose,
   onSave,
@@ -105,8 +65,14 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 }) => {
   const isEdit = Boolean(user);
 
+  // ── Roles ──
   const [availableRoles, setAvailableRoles] = useState<Role[]>(roles || []);
 
+  // ── Ranks & Positions (thay vì hard-code) ──
+  const [availableRanks, setAvailableRanks] = useState<MilitaryRank[]>(ranks || []);
+  const [availablePositions, setAvailablePositions] = useState<MilitaryPosition[]>(positions || []);
+
+  // ── Đồng bộ props vào state ──
   useEffect(() => {
     if (roles && roles.length > 0) {
       setAvailableRoles(roles);
@@ -114,6 +80,24 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       dashboardApi.getRoles().then((res) => setAvailableRoles(res.items || [])).catch(() => {});
     }
   }, [roles, open]);
+
+  useEffect(() => {
+    if (ranks && ranks.length > 0) {
+      setAvailableRanks(ranks);
+    }
+    if (positions && positions.length > 0) {
+      setAvailablePositions(positions);
+    }
+    // Fallback: nếu parent không truyền, tự load từ /api/meta
+    if (open && (!ranks || ranks.length === 0 || !positions || positions.length === 0)) {
+      dashboardApi.getMeta()
+        .then((meta: any) => {
+          if (!ranks || ranks.length === 0) setAvailableRanks(meta.ranks || []);
+          if (!positions || positions.length === 0) setAvailablePositions(meta.positions || []);
+        })
+        .catch(() => {});
+    }
+  }, [ranks, positions, open]);
 
   const [formData, setFormData] = useState<Partial<User> & { username?: string; password?: string; role_id?: string }>({
     user_id: '',
@@ -384,12 +368,12 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
                   <option value="">-- Chọn cấp bậc --</option>
-                  {formData.rank_name && !MILITARY_RANKS.includes(formData.rank_name) && (
+                  {formData.rank_name && !availableRanks.some((r) => r.name === formData.rank_name) && (
                     <option value={formData.rank_name}>{formData.rank_name}</option>
                   )}
-                  {MILITARY_RANKS.map((rank) => (
-                    <option key={rank} value={rank}>
-                      {rank}
+                  {availableRanks.map((r) => (
+                    <option key={r.rank_id} value={r.name}>
+                      {r.name}
                     </option>
                   ))}
                 </select>
@@ -403,12 +387,12 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
                   <option value="">-- Chọn chức vụ --</option>
-                  {formData.position && !MILITARY_POSITIONS.includes(formData.position) && (
+                  {formData.position && !availablePositions.some((p) => p.name === formData.position) && (
                     <option value={formData.position}>{formData.position}</option>
                   )}
-                  {MILITARY_POSITIONS.map((pos) => (
-                    <option key={pos} value={pos}>
-                      {pos}
+                  {availablePositions.map((p) => (
+                    <option key={p.position_id} value={p.name}>
+                      {p.name}
                     </option>
                   ))}
                 </select>
@@ -508,4 +492,3 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     </AnimatePresence>
   );
 };
-

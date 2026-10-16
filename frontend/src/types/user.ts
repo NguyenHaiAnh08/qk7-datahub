@@ -57,4 +57,18 @@ export interface AdminStats {
   byUnit: Array<{ id: string; name: string; n: number }>;
 }
 
+export interface MilitaryRank {
+  rank_id: string;
+  name: string;
+  sort_order?: number;
+  active?: boolean;
+}
+
+export interface MilitaryPosition {
+  position_id: string;
+  name: string;
+  sort_order?: number;
+  active?: boolean;
+}
+
 export type { SecurityLevel } from './document';

@@ -11,6 +11,8 @@ export interface User {
   clearance_level_id: number;
   clearance_name?: string;
   clearance_code?: string;
+  roles?: string[];
+  role_names?: string[];
 }
 
 export interface Unit {

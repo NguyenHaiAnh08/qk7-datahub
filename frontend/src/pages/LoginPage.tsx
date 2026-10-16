@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, HelpCircle, Building2, Server, X } from 'lucide-react';
 import { LoginForm } from '../components/auth/LoginForm';
@@ -7,15 +7,51 @@ import { Toast, ToastState } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { User } from '../types/user';
 import { ROUTE_PATHS } from '../routes/routePaths';
+import { useAuth } from '../hooks/useAuth';
+import { getDestinationByRole, isUserAdmin } from '../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, isAuthenticated } = useAuth();
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [toast, setToast] = useState<ToastState>({
     show: false,
     message: '',
     type: 'success',
   });
+
+  // Nếu user đã đăng nhập hợp lệ, tự động chuyển về trang tương ứng theo Role
+  useEffect(() => {
+    if (isAuthenticated && user && user.user_id !== 'GUEST') {
+      // Khi đăng nhập Admin thì vô thẳng admin-dashboard luôn
+      if (isUserAdmin(user)) {
+        navigate(ROUTE_PATHS.ADMIN, { replace: true });
+        return;
+      }
+
+      const state = location.state as { from?: { pathname: string } } | undefined;
+      let redirectUrl = state?.from?.pathname;
+
+      if (
+        redirectUrl &&
+        (redirectUrl.startsWith('/403') ||
+          redirectUrl.startsWith('/404') ||
+          redirectUrl.startsWith('/500') ||
+          ((redirectUrl.startsWith(ROUTE_PATHS.ADMIN) || redirectUrl.startsWith(ROUTE_PATHS.USERS)) &&
+            !isUserAdmin(user)))
+      ) {
+        redirectUrl = undefined;
+      }
+
+      if (redirectUrl && redirectUrl !== ROUTE_PATHS.LOGIN && redirectUrl !== ROUTE_PATHS.INDEX) {
+        navigate(redirectUrl, { replace: true });
+      } else {
+        const targetPath = getDestinationByRole(user);
+        navigate(targetPath, { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, navigate, location.state]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ show: true, message, type });
@@ -24,17 +60,38 @@ export const LoginPage: React.FC = () => {
     }, 3000);
   };
 
-  const handleLoginSuccess = (user: User) => {
-    // If admin or clearance >= 4, can go to admin or desk or portal
+  const handleLoginSuccess = (loggedInUser: User) => {
+    // Khi đăng nhập Admin thì vô thẳng admin-dashboard luôn
+    if (isUserAdmin(loggedInUser)) {
+      setTimeout(() => {
+        navigate(ROUTE_PATHS.ADMIN, { replace: true });
+      }, 400);
+      return;
+    }
+
+    const state = location.state as { from?: { pathname: string } } | undefined;
+    let redirectUrl = state?.from?.pathname;
+
+    if (
+      redirectUrl &&
+      (redirectUrl.startsWith('/403') ||
+        redirectUrl.startsWith('/404') ||
+        redirectUrl.startsWith('/500') ||
+        ((redirectUrl.startsWith(ROUTE_PATHS.ADMIN) || redirectUrl.startsWith(ROUTE_PATHS.USERS)) &&
+          !isUserAdmin(loggedInUser)))
+    ) {
+      redirectUrl = undefined;
+    }
+
     setTimeout(() => {
-      if (user.clearance_level_id >= 5) {
-        navigate(ROUTE_PATHS.ADMIN);
-      } else if (user.clearance_level_id >= 3) {
-        navigate(ROUTE_PATHS.DESK);
+      if (redirectUrl && redirectUrl !== ROUTE_PATHS.LOGIN && redirectUrl !== ROUTE_PATHS.INDEX) {
+        navigate(redirectUrl, { replace: true });
       } else {
-        navigate(ROUTE_PATHS.PORTAL);
+        // Phân quyền điều hướng theo Role
+        const targetPath = getDestinationByRole(loggedInUser);
+        navigate(targetPath, { replace: true });
       }
-    }, 700);
+    }, 500);
   };
 
   return (

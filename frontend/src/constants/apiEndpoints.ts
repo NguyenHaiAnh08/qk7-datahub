@@ -58,5 +58,9 @@ export const API_ENDPOINTS = {
     DOCUMENT_TYPE_DETAIL: (typeId: string) => `/api/admin/document-types/${encodeURIComponent(typeId)}`,
     SECURITY_LEVELS: '/api/admin/security-levels',
     SECURITY_LEVEL_DETAIL: (levelId: number | string) => `/api/admin/security-levels/${encodeURIComponent(String(levelId))}`,
+    RANKS: '/api/admin/ranks',
+    RANK_DETAIL: (rankId: string) => `/api/admin/ranks/${encodeURIComponent(rankId)}`,
+    POSITIONS: '/api/admin/positions',
+    POSITION_DETAIL: (positionId: string) => `/api/admin/positions/${encodeURIComponent(positionId)}`,
   },
 } as const;

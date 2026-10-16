@@ -120,16 +120,17 @@ function extractMetadata(text, existing = {}) {
     };
 
     // ── Số hiệu (suffix): /BC-TQS ──
-    const codeMatch = text.match(/S[ốo]\s*:?\s*(\d+)?\s*\/\s*([A-ZĐ][A-ZĐ0-9-]+)/);
+    const codeMatch = text.match(/S[ốo]\s*:?\s*(\d+)?\s*\/\s*([A-ZĐ][A-ZĐ0-9]+(?:\s*-\s*[A-ZĐ0-9]+)*)/);
     if (codeMatch) {
         result.document_number = codeMatch[1] || null;
-        const suffix = codeMatch[2];
+        // Chuẩn hoá suffix: bỏ space quanh dấu gạch
+        const suffix = codeMatch[2].replace(/\s*-\s*/g, '-').trim();
         if (codeMatch[1]) {
             result.document_code = `${codeMatch[1]}/${suffix}`;
         } else {
             result.document_code = `/${suffix}`;
         }
-        // Đoán doc_type_code từ suffix
+        // Đoán doc_type_code
         const guessType = suffix.split('-')[0];
         if (Object.values(DOC_TYPE_MAP).includes(guessType)) {
             result.doc_type_code = guessType;

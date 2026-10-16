@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
     LIST: '/api/documents',
     DETAIL: (fileId: string) => `/api/documents/${encodeURIComponent(fileId)}`,
     UPLOAD: '/api/documents/upload',
+    PARSE: '/api/documents/parse', 
     UPDATE: (fileId: string) => `/api/documents/${encodeURIComponent(fileId)}`,
     DELETE: (fileId: string) => `/api/documents/${encodeURIComponent(fileId)}`,
     VIEW: (fileId: string, download: '0' | '1' | boolean = '0') => {

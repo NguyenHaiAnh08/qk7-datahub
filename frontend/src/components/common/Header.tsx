@@ -29,7 +29,6 @@ export const Header: React.FC<HeaderProps> = ({
   activeNav
 }) => {
   const { user, isAdmin, isStaff, logout } = useAuth();
-  console.log('[Header] render, user =', user?.user_id, 'isAdmin =', isAdmin);
   const navigate = useNavigate();
   const [liveClock, setLiveClock] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);

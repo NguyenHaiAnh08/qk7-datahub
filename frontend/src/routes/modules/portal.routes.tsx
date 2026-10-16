@@ -10,11 +10,11 @@ const RootIndexRoute: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   if (isAuthenticated && user && user.user_id !== 'GUEST') {
     const dest = getDestinationByRole(user);
-    if (dest !== ROUTE_PATHS.INDEX && dest !== ROUTE_PATHS.PORTAL) {
+    if (dest !== ROUTE_PATHS.INDEX) {
       return <Navigate to={dest} replace />;
     }
   }
-  return <PortalPage />;
+  return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
 };
 
 const portalRoutes: RouteModuleExport = {
@@ -39,7 +39,7 @@ const portalRoutes: RouteModuleExport = {
     },
     {
       path: '/index.html',
-      element: <Navigate to={ROUTE_PATHS.PORTAL} replace />,
+      element: <Navigate to={ROUTE_PATHS.LOGIN} replace />,
     },
   ],
 };

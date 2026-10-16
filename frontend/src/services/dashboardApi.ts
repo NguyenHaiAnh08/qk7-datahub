@@ -5,6 +5,7 @@ import { unitService } from './unitService';
 import { documentTypeService } from './documentTypeService';
 import { securityLevelService } from './securityLevelService';
 import { logService } from './logService';
+import { militaryService } from './militaryService.ts';       // ← THÊM
 
 /**
  * Dashboard API (Aggregator Service)
@@ -46,6 +47,18 @@ export const dashboardApi = {
   createSecurityLevel: securityLevelService.createSecurityLevel,
   updateSecurityLevel: securityLevelService.updateSecurityLevel,
   deleteSecurityLevel: securityLevelService.deleteSecurityLevel,
+
+  // Military Ranks — Cấp bậc                                   
+  getRanks: militaryService.getRanks,
+  createRank: militaryService.createRank,
+  updateRank: militaryService.updateRank,
+  deleteRank: militaryService.deleteRank,
+
+  // Military Positions — Chức vụ                              
+  getPositions: militaryService.getPositions,
+  createPosition: militaryService.createPosition,
+  updatePosition: militaryService.updatePosition,
+  deletePosition: militaryService.deletePosition,
 };
 
 export default dashboardApi;

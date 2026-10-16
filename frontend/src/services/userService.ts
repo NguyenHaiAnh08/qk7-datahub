@@ -20,6 +20,8 @@ export const userService = {
     unit_id?: string;
     status?: string;
     clearance_level_id: number;
+    role_id?: string;
+    roles?: string[];
   }): Promise<{ success: boolean; user_id: string; username: string }> => {
     return http(API_ENDPOINTS.ADMIN.USERS, {
       method: 'POST',
@@ -28,7 +30,7 @@ export const userService = {
     });
   },
 
-  updateUser: async (userId: string, data: Partial<User>): Promise<{ success: boolean }> => {
+  updateUser: async (userId: string, data: Partial<User> & { role_id?: string }): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.USER_DETAIL(userId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

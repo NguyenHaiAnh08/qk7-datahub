@@ -45,11 +45,12 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     if (document) {
       setCode(document.document_code || '');
       setTitle(document.title || '');
-      setTypeId(document.type_id || (types[0]?.type_id ?? ''));
-      setUnitId(document.unit_id || (units[0]?.unit_id ?? ''));
+      setTypeId(document.doc_type_id || document.type_id || (types[0]?.type_id ?? ''));
+      setUnitId(document.issuing_unit_id || document.unit_id || (units[0]?.unit_id ?? ''));
       setSecurityLevel(document.security_level_id || 1);
       setSigner(document.signer || '');
-      setIssueDate(document.issue_date ? document.issue_date.split('T')[0] : '');
+      const rawDate = document.issued_date || document.issue_date;
+      setIssueDate(rawDate ? rawDate.split('T')[0] : '');
       setSummary(document.summary || '');
       setSelectedFile(null);
     } else {
@@ -87,11 +88,20 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       const formData = new FormData();
       formData.append('document_code', code.trim());
       formData.append('title', title.trim());
-      if (typeId) formData.append('type_id', typeId);
-      if (unitId) formData.append('unit_id', unitId);
+      if (typeId) {
+        formData.append('doc_type_id', typeId);
+        formData.append('type_id', typeId);
+      }
+      if (unitId) {
+        formData.append('issuing_unit_id', unitId);
+        formData.append('unit_id', unitId);
+      }
       formData.append('security_level_id', String(securityLevel));
       if (signer) formData.append('signer', signer.trim());
-      if (issueDate) formData.append('issue_date', issueDate);
+      if (issueDate) {
+        formData.append('issued_date', issueDate);
+        formData.append('issue_date', issueDate);
+      }
       if (summary) formData.append('summary', summary.trim());
 
       if (selectedFile) {

@@ -19,6 +19,13 @@ const ROOT_DIR = __dirname;
 const PDF_ROOT = path.join(ROOT_DIR, 'uploads');
 const publicDir = path.join(ROOT_DIR, 'public');
 
+// ─── Login Check ───
+const LOCKOUT_MAX_ATTEMPTS = parseInt(process.env.LOCKOUT_MAX_ATTEMPTS || '6', 10);
+const LOCKOUT_WINDOW_MINUTES = parseInt(process.env.LOCKOUT_WINDOW_MINUTES || '15', 10);
+const IPBLOCK_MAX_ATTEMPTS = parseInt(process.env.IPBLOCK_MAX_ATTEMPTS || '6', 10);
+const IPBLOCK_WINDOW_MINUTES = parseInt(process.env.IPBLOCK_WINDOW_MINUTES || '15', 10);
+const IPBLOCK_DURATION_MINUTES = parseInt(process.env.IPBLOCK_DURATION_MINUTES || '30', 10);
+
 app.use(cors());
 app.use(express.json());
 
@@ -145,6 +152,7 @@ function buildStoredPath({ docTypeId, documentCode, fallbackId }) {
 // 0. AUTH — ĐĂNG NHẬP
 // ============================================================
 app.post('/api/auth/login', async (req, res) => {
+    const ip = getClientIp(req);
     try {
         const { user_id, password } = req.body;
 
@@ -152,67 +160,175 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(400).json({ error: 'Thiếu user_id hoặc password' });
         }
 
-        const pool = await getPool();
-        const r = await pool.request()
-        .input('u', sql.VarChar(50), user_id.trim().toLowerCase())
-        .query(`
-            SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name,
-                u.[position], u.unit_id, u.status,
-                u.password_hash, u.pin_hash,
-                u.clearance_level_id,
-                un.name AS unit_name,
-                sl.name AS clearance_name, sl.code AS clearance_code
-            FROM [USER] u
-            LEFT JOIN UNIT un           ON un.unit_id  = u.unit_id
-            LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
-            WHERE LOWER(u.username) = @u OR LOWER(u.user_id) = @u
-        `);
+        const username = user_id.trim().toLowerCase();
 
+        // ── Bước 1: Check IP blocklist ──
+        const ipCheck = await checkIpBlocked(ip);
+        if (ipCheck.blocked) {
+            const minsLeft = Math.max(1, Math.ceil((new Date(ipCheck.blocked_until) - Date.now()) / 60000));
+            return res.status(429).json({
+                error: `IP của bạn tạm thời bị chặn do nhiều lần đăng nhập thất bại. Vui lòng thử lại sau ${minsLeft} phút.`
+            });
+        }
+
+        const pool = await getPool();
+
+        // ── Bước 2: Query user ──
+        const r = await pool.request()
+            .input('u', sql.VarChar(50), username)
+            .query(`
+                SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name,
+                       u.[position], u.unit_id, u.status,
+                       u.password_hash, u.pin_hash,
+                       u.clearance_level_id,
+                       u.failed_attempts, u.locked_at, u.last_failed_at,
+                       un.name AS unit_name,
+                       sl.name AS clearance_name, sl.code AS clearance_code
+                FROM [USER] u
+                LEFT JOIN UNIT un           ON un.unit_id  = u.unit_id
+                LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
+                WHERE LOWER(u.username) = @u OR LOWER(u.user_id) = @u
+            `);
+
+        // ── Bước 3: Username không tồn tại → dò username ──
         if (r.recordset.length === 0) {
-            return res.status(401).json({ error: 'Tài khoản không tồn tại' });
+            await writeLoginAttempt({ ip, username, result: 'USERNAME_NOT_FOUND' });
+            await checkAndBlockIp(ip);
+
+            await writeAccessLog({
+                userId: 'UNKNOWN', fileId: null,
+                action: 'LOGIN_FAIL', ip,
+                note: `Username không tồn tại: ${username}`
+            });
+
+            return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không chính xác' });
         }
 
         const user = r.recordset[0];
 
+        // ── Bước 4: Check status ──
         if (user.status !== 'active') {
-            return res.status(403).json({ error: 'Tài khoản đã bị khóa' });
+            await writeLoginAttempt({ ip, username, result: 'LOCKED' });
+            await writeAccessLog({
+                userId: user.user_id, fileId: null,
+                action: 'LOGIN_FAIL', ip,
+                note: `Tài khoản bị khóa (status = ${user.status})`
+            });
+            const msg = user.status === 'locked'
+                ? 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để mở khóa.'
+                : 'Tài khoản đã bị vô hiệu hóa.';
+            return res.status(403).json({ error: msg });
         }
 
+        // ── Bước 6: Sliding window — reset counter nếu quá hạn ──
+        let currentFailed = user.failed_attempts || 0;
+        if (user.last_failed_at && currentFailed > 0) {
+            const minsSince = (Date.now() - new Date(user.last_failed_at).getTime()) / 60000;
+            if (minsSince > LOCKOUT_WINDOW_MINUTES) {
+                await pool.request()
+                    .input('uid', sql.VarChar(50), user.user_id)
+                    .query(`UPDATE [USER] SET failed_attempts = 0, last_failed_at = NULL WHERE user_id = @uid`);
+                currentFailed = 0;
+            }
+        }
+
+        // ── Bước 7: bcrypt compare ──
         const pwdHash = user.password_hash || user.pin_hash;
         if (!pwdHash) {
+            await writeLoginAttempt({ ip, username, result: 'WRONG_PASSWORD' });
             return res.status(403).json({ error: 'Tài khoản chưa được cấp mật khẩu' });
         }
 
         const ok = await bcrypt.compare(password, pwdHash);
+
+        // ── Bước 7a: SAI mật khẩu ──
         if (!ok) {
+            // Kiểm tra user có phải Admin (ROL-01) → không khóa tự động
+            const adminCheck = await pool.request()
+                .input('uid', sql.VarChar(50), user.user_id)
+                .query(`SELECT COUNT(*) AS n FROM USER_ROLE
+                        WHERE user_id = @uid AND role_id = 'ROL-01'`);
+            const isAdminAccount = adminCheck.recordset[0].n > 0;
+
+            const newFailed = currentFailed + 1;
+            const willLock = !isAdminAccount && newFailed >= LOCKOUT_MAX_ATTEMPTS;
+
+            const query = willLock
+                ? `UPDATE [USER]
+                   SET failed_attempts = @n,
+                       last_failed_at = GETDATE(),
+                       locked_at = GETDATE(),
+                       status = 'locked'
+                   WHERE user_id = @uid`
+                : `UPDATE [USER]
+                   SET failed_attempts = @n,
+                       last_failed_at = GETDATE()
+                   WHERE user_id = @uid`;
+
+            await pool.request()
+                .input('uid', sql.VarChar(50), user.user_id)
+                .input('n',   sql.Int,         newFailed)
+                .query(query);
+
+            await writeLoginAttempt({ ip, username, result: 'WRONG_PASSWORD' });
             await writeAccessLog({
                 userId: user.user_id, fileId: null,
-                action: 'LOGIN_FAIL', ip: req.ip || '',
-                note: 'Sai mật khẩu'
+                action: 'LOGIN_FAIL', ip,
+                note: `Sai mật khẩu lần ${newFailed}/${LOCKOUT_MAX_ATTEMPTS}${isAdminAccount ? ' (Admin — không khóa tự động)' : ''}`
             });
-            return res.status(401).json({ error: 'Sai mật khẩu' });
+
+            if (willLock) {
+                console.warn(`[LOCKOUT] User ${user.user_id} bị khóa sau ${newFailed} lần sai`);
+                return res.status(403).json({
+                    error: `Tài khoản đã bị khóa do đăng nhập sai ${LOCKOUT_MAX_ATTEMPTS} lần. Vui lòng liên hệ quản trị viên để mở khóa.`
+                });
+            }
+
+            // Admin: báo sai mật khẩu đơn giản, không hiện "còn X lần"
+            if (isAdminAccount) {
+                return res.status(401).json({ error: 'Mật khẩu không đúng.' });
+            }
+
+            const remaining = LOCKOUT_MAX_ATTEMPTS - newFailed;
+            return res.status(401).json({
+                error: `Mật khẩu không đúng. Bạn còn ${remaining} lần thử.`
+            });
         }
 
+        // ── Bước 7b: ĐÚNG mật khẩu ──
+        await pool.request()
+            .input('uid', sql.VarChar(50), user.user_id)
+            .query(`UPDATE [USER]
+                    SET failed_attempts = 0,
+                        locked_at = NULL,
+                        last_failed_at = NULL,
+                        status = 'active'
+                    WHERE user_id = @uid`);
+
+        await writeLoginAttempt({ ip, username, result: 'SUCCESS' });
         await writeAccessLog({
             userId: user.user_id, fileId: null,
-            action: 'LOGIN', ip: req.ip || '',
+            action: 'LOGIN', ip,
             note: `${user.full_name} (mức ${user.clearance_level_id})`
         });
 
         delete user.password_hash;
         delete user.pin_hash;
+        delete user.failed_attempts;
+        delete user.locked_at;
+        delete user.last_failed_at;
 
-        // Bổ sung roles & role_names theo schema UserFull của Swagger
-        const rolesRes = await pool.request()
-            .input('u', sql.VarChar(50), user.user_id)
+        // ── Lấy roles + role_names ──
+        const rolesResult = await pool.request()
+            .input('uid', sql.VarChar(50), user.user_id)
             .query(`
-                SELECT r.role_id, r.name
+                SELECT r.role_id, r.name AS role_name
                 FROM USER_ROLE ur
                 JOIN [ROLE] r ON r.role_id = ur.role_id
-                WHERE ur.user_id = @u
+                WHERE ur.user_id = @uid
             `);
-        user.roles = rolesRes.recordset.map(x => x.role_id);
-        user.role_names = rolesRes.recordset.map(x => x.name);
+        user.roles = rolesResult.recordset.map(x => x.role_id);
+        user.role_names = rolesResult.recordset.map(x => x.role_name);
 
         res.json({ success: true, user });
 
@@ -301,7 +417,7 @@ app.get('/api/test-http-error/:code', (req, res) => {
 app.get('/api/meta', async (req, res) => {
     try {
         const pool = await getPool();
-        const [types, units, levels] = await Promise.all([
+        const [types, units, levels, ranks, positions] = await Promise.all([
             pool.request().query(`SELECT type_id, name, description FROM DOCUMENT_TYPE ORDER BY name`),
             pool.request().query(`
                 SELECT u.unit_id, u.name, u.parent_id, p.name AS parent_name
@@ -309,18 +425,33 @@ app.get('/api/meta', async (req, res) => {
                 LEFT JOIN UNIT p ON p.unit_id = u.parent_id
                 ORDER BY u.name
             `),
-            pool.request().query(`SELECT level_id, code, name FROM SECURITY_LEVEL ORDER BY level_id`)
+            pool.request().query(`SELECT level_id, code, name FROM SECURITY_LEVEL ORDER BY level_id`),
+            pool.request().query(`
+                SELECT rank_id, name, sort_order
+                FROM MILITARY_RANK
+                WHERE active = 1
+                ORDER BY sort_order, name
+            `),
+            pool.request().query(`
+                SELECT position_id, name, sort_order
+                FROM MILITARY_POSITION
+                WHERE active = 1
+                ORDER BY sort_order, name
+            `)
         ]);
         res.json({
-            types:  types.recordset,
-            units:  units.recordset,
-            levels: levels.recordset
+            types:     types.recordset,
+            units:     units.recordset,
+            levels:    levels.recordset,
+            ranks:     ranks.recordset,
+            positions: positions.recordset
         });
     } catch (e) {
         console.error('[GET /api/meta]', e);
         res.status(500).json({ error: e.message });
     }
 });
+
 
 // ============================================================
 // 3. ĐỌC — TÌM KIẾM TÀI LIỆU
@@ -859,7 +990,88 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Admin CRUD routes ───
-require('./src/admin-routes')(app, { sql, getPool, writeAccessLog });
+require('./src/admin-routes')(app, { sql, getPool, writeAccessLog })
+// ─── Lấy IP client (xử lý qua proxy/nginx) ───
+function getClientIp(req) {
+    const fwd = req.headers['x-forwarded-for'];
+    if (fwd) return String(fwd).split(',')[0].trim();
+    return (req.ip || req.connection?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+}
+
+// ─── Kiểm tra IP có bị block ───
+async function checkIpBlocked(ip) {
+    try {
+        const pool = await getPool();
+        const r = await pool.request()
+            .input('ip', sql.VarChar(50), ip)
+            .query(`SELECT ip, blocked_until, reason
+                    FROM IP_BLOCKLIST
+                    WHERE ip = @ip AND blocked_until > GETDATE()`);
+        if (r.recordset.length > 0) {
+            return { blocked: true, ...r.recordset[0] };
+        }
+        // Cleanup record hết hạn
+        await pool.request()
+            .input('ip', sql.VarChar(50), ip)
+            .query(`DELETE FROM IP_BLOCKLIST WHERE ip = @ip AND blocked_until <= GETDATE()`);
+        return { blocked: false };
+    } catch (err) {
+        console.error('[checkIpBlocked]', err.message);
+        return { blocked: false };
+    }
+}
+
+// ─── Ghi log login attempt ───
+async function writeLoginAttempt({ ip, username, result }) {
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input('ip',       sql.VarChar(50),  ip)
+            .input('username', sql.NVarChar(50), username || null)
+            .input('result',   sql.VarChar(30),  result)
+            .query(`INSERT INTO LOGIN_ATTEMPT (ip, username, result)
+                    VALUES (@ip, @username, @result)`);
+    } catch (err) {
+        console.error('[writeLoginAttempt]', err.message);
+    }
+}
+
+// ─── Đếm USERNAME_NOT_FOUND từ IP → block nếu vượt ngưỡng ───
+async function checkAndBlockIp(ip) {
+    try {
+        const pool = await getPool();
+        const r = await pool.request()
+            .input('ip', sql.VarChar(50), ip)
+            .input('window', sql.Int, IPBLOCK_WINDOW_MINUTES)
+            .query(`SELECT COUNT(*) AS n FROM LOGIN_ATTEMPT
+                    WHERE ip = @ip
+                      AND result = 'USERNAME_NOT_FOUND'
+                      AND attempted_at >= DATEADD(MINUTE, -@window, GETDATE())`);
+
+        const count = r.recordset[0].n;
+        if (count >= IPBLOCK_MAX_ATTEMPTS) {
+            const until = new Date(Date.now() + IPBLOCK_DURATION_MINUTES * 60000);
+            await pool.request()
+                .input('ip',     sql.VarChar(50),   ip)
+                .input('until',  sql.DateTime,      until)
+                .input('reason', sql.NVarChar(200), `Dò username ${count} lần trong ${IPBLOCK_WINDOW_MINUTES} phút`)
+                .query(`MERGE IP_BLOCKLIST AS target
+                        USING (SELECT @ip AS ip) AS src
+                        ON target.ip = src.ip
+                        WHEN MATCHED THEN
+                            UPDATE SET blocked_until = @until, reason = @reason, blocked_at = GETDATE()
+                        WHEN NOT MATCHED THEN
+                            INSERT (ip, blocked_until, reason) VALUES (@ip, @until, @reason);`);
+            console.warn(`[IPBLOCK] Đã chặn IP ${ip} trong ${IPBLOCK_DURATION_MINUTES} phút (${count} lần dò username)`);
+            return true;
+        }
+        return false;
+    } catch (err) {
+        console.error('[checkAndBlockIp]', err.message);
+        return false;
+    }
+}
+;
 
 // ─── SPA Fallback: mọi request GET/HEAD điều hướng giao diện trả về index.html ───
 app.use((req, res, next) => {

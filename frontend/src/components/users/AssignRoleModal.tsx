@@ -325,7 +325,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
         <div>
           <div className="font-semibold text-slate-900 dark:text-white text-xs">{name}</div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            {[record.rank_name, record.position].filter(Boolean).join(' • ') || '—'}
+            {[record.rank_name, record.position].filter(Boolean).join(' - ') || '—'}
           </div>
         </div>
       ),

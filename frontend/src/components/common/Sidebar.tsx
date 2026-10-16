@@ -10,6 +10,8 @@ import {
   Activity,
   Award,
   Briefcase,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export type AdminTab =
@@ -30,7 +32,6 @@ export interface SidebarProps {
   onSelect?: (id: any) => void;
   open?: boolean;
   onClose?: () => void;
-  backendStatus?: 'OK' | 'ERROR' | 'LOADING' | string;
   counts?: {
     users?: number;
     roles?: number;
@@ -41,6 +42,8 @@ export interface SidebarProps {
     ranks?: number;
     positions?: number;
   };
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -50,8 +53,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelect,
   open = true,
   onClose,
-  backendStatus = 'OK',
-  counts
+  counts,
+  collapsed = false,
+  onToggleCollapse,
 }) => {
   const currentTab = activeTab || activeId || 'overview';
   const handleSelect = (id: string) => {
@@ -60,26 +64,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (onClose) onClose();
   };
 
-  const navItems: Array<{ id: string; label: string; icon: any; count?: number }> = [
+  const navItems: Array<{ id: string; label: string; icon: any }> = [
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
-    { id: 'users', label: 'Người dùng', icon: Users, count: counts?.users },
-    { id: 'roles', label: 'Vai trò', icon: KeyRound, count: counts?.roles },
-    { id: 'permissions', label: 'Quyền', icon: ShieldAlert, count: counts?.permissions },
-    { id: 'units', label: 'Đơn vị', icon: Building, count: counts?.units },
-    { id: 'doctypes', label: 'Loại văn bản', icon: FileText, count: counts?.doctypes },
-    { id: 'levels', label: 'Mức bảo mật', icon: Shield, count: counts?.levels },
-    { id: 'ranks', label: 'Cấp bậc', icon: Award, count: counts?.ranks },
-    { id: 'positions', label: 'Chức vụ', icon: Briefcase, count: counts?.positions },
+    { id: 'users', label: 'Người dùng', icon: Users },
+    { id: 'roles', label: 'Vai trò', icon: KeyRound },
+    { id: 'permissions', label: 'Quyền', icon: ShieldAlert },
+    { id: 'units', label: 'Đơn vị', icon: Building },
+    { id: 'doctypes', label: 'Loại văn bản', icon: FileText },
+    { id: 'levels', label: 'Mức bảo mật', icon: Shield },
+    { id: 'ranks', label: 'Cấp bậc', icon: Award },
+    { id: 'positions', label: 'Chức vụ', icon: Briefcase },
     { id: 'logs', label: 'Nhật ký', icon: Activity },
   ];
 
   return (
-    <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-colors duration-200">
-      <div className="p-3 space-y-1 overflow-y-auto">
-        <div className="px-3 py-2 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-          Danh mục Quản trị
+    <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 select-none">
+      <div className="p-2 sm:p-3 space-y-1 overflow-y-auto">
+        {/* Sidebar Header with Toggle button */}
+        <div
+          className={`py-2 px-1 flex items-center ${
+            collapsed ? 'justify-center' : 'justify-between'
+          } border-b border-slate-100 dark:border-slate-800/80 mb-2`}
+        >
+          {!collapsed && (
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate pl-1">
+              Danh mục Quản trị
+            </span>
+          )}
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+              title={collapsed ? 'Mở rộng danh mục quản trị' : 'Thu gọn danh mục quản trị'}
+              aria-label={collapsed ? 'Mở rộng danh mục quản trị' : 'Thu gọn danh mục quản trị'}
+            >
+              {collapsed ? (
+                <ChevronRight className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              ) : (
+                <ChevronLeft className="w-4 h-4" />
+              )}
+            </button>
+          )}
         </div>
 
+        {/* Nav Items */}
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
@@ -87,49 +115,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => handleSelect(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition cursor-pointer ${
+              title={item.label}
+              className={`w-full flex items-center ${
+                collapsed ? 'justify-center p-2.5' : 'justify-start space-x-3 px-3 py-2.5'
+              } rounded-xl text-xs transition cursor-pointer relative group ${
                 isActive
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold shadow-sm'
+                  ? 'bg-purple-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/30 font-semibold shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium'
               }`}
             >
-              <span className="flex items-center space-x-3">
-                <Icon className="w-4 h-4 text-center" />
-                <span>{item.label}</span>
-              </span>
-              {item.count !== undefined && (
-                <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                  {item.count}
-                </span>
-              )}
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">{item.label}</span>}
             </button>
           );
         })}
-      </div>
-
-      {/* Backend Status Widget */}
-      <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60">
-        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] shadow-sm">
-          <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
-            <span className="flex items-center gap-1.5 font-medium">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  backendStatus === 'OK' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'
-                }`}
-              />
-              Hệ thống Backend
-            </span>
-            <span
-              className={`font-bold ${
-                backendStatus === 'OK'
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-red-500 dark:text-red-400'
-              }`}
-            >
-              {backendStatus}
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

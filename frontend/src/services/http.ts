@@ -73,6 +73,7 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
       }
 
       const httpError = new HttpError(response.status, errorMsg, data, url);
+      console.error(`[HTTP ${response.status}] ${options.method || 'GET'} ${url} ->`, errorMsg);
 
       // Kích hoạt custom event toàn cục để Router/App lắng nghe và điều hướng
       if (typeof window !== 'undefined' && !options.skipErrorNotification) {

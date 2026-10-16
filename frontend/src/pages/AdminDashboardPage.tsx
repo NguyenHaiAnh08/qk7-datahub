@@ -57,6 +57,23 @@ import {
 export const AdminDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('qk7_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('qk7_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Stats
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -457,13 +474,13 @@ export const AdminDashboardPage: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-transform duration-300 lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 lg:static lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+          } ${sidebarCollapsed ? 'w-16 sm:w-20' : 'w-64'}`}
         >
           <div className="lg:hidden p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-800">
             <span className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Điều hướng</span>
-            <button onClick={() => setSidebarOpen(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white">
+            <button onClick={() => setSidebarOpen(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -474,6 +491,8 @@ export const AdminDashboardPage: React.FC = () => {
               setActiveTab(id);
               setSidebarOpen(false);
             }}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebarCollapsed}
           />
         </aside>
 
@@ -487,14 +506,14 @@ export const AdminDashboardPage: React.FC = () => {
 
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-6">
-          {/* Mobile Menu Button */}
-          <div className="lg:hidden flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          {/* Mobile Menu Bar */}
+          <div className="lg:hidden flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800/80">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center gap-2 text-xs shadow-sm"
+              className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center gap-2 text-xs shadow-sm cursor-pointer"
             >
               <Menu className="w-4 h-4" />
-              <span>Menu Quản Trị</span>
+              <span>Danh mục Quản trị</span>
             </button>
           </div>
 
@@ -612,16 +631,6 @@ export const AdminDashboardPage: React.FC = () => {
                     )}
                   </div>
                   <button
-                    onClick={async () => {
-                      await loadUsers();
-                      showToast('Đã làm mới danh sách người dùng!', 'success');
-                    }}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer"
-                    title="Làm mới người dùng"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" /> Làm mới
-                  </button>
-                  <button
                     onClick={() => {
                       setSelectedUser(null);
                       setUserModalOpen(true);
@@ -662,17 +671,6 @@ export const AdminDashboardPage: React.FC = () => {
                   <p className="text-xs text-slate-400 mt-0.5">Phân quyền vai trò chức năng hệ thống</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={async () => {
-                      await loadRoles();
-                      await loadUsers();
-                      showToast('Đã làm mới danh sách vai trò!', 'success');
-                    }}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-                    title="Làm mới vai trò"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" /> Làm mới
-                  </button>
                   <button
                     onClick={() => {
                       loadUsers();

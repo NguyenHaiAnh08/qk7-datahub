@@ -7,7 +7,9 @@ import {
   Building,
   FileText,
   Shield,
-  Activity
+  Activity,
+  Award,
+  Briefcase,
 } from 'lucide-react';
 
 export type AdminTab =
@@ -36,6 +38,8 @@ export interface SidebarProps {
     units?: number;
     doctypes?: number;
     levels?: number;
+    ranks?: number;
+    positions?: number;
   };
 }
 
@@ -64,6 +68,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'units', label: 'Đơn vị', icon: Building, count: counts?.units },
     { id: 'doctypes', label: 'Loại văn bản', icon: FileText, count: counts?.doctypes },
     { id: 'levels', label: 'Mức bảo mật', icon: Shield, count: counts?.levels },
+    { id: 'ranks', label: 'Cấp bậc', icon: Award, count: counts?.ranks },
+    { id: 'positions', label: 'Chức vụ', icon: Briefcase, count: counts?.positions },
     { id: 'logs', label: 'Nhật ký', icon: Activity },
   ];
 

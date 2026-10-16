@@ -21,7 +21,9 @@ import {
   Save,
   Menu,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Award,
+  Briefcase,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
 import { Sidebar } from '../components/common/Sidebar';
@@ -45,7 +47,9 @@ import {
   Unit,
   DocumentType,
   SecurityLevel,
-  AccessLog
+  AccessLog,
+  MilitaryRank,
+  MilitaryPosition
 } from '../types';
 
 export const AdminDashboardPage: React.FC = () => {
@@ -62,6 +66,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [unitsList, setUnitsList] = useState<Unit[]>([]);
   const [docTypesList, setDocTypesList] = useState<DocumentType[]>([]);
   const [levelsList, setLevelsList] = useState<SecurityLevel[]>([]);
+  const [ranksList, setRanksList] = useState<MilitaryRank[]>([]);
+  const [positionsList, setPositionsList] = useState<MilitaryPosition[]>([]);
   const [logsList, setLogsList] = useState<AccessLog[]>([]);
 
   // Search & Filters
@@ -81,10 +87,10 @@ export const AdminDashboardPage: React.FC = () => {
     username: ''
   });
 
-  // Generic Edit Modal for Roles, Units, DocTypes, Levels
+  // Generic Edit Modal for Roles, Units, DocTypes, Levels, Ranks, Positions
   const [genericModal, setGenericModal] = useState<{
     open: boolean;
-    type: 'roles' | 'units' | 'doctypes' | 'levels' | null;
+    type: 'roles' | 'units' | 'doctypes' | 'levels' | 'ranks' | 'positions' | null;
     item: any;
   }>({
     open: false,
@@ -182,6 +188,24 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const loadRanks = async () => {
+    try {
+      const data = await dashboardApi.getRanks();
+      setRanksList(data.items || []);
+    } catch (err: any) {
+      showToast('Lỗi tải cấp bậc: ' + err.message, 'error');
+    }
+  };
+
+  const loadPositions = async () => {
+    try {
+      const data = await dashboardApi.getPositions();
+      setPositionsList(data.items || []);
+    } catch (err: any) {
+      showToast('Lỗi tải chức vụ: ' + err.message, 'error');
+    }
+  };
+
   const loadLogs = async () => {
     try {
       const data = await dashboardApi.getAccessLogs({ action: logFilterAction || undefined });
@@ -201,6 +225,8 @@ export const AdminDashboardPage: React.FC = () => {
         if (!unitsList.length) loadUnits();
         if (!levelsList.length) loadLevels();
         if (!rolesList.length) loadRoles();
+        if (!ranksList.length) loadRanks();
+        if (!positionsList.length) loadPositions();
         break;
       case 'roles':
         loadRoles();
@@ -216,6 +242,12 @@ export const AdminDashboardPage: React.FC = () => {
         break;
       case 'levels':
         loadLevels();
+        break;
+      case 'ranks':
+        loadRanks();
+        break;
+      case 'positions':
+        loadPositions();
         break;
       case 'logs':
         loadLogs();
@@ -303,6 +335,20 @@ export const AdminDashboardPage: React.FC = () => {
           });
         }
         loadLevels();
+      } else if (type === 'ranks') {
+        if (item) {
+          await dashboardApi.updateRank(item.rank_id, genericFormData);
+        } else {
+          await dashboardApi.createRank(genericFormData);
+        }
+        loadRanks();
+      } else if (type === 'positions') {
+        if (item) {
+          await dashboardApi.updatePosition(item.position_id, genericFormData);
+        } else {
+          await dashboardApi.createPosition(genericFormData);
+        }
+        loadPositions();
       }
       showToast('Đã lưu thành công');
       setGenericModal({ open: false, type: null, item: null });
@@ -334,6 +380,12 @@ export const AdminDashboardPage: React.FC = () => {
           } else if (type === 'levels') {
             await dashboardApi.deleteSecurityLevel(Number(id));
             loadLevels();
+          } else if (type === 'ranks') {
+            await dashboardApi.deleteRank(String(id));
+            loadRanks();
+          } else if (type === 'positions') {
+            await dashboardApi.deletePosition(String(id));
+            loadPositions();
           }
           showToast(`Đã xóa thành công ${id}`);
         } catch (err: any) {
@@ -874,6 +926,178 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
+          {/* TAB: RANKS */}
+          {activeTab === 'ranks' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Award className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Cấp Bậc Quân Hàm
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Số thứ tự nhỏ hiển thị trước trong dropdown
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setGenericFormData({ rank_id: '', name: '', sort_order: 0 });
+                    setGenericModal({ open: true, type: 'ranks', item: null });
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Thêm cấp bậc
+                </button>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                    <tr>
+                      <th className="py-3 px-4">Mã</th>
+                      <th className="py-3 px-4">Tên cấp bậc</th>
+                      <th className="py-3 px-4">Thứ tự</th>
+                      <th className="py-3 px-4">Trạng thái</th>
+                      <th className="py-3 px-4 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                    {ranksList.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                          Chưa có cấp bậc nào
+                        </td>
+                      </tr>
+                    ) : (
+                      ranksList.map((r) => (
+                        <tr key={r.rank_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.rank_id}</td>
+                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{r.sort_order ?? 0}</td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                r.active !== false
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
+                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
+                              }`}
+                            >
+                              {r.active !== false ? 'Đang dùng' : 'Đã ẩn'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                setGenericFormData({ ...r });
+                                setGenericModal({ open: true, type: 'ranks', item: r });
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              title="Sửa cấp bậc"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleGenericDelete('ranks', r.rank_id, r.name)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              title="Xóa cấp bậc"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: POSITIONS */}
+          {activeTab === 'positions' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Briefcase className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Chức Vụ
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Số thứ tự nhỏ hiển thị trước trong dropdown
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setGenericFormData({ position_id: '', name: '', sort_order: 0 });
+                    setGenericModal({ open: true, type: 'positions', item: null });
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Thêm chức vụ
+                </button>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                    <tr>
+                      <th className="py-3 px-4">Mã</th>
+                      <th className="py-3 px-4">Tên chức vụ</th>
+                      <th className="py-3 px-4">Thứ tự</th>
+                      <th className="py-3 px-4">Trạng thái</th>
+                      <th className="py-3 px-4 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                    {positionsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                          Chưa có chức vụ nào
+                        </td>
+                      </tr>
+                    ) : (
+                      positionsList.map((p) => (
+                        <tr key={p.position_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.position_id}</td>
+                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name}</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.sort_order ?? 0}</td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                p.active !== false
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
+                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
+                              }`}
+                            >
+                              {p.active !== false ? 'Đang dùng' : 'Đã ẩn'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                setGenericFormData({ ...p });
+                                setGenericModal({ open: true, type: 'positions', item: p });
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              title="Sửa chức vụ"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleGenericDelete('positions', p.position_id, p.name)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              title="Xóa chức vụ"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* TAB: LOGS */}
           {activeTab === 'logs' && (
             <div className="space-y-4">
@@ -1037,6 +1261,8 @@ export const AdminDashboardPage: React.FC = () => {
         units={unitsList}
         securityLevels={levelsList}
         roles={rolesList}
+        ranks={ranksList}
+        positions={positionsList}
         existingUsers={usersList}
         onClose={() => {
           setUserModalOpen(false);
@@ -1055,7 +1281,7 @@ export const AdminDashboardPage: React.FC = () => {
         onToast={showToast}
       />
 
-      {/* Generic Modal (Roles, Units, DocTypes, Levels) */}
+      {/* Generic Modal (Roles, Units, DocTypes, Levels, Ranks, Positions) */}
       <AnimatePresence>
         {genericModal.open && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -1081,14 +1307,15 @@ export const AdminDashboardPage: React.FC = () => {
                 {genericModal.type === 'roles' && (
                   <>
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Mã Vai Trò *</label>
+                      <label className="block text-slate-300 font-semibold mb-1">Mã Vai Trò (Tự động)</label>
                       <input
                         type="text"
-                        disabled={Boolean(genericModal.item)}
+                        readOnly
+                        disabled
                         value={genericFormData.role_id || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, role_id: e.target.value })}
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 disabled:opacity-50"
+                        placeholder="VD: ROL-07"
+                        className="w-full px-3 py-2 bg-slate-950/60 border border-slate-700 rounded-xl text-slate-400 font-mono cursor-not-allowed opacity-80"
+                        title="Mã vai trò được hệ thống tự động sinh theo thứ tự"
                       />
                     </div>
                     <div>
@@ -1209,6 +1436,100 @@ export const AdminDashboardPage: React.FC = () => {
                         className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
                       />
                     </div>
+                  </>
+                )}
+
+                {genericModal.type === 'ranks' && (
+                  <>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Mã Cấp Bậc (Tự động)</label>
+                      <input
+                        type="text"
+                        readOnly
+                        disabled
+                        value={genericFormData.rank_id || ''}
+                        placeholder="VD: R-21"
+                        className="w-full px-3 py-2 bg-slate-950/60 border border-slate-700 rounded-xl text-slate-400 font-mono cursor-not-allowed opacity-80"
+                        title="Mã cấp bậc được hệ thống tự động sinh theo thứ tự"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Tên Cấp Bậc *</label>
+                      <input
+                        type="text"
+                        value={genericFormData.name || ''}
+                        onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                        placeholder="VD: Trung sĩ QNCN"
+                        required
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Thứ tự</label>
+                      <input
+                        type="number"
+                        value={genericFormData.sort_order ?? 0}
+                        onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
+                      />
+                    </div>
+                    {genericModal.item && (
+                      <label className="flex items-center gap-2 text-slate-300 font-semibold">
+                        <input
+                          type="checkbox"
+                          checked={genericFormData.active !== false}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                        />
+                        <span>Đang kích hoạt</span>
+                      </label>
+                    )}
+                  </>
+                )}
+
+                {genericModal.type === 'positions' && (
+                  <>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Mã Chức Vụ (Tự động)</label>
+                      <input
+                        type="text"
+                        readOnly
+                        disabled
+                        value={genericFormData.position_id || ''}
+                        placeholder="VD: P-19"
+                        className="w-full px-3 py-2 bg-slate-950/60 border border-slate-700 rounded-xl text-slate-400 font-mono cursor-not-allowed opacity-80"
+                        title="Mã chức vụ được hệ thống tự động sinh theo thứ tự"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Tên Chức Vụ *</label>
+                      <input
+                        type="text"
+                        value={genericFormData.name || ''}
+                        onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                        placeholder="VD: Phó phòng Kỹ thuật"
+                        required
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Thứ tự</label>
+                      <input
+                        type="number"
+                        value={genericFormData.sort_order ?? 0}
+                        onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
+                      />
+                    </div>
+                    {genericModal.item && (
+                      <label className="flex items-center gap-2 text-slate-300 font-semibold">
+                        <input
+                          type="checkbox"
+                          checked={genericFormData.active !== false}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                        />
+                        <span>Đang kích hoạt</span>
+                      </label>
+                    )}
                   </>
                 )}
 

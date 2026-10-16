@@ -8,13 +8,22 @@ import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
 import { usersApi } from '../services/usersApi';
 import { dashboardApi } from '../services/dashboardApi';
-import { User, Unit, SecurityLevel, Role } from '../types';
+import {
+  User,
+  Unit,
+  SecurityLevel,
+  Role,
+  MilitaryRank,
+  MilitaryPosition,
+} from '../types';
 
 export const UsersPage: React.FC = () => {
   const [usersList, setUsersList] = useState<User[]>([]);
   const [unitsList, setUnitsList] = useState<Unit[]>([]);
   const [levelsList, setLevelsList] = useState<SecurityLevel[]>([]);
   const [rolesList, setRolesList] = useState<Role[]>([]);
+  const [ranksList, setRanksList] = useState<MilitaryRank[]>([]);
+  const [positionsList, setPositionsList] = useState<MilitaryPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [userSearch, setUserSearch] = useState('');
 
@@ -51,16 +60,19 @@ export const UsersPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [uRes, unitRes, lvlRes, roleRes] = await Promise.all([
+      const [uRes, unitRes, lvlRes, roleRes, metaRes] = await Promise.all([
         usersApi.getUsers(),
         dashboardApi.getUnits(),
         dashboardApi.getSecurityLevels(),
-        dashboardApi.getRoles()
+        dashboardApi.getRoles(),
+        dashboardApi.getMeta(),
       ]);
       setUsersList(uRes.items || []);
       setUnitsList(unitRes.items || []);
       setLevelsList(lvlRes.items || []);
       setRolesList(roleRes.items || []);
+      setRanksList((metaRes as any).ranks || []);
+      setPositionsList((metaRes as any).positions || []);
     } catch (err: any) {
       showToast('Lỗi tải dữ liệu quân nhân: ' + err.message, 'error');
     } finally {
@@ -185,6 +197,8 @@ export const UsersPage: React.FC = () => {
         units={unitsList}
         securityLevels={levelsList}
         roles={rolesList}
+        ranks={ranksList}
+        positions={positionsList}
         existingUsers={usersList}
         onClose={() => {
           setUserModalOpen(false);

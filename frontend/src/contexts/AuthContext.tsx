@@ -87,9 +87,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const navigate = useNavigate();
 
   const saveUserSession = useCallback((userData: User) => {
-    authService.saveSession(userData);
-    setUser(userData);
-  }, []);
+  console.log('[AuthProvider] saveUserSession called:', userData.user_id, userData.clearance_level_id);
+  authService.saveSession(userData);
+  setUser(userData);
+}, []);
 
   const refreshProfile = useCallback(async (): Promise<User | null> => {
     const current = authService.getCurrentSession();
@@ -177,6 +178,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         refreshProfile,
       }}
     >
+      
       {children}
     </AuthContext.Provider>
   );

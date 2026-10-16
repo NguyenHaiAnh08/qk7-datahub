@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Award,
   Briefcase,
+  UserCheck,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
 import { Sidebar } from '../components/common/Sidebar';
@@ -34,6 +35,7 @@ import { DistributionChart } from '../components/dashboard/DistributionChart';
 import { UserTable } from '../components/users/UserTable';
 import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
+import { AssignRoleModal } from '../components/users/AssignRoleModal';
 
 import { dashboardApi } from '../services/dashboardApi';
 import { usersApi } from '../services/usersApi';
@@ -85,6 +87,14 @@ export const AdminDashboardPage: React.FC = () => {
     open: false,
     userId: '',
     username: ''
+  });
+
+  const [assignRoleModal, setAssignRoleModal] = useState<{
+    open: boolean;
+    selectedRole: Role | null;
+  }>({
+    open: false,
+    selectedRole: null,
   });
 
   // Generic Edit Modal for Roles, Units, DocTypes, Levels, Ranks, Positions
@@ -230,6 +240,7 @@ export const AdminDashboardPage: React.FC = () => {
         break;
       case 'roles':
         loadRoles();
+        if (!usersList.length) loadUsers();
         break;
       case 'permissions':
         loadPermissions();
@@ -498,8 +509,11 @@ export const AdminDashboardPage: React.FC = () => {
                   <p className="text-xs text-slate-400 mt-0.5">Thống kê dữ liệu hoạt động thời gian thực</p>
                 </div>
                 <button
-                  onClick={loadStats}
-                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  onClick={async () => {
+                    await loadStats();
+                    showToast('Đã làm mới dữ liệu tổng quan!', 'success');
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <RotateCw className="w-3.5 h-3.5" /> Làm mới
                 </button>
@@ -598,6 +612,16 @@ export const AdminDashboardPage: React.FC = () => {
                     )}
                   </div>
                   <button
+                    onClick={async () => {
+                      await loadUsers();
+                      showToast('Đã làm mới danh sách người dùng!', 'success');
+                    }}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                    title="Làm mới người dùng"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" /> Làm mới
+                  </button>
+                  <button
                     onClick={() => {
                       setSelectedUser(null);
                       setUserModalOpen(true);
@@ -637,15 +661,37 @@ export const AdminDashboardPage: React.FC = () => {
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">Phân quyền vai trò chức năng hệ thống</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setGenericFormData({ role_id: '', name: '' });
-                    setGenericModal({ open: true, type: 'roles', item: null });
-                  }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" /> Thêm vai trò
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      await loadRoles();
+                      await loadUsers();
+                      showToast('Đã làm mới danh sách vai trò!', 'success');
+                    }}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                    title="Làm mới vai trò"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" /> Làm mới
+                  </button>
+                  <button
+                    onClick={() => {
+                      loadUsers();
+                      setAssignRoleModal({ open: true, selectedRole: null });
+                    }}
+                    className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-purple-600/30"
+                  >
+                    <UserCheck className="w-4 h-4" /> Gán vai trò
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGenericFormData({ role_id: '', name: '' });
+                      setGenericModal({ open: true, type: 'roles', item: null });
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" /> Thêm vai trò
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -663,6 +709,16 @@ export const AdminDashboardPage: React.FC = () => {
                         <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.role_id}</td>
                         <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => {
+                              loadUsers();
+                              setAssignRoleModal({ open: true, selectedRole: r });
+                            }}
+                            className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-600 dark:bg-purple-950/50 dark:hover:bg-purple-900/70 dark:text-purple-400 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                            title={`Gán vai trò "${r.name}" cho người dùng`}
+                          >
+                            <UserCheck className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => {
                               setGenericFormData({ ...r });
@@ -699,6 +755,16 @@ export const AdminDashboardPage: React.FC = () => {
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Các quyền hạn truy xuất trong hệ thống</p>
                 </div>
+                <button
+                  onClick={async () => {
+                    await loadPermissions();
+                    showToast('Đã làm mới danh sách quyền!', 'success');
+                  }}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  title="Làm mới quyền"
+                >
+                  <RotateCw className="w-3.5 h-3.5" /> Làm mới
+                </button>
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -1132,7 +1198,10 @@ export const AdminDashboardPage: React.FC = () => {
                     />
                   </div>
                   <button
-                    onClick={loadLogs}
+                    onClick={async () => {
+                      await loadLogs();
+                      showToast('Đã làm mới nhật ký truy cập!', 'success');
+                    }}
                     className="p-2 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-xl transition cursor-pointer shadow-sm"
                     title="Làm mới"
                   >
@@ -1278,6 +1347,17 @@ export const AdminDashboardPage: React.FC = () => {
         defaultUsername={credModal.username}
         onClose={() => setCredModal({ open: false, userId: '', username: '' })}
         onSuccess={loadUsers}
+        onToast={showToast}
+      />
+
+      {/* Assign Role Modal */}
+      <AssignRoleModal
+        open={assignRoleModal.open}
+        roles={rolesList}
+        users={usersList}
+        targetRole={assignRoleModal.selectedRole}
+        onClose={() => setAssignRoleModal({ open: false, selectedRole: null })}
+        onRefresh={loadUsers}
         onToast={showToast}
       />
 

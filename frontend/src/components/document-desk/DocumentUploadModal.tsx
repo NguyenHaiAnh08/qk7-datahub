@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Loader2, FileText } from 'lucide-react';
+import { X, Save, Loader2, FileText, Sparkles, AlertCircle } from 'lucide-react';
 import { Dropzone } from './Dropzone';
 import { DocumentItem, DocumentType, Unit, SecurityLevel } from '../../types';
+import { documentService, ParseDocumentResult } from '../../services/documentService';
 
 export interface DocumentUploadModalProps {
   open: boolean;
@@ -40,6 +41,12 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // ── Auto-parse PDF ──
+  const [parsing, setParsing] = useState(false);
+  const [parseResult, setParseResult] = useState<ParseDocumentResult | null>(null);
+  const [parseError, setParseError] = useState('');
+  const parsedFileRef = React.useRef<File | null>(null);
+
   // Prefill on edit
   useEffect(() => {
     if (document) {
@@ -65,7 +72,66 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setSelectedFile(null);
     }
     setError('');
+    // Reset parse state khi modal đóng/mở
+    setParseResult(null);
+    setParseError('');
+    parsedFileRef.current = null;
   }, [document, open, types, units]);
+
+  // ── Auto-parse PDF khi user chọn file mới ──
+  useEffect(() => {
+    // Khi xóa file → reset
+    if (!selectedFile) {
+      parsedFileRef.current = null;
+      setParseResult(null);
+      setParseError('');
+      return;
+    }
+
+    // Không parse khi đang edit
+    if (isEdit) return;
+
+    // Chỉ parse 1 lần cho mỗi file
+    if (parsedFileRef.current === selectedFile) return;
+    parsedFileRef.current = selectedFile;
+
+    setParsing(true);
+    setParseError('');
+
+    documentService.parseDocument(selectedFile)
+      .then((res) => {
+        if (!res.success || !res.parsed) {
+          setParseError(res.error || 'Không đọc được PDF');
+          return;
+        }
+
+        const p = res.parsed;
+
+        // Override các trường (workflow: chọn file trước → điền form sau)
+        if (p.document_code) setCode(p.document_code);
+        if (p.title) setTitle(p.title);
+        if (p.issued_date) setIssueDate(p.issued_date);
+
+        // Loại văn bản — chỉ set nếu có trong dropdown
+        if (p.doc_type_code && types.some(t => t.type_id === p.doc_type_code)) {
+          setTypeId(p.doc_type_code);
+        }
+
+        // Người ký — gộp cấp bậc + tên + chức danh
+        const signerParts = [p.signer, p.signer_position].filter(Boolean);
+        if (signerParts.length > 0) {
+          setSigner(signerParts.join(' — '));
+        }
+
+        setParseResult(res);
+      })
+      .catch((err) => {
+        console.warn('[parse PDF]', err);
+        setParseError(err.message || 'Không đọc được PDF');
+      })
+      .finally(() => setParsing(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFile, isEdit, types]);
 
   if (!open) return null;
 
@@ -170,6 +236,55 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               </label>
               <Dropzone selectedFile={selectedFile} onFileSelect={setSelectedFile} />
             </div>
+
+            {!parsing && parseError && (
+              <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-300 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Không tự động đọc được PDF: {parseError}. Vui lòng nhập thông tin thủ công.</span>
+              </div>
+            )}
+
+            {!parsing && parseError && (
+              <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-300 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Không tự động đọc được PDF: {parseError}. Vui lòng nhập thông tin thủ công.</span>
+              </div>
+            )}
+
+            {!parsing && parseResult && !parseError && (() => {
+              const filled = Object.values(parseResult.parsed).filter(
+                (v) => v !== null && v !== undefined && String(v).trim() !== ''
+              ).length;
+              return (
+                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-700 dark:text-emerald-300 text-xs space-y-1">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Sparkles className="w-4 h-4 shrink-0" />
+                    <span>
+                      Đã tự động điền {filled} trường
+                      {parseResult.usedOcr && ' (đã dùng OCR cho số ẩn)'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] opacity-80">
+                    Vui lòng kiểm tra lại trước khi lưu. Bạn có thể sửa bất kỳ trường nào.
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Trạng thái auto-parse PDF */}
+            {parsing && (
+              <div className="flex items-center gap-2 p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-700 dark:text-blue-300 text-xs">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <span>Đang đọc nội dung PDF và điền form...</span>
+              </div>
+            )}
+
+            {!parsing && parseError && (
+              <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-300 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Không tự động đọc được PDF: {parseError}. Vui lòng nhập thông tin thủ công.</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

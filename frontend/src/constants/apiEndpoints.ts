@@ -48,6 +48,8 @@ export const API_ENDPOINTS = {
     USERS: '/api/admin/users',
     USER_DETAIL: (userId: string) => `/api/admin/users/${encodeURIComponent(userId)}`,
     USER_CREDENTIALS: (userId: string) => `/api/admin/users/${encodeURIComponent(userId)}/credentials`,
+    USER_ROLES: (userId: string) => `/api/admin/users/${encodeURIComponent(userId)}/roles`,
+    USER_ROLE_DETAIL: (userId: string, roleId: string) => `/api/admin/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleId)}`,
     ROLES: '/api/admin/roles',
     ROLE_DETAIL: (roleId: string) => `/api/admin/roles/${encodeURIComponent(roleId)}`,
     PERMISSIONS: '/api/admin/permissions',

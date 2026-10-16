@@ -31,4 +31,22 @@ export const roleService = {
       method: 'DELETE',
     });
   },
+
+  getUserRoles: async (userId: string): Promise<{ items: Array<{ role_id: string; name: string }> }> => {
+    return http<{ items: Array<{ role_id: string; name: string }> }>(API_ENDPOINTS.ADMIN.USER_ROLES(userId));
+  },
+
+  assignRoleToUser: async (userId: string, roleId: string): Promise<{ success: boolean }> => {
+    return http<{ success: boolean }>(API_ENDPOINTS.ADMIN.USER_ROLES(userId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role_id: roleId }),
+    });
+  },
+
+  revokeRoleFromUser: async (userId: string, roleId: string): Promise<{ success: boolean }> => {
+    return http<{ success: boolean }>(API_ENDPOINTS.ADMIN.USER_ROLE_DETAIL(userId, roleId), {
+      method: 'DELETE',
+    });
+  },
 };

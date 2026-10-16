@@ -672,17 +672,17 @@ app.put('/api/admin/users/:id/credentials', async (req, res) => {
         }
     });
 
-    // ============================================================
-    // 9. ACCESS_LOG đọc (đã có ở route chính, thêm bản admin nếu cần)
-    // ============================================================
-    app.delete('/api/admin/access-logs/clear', async (req, res) => {
-        try {
-            const pool = await getPool();
-            await pool.request().query(`DELETE FROM ACCESS_LOG`);
-            await log(req, 'CLEAR_LOG', 'Xóa toàn bộ nhật ký');
-            res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
-    });
+    // // ============================================================
+    // // 9. ACCESS_LOG đọc (đã có ở route chính, thêm bản admin nếu cần)
+    // // ============================================================
+    // app.delete('/api/admin/access-logs/clear', async (req, res) => {
+    //     try {
+    //         const pool = await getPool();
+    //         await pool.request().query(`DELETE FROM ACCESS_LOG`);
+    //         await log(req, 'CLEAR_LOG', 'Xóa toàn bộ nhật ký');
+    //         res.json({ success: true });
+    //     } catch (e) { res.status(500).json({ error: e.message }); }
+    // });
 
         // ============================================================
     // 10. MILITARY_RANK CRUD — Cấp bậc quân hàm

@@ -64,7 +64,7 @@ module.exports = function (app, deps) {
         try {
             const pool = await getPool();
             const r = await pool.request().query(`
-                SELECT u.user_id, u.full_name, u.[rank] AS rank_name, u.[position],
+                SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name, u.[position],
                        u.unit_id, un.name AS unit_name,
                        u.status, u.clearance_level_id,
                        sl.name AS clearance_name, sl.code AS clearance_code
@@ -73,9 +73,29 @@ module.exports = function (app, deps) {
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
                 ORDER BY u.user_id
             `);
-            res.json({ total: r.recordset.length, items: r.recordset });
+
+            const rolesRes = await pool.request().query(`
+                SELECT ur.user_id, r.role_id, r.name
+                FROM USER_ROLE ur
+                JOIN [ROLE] r ON r.role_id = ur.role_id
+            `);
+            const rolesByUser = {};
+            const roleNamesByUser = {};
+            for (const row of rolesRes.recordset) {
+                if (!rolesByUser[row.user_id]) rolesByUser[row.user_id] = [];
+                if (!roleNamesByUser[row.user_id]) roleNamesByUser[row.user_id] = [];
+                rolesByUser[row.user_id].push(row.role_id);
+                roleNamesByUser[row.user_id].push(row.name);
+            }
+            const items = r.recordset.map(u => ({
+                ...u,
+                roles: rolesByUser[u.user_id] || [],
+                role_names: roleNamesByUser[u.user_id] || []
+            }));
+
+            res.json({ total: items.length, items });
         } catch (e) { res.status(500).json({ error: e.message }); }
-    });
+});
 
     // ============================================================
 // TẠO USER — có username + password
@@ -87,7 +107,8 @@ app.post('/api/admin/users', async (req, res) => {
     try {
         const {
             user_id, username, password, full_name,
-            rank_name, position, unit_id, status, clearance_level_id
+            rank_name, position, unit_id, status, clearance_level_id,
+            role_id, roles
         } = req.body;
 
         // Validate
@@ -127,6 +148,25 @@ app.post('/api/admin/users', async (req, res) => {
                    @status, @clearance_level_id, @password_hash)
             `);
 
+        // Gán vai trò (role) nếu có
+        if (role_id) {
+            await pool.request()
+                .input('u', sql.VarChar(50), user_id.trim())
+                .input('r', sql.VarChar(50), role_id)
+                .query(`IF NOT EXISTS (SELECT 1 FROM USER_ROLE WHERE user_id = @u AND role_id = @r)
+                        INSERT INTO USER_ROLE (user_id, role_id) VALUES (@u, @r)`);
+        } else if (Array.isArray(roles)) {
+            for (const rId of roles) {
+                if (rId) {
+                    await pool.request()
+                        .input('u', sql.VarChar(50), user_id.trim())
+                        .input('r', sql.VarChar(50), rId)
+                        .query(`IF NOT EXISTS (SELECT 1 FROM USER_ROLE WHERE user_id = @u AND role_id = @r)
+                                INSERT INTO USER_ROLE (user_id, role_id) VALUES (@u, @r)`);
+                }
+            }
+        }
+
         await log(req, 'CREATE_USER', `Tạo user ${user_id} (${username})`);
 
         res.json({
@@ -149,7 +189,7 @@ app.post('/api/admin/users', async (req, res) => {
 });
     app.put('/api/admin/users/:id', async (req, res) => {
         try {
-            const { full_name, rank_name, position, unit_id, status, clearance_level_id } = req.body;
+            const { full_name, rank_name, position, unit_id, status, clearance_level_id, role_id, roles } = req.body;
             const pool = await getPool();
             const r = await pool.request()
                 .input('user_id', sql.VarChar(50), req.params.id)
@@ -163,6 +203,22 @@ app.post('/api/admin/users', async (req, res) => {
                         unit_id=@unit_id, status=@status, clearance_level_id=@clearance_level_id
                         WHERE user_id=@user_id`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+            if (role_id !== undefined || roles !== undefined) {
+                await pool.request()
+                    .input('u', sql.VarChar(50), req.params.id)
+                    .query(`DELETE FROM USER_ROLE WHERE user_id = @u`);
+                const targetRoles = role_id ? [role_id] : (Array.isArray(roles) ? roles : []);
+                for (const rId of targetRoles) {
+                    if (rId) {
+                        await pool.request()
+                            .input('u', sql.VarChar(50), req.params.id)
+                            .input('r', sql.VarChar(50), rId)
+                            .query(`INSERT INTO USER_ROLE (user_id, role_id) VALUES (@u, @r)`);
+                    }
+                }
+            }
+
             await log(req, 'UPDATE_USER', `Sửa user ${req.params.id}`);
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -616,15 +672,288 @@ app.put('/api/admin/users/:id/credentials', async (req, res) => {
         }
     });
 
+    // // ============================================================
+    // // 9. ACCESS_LOG đọc (đã có ở route chính, thêm bản admin nếu cần)
+    // // ============================================================
+    // app.delete('/api/admin/access-logs/clear', async (req, res) => {
+    //     try {
+    //         const pool = await getPool();
+    //         await pool.request().query(`DELETE FROM ACCESS_LOG`);
+    //         await log(req, 'CLEAR_LOG', 'Xóa toàn bộ nhật ký');
+    //         res.json({ success: true });
+    //     } catch (e) { res.status(500).json({ error: e.message }); }
+    // });
+
+        // ============================================================
+    // 10. MILITARY_RANK CRUD — Cấp bậc quân hàm
     // ============================================================
-    // 9. ACCESS_LOG đọc (đã có ở route chính, thêm bản admin nếu cần)
-    // ============================================================
-    app.delete('/api/admin/access-logs/clear', async (req, res) => {
+    app.get('/api/admin/ranks', async (req, res) => {
         try {
             const pool = await getPool();
-            await pool.request().query(`DELETE FROM ACCESS_LOG`);
-            await log(req, 'CLEAR_LOG', 'Xóa toàn bộ nhật ký');
+            const r = await pool.request().query(
+                `SELECT rank_id, name, sort_order, active, created_at
+                 FROM MILITARY_RANK
+                 ORDER BY sort_order, name`
+            );
+            res.json({ items: r.recordset });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/admin/ranks', async (req, res) => {
+        try {
+            const { rank_id, name, sort_order } = req.body;
+            if (!rank_id || !name) {
+                return res.status(400).json({ error: 'Thiếu rank_id hoặc name' });
+            }
+            const pool = await getPool();
+            await pool.request()
+                .input('id',   sql.VarChar(20),   rank_id)
+                .input('n',    sql.NVarChar(100), name)
+                .input('sort', sql.Int,           sort_order || 0)
+                .query(`INSERT INTO MILITARY_RANK (rank_id, name, sort_order)
+                        VALUES (@id, @n, @sort)`);
+            await log(req, 'CREATE_RANK', `Tạo cấp bậc ${rank_id} - ${name}`);
+            res.json({ success: true, rank_id });
+        } catch (e) {
+            if (e.message.includes('PRIMARY KEY')) {
+                return res.status(409).json({ error: 'rank_id đã tồn tại' });
+            }
+            if (e.message.includes('UQ_MRANK_NAME')) {
+                return res.status(409).json({ error: 'Tên cấp bậc đã tồn tại' });
+            }
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.put('/api/admin/ranks/:id', async (req, res) => {
+        try {
+            const { name, sort_order, active } = req.body;
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('id',   sql.VarChar(20),   req.params.id)
+                .input('n',    sql.NVarChar(100), name)
+                .input('sort', sql.Int,           sort_order || 0)
+                .input('act',  sql.Bit,           active === false ? 0 : 1)
+                .query(`UPDATE MILITARY_RANK
+                        SET name = @n, sort_order = @sort, active = @act
+                        WHERE rank_id = @id`);
+            if (r.rowsAffected[0] === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy cấp bậc' });
+            }
+            await log(req, 'UPDATE_RANK', `Sửa cấp bậc ${req.params.id}`);
             res.json({ success: true });
+        } catch (e) {
+            if (e.message.includes('UQ_MRANK_NAME')) {
+                return res.status(409).json({ error: 'Tên cấp bậc đã tồn tại' });
+            }
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.delete('/api/admin/ranks/:id', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const rankRow = await pool.request()
+                .input('id', sql.VarChar(20), req.params.id)
+                .query(`SELECT name FROM MILITARY_RANK WHERE rank_id = @id`);
+            if (rankRow.recordset.length === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy cấp bậc' });
+            }
+            const rankName = rankRow.recordset[0].name;
+            const used = await pool.request()
+                .input('n', sql.NVarChar(100), rankName)
+                .query(`SELECT COUNT(*) AS n FROM [USER] WHERE [rank] = @n`);
+            if (used.recordset[0].n > 0) {
+                await pool.request()
+                    .input('id', sql.VarChar(20), req.params.id)
+                    .query(`UPDATE MILITARY_RANK SET active = 0 WHERE rank_id = @id`);
+                return res.json({
+                    success: true,
+                    soft_deleted: true,
+                    note: `${used.recordset[0].n} user đang dùng → chỉ ẩn khỏi dropdown`
+                });
+            }
+            await pool.request()
+                .input('id', sql.VarChar(20), req.params.id)
+                .query(`DELETE FROM MILITARY_RANK WHERE rank_id = @id`);
+            await log(req, 'DELETE_RANK', `Xóa cấp bậc ${req.params.id}`);
+            res.json({ success: true, soft_deleted: false });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // ============================================================
+    // 11. MILITARY_POSITION CRUD — Chức vụ
+    // ============================================================
+    app.get('/api/admin/positions', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const r = await pool.request().query(
+                `SELECT position_id, name, sort_order, active, created_at
+                 FROM MILITARY_POSITION
+                 ORDER BY sort_order, name`
+            );
+            res.json({ items: r.recordset });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/admin/positions', async (req, res) => {
+        try {
+            const { position_id, name, sort_order } = req.body;
+            if (!position_id || !name) {
+                return res.status(400).json({ error: 'Thiếu position_id hoặc name' });
+            }
+            const pool = await getPool();
+            await pool.request()
+                .input('id',   sql.VarChar(20),   position_id)
+                .input('n',    sql.NVarChar(100), name)
+                .input('sort', sql.Int,           sort_order || 0)
+                .query(`INSERT INTO MILITARY_POSITION (position_id, name, sort_order)
+                        VALUES (@id, @n, @sort)`);
+            await log(req, 'CREATE_POSITION', `Tạo chức vụ ${position_id} - ${name}`);
+            res.json({ success: true, position_id });
+        } catch (e) {
+            if (e.message.includes('PRIMARY KEY')) {
+                return res.status(409).json({ error: 'position_id đã tồn tại' });
+            }
+            if (e.message.includes('UQ_MPOS_NAME')) {
+                return res.status(409).json({ error: 'Tên chức vụ đã tồn tại' });
+            }
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.put('/api/admin/positions/:id', async (req, res) => {
+        try {
+            const { name, sort_order, active } = req.body;
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('id',   sql.VarChar(20),   req.params.id)
+                .input('n',    sql.NVarChar(100), name)
+                .input('sort', sql.Int,           sort_order || 0)
+                .input('act',  sql.Bit,           active === false ? 0 : 1)
+                .query(`UPDATE MILITARY_POSITION
+                        SET name = @n, sort_order = @sort, active = @act
+                        WHERE position_id = @id`);
+            if (r.rowsAffected[0] === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy chức vụ' });
+            }
+            await log(req, 'UPDATE_POSITION', `Sửa chức vụ ${req.params.id}`);
+            res.json({ success: true });
+        } catch (e) {
+            if (e.message.includes('UQ_MPOS_NAME')) {
+                return res.status(409).json({ error: 'Tên chức vụ đã tồn tại' });
+            }
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.delete('/api/admin/positions/:id', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const row = await pool.request()
+                .input('id', sql.VarChar(20), req.params.id)
+                .query(`SELECT name FROM MILITARY_POSITION WHERE position_id = @id`);
+            if (row.recordset.length === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy chức vụ' });
+            }
+            const posName = row.recordset[0].name;
+            const used = await pool.request()
+                .input('n', sql.NVarChar(100), posName)
+                .query(`SELECT COUNT(*) AS n FROM [USER] WHERE [position] = @n`);
+            if (used.recordset[0].n > 0) {
+                await pool.request()
+                    .input('id', sql.VarChar(20), req.params.id)
+                    .query(`UPDATE MILITARY_POSITION SET active = 0 WHERE position_id = @id`);
+                return res.json({
+                    success: true,
+                    soft_deleted: true,
+                    note: `${used.recordset[0].n} user đang dùng → chỉ ẩn khỏi dropdown`
+                });
+            }
+            await pool.request()
+                .input('id', sql.VarChar(20), req.params.id)
+                .query(`DELETE FROM MILITARY_POSITION WHERE position_id = @id`);
+            await log(req, 'DELETE_POSITION', `Xóa chức vụ ${req.params.id}`);
+            res.json({ success: true, soft_deleted: false });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+        // ============================================================
+    // 12. MỞ KHÓA TÀI KHOẢN — reset failed_attempts + locked_at
+    // ============================================================
+    app.post('/api/admin/users/:id/unlock', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('uid', sql.VarChar(50), req.params.id)
+                .query(`UPDATE [USER]
+                        SET status = 'active',
+                            failed_attempts = 0,
+                            locked_at = NULL,
+                            last_failed_at = NULL
+                        WHERE user_id = @uid`);
+
+            if (r.rowsAffected[0] === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy user' });
+            }
+
+            await log(req, 'UNLOCK_USER', `Mở khóa tài khoản ${req.params.id}`);
+            res.json({ success: true, user_id: req.params.id });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ============================================================
+    // 13. IP BLOCKLIST — xem + gỡ
+    // ============================================================
+    app.get('/api/admin/ip-blocklist', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const r = await pool.request().query(
+                `SELECT ip, blocked_until, reason, blocked_at
+                 FROM IP_BLOCKLIST
+                 WHERE blocked_until > GETDATE()
+                 ORDER BY blocked_at DESC`
+            );
+            res.json({ items: r.recordset });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.delete('/api/admin/ip-blocklist/:ip', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('ip', sql.VarChar(50), req.params.ip)
+                .query(`DELETE FROM IP_BLOCKLIST WHERE ip = @ip`);
+            if (r.rowsAffected[0] === 0) {
+                return res.status(404).json({ error: 'IP không tồn tại trong blocklist' });
+            }
+            await log(req, 'UNBLOCK_IP', `Gỡ chặn IP ${req.params.ip}`);
+            res.json({ success: true, ip: req.params.ip });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // ============================================================
+    // 14. LOGIN_ATTEMPT — xem lịch sử đăng nhập (audit)
+    // ============================================================
+    app.get('/api/admin/login-attempts', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const r = pool.request();
+            let query = `SELECT TOP 200 attempt_id, ip, username, result, attempted_at
+                         FROM LOGIN_ATTEMPT WHERE 1=1`;
+            if (req.query.ip) {
+                query += ` AND ip = @ip`;
+                r.input('ip', sql.VarChar(50), req.query.ip);
+            }
+            if (req.query.result) {
+                query += ` AND result = @result`;
+                r.input('result', sql.VarChar(30), req.query.result);
+            }
+            query += ` ORDER BY attempted_at DESC`;
+            const result = await r.query(query);
+            res.json({ items: result.recordset });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 };

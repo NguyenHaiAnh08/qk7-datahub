@@ -13,31 +13,48 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { DocumentItem } from '../../types';
-import { documentService } from '../../services/documentService';
+import { fileService } from '../../services/fileService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
+import { useAuth } from '../../hooks/useAuth';
 
 export interface DocumentPreviewModalProps {
   open: boolean;
   document: DocumentItem | null;
+  userClearanceLevel?: number;
   onClose: () => void;
 }
 
 export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   open,
   document,
+  userClearanceLevel: propClearanceLevel,
   onClose,
 }) => {
+  const { user } = useAuth();
+  const clearanceLevel = propClearanceLevel ?? (user?.clearance_level_id || 1);
+
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<boolean>(false);
 
+  const docLevel = document ? (document.security_level_id || 1) : 1;
+  const canView = !document || docLevel <= clearanceLevel;
+  // Chỉ cấp 1 và cấp 2 được tải về nếu clearanceLevel >= docLevel. Từ cấp 3 trở lên chỉ xem, không được tải về
+  const canDownload = !document || (docLevel <= 2 && docLevel <= clearanceLevel);
+  const isSecretLevel = docLevel >= 3;
+
   const loadPdfBlob = async (docId: string) => {
+    if (!canView) {
+      setError(`Cấp độ bảo mật của bạn (Cấp ${clearanceLevel}) không đủ điều kiện xem văn bản này.`);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const blob = await documentService.fetchDocumentBlob(docId, false);
+      const blob = await fileService.fetchFileBlob(docId, '0');
       const url = URL.createObjectURL(blob);
       setBlobUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -68,11 +85,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         return null;
       });
     };
-  }, [open, document?.file_id]);
+  }, [open, document?.file_id, clearanceLevel]);
 
   if (!open || !document) return null;
-
-  const canDownload = (document.security_level_id || 1) < 3;
 
   const handleDownload = async () => {
     if (!canDownload) return;
@@ -86,7 +101,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         a.click();
         window.document.body.removeChild(a);
       } else {
-        await documentService.downloadDocument(
+        await fileService.downloadFile(
           document.file_id,
           document.original_name || `${document.document_code}.pdf`
         );
@@ -102,7 +117,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     if (blobUrl) {
       window.open(`${blobUrl}#toolbar=0&navpanes=0`, '_blank');
     } else {
-      window.open(`${documentService.getViewUrl(document.file_id, false)}#toolbar=0&navpanes=0`, '_blank');
+      window.open(`${fileService.getViewUrl(document.file_id, '0')}#toolbar=0&navpanes=0`, '_blank');
     }
   };
 
@@ -138,18 +153,22 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   </span>
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-slate-400" />
-                    {formatDate(document.issue_date)}
+                    {formatDate(document.issued_date || document.issue_date)}
                   </span>
                   <span className="flex items-center gap-1">
                     <Shield className="w-3 h-3 text-amber-500" />
-                    {document.security_level_name || `Cấp ${document.security_level_id}`}
+                    {document.security_name || document.security_level_name || `Cấp ${document.security_level_id}`}
                   </span>
-                  {!canDownload && (
-                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.2 rounded">
-                      Chỉ xem trực tiếp
+                  {isSecretLevel ? (
+                    <span className="text-[10px] text-purple-700 dark:text-purple-400 font-semibold bg-purple-500/15 border border-purple-500/30 px-1.5 py-0.5 rounded">
+                      Chỉ xem trực tiếp (Mật)
                     </span>
-                  )}
-                  <span>{formatFileSize(document.file_size_bytes)}</span>
+                  ) : !canDownload ? (
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                      Chưa đủ quyền tải về
+                    </span>
+                  ) : null}
+                  <span>{formatFileSize(document.file_size ?? document.file_size_bytes)}</span>
                 </div>
               </div>
             </div>
@@ -179,8 +198,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               ) : (
                 <button
                   disabled
-                  className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-not-allowed opacity-75 shadow-none"
-                  title="Tài liệu từ Cấp 3 trở lên chỉ cho phép xem trực tiếp"
+                  className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-not-allowed opacity-60 shadow-none"
+                  title={
+                    isSecretLevel
+                      ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
+                      : `Cấp độ bảo mật của bạn (Cấp ${clearanceLevel}) không đủ điều kiện tải về văn bản Cấp ${docLevel}`
+                  }
                 >
                   <Download className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                   <span className="hidden sm:inline">Tải về</span>

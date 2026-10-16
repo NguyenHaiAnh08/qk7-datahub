@@ -19,6 +19,13 @@ const ROOT_DIR = __dirname;
 const PDF_ROOT = path.join(ROOT_DIR, 'uploads');
 const publicDir = path.join(ROOT_DIR, 'public');
 
+// ─── Login Check ───
+const LOCKOUT_MAX_ATTEMPTS = parseInt(process.env.LOCKOUT_MAX_ATTEMPTS || '6', 10);
+const LOCKOUT_WINDOW_MINUTES = parseInt(process.env.LOCKOUT_WINDOW_MINUTES || '15', 10);
+const IPBLOCK_MAX_ATTEMPTS = parseInt(process.env.IPBLOCK_MAX_ATTEMPTS || '6', 10);
+const IPBLOCK_WINDOW_MINUTES = parseInt(process.env.IPBLOCK_WINDOW_MINUTES || '15', 10);
+const IPBLOCK_DURATION_MINUTES = parseInt(process.env.IPBLOCK_DURATION_MINUTES || '30', 10);
+
 app.use(cors());
 app.use(express.json());
 
@@ -110,13 +117,14 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
     try {
         const pool = await getPool();
         const logId = 'LOG-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        const validUserId = (userId && userId !== 'GUEST') ? userId : null;
         await pool.request()
             .input('log_id',  sql.VarChar(50),   logId)
-            .input('user_id', sql.VarChar(50),   userId)
-            .input('file_id', sql.VarChar(50),   fileId)
+            .input('user_id', sql.VarChar(50),   validUserId)
+            .input('file_id', sql.VarChar(50),   fileId || null)
             .input('action',  sql.VarChar(50),   action)
-            .input('ip',      sql.VarChar(50),   ip)
-            .input('note',    sql.NVarChar(255), note)
+            .input('ip',      sql.VarChar(50),   ip || '')
+            .input('note',    sql.NVarChar(255), note || null)
             .query(`
                 INSERT INTO ACCESS_LOG (log_id, user_id, file_id, [action], ip, note)
                 VALUES (@log_id, @user_id, @file_id, @action, @ip, @note)
@@ -144,6 +152,7 @@ function buildStoredPath({ docTypeId, documentCode, fallbackId }) {
 // 0. AUTH — ĐĂNG NHẬP
 // ============================================================
 app.post('/api/auth/login', async (req, res) => {
+    const ip = getClientIp(req);
     try {
         const { user_id, password } = req.body;
 
@@ -151,55 +160,175 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(400).json({ error: 'Thiếu user_id hoặc password' });
         }
 
-        const pool = await getPool();
-        const r = await pool.request()
-        .input('u', sql.VarChar(50), user_id.trim().toLowerCase())
-        .query(`
-            SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name,
-                u.[position], u.unit_id, u.status,
-                u.password_hash, u.pin_hash,
-                u.clearance_level_id,
-                un.name AS unit_name,
-                sl.name AS clearance_name, sl.code AS clearance_code
-            FROM [USER] u
-            LEFT JOIN UNIT un           ON un.unit_id  = u.unit_id
-            LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
-            WHERE LOWER(u.username) = @u OR LOWER(u.user_id) = @u
-        `);
+        const username = user_id.trim().toLowerCase();
 
+        // ── Bước 1: Check IP blocklist ──
+        const ipCheck = await checkIpBlocked(ip);
+        if (ipCheck.blocked) {
+            const minsLeft = Math.max(1, Math.ceil((new Date(ipCheck.blocked_until) - Date.now()) / 60000));
+            return res.status(429).json({
+                error: `IP của bạn tạm thời bị chặn do nhiều lần đăng nhập thất bại. Vui lòng thử lại sau ${minsLeft} phút.`
+            });
+        }
+
+        const pool = await getPool();
+
+        // ── Bước 2: Query user ──
+        const r = await pool.request()
+            .input('u', sql.VarChar(50), username)
+            .query(`
+                SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name,
+                       u.[position], u.unit_id, u.status,
+                       u.password_hash, u.pin_hash,
+                       u.clearance_level_id,
+                       u.failed_attempts, u.locked_at, u.last_failed_at,
+                       un.name AS unit_name,
+                       sl.name AS clearance_name, sl.code AS clearance_code
+                FROM [USER] u
+                LEFT JOIN UNIT un           ON un.unit_id  = u.unit_id
+                LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
+                WHERE LOWER(u.username) = @u OR LOWER(u.user_id) = @u
+            `);
+
+        // ── Bước 3: Username không tồn tại → dò username ──
         if (r.recordset.length === 0) {
-            return res.status(401).json({ error: 'Tài khoản không tồn tại' });
+            await writeLoginAttempt({ ip, username, result: 'USERNAME_NOT_FOUND' });
+            await checkAndBlockIp(ip);
+
+            await writeAccessLog({
+                userId: 'UNKNOWN', fileId: null,
+                action: 'LOGIN_FAIL', ip,
+                note: `Username không tồn tại: ${username}`
+            });
+
+            return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không chính xác' });
         }
 
         const user = r.recordset[0];
 
+        // ── Bước 4: Check status ──
         if (user.status !== 'active') {
-            return res.status(403).json({ error: 'Tài khoản đã bị khóa' });
+            await writeLoginAttempt({ ip, username, result: 'LOCKED' });
+            await writeAccessLog({
+                userId: user.user_id, fileId: null,
+                action: 'LOGIN_FAIL', ip,
+                note: `Tài khoản bị khóa (status = ${user.status})`
+            });
+            const msg = user.status === 'locked'
+                ? 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để mở khóa.'
+                : 'Tài khoản đã bị vô hiệu hóa.';
+            return res.status(403).json({ error: msg });
         }
 
+        // ── Bước 6: Sliding window — reset counter nếu quá hạn ──
+        let currentFailed = user.failed_attempts || 0;
+        if (user.last_failed_at && currentFailed > 0) {
+            const minsSince = (Date.now() - new Date(user.last_failed_at).getTime()) / 60000;
+            if (minsSince > LOCKOUT_WINDOW_MINUTES) {
+                await pool.request()
+                    .input('uid', sql.VarChar(50), user.user_id)
+                    .query(`UPDATE [USER] SET failed_attempts = 0, last_failed_at = NULL WHERE user_id = @uid`);
+                currentFailed = 0;
+            }
+        }
+
+        // ── Bước 7: bcrypt compare ──
         const pwdHash = user.password_hash || user.pin_hash;
         if (!pwdHash) {
+            await writeLoginAttempt({ ip, username, result: 'WRONG_PASSWORD' });
             return res.status(403).json({ error: 'Tài khoản chưa được cấp mật khẩu' });
         }
 
         const ok = await bcrypt.compare(password, pwdHash);
+
+        // ── Bước 7a: SAI mật khẩu ──
         if (!ok) {
+            // Kiểm tra user có phải Admin (ROL-01) → không khóa tự động
+            const adminCheck = await pool.request()
+                .input('uid', sql.VarChar(50), user.user_id)
+                .query(`SELECT COUNT(*) AS n FROM USER_ROLE
+                        WHERE user_id = @uid AND role_id = 'ROL-01'`);
+            const isAdminAccount = adminCheck.recordset[0].n > 0;
+
+            const newFailed = currentFailed + 1;
+            const willLock = !isAdminAccount && newFailed >= LOCKOUT_MAX_ATTEMPTS;
+
+            const query = willLock
+                ? `UPDATE [USER]
+                   SET failed_attempts = @n,
+                       last_failed_at = GETDATE(),
+                       locked_at = GETDATE(),
+                       status = 'locked'
+                   WHERE user_id = @uid`
+                : `UPDATE [USER]
+                   SET failed_attempts = @n,
+                       last_failed_at = GETDATE()
+                   WHERE user_id = @uid`;
+
+            await pool.request()
+                .input('uid', sql.VarChar(50), user.user_id)
+                .input('n',   sql.Int,         newFailed)
+                .query(query);
+
+            await writeLoginAttempt({ ip, username, result: 'WRONG_PASSWORD' });
             await writeAccessLog({
                 userId: user.user_id, fileId: null,
-                action: 'LOGIN_FAIL', ip: req.ip || '',
-                note: 'Sai mật khẩu'
+                action: 'LOGIN_FAIL', ip,
+                note: `Sai mật khẩu lần ${newFailed}/${LOCKOUT_MAX_ATTEMPTS}${isAdminAccount ? ' (Admin — không khóa tự động)' : ''}`
             });
-            return res.status(401).json({ error: 'Sai mật khẩu' });
+
+            if (willLock) {
+                console.warn(`[LOCKOUT] User ${user.user_id} bị khóa sau ${newFailed} lần sai`);
+                return res.status(403).json({
+                    error: `Tài khoản đã bị khóa do đăng nhập sai ${LOCKOUT_MAX_ATTEMPTS} lần. Vui lòng liên hệ quản trị viên để mở khóa.`
+                });
+            }
+
+            // Admin: báo sai mật khẩu đơn giản, không hiện "còn X lần"
+            if (isAdminAccount) {
+                return res.status(401).json({ error: 'Mật khẩu không đúng.' });
+            }
+
+            const remaining = LOCKOUT_MAX_ATTEMPTS - newFailed;
+            return res.status(401).json({
+                error: `Mật khẩu không đúng. Bạn còn ${remaining} lần thử.`
+            });
         }
 
+        // ── Bước 7b: ĐÚNG mật khẩu ──
+        await pool.request()
+            .input('uid', sql.VarChar(50), user.user_id)
+            .query(`UPDATE [USER]
+                    SET failed_attempts = 0,
+                        locked_at = NULL,
+                        last_failed_at = NULL,
+                        status = 'active'
+                    WHERE user_id = @uid`);
+
+        await writeLoginAttempt({ ip, username, result: 'SUCCESS' });
         await writeAccessLog({
             userId: user.user_id, fileId: null,
-            action: 'LOGIN', ip: req.ip || '',
+            action: 'LOGIN', ip,
             note: `${user.full_name} (mức ${user.clearance_level_id})`
         });
 
         delete user.password_hash;
         delete user.pin_hash;
+        delete user.failed_attempts;
+        delete user.locked_at;
+        delete user.last_failed_at;
+
+        // ── Lấy roles + role_names ──
+        const rolesResult = await pool.request()
+            .input('uid', sql.VarChar(50), user.user_id)
+            .query(`
+                SELECT r.role_id, r.name AS role_name
+                FROM USER_ROLE ur
+                JOIN [ROLE] r ON r.role_id = ur.role_id
+                WHERE ur.user_id = @uid
+            `);
+        user.roles = rolesResult.recordset.map(x => x.role_id);
+        user.role_names = rolesResult.recordset.map(x => x.role_name);
 
         res.json({ success: true, user });
 
@@ -211,13 +340,18 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/me', async (req, res) => {
     try {
+        const userId = req.user?.user_id;
+        if (!userId || userId === 'GUEST') {
+            return res.status(401).json({ error: 'Chưa xác thực thông tin user (thiếu header X-User-Id)' });
+        }
+
         const pool = await getPool();
         const r = await pool.request()
-            .input('u', sql.VarChar(50), req.user.user_id)
+            .input('u', sql.VarChar(50), userId)
             .query(`
-                SELECT u.user_id, u.full_name, u.[rank] AS rank_name, u.[position],
-                       u.unit_id, un.name AS unit_name,
-                       u.clearance_level_id, sl.name AS clearance_name
+                SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name, u.[position],
+                       u.unit_id, un.name AS unit_name, u.status,
+                       u.clearance_level_id, sl.name AS clearance_name, sl.code AS clearance_code
                 FROM [USER] u
                 LEFT JOIN UNIT un           ON un.unit_id  = u.unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
@@ -226,7 +360,22 @@ app.get('/api/auth/me', async (req, res) => {
         if (r.recordset.length === 0) {
             return res.status(404).json({ error: 'Không tìm thấy user' });
         }
-        res.json(r.recordset[0]);
+
+        const user = r.recordset[0];
+
+        // Bổ sung roles & role_names theo schema UserFull của Swagger
+        const rolesRes = await pool.request()
+            .input('u', sql.VarChar(50), user.user_id)
+            .query(`
+                SELECT r.role_id, r.name
+                FROM USER_ROLE ur
+                JOIN [ROLE] r ON r.role_id = ur.role_id
+                WHERE ur.user_id = @u
+            `);
+        user.roles = rolesRes.recordset.map(x => x.role_id);
+        user.role_names = rolesRes.recordset.map(x => x.name);
+
+        res.json(user);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -268,21 +417,41 @@ app.get('/api/test-http-error/:code', (req, res) => {
 app.get('/api/meta', async (req, res) => {
     try {
         const pool = await getPool();
-        const [types, units, levels] = await Promise.all([
-            pool.request().query(`SELECT type_id, name FROM DOCUMENT_TYPE ORDER BY name`),
-            pool.request().query(`SELECT unit_id, name FROM UNIT ORDER BY name`),
-            pool.request().query(`SELECT level_id, name FROM SECURITY_LEVEL ORDER BY level_id`)
+        const [types, units, levels, ranks, positions] = await Promise.all([
+            pool.request().query(`SELECT type_id, name, description FROM DOCUMENT_TYPE ORDER BY name`),
+            pool.request().query(`
+                SELECT u.unit_id, u.name, u.parent_id, p.name AS parent_name
+                FROM UNIT u
+                LEFT JOIN UNIT p ON p.unit_id = u.parent_id
+                ORDER BY u.name
+            `),
+            pool.request().query(`SELECT level_id, code, name FROM SECURITY_LEVEL ORDER BY level_id`),
+            pool.request().query(`
+                SELECT rank_id, name, sort_order
+                FROM MILITARY_RANK
+                WHERE active = 1
+                ORDER BY sort_order, name
+            `),
+            pool.request().query(`
+                SELECT position_id, name, sort_order
+                FROM MILITARY_POSITION
+                WHERE active = 1
+                ORDER BY sort_order, name
+            `)
         ]);
         res.json({
-            types:  types.recordset,
-            units:  units.recordset,
-            levels: levels.recordset
+            types:     types.recordset,
+            units:     units.recordset,
+            levels:    levels.recordset,
+            ranks:     ranks.recordset,
+            positions: positions.recordset
         });
     } catch (e) {
         console.error('[GET /api/meta]', e);
         res.status(500).json({ error: e.message });
     }
 });
+
 
 // ============================================================
 // 3. ĐỌC — TÌM KIẾM TÀI LIỆU
@@ -295,10 +464,14 @@ app.get('/api/documents', async (req, res) => {
         let query = `
             SELECT d.file_id, d.document_code, d.title,
                    d.doc_type_id, dt.name AS doc_type_name,
-                   d.issued_date,
+                   d.doc_type_id AS type_id, dt.name AS type_name,
+                   d.issued_date, d.issued_date AS issue_date,
                    d.issuing_unit_id, u.name AS unit_name,
-                   d.signer, d.file_size, d.summary,
+                   d.issuing_unit_id AS unit_id,
+                   d.signer, d.file_size, d.file_size AS file_size_bytes,
+                   d.summary,
                    d.security_level_id, sl.name AS security_name,
+                   sl.name AS security_level_name,
                    d.created_at, d.updated_at
             FROM DOCUMENT d
             LEFT JOIN DOCUMENT_TYPE dt ON dt.type_id  = d.doc_type_id
@@ -308,32 +481,46 @@ app.get('/api/documents', async (req, res) => {
         `;
         r.input('clearance', sql.Int, req.user.clearance_level_id);
 
-        if (req.query.code) {
-            query += ` AND d.document_code LIKE '%' + @code + '%'`;
-            r.input('code', sql.NVarChar(100), req.query.code);
+        if (req.query.q) {
+            query += ` AND (d.document_code LIKE '%' + @q + '%' OR d.title LIKE N'%' + @q + N'%' OR d.summary LIKE N'%' + @q + N'%')`;
+            r.input('q', sql.NVarChar(500), req.query.q);
+        } else {
+            if (req.query.code) {
+                query += ` AND d.document_code LIKE '%' + @code + '%'`;
+                r.input('code', sql.NVarChar(100), req.query.code);
+            }
+            if (req.query.title) {
+                query += ` AND d.title LIKE N'%' + @title + N'%'`;
+                r.input('title', sql.NVarChar(500), req.query.title);
+            }
         }
-        if (req.query.title) {
-            query += ` AND d.title LIKE N'%' + @title + N'%'`;
-            r.input('title', sql.NVarChar(500), req.query.title);
-        }
-        if (req.query.type) {
+        const typeParam = req.query.type || req.query.doc_type_id;
+        if (typeParam) {
             query += ` AND d.doc_type_id = @type`;
-            r.input('type', sql.VarChar(20), req.query.type);
+            r.input('type', sql.VarChar(20), typeParam);
         }
-        if (req.query.unit) {
+        const unitParam = req.query.unit || req.query.issuing_unit_id;
+        if (unitParam) {
             query += ` AND d.issuing_unit_id = @unit`;
-            r.input('unit', sql.VarChar(50), req.query.unit);
+            r.input('unit', sql.VarChar(50), unitParam);
         }
         if (req.query.from) {
-            query += ` AND d.issued_date >= @from`;
-            r.input('from', sql.Date, req.query.from);
+            const fromDate = new Date(req.query.from);
+            if (!isNaN(fromDate.getTime())) {
+                query += ` AND d.issued_date >= @from`;
+                r.input('from', sql.Date, fromDate);
+            }
         }
         if (req.query.to) {
-            query += ` AND d.issued_date <= @to`;
-            r.input('to', sql.Date, req.query.to);
+            const toDate = new Date(req.query.to);
+            if (!isNaN(toDate.getTime())) {
+                query += ` AND d.issued_date <= @to`;
+                r.input('to', sql.Date, toDate);
+            }
         }
-        if (req.query.lv) {
-            const maxAllowed = Math.min(parseInt(req.query.lv, 10), req.user.clearance_level_id);
+        const lvParam = req.query.lv || req.query.security_level_id;
+        if (lvParam) {
+            const maxAllowed = Math.min(parseInt(lvParam, 10), req.user.clearance_level_id);
             query += ` AND d.security_level_id <= @lv`;
             r.input('lv', sql.Int, maxAllowed);
         }
@@ -357,8 +544,16 @@ app.get('/api/documents/:fileId', async (req, res) => {
         const r = await pool.request()
             .input('file_id', sql.VarChar(50), req.params.fileId)
             .query(`
-                SELECT d.*, dt.name AS doc_type_name, u.name AS unit_name,
-                       sl.name AS security_name
+                SELECT d.*,
+                       d.doc_type_id AS type_id,
+                       dt.name AS doc_type_name,
+                       dt.name AS type_name,
+                       u.name AS unit_name,
+                       d.issuing_unit_id AS unit_id,
+                       d.issued_date AS issue_date,
+                       d.file_size AS file_size_bytes,
+                       sl.name AS security_name,
+                       sl.name AS security_level_name
                 FROM DOCUMENT d
                 LEFT JOIN DOCUMENT_TYPE dt ON dt.type_id  = d.doc_type_id
                 LEFT JOIN UNIT u          ON u.unit_id   = d.issuing_unit_id
@@ -384,15 +579,19 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'Thiếu file PDF' });
         }
 
-        const {
-            document_code, title, doc_type_id, issued_date,
-            issuing_unit_id, signer, summary, security_level_id
-        } = req.body;
+        const docTypeId = req.body.doc_type_id || req.body.type_id || null;
+        const issuingUnitId = req.body.issuing_unit_id || req.body.unit_id || null;
+        const issuedDate = req.body.issued_date || req.body.issue_date || null;
+        const securityLevelId = req.body.security_level_id || req.body.level_id;
+        const documentCode = req.body.document_code || req.body.code || null;
+        const title = req.body.title;
+        const signer = req.body.signer || null;
+        const summary = req.body.summary || null;
 
         if (!title || !title.trim()) {
             return res.status(400).json({ error: 'Thiếu trích yếu' });
         }
-        if (!security_level_id) {
+        if (!securityLevelId) {
             return res.status(400).json({ error: 'Thiếu mức bảo mật' });
         }
 
@@ -403,7 +602,7 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
             .update(req.file.buffer).digest('hex');
 
         const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } =
-            buildStoredPath({ docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId });
+            buildStoredPath({ docTypeId, documentCode, fallbackId: fileId });
 
         const sha8 = sha256.slice(0, 8);
         const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
@@ -416,14 +615,14 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
         const pool = await getPool();
         await pool.request()
             .input('file_id',           sql.VarChar(50),       fileId)
-            .input('document_code',     sql.NVarChar(100),     document_code || null)
+            .input('document_code',     sql.NVarChar(100),     documentCode)
             .input('title',             sql.NVarChar(500),     title.trim())
-            .input('doc_type_id',       sql.VarChar(20),       doc_type_id || null)
-            .input('issued_date',       sql.Date,              issued_date || null)
-            .input('issuing_unit_id',   sql.VarChar(50),       issuing_unit_id || null)
-            .input('signer',            sql.NVarChar(100),     signer || null)
-            .input('summary',           sql.NVarChar(sql.MAX), summary || null)
-            .input('security_level_id', sql.Int,               parseInt(security_level_id, 10))
+            .input('doc_type_id',       sql.VarChar(20),       docTypeId)
+            .input('issued_date',       sql.Date,              issuedDate)
+            .input('issuing_unit_id',   sql.VarChar(50),       issuingUnitId)
+            .input('signer',            sql.NVarChar(100),     signer)
+            .input('summary',           sql.NVarChar(sql.MAX), summary)
+            .input('security_level_id', sql.Int,               parseInt(securityLevelId, 10))
             .input('original_name',     sql.NVarChar(255),     req.file.originalname)
             .input('stored_path',       sql.NVarChar(500),     relPath)
             .input('mime_type',         sql.VarChar(100),      req.file.mimetype)
@@ -483,15 +682,19 @@ app.put('/api/documents/:fileId',
 
         const oldDoc = exist.recordset[0];
 
-        const {
-            document_code, title, doc_type_id, issued_date,
-            issuing_unit_id, signer, summary, security_level_id
-        } = req.body;
+        const docTypeId = req.body.doc_type_id || req.body.type_id || null;
+        const issuingUnitId = req.body.issuing_unit_id || req.body.unit_id || null;
+        const issuedDate = req.body.issued_date || req.body.issue_date || null;
+        const securityLevelId = req.body.security_level_id || req.body.level_id;
+        const documentCode = req.body.document_code || req.body.code || null;
+        const title = req.body.title;
+        const signer = req.body.signer || null;
+        const summary = req.body.summary || null;
 
         if (!title || !title.trim()) {
             return res.status(400).json({ error: 'Thiếu trích yếu' });
         }
-        if (!security_level_id) {
+        if (!securityLevelId) {
             return res.status(400).json({ error: 'Thiếu mức bảo mật' });
         }
 
@@ -504,7 +707,7 @@ app.put('/api/documents/:fileId',
 
         if (req.file) {
             const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } =
-                buildStoredPath({ docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId });
+                buildStoredPath({ docTypeId, documentCode, fallbackId: fileId });
 
             sha256 = crypto.createHash('sha256')
                 .update(req.file.buffer).digest('hex');
@@ -534,14 +737,14 @@ app.put('/api/documents/:fileId',
 
         const reqUpdate = pool.request()
             .input('file_id',           sql.VarChar(50),       fileId)
-            .input('document_code',     sql.NVarChar(100),     document_code || null)
+            .input('document_code',     sql.NVarChar(100),     documentCode)
             .input('title',             sql.NVarChar(500),     title.trim())
-            .input('doc_type_id',       sql.VarChar(20),       doc_type_id || null)
-            .input('issued_date',       sql.Date,              issued_date || null)
-            .input('issuing_unit_id',   sql.VarChar(50),       issuing_unit_id || null)
-            .input('signer',            sql.NVarChar(100),     signer || null)
-            .input('summary',           sql.NVarChar(sql.MAX), summary || null)
-            .input('security_level_id', sql.Int,               parseInt(security_level_id, 10))
+            .input('doc_type_id',       sql.VarChar(20),       docTypeId)
+            .input('issued_date',       sql.Date,              issuedDate)
+            .input('issuing_unit_id',   sql.VarChar(50),       issuingUnitId)
+            .input('signer',            sql.NVarChar(100),     signer)
+            .input('summary',           sql.NVarChar(sql.MAX), summary)
+            .input('security_level_id', sql.Int,               parseInt(securityLevelId, 10))
             .input('stored_path',       sql.NVarChar(500),     storedPath)
             .input('original_name',     sql.NVarChar(255),     originalName)
             .input('mime_type',         sql.VarChar(100),      mimeType);
@@ -674,22 +877,27 @@ app.get('/api/files/:fileId/view', async (req, res) => {
 
         const doc = result.recordset[0];
 
+        // Quyền xem và tải tệp được kiểm soát theo Cấp độ bảo mật (Clearance Level vs doc.security_level_id)
         if (doc.security_level_id > req.user.clearance_level_id) {
             await writeAccessLog({
                 userId: req.user.user_id, fileId,
                 action: 'DENIED', ip,
-                note: `Can muc ${doc.security_level_id}, user co muc ${req.user.clearance_level_id}`
+                note: `Can muc ${doc.security_level_id}${isDownload ? ' de tai ve' : ' de xem'}, user co muc ${req.user.clearance_level_id}`
             });
-            return res.status(403).json({ error: 'Không có quyền truy cập' });
+            return res.status(403).json({ error: `Cấp độ bảo mật của bạn không đủ để ${isDownload ? 'tải về' : 'xem'} tài liệu này` });
         }
 
+        // Quy định bảo mật: Từ cấp 3 trở đi (gồm Cấp 3, Cấp 4, Cấp 5) chỉ duy nhất cho phép xem, KHÔNG được tải về.
+        // Chỉ cấp 1 và cấp 2 được phép tải về máy.
         if (isDownload && doc.security_level_id >= 3) {
             await writeAccessLog({
                 userId: req.user.user_id, fileId,
                 action: 'DENIED', ip,
-                note: `Tu cap 3 tro len khong duoc phep tai ve (doc level: ${doc.security_level_id})`
+                note: `Tu choi tai ve: Tai lieu Cap ${doc.security_level_id} chi duy nhat cho phep xem truc tiep`
             });
-            return res.status(403).json({ error: 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được tải về.' });
+            return res.status(403).json({
+                error: 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp trên hệ thống, không được phép tải về máy.'
+            });
         }
 
         const filePath = path.join(ROOT_DIR, doc.stored_path);
@@ -782,7 +990,88 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Admin CRUD routes ───
-require('./src/admin-routes')(app, { sql, getPool, writeAccessLog });
+require('./src/admin-routes')(app, { sql, getPool, writeAccessLog })
+// ─── Lấy IP client (xử lý qua proxy/nginx) ───
+function getClientIp(req) {
+    const fwd = req.headers['x-forwarded-for'];
+    if (fwd) return String(fwd).split(',')[0].trim();
+    return (req.ip || req.connection?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+}
+
+// ─── Kiểm tra IP có bị block ───
+async function checkIpBlocked(ip) {
+    try {
+        const pool = await getPool();
+        const r = await pool.request()
+            .input('ip', sql.VarChar(50), ip)
+            .query(`SELECT ip, blocked_until, reason
+                    FROM IP_BLOCKLIST
+                    WHERE ip = @ip AND blocked_until > GETDATE()`);
+        if (r.recordset.length > 0) {
+            return { blocked: true, ...r.recordset[0] };
+        }
+        // Cleanup record hết hạn
+        await pool.request()
+            .input('ip', sql.VarChar(50), ip)
+            .query(`DELETE FROM IP_BLOCKLIST WHERE ip = @ip AND blocked_until <= GETDATE()`);
+        return { blocked: false };
+    } catch (err) {
+        console.error('[checkIpBlocked]', err.message);
+        return { blocked: false };
+    }
+}
+
+// ─── Ghi log login attempt ───
+async function writeLoginAttempt({ ip, username, result }) {
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input('ip',       sql.VarChar(50),  ip)
+            .input('username', sql.NVarChar(50), username || null)
+            .input('result',   sql.VarChar(30),  result)
+            .query(`INSERT INTO LOGIN_ATTEMPT (ip, username, result)
+                    VALUES (@ip, @username, @result)`);
+    } catch (err) {
+        console.error('[writeLoginAttempt]', err.message);
+    }
+}
+
+// ─── Đếm USERNAME_NOT_FOUND từ IP → block nếu vượt ngưỡng ───
+async function checkAndBlockIp(ip) {
+    try {
+        const pool = await getPool();
+        const r = await pool.request()
+            .input('ip', sql.VarChar(50), ip)
+            .input('window', sql.Int, IPBLOCK_WINDOW_MINUTES)
+            .query(`SELECT COUNT(*) AS n FROM LOGIN_ATTEMPT
+                    WHERE ip = @ip
+                      AND result = 'USERNAME_NOT_FOUND'
+                      AND attempted_at >= DATEADD(MINUTE, -@window, GETDATE())`);
+
+        const count = r.recordset[0].n;
+        if (count >= IPBLOCK_MAX_ATTEMPTS) {
+            const until = new Date(Date.now() + IPBLOCK_DURATION_MINUTES * 60000);
+            await pool.request()
+                .input('ip',     sql.VarChar(50),   ip)
+                .input('until',  sql.DateTime,      until)
+                .input('reason', sql.NVarChar(200), `Dò username ${count} lần trong ${IPBLOCK_WINDOW_MINUTES} phút`)
+                .query(`MERGE IP_BLOCKLIST AS target
+                        USING (SELECT @ip AS ip) AS src
+                        ON target.ip = src.ip
+                        WHEN MATCHED THEN
+                            UPDATE SET blocked_until = @until, reason = @reason, blocked_at = GETDATE()
+                        WHEN NOT MATCHED THEN
+                            INSERT (ip, blocked_until, reason) VALUES (@ip, @until, @reason);`);
+            console.warn(`[IPBLOCK] Đã chặn IP ${ip} trong ${IPBLOCK_DURATION_MINUTES} phút (${count} lần dò username)`);
+            return true;
+        }
+        return false;
+    } catch (err) {
+        console.error('[checkAndBlockIp]', err.message);
+        return false;
+    }
+}
+;
 
 // ─── SPA Fallback: mọi request GET/HEAD điều hướng giao diện trả về index.html ───
 app.use((req, res, next) => {

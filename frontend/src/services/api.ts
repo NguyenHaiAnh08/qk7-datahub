@@ -1,5 +1,6 @@
 import { authService } from './authService';
 import { documentService } from './documentService';
+import { fileService } from './fileService';
 import { userService } from './userService';
 import { roleService } from './roleService';
 import { permissionService } from './permissionService';
@@ -15,6 +16,7 @@ import { systemService } from './systemService';
 export const api = {
   ...authService,
   ...documentService,
+  ...fileService,
   ...userService,
   ...roleService,
   ...permissionService,

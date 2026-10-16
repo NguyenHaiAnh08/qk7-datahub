@@ -8,12 +8,22 @@ import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
 import { usersApi } from '../services/usersApi';
 import { dashboardApi } from '../services/dashboardApi';
-import { User, Unit, SecurityLevel } from '../types';
+import {
+  User,
+  Unit,
+  SecurityLevel,
+  Role,
+  MilitaryRank,
+  MilitaryPosition,
+} from '../types';
 
 export const UsersPage: React.FC = () => {
   const [usersList, setUsersList] = useState<User[]>([]);
   const [unitsList, setUnitsList] = useState<Unit[]>([]);
   const [levelsList, setLevelsList] = useState<SecurityLevel[]>([]);
+  const [rolesList, setRolesList] = useState<Role[]>([]);
+  const [ranksList, setRanksList] = useState<MilitaryRank[]>([]);
+  const [positionsList, setPositionsList] = useState<MilitaryPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [userSearch, setUserSearch] = useState('');
 
@@ -50,14 +60,19 @@ export const UsersPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [uRes, unitRes, lvlRes] = await Promise.all([
+      const [uRes, unitRes, lvlRes, roleRes, metaRes] = await Promise.all([
         usersApi.getUsers(),
         dashboardApi.getUnits(),
-        dashboardApi.getSecurityLevels()
+        dashboardApi.getSecurityLevels(),
+        dashboardApi.getRoles(),
+        dashboardApi.getMeta(),
       ]);
       setUsersList(uRes.items || []);
       setUnitsList(unitRes.items || []);
       setLevelsList(lvlRes.items || []);
+      setRolesList(roleRes.items || []);
+      setRanksList((metaRes as any).ranks || []);
+      setPositionsList((metaRes as any).positions || []);
     } catch (err: any) {
       showToast('Lỗi tải dữ liệu quân nhân: ' + err.message, 'error');
     } finally {
@@ -101,7 +116,8 @@ export const UsersPage: React.FC = () => {
         (u.full_name || '').toLowerCase().includes(q) ||
         (u.rank_name || '').toLowerCase().includes(q) ||
         (u.position || '').toLowerCase().includes(q) ||
-        (u.unit_name || '').toLowerCase().includes(q)
+        (u.unit_name || '').toLowerCase().includes(q) ||
+        (u.role_names || []).some((rn) => rn.toLowerCase().includes(q))
     );
   }, [usersList, userSearch]);
 
@@ -121,7 +137,7 @@ export const UsersPage: React.FC = () => {
               <span>Danh Sách Quân Nhân & Cán Bộ</span>
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Phân cấp mức độ bảo mật (Cấp 1 - 5), tài khoản xác thực và đơn vị công tác
+              Phân cấp độ bảo mật (Cấp 1 - 5), tài khoản xác thực và đơn vị công tác
             </p>
           </div>
 
@@ -180,6 +196,9 @@ export const UsersPage: React.FC = () => {
         user={selectedUser}
         units={unitsList}
         securityLevels={levelsList}
+        roles={rolesList}
+        ranks={ranksList}
+        positions={positionsList}
         existingUsers={usersList}
         onClose={() => {
           setUserModalOpen(false);

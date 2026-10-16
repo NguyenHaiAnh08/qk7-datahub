@@ -13,6 +13,15 @@ export const API_ENDPOINTS = {
   SYSTEM: {
     HEALTH: '/api/health',
     META: '/api/meta',
+    TEST_HTTP_ERROR: (code: number) => `/api/test-http-error/${code}`,
+  },
+
+  // Files (PDF streaming & downloads - Swagger: GET /api/files/{fileId}/view)
+  FILES: {
+    VIEW: (fileId: string, download: '0' | '1' | boolean = '0') => {
+      const dl = typeof download === 'boolean' ? (download ? '1' : '0') : download;
+      return `/api/files/${encodeURIComponent(fileId)}/view?download=${dl}`;
+    },
   },
 
   // Documents
@@ -22,8 +31,10 @@ export const API_ENDPOINTS = {
     UPLOAD: '/api/documents/upload',
     UPDATE: (fileId: string) => `/api/documents/${encodeURIComponent(fileId)}`,
     DELETE: (fileId: string) => `/api/documents/${encodeURIComponent(fileId)}`,
-    VIEW: (fileId: string, download = false) =>
-      `/api/files/${encodeURIComponent(fileId)}/view${download ? '?download=1' : ''}`,
+    VIEW: (fileId: string, download: '0' | '1' | boolean = '0') => {
+      const dl = typeof download === 'boolean' ? (download ? '1' : '0') : download;
+      return `/api/files/${encodeURIComponent(fileId)}/view?download=${dl}`;
+    },
   },
 
   // Access Logs
@@ -47,5 +58,9 @@ export const API_ENDPOINTS = {
     DOCUMENT_TYPE_DETAIL: (typeId: string) => `/api/admin/document-types/${encodeURIComponent(typeId)}`,
     SECURITY_LEVELS: '/api/admin/security-levels',
     SECURITY_LEVEL_DETAIL: (levelId: number | string) => `/api/admin/security-levels/${encodeURIComponent(String(levelId))}`,
+    RANKS: '/api/admin/ranks',
+    RANK_DETAIL: (rankId: string) => `/api/admin/ranks/${encodeURIComponent(rankId)}`,
+    POSITIONS: '/api/admin/positions',
+    POSITION_DETAIL: (positionId: string) => `/api/admin/positions/${encodeURIComponent(positionId)}`,
   },
 } as const;

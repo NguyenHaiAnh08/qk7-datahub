@@ -710,16 +710,6 @@ export const AdminDashboardPage: React.FC = () => {
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <button
                               onClick={() => {
-                                loadUsers();
-                                setAssignRoleModal({ open: true, selectedRole: r });
-                              }}
-                              className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-600 dark:bg-purple-950/50 dark:hover:bg-purple-900/70 dark:text-purple-400 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                              title={`Gán vai trò "${r.name}" cho người dùng`}
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
                                 setGenericFormData({ ...r });
                                 setGenericModal({ open: true, type: 'roles', item: r });
                               }}

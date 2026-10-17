@@ -28,6 +28,7 @@ const IPBLOCK_DURATION_MINUTES = parseInt(process.env.IPBLOCK_DURATION_MINUTES |
 
 app.use(cors());
 app.use(express.json());
+app.disable('x-powered-by');   // tắt header X-Powered-By để tránh lộ thông tin server
 
 // Đảm bảo mọi response text trả UTF-8
 app.use((req, res, next) => {
@@ -98,8 +99,18 @@ const upload = multer({
     }
 });
 
-// ─── Middleware user ───
+// ─── Middleware user + chống cache API ───
 app.use('/api', (req, res, next) => {
+    // ═══════════════════════════════════════════════════════════════
+    // Chống 304 cho API — mọi response /api đều 200
+    // Static files (JS/CSS/font) KHÔNG bị ảnh hưởng → vẫn cache bình thường
+    // ═══════════════════════════════════════════════════════════════
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.removeHeader('ETag');           // Xóa ETag nếu có
+    res.removeHeader('Last-Modified');  // Xóa Last-Modified nếu có
+
     // Bỏ qua auth login (không cần user)
     if (req.path.startsWith('/auth/login')) return next();
 
@@ -1108,6 +1119,42 @@ async function start() {
         console.log(`  PDF root: ${PDF_ROOT}`);
         console.log('');
     });
+
+
+
+
+// Thử nghiệm - Test PDF parsing
+// ============================================================
+// 9. PARSE PDF (trích xuất metadata & text)
+// ============================================================
+const { parseDocumentPdf } = require('./pdf-parser');
+
+app.post('/api/documents/parse', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
+        }
+
+        const result = await parseDocumentPdf(req.file.buffer, { sql, getPool });
+
+        res.json({
+            ...result,
+            original_name: req.file.originalname,
+            file_size: req.file.size,
+            sha256: crypto.createHash('sha256').update(req.file.buffer).digest('hex'),
+        });
+    } catch (err) {
+        console.error('[POST /api/documents/parse]', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+
+
+
+
+
+
 }
 
 start();

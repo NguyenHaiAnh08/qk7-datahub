@@ -367,7 +367,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, rank_name: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
-                  <option value="">-- Chọn cấp bậc --</option>
+                  <option value=""> Chọn cấp bậc </option>
                   {formData.rank_name && !availableRanks.some((r) => r.name === formData.rank_name) && (
                     <option value={formData.rank_name}>{formData.rank_name}</option>
                   )}
@@ -386,7 +386,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
-                  <option value="">-- Chọn chức vụ --</option>
+                  <option value=""> Chọn chức vụ </option>
                   {formData.position && !availablePositions.some((p) => p.name === formData.position) && (
                     <option value={formData.position}>{formData.position}</option>
                   )}
@@ -407,7 +407,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
-                  <option value="">-- Chọn đơn vị --</option>
+                  <option value=""> Chọn đơn vị </option>
                   {units.map((u) => (
                     <option key={u.unit_id} value={u.unit_id}>
                       {u.name}
@@ -428,10 +428,10 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   required
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
-                  <option value="">-- Chọn độ bảo mật --</option>
+                  <option value=""> Chọn độ bảo mật </option>
                   {securityLevels.map((lvl) => (
                     <option key={lvl.level_id} value={lvl.level_id}>
-                      {lvl.name} (Cấp {lvl.level_id})
+                      {lvl.name} 
                     </option>
                   ))}
                 </select>
@@ -446,10 +446,10 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
                 >
-                  <option value="">-- Chọn vai trò (Role) --</option>
+                  <option value=""> Chọn vai trò</option>
                   {availableRoles.map((r) => (
                     <option key={r.role_id} value={r.role_id}>
-                      {r.name} ({r.role_id})
+                      {r.name} 
                     </option>
                   ))}
                 </select>
@@ -462,9 +462,9 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 text-xs"
                 >
-                  <option value="active">Hoạt động (active)</option>
-                  <option value="locked">Khóa tạm thời (locked)</option>
-                  <option value="inactive">Ngừng sử dụng (inactive)</option>
+                  <option value="active">Hoạt động</option>
+                  <option value="locked">Khóa tạm thời</option>
+                  <option value="inactive">Ngừng sử dụng</option>
                 </select>
               </div>
             </div>

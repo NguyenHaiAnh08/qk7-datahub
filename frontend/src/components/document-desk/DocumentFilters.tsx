@@ -41,9 +41,38 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   onReset,
   onRefresh,
 }) => {
+  // Nhóm đơn vị theo cấu trúc cha - con trực quan
+  const groupedUnits = React.useMemo(() => {
+    const parentMap = new Map<string, { parent: Unit; children: Unit[] }>();
+    const roots: { parent: Unit; children: Unit[] }[] = [];
+
+    for (const u of units) {
+      if (!u.parent_id) {
+        const item = { parent: u, children: [] };
+        parentMap.set(u.unit_id, item);
+        roots.push(item);
+      }
+    }
+
+    for (const u of units) {
+      if (u.parent_id && parentMap.has(u.parent_id)) {
+        parentMap.get(u.parent_id)!.children.push(u);
+      } else if (u.parent_id && !parentMap.has(u.parent_id)) {
+        roots.push({ parent: u, children: [] });
+      }
+    }
+
+    roots.sort((a, b) => a.parent.name.localeCompare(b.parent.name, 'vi'));
+    for (const r of roots) {
+      r.children.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    }
+
+    return roots;
+  }, [units]);
+
   return (
     <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3.5 shadow-sm transition-colors duration-200">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {/* Search Input */}
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
@@ -77,14 +106,27 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <select
             value={selectedUnit}
             onChange={(e) => onUnitChange(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition cursor-pointer"
           >
             <option value="">Tất cả đơn vị ban hành</option>
-            {units.map((u) => (
-              <option key={u.unit_id} value={u.unit_id}>
-                {u.name}
-              </option>
-            ))}
+            {groupedUnits.map((group) =>
+              group.children.length > 0 ? (
+                <optgroup key={group.parent.unit_id} label={`🏢 ${group.parent.name}`}>
+                  <option value={group.parent.unit_id}>
+                    {group.parent.name} (Cơ quan chỉ huy)
+                  </option>
+                  {group.children.map((c) => (
+                    <option key={c.unit_id} value={c.unit_id}>
+                      &nbsp;&nbsp;└─ {c.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : (
+                <option key={group.parent.unit_id} value={group.parent.unit_id}>
+                  {group.parent.name}
+                </option>
+              )
+            )}
           </select>
         </div>
 
@@ -95,10 +137,10 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
             onChange={(e) => onLevelChange(Number(e.target.value))}
             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
           >
-            <option value={5}>Mọi mức bảo mật (≤ Cấp 5)</option>
+            <option value={0}>Mức bảo mật</option>
             {levels.map((l) => (
               <option key={l.level_id} value={l.level_id}>
-                Chỉ xem ≤ {l.name} (Cấp {l.level_id})
+                {l.name}
               </option>
             ))}
           </select>
@@ -106,26 +148,30 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
       </div>
 
       {/* Date Filters & Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800/80">
-        <div className="flex items-center space-x-2 text-xs">
-          <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-          <span className="text-slate-600 dark:text-slate-400 text-[11px]">Từ ngày:</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => onDateFromChange(e.target.value)}
-            className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
-          />
-          <span className="text-slate-600 dark:text-slate-400 text-[11px]">Đến:</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => onDateToChange(e.target.value)}
-            className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
-          />
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2.5 border-t border-slate-200 dark:border-slate-800/80">
+        <div className="flex flex-wrap items-center gap-2.5 text-xs">
+          <div className="flex items-center space-x-1.5">
+            <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+            <span className="text-slate-600 dark:text-slate-400 text-[11px] shrink-0">Từ ngày:</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => onDateFromChange(e.target.value)}
+              className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div className="flex items-center space-x-1.5">
+            <span className="text-slate-600 dark:text-slate-400 text-[11px] shrink-0">Đến:</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => onDateToChange(e.target.value)}
+              className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center space-x-2 justify-end">
+        <div className="flex items-center gap-2 justify-end shrink-0">
           <button
             type="button"
             onClick={onReset}

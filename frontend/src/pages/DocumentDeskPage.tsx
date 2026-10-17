@@ -24,7 +24,7 @@ export const DocumentDeskPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('');
-  const [selectedLevel, setSelectedLevel] = useState<number>(user?.clearance_level_id || 5);
+  const [selectedLevel, setSelectedLevel] = useState<number>(0);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
@@ -59,12 +59,9 @@ export const DocumentDeskPage: React.FC = () => {
       .getMeta()
       .then((res) => {
         setMeta(res);
-        if (user) {
-          setSelectedLevel(user.clearance_level_id);
-        }
       })
       .catch((err) => console.error('[loadMeta]', err));
-  }, [user]);
+  }, []);
 
   // Load Documents
   const loadDocuments = async () => {
@@ -100,7 +97,7 @@ export const DocumentDeskPage: React.FC = () => {
     setSearchQuery('');
     setSelectedType('');
     setSelectedUnit('');
-    setSelectedLevel(user?.clearance_level_id || 5);
+    setSelectedLevel(0);
     setDateFrom('');
     setDateTo('');
     showToast('Đã làm mới các bộ lọc', 'info');
@@ -173,7 +170,7 @@ export const DocumentDeskPage: React.FC = () => {
       />
 
       {/* Main Container */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+      <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
         {/* Top Action & Title Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>

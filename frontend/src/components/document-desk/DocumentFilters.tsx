@@ -72,7 +72,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
 
   return (
     <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3.5 shadow-sm transition-colors duration-200">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {/* Search Input */}
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
@@ -148,26 +148,30 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
       </div>
 
       {/* Date Filters & Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800/80">
-        <div className="flex items-center space-x-2 text-xs">
-          <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-          <span className="text-slate-600 dark:text-slate-400 text-[11px]">Từ ngày:</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => onDateFromChange(e.target.value)}
-            className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
-          />
-          <span className="text-slate-600 dark:text-slate-400 text-[11px]">Đến:</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => onDateToChange(e.target.value)}
-            className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
-          />
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2.5 border-t border-slate-200 dark:border-slate-800/80">
+        <div className="flex flex-wrap items-center gap-2.5 text-xs">
+          <div className="flex items-center space-x-1.5">
+            <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+            <span className="text-slate-600 dark:text-slate-400 text-[11px] shrink-0">Từ ngày:</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => onDateFromChange(e.target.value)}
+              className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div className="flex items-center space-x-1.5">
+            <span className="text-slate-600 dark:text-slate-400 text-[11px] shrink-0">Đến:</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => onDateToChange(e.target.value)}
+              className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center space-x-2 justify-end">
+        <div className="flex items-center gap-2 justify-end shrink-0">
           <button
             type="button"
             onClick={onReset}

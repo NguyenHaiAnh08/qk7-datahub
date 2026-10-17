@@ -505,7 +505,7 @@ export const AdminDashboardPage: React.FC = () => {
         )}
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-6">
+        <main className="flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-5 lg:p-6 xl:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-6">
           {/* Mobile Menu Bar */}
           <div className="lg:hidden flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800/80">
             <button
@@ -520,7 +520,7 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <LayoutDashboard className="w-5 h-5 text-amber-400" /> Tổng Quan Hệ Thống
@@ -532,14 +532,14 @@ export const AdminDashboardPage: React.FC = () => {
                     await loadStats();
                     showToast('Đã làm mới dữ liệu tổng quan!', 'success');
                   }}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0"
                 >
                   <RotateCw className="w-3.5 h-3.5" /> Làm mới
                 </button>
               </div>
 
               {/* KPI Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4">
                 <StatCard
                   label="Quân nhân & Người dùng"
                   value={stats?.users ?? '—'}
@@ -574,7 +574,7 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
 
               {/* Distribution Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <DistributionChart
                   title="Phân Bố Tài Liệu Theo Mức Bảo Mật"
                   icon={<Shield className="w-4 h-4 text-amber-400" />}
@@ -663,14 +663,14 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: ROLES */}
           {activeTab === 'roles' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <KeyRound className="w-5 h-5 text-amber-400" /> Quản Lý Vai Trò (Roles)
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">Phân quyền vai trò chức năng hệ thống</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => {
                       loadUsers();
@@ -693,52 +693,54 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                    <tr>
-                      <th className="py-3 px-4">Mã Role</th>
-                      <th className="py-3 px-4">Tên vai trò</th>
-                      <th className="py-3 px-4 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                    {rolesList.map((r) => (
-                      <tr key={r.role_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.role_id}</td>
-                        <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => {
-                              loadUsers();
-                              setAssignRoleModal({ open: true, selectedRole: r });
-                            }}
-                            className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-600 dark:bg-purple-950/50 dark:hover:bg-purple-900/70 dark:text-purple-400 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                            title={`Gán vai trò "${r.name}" cho người dùng`}
-                          >
-                            <UserCheck className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setGenericFormData({ ...r });
-                              setGenericModal({ open: true, type: 'roles', item: r });
-                            }}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                            title="Sửa vai trò"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                            title="Xóa vai trò"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[500px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                      <tr>
+                        <th className="py-3 px-4">Mã Role</th>
+                        <th className="py-3 px-4">Tên vai trò</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                      {rolesList.map((r) => (
+                        <tr key={r.role_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.role_id}</td>
+                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                loadUsers();
+                                setAssignRoleModal({ open: true, selectedRole: r });
+                              }}
+                              className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-600 dark:bg-purple-950/50 dark:hover:bg-purple-900/70 dark:text-purple-400 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              title={`Gán vai trò "${r.name}" cho người dùng`}
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setGenericFormData({ ...r });
+                                setGenericModal({ open: true, type: 'roles', item: r });
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              title="Sửa vai trò"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              title="Xóa vai trò"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -746,7 +748,7 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: PERMISSIONS */}
           {activeTab === 'permissions' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <ShieldAlert className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Sách Quyền (Permissions)
@@ -758,7 +760,7 @@ export const AdminDashboardPage: React.FC = () => {
                     await loadPermissions();
                     showToast('Đã làm mới danh sách quyền!', 'success');
                   }}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0"
                   title="Làm mới quyền"
                 >
                   <RotateCw className="w-3.5 h-3.5" /> Làm mới
@@ -766,34 +768,36 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                    <tr>
-                      <th className="py-3 px-4">Mã Quyền</th>
-                      <th className="py-3 px-4">Tên quyền</th>
-                      <th className="py-3 px-4">Mô tả</th>
-                      <th className="py-3 px-4 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                    {permsList.map((p) => (
-                      <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.permission_id}</td>
-                        <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name || p.code || p.permission_id}</td>
-                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                            title="Xóa quyền"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                      <tr>
+                        <th className="py-3 px-4">Mã Quyền</th>
+                        <th className="py-3 px-4">Tên quyền</th>
+                        <th className="py-3 px-4">Mô tả</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                      {permsList.map((p) => (
+                        <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.permission_id}</td>
+                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name || p.code || p.permission_id}</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              title="Xóa quyền"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -801,7 +805,7 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: UNITS */}
           {activeTab === 'units' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Building className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Đơn Vị Quân Khu
@@ -813,51 +817,53 @@ export const AdminDashboardPage: React.FC = () => {
                     setGenericFormData({ unit_id: '', name: '', parent_id: '' });
                     setGenericModal({ open: true, type: 'units', item: null });
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" /> Thêm đơn vị
                 </button>
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                    <tr>
-                      <th className="py-3 px-4">Mã Đơn Vị</th>
-                      <th className="py-3 px-4">Tên đơn vị</th>
-                      <th className="py-3 px-4">Đơn vị cấp trên</th>
-                      <th className="py-3 px-4 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                    {unitsList.map((u) => (
-                      <tr key={u.unit_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{u.unit_id}</td>
-                        <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{u.name}</td>
-                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{u.parent_id || '—'}</td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => {
-                              setGenericFormData({ ...u });
-                              setGenericModal({ open: true, type: 'units', item: u });
-                            }}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                            title="Sửa đơn vị"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleGenericDelete('units', u.unit_id, u.name)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                            title="Xóa đơn vị"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                      <tr>
+                        <th className="py-3 px-4">Mã Đơn Vị</th>
+                        <th className="py-3 px-4">Tên đơn vị</th>
+                        <th className="py-3 px-4">Đơn vị cấp trên</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                      {unitsList.map((u) => (
+                        <tr key={u.unit_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{u.unit_id}</td>
+                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{u.name}</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{u.parent_id || '—'}</td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                setGenericFormData({ ...u });
+                                setGenericModal({ open: true, type: 'units', item: u });
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              title="Sửa đơn vị"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleGenericDelete('units', u.unit_id, u.name)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              title="Xóa đơn vị"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -865,7 +871,7 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: DOCTYPES */}
           {activeTab === 'doctypes' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <FileText className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Thể Loại Văn Bản
@@ -877,51 +883,53 @@ export const AdminDashboardPage: React.FC = () => {
                     setGenericFormData({ type_id: '', name: '', description: '' });
                     setGenericModal({ open: true, type: 'doctypes', item: null });
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" /> Thêm loại văn bản
                 </button>
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                    <tr>
-                      <th className="py-3 px-4">Mã Loại</th>
-                      <th className="py-3 px-4">Tên loại văn bản</th>
-                      <th className="py-3 px-4">Mô tả</th>
-                      <th className="py-3 px-4 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                    {docTypesList.map((dt) => (
-                      <tr key={dt.type_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{dt.type_id}</td>
-                        <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{dt.name}</td>
-                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{dt.description || '—'}</td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => {
-                              setGenericFormData({ ...dt });
-                              setGenericModal({ open: true, type: 'doctypes', item: dt });
-                            }}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                            title="Sửa loại văn bản"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleGenericDelete('doctypes', dt.type_id, dt.name)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                            title="Xóa loại văn bản"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                      <tr>
+                        <th className="py-3 px-4">Mã Loại</th>
+                        <th className="py-3 px-4">Tên loại văn bản</th>
+                        <th className="py-3 px-4">Mô tả</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                      {docTypesList.map((dt) => (
+                        <tr key={dt.type_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{dt.type_id}</td>
+                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{dt.name}</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{dt.description || '—'}</td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                setGenericFormData({ ...dt });
+                                setGenericModal({ open: true, type: 'doctypes', item: dt });
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              title="Sửa loại văn bản"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleGenericDelete('doctypes', dt.type_id, dt.name)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              title="Xóa loại văn bản"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -929,7 +937,7 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: LEVELS */}
           {activeTab === 'levels' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Shield className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Cấp Độ Bảo Mật Dữ Liệu
@@ -941,51 +949,53 @@ export const AdminDashboardPage: React.FC = () => {
                     setGenericFormData({ level_id: 1, code: '', name: '' });
                     setGenericModal({ open: true, type: 'levels', item: null });
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" /> Thêm mức bảo mật
                 </button>
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                    <tr>
-                      <th className="py-3 px-4">Cấp Số</th>
-                      <th className="py-3 px-4">Mã ký hiệu</th>
-                      <th className="py-3 px-4">Tên mức độ mật</th>
-                      <th className="py-3 px-4 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                    {levelsList.map((lvl) => (
-                      <tr key={lvl.level_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-bold">Cấp {lvl.level_id}</td>
-                        <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{lvl.code}</td>
-                        <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{lvl.name}</td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => {
-                              setGenericFormData({ ...lvl });
-                              setGenericModal({ open: true, type: 'levels', item: lvl });
-                            }}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                            title="Sửa mức bảo mật"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleGenericDelete('levels', lvl.level_id, lvl.name)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                            title="Xóa mức bảo mật"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[500px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                      <tr>
+                        <th className="py-3 px-4">Cấp Số</th>
+                        <th className="py-3 px-4">Mã ký hiệu</th>
+                        <th className="py-3 px-4">Tên mức độ mật</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                      {levelsList.map((lvl) => (
+                        <tr key={lvl.level_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-bold">Cấp {lvl.level_id}</td>
+                          <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{lvl.code}</td>
+                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{lvl.name}</td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                setGenericFormData({ ...lvl });
+                                setGenericModal({ open: true, type: 'levels', item: lvl });
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              title="Sửa mức bảo mật"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleGenericDelete('levels', lvl.level_id, lvl.name)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              title="Xóa mức bảo mật"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -993,7 +1003,7 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: RANKS */}
           {activeTab === 'ranks' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Award className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Cấp Bậc Quân Hàm
@@ -1007,71 +1017,73 @@ export const AdminDashboardPage: React.FC = () => {
                     setGenericFormData({ rank_id: '', name: '', sort_order: 0 });
                     setGenericModal({ open: true, type: 'ranks', item: null });
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" /> Thêm cấp bậc
                 </button>
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                    <tr>
-                      <th className="py-3 px-4">Mã</th>
-                      <th className="py-3 px-4">Tên cấp bậc</th>
-                      <th className="py-3 px-4">Thứ tự</th>
-                      <th className="py-3 px-4">Trạng thái</th>
-                      <th className="py-3 px-4 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                    {ranksList.length === 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                          Chưa có cấp bậc nào
-                        </td>
+                        <th className="py-3 px-4">Mã</th>
+                        <th className="py-3 px-4">Tên cấp bậc</th>
+                        <th className="py-3 px-4">Thứ tự</th>
+                        <th className="py-3 px-4">Trạng thái</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
-                    ) : (
-                      ranksList.map((r) => (
-                        <tr key={r.rank_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.rank_id}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{r.sort_order ?? 0}</td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                r.active !== false
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
-                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
-                              }`}
-                            >
-                              {r.active !== false ? 'Đang dùng' : 'Đã ẩn'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => {
-                                setGenericFormData({ ...r });
-                                setGenericModal({ open: true, type: 'ranks', item: r });
-                              }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                              title="Sửa cấp bậc"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleGenericDelete('ranks', r.rank_id, r.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                              title="Xóa cấp bậc"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                      {ranksList.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            Chưa có cấp bậc nào
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        ranksList.map((r) => (
+                          <tr key={r.rank_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.rank_id}</td>
+                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{r.sort_order ?? 0}</td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  r.active !== false
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
+                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
+                                }`}
+                              >
+                                {r.active !== false ? 'Đang dùng' : 'Đã ẩn'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => {
+                                  setGenericFormData({ ...r });
+                                  setGenericModal({ open: true, type: 'ranks', item: r });
+                                }}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                                title="Sửa cấp bậc"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleGenericDelete('ranks', r.rank_id, r.name)}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                title="Xóa cấp bậc"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1079,7 +1091,7 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: POSITIONS */}
           {activeTab === 'positions' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Briefcase className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Chức Vụ
@@ -1093,71 +1105,73 @@ export const AdminDashboardPage: React.FC = () => {
                     setGenericFormData({ position_id: '', name: '', sort_order: 0 });
                     setGenericModal({ open: true, type: 'positions', item: null });
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" /> Thêm chức vụ
                 </button>
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                  <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                    <tr>
-                      <th className="py-3 px-4">Mã</th>
-                      <th className="py-3 px-4">Tên chức vụ</th>
-                      <th className="py-3 px-4">Thứ tự</th>
-                      <th className="py-3 px-4">Trạng thái</th>
-                      <th className="py-3 px-4 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                    {positionsList.length === 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                          Chưa có chức vụ nào
-                        </td>
+                        <th className="py-3 px-4">Mã</th>
+                        <th className="py-3 px-4">Tên chức vụ</th>
+                        <th className="py-3 px-4">Thứ tự</th>
+                        <th className="py-3 px-4">Trạng thái</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
-                    ) : (
-                      positionsList.map((p) => (
-                        <tr key={p.position_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.position_id}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name}</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.sort_order ?? 0}</td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                p.active !== false
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
-                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
-                              }`}
-                            >
-                              {p.active !== false ? 'Đang dùng' : 'Đã ẩn'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => {
-                                setGenericFormData({ ...p });
-                                setGenericModal({ open: true, type: 'positions', item: p });
-                              }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                              title="Sửa chức vụ"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleGenericDelete('positions', p.position_id, p.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                              title="Xóa chức vụ"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                      {positionsList.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            Chưa có chức vụ nào
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        positionsList.map((p) => (
+                          <tr key={p.position_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.position_id}</td>
+                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name}</td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.sort_order ?? 0}</td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  p.active !== false
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
+                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
+                                }`}
+                              >
+                                {p.active !== false ? 'Đang dùng' : 'Đã ẩn'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => {
+                                  setGenericFormData({ ...p });
+                                  setGenericModal({ open: true, type: 'positions', item: p });
+                                }}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                                title="Sửa chức vụ"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleGenericDelete('positions', p.position_id, p.name)}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                title="Xóa chức vụ"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

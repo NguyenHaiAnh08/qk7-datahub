@@ -282,35 +282,164 @@ html:not(.dark) textarea::placeholder {
 }
 
 /* ── QK7 TreeSelect Custom UI/UX for Unit Hierarchy ── */
-.qk7-treeselect .ant-select-selector {
-  border-radius: 0.75rem !important; /* rounded-xl */
-  padding: 3px 12px !important;
-  font-size: 0.8125rem !important;
+/* Đồng bộ 100% màu sắc, viền, bo góc và placeholder với các ô input khác trong Modal */
+.qk7-treeselect,
+.qk7-treeselect.ant-select,
+.unit-treeselect-wrapper .ant-select {
+  width: 100% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  border-radius: 0.75rem !important; /* rounded-xl (12px) */
+  font-size: 0.75rem !important; /* text-xs */
+  line-height: 1.25rem !important;
+  box-sizing: border-box !important;
   transition: all 0.2s ease-in-out !important;
 }
 
-html.dark .qk7-treeselect .ant-select-selector {
-  background-color: #020617 !important; /* slate-950 */
-  border-color: #334155 !important; /* slate-700 */
+/* Đảm bảo khung bên trong selector Ant Design (v5 và v6) khớp hoàn hảo */
+.qk7-treeselect .ant-select-selector,
+.unit-treeselect-wrapper .ant-select-selector {
+  border-radius: 0.75rem !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.qk7-treeselect .ant-select-content,
+.unit-treeselect-wrapper .ant-select-content {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
+/* Dark Mode: Đồng bộ màu bg-slate-950 (#020617) và border-slate-700 (#334155) */
+html.dark .qk7-treeselect,
+.dark .qk7-treeselect,
+.dark .unit-treeselect-wrapper .ant-select {
+  --ant-select-background-color: #020617 !important;
+  --ant-select-border-color: #334155 !important;
+  --ant-select-border-radius: 0.75rem !important;
+  --ant-select-height: 38px !important;
+  --ant-select-font-size: 0.75rem !important;
+  --ant-select-color: #f1f5f9 !important;
+  background-color: #020617 !important;
+  background: #020617 !important;
+  border: 1px solid #334155 !important;
   color: #f1f5f9 !important;
 }
 
-html.dark .qk7-treeselect:hover .ant-select-selector,
-html.dark .qk7-treeselect.ant-select-focused .ant-select-selector {
-  border-color: #722ED1 !important; /* Tím chuẩn quân khu */
-  box-shadow: 0 0 0 2px rgba(114, 46, 209, 0.25) !important;
+html.dark .qk7-treeselect .ant-select-selector,
+.dark .unit-treeselect-wrapper .ant-select-selector {
+  background-color: #020617 !important;
+  background: #020617 !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
 }
 
-html:not(.dark) .qk7-treeselect .ant-select-selector {
+/* Placeholder trong Dark Mode (text-slate-400 / #94a3b8) */
+html.dark .qk7-treeselect .ant-select-placeholder,
+html.dark .qk7-treeselect .ant-select-selection-placeholder,
+.dark .unit-treeselect-wrapper .ant-select-placeholder,
+.dark .unit-treeselect-wrapper .ant-select-selection-placeholder {
+  color: #94a3b8 !important;
+  font-size: 0.75rem !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Suffix icon / Arrow & Clear trong Dark Mode */
+html.dark .qk7-treeselect .ant-select-suffix,
+html.dark .qk7-treeselect .ant-select-arrow,
+.dark .unit-treeselect-wrapper .ant-select-suffix,
+.dark .unit-treeselect-wrapper .ant-select-arrow {
+  color: #64748b !important;
+}
+
+html.dark .qk7-treeselect .ant-select-selection-item,
+.dark .unit-treeselect-wrapper .ant-select-selection-item {
+  color: #f1f5f9 !important;
+  font-size: 0.75rem !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Light Mode: Đồng bộ màu bg-slate-50 (#f8fafc) và border-slate-300 (#cbd5e1) */
+html:not(.dark) .qk7-treeselect,
+html.light .qk7-treeselect,
+:not(.dark) .unit-treeselect-wrapper .ant-select {
+  --ant-select-background-color: #f8fafc !important;
+  --ant-select-border-color: #cbd5e1 !important;
+  --ant-select-border-radius: 0.75rem !important;
+  --ant-select-height: 38px !important;
+  --ant-select-font-size: 0.75rem !important;
+  --ant-select-color: #0f172a !important;
   background-color: #f8fafc !important;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .qk7-treeselect .ant-select-selector,
+:not(.dark) .unit-treeselect-wrapper .ant-select-selector {
+  background-color: #f8fafc !important;
+  background: #f8fafc !important;
   border-color: #cbd5e1 !important;
   color: #0f172a !important;
 }
 
-html:not(.dark) .qk7-treeselect:hover .ant-select-selector,
-html:not(.dark) .qk7-treeselect.ant-select-focused .ant-select-selector {
-  border-color: #722ED1 !important;
-  box-shadow: 0 0 0 2px rgba(114, 46, 209, 0.2) !important;
+/* Placeholder trong Light Mode (placeholder-slate-400 / #94a3b8) */
+html:not(.dark) .qk7-treeselect .ant-select-placeholder,
+html:not(.dark) .qk7-treeselect .ant-select-selection-placeholder,
+:not(.dark) .unit-treeselect-wrapper .ant-select-placeholder,
+:not(.dark) .unit-treeselect-wrapper .ant-select-selection-placeholder {
+  color: #94a3b8 !important;
+  font-size: 0.75rem !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Suffix icon / Arrow & Clear trong Light Mode */
+html:not(.dark) .qk7-treeselect .ant-select-suffix,
+html:not(.dark) .qk7-treeselect .ant-select-arrow,
+:not(.dark) .unit-treeselect-wrapper .ant-select-suffix,
+:not(.dark) .unit-treeselect-wrapper .ant-select-arrow {
+  color: #94a3b8 !important;
+}
+
+html:not(.dark) .qk7-treeselect .ant-select-selection-item,
+:not(.dark) .unit-treeselect-wrapper .ant-select-selection-item {
+  color: #0f172a !important;
+  font-size: 0.75rem !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Hover & Focus state: focus:border-emerald-500 (#10b981) */
+.qk7-treeselect:hover,
+.qk7-treeselect.ant-select:hover,
+.qk7-treeselect.ant-select-focused,
+.qk7-treeselect.ant-select-open,
+.unit-treeselect-wrapper .ant-select:hover,
+.unit-treeselect-wrapper .ant-select.ant-select-focused,
+.unit-treeselect-wrapper .ant-select.ant-select-open {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 1px #10b981 !important;
+}
+
+.qk7-treeselect:hover .ant-select-selector,
+.qk7-treeselect.ant-select-focused .ant-select-selector,
+.unit-treeselect-wrapper .ant-select:hover .ant-select-selector,
+.unit-treeselect-wrapper .ant-select.ant-select-focused .ant-select-selector {
+  border-color: #10b981 !important;
 }
 
 /* TreeSelect Dropdown Popup */

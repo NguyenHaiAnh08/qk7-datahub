@@ -70,27 +70,33 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
 
         {/* Metadata Details */}
         <div className="space-y-1.5 text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/80 pt-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400 dark:text-slate-500">Thể loại:</span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[140px]">
+          <div className="flex items-start justify-between gap-2.5">
+            <span className="text-slate-400 dark:text-slate-500 shrink-0">Thể loại:</span>
+            <span
+              className="text-slate-700 dark:text-slate-300 font-medium text-right flex-1 break-normal leading-snug"
+              title={document.doc_type_name || document.type_name}
+            >
               {document.doc_type_name || document.type_name || '—'}
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400 dark:text-slate-500">Đơn vị:</span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[140px]">
+          <div className="flex items-start justify-between gap-2.5">
+            <span className="text-slate-400 dark:text-slate-500 shrink-0">Đơn vị:</span>
+            <span
+              className="text-slate-700 dark:text-slate-300 font-medium text-right flex-1 break-normal leading-snug"
+              title={document.unit_name}
+            >
               {document.unit_name || '—'}
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400 dark:text-slate-500">Ngày BH:</span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">
+          <div className="flex items-center justify-between gap-2.5">
+            <span className="text-slate-400 dark:text-slate-500 shrink-0">Ngày BH:</span>
+            <span className="text-slate-700 dark:text-slate-300 font-medium text-right">
               {formatDate(document.issued_date || document.issue_date)}
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400 dark:text-slate-500">Dung lượng:</span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">
+          <div className="flex items-center justify-between gap-2.5">
+            <span className="text-slate-400 dark:text-slate-500 shrink-0">Dung lượng:</span>
+            <span className="text-slate-700 dark:text-slate-300 font-medium text-right">
               {formatFileSize(document.file_size ?? document.file_size_bytes)}
             </span>
           </div>

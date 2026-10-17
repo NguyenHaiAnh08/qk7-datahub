@@ -324,7 +324,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                         type={showPassword ? 'text' : 'password'}
                         value={formData.password || ''}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        placeholder="Mặc định: Abc@12345"
+                        placeholder="Mặc định: 123456789"
                         required
                         minLength={8}
                         className="w-full h-9 pl-3 pr-14 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 font-mono text-xs"

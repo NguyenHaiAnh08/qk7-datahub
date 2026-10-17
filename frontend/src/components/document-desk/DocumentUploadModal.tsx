@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Loader2, FileText, Sparkles, AlertCircle, Plus, Minus } from 'lucide-react';
+import { X, Save, Loader2, FileText, Sparkles, AlertCircle, Plus, Minus, CheckCircle2, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { TreeSelect } from 'antd';
 import { Dropzone } from './Dropzone';
 import { DocumentItem, DocumentType, Unit, SecurityLevel } from '../../types';
@@ -42,6 +42,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // ── Cây đơn vị cho TreeSelect ──
   const unitTree = React.useMemo(() => buildUnitTree(units), [units]);
@@ -78,6 +79,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setSelectedFile(null);
     }
     setError('');
+    setShowConfirmModal(false);
     // Reset parse state khi modal đóng/mở
     setParseResult(null);
     setParseError('');
@@ -148,25 +150,77 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   if (!open) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ── Kiểm tra điền đủ các trường bắt buộc ──
+  // Bắt buộc: Tệp (khi tạo mới), Số hiệu, Người ký, Trích yếu, Loại VB, Đơn vị, Độ mật, Ngày ban hành
+  const isFormValid = Boolean(
+    (isEdit || selectedFile) &&
+    code.trim() &&
+    signer.trim() &&
+    title.trim() &&
+    typeId &&
+    unitId &&
+    securityLevel !== '' &&
+    issueDate
+  );
+
+  // Tên hiển thị phục vụ bước xác nhận
+  const selectedType = types.find((t) => t.type_id === typeId);
+  const selectedTypeName = selectedType ? selectedType.name : typeId;
+
+  const selectedUnit = units.find((u) => u.unit_id === unitId);
+  const selectedUnitName = selectedUnit ? selectedUnit.name : unitId;
+
+  const selectedLevel = levels.find((l) => l.level_id === Number(securityLevel));
+  const selectedSecurityLevelName = selectedLevel ? selectedLevel.name : '';
+
+  const formatDateDisplay = (dStr: string) => {
+    if (!dStr) return '—';
+    try {
+      const [y, m, d] = dStr.split('-');
+      if (y && m && d) return `${d}/${m}/${y}`;
+      return dStr;
+    } catch {
+      return dStr;
+    }
+  };
+
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const getSecurityBadgeClass = (name: string) => {
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('tuyệt mật')) {
+      return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30';
+    }
+    if (lower.includes('tối mật')) {
+      return 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30';
+    }
+    if (lower.includes('mật')) {
+      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+    }
+    return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+  };
+
+  // ── Mở modal xác nhận ──
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!isEdit && !selectedFile) {
-      setError('Vui lòng chọn tệp văn bản đính kèm!');
+    if (!isFormValid) {
+      setError('Vui lòng điền đầy đủ tất cả các trường dữ liệu bắt buộc (*)!');
       return;
     }
 
-    if (!code.trim() || !title.trim()) {
-      setError('Vui lòng nhập đầy đủ Số hiệu và Trích yếu văn bản!');
-      return;
-    }
+    setShowConfirmModal(true);
+  };
 
-    if (!securityLevel) {
-      setError('Vui lòng chọn Độ mật bảo quản cho văn bản!');
-      return;
-    }
-
+  // ── Thực hiện lưu sau khi xác nhận ──
+  const executeSave = async () => {
+    setError('');
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -180,7 +234,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         formData.append('issuing_unit_id', unitId);
         formData.append('unit_id', unitId);
       }
-      if (securityLevel) {
+      if (securityLevel !== '') {
         formData.append('security_level_id', String(securityLevel));
       }
       if (signer) formData.append('signer', signer.trim());
@@ -198,10 +252,12 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       if (onToast) {
         onToast(isEdit ? `Đã cập nhật văn bản ${code} thành công!` : `Đã tiếp nhận văn bản ${code} thành công!`, 'success');
       }
+      setShowConfirmModal(false);
       onClose();
     } catch (err: any) {
       console.error('[DocumentUploadModal]', err);
       setError(err.message || 'Thao tác không thành công, vui lòng thử lại!');
+      setShowConfirmModal(false);
     } finally {
       setSubmitting(false);
     }
@@ -252,7 +308,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             {/* Dropzone */}
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">
-                Tệp văn bản {isEdit ? '(Chọn tệp mới nếu muốn thay thế tệp cũ)' : '*'}
+                Tệp văn bản {isEdit ? '(Chọn tệp mới nếu muốn thay thế tệp cũ)' : <span className="text-rose-500 font-bold">*</span>}
               </label>
               <Dropzone selectedFile={selectedFile} onFileSelect={setSelectedFile} />
             </div>
@@ -295,21 +351,20 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  Số hiệu / Ký hiệu văn bản *
+                  Số hiệu / Ký hiệu văn bản <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="Ví dụ: 125/QĐ-QK7"
-                  required
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  Người ký ban hành
+                  Người ký ban hành <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -323,14 +378,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                Trích yếu nội dung văn bản *
+                Trích yếu nội dung văn bản <span className="text-rose-500 font-bold">*</span>
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Về việc chỉ đạo triển khai kế hoạch bảo đảm an toàn..."
-                required
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
               />
             </div>
@@ -338,7 +392,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  Loại văn bản
+                  Loại văn bản <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <select
                   value={typeId}
@@ -360,7 +414,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  Đơn vị ban hành
+                  Đơn vị ban hành <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <div
                   className="unit-treeselect-wrapper"
@@ -417,14 +471,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  Độ mật bảo quản *
+                  Độ mật bảo quản <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <select
                   value={securityLevel}
                   onChange={(e) => setSecurityLevel(e.target.value ? Number(e.target.value) : '')}
-                  required
                   className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors ${
-                    securityLevel ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
+                    securityLevel !== '' ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
                   }`}
                 >
                   <option value="" className="text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900">
@@ -442,7 +495,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  Ngày ban hành
+                  Ngày ban hành <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="date"
@@ -456,7 +509,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  Tóm tắt ghi chú
+                  Tóm tắt ghi chú <span className="text-slate-400 font-normal text-[11px]">(tùy chọn)</span>
                 </label>
                 <input
                   type="text"
@@ -468,35 +521,198 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-md shadow-emerald-600/30"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Đang lưu...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{isEdit ? 'Cập nhật văn bản' : 'Lưu trữ văn bản'}</span>
-                  </>
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <div>
+                {!isFormValid && (
+                  <span className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Chưa điền đủ thông tin bắt buộc (*)</span>
+                  </span>
                 )}
-              </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isFormValid || submitting}
+                  className={`px-4 py-2 font-bold rounded-xl flex items-center gap-1.5 transition ${
+                    isFormValid
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-md shadow-emerald-600/30'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700/60 cursor-not-allowed shadow-none'
+                  }`}
+                  title={!isFormValid ? 'Vui lòng điền đầy đủ các thông tin bắt buộc (*)' : undefined}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang xử lý...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{isEdit ? 'Cập nhật văn bản' : 'Lưu trữ văn bản'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         </motion.div>
       </div>
+
+      {/* ── Bước xác nhận lại thông tin trước khi lưu chính thức ── */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] transition-colors duration-200"
+          >
+            {/* Header xác nhận */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/70">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                    Xác Nhận Dữ Liệu Văn Bản
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Vui lòng rà soát kỹ các trường dữ liệu trước khi lưu trữ
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={submitting}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Nội dung đối soát dữ liệu */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
+              {/* Card tệp đính kèm */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Tệp văn bản đính kèm</div>
+                  <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                    {selectedFile ? selectedFile.name : (document?.original_name || 'Tệp hiện tại')}
+                  </div>
+                  {selectedFile && (
+                    <div className="text-[10px] text-slate-500 mt-0.5">Dung lượng: {formatFileSize(selectedFile.size)}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bảng chi tiết thông tin */}
+              <div className="divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-950/40">
+                <div className="p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Số hiệu / Ký hiệu:</span>
+                  <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm">
+                    {code.trim()}
+                  </span>
+                </div>
+
+                <div className="p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Người ký ban hành:</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {signer.trim()}
+                  </span>
+                </div>
+
+                <div className="p-3 sm:px-4 flex flex-col gap-1">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Trích yếu nội dung:</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-xs leading-relaxed">
+                    {title.trim()}
+                  </span>
+                </div>
+
+                <div className="p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Loại văn bản:</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {selectedTypeName || '—'}
+                  </span>
+                </div>
+
+                <div className="p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Đơn vị ban hành:</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-right sm:max-w-[65%]">
+                    {selectedUnitName || '—'}
+                  </span>
+                </div>
+
+                <div className="p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Độ mật bảo quản:</span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getSecurityBadgeClass(selectedSecurityLevelName)}`}>
+                    {selectedSecurityLevelName || '—'}
+                  </span>
+                </div>
+
+                <div className="p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Ngày ban hành:</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {formatDateDisplay(issueDate)}
+                  </span>
+                </div>
+
+                {summary.trim() && (
+                  <div className="p-3 sm:px-4 flex flex-col gap-1">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Ghi chú:</span>
+                    <span className="text-slate-700 dark:text-slate-300 italic">
+                      {summary.trim()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer hành động xác nhận */}
+            <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-end space-x-2.5">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={submitting}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Quay lại chỉnh sửa</span>
+              </button>
+              <button
+                type="button"
+                onClick={executeSave}
+                disabled={submitting}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-emerald-600/30 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang lưu trữ...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{isEdit ? 'Xác nhận & Cập nhật' : 'Xác nhận & Lưu trữ'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </AnimatePresence>
   );
 };

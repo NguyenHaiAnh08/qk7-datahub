@@ -14,6 +14,12 @@ export interface ParsedDocumentMetadata {
     signer: string | null;
     signer_position: string | null;
     issuer_unit_name: string | null;
+    issuer_parent_unit_name: string | null;  
+    issuer_parent_unit_id: string | null;       
+    issuer_unit_id: string | null;            
+    issuer_display: string | null;              
+    parent_matched: boolean;           
+    unit_matched: boolean;
 }
 
 export interface ParseDocumentResult {

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, Loader2, FileText, Sparkles, AlertCircle } from 'lucide-react';
+import { TreeSelect } from 'antd';
 import { Dropzone } from './Dropzone';
 import { DocumentItem, DocumentType, Unit, SecurityLevel } from '../../types';
 import { documentService, ParseDocumentResult } from '../../services/documentService';
+import { buildUnitTree } from '../../utils/unitTree';
 
 export interface DocumentUploadModalProps {
   open: boolean;
@@ -41,6 +43,27 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // ── Cây đơn vị cho TreeSelect ──
+  const unitTree = React.useMemo(() => buildUnitTree(units), [units]);
+
+  // ── State mở/đóng TreeSelect khi hover ──
+  const [unitTreeOpen, setUnitTreeOpen] = useState(false);
+  const unitCloseTimer = React.useRef<number | null>(null);
+
+  const handleUnitEnter = () => {
+    if (unitCloseTimer.current) {
+      clearTimeout(unitCloseTimer.current);
+      unitCloseTimer.current = null;
+    }
+    setUnitTreeOpen(true);
+  };
+
+  const handleUnitLeave = () => {
+    unitCloseTimer.current = window.setTimeout(() => {
+      setUnitTreeOpen(false);
+      unitCloseTimer.current = null;
+    }, 180);   // trễ 180ms để tránh đóng khi di chuyển qua lại
+  };
   // ── Auto-parse PDF ──
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseDocumentResult | null>(null);
@@ -123,6 +146,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           setSigner(signerParts.join(' — '));
         }
 
+        // ── ĐƠN VỊ BAN HÀNH ──
+        // Ưu tiên đơn vị cụ thể (cấp dưới) — nếu không match thì fallback cấp trên
+        const parsedUnitId = p.issuer_unit_id || p.issuer_parent_unit_id;
+        if (parsedUnitId && units.some(u => u.unit_id === parsedUnitId)) {
+          setUnitId(parsedUnitId);
+        }
+
         setParseResult(res);
       })
       .catch((err) => {
@@ -131,7 +161,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       })
       .finally(() => setParsing(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFile, isEdit, types]);
+  }, [selectedFile, isEdit, types, units]);
 
   if (!open) return null;
 
@@ -237,20 +267,6 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               <Dropzone selectedFile={selectedFile} onFileSelect={setSelectedFile} />
             </div>
 
-            {!parsing && parseError && (
-              <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-300 text-xs">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>Không tự động đọc được PDF: {parseError}. Vui lòng nhập thông tin thủ công.</span>
-              </div>
-            )}
-
-            {!parsing && parseError && (
-              <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-300 text-xs">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>Không tự động đọc được PDF: {parseError}. Vui lòng nhập thông tin thủ công.</span>
-              </div>
-            )}
-
             {!parsing && parseResult && !parseError && (() => {
               const filled = Object.values(parseResult.parsed).filter(
                 (v) => v !== null && v !== undefined && String(v).trim() !== ''
@@ -351,17 +367,32 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   Đơn vị ban hành
                 </label>
-                <select
-                  value={unitId}
-                  onChange={(e) => setUnitId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                <div
+                  className="unit-treeselect-wrapper"
+                  style={{ position: 'relative', width: '100%' }}
+                  onMouseEnter={handleUnitEnter}
+                  onMouseLeave={handleUnitLeave}
                 >
-                  {units.map((u) => (
-                    <option key={u.unit_id} value={u.unit_id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                                    <TreeSelect
+                    open={unitTreeOpen}
+                    onOpenChange={(open) => setUnitTreeOpen(open)}
+                    value={unitId || undefined}
+                    onChange={(val) => setUnitId(val || '')}
+                    treeData={unitTree}
+                    placeholder="-- Chọn đơn vị --"
+                    allowClear
+                    treeDefaultExpandAll
+                    showSearch={{
+                      filterTreeNode: (input: string, node: any) =>
+                        String(node.title || '').toLowerCase().includes(input.toLowerCase()),
+                    }}
+                    getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
+                    className="qk7-treeselect w-full"
+                    style={{ width: '100%' }}
+                    popupMatchSelectWidth={true}
+                    styles={{ popup: { root: { maxHeight: 400, overflow: 'auto' } } }}
+                  />
+                </div>
               </div>
 
               <div>

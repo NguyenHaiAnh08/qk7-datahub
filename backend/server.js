@@ -1135,7 +1135,7 @@ app.post('/api/documents/parse', upload.single('file'), async (req, res) => {
             return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
         }
 
-        const result = await parseDocumentPdf(req.file.buffer);
+        const result = await parseDocumentPdf(req.file.buffer, { sql, getPool });
 
         res.json({
             ...result,

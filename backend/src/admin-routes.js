@@ -956,4 +956,101 @@ app.put('/api/admin/users/:id/credentials', async (req, res) => {
             res.json({ items: result.recordset });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
+
+        // ============================================================
+    // 15. UNIT_ALIAS CRUD — Tên gọi khác của đơn vị
+    // ============================================================
+    app.get('/api/admin/unit-aliases', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const r = pool.request();
+            let query = `
+                SELECT ua.alias_id, ua.unit_id, u.name AS unit_name,
+                       ua.alias_text, ua.priority, ua.created_at
+                FROM UNIT_ALIAS ua
+                JOIN UNIT u ON u.unit_id = ua.unit_id
+                WHERE 1=1
+            `;
+            if (req.query.unit_id) {
+                query += ` AND ua.unit_id = @uid`;
+                r.input('uid', sql.VarChar(50), req.query.unit_id);
+            }
+            query += ` ORDER BY ua.unit_id, ua.priority DESC, ua.alias_text`;
+            const result = await r.query(query);
+            res.json({ items: result.recordset });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/admin/unit-aliases', async (req, res) => {
+        try {
+            const { unit_id, alias_text, priority } = req.body;
+            if (!unit_id || !alias_text) {
+                return res.status(400).json({ error: 'Thiếu unit_id hoặc alias_text' });
+            }
+            const pool = await getPool();
+
+            // Kiểm tra đơn vị tồn tại
+            const chk = await pool.request()
+                .input('uid', sql.VarChar(50), unit_id)
+                .query(`SELECT 1 FROM UNIT WHERE unit_id = @uid`);
+            if (chk.recordset.length === 0) {
+                return res.status(404).json({ error: 'Đơn vị không tồn tại' });
+            }
+
+            // Kiểm tra trùng alias
+            const dup = await pool.request()
+                .input('uid', sql.VarChar(50), unit_id)
+                .input('a',   sql.NVarChar(200), alias_text.trim())
+                .query(`SELECT 1 FROM UNIT_ALIAS WHERE unit_id = @uid AND alias_text = @a`);
+            if (dup.recordset.length > 0) {
+                return res.status(409).json({ error: 'Alias này đã có cho đơn vị' });
+            }
+
+            const r = await pool.request()
+                .input('uid', sql.VarChar(50),   unit_id)
+                .input('a',   sql.NVarChar(200), alias_text.trim())
+                .input('p',   sql.Int,           priority || 0)
+                .query(`INSERT INTO UNIT_ALIAS (unit_id, alias_text, priority)
+                        OUTPUT INSERTED.alias_id
+                        VALUES (@uid, @a, @p)`);
+
+            await log(req, 'CREATE_UNIT_ALIAS', `Thêm alias "${alias_text}" cho ${unit_id}`);
+            res.json({ success: true, alias_id: r.recordset[0].alias_id });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.put('/api/admin/unit-aliases/:id', async (req, res) => {
+        try {
+            const { alias_text, priority } = req.body;
+            if (!alias_text) return res.status(400).json({ error: 'Thiếu alias_text' });
+
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('id', sql.Int,           parseInt(req.params.id, 10))
+                .input('a',  sql.NVarChar(200), alias_text.trim())
+                .input('p',  sql.Int,           priority || 0)
+                .query(`UPDATE UNIT_ALIAS SET alias_text = @a, priority = @p WHERE alias_id = @id`);
+
+            if (r.rowsAffected[0] === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy alias' });
+            }
+            await log(req, 'UPDATE_UNIT_ALIAS', `Sửa alias #${req.params.id}`);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.delete('/api/admin/unit-aliases/:id', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('id', sql.Int, parseInt(req.params.id, 10))
+                .query(`DELETE FROM UNIT_ALIAS WHERE alias_id = @id`);
+            if (r.rowsAffected[0] === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy alias' });
+            }
+            await log(req, 'DELETE_UNIT_ALIAS', `Xóa alias #${req.params.id}`);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
 };

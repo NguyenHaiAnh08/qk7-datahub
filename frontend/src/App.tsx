@@ -45,6 +45,10 @@ const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
             controlHeight: 38,
             borderRadius: 8,
           },
+          TreeSelect: {
+            controlHeight: 38,
+            borderRadius: 12,
+          },
           Card: {
             borderRadiusLG: 12,
           },

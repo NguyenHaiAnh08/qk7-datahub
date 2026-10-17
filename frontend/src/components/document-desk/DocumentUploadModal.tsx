@@ -34,7 +34,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [title, setTitle] = useState('');
   const [typeId, setTypeId] = useState('');
   const [unitId, setUnitId] = useState('');
-  const [securityLevel, setSecurityLevel] = useState<number>(1);
+  const [securityLevel, setSecurityLevel] = useState<number | ''>('');
   const [signer, setSigner] = useState('');
   const [issueDate, setIssueDate] = useState('');
   const [summary, setSummary] = useState('');
@@ -58,9 +58,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     if (document) {
       setCode(document.document_code || '');
       setTitle(document.title || '');
-      setTypeId(document.doc_type_id || document.type_id || (types[0]?.type_id ?? ''));
+      setTypeId(document.doc_type_id || document.type_id || '');
       setUnitId(document.issuing_unit_id || document.unit_id || '');
-      setSecurityLevel(document.security_level_id || 1);
+      setSecurityLevel(document.security_level_id || '');
       setSigner(document.signer || '');
       const rawDate = document.issued_date || document.issue_date;
       setIssueDate(rawDate ? rawDate.split('T')[0] : '');
@@ -69,11 +69,11 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     } else {
       setCode('');
       setTitle('');
-      setTypeId(types[0]?.type_id || '');
+      setTypeId('');
       setUnitId('');
-      setSecurityLevel(1);
+      setSecurityLevel('');
       setSigner('');
-      setIssueDate(new Date().toISOString().split('T')[0]);
+      setIssueDate('');
       setSummary('');
       setSelectedFile(null);
     }
@@ -162,6 +162,11 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       return;
     }
 
+    if (!securityLevel) {
+      setError('Vui lòng chọn Độ mật bảo quản cho văn bản!');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -175,7 +180,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         formData.append('issuing_unit_id', unitId);
         formData.append('unit_id', unitId);
       }
-      formData.append('security_level_id', String(securityLevel));
+      if (securityLevel) {
+        formData.append('security_level_id', String(securityLevel));
+      }
       if (signer) formData.append('signer', signer.trim());
       if (issueDate) {
         formData.append('issued_date', issueDate);
@@ -336,10 +343,15 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <select
                   value={typeId}
                   onChange={(e) => setTypeId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors ${
+                    typeId ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
+                  }`}
                 >
+                  <option value="" className="text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900">
+                     Chọn loại văn bản
+                  </option>
                   {types.map((t) => (
-                    <option key={t.type_id} value={t.type_id}>
+                    <option key={t.type_id} value={t.type_id} className="text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900">
                       {t.name}
                     </option>
                   ))}
@@ -358,7 +370,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     value={unitId || undefined}
                     onChange={(val) => setUnitId(val || '')}
                     treeData={unitTree}
-                    placeholder="-- Chọn đơn vị ban hành --"
+                    placeholder=" Chọn đơn vị ban hành "
                     allowClear
                     treeDefaultExpandAll
                     treeLine={{ showLeafIcon: false }}
@@ -386,7 +398,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
                     className="qk7-treeselect w-full"
                     popupClassName="qk7-unit-treeselect-popup"
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', height: 38 }}
                     popupMatchSelectWidth={false}
                     styles={{
                       popup: {
@@ -409,11 +421,17 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 </label>
                 <select
                   value={securityLevel}
-                  onChange={(e) => setSecurityLevel(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                  onChange={(e) => setSecurityLevel(e.target.value ? Number(e.target.value) : '')}
+                  required
+                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors ${
+                    securityLevel ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
+                  }`}
                 >
+                  <option value="" className="text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900">
+                     Chọn độ mật
+                  </option>
                   {levels.map((lvl) => (
-                    <option key={lvl.level_id} value={lvl.level_id}>
+                    <option key={lvl.level_id} value={lvl.level_id} className="text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900">
                       {lvl.name}
                     </option>
                   ))}
@@ -430,7 +448,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   type="date"
                   value={issueDate}
                   onChange={(e) => setIssueDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors ${
+                    issueDate ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
+                  }`}
                 />
               </div>
 

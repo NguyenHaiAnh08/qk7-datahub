@@ -72,31 +72,78 @@ async function loadCatalogs(getPool, sql) {
 
     const pool = await getPool();
 
-    const [typesRes, ranksRes, positionsRes, unitsRes, patternsRes] = await Promise.all([
-        pool.request().query(`SELECT type_id, name FROM DOCUMENT_TYPE`),
-        pool.request().query(`SELECT name FROM MILITARY_RANK WHERE active = 1 ORDER BY sort_order`),
-        pool.request().query(`SELECT name FROM MILITARY_POSITION WHERE active = 1 ORDER BY sort_order`),
-        pool.request().query(`
+    // 1. Doc Types
+    let docTypes = [];
+    try {
+        const typesRes = await pool.request().query(`SELECT type_id, name FROM DOCUMENT_TYPE`);
+        docTypes = typesRes.recordset || [];
+    } catch (err) {
+        console.warn('[parser] Lỗi đọc DOCUMENT_TYPE:', err.message);
+    }
+
+    // 2. Ranks & Positions
+    let ranks = [];
+    try {
+        const ranksRes = await pool.request().query(`SELECT name FROM MILITARY_RANK WHERE active = 1 ORDER BY sort_order`);
+        ranks = ranksRes.recordset.map(r => r.name).filter(Boolean);
+    } catch (err) {
+        console.warn('[parser] Lỗi đọc MILITARY_RANK:', err.message);
+    }
+
+    let positions = [];
+    try {
+        const positionsRes = await pool.request().query(`SELECT name FROM MILITARY_POSITION WHERE active = 1 ORDER BY sort_order`);
+        positions = positionsRes.recordset.map(p => p.name).filter(Boolean);
+    } catch (err) {
+        console.warn('[parser] Lỗi đọc MILITARY_POSITION:', err.message);
+    }
+
+    // 3. Units with alias fallback
+    let units = [];
+    try {
+        const unitsRes = await pool.request().query(`
             SELECT u.unit_id, u.name, u.parent_id
             FROM UNIT u
             UNION
             SELECT ua.unit_id, ua.alias_text AS name, u.parent_id
             FROM UNIT_ALIAS ua
             JOIN UNIT u ON u.unit_id = ua.unit_id
-        `),
-        pool.request().query(`
+        `);
+        units = unitsRes.recordset || [];
+    } catch (err) {
+        console.warn('[parser] Không đọc được UNIT_ALIAS, fallback query bảng UNIT:', err.message);
+        try {
+            const fallbackUnits = await pool.request().query(`SELECT unit_id, name, parent_id FROM UNIT`);
+            units = fallbackUnits.recordset || [];
+        } catch (e) {
+            console.error('[parser] Lỗi query UNIT:', e.message);
+        }
+    }
+
+    // 4. Patterns with automatic fallback
+    let patterns = [];
+    try {
+        const patternsRes = await pool.request().query(`
             SELECT type_id, pattern_type, regex, priority
             FROM DOCUMENT_TYPE_PATTERN
             WHERE active = 1
             ORDER BY priority DESC, pattern_id
-        `),
-    ]);
+        `);
+        patterns = patternsRes.recordset || [];
+    } catch (err) {
+        console.warn('[parser] Không đọc được DOCUMENT_TYPE_PATTERN từ DB, dùng pattern mặc định:', err.message);
+    }
 
-    const docTypes = typesRes.recordset;
-    const ranks = ranksRes.recordset.map(r => r.name).filter(Boolean);
-    const positions = positionsRes.recordset.map(p => p.name).filter(Boolean);
-    const units = unitsRes.recordset;
-    const patterns = patternsRes.recordset;
+    // Fallback: nếu patterns từ DB rỗng hoặc lỗi, tự động sinh pattern từ docTypes
+    if (!patterns || patterns.length === 0) {
+        patterns = docTypes.map((dt, idx) => ({
+            pattern_id: idx + 1,
+            type_id: dt.type_id,
+            pattern_type: 'header',
+            regex: `^\\s*${escapeRegex(dt.name.toUpperCase())}\\s*(?:[:\\-\\.]\\s*(.*)|$)`,
+            priority: 10
+        }));
+    }
 
     const buildPattern = (items) =>
         items.filter(Boolean).map(s => s.trim()).filter(s => s.length > 0)

@@ -20,7 +20,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   return (
     <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[850px]">
           <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 text-[11px] uppercase border-b border-slate-200 dark:border-slate-800 tracking-wider">
             <tr>
               <th className="py-3 px-4">Mã</th>

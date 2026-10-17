@@ -59,7 +59,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setCode(document.document_code || '');
       setTitle(document.title || '');
       setTypeId(document.doc_type_id || document.type_id || (types[0]?.type_id ?? ''));
-      setUnitId(document.issuing_unit_id || document.unit_id || (units[0]?.unit_id ?? ''));
+      setUnitId(document.issuing_unit_id || document.unit_id || '');
       setSecurityLevel(document.security_level_id || 1);
       setSigner(document.signer || '');
       const rawDate = document.issued_date || document.issue_date;
@@ -70,7 +70,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setCode('');
       setTitle('');
       setTypeId(types[0]?.type_id || '');
-      setUnitId(units[0]?.unit_id || '');
+      setUnitId('');
       setSecurityLevel(1);
       setSigner('');
       setIssueDate(new Date().toISOString().split('T')[0]);
@@ -328,7 +328,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   Loại văn bản
@@ -391,9 +391,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     styles={{
                       popup: {
                         root: {
-                          minWidth: 360,
-                          maxWidth: 520,
-                          maxHeight: 420,
+                          minWidth: 280,
+                          maxWidth: 'min(520px, 90vw)',
+                          maxHeight: 380,
                           overflowX: 'hidden',
                           overflowY: 'auto',
                         },

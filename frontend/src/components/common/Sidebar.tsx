@@ -126,6 +126,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               {!collapsed && <span className="truncate">{item.label}</span>}
+              {collapsed && (
+                <span className="hidden md:block absolute left-full ml-2 px-2.5 py-1 bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-medium rounded-lg shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 border border-slate-700/60">
+                  {item.label}
+                </span>
+              )}
             </button>
           );
         })}

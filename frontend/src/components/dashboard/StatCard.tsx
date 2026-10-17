@@ -53,22 +53,30 @@ export const StatCard: React.FC<StatCardProps> = ({
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className={`bg-white dark:bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm border-l-4 ${scheme.border} transition-all hover:border-slate-300 dark:hover:border-slate-700`}
+      className={`bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm border-l-4 ${scheme.border} transition-all hover:border-slate-300 dark:hover:border-slate-700 min-w-0`}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium tracking-wide uppercase">
+      <div className="flex items-center justify-between gap-3 min-w-0">
+        <div className="min-w-0 flex-1">
+          <span
+            className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide uppercase block truncate"
+            title={label}
+          >
             {label}
           </span>
-          <h3 className={`text-2xl font-extrabold mt-1 tracking-tight ${scheme.valueText}`}>
+          <h3 className={`text-xl sm:text-2xl font-black mt-1 tracking-tight leading-tight truncate ${scheme.valueText}`}>
             {value}
           </h3>
           {subtext && (
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{subtext}</p>
+            <p
+              className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 leading-tight line-clamp-1"
+              title={subtext}
+            >
+              {subtext}
+            </p>
           )}
         </div>
         <div
-          className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${scheme.iconBg}`}
+          className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex items-center justify-center shrink-0 ${scheme.iconBg}`}
         >
           {icon}
         </div>

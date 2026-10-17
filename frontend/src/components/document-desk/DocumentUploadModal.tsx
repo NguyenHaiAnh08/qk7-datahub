@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Loader2, FileText, Sparkles, AlertCircle } from 'lucide-react';
+import { X, Save, Loader2, FileText, Sparkles, AlertCircle, Plus, Minus } from 'lucide-react';
 import { TreeSelect } from 'antd';
 import { Dropzone } from './Dropzone';
 import { DocumentItem, DocumentType, Unit, SecurityLevel } from '../../types';
@@ -46,24 +46,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   // ── Cây đơn vị cho TreeSelect ──
   const unitTree = React.useMemo(() => buildUnitTree(units), [units]);
 
-  // ── State mở/đóng TreeSelect khi hover ──
-  const [unitTreeOpen, setUnitTreeOpen] = useState(false);
-  const unitCloseTimer = React.useRef<number | null>(null);
 
-  const handleUnitEnter = () => {
-    if (unitCloseTimer.current) {
-      clearTimeout(unitCloseTimer.current);
-      unitCloseTimer.current = null;
-    }
-    setUnitTreeOpen(true);
-  };
-
-  const handleUnitLeave = () => {
-    unitCloseTimer.current = window.setTimeout(() => {
-      setUnitTreeOpen(false);
-      unitCloseTimer.current = null;
-    }, 180);   // trễ 180ms để tránh đóng khi di chuyển qua lại
-  };
   // ── Auto-parse PDF ──
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseDocumentResult | null>(null);
@@ -370,27 +353,52 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <div
                   className="unit-treeselect-wrapper"
                   style={{ position: 'relative', width: '100%' }}
-                  onMouseEnter={handleUnitEnter}
-                  onMouseLeave={handleUnitLeave}
                 >
-                                    <TreeSelect
-                    open={unitTreeOpen}
-                    onOpenChange={(open) => setUnitTreeOpen(open)}
+                  <TreeSelect
                     value={unitId || undefined}
                     onChange={(val) => setUnitId(val || '')}
                     treeData={unitTree}
-                    placeholder="-- Chọn đơn vị --"
+                    placeholder="-- Chọn đơn vị ban hành --"
                     allowClear
                     treeDefaultExpandAll
-                    showSearch={{
-                      filterTreeNode: (input: string, node: any) =>
-                        String(node.title || '').toLowerCase().includes(input.toLowerCase()),
+                    treeLine={{ showLeafIcon: false }}
+                    switcherIcon={(nodeProps: any) => {
+                      if (nodeProps.isLeaf) return null;
+                      const isExpanded = Boolean(nodeProps.expanded);
+                      return (
+                        <span
+                          className={`qk7-tree-switcher-btn ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+                          title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                        >
+                          {isExpanded ? (
+                            <Minus className="w-3 h-3 stroke-[2.5]" />
+                          ) : (
+                            <Plus className="w-3 h-3 stroke-[2.5]" />
+                          )}
+                        </span>
+                      );
                     }}
+                    treeNodeLabelProp="name"
+                    treeNodeFilterProp="name"
+                    filterTreeNode={(input: string, node: any) =>
+                      String(node.name || '').toLowerCase().includes(input.toLowerCase().trim())
+                    }
                     getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
                     className="qk7-treeselect w-full"
+                    popupClassName="qk7-unit-treeselect-popup"
                     style={{ width: '100%' }}
-                    popupMatchSelectWidth={true}
-                    styles={{ popup: { root: { maxHeight: 400, overflow: 'auto' } } }}
+                    popupMatchSelectWidth={false}
+                    styles={{
+                      popup: {
+                        root: {
+                          minWidth: 360,
+                          maxWidth: 520,
+                          maxHeight: 420,
+                          overflowX: 'hidden',
+                          overflowY: 'auto',
+                        },
+                      },
+                    }}
                   />
                 </div>
               </div>
@@ -406,7 +414,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 >
                   {levels.map((lvl) => (
                     <option key={lvl.level_id} value={lvl.level_id}>
-                      {lvl.name} (Cấp {lvl.level_id})
+                      {lvl.name}
                     </option>
                   ))}
                 </select>

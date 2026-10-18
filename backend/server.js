@@ -1,5 +1,12 @@
-// server.js - QK7 Paperless Gateway
+// ═══════════════════════════════════════════════════════════════
+// server.js — QK7 Paperless Gateway (v2.0 — JWT + Fingerprint)
 // Nguồn dữ liệu: SQL Server (metadata) + ổ đĩa server (file PDF)
+// Bảo mật:
+//   - JWT (Bearer token) thay X-User-Id/X-Clearance
+//   - Cấp 4-5 (Tối mật/Tuyệt mật) yêu cầu vân tay ZK9500
+//   - ALLOW_LEGACY_AUTH=true cho giai đoạn chuyển tiếp
+// ═══════════════════════════════════════════════════════════════
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -7,6 +14,7 @@ const fs = require('fs');
 const multer = require('multer');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
@@ -19,16 +27,49 @@ const ROOT_DIR = __dirname;
 const PDF_ROOT = path.join(ROOT_DIR, 'uploads');
 const publicDir = path.join(ROOT_DIR, 'public');
 
-// ─── Login Check ───
+// ─── JWT config ───
+const JWT_SECRET = process.env.JWT_SECRET || 'QK7-DEV-SECRET-CHANGE-IN-PROD-' + crypto.randomBytes(16).toString('hex');
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
+const FINGERPRINT_TOKEN_EXPIRES_IN = '5m';
+
+// ─── Fingerprint config ───
+const FINGERPRINT_BRIDGE_URL = process.env.FINGERPRINT_BRIDGE_URL || 'http://localhost:9000';
+const FP_ENC_KEY = process.env.FP_ENC_KEY
+    ? crypto.scryptSync(process.env.FP_ENC_KEY, 'qk7-fp-salt', 32)
+    : null;
+
+// ─── Legacy auth fallback (dùng trong giai đoạn chuyển đổi) ───
+const ALLOW_LEGACY_AUTH = (process.env.ALLOW_LEGACY_AUTH || 'true').toLowerCase() === 'true';
+
+// ─── Login Check config ───
 const LOCKOUT_MAX_ATTEMPTS = parseInt(process.env.LOCKOUT_MAX_ATTEMPTS || '6', 10);
 const LOCKOUT_WINDOW_MINUTES = parseInt(process.env.LOCKOUT_WINDOW_MINUTES || '15', 10);
 const IPBLOCK_MAX_ATTEMPTS = parseInt(process.env.IPBLOCK_MAX_ATTEMPTS || '6', 10);
 const IPBLOCK_WINDOW_MINUTES = parseInt(process.env.IPBLOCK_WINDOW_MINUTES || '15', 10);
 const IPBLOCK_DURATION_MINUTES = parseInt(process.env.IPBLOCK_DURATION_MINUTES || '30', 10);
 
+// ─── Startup warnings ───
+if (!process.env.JWT_SECRET) {
+    console.warn('');
+    console.warn('  ╔════════════════════════════════════════════════════════════╗');
+    console.warn('  ║  ⚠️  SECURITY WARNING                                      ║');
+    console.warn('  ║  JWT_SECRET chưa set trong .env — đang dùng default random ║');
+    console.warn('  ║  → Token sẽ mất hiệu lực khi restart backend!              ║');
+    console.warn('  ║  → BẮT BUỘC set JWT_SECRET trong .env trước production    ║');
+    console.warn('  ╚════════════════════════════════════════════════════════════╝');
+    console.warn('');
+}
+if (ALLOW_LEGACY_AUTH) {
+    console.warn('[SECURITY] ⚠️  ALLOW_LEGACY_AUTH=true — vẫn cho phép X-User-Id/X-Clearance (KHÔNG an toàn).');
+    console.warn('[SECURITY]    Tắt sau khi Frontend đã chuyển sang JWT (ALLOW_LEGACY_AUTH=false).');
+}
+if (!FP_ENC_KEY) {
+    console.warn('[SECURITY] ⚠️  FP_ENC_KEY chưa set — template vân tay lưu plaintext. Set trong .env để mã hóa.');
+}
+
 app.use(cors());
-app.use(express.json());
-app.disable('x-powered-by');   // tắt header X-Powered-By để tránh lộ thông tin server
+app.use(express.json({ limit: '2mb' }));
+app.disable('x-powered-by');
 
 // Đảm bảo mọi response text trả UTF-8
 app.use((req, res, next) => {
@@ -50,10 +91,7 @@ app.use((req, res, next) => {
 app.use(express.static(publicDir));
 
 // ─── Swagger ───
-// Bật/tắt qua biến ENABLE_SWAGGER trong .env
-// Mặc định: bật (nếu không set hoặc set khác 'false')
 const ENABLE_SWAGGER = (process.env.ENABLE_SWAGGER || 'true').toLowerCase() === 'true';
-
 if (ENABLE_SWAGGER) {
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
         customCss: `
@@ -68,15 +106,10 @@ if (ENABLE_SWAGGER) {
             filter: true,
             tryItOutEnabled: true,
             docExpansion: 'list',
-            defaultModelsExpandDepth: 1,
-            defaultModelExpandDepth: 1,
             deepLinking: true
         }
     }));
-    app.get('/api-docs.json', (req, res) => {
-        res.setHeader('Content-Type', 'application/json');
-        res.send(swaggerSpec);
-    });
+    app.get('/api-docs.json', (req, res) => res.json(swaggerSpec));
     console.log('[SWAGGER] Enabled at /api-docs');
 } else {
     console.log('[SWAGGER] Disabled (ENABLE_SWAGGER=false)');
@@ -89,39 +122,112 @@ app.get('/', (req, res) => {
     else res.status(404).send('Không tìm thấy public/index.html');
 });
 
-// ─── Multer: upload file vào memory ───
+// ─── Multer ───
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 },   // 50 MB
+    limits: { fileSize: 50 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (file.mimetype === 'application/pdf') cb(null, true);
         else cb(new Error('Chỉ chấp nhận file PDF'));
     }
 });
 
-// ─── Middleware user + chống cache API ───
+// ═══════════════════════════════════════════════════════════════
+// HELPER — Mã hóa / giải mã template vân tay
+// ═══════════════════════════════════════════════════════════════
+function encryptTemplate(plain) {
+    if (!FP_ENC_KEY) return plain;
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', FP_ENC_KEY, iv);
+    const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return 'enc:' + Buffer.concat([iv, tag, enc]).toString('base64');
+}
+
+function decryptTemplate(encoded) {
+    if (!FP_ENC_KEY || !encoded || !encoded.startsWith('enc:')) return encoded;
+    try {
+        const buf = Buffer.from(encoded.slice(4), 'base64');
+        const iv = buf.subarray(0, 12);
+        const tag = buf.subarray(12, 28);
+        const enc = buf.subarray(28);
+        const decipher = crypto.createDecipheriv('aes-256-gcm', FP_ENC_KEY, iv);
+        decipher.setAuthTag(tag);
+        return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
+    } catch (err) {
+        console.error('[decryptTemplate] Lỗi giải mã:', err.message);
+        return encoded;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MIDDLEWARE — Xác thực JWT (fallback legacy nếu bật)
+// ═══════════════════════════════════════════════════════════════
 app.use('/api', (req, res, next) => {
-    // ═══════════════════════════════════════════════════════════════
-    // Chống 304 cho API — mọi response /api đều 200
-    // Static files (JS/CSS/font) KHÔNG bị ảnh hưởng → vẫn cache bình thường
-    // ═══════════════════════════════════════════════════════════════
+    // Chống cache API
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.removeHeader('ETag');           // Xóa ETag nếu có
-    res.removeHeader('Last-Modified');  // Xóa Last-Modified nếu có
+    res.removeHeader('ETag');
+    res.removeHeader('Last-Modified');
 
-    // Bỏ qua auth login (không cần user)
-    if (req.path.startsWith('/auth/login')) return next();
+    // ── Public endpoints (không cần auth) ──
+    const isPublic =
+        req.path === '/auth/login' ||
+        req.path === '/health' ||
+        req.path === '/meta' ||
+        req.path.startsWith('/test-http-error');
+    if (isPublic) return next();
 
+    // ── Thử JWT trước ──
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+            const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+            req.user = {
+                user_id: decoded.user_id,
+                clearance_level_id: decoded.clearance_level_id,
+                roles: decoded.roles || [],
+                is_authenticated: true,
+            };
+            return next();
+        } catch (err) {
+            return res.status(401).json({
+                error: 'Token không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.',
+                code: 'TOKEN_INVALID',
+            });
+        }
+    }
+
+    // ── Legacy fallback (CHỈ khi ALLOW_LEGACY_AUTH=true) ──
+    if (ALLOW_LEGACY_AUTH && req.headers['x-user-id']) {
+        const uid = String(req.headers['x-user-id']).trim();
+        req.user = {
+            user_id: uid,
+            clearance_level_id: parseInt(req.headers['x-clearance'] || req.query.clr || '1', 10),
+            roles: [],
+            is_authenticated: uid !== 'GUEST',
+        };
+        return next();
+    }
+
+    // ── GUEST (chưa đăng nhập) ──
     req.user = {
-        user_id: req.headers['x-user-id'] || req.query.uid || 'GUEST',
-        clearance_level_id: parseInt(
-            req.headers['x-clearance'] || req.query.clr || '1', 10
-        )
+        user_id: 'GUEST',
+        clearance_level_id: 1,
+        roles: [],
+        is_authenticated: false,
     };
     next();
 });
+
+// ─── Helper: yêu cầu đăng nhập cho write endpoints ───
+function requireAuth(req, res, next) {
+    if (!req.user || !req.user.is_authenticated) {
+        return res.status(401).json({ error: 'Cần đăng nhập để thực hiện thao tác này' });
+    }
+    next();
+}
 
 // ─── Ghi nhật ký ───
 async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
@@ -136,37 +242,30 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
             .input('action',  sql.VarChar(50),   action)
             .input('ip',      sql.VarChar(50),   ip || '')
             .input('note',    sql.NVarChar(255), note || null)
-            .query(`
-                INSERT INTO ACCESS_LOG (log_id, user_id, file_id, [action], ip, note)
-                VALUES (@log_id, @user_id, @file_id, @action, @ip, @note)
-            `);
+            .query(`INSERT INTO ACCESS_LOG (log_id, user_id, file_id, [action], ip, note)
+                    VALUES (@log_id, @user_id, @file_id, @action, @ip, @note)`);
     } catch (err) {
         console.error('[writeAccessLog]', err.message);
     }
 }
 
-// ─── Helper: sinh đường dẫn file theo quy ước ───
 function buildStoredPath({ docTypeId, documentCode, fallbackId }) {
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const yyyymmdd = `${yyyy}${mm}${String(now.getDate()).padStart(2, '0')}`;
     const typeSafe = String(docTypeId || 'XX').replace(/[^A-Za-z0-9]/g, '');
-    const codeSafe = String(documentCode || fallbackId)
-        .replace(/[\/\\\s]/g, '-')
-        .replace(/[^A-Za-z0-9\-]/g, '');
+    const codeSafe = String(documentCode || fallbackId).replace(/[\/\\\s]/g, '-').replace(/[^A-Za-z0-9\-]/g, '');
     return { yyyy, mm, yyyymmdd, typeSafe, codeSafe };
 }
 
-
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 // 0. AUTH — ĐĂNG NHẬP
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 app.post('/api/auth/login', async (req, res) => {
     const ip = getClientIp(req);
     try {
         const { user_id, password } = req.body;
-
         if (!user_id || !password) {
             return res.status(400).json({ error: 'Thiếu user_id hoặc password' });
         }
@@ -184,7 +283,7 @@ app.post('/api/auth/login', async (req, res) => {
 
         const pool = await getPool();
 
-        // ── Bước 2: Query user ──
+        // ── Bước 2: Query user (kèm has_fingerprint) ──
         const r = await pool.request()
             .input('u', sql.VarChar(50), username)
             .query(`
@@ -194,24 +293,25 @@ app.post('/api/auth/login', async (req, res) => {
                        u.clearance_level_id,
                        u.failed_attempts, u.locked_at, u.last_failed_at,
                        un.name AS unit_name,
-                       sl.name AS clearance_name, sl.code AS clearance_code
+                       sl.name AS clearance_name, sl.code AS clearance_code,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM USER_FINGERPRINT uf
+                           WHERE uf.user_id = u.user_id AND uf.active = 1
+                       ) THEN 1 ELSE 0 END AS has_fingerprint
                 FROM [USER] u
                 LEFT JOIN UNIT un           ON un.unit_id  = u.unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
                 WHERE LOWER(u.username) = @u OR LOWER(u.user_id) = @u
             `);
 
-        // ── Bước 3: Username không tồn tại → dò username ──
+        // ── Bước 3: Username không tồn tại ──
         if (r.recordset.length === 0) {
             await writeLoginAttempt({ ip, username, result: 'USERNAME_NOT_FOUND' });
             await checkAndBlockIp(ip);
-
             await writeAccessLog({
-                userId: 'UNKNOWN', fileId: null,
-                action: 'LOGIN_FAIL', ip,
+                userId: 'UNKNOWN', fileId: null, action: 'LOGIN_FAIL', ip,
                 note: `Username không tồn tại: ${username}`
             });
-
             return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không chính xác' });
         }
 
@@ -221,17 +321,17 @@ app.post('/api/auth/login', async (req, res) => {
         if (user.status !== 'active') {
             await writeLoginAttempt({ ip, username, result: 'LOCKED' });
             await writeAccessLog({
-                userId: user.user_id, fileId: null,
-                action: 'LOGIN_FAIL', ip,
+                userId: user.user_id, fileId: null, action: 'LOGIN_FAIL', ip,
                 note: `Tài khoản bị khóa (status = ${user.status})`
             });
-            const msg = user.status === 'locked'
-                ? 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để mở khóa.'
-                : 'Tài khoản đã bị vô hiệu hóa.';
-            return res.status(403).json({ error: msg });
+            return res.status(403).json({
+                error: user.status === 'locked'
+                    ? 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để mở khóa.'
+                    : 'Tài khoản đã bị vô hiệu hóa.'
+            });
         }
 
-        // ── Bước 6: Sliding window — reset counter nếu quá hạn ──
+        // ── Bước 5: Sliding window ──
         let currentFailed = user.failed_attempts || 0;
         if (user.last_failed_at && currentFailed > 0) {
             const minsSince = (Date.now() - new Date(user.last_failed_at).getTime()) / 60000;
@@ -243,7 +343,7 @@ app.post('/api/auth/login', async (req, res) => {
             }
         }
 
-        // ── Bước 7: bcrypt compare ──
+        // ── Bước 6: bcrypt compare ──
         const pwdHash = user.password_hash || user.pin_hash;
         if (!pwdHash) {
             await writeLoginAttempt({ ip, username, result: 'WRONG_PASSWORD' });
@@ -254,38 +354,28 @@ app.post('/api/auth/login', async (req, res) => {
 
         // ── Bước 7a: SAI mật khẩu ──
         if (!ok) {
-            // Kiểm tra user có phải Admin (ROL-01) → không khóa tự động
             const adminCheck = await pool.request()
                 .input('uid', sql.VarChar(50), user.user_id)
-                .query(`SELECT COUNT(*) AS n FROM USER_ROLE
-                        WHERE user_id = @uid AND role_id = 'ROL-01'`);
+                .query(`SELECT COUNT(*) AS n FROM USER_ROLE WHERE user_id = @uid AND role_id = 'ROL-01'`);
             const isAdminAccount = adminCheck.recordset[0].n > 0;
 
             const newFailed = currentFailed + 1;
             const willLock = !isAdminAccount && newFailed >= LOCKOUT_MAX_ATTEMPTS;
 
             const query = willLock
-                ? `UPDATE [USER]
-                   SET failed_attempts = @n,
-                       last_failed_at = GETDATE(),
-                       locked_at = GETDATE(),
-                       status = 'locked'
-                   WHERE user_id = @uid`
-                : `UPDATE [USER]
-                   SET failed_attempts = @n,
-                       last_failed_at = GETDATE()
-                   WHERE user_id = @uid`;
+                ? `UPDATE [USER] SET failed_attempts = @n, last_failed_at = GETDATE(),
+                                    locked_at = GETDATE(), status = 'locked' WHERE user_id = @uid`
+                : `UPDATE [USER] SET failed_attempts = @n, last_failed_at = GETDATE() WHERE user_id = @uid`;
 
             await pool.request()
                 .input('uid', sql.VarChar(50), user.user_id)
-                .input('n',   sql.Int,         newFailed)
+                .input('n', sql.Int, newFailed)
                 .query(query);
 
             await writeLoginAttempt({ ip, username, result: 'WRONG_PASSWORD' });
             await writeAccessLog({
-                userId: user.user_id, fileId: null,
-                action: 'LOGIN_FAIL', ip,
-                note: `Sai mật khẩu lần ${newFailed}/${LOCKOUT_MAX_ATTEMPTS}${isAdminAccount ? ' (Admin — không khóa tự động)' : ''}`
+                userId: user.user_id, fileId: null, action: 'LOGIN_FAIL', ip,
+                note: `Sai mật khẩu lần ${newFailed}/${LOCKOUT_MAX_ATTEMPTS}${isAdminAccount ? ' (Admin — không khóa)' : ''}`
             });
 
             if (willLock) {
@@ -294,32 +384,23 @@ app.post('/api/auth/login', async (req, res) => {
                     error: `Tài khoản đã bị khóa do đăng nhập sai ${LOCKOUT_MAX_ATTEMPTS} lần. Vui lòng liên hệ quản trị viên để mở khóa.`
                 });
             }
-
-            // Admin: báo sai mật khẩu đơn giản, không hiện "còn X lần"
             if (isAdminAccount) {
                 return res.status(401).json({ error: 'Mật khẩu không đúng.' });
             }
-
-            const remaining = LOCKOUT_MAX_ATTEMPTS - newFailed;
             return res.status(401).json({
-                error: `Mật khẩu không đúng. Bạn còn ${remaining} lần thử.`
+                error: `Mật khẩu không đúng. Bạn còn ${LOCKOUT_MAX_ATTEMPTS - newFailed} lần thử.`
             });
         }
 
         // ── Bước 7b: ĐÚNG mật khẩu ──
         await pool.request()
             .input('uid', sql.VarChar(50), user.user_id)
-            .query(`UPDATE [USER]
-                    SET failed_attempts = 0,
-                        locked_at = NULL,
-                        last_failed_at = NULL,
-                        status = 'active'
-                    WHERE user_id = @uid`);
+            .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL,
+                                     last_failed_at = NULL, status = 'active' WHERE user_id = @uid`);
 
         await writeLoginAttempt({ ip, username, result: 'SUCCESS' });
         await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN', ip,
+            userId: user.user_id, fileId: null, action: 'LOGIN', ip,
             note: `${user.full_name} (mức ${user.clearance_level_id})`
         });
 
@@ -329,19 +410,35 @@ app.post('/api/auth/login', async (req, res) => {
         delete user.locked_at;
         delete user.last_failed_at;
 
-        // ── Lấy roles + role_names ──
+        // ── Lấy roles ──
         const rolesResult = await pool.request()
             .input('uid', sql.VarChar(50), user.user_id)
             .query(`
                 SELECT r.role_id, r.name AS role_name
-                FROM USER_ROLE ur
-                JOIN [ROLE] r ON r.role_id = ur.role_id
+                FROM USER_ROLE ur JOIN [ROLE] r ON r.role_id = ur.role_id
                 WHERE ur.user_id = @uid
             `);
         user.roles = rolesResult.recordset.map(x => x.role_id);
         user.role_names = rolesResult.recordset.map(x => x.role_name);
+        user.has_fingerprint = user.has_fingerprint === 1;
 
-        res.json({ success: true, user });
+        // ── Cấp JWT ──
+        const token = jwt.sign(
+            {
+                user_id: user.user_id,
+                clearance_level_id: user.clearance_level_id,
+                roles: user.roles,
+            },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRES_IN }
+        );
+
+        res.json({
+            success: true,
+            token,
+            expires_in: JWT_EXPIRES_IN,
+            user,
+        });
 
     } catch (err) {
         console.error('[POST /api/auth/login]', err);
@@ -353,7 +450,7 @@ app.get('/api/auth/me', async (req, res) => {
     try {
         const userId = req.user?.user_id;
         if (!userId || userId === 'GUEST') {
-            return res.status(401).json({ error: 'Chưa xác thực thông tin user (thiếu header X-User-Id)' });
+            return res.status(401).json({ error: 'Chưa đăng nhập' });
         }
 
         const pool = await getPool();
@@ -362,29 +459,31 @@ app.get('/api/auth/me', async (req, res) => {
             .query(`
                 SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name, u.[position],
                        u.unit_id, un.name AS unit_name, u.status,
-                       u.clearance_level_id, sl.name AS clearance_name, sl.code AS clearance_code
+                       u.clearance_level_id, sl.name AS clearance_name, sl.code AS clearance_code,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM USER_FINGERPRINT uf
+                           WHERE uf.user_id = u.user_id AND uf.active = 1
+                       ) THEN 1 ELSE 0 END AS has_fingerprint
                 FROM [USER] u
                 LEFT JOIN UNIT un           ON un.unit_id  = u.unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
                 WHERE u.user_id = @u
             `);
+
         if (r.recordset.length === 0) {
             return res.status(404).json({ error: 'Không tìm thấy user' });
         }
 
         const user = r.recordset[0];
-
-        // Bổ sung roles & role_names theo schema UserFull của Swagger
         const rolesRes = await pool.request()
             .input('u', sql.VarChar(50), user.user_id)
             .query(`
-                SELECT r.role_id, r.name
-                FROM USER_ROLE ur
-                JOIN [ROLE] r ON r.role_id = ur.role_id
-                WHERE ur.user_id = @u
+                SELECT r.role_id, r.name FROM USER_ROLE ur
+                JOIN [ROLE] r ON r.role_id = ur.role_id WHERE ur.user_id = @u
             `);
         user.roles = rolesRes.recordset.map(x => x.role_id);
         user.role_names = rolesRes.recordset.map(x => x.name);
+        user.has_fingerprint = user.has_fingerprint === 1;
 
         res.json(user);
     } catch (err) {
@@ -392,9 +491,147 @@ app.get('/api/auth/me', async (req, res) => {
     }
 });
 
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// 0b. FINGERPRINT — Đăng ký + Xác thực vân tay
+// ═══════════════════════════════════════════════════════════════
+
+// POST /api/auth/fingerprint/enroll — User đăng ký vân tay của mình
+app.post('/api/auth/fingerprint/enroll', requireAuth, async (req, res) => {
+    try {
+        const { template } = req.body;
+        if (!template || typeof template !== 'string' || template.length < 10) {
+            return res.status(400).json({ error: 'Template vân tay không hợp lệ' });
+        }
+
+        const targetUserId = req.user.user_id;
+        const encrypted = encryptTemplate(template);
+
+        const pool = await getPool();
+        await pool.request()
+            .input('uid', sql.VarChar(50), targetUserId)
+            .input('tpl', sql.NVarChar(sql.MAX), encrypted)
+            .query(`
+                MERGE USER_FINGERPRINT AS target
+                USING (SELECT @uid AS user_id) AS src ON target.user_id = src.user_id
+                WHEN MATCHED THEN
+                    UPDATE SET template_enc = @tpl, active = 1, enrolled_at = GETDATE()
+                WHEN NOT MATCHED THEN
+                    INSERT (user_id, template_enc) VALUES (@uid, @tpl);
+            `);
+
+        await writeAccessLog({
+            userId: targetUserId, fileId: null,
+            action: 'FINGERPRINT_ENROLL', ip: getClientIp(req),
+            note: 'Đăng ký / cập nhật vân tay'
+        });
+
+        res.json({ success: true, message: 'Đăng ký vân tay thành công' });
+    } catch (err) {
+        console.error('[POST /api/auth/fingerprint/enroll]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/auth/fingerprint/verify — Xác thực vân tay → cấp Access Token cho 1 file
+app.post('/api/auth/fingerprint/verify', requireAuth, async (req, res) => {
+    try {
+        const { file_id, template } = req.body;
+        if (!file_id || !template) {
+            return res.status(400).json({ error: 'Thiếu file_id hoặc template' });
+        }
+
+        const pool = await getPool();
+
+        // 1. Kiểm tra file có yêu cầu vân tay không
+        const docRes = await pool.request()
+            .input('file_id', sql.VarChar(50), file_id)
+            .query(`SELECT security_level_id FROM DOCUMENT WHERE file_id = @file_id`);
+
+        if (docRes.recordset.length === 0) {
+            return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+        }
+        const doc = docRes.recordset[0];
+
+        // Cấp 1-3: không cần vân tay
+        if (doc.security_level_id < 4) {
+            return res.json({ success: true, required: false, fingerprint_token: null });
+        }
+
+        // 2. Lấy template đã đăng ký
+        const fpRes = await pool.request()
+            .input('uid', sql.VarChar(50), req.user.user_id)
+            .query(`SELECT template_enc FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
+
+        if (fpRes.recordset.length === 0) {
+            return res.status(403).json({
+                error: 'Bạn chưa đăng ký vân tay. Vui lòng đăng ký trước khi xem tài liệu Tối mật/Tuyệt mật.',
+                needs_enroll: true
+            });
+        }
+
+        // 3. Gọi Bridge để so khớp
+        const storedTemplate = decryptTemplate(fpRes.recordset[0].template_enc);
+        let match = false;
+        try {
+            const bridgeRes = await fetch(`${FINGERPRINT_BRIDGE_URL}/compare`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ template1: storedTemplate, template2: template }),
+            });
+            if (!bridgeRes.ok) {
+                throw new Error(`Bridge HTTP ${bridgeRes.status}`);
+            }
+            const bridgeData = await bridgeRes.json();
+            match = bridgeData.match === true;
+        } catch (err) {
+            console.error('[fingerprint-verify] Bridge error:', err.message);
+            return res.status(503).json({
+                error: 'Không kết nối được máy quét vân tay. Vui lòng kiểm tra thiết bị ZK9500 và Bridge (localhost:9000).',
+                bridge_error: err.message
+            });
+        }
+
+        if (!match) {
+            await writeAccessLog({
+                userId: req.user.user_id, fileId: file_id,
+                action: 'FINGERPRINT_FAIL', ip: getClientIp(req),
+                note: 'Vân tay không khớp'
+            });
+            return res.status(403).json({ error: 'Vân tay không khớp. Vui lòng thử lại.' });
+        }
+
+        // 4. Cấp token tạm (5 phút, gắn với file + user)
+        const fpToken = jwt.sign(
+            {
+                user_id: req.user.user_id,
+                file_id: file_id,
+                purpose: 'file_access',
+            },
+            JWT_SECRET,
+            { expiresIn: FINGERPRINT_TOKEN_EXPIRES_IN }
+        );
+
+        await writeAccessLog({
+            userId: req.user.user_id, fileId: file_id,
+            action: 'FINGERPRINT_OK', ip: getClientIp(req),
+            note: `Xác thực vân tay OK → cấp token xem tài liệu cấp ${doc.security_level_id}`
+        });
+
+        res.json({
+            success: true,
+            required: true,
+            fingerprint_token: fpToken,
+            expires_in: FINGERPRINT_TOKEN_EXPIRES_IN,
+        });
+    } catch (err) {
+        console.error('[POST /api/auth/fingerprint/verify]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // 1. HEALTH
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 app.get('/api/health', async (req, res) => {
     try {
         const pool = await getPool();
@@ -407,24 +644,20 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// ============================================================
-// 1.1 HTTP STATUS TEST & SIMULATION
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// 1.1 HTTP ERROR TEST
+// ═══════════════════════════════════════════════════════════════
 app.get('/api/test-http-error/:code', (req, res) => {
     const code = parseInt(req.params.code, 10) || 500;
     const msg = req.query.msg || `Mô phỏng phản hồi mã lỗi HTTP ${code} từ máy chủ Backend QK7 DataHub`;
     return res.status(code).json({
-        ok: false,
-        code,
-        error: msg,
-        timestamp: new Date().toISOString()
+        ok: false, code, error: msg, timestamp: new Date().toISOString()
     });
 });
 
-
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 // 2. DANH MỤC
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 app.get('/api/meta', async (req, res) => {
     try {
         const pool = await getPool();
@@ -432,29 +665,17 @@ app.get('/api/meta', async (req, res) => {
             pool.request().query(`SELECT type_id, name, description FROM DOCUMENT_TYPE ORDER BY name`),
             pool.request().query(`
                 SELECT u.unit_id, u.name, u.parent_id, p.name AS parent_name
-                FROM UNIT u
-                LEFT JOIN UNIT p ON p.unit_id = u.parent_id
-                ORDER BY u.name
+                FROM UNIT u LEFT JOIN UNIT p ON p.unit_id = u.parent_id ORDER BY u.name
             `),
             pool.request().query(`SELECT level_id, code, name FROM SECURITY_LEVEL ORDER BY level_id`),
-            pool.request().query(`
-                SELECT rank_id, name, sort_order
-                FROM MILITARY_RANK
-                WHERE active = 1
-                ORDER BY sort_order, name
-            `),
-            pool.request().query(`
-                SELECT position_id, name, sort_order
-                FROM MILITARY_POSITION
-                WHERE active = 1
-                ORDER BY sort_order, name
-            `)
+            pool.request().query(`SELECT rank_id, name, sort_order FROM MILITARY_RANK WHERE active = 1 ORDER BY sort_order, name`),
+            pool.request().query(`SELECT position_id, name, sort_order FROM MILITARY_POSITION WHERE active = 1 ORDER BY sort_order, name`)
         ]);
         res.json({
-            types:     types.recordset,
-            units:     units.recordset,
-            levels:    levels.recordset,
-            ranks:     ranks.recordset,
+            types: types.recordset,
+            units: units.recordset,
+            levels: levels.recordset,
+            ranks: ranks.recordset,
             positions: positions.recordset
         });
     } catch (e) {
@@ -463,10 +684,9 @@ app.get('/api/meta', async (req, res) => {
     }
 });
 
-
-// ============================================================
-// 3. ĐỌC — TÌM KIẾM TÀI LIỆU
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// 3. TÌM KIẾM TÀI LIỆU (GUEST OK — giới hạn bởi clearance)
+// ═══════════════════════════════════════════════════════════════
 app.get('/api/documents', async (req, res) => {
     try {
         const pool = await getPool();
@@ -546,9 +766,9 @@ app.get('/api/documents', async (req, res) => {
     }
 });
 
-// ============================================================
-// 3b. ĐỌC CHI TIẾT 1 TÀI LIỆU
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// 3b. CHI TIẾT 1 TÀI LIỆU
+// ═══════════════════════════════════════════════════════════════
 app.get('/api/documents/:fileId', async (req, res) => {
     try {
         const pool = await getPool();
@@ -556,15 +776,11 @@ app.get('/api/documents/:fileId', async (req, res) => {
             .input('file_id', sql.VarChar(50), req.params.fileId)
             .query(`
                 SELECT d.*,
-                       d.doc_type_id AS type_id,
-                       dt.name AS doc_type_name,
-                       dt.name AS type_name,
-                       u.name AS unit_name,
-                       d.issuing_unit_id AS unit_id,
-                       d.issued_date AS issue_date,
+                       d.doc_type_id AS type_id, dt.name AS doc_type_name,
+                       dt.name AS type_name, u.name AS unit_name,
+                       d.issuing_unit_id AS unit_id, d.issued_date AS issue_date,
                        d.file_size AS file_size_bytes,
-                       sl.name AS security_name,
-                       sl.name AS security_level_name
+                       sl.name AS security_name, sl.name AS security_level_name
                 FROM DOCUMENT d
                 LEFT JOIN DOCUMENT_TYPE dt ON dt.type_id  = d.doc_type_id
                 LEFT JOIN UNIT u          ON u.unit_id   = d.issuing_unit_id
@@ -581,14 +797,12 @@ app.get('/api/documents/:fileId', async (req, res) => {
     }
 });
 
-// ============================================================
-// 4. TẠO — UPLOAD PDF MỚI
-// ============================================================
-app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
+// ═══════════════════════════════════════════════════════════════
+// 4. UPLOAD (yêu cầu đăng nhập)
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'Thiếu file PDF' });
-        }
+        if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
 
         const docTypeId = req.body.doc_type_id || req.body.type_id || null;
         const issuingUnitId = req.body.issuing_unit_id || req.body.unit_id || null;
@@ -599,19 +813,11 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
         const signer = req.body.signer || null;
         const summary = req.body.summary || null;
 
-        if (!title || !title.trim()) {
-            return res.status(400).json({ error: 'Thiếu trích yếu' });
-        }
-        if (!securityLevelId) {
-            return res.status(400).json({ error: 'Thiếu mức bảo mật' });
-        }
+        if (!title || !title.trim()) return res.status(400).json({ error: 'Thiếu trích yếu' });
+        if (!securityLevelId) return res.status(400).json({ error: 'Thiếu mức bảo mật' });
 
-        const fileId = 'DOC-' + Date.now() + '-' +
-                       Math.random().toString(36).slice(2, 6).toUpperCase();
-
-        const sha256 = crypto.createHash('sha256')
-            .update(req.file.buffer).digest('hex');
-
+        const fileId = 'DOC-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+        const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
         const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } =
             buildStoredPath({ docTypeId, documentCode, fallbackId: fileId });
 
@@ -679,35 +885,33 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
             file_id: fileId,
             stored_path: relPath,
             sha256
+            userId: req.user.user_id, fileId, action: 'UPLOAD',
+            ip: req.ip || '', note: `Upload: ${req.file.originalname}`
         });
 
+        res.json({ success: true, file_id: fileId, stored_path: relPath, sha256 });
     } catch (err) {
         console.error('[POST /api/documents/upload]', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// ============================================================
-// 5. CẬP NHẬT — SỬA METADATA (và tùy chọn thay file)
-// ============================================================
-app.put('/api/documents/:fileId',
-    upload.single('file'),
-    async (req, res) => {
+// ═══════════════════════════════════════════════════════════════
+// 5. CẬP NHẬT (yêu cầu đăng nhập)
+// ═══════════════════════════════════════════════════════════════
+app.put('/api/documents/:fileId', requireAuth, upload.single('file'), async (req, res) => {
     const fileId = req.params.fileId;
     try {
         const pool = await getPool();
-
         const exist = await pool.request()
             .input('file_id', sql.VarChar(50), fileId)
-            .query(`SELECT stored_path, original_name, sha256
-                    FROM DOCUMENT WHERE file_id = @file_id`);
+            .query(`SELECT stored_path, original_name, sha256 FROM DOCUMENT WHERE file_id = @file_id`);
 
         if (exist.recordset.length === 0) {
             return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
         }
 
         const oldDoc = exist.recordset[0];
-
         const docTypeId = req.body.doc_type_id || req.body.type_id || null;
         const issuingUnitId = req.body.issuing_unit_id || req.body.unit_id || null;
         const issuedDate = req.body.issued_date || req.body.issue_date || null;
@@ -717,47 +921,40 @@ app.put('/api/documents/:fileId',
         const signer = req.body.signer || null;
         const summary = req.body.summary || null;
 
-        if (!title || !title.trim()) {
-            return res.status(400).json({ error: 'Thiếu trích yếu' });
-        }
-        if (!securityLevelId) {
-            return res.status(400).json({ error: 'Thiếu mức bảo mật' });
-        }
+        if (!title || !title.trim()) return res.status(400).json({ error: 'Thiếu trích yếu' });
+        if (!securityLevelId) return res.status(400).json({ error: 'Thiếu mức bảo mật' });
 
-        let storedPath   = oldDoc.stored_path;
+        let storedPath = oldDoc.stored_path;
         let originalName = oldDoc.original_name;
-        let mimeType     = 'application/pdf';
-        let fileSize     = null;
-        let sha256       = oldDoc.sha256;
+        let mimeType = 'application/pdf';
+        let fileSize = null;
+        let sha256 = oldDoc.sha256;
         let replacedFile = false;
 
         if (req.file) {
             const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } =
                 buildStoredPath({ docTypeId, documentCode, fallbackId: fileId });
 
-            sha256 = crypto.createHash('sha256')
-                .update(req.file.buffer).digest('hex');
+            sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
             const sha8 = sha256.slice(0, 8);
             const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
-            const relPath  = `uploads/${yyyy}/${mm}/${fileName}`;
-            const absPath  = path.join(ROOT_DIR, relPath);
+            const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
+            const absPath = path.join(ROOT_DIR, relPath);
 
             fs.mkdirSync(path.dirname(absPath), { recursive: true });
             fs.writeFileSync(absPath, req.file.buffer);
 
-            // Xóa file cũ nếu khác file mới
             const oldAbs = path.join(ROOT_DIR, oldDoc.stored_path);
-            if (oldAbs !== absPath && fs.existsSync(oldAbs) &&
-                oldAbs.startsWith(PDF_ROOT)) {
+            if (oldAbs !== absPath && fs.existsSync(oldAbs) && oldAbs.startsWith(PDF_ROOT)) {
                 try { fs.unlinkSync(oldAbs); } catch (e) {
                     console.error('[update] Xóa file cũ lỗi:', e.message);
                 }
             }
 
-            storedPath   = relPath;
+            storedPath = relPath;
             originalName = req.file.originalname;
-            mimeType     = req.file.mimetype;
-            fileSize     = req.file.size;
+            mimeType = req.file.mimetype;
+            fileSize = req.file.size;
             replacedFile = true;
         }
 
@@ -777,65 +974,46 @@ app.put('/api/documents/:fileId',
 
         let updateQuery = `
             UPDATE DOCUMENT SET
-              document_code     = @document_code,
-              title             = @title,
-              doc_type_id       = @doc_type_id,
-              issued_date       = @issued_date,
-              issuing_unit_id   = @issuing_unit_id,
-              signer            = @signer,
-              summary           = @summary,
+              document_code = @document_code, title = @title, doc_type_id = @doc_type_id,
+              issued_date = @issued_date, issuing_unit_id = @issuing_unit_id,
+              signer = @signer, summary = @summary,
               security_level_id = @security_level_id,
-              stored_path       = @stored_path,
-              original_name     = @original_name,
-              mime_type         = @mime_type,
-              updated_at        = GETDATE()
+              stored_path = @stored_path, original_name = @original_name,
+              mime_type = @mime_type, updated_at = GETDATE()
         `;
 
         if (replacedFile) {
             updateQuery += `, file_size = @file_size, sha256 = @sha256`;
-            reqUpdate.input('file_size', sql.BigInt,  fileSize);
-            reqUpdate.input('sha256',    sql.Char(64), sha256);
+            reqUpdate.input('file_size', sql.BigInt, fileSize);
+            reqUpdate.input('sha256', sql.Char(64), sha256);
         }
-
         updateQuery += ` WHERE file_id = @file_id`;
 
         await reqUpdate.query(updateQuery);
 
         await writeAccessLog({
-            userId: req.user.user_id,
-            fileId,
-            action: 'UPDATE',
+            userId: req.user.user_id, fileId, action: 'UPDATE',
             ip: req.ip || '',
-            note: replacedFile
-                ? `Sửa metadata + thay file: ${originalName}`
-                : `Sửa metadata: ${title.trim()}`
+            note: replacedFile ? `Sửa metadata + thay file: ${originalName}` : `Sửa metadata: ${title.trim()}`
         });
 
-        res.json({
-            success: true,
-            file_id: fileId,
-            replaced_file: replacedFile,
-            stored_path: storedPath
-        });
-
+        res.json({ success: true, file_id: fileId, replaced_file: replacedFile, stored_path: storedPath });
     } catch (err) {
         console.error('[PUT /api/documents/:id]', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// ============================================================
-// 6. XÓA — XÓA TÀI LIỆU (file + record)
-// ============================================================
-app.delete('/api/documents/:fileId', async (req, res) => {
+// ═══════════════════════════════════════════════════════════════
+// 6. XÓA (yêu cầu đăng nhập)
+// ═══════════════════════════════════════════════════════════════
+app.delete('/api/documents/:fileId', requireAuth, async (req, res) => {
     const fileId = req.params.fileId;
     try {
         const pool = await getPool();
-
         const result = await pool.request()
             .input('file_id', sql.VarChar(50), fileId)
-            .query(`SELECT stored_path, original_name
-                    FROM DOCUMENT WHERE file_id = @file_id`);
+            .query(`SELECT stored_path, original_name FROM DOCUMENT WHERE file_id = @file_id`);
 
         if (result.recordset.length === 0) {
             return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
@@ -844,41 +1022,34 @@ app.delete('/api/documents/:fileId', async (req, res) => {
         const doc = result.recordset[0];
         const filePath = path.join(ROOT_DIR, doc.stored_path);
 
-        // Xóa file trên ổ đĩa
         if (fs.existsSync(filePath) && filePath.startsWith(PDF_ROOT)) {
             try { fs.unlinkSync(filePath); } catch (e) {
                 console.error('[delete file]', e.message);
             }
         }
 
-        // Xóa log trước (do FK), rồi xóa document
         await pool.request()
             .input('file_id', sql.VarChar(50), fileId)
             .query(`DELETE FROM ACCESS_LOG WHERE file_id = @file_id`);
-
         await pool.request()
             .input('file_id', sql.VarChar(50), fileId)
             .query(`DELETE FROM DOCUMENT WHERE file_id = @file_id`);
 
         await writeAccessLog({
-            userId: req.user.user_id,
-            fileId: null,
-            action: 'DELETE',
-            ip: req.ip || '',
-            note: `Xóa tài liệu ${fileId} (${doc.original_name})`
+            userId: req.user.user_id, fileId: null, action: 'DELETE',
+            ip: req.ip || '', note: `Xóa tài liệu ${fileId} (${doc.original_name})`
         });
 
         res.json({ success: true, file_id: fileId });
-
     } catch (err) {
         console.error('[DELETE /api/documents/:id]', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// ============================================================
-// 7. XEM / TẢI PDF
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// 7. XEM / TẢI PDF — Cấp 4-5 yêu cầu fingerprint token
+// ═══════════════════════════════════════════════════════════════
 app.get('/api/files/:fileId/view', async (req, res) => {
     const ip = req.ip || req.connection?.remoteAddress || '';
     const fileId = req.params.fileId;
@@ -888,89 +1059,122 @@ app.get('/api/files/:fileId/view', async (req, res) => {
         const pool = await getPool();
         const result = await pool.request()
             .input('file_id', sql.VarChar(50), fileId)
-            .query(`
-                SELECT stored_path, original_name, mime_type, security_level_id
-                FROM DOCUMENT WHERE file_id = @file_id
-            `);
+            .query(`SELECT stored_path, original_name, mime_type, security_level_id
+                    FROM DOCUMENT WHERE file_id = @file_id`);
 
         if (result.recordset.length === 0) {
             await writeAccessLog({
                 userId: req.user.user_id, fileId,
-                action: 'DENIED', ip, note: 'Khong tim thay tai lieu'
+                action: 'DENIED', ip, note: 'Không tìm thấy tài liệu'
             });
             return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
         }
 
         const doc = result.recordset[0];
 
-        // Quyền xem và tải tệp được kiểm soát theo Cấp độ bảo mật (Clearance Level vs doc.security_level_id)
+        // Kiểm tra clearance
         if (doc.security_level_id > req.user.clearance_level_id) {
             await writeAccessLog({
-                userId: req.user.user_id, fileId,
-                action: 'DENIED', ip,
-                note: `Can muc ${doc.security_level_id}${isDownload ? ' de tai ve' : ' de xem'}, user co muc ${req.user.clearance_level_id}`
-            });
-            return res.status(403).json({ error: `Cấp độ bảo mật của bạn không đủ để ${isDownload ? 'tải về' : 'xem'} tài liệu này` });
-        }
-
-        // Quy định bảo mật: Từ cấp 3 trở đi (gồm Cấp 3, Cấp 4, Cấp 5) chỉ duy nhất cho phép xem, KHÔNG được tải về.
-        // Chỉ cấp 1 và cấp 2 được phép tải về máy.
-        if (isDownload && doc.security_level_id >= 3) {
-            await writeAccessLog({
-                userId: req.user.user_id, fileId,
-                action: 'DENIED', ip,
-                note: `Tu choi tai ve: Tai lieu Cap ${doc.security_level_id} chi duy nhat cho phep xem truc tiep`
+                userId: req.user.user_id, fileId, action: 'DENIED', ip,
+                note: `Cần mức ${doc.security_level_id} để xem, user có mức ${req.user.clearance_level_id}`
             });
             return res.status(403).json({
-                error: 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp trên hệ thống, không được phép tải về máy.'
+                error: `Cấp độ bảo mật của bạn không đủ để ${isDownload ? 'tải về' : 'xem'} tài liệu này`
+            });
+        }
+
+        // ═══ Cấp 4-5: yêu cầu fingerprint token ═══
+        if (doc.security_level_id >= 4) {
+            if (!req.user.is_authenticated) {
+                return res.status(401).json({
+                    error: 'Tài liệu Tối mật/Tuyệt mật yêu cầu đăng nhập',
+                    require_fingerprint: true
+                });
+            }
+
+            const fpToken = req.headers['x-fingerprint-token'];
+            if (!fpToken) {
+                await writeAccessLog({
+                    userId: req.user.user_id, fileId, action: 'DENIED', ip,
+                    note: `Thiếu fingerprint token cho tài liệu cấp ${doc.security_level_id}`
+                });
+                return res.status(403).json({
+                    error: 'Tài liệu Tối mật/Tuyệt mật yêu cầu xác thực vân tay',
+                    require_fingerprint: true
+                });
+            }
+
+            try {
+                const decoded = jwt.verify(fpToken, JWT_SECRET);
+                if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
+                if (decoded.file_id !== fileId) throw new Error('Token không khớp file');
+                if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
+            } catch (err) {
+                await writeAccessLog({
+                    userId: req.user.user_id, fileId, action: 'DENIED', ip,
+                    note: `Fingerprint token không hợp lệ: ${err.message}`
+                });
+                return res.status(403).json({
+                    error: 'Phiên xác thực vân tay đã hết hạn. Vui lòng quét lại.',
+                    require_fingerprint: true
+                });
+            }
+        }
+
+        // Cấp 3+: không cho tải về
+        if (isDownload && doc.security_level_id >= 3) {
+            await writeAccessLog({
+                userId: req.user.user_id, fileId, action: 'DENIED', ip,
+                note: `Từ chối tải về: Tài liệu Cấp ${doc.security_level_id} chỉ cho phép xem`
+            });
+            return res.status(403).json({
+                error: 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy.'
             });
         }
 
         const filePath = path.join(ROOT_DIR, doc.stored_path);
-
         if (!filePath.startsWith(PDF_ROOT)) {
             return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
         }
-
         if (!fs.existsSync(filePath)) {
             await writeAccessLog({
-                userId: req.user.user_id, fileId,
-                action: 'ERROR', ip, note: 'File khong ton tai tren o dia'
+                userId: req.user.user_id, fileId, action: 'ERROR', ip,
+                note: 'File không tồn tại trên ổ đĩa'
             });
             return res.status(404).json({ error: 'File không tồn tại: ' + doc.stored_path });
         }
 
         await writeAccessLog({
             userId: req.user.user_id, fileId,
-            action: isDownload ? 'DOWNLOAD' : 'VIEW',
-            ip
+            action: isDownload ? 'DOWNLOAD' : 'VIEW', ip
         });
 
         res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
         res.setHeader('Content-Disposition',
             `${isDownload ? 'attachment' : 'inline'}; filename="${encodeURIComponent(doc.original_name)}"`);
         fs.createReadStream(filePath).pipe(res);
-
     } catch (err) {
         console.error('[GET /api/files/:id/view]', err);
         try {
             await writeAccessLog({
-                userId: req.user.user_id, fileId,
-                action: 'ERROR', ip, note: err.message
+                userId: req.user.user_id, fileId, action: 'ERROR', ip, note: err.message
             });
         } catch (_) {}
         res.status(500).json({ error: err.message });
     }
 });
 
-// ============================================================
-// 8. NHẬT KÝ
-// ============================================================
-app.get('/api/access-logs', async (req, res) => {
+// ═══════════════════════════════════════════════════════════════
+// 8. NHẬT KÝ (admin — clearance >= 4)
+// ═══════════════════════════════════════════════════════════════
+app.get('/api/access-logs', requireAuth, async (req, res) => {
     try {
+        if (req.user.clearance_level_id < 4) {
+            return res.status(403).json({ error: 'Cần quyền quản trị (mức 4+)' });
+        }
+
         const pool = await getPool();
         const r = pool.request();
-
         let query = `
             SELECT TOP 200
                 l.log_id, l.user_id, u.full_name,
@@ -981,7 +1185,6 @@ app.get('/api/access-logs', async (req, res) => {
             LEFT JOIN DOCUMENT d  ON d.file_id = l.file_id
             WHERE 1 = 1
         `;
-
         if (req.query.user) {
             query += ` AND l.user_id = @user`;
             r.input('user', sql.VarChar(50), req.query.user);
@@ -1000,7 +1203,7 @@ app.get('/api/access-logs', async (req, res) => {
     }
 });
 
-// ─── Error handler cho multer ───
+// ─── Multer error handler ───
 app.use((err, req, res, next) => {
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
@@ -1021,25 +1224,26 @@ app.use('/api/ai', require('./src/ai-routes'));
 // ─── Admin CRUD routes ───
 require('./src/admin-routes')(app, { sql, getPool, writeAccessLog });
 // ─── Lấy IP client (xử lý qua proxy/nginx) ───
+
+// ═══════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS (giữ nguyên vị trí — function declarations hoisted)
+// ═══════════════════════════════════════════════════════════════
 function getClientIp(req) {
     const fwd = req.headers['x-forwarded-for'];
     if (fwd) return String(fwd).split(',')[0].trim();
     return (req.ip || req.connection?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
 }
 
-// ─── Kiểm tra IP có bị block ───
 async function checkIpBlocked(ip) {
     try {
         const pool = await getPool();
         const r = await pool.request()
             .input('ip', sql.VarChar(50), ip)
-            .query(`SELECT ip, blocked_until, reason
-                    FROM IP_BLOCKLIST
+            .query(`SELECT ip, blocked_until, reason FROM IP_BLOCKLIST
                     WHERE ip = @ip AND blocked_until > GETDATE()`);
         if (r.recordset.length > 0) {
             return { blocked: true, ...r.recordset[0] };
         }
-        // Cleanup record hết hạn
         await pool.request()
             .input('ip', sql.VarChar(50), ip)
             .query(`DELETE FROM IP_BLOCKLIST WHERE ip = @ip AND blocked_until <= GETDATE()`);
@@ -1050,7 +1254,6 @@ async function checkIpBlocked(ip) {
     }
 }
 
-// ─── Ghi log login attempt ───
 async function writeLoginAttempt({ ip, username, result }) {
     try {
         const pool = await getPool();
@@ -1065,7 +1268,6 @@ async function writeLoginAttempt({ ip, username, result }) {
     }
 }
 
-// ─── Đếm USERNAME_NOT_FOUND từ IP → block nếu vượt ngưỡng ───
 async function checkAndBlockIp(ip) {
     try {
         const pool = await getPool();
@@ -1085,12 +1287,9 @@ async function checkAndBlockIp(ip) {
                 .input('until',  sql.DateTime,      until)
                 .input('reason', sql.NVarChar(200), `Dò username ${count} lần trong ${IPBLOCK_WINDOW_MINUTES} phút`)
                 .query(`MERGE IP_BLOCKLIST AS target
-                        USING (SELECT @ip AS ip) AS src
-                        ON target.ip = src.ip
-                        WHEN MATCHED THEN
-                            UPDATE SET blocked_until = @until, reason = @reason, blocked_at = GETDATE()
-                        WHEN NOT MATCHED THEN
-                            INSERT (ip, blocked_until, reason) VALUES (@ip, @until, @reason);`);
+                        USING (SELECT @ip AS ip) AS src ON target.ip = src.ip
+                        WHEN MATCHED THEN UPDATE SET blocked_until = @until, reason = @reason, blocked_at = GETDATE()
+                        WHEN NOT MATCHED THEN INSERT (ip, blocked_until, reason) VALUES (@ip, @until, @reason);`);
             console.warn(`[IPBLOCK] Đã chặn IP ${ip} trong ${IPBLOCK_DURATION_MINUTES} phút (${count} lần dò username)`);
             return true;
         }
@@ -1100,9 +1299,8 @@ async function checkAndBlockIp(ip) {
         return false;
     }
 }
-;
 
-// ─── SPA Fallback: mọi request GET/HEAD điều hướng giao diện trả về index.html ───
+// ─── SPA Fallback ───
 app.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs')) {
@@ -1116,38 +1314,12 @@ app.use((req, res, next) => {
     }
 });
 
-// ─── KHỞI ĐỘNG ───
-async function start() {
-    if (!fs.existsSync(PDF_ROOT)) {
-        fs.mkdirSync(PDF_ROOT, { recursive: true });
-        console.log(`[FS] Da tao thu muc: ${PDF_ROOT}`);
-    }
-
-    const ok = await testConnection();
-    if (!ok) {
-        console.error('Khong the ket noi database. Kiem tra .env va SQL Server.');
-        process.exit(1);
-    }
-
-    app.listen(PORT, () => {
-        console.log('');
-        console.log(`  QK7 Paperless Gateway`);
-        console.log(`  Web:      http://localhost:${PORT}`);
-        console.log(`  Swagger:  http://localhost:${PORT}/api-docs`);
-        console.log(`  PDF root: ${PDF_ROOT}`);
-        console.log('');
-    });
-
-
-
-
-// Thử nghiệm - Test PDF parsing
-// ============================================================
-// 9. PARSE PDF (trích xuất metadata & text)
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// 9. PARSE PDF (yêu cầu đăng nhập — tránh lạm dụng OCR)
+// ═══════════════════════════════════════════════════════════════
 const { parseDocumentPdf } = require('./pdf-parser');
 
-app.post('/api/documents/parse', upload.single('file'), async (req, res) => {
+app.post('/api/documents/parse', requireAuth, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
@@ -1167,15 +1339,40 @@ app.post('/api/documents/parse', upload.single('file'), async (req, res) => {
     }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// KHỞI ĐỘNG
+// ═══════════════════════════════════════════════════════════════
+async function start() {
+    if (!fs.existsSync(PDF_ROOT)) {
+        fs.mkdirSync(PDF_ROOT, { recursive: true });
+        console.log(`[FS] Đã tạo thư mục: ${PDF_ROOT}`);
+    }
 
+    const ok = await testConnection();
+    if (!ok) {
+        console.error('Không thể kết nối database. Kiểm tra .env và SQL Server.');
+        process.exit(1);
+    }
 
-
-
-
-
+    app.listen(PORT, () => {
+        console.log('');
+        console.log('  ╔════════════════════════════════════════════════════╗');
+        console.log('  ║  QK7 Paperless Gateway                             ║');
+        console.log('  ╠════════════════════════════════════════════════════╣');
+        console.log(`  ║  Web:      http://localhost:${PORT}                    ║`);
+        console.log(`  ║  Swagger:  http://localhost:${PORT}/api-docs           ║`);
+        console.log(`  ║  PDF root: ${PDF_ROOT.substring(0, 30)}...             ║`);
+        console.log('  ╠════════════════════════════════════════════════════╣');
+        console.log('  ║  BẢO MẬT:                                          ║');
+        console.log(`  ║  • JWT:    ${process.env.JWT_SECRET ? 'ĐÃ SET ✅' : 'MẶC ĐỊNH ⚠️ '}                              ║`);
+        console.log(`  ║  • Legacy: ${ALLOW_LEGACY_AUTH ? 'BẬT ⚠️  (không an toàn)' : 'TẮT ✅'}                ║`);
+        console.log(`  ║  • Finger: ${FP_ENC_KEY ? 'ĐÃ MÃ HÓA ✅' : 'PLAINTEXT ⚠️ '}                          ║`);
+        console.log('  ╚════════════════════════════════════════════════════╝');
+        console.log('');
+    });
 }
 
 start();
 
-process.on('SIGINT',  async () => { await closePool(); process.exit(0); });
+process.on('SIGINT', async () => { await closePool(); process.exit(0); });
 process.on('SIGTERM', async () => { await closePool(); process.exit(0); });

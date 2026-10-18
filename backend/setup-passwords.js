@@ -1,4 +1,5 @@
 // setup-passwords.js
+// Kịch bản này sẽ set password cho user_id = USR-001 có vai trò là admin
 // Chạy: node setup-passwords.js
 const bcrypt = require('bcryptjs');
 const { sql, getPool, closePool } = require('./src/db');
@@ -19,7 +20,7 @@ const DEFAULT_PASSWORD = '123456789';
 
         console.log(`[setup] Đã set password cho ${result.rowsAffected[0]} user`);
         console.log(`[setup] Mật khẩu: ${DEFAULT_PASSWORD}`);
-        console.log('[setup] user_id: USR-001, USR-002, USR-003, USR-004');
+        console.log('[setup] user_id: USR-001');
 
         await closePool();
         process.exit(0);

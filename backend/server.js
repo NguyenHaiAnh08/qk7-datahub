@@ -858,6 +858,33 @@ app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req
             `);
 
         await writeAccessLog({
+            userId: req.user.user_id,
+            fileId,
+            action: 'UPLOAD',
+            ip: req.ip || '',
+            note: `Upload: ${req.file.originalname}`
+        });
+
+        // Bất đồng bộ báo cho AI_BOXCHAT lập chỉ mục số trang
+        fetch('http://127.0.0.1:8001/ai/ingest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                file_id: fileId,
+                document_code: documentCode || fileId,
+                title: title.trim(),
+                stored_path: relPath,
+                security_level_id: parseInt(securityLevelId, 10)
+            })
+        }).catch(() => {
+            // Không làm gián đoạn phản hồi nếu AI service đang offline
+        });
+
+        res.json({
+            success: true,
+            file_id: fileId,
+            stored_path: relPath,
+            sha256
             userId: req.user.user_id, fileId, action: 'UPLOAD',
             ip: req.ip || '', note: `Upload: ${req.file.originalname}`
         });
@@ -1191,8 +1218,12 @@ app.use((err, req, res, next) => {
     next();
 });
 
+// ─── AI Assistant routes ───
+app.use('/api/ai', require('./src/ai-routes'));
+
 // ─── Admin CRUD routes ───
 require('./src/admin-routes')(app, { sql, getPool, writeAccessLog });
+// ─── Lấy IP client (xử lý qua proxy/nginx) ───
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS (giữ nguyên vị trí — function declarations hoisted)

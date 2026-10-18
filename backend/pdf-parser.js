@@ -65,6 +65,68 @@ let catalogCache = { data: null, loadedAt: 0 };
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+
+// ═══════════════════════════════════════════════════════════════
+// FUZZY MATCHING — So khớp mờ, không cần bảng alias 
+// ═══════════════════════════════════════════════════════════════
+
+/** Bỏ dấu tiếng Việt: "Đại tá" → "dai ta" */
+function removeDiacritics(str) {
+    if (!str) return '';
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+}
+
+/** Khoảng cách Levenshtein — số phép sửa tối thiểu để biến a thành b */
+function levenshtein(a, b) {
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+            dp[i][j] = Math.min(
+                dp[i - 1][j] + 1,
+                dp[i][j - 1] + 1,
+                dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+            );
+        }
+    }
+    return dp[a.length][b.length];
+}
+
+/**
+ * So khớp mờ: tìm tên chuẩn trong DB gần nhất với chuỗi OCR đọc được.
+ * @param {string} input - "Đại td", "Thượng ta"...
+ * @param {Array<string|{name:string}>} candidates - catalog.ranks / catalog.positions
+ * @param {number} threshold - Số ký tự sai tối đa (default 2)
+ */
+function fuzzyMatch(input, candidates, threshold = 2) {
+    if (!input || !candidates || candidates.length === 0) return null;
+    const inputNorm = removeDiacritics(input);
+    let best = null;
+    let bestDist = Infinity;
+
+    for (const c of candidates) {
+        const cName = typeof c === 'string' ? c : (c?.name || '');
+        if (!cName) continue;
+        const cNorm = removeDiacritics(cName);
+        const dist = levenshtein(inputNorm, cNorm);
+        if (dist === 0) return cName;
+        if (dist < bestDist && dist <= threshold) {
+            bestDist = dist;
+            best = cName;
+        }
+    }
+    return best;
+}
+
 async function loadCatalogs(getPool, sql) {
     if (catalogCache.data && Date.now() - catalogCache.loadedAt < CATALOG_CACHE_TTL_MS) {
         return catalogCache.data;
@@ -159,6 +221,18 @@ async function loadCatalogs(getPool, sql) {
     const rootUnits = units.filter(u => !u.parent_id).map(u => u.name.toUpperCase());
     const childUnits = units.filter(u => u.parent_id).map(u => u.name.toUpperCase());
 
+
+        // Build position signer pattern (cả có dấu và không dấu để bắt lỗi OCR)
+    const posPatternStr = positions
+        .map(p => {
+            const withD = escapeRegex(p);
+            const withoutD = escapeRegex(removeDiacritics(p));
+            return withD === withoutD ? withD : `(?:${withD}|${withoutD})`;
+        })
+        .sort((a, b) => b.length - a.length)
+        .join('|');
+
+
     const compiledPatterns = patterns.map(p => {
         try {
             return { ...p, compiled: new RegExp(p.regex, 'm') };
@@ -171,6 +245,7 @@ async function loadCatalogs(getPool, sql) {
     catalogCache.data = {
         docTypes, docTypeMap, ranks, positions, units,
         rankPattern, positionPattern,
+        posPatternStr,
         rootUnits, childUnits,
         patterns: compiledPatterns,
     };
@@ -553,7 +628,8 @@ function extractMetadata(text, catalog) {
         result.issued_date = `${year}-${month}-${day.padStart(2, '0')}`;
     }
 
-    // ── Người ký ──
+        // ── Người ký ──
+    // 1. Exact match: Cấp bậc + Tên (dùng catalog.rankPattern)
     if (catalog.rankPattern) {
         const signerRegex = new RegExp(
             `(${catalog.rankPattern})\\s+([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+)+)`
@@ -564,13 +640,32 @@ function extractMetadata(text, catalog) {
         }
     }
 
-    if (!result.signer) {
-        const POSITION_SIGNER = /^(BÍ THƯ|PHÓ BÍ THƯ|T\/M|KT\.|TM\.|CHỦ TỊCH|PHÓ CHỦ TỊCH|CHÍNH ỦY|CHÍNH UỶ)/i;
-        const NAME_REGEX = new RegExp(PARSER_CONFIG.signer_name);
+    // 2. FUZZY match: Cấp bậc + Tên (xử lý OCR sai như "Đại td", "Thuong ta")
+    if (!result.signer && catalog.ranks && catalog.ranks.length > 0) {
+        const rankPrefixRegex = /\b(Đại|Thượng|Trung|Thiếu|Chuẩn|Dai|Thuong|Thieu|Chuan)\s+[A-ZÀ-Ỹa-zà-ỹ]{1,5}/gi;
+        let rankMatch;
+        while ((rankMatch = rankPrefixRegex.exec(text)) !== null) {
+            const matchedRank = fuzzyMatch(rankMatch[0], catalog.ranks);
+            if (matchedRank) {
+                const after = text.slice(rankMatch.index + rankMatch[0].length);
+                const nameMatch = after.match(/^\s*,?\s*([A-ZÀ-Ỹa-zà-ỹ]+(?:\s+[A-ZÀ-Ỹa-zà-ỹ]+){1,4})/i);
+                if (nameMatch) {
+                    result.signer = `${matchedRank} ${nameMatch[1]}`.trim().replace(/\s+/g, ' ');
+                    break;
+                }
+            }
+        }
+    }
 
-        for (let i = 0; i < lines.length - 1; i++) {
+    // 3. Quét ngược từ dưới lên: Chức danh (từ DB) + Tên
+    if (!result.signer && catalog.posPatternStr) {
+        const POSITION_SIGNER = new RegExp(`(?:${catalog.posPatternStr})`, 'i');
+        const NAME_REGEX = /^(?=.*[A-ZÀ-Ỹa-zà-ỹ])[A-ZÀ-Ỹa-zà-ỹ]+(?:\s+[A-ZÀ-Ỹa-zà-ỹ]+){1,4}$/i;
+
+        for (let i = lines.length - 1; i >= 0; i--) {
             if (POSITION_SIGNER.test(lines[i])) {
-                for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+                for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+                    if (POSITION_SIGNER.test(lines[j])) continue;  // Bỏ qua chức danh khác
                     if (NAME_REGEX.test(lines[j])) {
                         result.signer = lines[j];
                         break;
@@ -579,10 +674,19 @@ function extractMetadata(text, catalog) {
                 if (result.signer) break;
             }
         }
-        if (!result.signer) {
-            const tail = lines.slice(-15).reverse();
-            for (const line of tail) {
-                if (NAME_REGEX.test(line)) { result.signer = line; break; }
+    }
+
+    // 4. Fallback cuối: quét ngược tên thuần Việt (bỏ qua dòng toàn số/rác)
+    if (!result.signer) {
+        const NAME_REGEX = /^(?=.*[A-ZÀ-Ỹa-zà-ỹ])[A-ZÀ-Ỹa-zà-ỹ]+(?:\s+[A-ZÀ-Ỹa-zà-ỹ]+){1,4}$/i;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i];
+            if (line.length < 8) continue;
+            if (/^[0-9\s\.\,\-\/]+$/.test(line)) continue;
+            if (!/[À-Ỹà-ỹ]/.test(line) && !/Đ|đ/.test(line)) continue;
+            if (NAME_REGEX.test(line)) {
+                result.signer = line;
+                break;
             }
         }
     }
@@ -730,27 +834,40 @@ async function ocrSignerFromTail(buffer, catalog, nLastPages = 3) {
             return { signer: parsed.signer, signer_position: parsed.signer_position, page: pageIdx };
         }
 
-        // [FIX] Bước 2: fallback rank hardcoded (khi DB MILITARY_RANK thiếu data)
-        const RANK_HARDCODED = /(Đại tướng|Thượng tướng|Trung tướng|Thiếu tướng|Đại tá|Thượng tá|Trung tá|Thiếu tá|Đại úy|Thượng úy|Trung úy|Thiếu úy|Chuẩn úy)/;
-        const rankMatch = ocrText.match(RANK_HARDCODED);
-        if (rankMatch) {
-            // Tìm tên người VN gần sau rank
-            const afterRank = ocrText.slice(rankMatch.index + rankMatch[0].length);
-            const nameMatch = afterRank.match(/^\s*,?\s*([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,3})/);
-            if (nameMatch) {
-                const fullSigner = `${rankMatch[0]} ${nameMatch[1]}`.trim();
-                console.log(`[signer-ocr] ✅ Page ${pageIdx} (hardcoded): "${fullSigner}"`);
-                return { signer: fullSigner, signer_position: null, page: pageIdx };
+        // [FUZZY] Bước 2: Fuzzy match Cấp bậc từ DB (thay RANK_HARDCODED hard-code)
+        if (catalog.ranks && catalog.ranks.length > 0) {
+            const rankPrefixRegex = /\b(Đại|Thượng|Trung|Thiếu|Chuẩn|Dai|Thuong|Thieu|Chuan)\s+[A-ZÀ-Ỹa-zà-ỹ]{1,5}/gi;
+            let rankMatch;
+            while ((rankMatch = rankPrefixRegex.exec(ocrText)) !== null) {
+                const matchedRank = fuzzyMatch(rankMatch[0], catalog.ranks);
+                if (matchedRank) {
+                    const after = ocrText.slice(rankMatch.index + rankMatch[0].length);
+                    const nameMatch = after.match(/^\s*,?\s*([A-ZÀ-Ỹa-zà-ỹ]+(?:\s+[A-ZÀ-Ỹa-zà-ỹ]+){1,4})/i);
+                    if (nameMatch) {
+                        const fullSigner = `${matchedRank} ${nameMatch[1]}`.trim().replace(/\s+/g, ' ');
+                        console.log(`[signer-ocr] ✅ Page ${pageIdx} (fuzzy DB): "${fullSigner}"`);
+                        return { signer: fullSigner, signer_position: null, page: pageIdx };
+                    }
+                }
             }
         }
 
         // [FIX] Bước 3: fallback tên thuần Việt — lấy dòng cuối cùng có dạng tên người
         const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
-        const nameRegex = /^[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,3}$/;
-        for (let k = lines.length - 1; k >= Math.max(0, lines.length - 15); k--) {
-            if (nameRegex.test(lines[k]) && lines[k].length >= 8) {
-                console.log(`[signer-ocr] ⚠️ Page ${pageIdx} (name-only, không rõ rank): "${lines[k]}"`);
-                return { signer: lines[k], signer_position: null, page: pageIdx, warning: 'no_rank' };
+        // Regex mới: linh hoạt hơn, chấp nhận chữ thường
+        const nameRegex = /^[A-ZÀ-Ỹa-zà-ỹ]+(?:\s+[A-ZÀ-Ỹa-zà-ỹ]+){1,4}$/i;
+        
+        for (let k = lines.length - 1; k >= Math.max(0, lines.length - 20); k--) {
+            const line = lines[k];
+            if (line.length < 8) continue;
+            // Bỏ qua dòng toàn số hoặc ký tự rác (như trang 8)
+            if (/^[0-9\s\.\,\-\/]+$/.test(line)) continue; 
+            // Yêu cầu có ít nhất 1 ký tự tiếng Việt có dấu hoặc chữ Đ để tránh bắt nhầm từ tiếng Anh
+            if (!/[À-Ỹà-ỹ]/.test(line) && !/Đ|đ/.test(line)) continue;
+            
+            if (nameRegex.test(line)) {
+                console.log(`[signer-ocr] ⚠️ Page ${pageIdx} (name-only, không rõ rank): "${line}"`);
+                return { signer: line, signer_position: null, page: pageIdx, warning: 'no_rank' };
             }
         }
 
@@ -775,6 +892,27 @@ async function ocrWholeDocument(buffer) {
     }
     return fullText;
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// [FUZZY] Chuẩn hóa Cấp bậc người ký bằng DB
+// ═══════════════════════════════════════════════════════════════
+function normalizeRankName(signer, catalog) {
+    if (!signer || !catalog || !catalog.ranks || catalog.ranks.length === 0) return signer;
+
+    const parts = signer.trim().split(/\s+/);
+    // Thử prefix 3 từ → 2 từ (VD: "Đại td Lê" fail → "Đại td" match "Đại tá")
+    for (let n = Math.min(3, parts.length - 1); n >= 2; n--) {
+        const rankPart = parts.slice(0, n).join(' ');
+        const matched = fuzzyMatch(rankPart, catalog.ranks);
+        if (matched) {
+            const namePart = parts.slice(n).join(' ');
+            return namePart ? `${matched} ${namePart}` : matched;
+        }
+    }
+    return signer;
+}
+
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN
@@ -919,6 +1057,11 @@ async function parseDocumentPdf(buffer, deps = {}) {
         issuer_display = parsed.issuer_unit_name;
     } else if (parsed.issuer_parent_unit_name) {
         issuer_display = parsed.issuer_parent_unit_name;
+    }
+
+    // [FUZZY] Chuẩn hóa cấp bậc người ký (Đại td → Đại tá)
+    if (parsed.signer && catalog) {
+        parsed.signer = normalizeRankName(parsed.signer, catalog);
     }
 
     // ── [FIX] Cập nhật lại missingFields sau khi OCR ──

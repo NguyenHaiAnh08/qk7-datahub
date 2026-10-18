@@ -15,11 +15,11 @@ frontend/.env
 dist/
 backend/public/assets/
 
-# Uploaded documents (Do not commit sensitive military PDFs)
-backend/uploads/**
-!backend/uploads/
-!backend/uploads/**/
-!backend/uploads/.gitkeep
+# # Uploaded documents (Do not commit sensitive military PDFs)
+# backend/uploads/**
+# !backend/uploads/
+# !backend/uploads/**/
+# !backend/uploads/.gitkeep
 
 # Logs and system artifacts
 *.log

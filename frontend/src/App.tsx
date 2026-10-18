@@ -1,11 +1,12 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, useLocation } from 'react-router-dom';
 import { ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { RouterProvider } from './routes/RouterProvider';
 import { HttpErrorListener } from './components/common/HttpErrorListener';
+import { AIChatWidget } from './components/ai-chat/AIChatWidget';
 import './index.css';
 
 /**
@@ -73,6 +74,22 @@ const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 /**
+ * Global AI Assistant Chat Wrapper
+ * Đảm bảo hiển thị xuyên suốt trên mọi trang sau khi quân nhân đăng nhập
+ * (Bao gồm cả Cổng Portal, Bàn làm việc Văn thư và Toàn bộ các trang Quản trị)
+ */
+const AIChatWrapper: React.FC = () => {
+  const location = useLocation();
+
+  // Không hiển thị trên trang đăng nhập
+  if (location.pathname === '/login') {
+    return null;
+  }
+
+  return <AIChatWidget />;
+};
+
+/**
  * Root Application Component
  * Sets up global context providers (Theme, Ant Design, Auth) and BrowserRouter.
  * Route definitions are fully delegated to RouterProvider (auto-discovered routes).
@@ -84,6 +101,7 @@ export const App: React.FC = () => {
         <AntdAppWrapper>
           <AuthProvider>
             <RouterProvider />
+            <AIChatWrapper />
           </AuthProvider>
         </AntdAppWrapper>
       </ThemeProvider>

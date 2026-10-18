@@ -884,7 +884,7 @@ app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req
             success: true,
             file_id: fileId,
             stored_path: relPath,
-            sha256
+            sha256,
             userId: req.user.user_id, fileId, action: 'UPLOAD',
             ip: req.ip || '', note: `Upload: ${req.file.originalname}`
         });

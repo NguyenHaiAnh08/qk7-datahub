@@ -27,6 +27,7 @@ const swaggerSpec = {
     { name: 'Files',     description: 'Xem / tải PDF' },
     { name: 'Logs',      description: 'Nhật ký truy cập' },
     { name: 'Admin',     description: 'Quản trị hệ thống' },
+    { name: 'AI Assistant', description: 'Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded Agentic RAG)' },
   ],
 
   security: [{ UserHeader: [], ClearanceHeader: [] }],
@@ -1111,6 +1112,145 @@ const swaggerSpec = {
       },
     },
 
+    // ==========================================================
+    // AI ASSISTANT (TRỢ LÝ TÁC CHIẾN & VĂN THƯ)
+    // ==========================================================
+    '/api/ai/health': {
+      get: {
+        tags: ['AI Assistant'],
+        summary: 'Kiểm tra trạng thái AI_BOXCHAT Microservice & Fallback',
+        responses: {
+          200: {
+            description: 'Trạng thái hoạt động',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string', example: 'online' },
+                    service: { type: 'string', example: 'AI_BOXCHAT' },
+                    port: { type: 'integer', example: 8001 },
+                    total_chunks_indexed: { type: 'integer', example: 120 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/api/ai/chat': {
+      post: {
+        tags: ['AI Assistant'],
+        summary: 'Hỏi đáp tác chiến & văn thư có trích dẫn số trang [p.X]',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['query'],
+                properties: {
+                  query: { type: 'string', example: 'Quy định bảo mật tài liệu tác chiến?' },
+                  file_id: { type: 'string', nullable: true, example: 'DOC-1760000000000-A1B2' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Câu trả lời kèm trích dẫn số trang',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    answer: { type: 'string' },
+                    citations: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          file_id: { type: 'string' },
+                          document_code: { type: 'string' },
+                          title: { type: 'string' },
+                          page: { type: 'integer' },
+                          security_level_name: { type: 'string' },
+                          snippet: { type: 'string' }
+                        }
+                      }
+                    },
+                    reasoning: {
+                      type: 'object',
+                      properties: {
+                        mem: { type: 'string' },
+                        think: { type: 'string' },
+                        tool_call: { type: 'string' }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/api/ai/study-book/{fileId}': {
+      get: {
+        tags: ['AI Assistant'],
+        summary: 'Tạo Cuốn Sách Riêng 3 Tab (01 Tài liệu, 02 Sơ đồ Mermaid, 03 Kiểm tra trắc nghiệm)',
+        parameters: [{ $ref: '#/components/parameters/FileId' }],
+        responses: {
+          200: {
+            description: 'Dữ liệu 3 tab chi tiết',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    file_id: { type: 'string' },
+                    document_code: { type: 'string' },
+                    title: { type: 'string' },
+                    total_pages: { type: 'integer' },
+                    tab_document: { type: 'object' },
+                    tab_diagram: { type: 'object' },
+                    tab_quiz: { type: 'array', items: { type: 'object' } }
+                  }
+                }
+              }
+            }
+          },
+          403: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+
+    '/api/ai/sync-all': {
+      post: {
+        tags: ['AI Assistant'],
+        summary: 'Đồng bộ toàn bộ metadata và file PDF từ Database sang Vector DB',
+        responses: {
+          200: {
+            description: 'Kết quả đồng bộ',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    total_documents: { type: 'integer', example: 15 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
   },
 
   // ============================================================

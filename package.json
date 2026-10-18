@@ -11,6 +11,8 @@
     "frontend:dev": "cd frontend && npm run dev",
     "frontend:build": "cd frontend && npm run build",
     "dev": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build"
+    "build": "cd frontend && npm run build",
+    "ai:install": "cd boxchat && python -m pip install -r requirements.txt",
+    "ai:start": "cd boxchat && python -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload"
   }
 }

@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Fingerprint,
   Loader2,
   CheckCircle2,
   AlertCircle,
   X,
   RefreshCw,
   Cable,
+  Fingerprint,
 } from 'lucide-react';
 import { fingerprintService } from '../../services/fingerprintService';
+import { TouchIDFingerprint } from '../common/TouchIDFingerprint';
 
 export interface FingerprintScanModalProps {
   open: boolean;
@@ -29,11 +30,49 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   const [phase, setPhase] = useState<Phase>('scanning');
   const [error, setError] = useState<string>('');
   const [score, setScore] = useState<number | null>(null);
-  const [attempt, setAttempt] = useState(0);
   const [needsEnroll, setNeedsEnroll] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+  const inFlightRef = React.useRef(false);
+  const autoRetryTimerRef = React.useRef<any>(null);
+
+  // Progressive fill animation simulating Touch ID scanning
+  useEffect(() => {
+    let timer: any;
+    if (phase === 'scanning') {
+      setProgress(25);
+      timer = setInterval(() => {
+        setProgress((prev) => (prev < 70 ? prev + 12 : prev));
+      }, 2000);
+    } else if (phase === 'success') {
+      setProgress(100);
+    } else if (phase === 'error') {
+      setProgress(0);
+    }
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  // Dọn dẹp timer khi component unmount
+  useEffect(() => {
+    return () => {
+      if (autoRetryTimerRef.current) {
+        clearTimeout(autoRetryTimerRef.current);
+        autoRetryTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      inFlightRef.current = false;
+      if (autoRetryTimerRef.current) {
+        clearTimeout(autoRetryTimerRef.current);
+        autoRetryTimerRef.current = null;
+      }
+      return;
+    }
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setPhase('scanning');
     setError('');
     setScore(null);
@@ -67,26 +106,56 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       }
 
       setScore(res.score ?? null);
+      setProgress(100);
       setPhase('success');
-      setTimeout(() => onSuccess(res.fingerprint_token!), 700);
+      setTimeout(() => onSuccess(res.fingerprint_token!), 900);
     } catch (err: any) {
       const msg = err.message || 'Xác thực thất bại';
-      if (err.data?.agent_offline) {
+      const isAgentOffline = Boolean(err.data?.agent_offline);
+      const isNeedsEnroll = Boolean(err.data?.needs_enroll);
+
+      if (isAgentOffline) {
         setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
-      } else if (err.data?.needs_enroll) {
+        setPhase('error');
+      } else if (isNeedsEnroll) {
         setError('Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên để đăng ký.');
         setNeedsEnroll(true);
-      } else if (err.status === 408) {
-        setError('Hết thời gian chờ quét. Vui lòng thử lại.');
+        setPhase('error');
       } else {
-        setError(msg);
+        const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
+        setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
+        setPhase('error');
+
+        // Tự động quét lại sau 1.2s thay vì phải bấm thủ công
+        if (autoRetryTimerRef.current) {
+          clearTimeout(autoRetryTimerRef.current);
+        }
+        autoRetryTimerRef.current = setTimeout(() => {
+          handleRetry();
+        }, 1200);
       }
-      setPhase('error');
+    } finally {
+      inFlightRef.current = false;
     }
   };
 
   const handleRetry = () => {
+    if (autoRetryTimerRef.current) {
+      clearTimeout(autoRetryTimerRef.current);
+      autoRetryTimerRef.current = null;
+    }
+    inFlightRef.current = false;
+    setProgress(0);
     setAttempt((n) => n + 1);
+  };
+
+  const handleCancel = () => {
+    if (autoRetryTimerRef.current) {
+      clearTimeout(autoRetryTimerRef.current);
+      autoRetryTimerRef.current = null;
+    }
+    inFlightRef.current = false;
+    onCancel();
   };
 
   if (!open) return null;
@@ -115,74 +184,75 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
               </div>
             </div>
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="p-8 flex flex-col items-center text-center min-h-[280px] justify-center">
+          <div className="p-6 flex flex-col items-center text-center min-h-[310px] justify-center">
+            {/* Apple Touch ID Fingerprint Graphic */}
+            <TouchIDFingerprint
+              phase={phase}
+              progress={progress}
+              size="md"
+              className="mb-4"
+            />
+
             {phase === 'scanning' && (
               <>
-                <motion.div
-                  animate={{ scale: [1, 1.08, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="w-24 h-24 rounded-full bg-purple-500/15 border-2 border-purple-500/40 flex items-center justify-center text-purple-600 dark:text-purple-400 mb-5"
-                >
-                  <Fingerprint className="w-12 h-12" />
-                </motion.div>
                 <h4 className="font-bold text-base text-slate-900 dark:text-white mb-1">
                   Đặt ngón tay lên máy quét
                 </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 max-w-xs">
                   Vui lòng đặt ngón tay đã đăng ký lên đầu đọc ZK9500
                 </p>
-                <div className="flex items-center gap-2 text-[11px] text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-500/30 px-3 py-1.5 rounded-full">
+                <div className="flex items-center gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-1.5 rounded-full font-medium">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Đang chờ quét vân tay...
+                  Đang nhận diện vân tay...
                 </div>
               </>
             )}
 
             {phase === 'success' && (
               <>
-                <div className="w-24 h-24 rounded-full bg-emerald-500/15 border-2 border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-5">
-                  <CheckCircle2 className="w-12 h-12" />
+                <div className="flex items-center justify-center gap-1.5 mb-1 text-emerald-600 dark:text-emerald-400 font-bold text-base">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span>Quét vân tay thành công</span>
                 </div>
-                <h4 className="font-bold text-base text-slate-900 dark:text-white mb-1">
-                  Xác thực thành công
-                </h4>
-                {score !== null && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-mono">
-                    Score: {score}
-                  </p>
-                )}
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  Đang mở tài liệu...
+                </p>
               </>
             )}
 
             {phase === 'error' && (
               <>
-                <div className="w-24 h-24 rounded-full bg-rose-500/15 border-2 border-rose-500/40 flex items-center justify-center text-rose-600 dark:text-rose-400 mb-5">
+                <div className="flex items-center justify-center gap-1.5 mb-1 text-rose-500 font-bold text-base">
                   {needsEnroll ? (
-                    <Cable className="w-12 h-12" />
+                    <Cable className="w-5 h-5" />
                   ) : (
-                    <AlertCircle className="w-12 h-12" />
+                    <AlertCircle className="w-5 h-5" />
                   )}
+                  <span>{needsEnroll ? 'Chưa đăng ký vân tay' : 'Xác thực thất bại'}</span>
                 </div>
-                <h4 className="font-bold text-base text-slate-900 dark:text-white mb-1">
-                  {needsEnroll ? 'Chưa đăng ký vân tay' : 'Xác thực thất bại'}
-                </h4>
                 <p className="text-xs text-rose-600 dark:text-rose-400 max-w-xs">
                   {error}
                 </p>
+                {!needsEnroll && !error.includes('Chưa kết nối') && (
+                  <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang tự động quét lại... Đặt ngón tay lên cảm biến</span>
+                  </div>
+                )}
               </>
             )}
           </div>
 
           <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
             >
               Hủy
@@ -193,7 +263,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-purple-600/30 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Thử lại
+                Quét ngay
               </button>
             )}
           </div>

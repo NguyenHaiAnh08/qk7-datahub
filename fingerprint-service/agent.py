@@ -42,7 +42,26 @@ def get_or_create_device_id() -> str:
     return did
 
 
+def free_port(port: int):
+    try:
+        import subprocess
+        res = subprocess.run(["netstat", "-ano"], capture_output=True, text=True)
+        my_pid = str(os.getpid())
+        for line in res.stdout.splitlines():
+            if f":{port}" in line and "LISTENING" in line:
+                parts = line.strip().split()
+                pid = parts[-1]
+                if pid != my_pid and pid != "0":
+                    print(f"[Agent] 🔄 Đóng tiến trình cũ (PID {pid}) đang chiếm cổng {port}...")
+                    subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+                    import time
+                    time.sleep(1)
+    except Exception:
+        pass
+
+
 def start_device_id_server(device_id: str, host: str, port: int):
+    free_port(port)
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             if self.path == "/device-id":
@@ -83,6 +102,7 @@ class FingerprintAgent:
         self.svc = ZK9500Service()
         self.device_id = device_id
         self.running = True
+        self.busy = False
         self.reconnect_delay = 3
 
     async def run(self):
@@ -131,6 +151,15 @@ class FingerprintAgent:
         template_b64 = job.get("template_plain_b64")
         timeout = int(job.get("timeout_seconds", 30))
 
+        if self.busy:
+            print(f"[Agent] ⚠️ Bỏ qua scan {job_id} vì thiết bị đang bận.")
+            await ws.send(json.dumps({
+                "type": "scan_result", "job_id": job_id,
+                "match": False, "score": 0, "error": "BUSY",
+            }))
+            return
+
+        self.busy = True
         print(f"\n[Agent] 📥 scan {job_id} | timeout={timeout}s")
         print(f"[Agent] 👉 Đặt tay lên máy quét...")
 
@@ -158,12 +187,23 @@ class FingerprintAgent:
                 }))
             except Exception:
                 pass
+        finally:
+            self.busy = False
 
     async def _handle_enroll(self, ws, job):
         job_id = job.get("job_id")
         user_id = job.get("user_id")
         step_timeout = max(10, int(job.get("timeout_seconds", 60)) // 3)
 
+        if self.busy:
+            print(f"[Agent] ⚠️ Bỏ qua enroll {job_id} vì thiết bị đang bận.")
+            await ws.send(json.dumps({
+                "type": "enroll_result", "job_id": job_id,
+                "success": False, "error": "BUSY",
+            }))
+            return
+
+        self.busy = True
         print(f"\n[Agent] 📥 enroll {job_id} | user={user_id} | {step_timeout}s/lần")
 
         try:
@@ -184,7 +224,7 @@ class FingerprintAgent:
                     if not matched:
                         await ws.send(json.dumps({
                             "type": "enroll_result", "job_id": job_id,
-                            "success": False, "error": f"Lần {i+1} không khớp ngón ban đầu (score={score})",
+                            "success": False, "error": f"Lần {i+1} không khớp ngón ban đầu. Vui lòng thử lại.",
                         }))
                         return
                 templates.append(t)
@@ -213,6 +253,8 @@ class FingerprintAgent:
                 }))
             except Exception:
                 pass
+        finally:
+            self.busy = False
 
 
 def main():

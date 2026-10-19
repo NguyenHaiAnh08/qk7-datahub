@@ -138,7 +138,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-sm">
+      <div key="preview-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -273,6 +273,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       </div>
 
       <FingerprintScanModal
+        key="fingerprint-scan-modal"
         open={showScanModal}
         fileId={document?.file_id || ''}
         onSuccess={(token) => {

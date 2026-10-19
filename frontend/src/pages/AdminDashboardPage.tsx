@@ -1370,18 +1370,20 @@ export const AdminDashboardPage: React.FC = () => {
       />
 
       {fpEnrollModal.open && fpEnrollModal.user && (
-  <FingerprintEnrollModal
-    open={fpEnrollModal.open}
-    userId={fpEnrollModal.user.user_id}
-    userName={fpEnrollModal.user.full_name}
-    onSuccess={() => {
-      setFpEnrollModal({ open: false, user: null });
-      showToast(`Đã đăng ký vân tay cho ${fpEnrollModal.user?.full_name}`, 'success');
-      loadUsers();
-    }}
-    onCancel={() => setFpEnrollModal({ open: false, user: null })}
-    />
-  )}
+        <FingerprintEnrollModal
+          open={fpEnrollModal.open}
+          userId={fpEnrollModal.user.user_id}
+          userName={fpEnrollModal.user.full_name}
+          hasFingerprint={fpEnrollModal.user.has_fingerprint}
+          onSuccess={() => {
+            const name = fpEnrollModal.user?.full_name;
+            setFpEnrollModal({ open: false, user: null });
+            showToast(`Đã lưu dữ liệu vân tay cho ${name}`, 'success');
+            loadUsers();
+          }}
+          onCancel={() => setFpEnrollModal({ open: false, user: null })}
+        />
+      )}
 
       {/* Generic Modal (Roles, Units, DocTypes, Levels, Ranks, Positions) */}
       <AnimatePresence>

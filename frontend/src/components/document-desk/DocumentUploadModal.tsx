@@ -424,7 +424,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     value={unitId || undefined}
                     onChange={(val) => setUnitId(val || '')}
                     treeData={unitTree}
-                    placeholder=" Chọn đơn vị ban hành "
+                    placeholder="Chọn đơn vị ban hành"
                     allowClear
                     treeDefaultExpandAll
                     treeLine={{ showLeafIcon: false }}

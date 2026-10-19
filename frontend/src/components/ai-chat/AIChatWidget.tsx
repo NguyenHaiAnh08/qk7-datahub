@@ -81,10 +81,173 @@ export const AIChatWidget: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Kiểm tra sức khỏe của AI microservice & DB Fallback
+  // ── Vị trí có thể kéo thả (Draggable) của bong bóng chat ──
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    if (typeof window === 'undefined') return { x: 0, y: 0 };
+    try {
+      const saved = localStorage.getItem('qk7_ai_chat_bubble_pos');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          typeof parsed.x === 'number' &&
+          typeof parsed.y === 'number' &&
+          parsed.x >= 0 &&
+          parsed.x <= window.innerWidth - 60 &&
+          parsed.y >= 0 &&
+          parsed.y <= window.innerHeight - 60
+        ) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return {
+      x: Math.max(16, window.innerWidth - 24 - 56),
+      y: Math.max(16, window.innerHeight - 96 - 56),
+    };
+  });
+
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+    moved: boolean;
+  }>({ startX: 0, startY: 0, origX: 0, origY: 0, moved: false });
+  const justDraggedRef = useRef(false);
+  const currentPosRef = useRef<{ x: number; y: number }>(pos);
+
   useEffect(() => {
-    checkServiceStatus();
+    currentPosRef.current = pos;
+  }, [pos]);
+
+  // Giữ bong bóng trong màn hình khi thay đổi kích thước cửa sổ
+  useEffect(() => {
+    const handleResize = () => {
+      setPos((prev) => {
+        const next = {
+          x: Math.min(Math.max(16, prev.x), window.innerWidth - 56 - 16),
+          y: Math.min(Math.max(16, prev.y), window.innerHeight - 56 - 16),
+        };
+        currentPosRef.current = next;
+        return next;
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: currentPosRef.current.x,
+      origY: currentPosRef.current.y,
+      moved: false,
+    };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - dragStartRef.current.startX;
+      const dy = moveEvent.clientY - dragStartRef.current.startY;
+
+      if (!dragStartRef.current.moved && Math.hypot(dx, dy) > 4) {
+        dragStartRef.current.moved = true;
+        setIsDragging(true);
+      }
+
+      if (dragStartRef.current.moved) {
+        const nextX = Math.min(
+          Math.max(16, dragStartRef.current.origX + dx),
+          window.innerWidth - 56 - 16
+        );
+        const nextY = Math.min(
+          Math.max(16, dragStartRef.current.origY + dy),
+          window.innerHeight - 56 - 16
+        );
+        currentPosRef.current = { x: nextX, y: nextY };
+        setPos({ x: nextX, y: nextY });
+      }
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+
+      if (dragStartRef.current.moved) {
+        justDraggedRef.current = true;
+        setIsDragging(false);
+        try {
+          localStorage.setItem('qk7_ai_chat_bubble_pos', JSON.stringify(currentPosRef.current));
+        } catch {}
+        setTimeout(() => {
+          justDraggedRef.current = false;
+        }, 120);
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
+
+  const handleToggleOpen = () => {
+    if (justDraggedRef.current) return;
+    setIsOpen(!isOpen);
+  };
+
+  // Tính toán vị trí thông minh cho khung chat dựa trên vị trí bong bóng
+  const popupWidth = isExpanded ? 520 : 390;
+  const popupHeight = isExpanded ? 720 : 580;
+
+  const getPopupStyle = (): React.CSSProperties => {
+    if (typeof window === 'undefined') {
+      return { position: 'fixed', bottom: 160, right: 24, zIndex: 99999 };
+    }
+
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+
+    const actualW = Math.min(popupWidth, screenW - 32);
+    const actualH = Math.min(popupHeight, screenH - 100);
+
+    // X: Ưu tiên căn theo lề phải của bong bóng nếu nằm bên phải màn hình, hoặc lề trái nếu nằm bên trái
+    let left = pos.x + 56 - actualW;
+    if (pos.x < screenW / 2) {
+      left = pos.x;
+    }
+    if (left < 16) left = 16;
+    if (left + actualW > screenW - 16) left = screenW - actualW - 16;
+
+    // Y: Nếu bong bóng ở nửa dưới màn hình -> Mở lên trên; nếu ở nửa trên -> Mở xuống dưới
+    let top = 0;
+    if (pos.y > screenH / 2) {
+      top = pos.y - actualH - 12;
+      if (top < 16) top = 16;
+    } else {
+      top = pos.y + 56 + 12;
+      if (top + actualH > screenH - 16) top = screenH - actualH - 16;
+    }
+
+    return {
+      position: 'fixed',
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${actualW}px`,
+      height: `${actualH}px`,
+      zIndex: 99999,
+      boxShadow: isDark
+        ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(114, 46, 209, 0.25)'
+        : '0 25px 50px -12px rgba(114, 46, 209, 0.2), 0 0 20px rgba(0,0,0,0.06)'
+    };
+  };
+
+  // CHỈ kiểm tra sức khỏe của AI microservice & DB Fallback khi người dùng mở hộp chat
+  useEffect(() => {
+    if (isOpen) {
+      checkServiceStatus();
+    }
+  }, [isOpen]);
 
   const checkServiceStatus = async () => {
     try {
@@ -157,7 +320,7 @@ export const AIChatWidget: React.FC = () => {
       const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
         sender: 'ai',
-        text: `Báo cáo đồng chí, hệ thống gặp gián đoạn tạm thời: ${err.message || 'Lỗi kết nối'}. Vui lòng thử lại sau giây lát.`,
+        text: `Báo cáo đồng chí, hệ thống gặp gián đoạn tạm thời. Vui lòng thử lại sau giây lát.`,
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -237,24 +400,38 @@ export const AIChatWidget: React.FC = () => {
   return (
     <>
       {/* ─────────────────────────────────────────────────────────────
-          1. NÚT TRÒN MỞ CHAT (FLOATING ACTION BUTTON) GÓC DƯỚI PHẢI
+          1. NÚT TRÒN MỞ CHAT (FLOATING ACTION BUTTON) KÉO THẢ TỰ DO
       ───────────────────────────────────────────────────────────── */}
-      <div className="fixed bottom-6 right-6" style={{ zIndex: 99999 }}>
+      <div
+        onPointerDown={handlePointerDown}
+        style={{
+          position: 'fixed',
+          left: `${pos.x}px`,
+          top: `${pos.y}px`,
+          zIndex: 99999,
+          touchAction: 'none',
+          userSelect: 'none',
+        }}
+        className={`transition-shadow ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      >
         <Tooltip
-          title="Trợ Lý AI Tác Chiến & Văn Thư (QK7)"
+          title={isDragging ? '' : 'Kéo để di chuyển • Nhấn để mở chat AI'}
           placement="left"
-          open={isOpen ? false : undefined}
+          open={isOpen || isDragging ? false : undefined}
         >
           <button
-            onClick={() => setIsOpen(!isOpen)}
+            type="button"
+            onClick={handleToggleOpen}
             className={`
               relative w-14 h-14 rounded-full flex items-center justify-center text-white
-              shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95
+              shadow-xl transition-transform duration-200
+              ${isDragging ? 'scale-110 shadow-2xl' : 'hover:scale-105 active:scale-95'}
               bg-gradient-to-tr from-[#531dab] via-[#722ED1] to-[#9254de]
               border-2 border-white/20
-              focus:outline-none focus:ring-4 focus:ring-purple-500/30 cursor-pointer
+              focus:outline-none focus:ring-4 focus:ring-purple-500/30
             `}
             style={{
+              cursor: isDragging ? 'grabbing' : 'grab',
               boxShadow: isDark
                 ? '0 10px 25px -5px rgba(114, 46, 209, 0.6), 0 0 15px rgba(146, 84, 222, 0.4)'
                 : '0 10px 25px -5px rgba(114, 46, 209, 0.4)'
@@ -276,22 +453,16 @@ export const AIChatWidget: React.FC = () => {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          2. KHUNG POPUP CHAT (390px x 580px, bo góc 26px, Dark/Light)
+          2. KHUNG POPUP CHAT (bo góc 26px, Dark/Light, Tọa độ thông minh)
       ───────────────────────────────────────────────────────────── */}
       {isOpen && (
         <div
           className={`
-            fixed bottom-24 right-6 flex flex-col overflow-hidden transition-all duration-300
-            ${isExpanded ? 'w-[520px] h-[720px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-110px)]' : 'w-[390px] h-[580px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-110px)]'}
+            flex flex-col overflow-hidden transition-all duration-300
             rounded-[26px] shadow-2xl
             ${isDark ? 'bg-[#0b0c10] border border-purple-800/40 text-slate-100' : 'bg-[#fcfaff] border border-purple-200 text-slate-900'}
           `}
-          style={{
-            zIndex: 99999,
-            boxShadow: isDark
-              ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(114, 46, 209, 0.25)'
-              : '0 25px 50px -12px rgba(114, 46, 209, 0.2), 0 0 20px rgba(0,0,0,0.06)'
-          }}
+          style={getPopupStyle()}
         >
           {/* HEADER KHUNG CHAT */}
           <div
@@ -599,7 +770,7 @@ export const AIChatWidget: React.FC = () => {
           </Button>
         ]}
         width={700}
-        destroyOnClose
+        destroyOnHidden
       >
         {loadingStudyBook ? (
           <div className="py-12 text-center space-y-3">
@@ -718,7 +889,7 @@ export const AIChatWidget: React.FC = () => {
           </Button>
         ]}
         width={760}
-        destroyOnClose
+        destroyOnHidden
       >
         {loadingStudyBook ? (
           <div className="py-12 text-center space-y-3">

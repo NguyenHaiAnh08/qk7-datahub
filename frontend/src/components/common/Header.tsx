@@ -84,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <UploadCloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Văn thư</span>
+            <span>Đăng tải</span>
           </Link>
         )}
 
@@ -173,7 +173,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="flex items-center px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                     >
                       <UploadCloud className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mr-2.5" />
-                      <span>Bàn làm việc văn thư</span>
+                      <span>Đăng tải văn bản</span>
                     </Link>
                   )}
                   {isAdmin && (

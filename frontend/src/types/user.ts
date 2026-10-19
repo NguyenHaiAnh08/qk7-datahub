@@ -13,6 +13,7 @@ export interface User {
   clearance_code?: string;
   roles?: string[];
   role_names?: string[];
+  has_fingerprint?: boolean;
 }
 
 export interface Unit {

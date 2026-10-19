@@ -770,7 +770,7 @@ export const AIChatWidget: React.FC = () => {
           </Button>
         ]}
         width={700}
-        destroyOnHidden
+        destroyOnClose
       >
         {loadingStudyBook ? (
           <div className="py-12 text-center space-y-3">
@@ -889,7 +889,7 @@ export const AIChatWidget: React.FC = () => {
           </Button>
         ]}
         width={760}
-        destroyOnHidden
+        destroyOnClose
       >
         {loadingStudyBook ? (
           <div className="py-12 text-center space-y-3">

@@ -40,6 +40,9 @@ function setupFingerprintWS(httpServer, { BRIDGE_TOKEN }) {
             pendingJobs.delete(msg.job_id);
             pending.resolve(msg);
           }
+        } else if (msg.type === 'enroll_progress') {
+          const pending = pendingJobs.get(msg.job_id);
+          if (pending) pending.latestStep = msg.step;
         }
       } catch (err) {
         console.error('[WS] msg parse:', err.message);

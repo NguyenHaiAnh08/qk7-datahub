@@ -20,9 +20,15 @@
     "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "mssql": "^12.7.4",
     "multer": "^2.4.0",
+    "pdf-to-img": "^7.0.1",
+    "pdfjs-dist": "^6.4.299",
+    "sharp": "^0.35.5",
     "swagger-jsdoc": "^6.3.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "tesseract.js": "^7.0.0",
+    "ws": "^8.22.0"
   }
 }

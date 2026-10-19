@@ -1,9 +1,10 @@
 // ============================================================
-// backend/swagger.js — QK7 DataHub OpenAPI 3.0 (FINAL)
-// Bao gồm TOÀN BỘ 56 operations khớp server.js + admin-routes.js
+// backend/swagger.js — QK7 DataHub OpenAPI 3.0 (FINAL v1.1)
+// Bao gồm TOÀN BỘ operations khớp server.js + admin-routes.js
+// + UNIT_ALIAS (bảng có alias_id INT IDENTITY + priority)
+// + POST /api/documents/parse (đã bổ sung)
+// + Response Schema chi tiết cho các endpoint Admin GET
 // ============================================================
-
-const bearerErr = (desc) => ({ description: desc });
 
 const swaggerSpec = {
   openapi: '3.0.0',
@@ -27,6 +28,7 @@ const swaggerSpec = {
     { name: 'Files',     description: 'Xem / tải PDF' },
     { name: 'Logs',      description: 'Nhật ký truy cập' },
     { name: 'Admin',     description: 'Quản trị hệ thống' },
+    { name: 'AI Assistant', description: 'Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded Agentic RAG)' },
   ],
 
   security: [{ UserHeader: [], ClearanceHeader: [] }],
@@ -57,14 +59,16 @@ const swaggerSpec = {
         },
         responses: {
           200: {
-            description: 'Thành công',
+            description: 'Thành công — trả JWT + thông tin user',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    success: { type: 'boolean', example: true },
-                    user: { $ref: '#/components/schemas/UserFull' },
+                    success:    { type: 'boolean', example: true },
+                    token:      { type: 'string', description: 'JWT token dùng cho header Authorization: Bearer <token>', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+                    expires_in: { type: 'string', example: '8h' },
+                    user:       { $ref: '#/components/schemas/UserFull' },
                   },
                 },
               },
@@ -90,6 +94,217 @@ const swaggerSpec = {
           },
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { $ref: '#/components/responses/NotFound' },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+
+        // ==========================================================
+    // FINGERPRINT — VERIFY (device-based via WebSocket)
+    // ==========================================================
+    '/api/auth/fingerprint/verify': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Xác thực vân tay → cấp token tạm xem file cấp 4-5',
+        description:
+          'Endpoint xác thực vân tay cho tài liệu cấp Tối mật (4) / Tuyệt mật (5).\n\n' +
+          '**Cách hoạt động:**\n' +
+          '1. Browser lấy `device_id` từ Fingerprint Agent local (`http://127.0.0.1:9001/device-id`)\n' +
+          '2. Browser gọi endpoint này kèm header `X-Device-FP: <device_id>`\n' +
+          '3. Backend tìm Agent đang online qua WebSocket, gửi job scan\n' +
+          '4. Agent quét ZK9500, so khớp template, gửi kết quả về BE\n' +
+          '5. Nếu khớp → BE cấp `fingerprint_token` (JWT 5 phút, gắn file_id + user_id)\n\n' +
+          '**Frontend dùng token này** để gọi `GET /api/files/{fileId}/view` qua header `X-Fingerprint-Token`.',
+        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        parameters: [
+          {
+            in: 'header',
+            name: 'X-Device-FP',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Device ID lấy từ Agent local',
+            example: 'DEV-73f027ff-84ea-464a-9610-bc5c556a499c',
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['file_id'],
+                properties: {
+                  file_id: { type: 'string', example: 'DOC-1760000000000-A1B2' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Xác thực thành công → cấp fingerprint_token',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success:           { type: 'boolean', example: true },
+                    required:          { type: 'boolean', example: true, description: 'true = file yêu cầu vân tay (cấp 4-5). false = file cấp 1-3 không cần' },
+                    fingerprint_token: { type: 'string', nullable: true, example: 'eyJhbGciOiJIUzI1NiIs...' },
+                    expires_in:        { type: 'string', example: '5m' },
+                    score:             { type: 'integer', example: 100, description: 'Điểm khớp 0-100' },
+                  },
+                },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: {
+            description: 'Vân tay không khớp, hoặc user chưa đăng ký vân tay (`needs_enroll: true`)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error:        { type: 'string' },
+                    needs_enroll: { type: 'boolean', example: false },
+                    score:        { type: 'integer' },
+                  },
+                },
+              },
+            },
+          },
+          408: { description: 'Timeout chờ quét (45s)' },
+          503: {
+            description: 'Agent chưa online (`agent_offline: true`)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error:         { type: 'string' },
+                    agent_offline: { type: 'boolean', example: true },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    // ==========================================================
+    // ADMIN — FINGERPRINT ENROLL (admin enroll cho user bất kỳ)
+    // ==========================================================
+    '/api/admin/fingerprint/enroll/{userId}': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Enroll vân tay cho user (yêu cầu admin cấp ≥ 4)',
+        description:
+          'Admin enroll vân tay cho BẤT KỲ user nào thông qua máy quét đang kết nối.\n\n' +
+          '**Quy trình:**\n' +
+          '1. Admin login, lấy device_id từ Agent local\n' +
+          '2. Gọi endpoint kèm header `X-Device-FP: <device_id>`\n' +
+          '3. BE gửi job enroll xuống Agent (timeout 60s)\n' +
+          '4. Agent chờ user đặt tay 3 lần (cùng ngón), merge template, gửi về BE\n' +
+          '5. BE mã hóa template (AES-256-GCM) → lưu vào `USER_FINGERPRINT.template_enc`\n\n' +
+          '**Lưu ý:** Người đặt tay PHẢI là user đích — nếu admin đặt tay của mình thì sau này user đích sẽ không quét được.',
+        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'userId',
+            required: true,
+            schema: { type: 'string' },
+            example: 'USR-005',
+            description: 'Mã user cần enroll vân tay',
+          },
+          {
+            in: 'header',
+            name: 'X-Device-FP',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Device ID lấy từ Agent local',
+            example: 'DEV-73f027ff-84ea-464a-9610-bc5c556a499c',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Enroll thành công — template đã lưu vào DB',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    user_id: { type: 'string', example: 'USR-005' },
+                  },
+                },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          403: { description: 'Cần quyền admin (clearance ≥ 4)' },
+          404: { description: 'Không tìm thấy user' },
+          408: { description: 'Timeout chờ quét 3 lần (60s)' },
+          503: {
+            description: 'Agent chưa online',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error:         { type: 'string' },
+                    agent_offline: { type: 'boolean', example: true },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    // ==========================================================
+    // ADMIN — FINGERPRINT AGENTS (danh sách agent online)
+    // ==========================================================
+    '/api/admin/fingerprint/agents': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách Fingerprint Agent đang online (yêu cầu admin cấp ≥ 4)',
+        description:
+          'Trả về danh sách các Agent (máy trạm có đầu đọc ZK9500) đang kết nối WebSocket tới BE.\n\n' +
+          'Dùng để debug hoặc kiểm tra máy nào đang sẵn sàng quét vân tay.',
+        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        responses: {
+          200: {
+            description: 'Danh sách agent',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          device_id:    { type: 'string', example: 'DEV-73f027ff-84ea-464a-9610-bc5c556a499c' },
+                          connected_at: { type: 'string', format: 'date-time' },
+                          last_ping:    { type: 'string', format: 'date-time' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          403: { description: 'Cần quyền admin (clearance ≥ 4)' },
           500: { $ref: '#/components/responses/ServerError' },
         },
       },
@@ -269,6 +484,98 @@ const swaggerSpec = {
       },
     },
 
+    // ==========================================================
+    // ✅ MỚI BỔ SUNG: PARSE PDF → METADATA (không lưu DB)
+    // ==========================================================
+    '/api/documents/parse': {
+      post: {
+        tags: ['Documents'],
+        summary: 'Parse PDF → tự động trích xuất metadata (không lưu DB, không lưu file)',
+        description:
+          'Endpoint AI/OCR cực mạnh: Bóc tách Số hiệu, Trích yếu, Ngày ban hành, Người ký, Đơn vị ban hành từ file PDF. ' +
+          'Tự động phát hiện PDF lỗi font (garbage text / TCVN3 typo) và chuyển sang OCR toàn bộ. ' +
+          'Có cơ chế **Header OCR** đọc vùng số hiệu bị ẩn dạng ảnh, và **Tail OCR** tìm người ký ở trang cuối. ' +
+          'Không lưu file, không ghi DB — chỉ trả về metadata để Frontend điền tự động vào form upload.',
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: {
+                  file: { type: 'string', format: 'binary' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Parse thành công — trả về metadata + chẩn đoán + nguồn dữ liệu',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success:       { type: 'boolean', example: true },
+                    source:        { type: 'string', enum: ['digital', 'scan'], description: 'Nguồn trích xuất' },
+                    usedOcr:       { type: 'boolean', description: 'Có dùng OCR hay không' },
+                    missingFields: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'Các trường không đọc được — user cần nhập tay',
+                      example: ['signer'],
+                    },
+                    parsed: {
+                      type: 'object',
+                      properties: {
+                        document_code:           { type: 'string', nullable: true, example: '532/KH-CT' },
+                        document_number:         { type: 'string', nullable: true, example: '532' },
+                        doc_type_code:           { type: 'string', nullable: true, example: 'KH' },
+                        doc_type_name:           { type: 'string', nullable: true, example: 'KẾ HOẠCH' },
+                        title:                   { type: 'string', nullable: true },
+                        issued_date:             { type: 'string', nullable: true, example: '2026-08-24' },
+                        signer:                  { type: 'string', nullable: true, example: 'Đại tá Nguyễn Đức Thịnh' },
+                        signer_position:         { type: 'string', nullable: true },
+                        issuer_unit_name:        { type: 'string', nullable: true },
+                        issuer_parent_unit_name: { type: 'string', nullable: true },
+                        issuer_unit_id:          { type: 'string', nullable: true },
+                        issuer_parent_unit_id:   { type: 'string', nullable: true },
+                        issuer_display:          { type: 'string', nullable: true },
+                        parent_matched:          { type: 'boolean' },
+                        unit_matched:            { type: 'boolean' },
+                      },
+                    },
+                    sources: {
+                      type: 'object',
+                      additionalProperties: { type: 'string' },
+                      description: 'Nguồn của từng trường: text / ocr / header-ocr / ocr-tail',
+                      example: { document_code: 'text+header-ocr', title: 'text', signer: 'ocr-tail' },
+                    },
+                    diagnostics: {
+                      type: 'object',
+                      properties: {
+                        totalPages:      { type: 'integer' },
+                        garbagePages:    { type: 'integer' },
+                        garbageRatio:    { type: 'number' },
+                        detectedGarbage: { type: 'boolean' },
+                      },
+                    },
+                    original_name: { type: 'string' },
+                    file_size:     { type: 'integer' },
+                    sha256:        { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
     '/api/documents/{fileId}': {
       get: {
         tags: ['Documents'],
@@ -334,9 +641,17 @@ const swaggerSpec = {
         summary: 'Xem (inline) hoặc tải (attachment) PDF',
         description: 'Tài liệu Cấp ≥ 3 → CHỈ xem được, `download=1` sẽ trả 403.',
         parameters: [
-          { $ref: '#/components/parameters/FileId' },
-          { in: 'query', name: 'download', schema: { type: 'string', enum: ['0', '1'], default: '0' } },
-        ],
+        { $ref: '#/components/parameters/FileId' },
+        { in: 'query', name: 'download', schema: { type: 'string', enum: ['0', '1'], default: '0' } },
+        {
+          in: 'header',
+          name: 'X-Fingerprint-Token',
+          required: false,
+          schema: { type: 'string' },
+          description: 'BẮT BUỘC nếu file có security_level_id ≥ 4. Lấy từ POST /api/auth/fingerprint/verify. Token có hạn 5 phút, gắn với user_id + file_id.',
+          example: 'eyJhbGciOiJIUzI1NiIs...',
+        },
+      ],
         responses: {
           200: { description: 'Stream PDF', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } },
           403: { description: 'Không đủ quyền hoặc Cấp ≥ 3 không được tải' },
@@ -452,14 +767,14 @@ const swaggerSpec = {
                 required: ['user_id', 'username', 'password', 'full_name', 'clearance_level_id'],
                 properties: {
                   user_id:            { type: 'string', example: 'USR-005' },
-                  username:           { type: 'string', example: 'nguyenvana' },
-                  password:           { type: 'string', minLength: 8, example: 'MatKhau@2026' },
-                  full_name:          { type: 'string', example: 'Nguyễn Văn A' },
+                  username:           { type: 'string', example: 'usr-005' },
+                  password:           { type: 'string', minLength: 8, example: 'Abc@12345' },
+                  full_name:          { type: 'string', example: 'Nguyễn Văn E' },
                   rank_name:          { type: 'string', example: 'Đại tá' },
                   position:           { type: 'string', example: 'Trưởng phòng' },
                   unit_id:            { type: 'string', example: 'U-BGH' },
                   status:             { type: 'string', enum: ['active', 'locked', 'inactive'], default: 'active' },
-                  clearance_level_id: { type: 'integer', minimum: 1, maximum: 5 },
+                  clearance_level_id: { type: 'integer', minimum: 1, maximum: 5, example: 3 },
                   role_id:            { type: 'string', example: 'ROL-04' },
                   roles:              { type: 'array', items: { type: 'string' } },
                 },
@@ -567,7 +882,21 @@ const swaggerSpec = {
         tags: ['Admin'],
         summary: 'Danh sách role của user',
         parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'OK' } },
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/Role' } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       post: {
         tags: ['Admin'],
@@ -605,7 +934,25 @@ const swaggerSpec = {
     // ADMIN — ROLES
     // ==========================================================
     '/api/admin/roles': {
-      get: { tags: ['Admin'], summary: 'Danh sách role', responses: { 200: { description: 'OK' } } },
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách role',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/Role' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       post: {
         tags: ['Admin'],
         summary: 'Tạo role',
@@ -617,7 +964,7 @@ const swaggerSpec = {
                 type: 'object',
                 required: ['role_id', 'name'],
                 properties: {
-                  role_id: { type: 'string', example: 'ROL-09' },
+                  role_id: { type: 'string', example: 'ROL-07' },
                   name:    { type: 'string', example: 'Nhân viên' },
                 },
               },
@@ -655,7 +1002,25 @@ const swaggerSpec = {
     // ADMIN — PERMISSIONS
     // ==========================================================
     '/api/admin/permissions': {
-      get: { tags: ['Admin'], summary: 'Danh sách quyền', responses: { 200: { description: 'OK' } } },
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách quyền',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/Permission' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       post: {
         tags: ['Admin'],
         summary: 'Tạo quyền',
@@ -667,8 +1032,8 @@ const swaggerSpec = {
                 type: 'object',
                 required: ['permission_id', 'code'],
                 properties: {
-                  permission_id: { type: 'string', example: 'PERM-10' },
-                  code:          { type: 'string', example: 'doc.delete' },
+                  permission_id: { type: 'string', example: 'PER-09' },
+                  code:          { type: 'string', example: 'doc.approve' },
                   description:   { type: 'string' },
                 },
               },
@@ -696,7 +1061,21 @@ const swaggerSpec = {
         tags: ['Admin'],
         summary: 'Danh sách quyền của role',
         parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'OK' } },
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/Permission' } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       post: {
         tags: ['Admin'],
@@ -730,7 +1109,25 @@ const swaggerSpec = {
     // ADMIN — UNITS
     // ==========================================================
     '/api/admin/units': {
-      get: { tags: ['Admin'], summary: 'Danh sách đơn vị', responses: { 200: { description: 'OK' } } },
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách đơn vị',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/Unit' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       post: {
         tags: ['Admin'],
         summary: 'Tạo đơn vị',
@@ -785,10 +1182,197 @@ const swaggerSpec = {
     },
 
     // ==========================================================
+    // ADMIN — UNIT ALIASES
+    // ==========================================================
+    '/api/admin/unit-aliases': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách tên viết tắt / bí danh của đơn vị',
+        description:
+          'Bảng `UNIT_ALIAS` lưu các tên viết tắt / bí danh của đơn vị. ' +
+          'Bộ parser PDF (`pdf-parser.js` → `findUnitsInText`) dùng bảng này để nhận diện ' +
+          'đơn vị ban hành từ header văn bản. Priority càng cao càng được ưu tiên khi khớp trùng.',
+        parameters: [
+          {
+            in: 'query', name: 'unit_id',
+            schema: { type: 'string' },
+            description: 'Lọc theo đơn vị',
+            example: 'TQS',
+          },
+          {
+            in: 'query', name: 'q',
+            schema: { type: 'string' },
+            description: 'Tìm gần đúng trong alias_text (LIKE %q%)',
+            example: 'Quân sự',
+          },
+          {
+            in: 'query', name: 'min_priority',
+            schema: { type: 'integer', minimum: 0, maximum: 1000 },
+            description: 'Chỉ lấy alias có priority >= giá trị này',
+            example: 90,
+          },
+        ],
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    total: { type: 'integer', example: 57 },
+                    items: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/UnitAlias' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+      post: {
+        tags: ['Admin'],
+        summary: 'Thêm alias cho đơn vị',
+        description:
+          'Bảng có ràng buộc `(unit_id, alias_text)` — không cho phép 2 alias cùng text trong ' +
+          'một đơn vị. `alias_id` do DB tự sinh (IDENTITY INT), `created_at` tự gán `GETDATE()`.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['unit_id', 'alias_text'],
+                properties: {
+                  unit_id:    { type: 'string', example: 'TQS' },
+                  alias_text: { type: 'string', example: 'TRƯỜNG QUÂN SỰ QK7' },
+                  priority:   {
+                    type: 'integer', minimum: 0, maximum: 1000, default: 100,
+                    description: 'Càng cao càng ưu tiên (100 = cao nhất trong seed hiện tại)',
+                    example: 95,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Tạo thành công — trả về record vừa tạo (kèm alias_id, created_at)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/UnitAlias' },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          409: { description: 'Trùng (unit_id, alias_text) — alias đã tồn tại cho đơn vị này' },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    '/api/admin/unit-aliases/{id}': {
+      put: {
+        tags: ['Admin'],
+        summary: 'Cập nhật alias đơn vị',
+        description: 'Cho phép đổi `unit_id`, `alias_text` hoặc `priority`. Bỏ trống field nào thì giữ nguyên.',
+        parameters: [
+          {
+            in: 'path', name: 'id', required: true,
+            schema: { type: 'integer' },
+            description: 'Mã alias (alias_id — IDENTITY INT)',
+            example: 71,
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  unit_id:    { type: 'string', example: 'TQS' },
+                  alias_text: { type: 'string', example: 'TRƯỜNG QUÂN SỰ QK7' },
+                  priority:   { type: 'integer', minimum: 0, maximum: 1000, example: 95 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'OK — trả về record sau khi cập nhật',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/UnitAlias' },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { description: 'Trùng (unit_id, alias_text) với alias khác cùng đơn vị' },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+      delete: {
+        tags: ['Admin'],
+        summary: 'Xóa alias đơn vị',
+        parameters: [
+          {
+            in: 'path', name: 'id', required: true,
+            schema: { type: 'integer' },
+            description: 'Mã alias (alias_id)',
+            example: 71,
+          },
+        ],
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success:  { type: 'boolean', example: true },
+                    alias_id: { type: 'integer', example: 71 },
+                  },
+                },
+              },
+            },
+          },
+          404: { $ref: '#/components/responses/NotFound' },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    // ==========================================================
     // ADMIN — DOCUMENT TYPES
     // ==========================================================
     '/api/admin/document-types': {
-      get: { tags: ['Admin'], summary: 'Danh sách loại văn bản', responses: { 200: { description: 'OK' } } },
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách loại văn bản',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/DocumentType' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       post: {
         tags: ['Admin'],
         summary: 'Tạo loại văn bản',
@@ -846,7 +1430,25 @@ const swaggerSpec = {
     // ADMIN — SECURITY LEVELS
     // ==========================================================
     '/api/admin/security-levels': {
-      get: { tags: ['Admin'], summary: 'Danh sách mức bảo mật', responses: { 200: { description: 'OK' } } },
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách mức bảo mật',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/SecurityLevel' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       post: {
         tags: ['Admin'],
         summary: 'Tạo mức bảo mật',
@@ -904,7 +1506,25 @@ const swaggerSpec = {
     // ADMIN — RANKS
     // ==========================================================
     '/api/admin/ranks': {
-      get: { tags: ['Admin'], summary: 'Danh sách cấp bậc quân hàm', responses: { 200: { description: 'OK' } } },
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách cấp bậc quân hàm',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/Rank' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       post: {
         tags: ['Admin'],
         summary: 'Tạo cấp bậc quân hàm',
@@ -916,9 +1536,9 @@ const swaggerSpec = {
                 type: 'object',
                 required: ['rank_id', 'name'],
                 properties: {
-                  rank_id:    { type: 'string', example: 'MR-11' },
-                  name:       { type: 'string', example: 'Thượng tá' },
-                  sort_order: { type: 'integer', example: 11 },
+                  rank_id:    { type: 'string', example: 'R-21' },
+                  name:       { type: 'string', example: 'Trung sĩ QNCN' },
+                  sort_order: { type: 'integer', example: 210 },
                 },
               },
             },
@@ -962,7 +1582,25 @@ const swaggerSpec = {
     // ADMIN — POSITIONS
     // ==========================================================
     '/api/admin/positions': {
-      get: { tags: ['Admin'], summary: 'Danh sách chức vụ', responses: { 200: { description: 'OK' } } },
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách chức vụ',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: { type: 'array', items: { $ref: '#/components/schemas/Position' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       post: {
         tags: ['Admin'],
         summary: 'Tạo chức vụ',
@@ -974,9 +1612,9 @@ const swaggerSpec = {
                 type: 'object',
                 required: ['position_id', 'name'],
                 properties: {
-                  position_id: { type: 'string', example: 'MP-11' },
-                  name:        { type: 'string', example: 'Phó phòng' },
-                  sort_order:  { type: 'integer', example: 11 },
+                  position_id: { type: 'string', example: 'P-19' },
+                  name:        { type: 'string', example: 'Phó phòng Kỹ thuật' },
+                  sort_order:  { type: 'integer', example: 190 },
                 },
               },
             },
@@ -1111,6 +1749,145 @@ const swaggerSpec = {
       },
     },
 
+    // ==========================================================
+    // AI ASSISTANT (TRỢ LÝ TÁC CHIẾN & VĂN THƯ)
+    // ==========================================================
+    '/api/ai/health': {
+      get: {
+        tags: ['AI Assistant'],
+        summary: 'Kiểm tra trạng thái AI_BOXCHAT Microservice & Fallback',
+        responses: {
+          200: {
+            description: 'Trạng thái hoạt động',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string', example: 'online' },
+                    service: { type: 'string', example: 'AI_BOXCHAT' },
+                    port: { type: 'integer', example: 8001 },
+                    total_chunks_indexed: { type: 'integer', example: 120 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/api/ai/chat': {
+      post: {
+        tags: ['AI Assistant'],
+        summary: 'Hỏi đáp tác chiến & văn thư có trích dẫn số trang [p.X]',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['query'],
+                properties: {
+                  query: { type: 'string', example: 'Quy định bảo mật tài liệu tác chiến?' },
+                  file_id: { type: 'string', nullable: true, example: 'DOC-1760000000000-A1B2' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Câu trả lời kèm trích dẫn số trang',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    answer: { type: 'string' },
+                    citations: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          file_id: { type: 'string' },
+                          document_code: { type: 'string' },
+                          title: { type: 'string' },
+                          page: { type: 'integer' },
+                          security_level_name: { type: 'string' },
+                          snippet: { type: 'string' }
+                        }
+                      }
+                    },
+                    reasoning: {
+                      type: 'object',
+                      properties: {
+                        mem: { type: 'string' },
+                        think: { type: 'string' },
+                        tool_call: { type: 'string' }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/api/ai/study-book/{fileId}': {
+      get: {
+        tags: ['AI Assistant'],
+        summary: 'Tạo Cuốn Sách Riêng 3 Tab (01 Tài liệu, 02 Sơ đồ Mermaid, 03 Kiểm tra trắc nghiệm)',
+        parameters: [{ $ref: '#/components/parameters/FileId' }],
+        responses: {
+          200: {
+            description: 'Dữ liệu 3 tab chi tiết',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    file_id: { type: 'string' },
+                    document_code: { type: 'string' },
+                    title: { type: 'string' },
+                    total_pages: { type: 'integer' },
+                    tab_document: { type: 'object' },
+                    tab_diagram: { type: 'object' },
+                    tab_quiz: { type: 'array', items: { type: 'object' } }
+                  }
+                }
+              }
+            }
+          },
+          403: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+
+    '/api/ai/sync-all': {
+      post: {
+        tags: ['AI Assistant'],
+        summary: 'Đồng bộ toàn bộ metadata và file PDF từ Database sang Vector DB',
+        responses: {
+          200: {
+            description: 'Kết quả đồng bộ',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    total_documents: { type: 'integer', example: 15 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
   },
 
   // ============================================================
@@ -1118,19 +1895,37 @@ const swaggerSpec = {
   // ============================================================
   components: {
     securitySchemes: {
-      UserHeader: {
-        type: 'apiKey',
-        in: 'header',
-        name: 'X-User-Id',
-        description: 'Mã user (VD: USR-001)',
-      },
-      ClearanceHeader: {
-        type: 'apiKey',
-        in: 'header',
-        name: 'X-Clearance',
-        description: 'Mức bảo mật 1-5',
-      },
-    },
+  UserHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-User-Id',
+    description: 'Mã user (VD: USR-001) — legacy auth (khi ALLOW_LEGACY_AUTH=true)',
+  },
+  ClearanceHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Clearance',
+    description: 'Mức bảo mật 1-5 — legacy auth',
+  },
+  BearerAuth: {
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT',
+    description: 'JWT token lấy từ POST /api/auth/login (khuyến nghị dùng thay legacy)',
+  },
+  DeviceFPHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Device-FP',
+    description: 'Device ID của Fingerprint Agent trên máy user — lấy từ http://127.0.0.1:9001/device-id. Bắt buộc cho các endpoint fingerprint.',
+  },
+  FingerprintTokenHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Fingerprint-Token',
+    description: 'Token tạm 5 phút cấp sau khi xác thực vân tay — BẮT BUỘC để xem file cấp 4-5.',
+  },
+},
 
     parameters: {
       FileId: {
@@ -1214,6 +2009,13 @@ const swaggerSpec = {
           file_size:         { type: 'integer', nullable: true },
           security_level_id: { type: 'integer' },
           security_name:     { type: 'string', nullable: true },
+          original_name:     { type: 'string', nullable: true, description: 'Tên file gốc khi upload' },
+          stored_path:       { type: 'string', nullable: true, description: 'Đường dẫn lưu trữ trên ổ đĩa' },
+          sha256:            { type: 'string', nullable: true, description: 'Mã băm toàn vẹn file' },
+          mime_type:         { type: 'string', nullable: true, example: 'application/pdf' },
+          folder_id:         { type: 'string', nullable: true },
+          category_id:       { type: 'string', nullable: true },
+          uploaded_by:       { type: 'string', nullable: true, description: 'Mã quân nhân upload' },
           created_at:        { type: 'string', format: 'date-time' },
           updated_at:        { type: 'string', format: 'date-time', nullable: true },
         },
@@ -1253,6 +2055,73 @@ const swaggerSpec = {
         },
       },
 
+      Role: {
+        type: 'object',
+        properties: {
+          role_id: { type: 'string', example: 'ROL-01' },
+          name:    { type: 'string', example: 'Admin' },
+        },
+      },
+
+      Permission: {
+        type: 'object',
+        properties: {
+          permission_id: { type: 'string', example: 'PER-01' },
+          code:          { type: 'string', example: 'SEARCH_DOCUMENT' },
+          description:   { type: 'string', nullable: true },
+        },
+      },
+
+      UnitAlias: {
+        type: 'object',
+        description: 'Bản ghi bảng UNIT_ALIAS — tên viết tắt / bí danh của đơn vị',
+        properties: {
+          alias_id: {
+            type: 'integer',
+            description: 'Khóa chính (IDENTITY INT)',
+            example: 71,
+          },
+          unit_id: {
+            type: 'string',
+            description: 'Mã đơn vị — FK → UNIT.unit_id',
+            example: 'QK7',
+          },
+          alias_text: {
+            type: 'string',
+            description: 'Tên viết tắt / bí danh (đã được chuẩn hoá Unicode NFC)',
+            example: 'QUÂN KHU 7',
+          },
+          priority: {
+            type: 'integer',
+            description: 'Độ ưu tiên — số càng cao càng được ưu tiên khi match',
+            example: 100,
+          },
+          active: {
+            type: 'boolean',
+            description: 'Trạng thái kích hoạt (đã thêm vào bảng từ v2.1)',
+            example: true,
+          },
+          created_at: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Thời điểm tạo',
+            example: '2026-10-17T07:07:34.067Z',
+          },
+          updated_at: {
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+            description: 'Thời điểm cập nhật gần nhất',
+          },
+          unit_name: {
+            type: 'string',
+            nullable: true,
+            description: 'Tên đơn vị (JOIN từ bảng UNIT) — chỉ có nếu API trả về',
+            example: 'QUÂN KHU 7',
+          },
+        },
+      },
+
       SecurityLevel: {
         type: 'object',
         properties: {
@@ -1265,9 +2134,9 @@ const swaggerSpec = {
       Rank: {
         type: 'object',
         properties: {
-          rank_id:    { type: 'string', example: 'MR-01' },
+          rank_id:    { type: 'string', example: 'R-01' },
           name:       { type: 'string', example: 'Đại tá' },
-          sort_order: { type: 'integer', example: 1 },
+          sort_order: { type: 'integer', example: 10 },
           active:     { type: 'boolean', example: true },
           created_at: { type: 'string', format: 'date-time', nullable: true },
         },
@@ -1276,9 +2145,9 @@ const swaggerSpec = {
       Position: {
         type: 'object',
         properties: {
-          position_id: { type: 'string', example: 'MP-01' },
-          name:        { type: 'string', example: 'Trưởng phòng' },
-          sort_order:  { type: 'integer', example: 1 },
+          position_id: { type: 'string', example: 'P-01' },
+          name:        { type: 'string', example: 'Hiệu trưởng' },
+          sort_order:  { type: 'integer', example: 10 },
           active:      { type: 'boolean', example: true },
           created_at:  { type: 'string', format: 'date-time', nullable: true },
         },

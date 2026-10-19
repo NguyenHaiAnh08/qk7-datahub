@@ -280,3 +280,438 @@ html:not(.dark) input::placeholder,
 html:not(.dark) textarea::placeholder {
   color: #94a3b8;
 }
+
+/* ── QK7 TreeSelect Custom UI/UX for Unit Hierarchy ── */
+/* Đồng bộ 100% màu sắc, viền, bo góc và placeholder với các ô input khác trong Modal */
+.qk7-treeselect,
+.qk7-treeselect.ant-select,
+.unit-treeselect-wrapper .ant-select {
+  width: 100% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  border-radius: 0.75rem !important; /* rounded-xl (12px) */
+  font-size: 0.75rem !important; /* text-xs */
+  line-height: 1.25rem !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+/* Đảm bảo khung bên trong selector Ant Design (v5 và v6) khớp hoàn hảo */
+.qk7-treeselect .ant-select-selector,
+.unit-treeselect-wrapper .ant-select-selector {
+  border-radius: 0.75rem !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.qk7-treeselect .ant-select-content,
+.unit-treeselect-wrapper .ant-select-content {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
+/* Dark Mode: Đồng bộ màu bg-slate-950 (#020617) và border-slate-700 (#334155) */
+html.dark .qk7-treeselect,
+html.dark .qk7-treeselect.ant-select,
+html.dark .unit-treeselect-wrapper .ant-select,
+.dark .qk7-treeselect,
+.dark .qk7-treeselect.ant-select,
+.dark .unit-treeselect-wrapper .ant-select {
+  --ant-select-background-color: #020617 !important;
+  --ant-select-border-color: #334155 !important;
+  --ant-select-border-radius: 0.75rem !important;
+  --ant-select-height: 38px !important;
+  --ant-select-font-size: 0.75rem !important;
+  --ant-select-color: #f1f5f9 !important;
+  background-color: #020617 !important;
+  background: #020617 !important;
+  border: 1px solid #334155 !important;
+  border-radius: 0.75rem !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .qk7-treeselect .ant-select-selector,
+html.dark .unit-treeselect-wrapper .ant-select-selector,
+.dark .qk7-treeselect .ant-select-selector,
+.dark .unit-treeselect-wrapper .ant-select-selector {
+  background-color: #020617 !important;
+  background: #020617 !important;
+  border: none !important;
+  color: #f1f5f9 !important;
+  box-shadow: none !important;
+}
+
+/* Placeholder trong Dark Mode (text-slate-400 / text-slate-500) */
+html.dark .qk7-treeselect .ant-select-placeholder,
+html.dark .qk7-treeselect .ant-select-selection-placeholder,
+html.dark .unit-treeselect-wrapper .ant-select-placeholder,
+html.dark .unit-treeselect-wrapper .ant-select-selection-placeholder,
+.dark .qk7-treeselect .ant-select-placeholder,
+.dark .qk7-treeselect .ant-select-selection-placeholder,
+.dark .unit-treeselect-wrapper .ant-select-placeholder,
+.dark .unit-treeselect-wrapper .ant-select-selection-placeholder {
+  color: #64748b !important;
+  font-size: 0.75rem !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Suffix icon / Arrow & Clear trong Dark Mode */
+html.dark .qk7-treeselect .ant-select-suffix,
+html.dark .qk7-treeselect .ant-select-arrow,
+html.dark .qk7-treeselect .ant-select-clear,
+html.dark .unit-treeselect-wrapper .ant-select-suffix,
+html.dark .unit-treeselect-wrapper .ant-select-arrow,
+html.dark .unit-treeselect-wrapper .ant-select-clear,
+.dark .qk7-treeselect .ant-select-suffix,
+.dark .qk7-treeselect .ant-select-arrow,
+.dark .qk7-treeselect .ant-select-clear,
+.dark .unit-treeselect-wrapper .ant-select-suffix,
+.dark .unit-treeselect-wrapper .ant-select-arrow,
+.dark .unit-treeselect-wrapper .ant-select-clear {
+  color: #64748b !important;
+  background: transparent !important;
+}
+
+html.dark .qk7-treeselect .ant-select-selection-item,
+html.dark .unit-treeselect-wrapper .ant-select-selection-item,
+.dark .qk7-treeselect .ant-select-selection-item,
+.dark .unit-treeselect-wrapper .ant-select-selection-item {
+  color: #f1f5f9 !important;
+  font-size: 0.75rem !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+html.dark .qk7-treeselect .ant-select-selection-search-input,
+html.dark .unit-treeselect-wrapper .ant-select-selection-search-input,
+.dark .qk7-treeselect .ant-select-selection-search-input,
+.dark .unit-treeselect-wrapper .ant-select-selection-search-input {
+  color: #f1f5f9 !important;
+}
+
+/* Light Mode: Đồng bộ màu bg-slate-50 (#f8fafc) và border-slate-300 (#cbd5e1) */
+html:not(.dark) .qk7-treeselect,
+html:not(.dark) .qk7-treeselect.ant-select,
+html:not(.dark) .unit-treeselect-wrapper .ant-select,
+html.light .qk7-treeselect,
+html.light .qk7-treeselect.ant-select,
+html.light .unit-treeselect-wrapper .ant-select {
+  --ant-select-background-color: #f8fafc !important;
+  --ant-select-border-color: #cbd5e1 !important;
+  --ant-select-border-radius: 0.75rem !important;
+  --ant-select-height: 38px !important;
+  --ant-select-font-size: 0.75rem !important;
+  --ant-select-color: #0f172a !important;
+  background-color: #f8fafc !important;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.75rem !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .qk7-treeselect .ant-select-selector,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-selector,
+html.light .qk7-treeselect .ant-select-selector,
+html.light .unit-treeselect-wrapper .ant-select-selector {
+  background-color: #f8fafc !important;
+  background: #f8fafc !important;
+  border: none !important;
+  color: #0f172a !important;
+  box-shadow: none !important;
+}
+
+/* Placeholder trong Light Mode (placeholder-slate-400 / #94a3b8) */
+html:not(.dark) .qk7-treeselect .ant-select-placeholder,
+html:not(.dark) .qk7-treeselect .ant-select-selection-placeholder,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-placeholder,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-selection-placeholder,
+html.light .qk7-treeselect .ant-select-placeholder,
+html.light .qk7-treeselect .ant-select-selection-placeholder,
+html.light .unit-treeselect-wrapper .ant-select-placeholder,
+html.light .unit-treeselect-wrapper .ant-select-selection-placeholder {
+  color: #94a3b8 !important;
+  font-size: 0.75rem !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Suffix icon / Arrow & Clear trong Light Mode */
+html:not(.dark) .qk7-treeselect .ant-select-suffix,
+html:not(.dark) .qk7-treeselect .ant-select-arrow,
+html:not(.dark) .qk7-treeselect .ant-select-clear,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-suffix,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-arrow,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-clear,
+html.light .qk7-treeselect .ant-select-suffix,
+html.light .qk7-treeselect .ant-select-arrow,
+html.light .qk7-treeselect .ant-select-clear,
+html.light .unit-treeselect-wrapper .ant-select-suffix,
+html.light .unit-treeselect-wrapper .ant-select-arrow,
+html.light .unit-treeselect-wrapper .ant-select-clear {
+  color: #94a3b8 !important;
+  background: transparent !important;
+}
+
+html:not(.dark) .qk7-treeselect .ant-select-selection-item,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-selection-item,
+html.light .qk7-treeselect .ant-select-selection-item,
+html.light .unit-treeselect-wrapper .ant-select-selection-item {
+  color: #0f172a !important;
+  font-size: 0.75rem !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+html:not(.dark) .qk7-treeselect .ant-select-selection-search-input,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-selection-search-input,
+html.light .qk7-treeselect .ant-select-selection-search-input,
+html.light .unit-treeselect-wrapper .ant-select-selection-search-input {
+  color: #0f172a !important;
+}
+
+/* Hover & Focus state: focus:border-emerald-500 (#10b981) */
+.qk7-treeselect:hover,
+.qk7-treeselect.ant-select:hover,
+.qk7-treeselect.ant-select-focused,
+.qk7-treeselect.ant-select-open,
+.unit-treeselect-wrapper .ant-select:hover,
+.unit-treeselect-wrapper .ant-select.ant-select-focused,
+.unit-treeselect-wrapper .ant-select.ant-select-open {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 1px #10b981 !important;
+}
+
+.qk7-treeselect:hover .ant-select-selector,
+.qk7-treeselect.ant-select-focused .ant-select-selector,
+.unit-treeselect-wrapper .ant-select:hover .ant-select-selector,
+.unit-treeselect-wrapper .ant-select.ant-select-focused .ant-select-selector {
+  border-color: #10b981 !important;
+}
+
+/* TreeSelect Dropdown Popup */
+.qk7-unit-treeselect-popup {
+  min-width: 360px !important;
+  max-width: 540px !important;
+  border-radius: 0.875rem !important;
+  overflow: hidden !important;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.45), 0 6px 16px -2px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.dark .qk7-unit-treeselect-popup,
+html.dark .qk7-unit-treeselect-popup.ant-select-dropdown,
+.dark .qk7-unit-treeselect-popup,
+.dark .qk7-unit-treeselect-popup.ant-select-dropdown {
+  background: #090d16 !important;
+  background-color: #090d16 !important;
+  border: 1px solid #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .qk7-unit-treeselect-popup .ant-select-tree,
+.dark .qk7-unit-treeselect-popup .ant-select-tree {
+  background: transparent !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-treenode,
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper,
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-title,
+.dark .qk7-unit-treeselect-popup .ant-select-tree-treenode,
+.dark .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper,
+.dark .qk7-unit-treeselect-popup .ant-select-tree-title {
+  color: #f1f5f9 !important;
+}
+
+html.dark .qk7-unit-treeselect-popup .ant-empty,
+html.dark .qk7-unit-treeselect-popup .ant-empty-description,
+.dark .qk7-unit-treeselect-popup .ant-empty,
+.dark .qk7-unit-treeselect-popup .ant-empty-description {
+  color: #94a3b8 !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup,
+html:not(.dark) .qk7-unit-treeselect-popup.ant-select-dropdown,
+html.light .qk7-unit-treeselect-popup,
+html.light .qk7-unit-treeselect-popup.ant-select-dropdown {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree,
+html.light .qk7-unit-treeselect-popup .ant-select-tree {
+  background: transparent !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-treenode,
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper,
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-title,
+html.light .qk7-unit-treeselect-popup .ant-select-tree-treenode,
+html.light .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper,
+html.light .qk7-unit-treeselect-popup .ant-select-tree-title {
+  color: #0f172a !important;
+}
+
+.qk7-unit-treeselect-popup .ant-select-tree {
+  background: transparent !important;
+  padding: 6px !important;
+}
+
+/* Tree Node Row - Cân bằng trục giữa */
+.qk7-unit-treeselect-popup .ant-select-tree-treenode {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 2px 4px !important;
+  border-radius: 8px !important;
+  margin-bottom: 3px !important;
+  min-height: 36px !important;
+}
+
+/* Switcher Icon Cell (Dấu cộng / trừ) - Cân bằng dọc hoàn hảo */
+.qk7-unit-treeselect-popup .ant-select-tree-switcher {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  width: 24px !important;
+  height: 24px !important;
+  line-height: 1 !important;
+  margin-right: 4px !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  background: transparent !important;
+  border: none !important;
+  flex-shrink: 0 !important;
+}
+
+/* Bỏ khung absolute giả của AntD gây lệch tâm */
+.qk7-unit-treeselect-popup .ant-select-tree-switcher::before {
+  display: none !important;
+}
+
+.qk7-unit-treeselect-popup .ant-select-tree-switcher.ant-select-tree-switcher-noop {
+  cursor: default !important;
+  align-self: stretch !important;
+  height: auto !important;
+}
+
+/* Nút dấu cộng / trừ bo tròn hiện đại, chuẩn tone Tím quân khu */
+.qk7-tree-switcher-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 6px !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+}
+
+/* Dark mode nút dấu cộng / trừ */
+html.dark .qk7-tree-switcher-btn {
+  background-color: rgba(114, 46, 209, 0.16) !important;
+  border: 1px solid rgba(168, 85, 247, 0.4) !important;
+  color: #c084fc !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-switcher:hover .qk7-tree-switcher-btn,
+html.dark .qk7-tree-switcher-btn:hover {
+  background-color: rgba(114, 46, 209, 0.38) !important;
+  border-color: rgba(192, 132, 252, 0.8) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.45) !important;
+  transform: scale(1.08) !important;
+}
+
+html.dark .qk7-tree-switcher-btn.is-expanded {
+  background-color: rgba(114, 46, 209, 0.25) !important;
+  border-color: rgba(168, 85, 247, 0.5) !important;
+  color: #e9d5ff !important;
+}
+
+/* Light mode nút dấu cộng / trừ */
+html:not(.dark) .qk7-tree-switcher-btn {
+  background-color: #f5f3ff !important;
+  border: 1px solid #d8b4fe !important;
+  color: #722ed1 !important;
+  box-shadow: 0 1px 2px rgba(114, 46, 209, 0.08) !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-switcher:hover .qk7-tree-switcher-btn,
+html:not(.dark) .qk7-tree-switcher-btn:hover {
+  background-color: #ede9fe !important;
+  border-color: #a855f7 !important;
+  color: #581c87 !important;
+  box-shadow: 0 0 8px rgba(114, 46, 209, 0.25) !important;
+  transform: scale(1.08) !important;
+}
+
+html:not(.dark) .qk7-tree-switcher-btn.is-expanded {
+  background-color: #ede9fe !important;
+  border-color: #a855f7 !important;
+  color: #6b21a8 !important;
+}
+
+/* Fallback căn giữa icon mặc định */
+.qk7-unit-treeselect-popup .ant-select-tree-switcher-line-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+}
+
+/* Nội dung node (Icon đơn vị + Tên) */
+.qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 !important;
+  border-radius: 8px !important;
+  padding: 3px 8px !important;
+  min-height: 32px !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper:hover {
+  background-color: rgba(114, 46, 209, 0.16) !important;
+}
+
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-node-selected {
+  background-color: rgba(114, 46, 209, 0.3) !important;
+  border: 1px solid rgba(168, 85, 247, 0.4) !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper:hover {
+  background-color: rgba(114, 46, 209, 0.08) !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-node-selected {
+  background-color: rgba(114, 46, 209, 0.15) !important;
+  border: 1px solid rgba(114, 46, 209, 0.35) !important;
+}
+
+/* Tree line guide styling */
+.qk7-unit-treeselect-popup .ant-select-tree-show-line .ant-select-tree-indent-unit::before {
+  border-color: rgba(148, 163, 184, 0.3) !important;
+}
+
+.qk7-unit-treeselect-popup .ant-select-tree-show-line .ant-select-tree-switcher-leaf-line::before,
+.qk7-unit-treeselect-popup .ant-select-tree-show-line .ant-select-tree-switcher-leaf-line::after {
+  border-color: rgba(148, 163, 184, 0.3) !important;
+}

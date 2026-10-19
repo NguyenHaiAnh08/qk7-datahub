@@ -80,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 select-none overflow-x-hidden">
-      <div className="p-2 sm:p-2.5 space-y-1 overflow-y-auto overflow-x-hidden">
+      <div className="p-2 sm:p-2.5 pb-24 space-y-1 overflow-y-auto overflow-x-hidden">
         {/* Sidebar Header with Toggle button */}
         <div
           className={`py-2 px-1 flex items-center ${

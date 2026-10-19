@@ -525,7 +525,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
       footer={null}
       width={980}
       centered
-      destroyOnClose
+      destroyOnHidden
       className="assign-role-modal"
       title={
         <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">

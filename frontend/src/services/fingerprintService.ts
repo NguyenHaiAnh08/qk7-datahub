@@ -56,6 +56,15 @@ export const fingerprintService = {
       }
     );
   },
+  async checkStatus(userId: string): Promise<{ user_id: string; has_fingerprint: boolean; enrolled_at?: string }> {
+    return http<{ user_id: string; has_fingerprint: boolean; enrolled_at?: string }>(
+      `/api/admin/fingerprint/status/${encodeURIComponent(userId)}`,
+      {
+        method: 'GET',
+        skipErrorNotification: true,
+      }
+    );
+  },
 };
 
 export default fingerprintService;

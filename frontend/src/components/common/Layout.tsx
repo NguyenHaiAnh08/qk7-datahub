@@ -1,7 +1,6 @@
 import React, { ReactNode } from 'react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { AIChatWidget } from '../ai-chat/AIChatWidget';
 
 export interface LayoutProps {
   children: ReactNode;
@@ -40,8 +39,6 @@ export const Layout: React.FC<LayoutProps> = ({
           <div className="max-w-7xl mx-auto space-y-6">{children}</div>
         </main>
       </div>
-
-      <AIChatWidget />
     </div>
   );
 };

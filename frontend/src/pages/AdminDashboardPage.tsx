@@ -36,6 +36,7 @@ import { UserTable } from '../components/users/UserTable';
 import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
 import { AssignRoleModal } from '../components/users/AssignRoleModal';
+import { FingerprintEnrollModal } from '../components/users/FingerprintEnrollModal';
 
 import { dashboardApi } from '../services/dashboardApi';
 import { usersApi } from '../services/usersApi';
@@ -112,6 +113,10 @@ export const AdminDashboardPage: React.FC = () => {
   }>({
     open: false,
     selectedRole: null,
+  });
+
+  const [fpEnrollModal, setFpEnrollModal] = useState<{ open: boolean; user: User | null }>({
+  open: false, user: null,
   });
 
   // Generic Edit Modal for Roles, Units, DocTypes, Levels, Ranks, Positions
@@ -643,20 +648,21 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
 
               <UserTable
-                users={filteredUsers}
-                onEdit={(u) => {
-                  setSelectedUser(u);
-                  setUserModalOpen(true);
-                }}
-                onUpdateCredentials={(u) => {
-                  setCredModal({
-                    open: true,
-                    userId: u.user_id,
-                    username: u.username || u.user_id.toLowerCase()
-                  });
-                }}
-                onDelete={handleDeleteUser}
-              />
+                  users={filteredUsers}
+                  onEdit={(u) => {
+                    setSelectedUser(u);
+                    setUserModalOpen(true);
+                  }}
+                  onUpdateCredentials={(u) => {
+                    setCredModal({
+                      open: true,
+                      userId: u.user_id,
+                      username: u.username || u.user_id.toLowerCase()
+                    });
+                  }}
+                  onDelete={handleDeleteUser}
+                  onEnrollFingerprint={(u) => setFpEnrollModal({ open: true, user: u })}
+                />
             </div>
           )}
 
@@ -1362,6 +1368,20 @@ export const AdminDashboardPage: React.FC = () => {
         onRefresh={loadUsers}
         onToast={showToast}
       />
+
+      {fpEnrollModal.open && fpEnrollModal.user && (
+  <FingerprintEnrollModal
+    open={fpEnrollModal.open}
+    userId={fpEnrollModal.user.user_id}
+    userName={fpEnrollModal.user.full_name}
+    onSuccess={() => {
+      setFpEnrollModal({ open: false, user: null });
+      showToast(`Đã đăng ký vân tay cho ${fpEnrollModal.user?.full_name}`, 'success');
+      loadUsers();
+    }}
+    onCancel={() => setFpEnrollModal({ open: false, user: null })}
+    />
+  )}
 
       {/* Generic Modal (Roles, Units, DocTypes, Levels, Ranks, Positions) */}
       <AnimatePresence>

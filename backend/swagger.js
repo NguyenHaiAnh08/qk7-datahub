@@ -59,14 +59,16 @@ const swaggerSpec = {
         },
         responses: {
           200: {
-            description: 'Thành công',
+            description: 'Thành công — trả JWT + thông tin user',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    success: { type: 'boolean', example: true },
-                    user: { $ref: '#/components/schemas/UserFull' },
+                    success:    { type: 'boolean', example: true },
+                    token:      { type: 'string', description: 'JWT token dùng cho header Authorization: Bearer <token>', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+                    expires_in: { type: 'string', example: '8h' },
+                    user:       { $ref: '#/components/schemas/UserFull' },
                   },
                 },
               },
@@ -92,6 +94,217 @@ const swaggerSpec = {
           },
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { $ref: '#/components/responses/NotFound' },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+
+        // ==========================================================
+    // FINGERPRINT — VERIFY (device-based via WebSocket)
+    // ==========================================================
+    '/api/auth/fingerprint/verify': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Xác thực vân tay → cấp token tạm xem file cấp 4-5',
+        description:
+          'Endpoint xác thực vân tay cho tài liệu cấp Tối mật (4) / Tuyệt mật (5).\n\n' +
+          '**Cách hoạt động:**\n' +
+          '1. Browser lấy `device_id` từ Fingerprint Agent local (`http://127.0.0.1:9001/device-id`)\n' +
+          '2. Browser gọi endpoint này kèm header `X-Device-FP: <device_id>`\n' +
+          '3. Backend tìm Agent đang online qua WebSocket, gửi job scan\n' +
+          '4. Agent quét ZK9500, so khớp template, gửi kết quả về BE\n' +
+          '5. Nếu khớp → BE cấp `fingerprint_token` (JWT 5 phút, gắn file_id + user_id)\n\n' +
+          '**Frontend dùng token này** để gọi `GET /api/files/{fileId}/view` qua header `X-Fingerprint-Token`.',
+        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        parameters: [
+          {
+            in: 'header',
+            name: 'X-Device-FP',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Device ID lấy từ Agent local',
+            example: 'DEV-73f027ff-84ea-464a-9610-bc5c556a499c',
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['file_id'],
+                properties: {
+                  file_id: { type: 'string', example: 'DOC-1760000000000-A1B2' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Xác thực thành công → cấp fingerprint_token',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success:           { type: 'boolean', example: true },
+                    required:          { type: 'boolean', example: true, description: 'true = file yêu cầu vân tay (cấp 4-5). false = file cấp 1-3 không cần' },
+                    fingerprint_token: { type: 'string', nullable: true, example: 'eyJhbGciOiJIUzI1NiIs...' },
+                    expires_in:        { type: 'string', example: '5m' },
+                    score:             { type: 'integer', example: 100, description: 'Điểm khớp 0-100' },
+                  },
+                },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: {
+            description: 'Vân tay không khớp, hoặc user chưa đăng ký vân tay (`needs_enroll: true`)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error:        { type: 'string' },
+                    needs_enroll: { type: 'boolean', example: false },
+                    score:        { type: 'integer' },
+                  },
+                },
+              },
+            },
+          },
+          408: { description: 'Timeout chờ quét (45s)' },
+          503: {
+            description: 'Agent chưa online (`agent_offline: true`)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error:         { type: 'string' },
+                    agent_offline: { type: 'boolean', example: true },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    // ==========================================================
+    // ADMIN — FINGERPRINT ENROLL (admin enroll cho user bất kỳ)
+    // ==========================================================
+    '/api/admin/fingerprint/enroll/{userId}': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Enroll vân tay cho user (yêu cầu admin cấp ≥ 4)',
+        description:
+          'Admin enroll vân tay cho BẤT KỲ user nào thông qua máy quét đang kết nối.\n\n' +
+          '**Quy trình:**\n' +
+          '1. Admin login, lấy device_id từ Agent local\n' +
+          '2. Gọi endpoint kèm header `X-Device-FP: <device_id>`\n' +
+          '3. BE gửi job enroll xuống Agent (timeout 60s)\n' +
+          '4. Agent chờ user đặt tay 3 lần (cùng ngón), merge template, gửi về BE\n' +
+          '5. BE mã hóa template (AES-256-GCM) → lưu vào `USER_FINGERPRINT.template_enc`\n\n' +
+          '**Lưu ý:** Người đặt tay PHẢI là user đích — nếu admin đặt tay của mình thì sau này user đích sẽ không quét được.',
+        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'userId',
+            required: true,
+            schema: { type: 'string' },
+            example: 'USR-005',
+            description: 'Mã user cần enroll vân tay',
+          },
+          {
+            in: 'header',
+            name: 'X-Device-FP',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Device ID lấy từ Agent local',
+            example: 'DEV-73f027ff-84ea-464a-9610-bc5c556a499c',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Enroll thành công — template đã lưu vào DB',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    user_id: { type: 'string', example: 'USR-005' },
+                  },
+                },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          403: { description: 'Cần quyền admin (clearance ≥ 4)' },
+          404: { description: 'Không tìm thấy user' },
+          408: { description: 'Timeout chờ quét 3 lần (60s)' },
+          503: {
+            description: 'Agent chưa online',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error:         { type: 'string' },
+                    agent_offline: { type: 'boolean', example: true },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    // ==========================================================
+    // ADMIN — FINGERPRINT AGENTS (danh sách agent online)
+    // ==========================================================
+    '/api/admin/fingerprint/agents': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Danh sách Fingerprint Agent đang online (yêu cầu admin cấp ≥ 4)',
+        description:
+          'Trả về danh sách các Agent (máy trạm có đầu đọc ZK9500) đang kết nối WebSocket tới BE.\n\n' +
+          'Dùng để debug hoặc kiểm tra máy nào đang sẵn sàng quét vân tay.',
+        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        responses: {
+          200: {
+            description: 'Danh sách agent',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          device_id:    { type: 'string', example: 'DEV-73f027ff-84ea-464a-9610-bc5c556a499c' },
+                          connected_at: { type: 'string', format: 'date-time' },
+                          last_ping:    { type: 'string', format: 'date-time' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          403: { description: 'Cần quyền admin (clearance ≥ 4)' },
           500: { $ref: '#/components/responses/ServerError' },
         },
       },
@@ -428,9 +641,17 @@ const swaggerSpec = {
         summary: 'Xem (inline) hoặc tải (attachment) PDF',
         description: 'Tài liệu Cấp ≥ 3 → CHỈ xem được, `download=1` sẽ trả 403.',
         parameters: [
-          { $ref: '#/components/parameters/FileId' },
-          { in: 'query', name: 'download', schema: { type: 'string', enum: ['0', '1'], default: '0' } },
-        ],
+        { $ref: '#/components/parameters/FileId' },
+        { in: 'query', name: 'download', schema: { type: 'string', enum: ['0', '1'], default: '0' } },
+        {
+          in: 'header',
+          name: 'X-Fingerprint-Token',
+          required: false,
+          schema: { type: 'string' },
+          description: 'BẮT BUỘC nếu file có security_level_id ≥ 4. Lấy từ POST /api/auth/fingerprint/verify. Token có hạn 5 phút, gắn với user_id + file_id.',
+          example: 'eyJhbGciOiJIUzI1NiIs...',
+        },
+      ],
         responses: {
           200: { description: 'Stream PDF', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } },
           403: { description: 'Không đủ quyền hoặc Cấp ≥ 3 không được tải' },
@@ -1674,19 +1895,37 @@ const swaggerSpec = {
   // ============================================================
   components: {
     securitySchemes: {
-      UserHeader: {
-        type: 'apiKey',
-        in: 'header',
-        name: 'X-User-Id',
-        description: 'Mã user (VD: USR-001)',
-      },
-      ClearanceHeader: {
-        type: 'apiKey',
-        in: 'header',
-        name: 'X-Clearance',
-        description: 'Mức bảo mật 1-5',
-      },
-    },
+  UserHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-User-Id',
+    description: 'Mã user (VD: USR-001) — legacy auth (khi ALLOW_LEGACY_AUTH=true)',
+  },
+  ClearanceHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Clearance',
+    description: 'Mức bảo mật 1-5 — legacy auth',
+  },
+  BearerAuth: {
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT',
+    description: 'JWT token lấy từ POST /api/auth/login (khuyến nghị dùng thay legacy)',
+  },
+  DeviceFPHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Device-FP',
+    description: 'Device ID của Fingerprint Agent trên máy user — lấy từ http://127.0.0.1:9001/device-id. Bắt buộc cho các endpoint fingerprint.',
+  },
+  FingerprintTokenHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Fingerprint-Token',
+    description: 'Token tạm 5 phút cấp sau khi xác thực vân tay — BẮT BUỘC để xem file cấp 4-5.',
+  },
+},
 
     parameters: {
       FileId: {

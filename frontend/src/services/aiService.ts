@@ -114,6 +114,7 @@ export const aiService = {
     return http<AIHealthStatus>('/api/ai/health', {
       method: 'GET',
       skipErrorNotification: true,
+      silent: true,
     }).catch(() => ({
       status: 'offline',
       service: 'AI Gateway Fallback',

@@ -67,7 +67,10 @@ module.exports = function (app, deps) {
                 SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name, u.[position],
                        u.unit_id, un.name AS unit_name,
                        u.status, u.clearance_level_id,
-                       sl.name AS clearance_name, sl.code AS clearance_code
+                       sl.name AS clearance_name, sl.code AS clearance_code,
+                       CASE WHEN EXISTS (
+                         SELECT 1 FROM USER_FINGERPRINT uf WHERE uf.user_id = u.user_id AND uf.active = 1
+                       ) THEN 1 ELSE 0 END AS has_fingerprint
                 FROM [USER] u
                 LEFT JOIN UNIT un          ON un.unit_id = u.unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
@@ -89,6 +92,7 @@ module.exports = function (app, deps) {
             }
             const items = r.recordset.map(u => ({
                 ...u,
+                has_fingerprint: u.has_fingerprint === 1,
                 roles: rolesByUser[u.user_id] || [],
                 role_names: roleNamesByUser[u.user_id] || []
             }));

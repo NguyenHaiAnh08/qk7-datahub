@@ -166,7 +166,7 @@ export const DocumentDeskPage: React.FC = () => {
       <Header
         activeNav="desk"
         title="QK7 DATAHUB"
-        subtitle="Bàn Làm Việc Văn Thư — Quản Lý Lưu Trữ Văn Bản"
+        subtitle="Trung tâm văn bản — Quản Lý Lưu Trữ Văn Bản"
       />
 
       {/* Main Container */}
@@ -176,7 +176,7 @@ export const DocumentDeskPage: React.FC = () => {
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
               <FileCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-              <span>Bàn Làm Việc Văn Thư Quân Khu</span>
+              <span>Trung tâm văn bản</span>
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Tiếp nhận, xử lý, phân loại và lưu trữ văn bản quân sự tuyệt mật & công khai

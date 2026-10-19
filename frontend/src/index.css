@@ -319,7 +319,10 @@ html:not(.dark) textarea::placeholder {
 
 /* Dark Mode: Đồng bộ màu bg-slate-950 (#020617) và border-slate-700 (#334155) */
 html.dark .qk7-treeselect,
+html.dark .qk7-treeselect.ant-select,
+html.dark .unit-treeselect-wrapper .ant-select,
 .dark .qk7-treeselect,
+.dark .qk7-treeselect.ant-select,
 .dark .unit-treeselect-wrapper .ant-select {
   --ant-select-background-color: #020617 !important;
   --ant-select-border-color: #334155 !important;
@@ -330,23 +333,31 @@ html.dark .qk7-treeselect,
   background-color: #020617 !important;
   background: #020617 !important;
   border: 1px solid #334155 !important;
+  border-radius: 0.75rem !important;
   color: #f1f5f9 !important;
 }
 
 html.dark .qk7-treeselect .ant-select-selector,
+html.dark .unit-treeselect-wrapper .ant-select-selector,
+.dark .qk7-treeselect .ant-select-selector,
 .dark .unit-treeselect-wrapper .ant-select-selector {
   background-color: #020617 !important;
   background: #020617 !important;
-  border-color: #334155 !important;
+  border: none !important;
   color: #f1f5f9 !important;
+  box-shadow: none !important;
 }
 
-/* Placeholder trong Dark Mode (text-slate-400 / #94a3b8) */
+/* Placeholder trong Dark Mode (text-slate-400 / text-slate-500) */
 html.dark .qk7-treeselect .ant-select-placeholder,
 html.dark .qk7-treeselect .ant-select-selection-placeholder,
+html.dark .unit-treeselect-wrapper .ant-select-placeholder,
+html.dark .unit-treeselect-wrapper .ant-select-selection-placeholder,
+.dark .qk7-treeselect .ant-select-placeholder,
+.dark .qk7-treeselect .ant-select-selection-placeholder,
 .dark .unit-treeselect-wrapper .ant-select-placeholder,
 .dark .unit-treeselect-wrapper .ant-select-selection-placeholder {
-  color: #94a3b8 !important;
+  color: #64748b !important;
   font-size: 0.75rem !important;
   line-height: normal !important;
   display: flex !important;
@@ -356,12 +367,23 @@ html.dark .qk7-treeselect .ant-select-selection-placeholder,
 /* Suffix icon / Arrow & Clear trong Dark Mode */
 html.dark .qk7-treeselect .ant-select-suffix,
 html.dark .qk7-treeselect .ant-select-arrow,
+html.dark .qk7-treeselect .ant-select-clear,
+html.dark .unit-treeselect-wrapper .ant-select-suffix,
+html.dark .unit-treeselect-wrapper .ant-select-arrow,
+html.dark .unit-treeselect-wrapper .ant-select-clear,
+.dark .qk7-treeselect .ant-select-suffix,
+.dark .qk7-treeselect .ant-select-arrow,
+.dark .qk7-treeselect .ant-select-clear,
 .dark .unit-treeselect-wrapper .ant-select-suffix,
-.dark .unit-treeselect-wrapper .ant-select-arrow {
+.dark .unit-treeselect-wrapper .ant-select-arrow,
+.dark .unit-treeselect-wrapper .ant-select-clear {
   color: #64748b !important;
+  background: transparent !important;
 }
 
 html.dark .qk7-treeselect .ant-select-selection-item,
+html.dark .unit-treeselect-wrapper .ant-select-selection-item,
+.dark .qk7-treeselect .ant-select-selection-item,
 .dark .unit-treeselect-wrapper .ant-select-selection-item {
   color: #f1f5f9 !important;
   font-size: 0.75rem !important;
@@ -370,10 +392,20 @@ html.dark .qk7-treeselect .ant-select-selection-item,
   align-items: center !important;
 }
 
+html.dark .qk7-treeselect .ant-select-selection-search-input,
+html.dark .unit-treeselect-wrapper .ant-select-selection-search-input,
+.dark .qk7-treeselect .ant-select-selection-search-input,
+.dark .unit-treeselect-wrapper .ant-select-selection-search-input {
+  color: #f1f5f9 !important;
+}
+
 /* Light Mode: Đồng bộ màu bg-slate-50 (#f8fafc) và border-slate-300 (#cbd5e1) */
 html:not(.dark) .qk7-treeselect,
+html:not(.dark) .qk7-treeselect.ant-select,
+html:not(.dark) .unit-treeselect-wrapper .ant-select,
 html.light .qk7-treeselect,
-:not(.dark) .unit-treeselect-wrapper .ant-select {
+html.light .qk7-treeselect.ant-select,
+html.light .unit-treeselect-wrapper .ant-select {
   --ant-select-background-color: #f8fafc !important;
   --ant-select-border-color: #cbd5e1 !important;
   --ant-select-border-radius: 0.75rem !important;
@@ -383,22 +415,30 @@ html.light .qk7-treeselect,
   background-color: #f8fafc !important;
   background: #f8fafc !important;
   border: 1px solid #cbd5e1 !important;
+  border-radius: 0.75rem !important;
   color: #0f172a !important;
 }
 
 html:not(.dark) .qk7-treeselect .ant-select-selector,
-:not(.dark) .unit-treeselect-wrapper .ant-select-selector {
+html:not(.dark) .unit-treeselect-wrapper .ant-select-selector,
+html.light .qk7-treeselect .ant-select-selector,
+html.light .unit-treeselect-wrapper .ant-select-selector {
   background-color: #f8fafc !important;
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: none !important;
   color: #0f172a !important;
+  box-shadow: none !important;
 }
 
 /* Placeholder trong Light Mode (placeholder-slate-400 / #94a3b8) */
 html:not(.dark) .qk7-treeselect .ant-select-placeholder,
 html:not(.dark) .qk7-treeselect .ant-select-selection-placeholder,
-:not(.dark) .unit-treeselect-wrapper .ant-select-placeholder,
-:not(.dark) .unit-treeselect-wrapper .ant-select-selection-placeholder {
+html:not(.dark) .unit-treeselect-wrapper .ant-select-placeholder,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-selection-placeholder,
+html.light .qk7-treeselect .ant-select-placeholder,
+html.light .qk7-treeselect .ant-select-selection-placeholder,
+html.light .unit-treeselect-wrapper .ant-select-placeholder,
+html.light .unit-treeselect-wrapper .ant-select-selection-placeholder {
   color: #94a3b8 !important;
   font-size: 0.75rem !important;
   line-height: normal !important;
@@ -409,18 +449,36 @@ html:not(.dark) .qk7-treeselect .ant-select-selection-placeholder,
 /* Suffix icon / Arrow & Clear trong Light Mode */
 html:not(.dark) .qk7-treeselect .ant-select-suffix,
 html:not(.dark) .qk7-treeselect .ant-select-arrow,
-:not(.dark) .unit-treeselect-wrapper .ant-select-suffix,
-:not(.dark) .unit-treeselect-wrapper .ant-select-arrow {
+html:not(.dark) .qk7-treeselect .ant-select-clear,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-suffix,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-arrow,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-clear,
+html.light .qk7-treeselect .ant-select-suffix,
+html.light .qk7-treeselect .ant-select-arrow,
+html.light .qk7-treeselect .ant-select-clear,
+html.light .unit-treeselect-wrapper .ant-select-suffix,
+html.light .unit-treeselect-wrapper .ant-select-arrow,
+html.light .unit-treeselect-wrapper .ant-select-clear {
   color: #94a3b8 !important;
+  background: transparent !important;
 }
 
 html:not(.dark) .qk7-treeselect .ant-select-selection-item,
-:not(.dark) .unit-treeselect-wrapper .ant-select-selection-item {
+html:not(.dark) .unit-treeselect-wrapper .ant-select-selection-item,
+html.light .qk7-treeselect .ant-select-selection-item,
+html.light .unit-treeselect-wrapper .ant-select-selection-item {
   color: #0f172a !important;
   font-size: 0.75rem !important;
   line-height: normal !important;
   display: flex !important;
   align-items: center !important;
+}
+
+html:not(.dark) .qk7-treeselect .ant-select-selection-search-input,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-selection-search-input,
+html.light .qk7-treeselect .ant-select-selection-search-input,
+html.light .unit-treeselect-wrapper .ant-select-selection-search-input {
+  color: #0f172a !important;
 }
 
 /* Hover & Focus state: focus:border-emerald-500 (#10b981) */
@@ -451,14 +509,61 @@ html:not(.dark) .qk7-treeselect .ant-select-selection-item,
   box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.45), 0 6px 16px -2px rgba(0, 0, 0, 0.25) !important;
 }
 
-html.dark .qk7-unit-treeselect-popup {
+html.dark .qk7-unit-treeselect-popup,
+html.dark .qk7-unit-treeselect-popup.ant-select-dropdown,
+.dark .qk7-unit-treeselect-popup,
+.dark .qk7-unit-treeselect-popup.ant-select-dropdown {
   background: #090d16 !important;
+  background-color: #090d16 !important;
   border: 1px solid #1e293b !important;
+  color: #f1f5f9 !important;
 }
 
-html:not(.dark) .qk7-unit-treeselect-popup {
+html.dark .qk7-unit-treeselect-popup .ant-select-tree,
+.dark .qk7-unit-treeselect-popup .ant-select-tree {
+  background: transparent !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-treenode,
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper,
+html.dark .qk7-unit-treeselect-popup .ant-select-tree-title,
+.dark .qk7-unit-treeselect-popup .ant-select-tree-treenode,
+.dark .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper,
+.dark .qk7-unit-treeselect-popup .ant-select-tree-title {
+  color: #f1f5f9 !important;
+}
+
+html.dark .qk7-unit-treeselect-popup .ant-empty,
+html.dark .qk7-unit-treeselect-popup .ant-empty-description,
+.dark .qk7-unit-treeselect-popup .ant-empty,
+.dark .qk7-unit-treeselect-popup .ant-empty-description {
+  color: #94a3b8 !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup,
+html:not(.dark) .qk7-unit-treeselect-popup.ant-select-dropdown,
+html.light .qk7-unit-treeselect-popup,
+html.light .qk7-unit-treeselect-popup.ant-select-dropdown {
   background: #ffffff !important;
+  background-color: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree,
+html.light .qk7-unit-treeselect-popup .ant-select-tree {
+  background: transparent !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-treenode,
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper,
+html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-title,
+html.light .qk7-unit-treeselect-popup .ant-select-tree-treenode,
+html.light .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper,
+html.light .qk7-unit-treeselect-popup .ant-select-tree-title {
+  color: #0f172a !important;
 }
 
 .qk7-unit-treeselect-popup .ant-select-tree {

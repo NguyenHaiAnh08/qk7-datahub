@@ -51,6 +51,10 @@ class ZK9500Service:
             return False, f"pyzkfp không import được: {_IMPORT_ERR}"
         try:
             self.zk = ZKFP2()
+            try:
+                self.zk.Terminate()
+            except Exception:
+                pass
             self.zk.Init()
             self.sdk_loaded = True
             if getattr(self.zk, "width", None):
@@ -70,7 +74,11 @@ class ZK9500Service:
             if n <= 0:
                 return False, "Không tìm thấy đầu đọc ZK9500"
             self.zk.OpenDevice(0)
-            self.device_serial = getattr(self.zk, "dev_serial_number", "ZK9500")
+            raw_sn = getattr(self.zk, "dev_serial_number", "ZK9500")
+            if isinstance(raw_sn, str):
+                self.device_serial = raw_sn.replace("\x00", "").strip() or "ZK9500"
+            else:
+                self.device_serial = "ZK9500"
             self.device_connected = True
             return True, f"Đã mở {self.device_serial} ({self.width}x{self.height})"
         except Exception as e:

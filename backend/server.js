@@ -534,7 +534,7 @@ app.post('/api/auth/fingerprint/verify', requireAuth, async (req, res) => {
       return res.status(403).json({
         error: scanResult.error === 'TIMEOUT'
           ? 'Hết thời gian chờ quét vân tay.'
-          : `Vân tay không khớp (score=${scanResult.score}). Vui lòng thử lại.`,
+          : 'Vân tay không khớp. Vui lòng thử lại.',
         score: scanResult.score,
       });
     }
@@ -635,6 +635,24 @@ app.get('/api/admin/fingerprint/agents', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Cần quyền quản trị (mức 4+)' });
   }
   res.json({ items: listAgents() });
+});
+
+app.get('/api/admin/fingerprint/status/:userId', requireAuth, async (req, res) => {
+  try {
+    const targetUserId = req.params.userId;
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('uid', sql.VarChar(50), targetUserId)
+      .query(`SELECT user_id, active, enrolled_at FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
+    const hasFp = r.recordset.length > 0;
+    res.json({
+      user_id: targetUserId,
+      has_fingerprint: hasFp,
+      enrolled_at: hasFp ? r.recordset[0].enrolled_at : null
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/health', async (req, res) => {
@@ -954,11 +972,40 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       return res.status(403).json({ error: 'Tài liệu Cấp 3+ chỉ xem trực tiếp, không tải về.' });
     }
 
-    const filePath = path.join(ROOT_DIR, doc.stored_path);
+    let filePath = path.join(ROOT_DIR, doc.stored_path);
+    if (!fs.existsSync(filePath)) {
+      // Fallback: Tìm file theo SHA256 nếu stored_path bị lệch ngày/tên
+      const sha8 = doc.sha256 ? doc.sha256.trim().slice(0, 8) : null;
+      if (sha8) {
+        const findInDir = (dir) => {
+          if (!fs.existsSync(dir)) return null;
+          for (const item of fs.readdirSync(dir)) {
+            const full = path.join(dir, item);
+            if (fs.statSync(full).isDirectory()) {
+              const res = findInDir(full);
+              if (res) return res;
+            } else if (item.includes(sha8)) {
+              return full;
+            }
+          }
+          return null;
+        };
+        const fallbackPath = findInDir(PDF_ROOT);
+        if (fallbackPath) {
+          filePath = fallbackPath;
+          const relPath = path.relative(ROOT_DIR, filePath).replace(/\\/g, '/');
+          pool.request()
+            .input('fid', sql.VarChar(50), fileId)
+            .input('p', sql.NVarChar(500), relPath)
+            .query('UPDATE DOCUMENT SET stored_path = @p WHERE file_id = @fid')
+            .catch(() => {});
+        }
+      }
+    }
     if (!filePath.startsWith(PDF_ROOT)) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
     if (!fs.existsSync(filePath)) {
       await writeAccessLog({ userId: req.user.user_id, fileId, action: 'ERROR', ip, note: 'File không tồn tại' });
-      return res.status(404).json({ error: 'File không tồn tại' });
+      return res.status(404).json({ error: 'File không tồn tại trên hệ thống lưu trữ' });
     }
 
     await writeAccessLog({
@@ -1015,6 +1062,7 @@ app.use((err, req, res, next) => {
 });
 
 require('./src/admin-routes')(app, { sql, getPool, writeAccessLog });
+app.use('/api/ai', require('./src/ai-routes'));
 
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();

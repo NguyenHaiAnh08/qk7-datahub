@@ -160,7 +160,7 @@ export const PortalPage: React.FC = () => {
       />
 
       {/* Main Container */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+      <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
         {/* Security Banner */}
         <SecurityBanner
           user={user}
@@ -223,7 +223,7 @@ export const PortalPage: React.FC = () => {
               >
                 {meta.levels.map((l) => (
                   <option key={l.level_id} value={l.level_id}>
-                    Tài liệu ≤ {l.name} (Cấp {l.level_id})
+                    {l.name}
                   </option>
                 ))}
               </select>

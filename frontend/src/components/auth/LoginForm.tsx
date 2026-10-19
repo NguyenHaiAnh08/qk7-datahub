@@ -124,7 +124,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast }) => {
         }, 500);
       }
     } catch (err: any) {
-      console.error('[login error]', err);
+      console.error('[Đăng nhập thất bại]:', err?.message || err);
       setErrorMessage(err.message || 'Mã định danh hoặc mật khẩu không chính xác!');
     } finally {
       setLoading(false);

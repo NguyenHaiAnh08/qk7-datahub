@@ -21,6 +21,8 @@ const {
   isAgentOnline, listAgents,
 } = require('./src/fingerprint-ws');
 
+const { getUserUnitScope, getSubtreeUnits, getRootUnitId, resolveUserUnitId } = require('./src/unit-scope');
+
 const app = express();
 const PORT = process.env.PORT || 8000;
 const ROOT_DIR = __dirname;
@@ -729,6 +731,106 @@ app.get('/api/documents', async (req, res) => {
   }
 });
 
+
+// ═══════════════════════════════════════════════════════════════
+// GET /api/documents/my-unit — Portal riêng đơn vị
+// ═══════════════════════════════════════════════════════════════
+app.get('/api/documents/my-unit', requireAuth, async (req, res) => {
+  try {
+    const scope = await getUserUnitScope(req.user);
+    const pool = await getPool();
+
+    let targetUnitId = null;
+    let canSelectUnit = false;
+
+    if (scope.restricted) {
+      targetUnitId = scope.root_unit;
+      canSelectUnit = false;
+    } else if (scope.no_unit) {
+      return res.status(403).json({
+        error: 'Tài khoản của bạn chưa được gán đơn vị. Vui lòng liên hệ quản trị viên.',
+        no_unit: true,
+      });
+    } else {
+      canSelectUnit = true;
+      const queryUnitId = (req.query.unit_id || '').trim();
+
+      if (queryUnitId) {
+        targetUnitId = queryUnitId;
+      } else {
+        // Query DB lấy đơn vị của user (vì req.user.unit_id có thể không có)
+        const userUnitId = await resolveUserUnitId(req.user);
+        targetUnitId = userUnitId || await getRootUnitId();
+      }
+    } 
+
+    if (!targetUnitId) {
+      return res.status(400).json({ error: 'Không xác định được đơn vị.' });
+    }
+
+    const subtreeUnitIds = await getSubtreeUnits(targetUnitId);
+
+    if (subtreeUnitIds.length === 0) {
+      return res.status(404).json({
+        error: `Đơn vị ${targetUnitId} không tồn tại trong hệ thống.`,
+        not_found: true,
+      });
+    }
+
+    const r = pool.request();
+    const unitParams = subtreeUnitIds.map((_, i) => `@u${i}`).join(',');
+    subtreeUnitIds.forEach((u, i) => r.input(`u${i}`, sql.VarChar(50), u));
+
+    let query = `
+      SELECT d.file_id, d.document_code, d.title,
+             d.doc_type_id, dt.name AS doc_type_name,
+             d.issued_date, d.issuing_unit_id, u.name AS unit_name,
+             d.signer, d.file_size, d.summary,
+             d.security_level_id, sl.name AS security_name,
+             d.created_at, d.updated_at
+      FROM DOCUMENT d
+      LEFT JOIN DOCUMENT_TYPE dt ON dt.type_id = d.doc_type_id
+      LEFT JOIN UNIT u ON u.unit_id = d.issuing_unit_id
+      JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
+      WHERE d.security_level_id <= @clearance
+        AND d.issuing_unit_id IN (${unitParams})
+    `;
+    r.input('clearance', sql.Int, req.user.clearance_level_id);
+
+    if (req.query.code) { query += ` AND d.document_code LIKE '%' + @code + '%'`; r.input('code', sql.NVarChar(100), req.query.code); }
+    if (req.query.title) { query += ` AND d.title LIKE N'%' + @title + N'%'`; r.input('title', sql.NVarChar(500), req.query.title); }
+    if (req.query.type) { query += ` AND d.doc_type_id = @type`; r.input('type', sql.VarChar(20), req.query.type); }
+    if (req.query.from) { query += ` AND d.issued_date >= @from`; r.input('from', sql.Date, req.query.from); }
+    if (req.query.to) { query += ` AND d.issued_date <= @to`; r.input('to', sql.Date, req.query.to); }
+    if (req.query.lv) {
+      const maxAllowed = Math.min(parseInt(req.query.lv, 10), req.user.clearance_level_id);
+      query += ` AND d.security_level_id <= @lv`;
+      r.input('lv', sql.Int, maxAllowed);
+    }
+    query += ` ORDER BY d.issued_date DESC, d.document_code`;
+
+    const result = await r.query(query);
+
+    const unitRes = await pool.request()
+      .input('uid', sql.VarChar(50), targetUnitId)
+      .query(`SELECT unit_id, name, parent_id FROM UNIT WHERE unit_id = @uid`);
+
+    res.json({
+      total: result.recordset.length,
+      items: result.recordset,
+      unit: unitRes.recordset[0] || { unit_id: targetUnitId, name: targetUnitId },
+      subtree_unit_ids: subtreeUnitIds,
+      can_select_unit: canSelectUnit,
+      selected_unit_id: targetUnitId,
+    });
+  } catch (err) {
+    console.error('[GET /api/documents/my-unit]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
 app.get('/api/documents/:fileId', async (req, res) => {
   try {
     const pool = await getPool();
@@ -814,6 +916,17 @@ app.post('/api/documents/check-duplicate', requireAuth, upload.single('file'), a
 app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
+
+    // ─── Chỉ Admin + Thư ký được upload ───
+    const roles = req.user.roles || [];
+    const canUpload = roles.includes('ROL-01') || roles.includes('ROL-04');
+    if (!canUpload) {
+      return res.status(403).json({
+        error: 'Chỉ quản trị viên và thư ký được phép upload tài liệu.',
+        can_upload: false,
+      });
+    }
+
     const {
       document_code, title, doc_type_id, issued_date,
       issuing_unit_id, signer, summary, security_level_id,

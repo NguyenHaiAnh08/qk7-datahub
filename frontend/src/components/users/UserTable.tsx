@@ -85,8 +85,16 @@ export const UserTable: React.FC<UserTableProps> = ({
                     {onEnrollFingerprint && (
                       <button
                         onClick={() => onEnrollFingerprint(u)}
-                        className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/70 dark:text-purple-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                        title="Đăng ký vân tay"
+                        className={`p-1.5 rounded-lg mr-1.5 transition cursor-pointer ${
+                          u.has_fingerprint
+                            ? 'bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 dark:border-emerald-800/50'
+                            : 'bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/70 dark:text-purple-300 dark:border-transparent'
+                        }`}
+                        title={
+                          u.has_fingerprint
+                            ? 'Đã có vân tay (Nhấn để thay thế / dán đè)'
+                            : 'Chưa có vân tay (Nhấn để thêm vân tay)'
+                        }
                       >
                         <Fingerprint className="w-3.5 h-3.5" />
                       </button>

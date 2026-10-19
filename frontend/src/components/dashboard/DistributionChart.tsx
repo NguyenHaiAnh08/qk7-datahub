@@ -42,7 +42,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
   }[barColor];
 
   return (
-    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200 min-w-0">
       <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
         {icon}
         <span>{title}</span>
@@ -57,15 +57,15 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
           {items.map((item) => {
             const percentage = calculatedMax > 0 ? (item.count / calculatedMax) * 100 : 0;
             return (
-              <div key={item.id} className="flex items-center justify-between gap-3">
+              <div key={item.id} className="flex items-center justify-between gap-3 min-w-0">
                 <span
-                  className="text-slate-700 dark:text-slate-300 truncate max-w-[180px] sm:max-w-[220px]"
+                  className="text-slate-700 dark:text-slate-300 truncate min-w-0 flex-1"
                   title={item.label}
                 >
                   {item.label}
                 </span>
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="w-28 sm:w-36 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                  <div className="w-20 sm:w-28 md:w-36 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.min(100, Math.max(4, percentage))}%` }}
@@ -73,7 +73,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
                       className={`h-full ${item.color || barColorClasses}`}
                     />
                   </div>
-                  <span className={`font-bold w-8 text-right ${countColorClasses}`}>
+                  <span className={`font-bold w-6 sm:w-8 text-right shrink-0 ${countColorClasses}`}>
                     {item.count}
                   </span>
                 </div>

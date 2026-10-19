@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, HelpCircle, Building2, Server, X } from 'lucide-react';
+import { ShieldCheck, HelpCircle, Building2, X } from 'lucide-react';
 import { LoginForm } from '../components/auth/LoginForm';
 import { Toast, ToastState } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
@@ -151,15 +151,8 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <footer className="relative z-10 px-6 py-4 border-t border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
-        <div>Bản quyền © 2026 Bộ Tư Lệnh Quân Khu 7. Bảo mật cấp ngành.</div>
-        <div className="flex items-center space-x-4">
-          <span className="flex items-center gap-1">
-            <Server className="w-3.5 h-3.5 text-emerald-500" />
-            Máy chủ: QK7-NODE-01 (Hoạt động)
-          </span>
-          <span>Bản dựng: v2.4-PROD</span>
-        </div>
+      <footer className="relative z-10 px-6 py-4 border-t border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md flex items-center justify-center text-[11px] text-slate-500 text-center">
+        <div>Bản quyền © 2026 Trường Quân sự Quân khu 7.</div>
       </footer>
 
       {/* Support Modal */}

@@ -11,6 +11,11 @@ import sys
 import threading
 import uuid
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 import websockets
 from dotenv import load_dotenv
 
@@ -60,9 +65,16 @@ def free_port(port: int):
         pass
 
 
-def start_device_id_server(device_id: str, host: str, port: int):
+def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None):
     free_port(port)
     class Handler(http.server.BaseHTTPRequestHandler):
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "*")
+            self.end_headers()
+
         def do_GET(self):
             if self.path == "/device-id":
                 body = json.dumps({"device_id": device_id, "service": "qk7-fingerprint-agent"}).encode()
@@ -77,6 +89,19 @@ def start_device_id_server(device_id: str, host: str, port: int):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            elif self.path == "/enroll-status":
+                status = agent_ref.get_enroll_status() if agent_ref else {
+                    "enrolling": False, "step": 0, "total": 3, "state": "idle"
+                }
+                body = json.dumps(status).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "*")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -103,6 +128,17 @@ class FingerprintAgent:
         self.device_id = device_id
         self.running = True
         self.reconnect_delay = 3
+        self.enroll_step = 0
+        self.enroll_total = 3
+        self.enroll_state = "idle"
+
+    def get_enroll_status(self):
+        return {
+            "enrolling": bool(self.busy and self.enroll_state != "idle"),
+            "step": self.enroll_step,
+            "total": self.enroll_total,
+            "state": self.enroll_state,
+        }
         self._cancel_event = threading.Event()
 
     async def run(self):
@@ -208,22 +244,25 @@ class FingerprintAgent:
         user_id = job.get("user_id")
         step_timeout = max(10, int(job.get("timeout_seconds", 60)) // 3)
 
+        if self.busy:
+            print(f"[Agent] ⚠️ Bỏ qua enroll {job_id} vì thiết bị đang bận.")
+            await ws.send(json.dumps({
+                "type": "enroll_result", "job_id": job_id,
+                "success": False, "error": "BUSY",
+            }))
+            return
+
+        self.busy = True
+        self.enroll_step = 0
+        self.enroll_total = 3
+        self.enroll_state = "waiting_touch_1"
         print(f"\n[Agent] 📥 enroll {job_id} | user={user_id} | {step_timeout}s/lần")
 
         try:
             templates = []
             for i in range(3):
-                if cancel_event.is_set():
-                    print(f"[Agent] ⏹️ Enroll {job_id} bị hủy trước lần {i+1}.")
-                    try:
-                        await ws.send(json.dumps({
-                            "type": "enroll_result", "job_id": job_id,
-                            "success": False, "error": "CANCELLED",
-                        }))
-                    except Exception:
-                        pass
-                    return
-
+                self.enroll_step = i
+                self.enroll_state = f"waiting_touch_{i+1}"
                 print(f"[Agent] 👉 Lần {i+1}/3 — Đặt tay...")
                 t = await asyncio.to_thread(
                     self.svc.wait_for_finger, step_timeout, cancel_event
@@ -241,9 +280,10 @@ class FingerprintAgent:
                     return
 
                 if t is None:
+                    self.enroll_state = "timeout"
                     await ws.send(json.dumps({
                         "type": "enroll_result", "job_id": job_id,
-                        "success": False, "error": f"Lần {i+1} quét không thành công sau {step_timeout}s. Vui lòng thử lại.",
+                        "success": False, "error": f"Quét vần tay không thành công lần {i+1}/3",
                     }))
                     return
 
@@ -252,6 +292,7 @@ class FingerprintAgent:
                         self.svc.compare_templates, templates[0], t
                     )
                     if not matched:
+                        self.enroll_state = "mismatch"
                         await ws.send(json.dumps({
                             "type": "enroll_result", "job_id": job_id,
                             "success": False, "error": f"Lần {i+1} không khớp ngón ban đầu. Vui lòng thử lại.",
@@ -259,6 +300,16 @@ class FingerprintAgent:
                         return
 
                 templates.append(t)
+                self.enroll_step = i + 1
+                self.enroll_state = f"captured_{i+1}" if (i + 1 < 3) else "merging"
+                print(f"[Agent] ✓ Ghi nhận ngón tay lần {i+1}/3 thành công")
+                try:
+                    await ws.send(json.dumps({
+                        "type": "enroll_progress", "job_id": job_id,
+                        "step": i + 1, "total": 3,
+                    }))
+                except Exception:
+                    pass
                 await asyncio.sleep(0.8)
 
             if cancel_event.is_set():
@@ -273,6 +324,7 @@ class FingerprintAgent:
             )
             merged_bytes = bytes(result[0]) if isinstance(result, tuple) else bytes(result)
             print(f"[Agent] ✅ enroll {job_id} done, merged={len(merged_bytes)}B")
+            self.enroll_state = "completed"
 
             await ws.send(json.dumps({
                 "type": "enroll_result", "job_id": job_id,
@@ -280,6 +332,7 @@ class FingerprintAgent:
                 "template_b64": base64.b64encode(merged_bytes).decode(),
             }))
         except Exception as e:
+            self.enroll_state = "error"
             print(f"[Agent] ❌ enroll error: {e}")
             try:
                 await ws.send(json.dumps({
@@ -293,7 +346,7 @@ class FingerprintAgent:
 def main():
     device_id = get_or_create_device_id()
     agent = FingerprintAgent(device_id)
-    start_device_id_server(device_id, DEVICE_SERVER_HOST, DEVICE_SERVER_PORT)
+    start_device_id_server(device_id, DEVICE_SERVER_HOST, DEVICE_SERVER_PORT, agent)
 
     def _stop(*_):
         agent.running = False

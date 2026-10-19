@@ -10,10 +10,9 @@ import {
   Space,
   Popconfirm,
   Badge,
-  Tooltip,
   Dropdown,
+  type TableColumnsType,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import {
   Search,
   UserCheck,
@@ -62,6 +61,14 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
 
   // Trạng thái đang làm mới dữ liệu
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Quản lý trang hiện tại (5 người dùng / trang)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Reset trang về 1 khi thay đổi tìm kiếm, bộ lọc hoặc mở modal
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchText, filterStatus, filterRoleId, open]);
 
   // Hàm xử lý làm mới danh sách dữ liệu trong modal
   const handleRefreshModal = async () => {
@@ -306,7 +313,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
   };
 
   // Cấu hình các cột của Ant Design Table
-  const columns: ColumnsType<User> = [
+  const columns: TableColumnsType<User> = [
     {
       title: 'Mã QN',
       dataIndex: 'user_id',
@@ -334,9 +341,11 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
       title: 'Đơn vị',
       dataIndex: 'unit_name',
       key: 'unit_name',
-      width: 150,
+      width: 220,
       render: (unit: string) => (
-        <span className="text-slate-600 dark:text-slate-300 text-xs">{unit || '—'}</span>
+        <span className="text-slate-600 dark:text-slate-300 text-xs whitespace-nowrap inline-block" title={unit || '—'}>
+          {unit || '—'}
+        </span>
       ),
     },
     {
@@ -460,7 +469,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
               <Select
                 key={`switch-${record.user_id}-${primaryRoleId}-${switchRoleKey}`}
                 size="small"
-                value={null}
+                value={undefined}
                 placeholder="Đổi vai trò..."
                 style={{ width: 120 }}
                 onChange={(newRoleId) => handleSwitchRole(record.user_id, primaryRoleId, newRoleId)}
@@ -514,7 +523,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
       open={open}
       onCancel={onClose}
       footer={null}
-      width={940}
+      width={980}
       centered
       destroyOnHidden
       className="assign-role-modal"
@@ -609,14 +618,16 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
         </div>
 
         {/* Bảng danh sách người dùng */}
-        <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs bg-white dark:bg-transparent">
+        <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs bg-white dark:bg-transparent [&_.ant-pagination]:px-3 [&_.ant-pagination]:py-2">
           <Table<User>
             columns={columns}
             dataSource={filteredUsers}
             rowKey="user_id"
             size="small"
             pagination={{
-              pageSize: 7,
+              current: Math.min(Math.max(1, currentPage), Math.ceil(filteredUsers.length / 5) || 1),
+              pageSize: 5,
+              onChange: (page) => setCurrentPage(page),
               showSizeChanger: false,
               showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} người dùng`,
             }}

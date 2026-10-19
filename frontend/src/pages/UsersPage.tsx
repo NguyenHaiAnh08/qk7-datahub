@@ -67,7 +67,14 @@ export const UsersPage: React.FC = () => {
         dashboardApi.getRoles(),
         dashboardApi.getMeta(),
       ]);
-      setUsersList(uRes.items || []);
+      const sortedUsers = [...(uRes.items || [])].sort((a, b) => {
+        const parseNum = (id?: string) => {
+          const m = (id || '').match(/USR-(\d+)/i);
+          return m ? parseInt(m[1], 10) : 999999;
+        };
+        return parseNum(a.user_id) - parseNum(b.user_id);
+      });
+      setUsersList(sortedUsers);
       setUnitsList(unitRes.items || []);
       setLevelsList(lvlRes.items || []);
       setRolesList(roleRes.items || []);

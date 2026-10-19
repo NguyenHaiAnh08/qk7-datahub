@@ -1,4 +1,5 @@
 import React from 'react';
+import { Tooltip } from 'antd';
 import {
   LayoutDashboard,
   Users,
@@ -78,8 +79,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 select-none">
-      <div className="p-2 sm:p-3 space-y-1 overflow-y-auto">
+    <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 select-none overflow-x-hidden">
+      <div className="p-2 sm:p-2.5 pb-24 space-y-1 overflow-y-auto overflow-x-hidden">
         {/* Sidebar Header with Toggle button */}
         <div
           className={`py-2 px-1 flex items-center ${
@@ -92,18 +93,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           )}
           {onToggleCollapse && (
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
-              title={collapsed ? 'Mở rộng danh mục quản trị' : 'Thu gọn danh mục quản trị'}
-              aria-label={collapsed ? 'Mở rộng danh mục quản trị' : 'Thu gọn danh mục quản trị'}
+            <Tooltip
+              title={collapsed ? 'Mở rộng danh mục quản trị' : undefined}
+              placement="right"
+              mouseEnterDelay={0.2}
             >
-              {collapsed ? (
-                <ChevronRight className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              ) : (
-                <ChevronLeft className="w-4 h-4" />
-              )}
-            </button>
+              <button
+                onClick={onToggleCollapse}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                title={!collapsed ? 'Thu gọn danh mục quản trị' : undefined}
+                aria-label={collapsed ? 'Mở rộng danh mục quản trị' : 'Thu gọn danh mục quản trị'}
+              >
+                {collapsed ? (
+                  <ChevronRight className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                ) : (
+                  <ChevronLeft className="w-4 h-4" />
+                )}
+              </button>
+            </Tooltip>
           )}
         </div>
 
@@ -111,14 +118,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
-          return (
+          const buttonElement = (
             <button
               key={item.id}
               onClick={() => handleSelect(item.id)}
-              title={item.label}
               className={`w-full flex items-center ${
                 collapsed ? 'justify-center p-2.5' : 'justify-start space-x-3 px-3 py-2.5'
-              } rounded-xl text-xs transition cursor-pointer relative group ${
+              } rounded-xl text-xs transition cursor-pointer ${
                 isActive
                   ? 'bg-purple-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/30 font-semibold shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium'
@@ -126,13 +132,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               {!collapsed && <span className="truncate">{item.label}</span>}
-              {collapsed && (
-                <span className="hidden md:block absolute left-full ml-2 px-2.5 py-1 bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-medium rounded-lg shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 border border-slate-700/60">
-                  {item.label}
-                </span>
-              )}
             </button>
           );
+
+          if (collapsed) {
+            return (
+              <Tooltip key={item.id} title={item.label} placement="right" mouseEnterDelay={0.15}>
+                {buttonElement}
+              </Tooltip>
+            );
+          }
+
+          return buttonElement;
         })}
       </div>
     </div>

@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, animate } from 'framer-motion';
 import {
-  Loader2,
   CheckCircle2,
   AlertCircle,
   X,
@@ -22,6 +21,44 @@ export interface FingerprintEnrollModalProps {
 
 type Phase = 'checking' | 'confirm_overwrite' | 'scanning' | 'success' | 'error';
 
+/**
+ * CircularSpinner: SVG loading spinner perfectly centered and circular,
+ * with no subpixel border-radius artifacts or lines drawn outside.
+ */
+export const CircularSpinner: React.FC<{
+  size?: number;
+  className?: string;
+  strokeWidth?: number;
+}> = ({ size = 16, className = 'text-red-500', strokeWidth = 2.5 }) => (
+  <svg
+    className={`animate-spin ${className}`}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle
+      cx="12"
+      cy="12"
+      r="9"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      className="opacity-20"
+    />
+    <circle
+      cx="12"
+      cy="12"
+      r="9"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeDasharray="26 56"
+      className="opacity-95"
+    />
+  </svg>
+);
+
 export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
   open,
   userId,
@@ -33,24 +70,83 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
   const [phase, setPhase] = useState<Phase>('checking');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [enrollStep, setEnrollStep] = useState(0); // 0: chờ lần 1, 1: xong lần 1, 2: xong lần 2, 3: xong lần 3
   const [progress, setProgress] = useState(0);
 
   const inFlightRef = useRef(false);
+  const progressRef = useRef(0);
+  const currentStepRef = useRef(0);
+  const animControlsRef = useRef<any>(null);
+  const pollTimerRef = useRef<any>(null);
+
+  const animateToProgress = (target: number, duration: number = 0.65) => {
+    if (animControlsRef.current) {
+      animControlsRef.current.stop();
+    }
+    animControlsRef.current = animate(progressRef.current, target, {
+      duration,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (latest) => {
+        progressRef.current = latest;
+        setProgress(latest);
+      },
+    });
+  };
 
   // Progressive fill animation simulating Touch ID ridge scanning
   useEffect(() => {
-    let timer: any;
-    if (phase === 'scanning') {
-      setProgress(25);
-      timer = setInterval(() => {
-        setProgress((prev) => (prev < 80 ? prev + 15 : prev));
-      }, 3000);
-    } else if (phase === 'success') {
-      setProgress(100);
-    } else if (phase === 'error' || phase === 'confirm_overwrite' || phase === 'checking') {
-      setProgress(0);
+    if (phase !== 'scanning') {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+      if (phase === 'success') {
+        currentStepRef.current = 3;
+        setEnrollStep(3);
+        animateToProgress(100, 0.4);
+      } else if (phase === 'error' || phase === 'confirm_overwrite' || phase === 'checking') {
+        if (animControlsRef.current) animControlsRef.current.stop();
+        progressRef.current = 0;
+        setProgress(0);
+        setEnrollStep(0);
+        currentStepRef.current = 0;
+      }
+      return;
     }
-    return () => clearInterval(timer);
+
+    // Khi bắt đầu quét: không đặt tay thì không fill màu đỏ (progress = 0)
+    progressRef.current = 0;
+    setProgress(0);
+    setEnrollStep(0);
+    currentStepRef.current = 0;
+
+    pollTimerRef.current = setInterval(async () => {
+      const status = await fingerprintService.getEnrollStatus();
+      if (!status || !status.enrolling) return;
+
+      const newStep = status.step;
+      if (newStep > currentStepRef.current) {
+        currentStepRef.current = newStep;
+        setEnrollStep(newStep);
+        if (newStep === 1) {
+          // Lần 1: hiện đỏ 1 chút (~35%) xong dừng chờ đặt lần tiếp
+          animateToProgress(35, 0.65);
+        } else if (newStep === 2) {
+          // Lần 2: hiện đỏ thêm (~70%) xong dừng chờ đặt lần tiếp
+          animateToProgress(70, 0.65);
+        } else if (newStep >= 3) {
+          // Lần 3: fill đầy 100% màu đỏ
+          animateToProgress(100, 0.5);
+        }
+      }
+    }, 200);
+
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
   }, [phase]);
 
   // Check fingerprint state on open
@@ -62,7 +158,10 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
 
     const checkAndStart = async () => {
       setError('');
+      progressRef.current = 0;
       setProgress(0);
+      setEnrollStep(0);
+      currentStepRef.current = 0;
 
       // If prop already indicates user has fingerprint
       if (propHasFingerprint === true) {
@@ -112,12 +211,18 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
       }
 
       await fingerprintService.enrollForUser(userId, deviceId);
-      setProgress(100);
+      currentStepRef.current = 3;
+      setEnrollStep(3);
+      animateToProgress(100, 0.4);
       setPhase('success');
       setTimeout(() => {
         onSuccess();
       }, 1500);
     } catch (err: any) {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
       const msg = err.message || 'Enroll thất bại';
       if (err.data?.agent_offline) {
         setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent.');
@@ -139,8 +244,16 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
   };
 
   const handleRetry = () => {
+    if (animControlsRef.current) animControlsRef.current.stop();
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
     inFlightRef.current = false;
+    progressRef.current = 0;
+    currentStepRef.current = 0;
     setProgress(0);
+    setEnrollStep(0);
     setAttempt((n) => n + 1);
   };
 
@@ -162,14 +275,14 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
           <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div
-                className={`w-9 h-9 rounded-xl border flex items-center justify-center ${
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
                   phase === 'confirm_overwrite'
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
                     : 'bg-red-500/10 border-red-500/30 text-red-500'
                 }`}
               >
                 {phase === 'scanning' ? (
-                  <div className="w-3.5 h-3.5 rounded-full border-2 border-red-500 border-t-transparent animate-spin" />
+                  <CircularSpinner size={16} className="text-red-500" strokeWidth={2.6} />
                 ) : (
                   <Fingerprint className="w-5 h-5" />
                 )}
@@ -191,11 +304,11 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
             </button>
           </div>
 
-          <div className="p-6 flex flex-col items-center text-center min-h-[310px] justify-center">
+          <div className="p-6 flex flex-col items-center text-center min-h-[320px] justify-center">
             {/* Checking status */}
             {phase === 'checking' && (
               <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-600 dark:text-purple-400" />
+                <CircularSpinner size={32} className="text-purple-600 dark:text-purple-400" strokeWidth={2.5} />
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Đang kiểm tra dữ liệu vân tay của người dùng...
                 </p>
@@ -229,21 +342,56 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
             {/* Scanning In Progress */}
             {phase === 'scanning' && (
               <>
+                {/* 3-segment progress indicator like iPhone Touch ID */}
+                <div className="flex items-center justify-center gap-2 mb-3.5 w-full max-w-[210px]">
+                  {[1, 2, 3].map((s) => {
+                    const isDone = enrollStep >= s;
+                    const isCurrent = enrollStep === s - 1;
+                    return (
+                      <div
+                        key={s}
+                        className={`flex-1 h-1.5 rounded-full transition-all duration-500 ${
+                          isDone
+                            ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)]'
+                            : isCurrent
+                            ? 'bg-red-500/40 animate-pulse'
+                            : 'bg-slate-200 dark:bg-slate-800'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+
                 <TouchIDFingerprint
                   phase={phase}
                   progress={progress}
+                  pulseKey={enrollStep}
                   size="md"
-                  className="mb-4"
+                  className="mb-3.5"
                 />
-                <h4 className="font-bold text-base text-slate-900 dark:text-white mb-1">
-                  Đặt tay lên máy quét 3 lần
+
+                <h4 className="font-bold text-base text-slate-900 dark:text-white mb-1 transition-all whitespace-nowrap">
+                  {enrollStep === 0 && 'Đặt tay lên máy quét 3 lần'}
+                  {enrollStep === 1 && 'Đã ghi nhận lần 1 (Lần 2/3)'}
+                  {enrollStep === 2 && 'Đã ghi nhận lần 2 (Lần 3/3)'}
+                  {enrollStep >= 3 && 'Hoàn tất quét 3 lần'}
                 </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 max-w-xs">
-                  Cùng một ngón tay, nhấc ra và đặt lại giữa các lần quét
+
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 w-full whitespace-nowrap text-center transition-all">
+                  {enrollStep === 0 && 'Cùng một ngón tay, đặt lên đầu đọc để bắt đầu lần 1'}
+                  {enrollStep === 1 && 'Nhấc ngón tay ra và đặt lại cùng ngón tay đó để quét lần 2'}
+                  {enrollStep === 2 && 'Nhấc ngón tay ra và đặt lại lần cuối cùng để hoàn tất'}
+                  {enrollStep >= 3 && 'Đang hợp nhất và mã hóa dữ liệu đường vân mới...'}
                 </p>
-                <div className="flex items-center gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-1.5 rounded-full font-medium">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Đang quét và ghi nhận đường vân mới...
+
+                <div className="inline-flex items-center gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-1.5 rounded-full font-medium shadow-sm">
+                  <CircularSpinner size={12} className="text-red-500 shrink-0" strokeWidth={2.8} />
+                  <span>
+                    {enrollStep === 0 && 'Chờ đặt ngón tay lần 1...'}
+                    {enrollStep === 1 && 'Chờ nhấc ra và đặt lại lần 2...'}
+                    {enrollStep === 2 && 'Chờ nhấc ra và đặt lại lần 3...'}
+                    {enrollStep >= 3 && 'Đang xử lý mẫu vân tay...'}
+                  </span>
                 </div>
               </>
             )}

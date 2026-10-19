@@ -180,7 +180,7 @@ class ZK9500Service:
             pass
         return None
 
-    def wait_for_finger(self, timeout: float = 30.0) -> Optional[bytes]:
+    def wait_for_finger(self, timeout: float = 30.0, cancel_event=None) -> Optional[bytes]:
         if not self.device_connected:
             raise RuntimeError("Thiết bị chưa mở")
         if not self._scan_lock.acquire(timeout=timeout):
@@ -188,6 +188,8 @@ class ZK9500Service:
         try:
             start = time.time()
             while time.time() - start < timeout:
+                if cancel_event is not None and cancel_event.is_set():
+                    return None
                 t = self._capture_once()
                 if t is not None:
                     time.sleep(0.05)

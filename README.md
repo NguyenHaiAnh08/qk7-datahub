@@ -65,7 +65,7 @@ qk7-datahub/
 └── frontend/                               # 🔵 GIAO DIỆN CLIENT REACT 18 + TYPESCRIPT + ANT DESIGN
     ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
     ├── vite.config.ts                      # Config build xuất sang ../backend/public, proxy :8000
-    ├── package.json                        # Dependencies: antd, react-router-dom, lucide-react...
+    ├── package.json                        # Dependencies: antd, react-router-dom, lucide-react, exceljs...
     └── src/
         ├── App.tsx                         # Ant Design ConfigProvider (Màu Tím #722ED1), Auth, Theme
         ├── routes/                         # Auto-Discovery Routing & ProtectedRoute theo Cấp mật
@@ -74,7 +74,9 @@ qk7-datahub/
         │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
         │   ├── document-desk/              # FingerprintScanModal (Xác thực vân tay xem văn bản Mật)
         │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Touch ID SVG)
+        │   ├── dashboard/                  # SecurityAuditLog (Trung tâm SOC), UnitTreeTable (Cây đơn vị), StatCard...
         │   └── common/                     # Header, Sidebar, Layout, TouchIDFingerprint...
+        ├── utils/                          # exportAuditReportExcel.ts (Xuất file Excel .xlsx chuẩn biểu mẫu Quân đội)
         ├── services/                       # authService, documentService, userService, fingerprintService...
         └── contexts/                       # AuthContext, ThemeContext
 ```
@@ -97,6 +99,28 @@ qk7-datahub/
 - **Theme & Color:** Toàn bộ ứng dụng cấu hình qua `<ConfigProvider>` của Ant Design với màu chủ đạo hành động (Primary Action) là **Màu Tím (`#722ED1`)**, hỗ trợ chế độ Sáng / Tối mượt mà và giao diện Việt hóa 100% (`vi_VN`).
 - **Phân trang chuẩn 5 người dùng / trang:** Danh sách quân nhân hiển thị đúng 5 người dùng / trang, người thứ 6 chuyển sang trang tiếp theo kèm bộ điều hướng Ant Design Pagination.
 - **Trang xử lý mã lỗi HTTP chuẩn mực:** Sử dụng `<Result>` của Ant Design xử lý thân thiện các mã 400, 401, 403, 404, 500, 502, 503.
+
+### 4. Trung Tâm Giám Sát Nhật Ký Hoạt Động & Kiểm Toán An Ninh SOC (`SecurityAuditLog`)
+- **Giao diện SOC chuyên nghiệp:** Tối ưu hóa phân cấp chiều sâu thị giác (Layered backgrounds), kính mờ (Backdrop blur) và viền phát sáng; hỗ trợ hoàn hảo cả Dark Mode (cho kíp trực an ninh ban đêm) và Light Mode.
+- **4 Thẻ KPI Tác Chiến Thời Gian Thực:** Giám sát tổng hoạt động, cảnh báo an ninh (`FINGERPRINT_FAIL`, `ACCESS_DENIED`...), biến động vai trò/đặc quyền (`ASSIGN_ROLE`...) và lượt truy xuất văn bản mật.
+- **Giám sát trực tuyến & Tự động làm mới:** Chỉ báo trạng thái trực tuyến `🟢 Hệ thống Trực tuyến`, bộ hẹn giờ tự động làm mới chu kỳ 10s / 30s / Tắt kèm thanh đếm ngược và nút tạm dừng / tiếp tục.
+- **Bảng kiểm toán thông minh:** Cột thời gian Monospace chính xác từng giây, badge IP mạng nội bộ/localhost, avatar quân nhân không ngắt dòng, tự động bóc tách thực thể mục tiêu (`USR-...`, `DEV-...`, `ROL-...`, `DOC-...`) từ nội dung ghi chú.
+- **Điều tra sự cố chuyên sâu (Deep Incident Inspection):** Hộp thoại Drawer / Modal kiểm toán chi tiết hiển thị toàn bộ thuộc tính, Raw JSON Payload với tính năng 1-click sao chép Clipboard.
+
+### 5. Cây Quản Lý Phân Cấp Đơn Vị Quân Khu Đa Tầng (`UnitTreeTable`)
+- **Tổ chức thứ bậc chỉ huy cây đa tầng (Command Tree Hierarchy):** Hiển thị trực quan quan hệ cơ quan cha - đơn vị con với số lượng đơn vị trực thuộc tự động tổng hợp.
+- **Cơ chế bảo vệ đơn vị "mồ côi" (Orphan Safeguarding):** Tự động phát hiện và chuyển các đơn vị có `parent_id` không hợp lệ về gốc (Root), ngăn ngừa triệt để lỗi mất dữ liệu trên giao diện.
+- **Phân loại cấp bậc tự động 6 tầng quân sự:** Nhận diện thông minh qua tên đơn vị: Cấp Quân Khu, Sư Đoàn, Trung Đoàn, Tiểu Đoàn, Nhà Trường/Học Viện và Cơ Quan/Phòng Ban.
+- **Thanh thống kê tương tác (Mini KPI Stat Pills):** Lọc nhanh đơn vị theo cấp bậc chỉ với 1 cú click chuột.
+- **Tìm kiếm tiếng Việt thông minh (Accent-Insensitive Search):** Tự động loại bỏ dấu tiếng Việt khi tìm kiếm và tự động bung (expand) tất cả các nhánh cha dẫn đến kết quả tìm kiếm.
+
+### 6. Xuất Báo Cáo Nhật Ký Kiểm Toán Chuẩn Quy Chuẩn Quân Đội (`exportAuditReportExcel`)
+- **Định dạng file Excel (.xlsx) chính quy:** Thay thế việc xuất file CSV đơn giản bằng định dạng Excel `.xlsx` chuyên nghiệp thông qua thư viện `exceljs`, tuân thủ 100% biểu mẫu công văn `Xuất báo cáo mẫu.xlsx`.
+- **Đầy đủ trường chuẩn hành chính quân sự:**
+  - Tiêu ngữ bên trái: **PHÒNG THAM MƯU HÀNH CHÍNH** / **TỔ CÔNG NGHỆ THÔNG TIN** / **Số: ....../BC-CNTT**.
+  - Quốc hiệu bên phải: **CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM** / **Độc lập - Tự do - Hạnh phúc** / Ngày tháng địa danh tự động (`TP. Hồ Chí Minh, ngày DD tháng MM năm YYYY`).
+- **Bảng dữ liệu chuẩn 9 cột:** `Mã Log`, `Thời Gian`, `Mã Quân Nhân`, `Họ Tên Quân Nhân`, `Hành Động`, `Nhóm Phân Loại`, `Đối Tượng / Văn Bản`, `Địa Chỉ IP`, `Ghi Chú` với tiêu đề màu vàng cam `#FFC000`, font `Times New Roman` và khung viền mảnh chuẩn mực.
+- **Chân trang ký duyệt quân sự:** Khối ký duyệt `NGƯỜI LẬP` và chức danh người lập báo cáo: `Thiếu tá QNCN Nguyễn Mạnh Nam`.
 
 ---
 

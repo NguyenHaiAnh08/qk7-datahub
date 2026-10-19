@@ -17,6 +17,9 @@
 8. [Kiến Trúc Xác Thực Sinh Trắc Học Vân Tay (ZKTeco ZK9500 Biometric Engine)](#8-kiến-trúc-xác-thực-sinh-trắc-học-vân-tay-zkteco-zk9500-biometric-engine)
 9. [Danh Mục API Endpoints Chuẩn OpenAPI 3.0 / Swagger](#9-danh-mục-api-endpoints-chuẩn-openapi-30--swagger)
 10. [Hướng Dẫn Triển Khai & Vận Hành (Operations Runbook)](#10-hướng-dẫn-triển-khai--vận-hành)
+11. [Kiến Trúc Trung Tâm Kiểm Toán & Giám Sát An Ninh SOC (Security Audit Log Engine)](#11-kiến-trúc-trung-tâm-kiểm-toán--giám-sát-an-ninh-soc)
+12. [Kiến Trúc Bảng Phân Cấp Đơn Vị Quân Khu Đa Tầng (Military Unit Hierarchy & Command Tree Engine)](#12-kiến-trúc-bảng-phân-cấp-đơn-vị-quân-khu-đa-tầng)
+13. [Đặc Tả Kỹ Thuật Mô-đun Xuất Báo Cáo Kiểm Toán Quân Đội Dạng Excel (Military Audit Reporting Engine)](#13-đặc-tả-kỹ-thuật-mô-đun-xuất-báo-cáo-kiểm-toán-quân-đội-dạng-excel)
 
 ---
 
@@ -61,12 +64,17 @@ graph TB
         
         AIChatWidgetComp["AIChatWidget<br/>(Trợ lý AI nổi, Markdown, LaTeX, Citations)"]
         FpModals["FingerprintScanModal & FingerprintEnrollModal<br/>(Animation Touch ID 3 bước)"]
+        SecurityAuditLogComp["SecurityAuditLog (Trung Tâm SOC)<br/>(Live Monitor, 4 KPI, Filter Pills, Deep JSON Drawer)"]
+        UnitTreeComp["UnitTreeTable (Cây Đơn Vị)<br/>(Command Hierarchy, 6 Tiers, Orphan Safe)"]
+        ExcelExportTool["exportAuditReportExcel<br/>(ExcelJS Báo Cáo Quân Đội .xlsx)"]
 
         BrowserApp --> SingleHTML
         SingleHTML --> AppRouter
         AppRouter --> LoginPage & PortalPage & DeskPage & AdminDashboard & UsersPage
         PortalPage & DeskPage & AdminDashboard -.-> AIChatWidgetComp
         PortalPage & DeskPage & UsersPage -.-> FpModals
+        AdminDashboard -.-> SecurityAuditLogComp & UnitTreeComp
+        SecurityAuditLogComp -.-> ExcelExportTool
     end
 
     subgraph GATEWAY_TIER ["3. TẦNG MÁY CHỦ EXPRESS GATEWAY (:8000)"]
@@ -118,7 +126,7 @@ graph TB
     classDef store fill:#450a0a,stroke:#f43f5e,stroke-width:2px,color:#fff;
 
     class Officer,Commander,AdminHigh,ScannerHardware,LocalAgent,BrowserApp client;
-    class SingleHTML,AppRouter,LoginPage,PortalPage,DeskPage,AdminDashboard,UsersPage,AIChatWidgetComp,FpModals front;
+    class SingleHTML,AppRouter,LoginPage,PortalPage,DeskPage,AdminDashboard,UsersPage,AIChatWidgetComp,FpModals,SecurityAuditLogComp,UnitTreeComp,ExcelExportTool front;
     class ExpressStatic,AuthSecMiddleware,BiometricBridge,AIRouterProxy,CoreAPIRouter,AuditLoggingEngine gate;
     class FastAPIServer,AgentTutor,PDFProcessor,StudyBookGen,MediaTimeline,HybridVectorStore ai;
     class MSSQLDB,DiskStorage,VectorStorage store;
@@ -209,7 +217,14 @@ qk7-datahub/
         │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Đăng ký vân tay)
         │   ├── auth/                       # LoginForm
         │   ├── portal/                     # SecurityBanner, DocumentCard, PortalDocumentList
-        │   └── dashboard/                  # StatCard, DistributionChart
+        │   └── dashboard/                  # PHÂN HỆ QUẢN TRỊ & TRUNG TÂM KIỂM TOÁN SOC
+        │       ├── SecurityAuditLog.tsx    # Trung tâm SOC, Live Monitor, 4 KPI, Filter Pills, Raw JSON Drawer
+        │       ├── UnitTreeTable.tsx       # Bảng cây đơn vị 6 cấp bậc, bảo vệ mồ côi, tìm kiếm không dấu
+        │       ├── StatCard.tsx            # Thẻ thống kê chỉ số nghiệp vụ
+        │       └── DistributionChart.tsx   # Biểu đồ phân bổ loại văn bản & an ninh
+        │
+        ├── utils/                          # TIỆN ÍCH HỆ THỐNG
+        │   └── exportAuditReportExcel.ts   # Xuất file Excel (.xlsx) chuẩn biểu mẫu báo cáo Quân đội
         │
         ├── services/                       # TẦNG DỊCH VỤ MẠNG & INTEGRATION
         │   ├── http.ts                     # HTTP Client Wrapper với HttpError & Event phát lỗi toàn cục
@@ -570,6 +585,128 @@ python agent.py
 * **Tài liệu Swagger API Spec:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
 * **API Trợ lý AI boxchat:** [http://localhost:8001/docs](http://localhost:8001/docs)
 * **Trạm kiểm soát vân tay nội bộ:** [http://127.0.0.1:9001/device-id](http://127.0.0.1:9001/device-id)
+
+---
+
+## 11. Kiến Trúc Trung Tâm Kiểm Toán & Giám Sát An Ninh SOC
+
+### 11.1. Triết Lý Thiết Kế SOC (Security Operations Center Dual-Theme)
+Phân hệ **SecurityAuditLog** (`frontend/src/components/dashboard/SecurityAuditLog.tsx`) được thiết kế nhằm phục vụ kíp trực ban an ninh mạng, cán bộ giám sát tác chiến của Bộ Tư Lệnh 24/7 với 2 chế độ hiển thị chuyên biệt:
+- **Dark Mode (Night Ops / Phòng tác chiến đêm):**
+  - Nền phân lớp thị giác: Nền gốc `bg-slate-950` / `bg-[#0b0f19]`, thẻ card thống kê & toolbar `bg-slate-900/80` phủ hiệu ứng kính mờ `backdrop-blur-md`.
+  - Đường viền và phân cách: `border-slate-800/80` kèm hiệu ứng phát sáng nhẹ (subtle glow), giảm thiểu tối đa hiện tượng lóa và mỏi mắt khi trực ca đêm kéo dài.
+- **Light Mode (Day Ops / Văn phòng ban ngày):**
+  - Nền `bg-slate-50`, card `bg-white/90`, viền `border-slate-200/90`, văn bản tương phản rõ ràng, bảo đảm khả năng đọc văn bản dưới ánh sáng mạnh.
+- **Màu sắc hành động chủ đạo:** Tông màu tím Ant Design (`#722ED1`, `bg-purple-600`) đồng nhất toàn hệ thống.
+
+### 11.2. Bốn Thẻ Chỉ Số KPI Tác Chiến Thời Gian Thực (Tactical KPI Cards)
+Hệ thống tự động phân loại và tính toán 4 chỉ số KPI ngay trên dữ liệu nhật ký kiểm toán:
+1. **Tổng Hoạt Động (Total Activities):** Thống kê tổng số lượng bản ghi kiểm toán trong hệ thống kèm tỷ lệ phát sinh trong 24 giờ qua.
+2. **Cảnh Báo An Ninh & Vi Phạm Chính Sách (Security Alerts):** Tự động lọc và đếm các hành vi nguy cơ cao:
+   $$\text{Security Alert Actions} = \{\text{'FINGERPRINT\_FAIL'}, \text{'ACCESS\_DENIED'}, \text{'CLEARANCE\_VIOLATION'}, \text{'SUSPICIOUS\_LOGIN'}\}$$
+3. **Thay Đổi Vai Trò & Đặc Quyền (Privilege Mutations):** Giám sát các can thiệp nhạy cảm về phân quyền quân nhân:
+   $$\text{Privilege Actions} = \{\text{'ASSIGN\_ROLE'}, \text{'ENROLL\_FINGERPRINT'}, \text{'REVOKE\_PERMISSION'}, \text{'UPDATE\_USER'}\}$$
+4. **Truy Xuất Văn Bản Mật (Document Access Events):** Theo dõi lưu lượng xem và tải các tài liệu quân sự cấp độ Mật, Tối Mật và Tuyệt Mật.
+
+### 11.3. Cơ Chế Giám Sát Trực Tuyến & Tự Động Làm Mới (Live SOC Monitor)
+- **Tín hiệu trực tuyến Live Pulse:** Hiển thị huy hiệu `🟢 Hệ thống Trực tuyến` với hiệu ứng xung nhịp (pulse animation), cho phép kíp trực bấm nút Tạm dừng (Pause) hoặc Tiếp tục (Resume) giám sát bất cứ lúc nào.
+- **Bộ đếm ngược làm mới (Auto-Refresh Countdown):**
+  - Hỗ trợ các chu kỳ: **10 giây**, **30 giây**, hoặc **Tắt**.
+  - Thanh tiến trình đếm ngược trực quan (Progress Bar) hiển thị thời gian còn lại trước khi tự động nạp dữ liệu mới nhất từ máy chủ, ngăn chặn việc gián đoạn thao tác của người dùng.
+
+### 11.4. Bảng Nhật Ký SOC Thông Minh & Trích Xuất Thực Thể Mục Tiêu
+- **Thời gian Monospace:** Định dạng `YYYY-MM-DD HH:mm:ss` với font chữ đơn cách, bảo đảm tính thẳng hàng và chính xác đến từng giây.
+- **Quân nhân & Đơn vị:** Hiển thị Avatar dạng chữ viết tắt với màu sắc quân hàm, tên đầy đủ, chức vụ và đơn vị, cấu hình không ngắt dòng (`whitespace-nowrap`).
+- **Phân loại mức độ nghiêm trọng (Severity Pills):**
+  - **Critical (Cực kỳ nghiêm trọng):** Vi phạm sinh trắc học vân tay, từ chối cấp quyền, cố ý vượt cấp mật (Màu đỏ).
+  - **Warning (Cảnh báo):** Thay đổi vai trò, xóa tệp, khóa tài khoản (Màu cam vàng).
+  - **Info (Thông tin):** Đăng nhập thành công, xem văn bản, tải tệp thông thường (Màu xanh dương / xanh lục).
+- **Smart Target Entity Extraction:** Tự động dùng biểu thức chính quy (Regex) quét trường ghi chú `note` để nhận diện các mã thực thể mục tiêu và hiển thị thành Tag nổi bật:
+  - Mã quân nhân: `USR-[A-Za-z0-9_-]+` (Badge Tím)
+  - Mã thiết bị: `DEV-[A-Za-z0-9_-]+` (Badge Cam)
+  - Mã vai trò: `ROL-[A-Za-z0-9_-]+` (Badge Xanh lam)
+  - Mã văn bản: `DOC-[A-Za-z0-9_-]+` (Badge Xanh ngọc)
+- **Nhãn IP Thông Minh:** Tự động phát hiện và đánh dấu các kết nối nội bộ hoặc trạm làm việc cục bộ (`::1`, `127.0.0.1` -> Tag `Localhost`).
+
+### 11.5. Hộp Thoại Điều Tra Sự Cố Chuyên Sâu (Deep Security Incident Inspection Drawer)
+- Khi chọn bất kỳ sự kiện nào trên bảng, Drawer/Modal trượt mở từ cạnh phải, cung cấp hồ sơ toàn diện:
+  - Thông tin định danh: Log ID, Unix Timestamp, ISO 8601 Timestamp.
+  - Chủ thể thực hiện: Mã quân nhân, Họ tên, Đơn vị trực thuộc, Cấp bậc, Địa chỉ IP nguồn.
+  - Hành động & Phân loại an ninh: Action code, Severity status, Ghi chú nguyên văn.
+  - **Raw JSON Payload:** Trình diễn toàn bộ gói dữ liệu JSON thô với định dạng thụt dòng chuẩn cú pháp, kèm nút bấm **1-click sao chép Clipboard (`navigator.clipboard.writeText`)** để lập báo cáo điều tra sự cố an ninh mạng.
+
+---
+
+## 12. Kiến Trúc Bảng Phân Cấp Đơn Vị Quân Khu Đa Tầng
+
+### 12.1. Thuật Toán Dựng Cây Chỉ Huy & Bảo Vệ Đơn Vị Mồ Côi (Orphan Safeguarding)
+Phân hệ **UnitTreeTable** (`frontend/src/components/dashboard/UnitTreeTable.tsx`) giải quyết bài toán biểu diễn cơ cấu tổ chức lực lượng vũ trang quân khu từ bảng quan hệ phẳng `UNIT (unit_id, name, parent_id)`:
+1. **Dựng cây thứ bậc đệ quy:**
+   - Khởi tạo bảng tra cứu nhanh `Map<string, UnitNode>`.
+   - Lặp qua danh sách đơn vị, xác định các nút Gốc (Root) có `parent_id == null` hoặc rỗng.
+   - Gắn các nút con vào danh sách `children` của nút cha tương ứng và tự động tính toán tổng số đơn vị con trực thuộc (`childrenCount`).
+2. **Cơ chế bảo vệ đơn vị "mồ côi" (Orphan Unit Safeguarding):**
+   - Trong môi trường quân đội, khi một cơ quan cấp trên được điều động, giải thể hoặc mã cha chưa kịp đồng bộ, các đơn vị cấp dưới có nguy cơ biến mất khỏi cây thứ bậc.
+   - Thuật toán tự động phát hiện những đơn vị có `parent_id` không tồn tại trong tập dữ liệu và chủ động gắn chúng vào cấp Gốc (Root) kèm nhãn chú thích, bảo toàn 100% dữ liệu hiển thị.
+
+### 12.2. Mô Hình Phân Loại Cấp Bậc Tự Động 6 Tầng Quân Sự
+Hệ thống sử dụng bộ phân loại từ khóa và biểu thức chính quy để phân loại đơn vị thành 6 cấp hành chính quân đội:
+
+| Phân Cấp | Tiêu Chí Nhận Diện Tên Đơn Vị | Màu Sắc / Badge |
+| :--- | :--- | :---: |
+| **Cấp Quân Khu** | `Bộ Tư Lệnh`, `Quân Khu`, `BTL` | Tím Đậm (`#722ED1`) |
+| **Cấp Sư Đoàn** | `Sư đoàn`, `Lữ đoàn`, `F[0-9]+`, `Lữ` | Xanh Lam Đậm |
+| **Cấp Trung Đoàn** | `Trung đoàn`, `E[0-9]+` | Xanh Dương |
+| **Cấp Tiểu Đoàn** | `Tiểu đoàn`, `Đại đội`, `D[0-9]+`, `C[0-9]+` | Xanh Lá Cây |
+| **Nhà Trường / Học Viện** | `Trường`, `Học viện`, `Trung tâm Đào tạo` | Cam Vàng |
+| **Cơ Quan / Phòng Ban** | `Phòng`, `Ban`, `Trợ lý`, `Bộ phận` | Xám Tro |
+
+### 12.3. Thanh Thống Kê Tương Tác & Tìm Kiếm Tiếng Việt Thông Minh
+- **Mini KPI Stat Pills:** Thanh chỉ số tương tác nhanh hiển thị tổng số đơn vị theo từng nhóm cấp bậc. Click vào pill sẽ kích hoạt lọc nhanh và tô sáng các đơn vị thuộc nhóm đó.
+- **Tìm kiếm tiếng Việt không dấu (Accent-Insensitive Search):**
+  - Tự động chuẩn hóa chuỗi Unicode (NFD normalization) để loại bỏ dấu thanh, cho phép gõ "su doan" vẫn khớp "Sư đoàn".
+  - **Tự động mở rộng (Auto-Expand):** Khi tìm thấy kết quả ở tầng con sâu, hệ thống tự động xác định đường dẫn ngược lên gốc và mở rộng tất cả các nút cha, giúp người chỉ huy định vị vị trí đơn vị tức thì.
+
+---
+
+## 13. Đặc Tả Kỹ Thuật Mô-đun Xuất Báo Cáo Kiểm Toán Quân Đội Dạng Excel
+
+### 13.1. Động Cơ Xuất Báo Cáo Phía Client (ExcelJS Engine)
+Mô-đun **exportAuditReportExcel** (`frontend/src/utils/exportAuditReportExcel.ts`) thay thế cơ chế xuất CSV giản lược bằng định dạng bảng tính nhị phân Microsoft Excel (`.xlsx`) tiêu chuẩn, tuân thủ 100% biểu mẫu công văn quy chuẩn Quân đội (`Xuất báo cáo mẫu.xlsx`).
+- Biên dịch trực tiếp trên trình duyệt bằng thư viện `exceljs`, không cần tải qua trung gian máy chủ.
+- Xuất file nhị phân qua `Blob` kiểu MIME:
+  `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+### 13.2. Cấu Trúc Biểu Mẫu Công Văn Hành Chính Quân Sự Chuẩn Mực
+
+```text
+Row 1:  [A1:D1] PHÒNG THAM MƯU HÀNH CHÍNH      [E1:I1] CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Row 2:  [A2:D2] TỔ CÔNG NGHỆ THÔNG TIN         [E2:I2] Độc lập - Tự do - Hạnh phúc
+Row 3:  [A3:D3] Số: ....../BC-CNTT             [E3:I3] TP. Hồ Chí Minh, ngày DD tháng MM năm YYYY
+Row 4:  (Dòng trống)
+Row 5:  [A5:I5] NHẬT KÝ HOẠT ĐỘNG - THƯ VIỆN SỐ (14pt BOLD, MERGE CENTER, HEIGHT 28)
+Row 6:  [A6:I6] TIÊU ĐỀ 9 CỘT DỮ LIỆU (FILL #FFC000, 11pt BOLD, THIN BORDER)
+Row 7+: DỮ LIỆU NHẬT KÝ (Times New Roman 11pt, Thin Border các ô)
+Row N+2:                                       [H:I]   NGƯỜI LẬP (11pt BOLD)
+Row N+6:                                       [H:I]   Thiếu tá QNCN Nguyễn Mạnh Nam (12pt BOLD)
+```
+
+### 13.3. Đặc Tả Kỹ Thuật 9 Cột Dữ Liệu Bảng Tính
+
+| STT | Tên Cột | Chiều Rộng (Width) | Kiểu Dữ Liệu | Định Dạng Căn Lề | Ghi Chú |
+| :---: | :--- | :---: | :---: | :---: | :--- |
+| **A** | **Mã Log** | 14 | Chuỗi | Căn giữa | `LOG-xxx` hoặc mã tự tăng |
+| **B** | **Thời Gian** | 22 | Thời gian | Căn giữa | Định dạng `YYYY-MM-DD HH:mm:ss` |
+| **C** | **Mã Quân Nhân** | 16 | Chuỗi | Căn giữa | `USR-xxx` |
+| **D** | **Họ Tên Quân Nhân** | 25 | Chuỗi | Căn trái | Tên đầy đủ quân nhân |
+| **E** | **Hành Động** | 22 | Chuỗi | Căn giữa | Mã hành vi kiểm toán (`LOGIN`, `VIEW`...) |
+| **F** | **Nhóm Phân Loại** | 20 | Chuỗi | Căn giữa | Xác thực, Tài liệu, An ninh, Hệ thống |
+| **G** | **Đối Tượng / Văn Bản** | 22 | Chuỗi | Căn giữa | Mã tài liệu, mã quân nhân tác động |
+| **H** | **Địa Chỉ IP** | 18 | Chuỗi | Căn giữa | Địa chỉ IP máy trạm phát sinh |
+| **I** | **Ghi Chú** | 35 | Chuỗi | Căn trái | Nội dung diễn giải chi tiết |
+
+- **Quy chuẩn Font & Đường viền:** Toàn bộ bảng tính sử dụng duy nhất phông chữ **Times New Roman** kích thước 11pt (riêng tiêu đề 14pt, tên người ký 12pt). Toàn bộ tiêu đề cột được đổ màu nền vàng cam **`#FFC000`**. Mọi ô dữ liệu đều áp dụng khung viền mảnh chuẩn mực (`border: { top, left, bottom, right: { style: 'thin' } }`).
+- **Khối ký duyệt báo cáo:** Đặt tại cột H và I, cách 2 dòng sau bảng dữ liệu với tiêu đề `NGƯỜI LẬP` và chức danh quân nhân ký duyệt `Thiếu tá QNCN Nguyễn Mạnh Nam`.
 
 ---
 *Tài liệu kiến trúc hệ thống QK7 DataHub được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*

@@ -46,6 +46,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   // ── Cây đơn vị cho TreeSelect ──
   const unitTree = React.useMemo(() => buildUnitTree(units), [units]);
+  const rootUnitKeys = React.useMemo(() => unitTree.map((node) => String(node.key)), [unitTree]);
+  const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (rootUnitKeys.length > 0) {
+      setTreeExpandedKeys(rootUnitKeys);
+    }
+  }, [rootUnitKeys]);
 
 
   // ── Auto-parse PDF ──
@@ -465,7 +473,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     treeData={unitTree}
                     placeholder="Chọn đơn vị ban hành"
                     allowClear
-                    treeDefaultExpandAll
+                    treeExpandedKeys={treeExpandedKeys}
+                    onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
+                    onOpenChange={(visible) => {
+                      if (visible && rootUnitKeys.length > 0) {
+                        setTreeExpandedKeys(rootUnitKeys);
+                      }
+                    }}
                     treeLine={{ showLeafIcon: false }}
                     switcherIcon={(nodeProps: any) => {
                       if (nodeProps.isLeaf) return null;
@@ -493,16 +507,19 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     popupClassName="qk7-unit-treeselect-popup"
                     style={{ width: '100%', height: 38 }}
                     popupMatchSelectWidth={false}
-                    styles={{
-                      popup: {
-                        root: {
-                          minWidth: 280,
-                          maxWidth: 'min(520px, 90vw)',
-                          maxHeight: 380,
-                          overflowX: 'hidden',
-                          overflowY: 'auto',
-                        },
-                      },
+                    popupStyle={{
+                      minWidth: 280,
+                      maxWidth: 'min(520px, 90vw)',
+                      maxHeight: 380,
+                      overflowX: 'hidden',
+                      overflowY: 'auto',
+                    }}
+                    dropdownStyle={{
+                      minWidth: 280,
+                      maxWidth: 'min(520px, 90vw)',
+                      maxHeight: 380,
+                      overflowX: 'hidden',
+                      overflowY: 'auto',
                     }}
                   />
                 </div>

@@ -9,11 +9,15 @@ import {
   Check,
   Eye,
   EyeOff,
+  Plus,
+  Minus,
 } from 'lucide-react';
+import { TreeSelect } from 'antd';
 import { User, MilitaryRank, MilitaryPosition } from '../../types/user';
 import { Unit, SecurityLevel, Role } from '../../types';
 import { usersApi } from '../../services/usersApi';
 import { dashboardApi } from '../../services/dashboardApi';
+import { buildUnitTree } from '../../utils/unitTree';
 
 export interface UserFormModalProps {
   open: boolean;
@@ -30,25 +34,29 @@ export interface UserFormModalProps {
 }
 
 /**
- * Tự động tính toán mã quân nhân kế tiếp theo thứ tự tăng dần (ví dụ: USR-001...USR-004 -> USR-005)
+ * Tự động tính toán mã quân nhân kế tiếp theo thứ tự tăng dần, lấp đầy khoảng trống (ví dụ: có 1, 3, 4 -> lấy 2; có 1, 2, 3 -> lấy 4)
  */
 export const getNextUserId = (users: Array<{ user_id?: string }>): string => {
-  let maxNum = 0;
+  const existingNums = new Set<number>();
   for (const u of users) {
     if (!u.user_id) continue;
     const match = u.user_id.match(/USR-(\d+)/i);
     if (match) {
       const num = parseInt(match[1], 10);
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num;
+      if (!isNaN(num) && num > 0) {
+        existingNums.add(num);
       }
     }
   }
-  const nextNum = maxNum + 1;
-  return `USR-${String(nextNum).padStart(3, '0')}`;
+  let candidate = 1;
+  while (existingNums.has(candidate)) {
+    candidate++;
+  }
+  return `USR-${String(candidate).padStart(3, '0')}`;
 };
 
-export const DEFAULT_USER_PASSWORD = 'Abc@12345';
+
+export const DEFAULT_USER_PASSWORD = '123456789';
 
 export const UserFormModal: React.FC<UserFormModalProps> = ({
   open,
@@ -98,6 +106,30 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         .catch(() => {});
     }
   }, [ranks, positions, open]);
+
+  // ── Đơn vị công tác (Hỗ trợ mô hình phân cấp cha - con) ──
+  const [availableUnits, setAvailableUnits] = useState<Unit[]>(units || []);
+
+  useEffect(() => {
+    if (units && units.length > 0) {
+      setAvailableUnits(units);
+    } else if (open) {
+      dashboardApi
+        .getUnits()
+        .then((res: any) => setAvailableUnits(res.items || res || []))
+        .catch(() => {});
+    }
+  }, [units, open]);
+
+  const unitTree = React.useMemo(() => buildUnitTree(availableUnits), [availableUnits]);
+  const rootUnitKeys = React.useMemo(() => unitTree.map((node) => String(node.key)), [unitTree]);
+  const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (rootUnitKeys.length > 0) {
+      setTreeExpandedKeys(rootUnitKeys);
+    }
+  }, [rootUnitKeys]);
 
   const [formData, setFormData] = useState<Partial<User> & { username?: string; password?: string; role_id?: string }>({
     user_id: '',
@@ -157,12 +189,13 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
       if (existingUsers && existingUsers.length > 0) {
         calculateAndSet(existingUsers);
-      } else {
-        usersApi
-          .getUsers()
-          .then((res) => calculateAndSet(res.items || []))
-          .catch(() => calculateAndSet([]));
       }
+      usersApi
+        .getUsers()
+        .then((res) => calculateAndSet(res.items || []))
+        .catch(() => {
+          if (!existingUsers || existingUsers.length === 0) calculateAndSet([]);
+        });
     }
     setError('');
     setCopied(false);
@@ -303,7 +336,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 <div className="grid grid-cols-2 gap-4 items-start">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5 text-xs whitespace-nowrap">
-                      Tên đăng nhập (Username) *
+                      Tên đăng nhập*
                     </label>
                     <input
                       type="text"
@@ -317,7 +350,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5 text-xs whitespace-nowrap">
-                      Mật khẩu (≥ 8 ký tự) *
+                      Mật khẩu *
                     </label>
                     <div className="relative">
                       <input
@@ -401,19 +434,69 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Đơn vị công tác</label>
-                <select
-                  value={formData.unit_id || ''}
-                  onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  Đơn vị công tác
+                </label>
+                <div
+                  className="unit-treeselect-wrapper"
+                  style={{ position: 'relative', width: '100%' }}
                 >
-                  <option value=""> Chọn đơn vị </option>
-                  {units.map((u) => (
-                    <option key={u.unit_id} value={u.unit_id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                  <TreeSelect
+                    value={formData.unit_id || undefined}
+                    onChange={(val) => setFormData({ ...formData, unit_id: val || '' })}
+                    treeData={unitTree}
+                    placeholder="Chọn đơn vị công tác"
+                    allowClear
+                    treeExpandedKeys={treeExpandedKeys}
+                    onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
+                    onOpenChange={(visible) => {
+                      if (visible && rootUnitKeys.length > 0) {
+                        setTreeExpandedKeys(rootUnitKeys);
+                      }
+                    }}
+                    treeLine={{ showLeafIcon: false }}
+                    switcherIcon={(nodeProps: any) => {
+                      if (nodeProps.isLeaf) return null;
+                      const isExpanded = Boolean(nodeProps.expanded);
+                      return (
+                        <span
+                          className={`qk7-tree-switcher-btn ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+                          title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                        >
+                          {isExpanded ? (
+                            <Minus className="w-3 h-3 stroke-[2.5]" />
+                          ) : (
+                            <Plus className="w-3 h-3 stroke-[2.5]" />
+                          )}
+                        </span>
+                      );
+                    }}
+                    treeNodeLabelProp="name"
+                    treeNodeFilterProp="name"
+                    filterTreeNode={(input: string, node: any) =>
+                      String(node.name || '').toLowerCase().includes(input.toLowerCase().trim())
+                    }
+                    getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
+                    className="qk7-treeselect w-full"
+                    popupClassName="qk7-unit-treeselect-popup"
+                    style={{ width: '100%', height: 38 }}
+                    popupMatchSelectWidth={false}
+                    popupStyle={{
+                      minWidth: 280,
+                      maxWidth: 'min(520px, 90vw)',
+                      maxHeight: 380,
+                      overflowX: 'hidden',
+                      overflowY: 'auto',
+                    }}
+                    dropdownStyle={{
+                      minWidth: 280,
+                      maxWidth: 'min(520px, 90vw)',
+                      maxHeight: 380,
+                      overflowX: 'hidden',
+                      overflowY: 'auto',
+                    }}
+                  />
+                </div>
               </div>
 
               <div>

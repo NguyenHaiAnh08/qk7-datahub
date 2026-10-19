@@ -32,6 +32,8 @@ import { Toast, ToastState } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { StatCard } from '../components/dashboard/StatCard';
 import { DistributionChart } from '../components/dashboard/DistributionChart';
+import { UnitTreeTable } from '../components/dashboard/UnitTreeTable';
+import { SecurityAuditLog } from '../components/dashboard/SecurityAuditLog';
 import { UserTable } from '../components/users/UserTable';
 import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
@@ -54,6 +56,48 @@ import {
   MilitaryRank,
   MilitaryPosition
 } from '../types';
+
+const getNextRoleId = (roles: Role[]): string => {
+  const existingNums = new Set<number>();
+  for (const r of roles) {
+    const m = (r.role_id || '').match(/ROL-(\d+)/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n) && n > 0) existingNums.add(n);
+    }
+  }
+  let candidate = 1;
+  while (existingNums.has(candidate)) candidate++;
+  return `ROL-${String(candidate).padStart(2, '0')}`;
+};
+
+const getNextRankId = (ranks: MilitaryRank[]): string => {
+  const existingNums = new Set<number>();
+  for (const r of ranks) {
+    const m = (r.rank_id || '').match(/R-(\d+)/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n) && n > 0) existingNums.add(n);
+    }
+  }
+  let candidate = 1;
+  while (existingNums.has(candidate)) candidate++;
+  return `R-${String(candidate).padStart(2, '0')}`;
+};
+
+const getNextPositionId = (positions: MilitaryPosition[]): string => {
+  const existingNums = new Set<number>();
+  for (const p of positions) {
+    const m = (p.position_id || '').match(/P-(\d+)/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n) && n > 0) existingNums.add(n);
+    }
+  }
+  let candidate = 1;
+  while (existingNums.has(candidate)) candidate++;
+  return `P-${String(candidate).padStart(2, '0')}`;
+};
 
 export const AdminDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -88,14 +132,9 @@ export const AdminDashboardPage: React.FC = () => {
   const [levelsList, setLevelsList] = useState<SecurityLevel[]>([]);
   const [ranksList, setRanksList] = useState<MilitaryRank[]>([]);
   const [positionsList, setPositionsList] = useState<MilitaryPosition[]>([]);
-  const [logsList, setLogsList] = useState<AccessLog[]>([]);
 
   // Search & Filters
   const [userSearch, setUserSearch] = useState('');
-  const [logSearch, setLogSearch] = useState('');
-  const [logFilterAction, setLogFilterAction] = useState('');
-  const [logCurrentPage, setLogCurrentPage] = useState(1);
-  const LOGS_PER_PAGE = 20;
 
   // Modals
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -169,7 +208,14 @@ export const AdminDashboardPage: React.FC = () => {
   const loadUsers = async () => {
     try {
       const data = await usersApi.getUsers();
-      setUsersList(data.items || []);
+      const sorted = [...(data.items || [])].sort((a, b) => {
+        const parseNum = (id?: string) => {
+          const m = (id || '').match(/USR-(\d+)/i);
+          return m ? parseInt(m[1], 10) : 999999;
+        };
+        return parseNum(a.user_id) - parseNum(b.user_id);
+      });
+      setUsersList(sorted);
     } catch (err: any) {
       showToast('Lỗi tải người dùng: ' + err.message, 'error');
     }
@@ -238,14 +284,7 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const loadLogs = async () => {
-    try {
-      const data = await dashboardApi.getAccessLogs({ action: logFilterAction || undefined });
-      setLogsList(data.items || []);
-    } catch (err: any) {
-      showToast('Lỗi tải nhật ký: ' + err.message, 'error');
-    }
-  };
+
 
   useEffect(() => {
     switch (activeTab) {
@@ -283,21 +322,11 @@ export const AdminDashboardPage: React.FC = () => {
         loadPositions();
         break;
       case 'logs':
-        loadLogs();
         break;
     }
   }, [activeTab]);
 
-  useEffect(() => {
-    if (activeTab === 'logs') {
-      setLogCurrentPage(1);
-      loadLogs();
-    }
-  }, [logFilterAction]);
 
-  useEffect(() => {
-    setLogCurrentPage(1);
-  }, [logSearch]);
 
   // Save User
   const handleSaveUser = async (userData: Partial<User>) => {
@@ -445,26 +474,7 @@ export const AdminDashboardPage: React.FC = () => {
     );
   }, [usersList, userSearch]);
 
-  const filteredLogs = useMemo(() => {
-    if (!logSearch.trim()) return logsList;
-    const q = logSearch.toLowerCase().trim();
-    return logsList.filter(
-      (l) =>
-        (l.user_id || '').toLowerCase().includes(q) ||
-        (l.full_name || '').toLowerCase().includes(q) ||
-        (l.action || '').toLowerCase().includes(q) ||
-        (l.doc_title || '').toLowerCase().includes(q) ||
-        (l.file_id || '').toLowerCase().includes(q) ||
-        (l.ip || '').toLowerCase().includes(q)
-    );
-  }, [logsList, logSearch]);
 
-  const totalLogPages = Math.max(1, Math.ceil(filteredLogs.length / LOGS_PER_PAGE));
-
-  const paginatedLogs = useMemo(() => {
-    const startIndex = (logCurrentPage - 1) * LOGS_PER_PAGE;
-    return filteredLogs.slice(startIndex, startIndex + LOGS_PER_PAGE);
-  }, [filteredLogs, logCurrentPage, LOGS_PER_PAGE]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
@@ -479,7 +489,7 @@ export const AdminDashboardPage: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 lg:static lg:translate-x-0 overflow-x-hidden ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } ${sidebarCollapsed ? 'w-16 sm:w-20' : 'w-64'}`}
         >
@@ -688,7 +698,7 @@ export const AdminDashboardPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setGenericFormData({ role_id: '', name: '' });
+                      setGenericFormData({ role_id: getNextRoleId(rolesList), name: '' });
                       setGenericModal({ open: true, type: 'roles', item: null });
                     }}
                     className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
@@ -800,68 +810,23 @@ export const AdminDashboardPage: React.FC = () => {
 
           {/* TAB: UNITS */}
           {activeTab === 'units' && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Building className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Đơn Vị Quân Khu
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Các phòng ban, trung đoàn, sư đoàn trực thuộc</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setGenericFormData({ unit_id: '', name: '', parent_id: '' });
-                    setGenericModal({ open: true, type: 'units', item: null });
-                  }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                >
-                  <Plus className="w-4 h-4" /> Thêm đơn vị
-                </button>
-              </div>
-
-              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                      <tr>
-                        <th className="py-3 px-4">Mã Đơn Vị</th>
-                        <th className="py-3 px-4">Tên đơn vị</th>
-                        <th className="py-3 px-4">Đơn vị cấp trên</th>
-                        <th className="py-3 px-4 text-right">Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {unitsList.map((u) => (
-                        <tr key={u.unit_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{u.unit_id}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{u.name}</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{u.parent_id || '—'}</td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => {
-                                setGenericFormData({ ...u });
-                                setGenericModal({ open: true, type: 'units', item: u });
-                              }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                              title="Sửa đơn vị"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleGenericDelete('units', u.unit_id, u.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                              title="Xóa đơn vị"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <UnitTreeTable
+              units={unitsList}
+              onAddRoot={() => {
+                setGenericFormData({ unit_id: '', name: '', parent_id: '' });
+                setGenericModal({ open: true, type: 'units', item: null });
+              }}
+              onAddChild={(parentUnit) => {
+                setGenericFormData({ unit_id: '', name: '', parent_id: parentUnit.unit_id });
+                setGenericModal({ open: true, type: 'units', item: null });
+              }}
+              onEdit={(u) => {
+                setGenericFormData({ ...u });
+                setGenericModal({ open: true, type: 'units', item: u });
+              }}
+              onDelete={(u) => handleGenericDelete('units', u.unit_id, u.name)}
+              onToast={(msg, type) => showToast(msg, type)}
+            />
           )}
 
           {/* TAB: DOCTYPES */}
@@ -1010,7 +975,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
                 <button
                   onClick={() => {
-                    setGenericFormData({ rank_id: '', name: '', sort_order: 0 });
+                    setGenericFormData({ rank_id: getNextRankId(ranksList), name: '', sort_order: ranksList.length + 1 });
                     setGenericModal({ open: true, type: 'ranks', item: null });
                   }}
                   className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
@@ -1098,7 +1063,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
                 <button
                   onClick={() => {
-                    setGenericFormData({ position_id: '', name: '', sort_order: 0 });
+                    setGenericFormData({ position_id: getNextPositionId(positionsList), name: '', sort_order: positionsList.length + 1 });
                     setGenericModal({ open: true, type: 'positions', item: null });
                   }}
                   className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
@@ -1174,159 +1139,7 @@ export const AdminDashboardPage: React.FC = () => {
 
           {/* TAB: LOGS */}
           {activeTab === 'logs' && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Nhật Ký Hoạt Động & Kiểm Toán An Ninh
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Giám sát truy cập văn bản và thay đổi hệ thống 24/7</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={logFilterAction}
-                    onChange={(e) => setLogFilterAction(e.target.value)}
-                    className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-500 shadow-sm"
-                  >
-                    <option value="">Tất cả hành động</option>
-                    <option value="VIEW">VIEW (Xem tài liệu)</option>
-                    <option value="DOWNLOAD">DOWNLOAD (Tải tệp)</option>
-                    <option value="UPLOAD">UPLOAD (Tải lên)</option>
-                    <option value="UPDATE">UPDATE (Cập nhật)</option>
-                    <option value="DELETE">DELETE (Xóa tài liệu)</option>
-                  </select>
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={logSearch}
-                      onChange={(e) => setLogSearch(e.target.value)}
-                      placeholder="Tìm IP, User, Tiêu đề..."
-                      className="w-full sm:w-60 pl-9 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 shadow-sm"
-                    />
-                  </div>
-                  <button
-                    onClick={async () => {
-                      await loadLogs();
-                      showToast('Đã làm mới nhật ký truy cập!', 'success');
-                    }}
-                    className="p-2 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-xl transition cursor-pointer shadow-sm"
-                    title="Làm mới"
-                  >
-                    <RotateCw className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
-                      <tr>
-                        <th className="py-3 px-4">Thời Gian</th>
-                        <th className="py-3 px-4">Quân Nhân</th>
-                        <th className="py-3 px-4">Hành Động</th>
-                        <th className="py-3 px-4">Văn Bản / Đối Tượng</th>
-                        <th className="py-3 px-4">Địa Chỉ IP</th>
-                        <th className="py-3 px-4">Ghi Chú</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {filteredLogs.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                            Chưa có bản ghi nhật ký phù hợp
-                          </td>
-                        </tr>
-                      ) : (
-                        paginatedLogs.map((l, idx) => (
-                          <tr key={l.log_id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3 px-4 text-slate-500 dark:text-slate-400 whitespace-nowrap font-mono text-[11px]">
-                              {(l.created_at || l.timestamp) ? new Date(l.created_at || l.timestamp || '').toLocaleString('vi-VN') : '—'}
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="font-semibold text-slate-900 dark:text-white">{l.full_name || l.user_id}</span>
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono ml-1.5">({l.user_id})</span>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                  l.action === 'DOWNLOAD'
-                                    ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-200 dark:border-transparent'
-                                    : l.action === 'VIEW'
-                                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border border-blue-200 dark:border-transparent'
-                                    : l.action === 'UPLOAD'
-                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-200 dark:border-transparent'
-                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-200 dark:border-transparent'
-                                }`}
-                              >
-                                {l.action}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-slate-700 dark:text-slate-300 truncate max-w-xs">{l.doc_title || l.file_id || '—'}</td>
-                            <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">{l.ip || '—'}</td>
-                            <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{l.note || '—'}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Phân trang: 20 bản ghi/trang */}
-                {totalLogPages > 1 && (
-                  <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60">
-                    <div>
-                      Hiển thị bản ghi{' '}
-                      <span className="font-semibold text-slate-900 dark:text-white">
-                        {(logCurrentPage - 1) * LOGS_PER_PAGE + 1} - {Math.min(logCurrentPage * LOGS_PER_PAGE, filteredLogs.length)}
-                      </span>{' '}
-                      / Tổng{' '}
-                      <span className="font-semibold text-slate-900 dark:text-white">{filteredLogs.length}</span> (Trang{' '}
-                      <span className="font-semibold text-slate-900 dark:text-white">{logCurrentPage}</span> /{' '}
-                      <span className="font-semibold text-slate-900 dark:text-white">{totalLogPages}</span>)
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <button
-                        onClick={() => setLogCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={logCurrentPage <= 1}
-                        className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
-                      >
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                      </button>
-                      {Array.from({ length: totalLogPages }, (_, i) => i + 1)
-                        .filter((p) => p === 1 || p === totalLogPages || Math.abs(p - logCurrentPage) <= 1)
-                        .map((p, idx, arr) => {
-                          const prev = arr[idx - 1];
-                          const showEllipsis = prev && p - prev > 1;
-                          return (
-                            <React.Fragment key={p}>
-                              {showEllipsis && <span className="px-1 text-slate-400">...</span>}
-                              <button
-                                onClick={() => setLogCurrentPage(p)}
-                                className={`px-2.5 py-1 rounded transition text-xs ${
-                                  logCurrentPage === p
-                                    ? 'bg-purple-600 text-white font-bold'
-                                    : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                                }`}
-                              >
-                                {p}
-                              </button>
-                            </React.Fragment>
-                          );
-                        })}
-                      <button
-                        onClick={() => setLogCurrentPage((p) => Math.min(totalLogPages, p + 1))}
-                        disabled={logCurrentPage >= totalLogPages}
-                        className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
-                      >
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <SecurityAuditLog showToast={showToast} />
           )}
         </main>
       </div>
@@ -1393,15 +1206,28 @@ export const AdminDashboardPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl text-xs space-y-4"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl text-xs space-y-4"
             >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="font-bold text-sm text-white capitalize">
-                  {genericModal.item ? 'Chỉnh Sửa' : 'Thêm Mới'} {genericModal.type}
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  {genericModal.item ? 'Chỉnh Sửa' : 'Thêm Mới'}{' '}
+                  {genericModal.type === 'units'
+                    ? 'Đơn Vị'
+                    : genericModal.type === 'roles'
+                    ? 'Vai Trò'
+                    : genericModal.type === 'doctypes'
+                    ? 'Loại Văn Bản'
+                    : genericModal.type === 'levels'
+                    ? 'Mức Bảo Mật'
+                    : genericModal.type === 'ranks'
+                    ? 'Cấp Bậc'
+                    : genericModal.type === 'positions'
+                    ? 'Chức Vụ'
+                    : genericModal.type}
                 </h3>
                 <button
                   onClick={() => setGenericModal({ open: false, type: null, item: null })}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1438,34 +1264,43 @@ export const AdminDashboardPage: React.FC = () => {
                 {genericModal.type === 'units' && (
                   <>
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Mã Đơn Vị *</label>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Mã Đơn Vị *</label>
                       <input
                         type="text"
                         disabled={Boolean(genericModal.item)}
                         value={genericFormData.unit_id || ''}
                         onChange={(e) => setGenericFormData({ ...genericFormData, unit_id: e.target.value })}
                         required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 disabled:opacity-50"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 text-sm font-mono font-medium"
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Tên Đơn Vị *</label>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Tên Đơn Vị *</label>
                       <input
                         type="text"
                         value={genericFormData.name || ''}
                         onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
                         required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-medium"
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Đơn Vị Cấp Trên</label>
-                      <input
-                        type="text"
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Đơn Vị Cấp Trên</label>
+                      <select
                         value={genericFormData.parent_id || ''}
                         onChange={(e) => setGenericFormData({ ...genericFormData, parent_id: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 font-medium text-sm cursor-pointer"
+                      >
+                        <option value="">Cấp cao nhất</option>
+                        {[...unitsList]
+                          .filter((u) => !genericModal.item || u.unit_id !== genericModal.item.unit_id)
+                          .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+                          .map((u) => (
+                            <option key={u.unit_id} value={u.unit_id}>
+                              {u.name}
+                            </option>
+                          ))}
+                      </select>
                     </div>
                   </>
                 )}
@@ -1637,17 +1472,17 @@ export const AdminDashboardPage: React.FC = () => {
                   </>
                 )}
 
-                <div className="pt-3 border-t border-slate-800 flex items-center justify-end space-x-2">
+                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-2">
                   <button
                     type="button"
                     onClick={() => setGenericModal({ open: false, type: null, item: null })}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-xl transition font-medium"
                   >
                     Hủy bỏ
                   </button>
                   <button
                     type="submit"
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1 transition"
+                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm"
                   >
                     <Save className="w-3.5 h-3.5" /> Lưu lại
                   </button>

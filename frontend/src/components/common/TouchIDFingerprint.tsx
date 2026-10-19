@@ -7,6 +7,7 @@ export interface TouchIDFingerprintProps {
   phase?: 'idle' | 'scanning' | 'success' | 'error';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  pulseKey?: number;
 }
 
 export const TouchIDFingerprint: React.FC<TouchIDFingerprintProps> = ({
@@ -14,12 +15,13 @@ export const TouchIDFingerprint: React.FC<TouchIDFingerprintProps> = ({
   phase = 'scanning',
   size = 'md',
   className = '',
+  pulseKey,
 }) => {
   // Determine progress percentage based on phase or prop
   let progress = customProgress !== undefined ? customProgress : 0;
   if (customProgress === undefined) {
     if (phase === 'success') progress = 100;
-    else if (phase === 'scanning') progress = 50;
+    else if (phase === 'scanning') progress = 0;
     else if (phase === 'idle') progress = 0;
   }
 
@@ -60,16 +62,19 @@ export const TouchIDFingerprint: React.FC<TouchIDFingerprintProps> = ({
       className={`relative mx-auto flex items-center justify-center select-none ${className}`}
       style={{ width, height }}
     >
-      {/* Error shake / Success micro-bounce container */}
+      {/* Error shake / Success micro-bounce / Step pulse container */}
       <motion.div
+        key={pulseKey}
         animate={
           phase === 'error'
             ? { x: [-8, 8, -6, 6, -3, 3, 0] }
             : phase === 'success'
-            ? { scale: [1, 1.04, 1] }
+            ? { scale: [1, 1.05, 1] }
+            : pulseKey && pulseKey > 0
+            ? { scale: [1, 1.035, 1] }
             : {}
         }
-        transition={{ duration: phase === 'error' ? 0.45 : 0.6, ease: 'easeOut' }}
+        transition={{ duration: phase === 'error' ? 0.45 : 0.35, ease: 'easeOut' }}
         className="relative w-full h-full flex items-center justify-center"
       >
         {/* Layer 1: Gray Ridges (Base Un-scanned State) */}
@@ -84,10 +89,12 @@ export const TouchIDFingerprint: React.FC<TouchIDFingerprintProps> = ({
         <div
           style={{
             ...maskStyle,
-            transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: 'opacity 0.25s ease-out, filter 0.3s ease-out',
             filter:
-              phase === 'success'
-                ? 'drop-shadow(0 0 10px rgba(255, 45, 85, 0.55))'
+              phase === 'success' || isFullRed
+                ? 'drop-shadow(0 0 12px rgba(255, 45, 85, 0.75))'
+                : progress > 0
+                ? 'drop-shadow(0 0 6px rgba(255, 45, 85, 0.45))'
                 : 'none',
           }}
           className="absolute inset-0 w-full h-full"

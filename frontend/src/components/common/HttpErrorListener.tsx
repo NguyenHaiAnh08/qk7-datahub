@@ -44,7 +44,7 @@ export const HttpErrorListener: React.FC = () => {
       switch (status) {
         case 401:
           notification.warning({
-            title: 'Phiên Làm Việc Hết Hạn',
+            message: 'Phiên Làm Việc Hết Hạn',
             description: message || 'Bạn cần đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
             icon: <WarningOutlined className="text-amber-500" />,
             duration: 4.5,
@@ -54,7 +54,7 @@ export const HttpErrorListener: React.FC = () => {
 
         case 403:
           notification.error({
-            title: 'Truy Cập Bị Từ Chối',
+            message: 'Truy Cập Bị Từ Chối',
             description:
               message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
             icon: <StopOutlined className="text-red-500" />,
@@ -65,7 +65,7 @@ export const HttpErrorListener: React.FC = () => {
 
         case 404:
           notification.info({
-            title: 'Không Tìm Thấy Tài Nguyên',
+            message: 'Không Tìm Thấy Tài Nguyên',
             description: message || `Không tìm thấy endpoint hoặc tài liệu yêu cầu: ${url}`,
             duration: 4.5,
             closeIcon: null,
@@ -77,7 +77,7 @@ export const HttpErrorListener: React.FC = () => {
         case 503:
         case 504:
           notification.error({
-            title: 'Sự Cố Máy Chủ',
+            message: 'Sự Cố Máy Chủ',
             description:
               message || 'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
             icon: <ApiOutlined className="text-red-500" />,
@@ -88,7 +88,7 @@ export const HttpErrorListener: React.FC = () => {
 
         default:
           notification.warning({
-            title: 'Lỗi Phản Hồi Hệ Thống',
+            message: 'Lỗi Phản Hồi Hệ Thống',
             description: message,
             icon: <ExclamationCircleOutlined className="text-amber-500" />,
             duration: 4.5,

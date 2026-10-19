@@ -13,6 +13,7 @@ export * from './documentTypeService';
 export * from './securityLevelService';
 export * from './logService';
 export * from './systemService';
+export * from './aiService';
 
 // Compatibility Aliases
 export * from './documentsApi';

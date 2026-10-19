@@ -1,0 +1,8 @@
+{
+  "_comment": "Regex cấu trúc văn bản VN — đa dạng hóa cho nhiều format",
+  "document_code": "S[ốo]\\s*[:.]?\\s*(\\d+)?[ \\t]*([\\/\\-]?)[ \\t]*([A-ZÀ-Ỹa-zà-ỹ0-9]+(?:[ \\t]*[\\/\\-.][ \\t]*[A-ZÀ-Ỹa-zà-ỹ0-9]+)*)",
+  "issued_date": "ng[àa]y\\s*(\\d+)?\\s*th[áa]ng\\s*(\\d+)\\s*n[ăa]m\\s*(\\d{4})",
+  "title_stop": "^(Căn cứ|Kính gửi|Thực hiện|Căn cứ vào|HIỆU TRƯỞNG|CHỦ TỊCH|KT\\.|TM\\.|T\\/M|Nơi nhận)",
+  "roman_heading": "^\\s*(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)[\\-\\s\\.]",
+  "signer_name": "^[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,4}$"
+}

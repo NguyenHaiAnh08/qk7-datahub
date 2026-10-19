@@ -55,6 +55,48 @@ import {
   MilitaryPosition
 } from '../types';
 
+export const getNextRoleId = (roles: Role[]): string => {
+  const existingNums = new Set<number>();
+  for (const r of roles) {
+    const m = (r.role_id || '').match(/ROL-(\d+)/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n) && n > 0) existingNums.add(n);
+    }
+  }
+  let candidate = 1;
+  while (existingNums.has(candidate)) candidate++;
+  return `ROL-${String(candidate).padStart(2, '0')}`;
+};
+
+export const getNextRankId = (ranks: MilitaryRank[]): string => {
+  const existingNums = new Set<number>();
+  for (const r of ranks) {
+    const m = (r.rank_id || '').match(/R-(\d+)/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n) && n > 0) existingNums.add(n);
+    }
+  }
+  let candidate = 1;
+  while (existingNums.has(candidate)) candidate++;
+  return `R-${String(candidate).padStart(2, '0')}`;
+};
+
+export const getNextPositionId = (positions: MilitaryPosition[]): string => {
+  const existingNums = new Set<number>();
+  for (const p of positions) {
+    const m = (p.position_id || '').match(/P-(\d+)/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n) && n > 0) existingNums.add(n);
+    }
+  }
+  let candidate = 1;
+  while (existingNums.has(candidate)) candidate++;
+  return `P-${String(candidate).padStart(2, '0')}`;
+};
+
 export const AdminDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -169,7 +211,14 @@ export const AdminDashboardPage: React.FC = () => {
   const loadUsers = async () => {
     try {
       const data = await usersApi.getUsers();
-      setUsersList(data.items || []);
+      const sorted = [...(data.items || [])].sort((a, b) => {
+        const parseNum = (id?: string) => {
+          const m = (id || '').match(/USR-(\d+)/i);
+          return m ? parseInt(m[1], 10) : 999999;
+        };
+        return parseNum(a.user_id) - parseNum(b.user_id);
+      });
+      setUsersList(sorted);
     } catch (err: any) {
       showToast('Lỗi tải người dùng: ' + err.message, 'error');
     }
@@ -479,7 +528,7 @@ export const AdminDashboardPage: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 lg:static lg:translate-x-0 overflow-x-hidden ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } ${sidebarCollapsed ? 'w-16 sm:w-20' : 'w-64'}`}
         >
@@ -688,7 +737,7 @@ export const AdminDashboardPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setGenericFormData({ role_id: '', name: '' });
+                      setGenericFormData({ role_id: getNextRoleId(rolesList), name: '' });
                       setGenericModal({ open: true, type: 'roles', item: null });
                     }}
                     className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
@@ -1010,7 +1059,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
                 <button
                   onClick={() => {
-                    setGenericFormData({ rank_id: '', name: '', sort_order: 0 });
+                    setGenericFormData({ rank_id: getNextRankId(ranksList), name: '', sort_order: ranksList.length + 1 });
                     setGenericModal({ open: true, type: 'ranks', item: null });
                   }}
                   className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
@@ -1098,7 +1147,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
                 <button
                   onClick={() => {
-                    setGenericFormData({ position_id: '', name: '', sort_order: 0 });
+                    setGenericFormData({ position_id: getNextPositionId(positionsList), name: '', sort_order: positionsList.length + 1 });
                     setGenericModal({ open: true, type: 'positions', item: null });
                   }}
                   className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"

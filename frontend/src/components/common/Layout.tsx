@@ -27,7 +27,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
       <div className="flex-1 flex overflow-hidden">
         {showSidebar && (
-          <aside className="w-64 flex-shrink-0 hidden md:block border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/40 backdrop-blur-sm">
+          <aside className="w-64 flex-shrink-0 hidden md:block border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/40 backdrop-blur-sm overflow-x-hidden">
             <Sidebar
               activeTab={activeSidebarItem}
               onTabChange={onSidebarSelect || (() => {})}

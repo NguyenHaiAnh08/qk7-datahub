@@ -65,6 +65,20 @@ export const fingerprintService = {
       }
     );
   },
+
+  async getEnrollStatus(): Promise<{ enrolling: boolean; step: number; total: number; state: string } | null> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1000);
+    try {
+      const res = await fetch('http://127.0.0.1:9001/enroll-status', { signal: ctrl.signal });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  },
 };
 
 export default fingerprintService;

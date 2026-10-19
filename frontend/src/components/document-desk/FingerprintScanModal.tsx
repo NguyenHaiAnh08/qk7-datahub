@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { fingerprintService } from '../../services/fingerprintService';
 import { TouchIDFingerprint } from '../common/TouchIDFingerprint';
+import { CircularSpinner } from '../users/FingerprintEnrollModal';
 
 export interface FingerprintScanModalProps {
   open: boolean;
@@ -36,20 +37,13 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   const inFlightRef = React.useRef(false);
   const autoRetryTimerRef = React.useRef<any>(null);
 
-  // Progressive fill animation simulating Touch ID scanning
+  // Progressive fill animation: 0% until finger is verified, then 100%
   useEffect(() => {
-    let timer: any;
-    if (phase === 'scanning') {
-      setProgress(25);
-      timer = setInterval(() => {
-        setProgress((prev) => (prev < 70 ? prev + 12 : prev));
-      }, 2000);
-    } else if (phase === 'success') {
+    if (phase === 'success') {
       setProgress(100);
-    } else if (phase === 'error') {
+    } else {
       setProgress(0);
     }
-    return () => clearInterval(timer);
   }, [phase]);
 
   // Dọn dẹp timer khi component unmount
@@ -208,9 +202,9 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 max-w-xs">
                   Vui lòng đặt ngón tay đã đăng ký lên đầu đọc ZK9500
                 </p>
-                <div className="flex items-center gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-1.5 rounded-full font-medium">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Đang nhận diện vân tay...
+                <div className="inline-flex items-center gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-1.5 rounded-full font-medium">
+                  <CircularSpinner size={12} className="text-red-500 shrink-0" strokeWidth={2.8} />
+                  <span>Đang nhận diện vân tay...</span>
                 </div>
               </>
             )}

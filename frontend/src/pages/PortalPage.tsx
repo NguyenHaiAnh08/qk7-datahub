@@ -223,7 +223,7 @@ export const PortalPage: React.FC = () => {
               >
                 {meta.levels.map((l) => (
                   <option key={l.level_id} value={l.level_id}>
-                    Tài liệu ≤ {l.name} (Cấp {l.level_id})
+                    {l.name}
                   </option>
                 ))}
               </select>

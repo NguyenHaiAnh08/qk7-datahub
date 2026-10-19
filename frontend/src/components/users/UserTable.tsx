@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Pagination } from 'antd';
 import { User } from '../../types/user';
 import { Pencil, KeyRound, Trash2, Fingerprint } from 'lucide-react';
 
@@ -9,6 +10,7 @@ export interface UserTableProps {
   onDelete: (user: User) => void;
   onEnrollFingerprint?: (user: User) => void;
   loading?: boolean;
+  pageSize?: number;
 }
 
 export const UserTable: React.FC<UserTableProps> = ({
@@ -18,7 +20,23 @@ export const UserTable: React.FC<UserTableProps> = ({
   onDelete,
   onEnrollFingerprint,
   loading = false,
+  pageSize = 5,
 }) => {
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Tự động reset trang về 1 khi số lượng users thay đổi (do search/filter)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [users.length]);
+
+  const totalPages = Math.ceil(users.length / pageSize) || 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const pagedUsers = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return users.slice(start, start + pageSize);
+  }, [users, safeCurrentPage, pageSize]);
+
   return (
     <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
       <div className="overflow-x-auto">
@@ -48,7 +66,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                 </td>
               </tr>
             ) : (
-              users.map((u) => (
+              pagedUsers.map((u) => (
                 <tr
                   key={u.user_id}
                   className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
@@ -62,7 +80,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                   <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
                     {u.rank_name || ''} {u.position ? `— ${u.position}` : ''}
                   </td>
-                  <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                  <td className="py-3 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                     {u.unit_name || '—'}
                   </td>
                   <td className="py-3 px-4">
@@ -127,6 +145,25 @@ export const UserTable: React.FC<UserTableProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Phân trang 5 quân nhân / trang */}
+      {!loading && users.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-200 dark:border-slate-800 text-xs bg-slate-50/60 dark:bg-slate-900/60">
+          <div className="text-slate-500 dark:text-slate-400">
+            Hiển thị <span className="font-semibold text-slate-800 dark:text-slate-200">{(safeCurrentPage - 1) * pageSize + 1}</span> -{' '}
+            <span className="font-semibold text-slate-800 dark:text-slate-200">{Math.min(safeCurrentPage * pageSize, users.length)}</span> trên{' '}
+            <span className="font-semibold text-slate-800 dark:text-slate-200">{users.length}</span> quân nhân
+          </div>
+          <Pagination
+            size="small"
+            current={safeCurrentPage}
+            pageSize={pageSize}
+            total={users.length}
+            onChange={(page) => setCurrentPage(page)}
+            showSizeChanger={false}
+          />
+        </div>
+      )}
     </div>
   );
 };

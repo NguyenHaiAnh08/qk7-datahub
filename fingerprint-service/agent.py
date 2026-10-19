@@ -127,7 +127,6 @@ class FingerprintAgent:
         self.svc = ZK9500Service()
         self.device_id = device_id
         self.running = True
-        self.busy = False
         self.reconnect_delay = 3
         self.enroll_step = 0
         self.enroll_total = 3
@@ -140,6 +139,7 @@ class FingerprintAgent:
             "total": self.enroll_total,
             "state": self.enroll_state,
         }
+        self._cancel_event = threading.Event()
 
     async def run(self):
         ok, msg = self.svc.load_sdk()
@@ -178,37 +178,52 @@ class FingerprintAgent:
                 if t == "ping":
                     await ws.send(json.dumps({"type": "pong"}))
                 elif t == "scan_request":
-                    asyncio.create_task(self._handle_scan(ws, msg))
+                    # Cancel job cũ (nếu có)
+                    self._cancel_event.set()
+                    new_event = threading.Event()
+                    self._cancel_event = new_event
+                    asyncio.create_task(self._handle_scan(ws, msg, new_event))
                 elif t == "enroll_request":
-                    asyncio.create_task(self._handle_enroll(ws, msg))
+                    self._cancel_event.set()
+                    new_event = threading.Event()
+                    self._cancel_event = new_event
+                    asyncio.create_task(self._handle_enroll(ws, msg, new_event))
 
-    async def _handle_scan(self, ws, job):
+    async def _handle_scan(self, ws, job, cancel_event: threading.Event):
         job_id = job.get("job_id")
         template_b64 = job.get("template_plain_b64")
         timeout = int(job.get("timeout_seconds", 30))
 
-        if self.busy:
-            print(f"[Agent] ⚠️ Bỏ qua scan {job_id} vì thiết bị đang bận.")
-            await ws.send(json.dumps({
-                "type": "scan_result", "job_id": job_id,
-                "match": False, "score": 0, "error": "BUSY",
-            }))
-            return
-
-        self.busy = True
         print(f"\n[Agent] 📥 scan {job_id} | timeout={timeout}s")
         print(f"[Agent] 👉 Đặt tay lên máy quét...")
 
         try:
             stored = base64.b64decode(template_b64)
-            scanned = await asyncio.to_thread(self.svc.wait_for_finger, timeout)
+            scanned = await asyncio.to_thread(
+                self.svc.wait_for_finger, timeout, cancel_event
+            )
+
+            if cancel_event.is_set():
+                print(f"[Agent] ⏹️ Scan {job_id} bị hủy bởi job mới.")
+                try:
+                    await ws.send(json.dumps({
+                        "type": "scan_result", "job_id": job_id,
+                        "match": False, "score": 0, "error": "CANCELLED",
+                    }))
+                except Exception:
+                    pass
+                return
+
             if scanned is None:
                 await ws.send(json.dumps({
                     "type": "scan_result", "job_id": job_id,
                     "match": False, "score": 0, "error": "TIMEOUT",
                 }))
                 return
-            matched, score = await asyncio.to_thread(self.svc.compare_templates, stored, scanned)
+
+            matched, score = await asyncio.to_thread(
+                self.svc.compare_templates, stored, scanned
+            )
             print(f"[Agent] {'✅' if matched else '❌'} {job_id}: match={matched} score={score}")
             await ws.send(json.dumps({
                 "type": "scan_result", "job_id": job_id,
@@ -223,10 +238,8 @@ class FingerprintAgent:
                 }))
             except Exception:
                 pass
-        finally:
-            self.busy = False
 
-    async def _handle_enroll(self, ws, job):
+    async def _handle_enroll(self, ws, job, cancel_event: threading.Event):
         job_id = job.get("job_id")
         user_id = job.get("user_id")
         step_timeout = max(10, int(job.get("timeout_seconds", 60)) // 3)
@@ -251,7 +264,21 @@ class FingerprintAgent:
                 self.enroll_step = i
                 self.enroll_state = f"waiting_touch_{i+1}"
                 print(f"[Agent] 👉 Lần {i+1}/3 — Đặt tay...")
-                t = await asyncio.to_thread(self.svc.wait_for_finger, step_timeout)
+                t = await asyncio.to_thread(
+                    self.svc.wait_for_finger, step_timeout, cancel_event
+                )
+
+                if cancel_event.is_set():
+                    print(f"[Agent] ⏹️ Enroll {job_id} bị hủy sau lần {i+1}.")
+                    try:
+                        await ws.send(json.dumps({
+                            "type": "enroll_result", "job_id": job_id,
+                            "success": False, "error": "CANCELLED",
+                        }))
+                    except Exception:
+                        pass
+                    return
+
                 if t is None:
                     self.enroll_state = "timeout"
                     await ws.send(json.dumps({
@@ -259,6 +286,7 @@ class FingerprintAgent:
                         "success": False, "error": f"Quét vần tay không thành công lần {i+1}/3",
                     }))
                     return
+
                 if i > 0:
                     matched, score = await asyncio.to_thread(
                         self.svc.compare_templates, templates[0], t
@@ -270,6 +298,7 @@ class FingerprintAgent:
                             "success": False, "error": f"Lần {i+1} không khớp ngón ban đầu. Vui lòng thử lại.",
                         }))
                         return
+
                 templates.append(t)
                 self.enroll_step = i + 1
                 self.enroll_state = f"captured_{i+1}" if (i + 1 < 3) else "merging"
@@ -282,6 +311,10 @@ class FingerprintAgent:
                 except Exception:
                     pass
                 await asyncio.sleep(0.8)
+
+            if cancel_event.is_set():
+                print(f"[Agent] ⏹️ Enroll {job_id} bị hủy trước khi merge.")
+                return
 
             from zk_service import to_csharp_byte_array
             result = self.svc.zk.DBMerge(
@@ -308,10 +341,6 @@ class FingerprintAgent:
                 }))
             except Exception:
                 pass
-        finally:
-            self.busy = False
-            self.enroll_step = 0
-            self.enroll_state = "idle"
 
 
 def main():

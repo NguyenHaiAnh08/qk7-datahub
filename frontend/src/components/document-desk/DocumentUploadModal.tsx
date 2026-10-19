@@ -4,7 +4,7 @@ import { X, Save, Loader2, FileText, Sparkles, AlertCircle, Plus, Minus, CheckCi
 import { TreeSelect } from 'antd';
 import { Dropzone } from './Dropzone';
 import { DocumentItem, DocumentType, Unit, SecurityLevel } from '../../types';
-import { documentService, ParseDocumentResult } from '../../services/documentService';
+import { documentService, ParseDocumentResult, CheckDuplicateResult } from '../../services/documentService';
 import { buildUnitTree } from '../../utils/unitTree';
 
 export interface DocumentUploadModalProps {
@@ -53,6 +53,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [parseResult, setParseResult] = useState<ParseDocumentResult | null>(null);
   const [parseError, setParseError] = useState('');
   const parsedFileRef = React.useRef<File | null>(null);
+  const [duplicateInfo, setDuplicateInfo] = useState<CheckDuplicateResult | null>(null);
+  const [allowOverride, setAllowOverride] = useState(false);  
 
   // Prefill on edit
   useEffect(() => {
@@ -88,65 +90,54 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   // ── Auto-parse PDF khi user chọn file mới ──
   useEffect(() => {
-    // Khi xóa file → reset
-    if (!selectedFile) {
-      parsedFileRef.current = null;
-      setParseResult(null);
-      setParseError('');
-      return;
-    }
-
-    // Không parse khi đang edit
-    if (isEdit) return;
-
-    // Chỉ parse 1 lần cho mỗi file
-    if (parsedFileRef.current === selectedFile) return;
-    parsedFileRef.current = selectedFile;
-
-    setParsing(true);
+  if (!selectedFile) {
+    parsedFileRef.current = null;
+    setParseResult(null);
     setParseError('');
+    setDuplicateInfo(null);
+    setAllowOverride(false);
+    return;
+  }
+  if (isEdit) return;
+  if (parsedFileRef.current === selectedFile) return;
+  parsedFileRef.current = selectedFile;
 
-    documentService.parseDocument(selectedFile)
-      .then((res) => {
-        if (!res.success || !res.parsed) {
-          setParseError(res.error || 'Không đọc được PDF');
-          return;
-        }
+  setParsing(true);
+  setParseError('');
+  setDuplicateInfo(null);
+  setAllowOverride(false);
 
-        const p = res.parsed;
-
-        // Override các trường (workflow: chọn file trước → điền form sau)
+  Promise.all([
+    documentService.parseDocument(selectedFile).catch((err) => {
+      console.warn('[parse PDF]', err);
+      return { success: false, error: err.message } as ParseDocumentResult;
+    }),
+    documentService.checkDuplicate(selectedFile).catch(() => null),
+  ])
+    .then(([parseRes, dupRes]) => {
+      if (parseRes.success && parseRes.parsed) {
+        const p = parseRes.parsed;
         if (p.document_code) setCode(p.document_code);
         if (p.title) setTitle(p.title);
         if (p.issued_date) setIssueDate(p.issued_date);
-
-        // Loại văn bản — chỉ set nếu có trong dropdown
         if (p.doc_type_code && types.some(t => t.type_id === p.doc_type_code)) {
           setTypeId(p.doc_type_code);
         }
-
-        // Người ký — gộp cấp bậc + tên + chức danh
         const signerParts = [p.signer, p.signer_position].filter(Boolean);
-        if (signerParts.length > 0) {
-          setSigner(signerParts.join(' — '));
-        }
-
-        // ── ĐƠN VỊ BAN HÀNH ──
-        // Ưu tiên đơn vị cụ thể (cấp dưới) — nếu không match thì fallback cấp trên
+        if (signerParts.length > 0) setSigner(signerParts.join(' — '));
         const parsedUnitId = p.issuer_unit_id || p.issuer_parent_unit_id;
         if (parsedUnitId && units.some(u => u.unit_id === parsedUnitId)) {
           setUnitId(parsedUnitId);
         }
-
-        setParseResult(res);
-      })
-      .catch((err) => {
-        console.warn('[parse PDF]', err);
-        setParseError(err.message || 'Không đọc được PDF');
-      })
-      .finally(() => setParsing(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFile, isEdit, types, units]);
+        setParseResult(parseRes);
+      } else if (parseRes.error) {
+        setParseError(parseRes.error);
+      }
+      if (dupRes) setDuplicateInfo(dupRes);
+    })
+    .finally(() => setParsing(false));
+  // eslint-disable-next-line
+}, [selectedFile, isEdit, types, units]);
 
   if (!open) return null;
 
@@ -248,6 +239,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         formData.append('file', selectedFile);
       }
 
+      if (allowOverride) {
+        formData.append('force_upload', '1');
+      }
+
       await onSave(formData, isEdit);
       if (onToast) {
         onToast(isEdit ? `Đã cập nhật văn bản ${code} thành công!` : `Đã tiếp nhận văn bản ${code} thành công!`, 'success');
@@ -347,6 +342,50 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <span>Không tự động đọc được PDF: {parseError}. Vui lòng nhập thông tin thủ công.</span>
               </div>
             )}
+
+            {!parsing && duplicateInfo?.sha_duplicate && (
+  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-2">
+    <div className="flex items-center gap-2 font-semibold text-rose-700 dark:text-rose-400 text-xs">
+      <AlertCircle className="w-4 h-4 shrink-0" />
+      <span>File này đã tồn tại trong hệ thống (SHA-256 trùng)</span>
+    </div>
+    <div className="text-[11px] text-rose-600 dark:text-rose-400 space-y-1 pl-6">
+      {duplicateInfo.matches.by_sha256.slice(0, 3).map((d) => (
+        <div key={d.file_id}>
+          • <span className="font-mono">{d.document_code || d.file_id}</span> — {d.title}
+        </div>
+      ))}
+    </div>
+    <label className="flex items-center gap-2 text-[11px] text-rose-700 dark:text-rose-300 cursor-pointer pt-1 pl-6">
+      <input
+        type="checkbox"
+        checked={allowOverride}
+        onChange={(e) => setAllowOverride(e.target.checked)}
+        className="cursor-pointer"
+      />
+      <span>Tôi muốn ghi đè — vẫn lưu file này (tạo bản ghi mới)</span>
+    </label>
+  </div>
+)}
+
+        {!parsing && !duplicateInfo?.sha_duplicate && duplicateInfo?.code_duplicate && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-400 text-xs">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>Cảnh báo: Số hiệu văn bản đã tồn tại</span>
+            </div>
+            <div className="text-[11px] text-amber-700 dark:text-amber-400 space-y-1 pl-6">
+              {duplicateInfo.matches.by_code.slice(0, 3).map((d) => (
+                <div key={d.file_id}>
+                  • <span className="font-mono">{d.document_code}</span> — {d.title}
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] text-amber-600 dark:text-amber-400 pl-6">
+              Vẫn có thể lưu nếu đây là văn bản sửa đổi / đính chính.
+            </div>
+          </div>
+        )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -540,7 +579,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={!isFormValid || submitting}
+                  disabled={!isFormValid || submitting || (duplicateInfo?.sha_duplicate && !allowOverride)}
                   className={`px-4 py-2 font-bold rounded-xl flex items-center gap-1.5 transition ${
                     isFormValid
                       ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-md shadow-emerald-600/30'

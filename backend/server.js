@@ -12,6 +12,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
+const { parseDocumentPdf } = require('./pdf-parser');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -748,6 +749,68 @@ app.get('/api/documents/:fileId', async (req, res) => {
   }
 });
 
+
+// ============================================================
+// CHECK DUPLICATE — kiểm tra file đã tồn tại chưa (không lưu)
+// ============================================================
+app.post('/api/documents/check-duplicate', requireAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
+
+    const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+    const documentCode = (req.body.document_code || '').trim() || null;
+
+    const pool = await getPool();
+
+    // 1. Check trùng SHA-256
+    const bySha = await pool.request()
+      .input('sha', sql.Char(64), sha256)
+      .query(`
+        SELECT d.file_id, d.document_code, d.title, d.security_level_id,
+               sl.name AS security_name, d.created_at, d.uploaded_by,
+               u.full_name AS uploaded_by_name
+        FROM DOCUMENT d
+        LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
+        LEFT JOIN [USER] u ON u.user_id = d.uploaded_by
+        WHERE d.sha256 = @sha
+      `);
+
+    // 2. Check trùng document_code
+    let byCode = [];
+    if (documentCode) {
+      const codeRes = await pool.request()
+        .input('code', sql.NVarChar(100), documentCode)
+        .query(`
+          SELECT d.file_id, d.document_code, d.title, d.security_level_id,
+                 sl.name AS security_name, d.created_at, d.sha256
+          FROM DOCUMENT d
+          LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
+          WHERE d.document_code = @code
+          ORDER BY d.created_at DESC
+        `);
+      byCode = codeRes.recordset;
+    }
+
+    const isShaDuplicate = bySha.recordset.length > 0;
+    const isCodeDuplicate = byCode.length > 0;
+
+    res.json({
+      sha256,
+      is_duplicate: isShaDuplicate || isCodeDuplicate,
+      sha_duplicate: isShaDuplicate,
+      code_duplicate: isCodeDuplicate,
+      matches: {
+        by_sha256: bySha.recordset,
+        by_code: byCode,
+      },
+    });
+  } catch (err) {
+    console.error('[POST /api/documents/check-duplicate]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
@@ -760,6 +823,38 @@ app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req
 
     const fileId = 'DOC-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+
+    
+    // ─── CHECK TRÙNG LẶP SHA-256 ───
+    const forceUpload = req.body.force_upload === '1' || req.body.force_upload === 'true';
+    if (!forceUpload) {
+      const pool = await getPool();
+      const dupCheck = await pool.request()
+        .input('sha', sql.Char(64), sha256)
+        .query(`
+          SELECT file_id, document_code, title, security_level_id, created_at
+          FROM DOCUMENT WHERE sha256 = @sha
+        `);
+
+      if (dupCheck.recordset.length > 0) {
+        const existing = dupCheck.recordset[0];
+        await writeAccessLog({
+          userId: req.user.user_id, fileId: existing.file_id,
+          action: 'UPLOAD_DUPLICATE', ip: getClientIp(req),
+          note: `Trùng SHA256 với file ${existing.file_id}`,
+        });
+        return res.status(409).json({
+          error: 'File này đã tồn tại trong hệ thống',
+          is_duplicate: true,
+          match_type: 'sha256',
+          existing,
+          hint: 'Gửi lại với force_upload=1 để ghi đè (nếu chắc chắn muốn lưu trùng)',
+        });
+      }
+    }
+
+
     const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
       docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
     });
@@ -1048,6 +1143,50 @@ app.get('/api/access-logs', requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// ============================================================
+// PARSE PDF — Trích xuất metadata tự động (không lưu DB, không lưu file)
+// ============================================================
+app.post('/api/documents/parse', requireAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
+    }
+
+    const result = await parseDocumentPdf(req.file.buffer, { sql, getPool });
+    const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+    // Kiểm tra trùng lặp SHA-256 (không block, chỉ trả info)
+    let duplicateInfo = { is_duplicate: false, matches: [] };
+    try {
+      const pool = await getPool();
+      const dupCheck = await pool.request()
+        .input('sha', sql.Char(64), sha256)
+        .query(`
+          SELECT file_id, document_code, title, security_level_id, created_at
+          FROM DOCUMENT WHERE sha256 = @sha
+        `);
+      if (dupCheck.recordset.length > 0) {
+        duplicateInfo = { is_duplicate: true, matches: dupCheck.recordset };
+      }
+    } catch (e) {
+      console.warn('[parse] duplicate check fail:', e.message);
+    }
+
+    res.json({
+      ...result,
+      original_name: req.file.originalname,
+      file_size: req.file.size,
+      sha256,
+      duplicate_check: duplicateInfo,
+    });
+  } catch (err) {
+    console.error('[POST /api/documents/parse]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {

@@ -33,7 +33,37 @@ export interface ParseDocumentResult {
     file_size?: number;
     sha256?: string;
     error?: string;
+      duplicate_check?: {
+    is_duplicate: boolean;
+    matches: DuplicateMatchDoc[];
+  };
 }
+
+/**
+ * Check duplicate document based on SHA256 and document code
+ */
+export interface DuplicateMatchDoc {
+  file_id: string;
+  document_code?: string | null;
+  title: string;
+  security_level_id: number;
+  security_name?: string;
+  created_at?: string;
+  uploaded_by?: string;
+  uploaded_by_name?: string;
+}
+
+export interface CheckDuplicateResult {
+  sha256: string;
+  is_duplicate: boolean;
+  sha_duplicate: boolean;
+  code_duplicate: boolean;
+  matches: {
+    by_sha256: DuplicateMatchDoc[];
+    by_code: DuplicateMatchDoc[];
+  };
+}
+
 
 /**
  * Document Service — Quản lý tìm kiếm, tra cứu, tải lên và số hóa văn bản
@@ -73,6 +103,28 @@ export const documentService = {
       body: formData,
     });
   },
+
+
+  /**
+   * Check for duplicate documents based on SHA256 and document code
+   * 
+   * 
+   */
+    checkDuplicate: async (
+      file: File,
+      documentCode?: string
+    ): Promise<CheckDuplicateResult> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (documentCode) formData.append('document_code', documentCode);
+
+      return http<CheckDuplicateResult>('/api/documents/check-duplicate', {
+        method: 'POST',
+        body: formData,
+        skipErrorNotification: true,
+      });
+    },
+
 
   /**
    * Parse PDF → metadata (không lưu file, không ghi DB)

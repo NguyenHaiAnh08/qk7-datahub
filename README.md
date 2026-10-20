@@ -1,132 +1,126 @@
 # QK7 DATAHUB — Cổng Quản Lý Dữ Liệu Tập Trung Quân Khu 7
 
-Hệ thống quản lý, lưu trữ số hóa và phân quyền khai thác tài liệu văn bản quân sự bảo mật đa cấp độ của Bộ Tư Lệnh Quân Khu 7.
+Hệ thống quản lý, lưu trữ số hóa, phân quyền khai thác tài liệu quân sự bảo mật đa cấp độ, tích hợp Trợ lý Trí Tuệ Nhân Tạo (AI RAG) và Xác Thực Sinh Trắc Học Vân Tay (ZKTeco ZK9500) của Bộ Tư Lệnh Quân Khu 7.
 
 ---
 
 ## 📌 Tài Liệu Kiến Trúc Toàn Diện
 
-Toàn bộ sơ đồ kiến trúc hệ thống, sơ đồ cấu trúc mã nguồn, lưu đồ tuần tự nghiệp vụ và thiết kế cơ sở dữ liệu được trình bày chi tiết tại:
+Toàn bộ sơ đồ kiến trúc hệ thống, sơ đồ cấu trúc mã nguồn, lưu đồ tuần tự nghiệp vụ, thiết kế cơ sở dữ liệu và chi tiết tích hợp AI/vân tay được trình bày tại:
 
 👉 **[SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)**
 
 Nội dung tài liệu bao gồm:
-1. **Sơ Đồ Kiến Trúc Hệ Thống (System Architecture Diagram - Mermaid):** 4 tầng Client, Presentation (React SPA), Gateway Express 5 và Storage vật lý / SQL Server.
-2. **Sơ Đồ Cấu Trúc Mã Nguồn (Source Tree & Architecture):** Cây thư mục chi tiết, quan hệ giữa các mô-đun frontend, backend, public và uploads.
-3. **Mô Hình Phân Quyền & Bảo Mật:** 5 cấp độ bảo mật quân sự (Công khai, Nội bộ, Mật, Tối mật, Tuyệt mật), cơ chế băm SHA-256 và Access Audit Log.
-4. **Sơ Đồ Luồng Dữ Liệu (Sequence Diagrams):** Đăng nhập xác thực, Tải lên tệp văn bản và Tra cứu kiểm soát cấp độ mật.
-5. **Sơ Đồ Cơ Sở Dữ Liệu (Database ERD):** Quan hệ giữa các bảng `USER`, `SECURITY_LEVEL`, `UNIT`, `DOCUMENT`, `DOCUMENT_TYPE`, `ACCESS_LOG`, `ROLE`, `PERMISSION`.
-6. **Danh Mục API Endpoints:** Bảng đặc tả chi tiết toàn bộ REST APIs chuẩn OpenAPI 3.0 / Swagger.
-7. **Hướng Dẫn Vận Hành & Lệnh Chạy:** Runbook chi tiết cho môi trường phát triển và sản phẩm.
+1. **Sơ Đồ Kiến Trúc Hệ Thống (Mermaid):** Mô hình 5 tầng: Client & Phần cứng ZK9500, Presentation React 18 SPA, Gateway Express 5 & WebSocket, Microservice AI FastAPI (:8001) và CSDL SQL Server / Qdrant Vector Storage.
+2. **Sơ Đồ Cấu Trúc Mã Nguồn:** Cây thư mục chi tiết toàn bộ dự án (`backend/`, `frontend/`, `boxchat/`, `fingerprint/`).
+3. **Mô Hình Phân Quyền & Bảo Mật Đa Tầng:** 5 cấp độ mật quân sự, xác thực sinh trắc học 2FA và lọc ngữ cảnh an toàn trong AI RAG.
+4. **Sơ Đồ Luồng Dữ Liệu Nghiệp Vụ:** Đăng nhập, tải lên văn bản, tra cứu độ mật, xác thực vân tay xem tài liệu Mật/Tuyệt Mật, đăng ký mẫu vân tay 3 bước và hỏi đáp tác chiến AI kèm Smart SQL Fallback.
+5. **Sơ Đồ Cơ Sở Dữ Liệu (Database ERD):** Ràng buộc quan hệ giữa các bảng `USER`, `USER_FINGERPRINT`, `SECURITY_LEVEL`, `UNIT`, `DOCUMENT`, `DOCUMENT_TYPE`, `ACCESS_LOG`, `ROLE`, `PERMISSION`.
+6. **Kiến Trúc Trợ Lý AI Tác Chiến (boxchat):** RAG với trích dẫn số trang chính xác, tự động sinh cẩm nang học tập tác chiến (`study-book`) và cơ chế Smart SQL Fallback.
+7. **Kiến Trúc Sinh Trắc Học Vân Tay (ZKTeco ZK9500):** CTypes wrapper kết nối `libzkfp.dll`, Local Agent (:9001), WebSocket Gateway và mã hóa AES-256-GCM.
+8. **Danh Mục API Endpoints:** Đặc tả OpenAPI 3.0 / Swagger UI đầy đủ cho Core, AI và Fingerprint.
+9. **Hướng Dẫn Vận Hành & Lệnh Chạy Runbook:** Hướng dẫn khởi động cả 4 dịch vụ hệ thống.
 
 ---
 
-## 📁 Cấu Trúc Dự Án (Chuẩn SPA React 18 + Vite + Ant Design + Express Gateway)
+## 📁 Cấu Trúc Dự Án Toàn Diện
 
 ```text
 qk7-datahub/
-├── backend/                                # 🟢 Máy chủ Backend Express & Cơ sở dữ liệu
-│   ├── src/                                # db.js (Kết nối SQL Server) & admin-routes.js (APIs QTV)
-│   ├── uploads/                            # Kho lưu trữ file PDF thật (2026/..., Mat/, ToiMat/, TuyetMat/)
-│   ├── public/                             # Thư mục chứa sản phẩm build tĩnh từ frontend (index.html, assets/)
-│   ├── server.js                           # Entry point Express API Gateway (:8000) & SPA Fallback Middleware
+├── package.json                            # Điều phối kịch bản khởi chạy toàn bộ dự án
+├── README.md                               # Sổ tay hướng dẫn khởi động nhanh
+├── SYSTEM_ARCHITECTURE.md                  # Tài liệu kiến trúc toàn diện hệ thống
+│
+├── backend/                                # 🟢 MÁY CHỦ EXPRESS 5 & WEBSOCKET GATEWAY (:8000)
+│   ├── src/
+│   │   ├── db.js                           # Kết nối Microsoft SQL Server (QK7_ThuVienSo)
+│   │   ├── admin-routes.js                 # API quản trị CRUD (Users, Roles, Units, Permissions...)
+│   │   ├── ai-routes.js                    # Cổng giao tiếp AI boxchat (:8001) & Smart SQL Fallback
+│   │   └── fingerprint-ws.js               # WebSocket Server (/ws/fingerprint) quản lý ZK9500
+│   ├── uploads/                            # Kho lưu trữ tệp PDF thật (2026/10/..., Mat/, ToiMat/, TuyetMat/)
+│   ├── public/                             # Sản phẩm build tĩnh từ Frontend xuất sang
+│   ├── server.js                           # Entry point Express API Gateway, SPA Fallback & Biometrics
 │   ├── swagger.js                          # Đặc tả OpenAPI 3.0 Swagger Spec (/api-docs)
-│   ├── setup-passwords.js                  # Script đồng bộ và băm mật khẩu bcrypt tài khoản
-│   ├── .env                                # Cấu hình kết nối SQL Server và PORT
-│   └── package.json                        # Dependencies & scripts riêng cho Backend (Express 5)
+│   ├── setup-passwords.js                  # Script đồng bộ và băm mật khẩu bcrypt
+│   └── package.json                        # Dependencies backend (express 5, mssql, ws, jsonwebtoken...)
 │
-├── frontend/                               # 🔵 Giao diện người dùng Single Page Application (SPA)
-│   ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
-│   ├── vite.config.ts                      # Config build xuất sang ../backend/public, proxy :8000
-│   ├── tsconfig.json                       # Cấu hình TypeScript compiler
-│   ├── tailwind.config.js                  # Cấu hình TailwindCSS
-│   ├── package.json                        # Dependencies Frontend (antd, @ant-design/icons, react-router-dom...)
-│   └── src/
-│       ├── App.tsx                         # Khởi tạo Ant Design ConfigProvider (Màu Tím #722ED1), Auth, Theme
-│       ├── main.tsx                        # Entry point React 18 createRoot
-│       ├── index.css                       # Design System CSS, biến màu quân sự, glassmorphism
-│       │
-│       ├── routes/                         # Hệ thống Auto-Discovery Routing & Phân Quyền
-│       │   ├── routePaths.ts               # Danh mục URL tập trung (/login, /portal, /403, /404, /500...)
-│       │   ├── routeAccess.ts              # Ma trận phân quyền kiểm soát Clearance Level & Login Guard (.ts)
-│       │   ├── getAppRoutes.ts             # Tự động quét modules/*.routes.tsx qua import.meta.glob (.ts)
-│       │   ├── RouterProvider.tsx          # Component điều hướng useRoutes hook (.tsx)
-│       │   └── modules/                    # Định nghĩa route theo từng module nghiệp vụ (.routes.tsx)
-│       │       ├── auth.routes.tsx         # Tuyến đường xác thực (/login)
-│       │       ├── portal.routes.tsx       # Tuyến đường Cổng tra cứu (/portal, /)
-│       │       ├── desk.routes.tsx         # Bàn làm việc văn thư (/document-desk, yêu cầu Cấp mật ≥ 3)
-│       │       ├── admin.routes.tsx        # Quản trị hệ thống (/admin-dashboard, /users, yêu cầu Cấp mật ≥ 4)
-│       │       ├── error.routes.tsx        # Tuyến đường mã lỗi HTTP (/400, /401, /403, /404, /500, /502, /503)
-│       │       └── fallback.routes.tsx     # Bắt URL không hợp lệ (*) chuyển sang HttpErrorPage 404
-│       │
-│       ├── pages/                          # Các màn hình giao diện chính (TSX)
-│       │   ├── LoginPage.tsx               # Màn hình đăng nhập quân nhân
-│       │   ├── PortalPage.tsx              # Cổng tra cứu tài liệu quân sự
-│       │   ├── DocumentDeskPage.tsx        # Bàn làm việc số hóa văn bản
-│       │   ├── AdminDashboardPage.tsx      # Bảng điều khiển quản trị trung tâm
-│       │   ├── UsersPage.tsx               # Quản lý tài khoản quân nhân & phân quyền
-│       │   └── HttpErrorPage.tsx           # Trang mã trạng thái HTTP tinh gọn chuẩn Ant Design Result
-│       │
-│       ├── components/                     # Giao diện thành phần tái sử dụng
-│       │   ├── common/                     # Header, Sidebar, Layout, ProtectedRoute, HttpErrorListener, Toast...
-│       │   ├── auth/                       # LoginForm
-│       │   ├── portal/                     # SecurityBanner, DocumentCard, PortalDocumentList
-│       │   ├── document-desk/              # Dropzone, DocumentFilters, DocumentTable, DocumentUploadModal...
-│       │   ├── dashboard/                  # StatCard, DistributionChart
-│       │   └── users/                      # UserTable, UserFormModal, UserCredentialsModal
-│       │
-│       ├── services/                       # Tầng Dịch Vụ Mạng (Domain-Driven Architecture)
-│       │   ├── http.ts                     # HTTP Client Wrapper với HttpError & Event phát lỗi HTTP
-│       │   ├── authService.ts              # Xác thực đăng nhập & quản lý phiên làm việc
-│       │   ├── documentService.ts          # Nghiệp vụ tìm kiếm, tải lên, xem, sửa, xóa văn bản
-│       │   ├── userService.ts              # Nghiệp vụ quản lý người dùng & phân quyền quân nhân
-│       │   ├── roleService.ts              # Nghiệp vụ quản lý vai trò (Roles)
-│       │   ├── permissionService.ts        # Nghiệp vụ quản lý quyền thao tác (Permissions)
-│       │   ├── unitService.ts              # Nghiệp vụ quản lý cơ quan, đơn vị quân khu
-│       │   ├── documentTypeService.ts      # Nghiệp vụ quản lý danh mục loại văn bản
-│       │   ├── securityLevelService.ts     # Nghiệp vụ quản lý 5 cấp độ bảo mật
-│       │   ├── logService.ts               # Nghiệp vụ nhật ký kiểm toán an ninh (ACCESS_LOG)
-│       │   ├── systemService.ts            # Kiểm tra trạng thái máy chủ (/api/health, /api/meta)
-│       │   ├── dashboardApi.ts             # Aggregator Service phục vụ Admin Dashboard
-│       │   ├── documentsApi.ts / usersApi.ts # Compatibility Aliases
-│       │   └── index.ts                    # Barrel export tập trung toàn bộ services
-│       │
-│       ├── contexts/                       # Quản lý trạng thái toàn cục (AuthContext, ThemeContext)
-│       ├── hooks/                          # Custom hooks tiện ích (useAuth)
-│       ├── types/                          # Định nghĩa kiểu dữ liệu TypeScript (document.ts, user.ts)
-│       └── utils/                          # Công cụ định dạng ngày tháng, kích thước tệp
+├── boxchat/                                # 🟣 MICROSERVICE TRỢ LÝ AI TÁC CHIẾN (:8001 - FastAPI)
+│   ├── main.py                             # Entry point FastAPI: /api/ai/query, /api/ai/study-book...
+│   ├── core/
+│   │   ├── pdf_processor.py                # Bóc tách văn kiện PDF quân sự theo từng trang
+│   │   ├── vector_store.py                 # Hybrid Vector Store (Qdrant Local Engine) & Auto-index
+│   │   ├── agent_tutor.py                  # Agent RAG trả lời câu hỏi kèm trích dẫn và luồng suy nghĩ
+│   │   ├── study_book_gen.py               # Biên soạn giáo trình tác chiến & trắc nghiệm nhận thức
+│   │   └── media_timeline.py               # Quản lý dòng thời gian sự kiện, chiến dịch quân sự
+│   ├── local_storage/                      # Kho lưu trữ vector embedding nội bộ bảo mật
+│   └── requirements.txt                    # Dependencies: fastapi, uvicorn, qdrant-client, langchain...
 │
-├── package.json                            # Scripts tiện ích điều phối chạy từ thư mục gốc
-├── .gitignore                              # Cấu hình bỏ qua node_modules, .env, uploads PDF
-└── README.md
+├── fingerprint/                            # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001)
+│   ├── agent.py                            # Local HTTP Server (:9001) & WebSocket Client
+│   ├── zk_service.py                       # CTypes wrapper SDK ZKTeco ZK9500 (libzkfp.dll)
+│   ├── libzkfp.dll                         # Thư viện DLL điều khiển cảm biến quang học ZKTeco
+│   ├── device_id.txt                       # Mã định danh máy quét trạm làm việc
+│   └── requirements.txt                    # Dependencies: websockets, aiohttp
+│
+└── frontend/                               # 🔵 GIAO DIỆN CLIENT REACT 18 + TYPESCRIPT + ANT DESIGN
+    ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
+    ├── vite.config.ts                      # Config build xuất sang ../backend/public, proxy :8000
+    ├── package.json                        # Dependencies: antd, react-router-dom, lucide-react, exceljs...
+    └── src/
+        ├── App.tsx                         # Ant Design ConfigProvider (Màu Tím #722ED1), Auth, Theme
+        ├── routes/                         # Auto-Discovery Routing & ProtectedRoute theo Cấp mật
+        ├── pages/                          # LoginPage, PortalPage, DocumentDeskPage, AdminDashboardPage, UsersPage
+        ├── components/
+        │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
+        │   ├── document-desk/              # FingerprintScanModal (Xác thực vân tay xem văn bản Mật)
+        │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Touch ID SVG)
+        │   ├── dashboard/                  # SecurityAuditLog (Trung tâm SOC), UnitTreeTable (Cây đơn vị), StatCard...
+        │   └── common/                     # Header, Sidebar, Layout, TouchIDFingerprint...
+        ├── utils/                          # exportAuditReportExcel.ts (Xuất file Excel .xlsx chuẩn biểu mẫu Quân đội)
+        ├── services/                       # authService, documentService, userService, fingerprintService...
+        └── contexts/                       # AuthContext, ThemeContext
 ```
 
 ---
 
-## 🛡️ Điểm Nhấn Kiến Trúc & Tính Năng Mới
+## 🛡️ Điểm Nhấn Kiến Trúc & Tính Năng Nổi Bật
 
-### 1. Chuẩn Giao Diện Ant Design Toàn Diện (Tông Màu Tím `#722ED1`)
-- **Theme & Color:** Toàn bộ ứng dụng được cấu hình qua `<ConfigProvider>` của Ant Design với màu chủ đạo hành động (Primary Action) là **Màu Tím (`#722ED1`)**, kết hợp phông chữ hệ thống tiêu chuẩn và tự động thích ứng chế độ Sáng / Tối (`algorithm: darkAlgorithm / defaultAlgorithm`).
-- **Việt hóa toàn diện:** Tích hợp locale `vi_VN` sẵn trong Ant Design cho lịch, phân trang, thông báo, modal.
+### 1. Trợ Lý AI Tác Chiến & Văn Thư (boxchat Agentic RAG)
+- **Hỏi đáp thông minh kèm trích dẫn:** Trả lời các câu hỏi về điều lệnh, chỉ thị, phương án tác chiến dựa trên tài liệu PDF đã nạp vào hệ thống. Kèm trích dẫn số trang chính xác và hiển thị quá trình suy luận (`think`).
+- **Biên soạn cẩm nang học tập (`study-book`):** Tự động phân tích tài liệu để tóm tắt các điểm cốt lõi và sinh đề trắc nghiệm kiểm tra nhận thức chính trị, nghiệp vụ quân sự.
+- **Smart SQL Fallback:** Khi microservice AI tạm thời chưa bật, Gateway Express tự động chuyển sang chế độ dự phòng thông minh, truy vấn trực tiếp SQL Server đảm bảo không gián đoạn dịch vụ.
 
-### 2. Trang Xử Lý Mã Trạng Thái HTTP Tinh Gọn (`HttpErrorPage.tsx`)
-- Tích hợp chuẩn giao diện `<Result>` của Ant Design, xử lý trực quan các mã trạng thái:
-  - **400 (Yêu cầu không hợp lệ)**: Báo lỗi định dạng truy vấn.
-  - **401 (Chưa xác thực)**: Yêu cầu đăng nhập tài khoản quân nhân.
-  - **403 (Truy cập bị từ chối)**: Vi phạm cấp độ bảo mật hoặc chưa được cấp quyền.
-  - **404 (Không tìm thấy tài liệu)**: Đường dẫn không tồn tại hoặc văn bản đã bị thu hồi/hủy bỏ.
-  - **500 / 502 / 503 (Lỗi máy chủ)**: Máy chủ gặp sự cố hoặc gián đoạn kết nối.
-- **Trải nghiệm người dùng:**
-  - Lỗi `4xx`: Hiển thị duy nhất nút **"Về Trang Chủ"** (`/portal`), thông điệp ngắn gọn, thân thiện.
-  - Lỗi `5xx`: Bổ sung nút **"Tải Lại Trang"** song song với **"Về Trang Chủ"** để người dùng chủ động thử lại kết nối.
-  - Không hiển thị thanh test mã lỗi hay các khối chẩn đoán kỹ thuật thừa thãi.
-  - Tự động bắt lỗi qua `http.ts` và lắng nghe sự kiện `qk7:http-error` trong `HttpErrorListener.tsx`.
+### 2. Xác Thực Sinh Trắc Học Vân Tay Hai Lớp (ZKTeco ZK9500)
+- **Bảo mật cấp độ cao:** Đối với văn bản Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), quân nhân bắt buộc phải xác thực vân tay quang học trên máy quét ZK9500 trước khi mở xem inline hoặc tải tệp.
+- **Biometric Token:** Sau khi xác thực thành công, Gateway cấp JWT `fingerprint_token` có hiệu lực 5 phút gắn với `(user_id, file_id)`.
+- **Đăng ký vân tay 3 bước trực quan:** Hộp thoại đăng ký quân nhân tích hợp hoạt ảnh Touch ID mô phỏng vector chuyển màu đỏ theo tiến trình đặt ngón tay 3 lần liên tiếp, cập nhật real-time từ cảm biến quang học.
 
-### 3. Bộ Gác Cổng Phân Quyền Theo 5 Cấp Độ Mật (`ProtectedRoute.tsx` & `routeAccess.ts`)
-- **Cấp 1 - 2 (Công khai / Lưu hành nội bộ):** Truy cập Cổng tra cứu tài liệu (`/portal`, `/`).
-- **Cấp 3 (Mật):** Truy cập Bàn làm việc văn thư (`/document-desk`).
-- **Cấp 4 - 5 (Tối Mật / Tuyệt Mật):** Truy cập Trung tâm quản trị (`/admin-dashboard`) và Quản lý quân nhân (`/users`).
-- Khi người dùng chưa đăng nhập hoặc không đủ cấp độ bảo mật tối thiểu, `ProtectedRoute` tự động chuyển hướng an toàn về `/login` hoặc hiển thị mã trạng thái `/403`.
+### 3. Chuẩn Giao Diện Ant Design Toàn Diện (Tông Màu Tím `#722ED1`)
+- **Theme & Color:** Toàn bộ ứng dụng cấu hình qua `<ConfigProvider>` của Ant Design với màu chủ đạo hành động (Primary Action) là **Màu Tím (`#722ED1`)**, hỗ trợ chế độ Sáng / Tối mượt mà và giao diện Việt hóa 100% (`vi_VN`).
+- **Phân trang chuẩn 5 người dùng / trang:** Danh sách quân nhân hiển thị đúng 5 người dùng / trang, người thứ 6 chuyển sang trang tiếp theo kèm bộ điều hướng Ant Design Pagination.
+- **Trang xử lý mã lỗi HTTP chuẩn mực:** Sử dụng `<Result>` của Ant Design xử lý thân thiện các mã 400, 401, 403, 404, 500, 502, 503.
+
+### 4. Trung Tâm Giám Sát Nhật Ký Hoạt Động & Kiểm Toán An Ninh SOC (`SecurityAuditLog`)
+- **Giao diện SOC chuyên nghiệp:** Tối ưu hóa phân cấp chiều sâu thị giác (Layered backgrounds), kính mờ (Backdrop blur) và viền phát sáng; hỗ trợ hoàn hảo cả Dark Mode (cho kíp trực an ninh ban đêm) và Light Mode.
+- **4 Thẻ KPI Tác Chiến Thời Gian Thực:** Giám sát tổng hoạt động, cảnh báo an ninh (`FINGERPRINT_FAIL`, `ACCESS_DENIED`...), biến động vai trò/đặc quyền (`ASSIGN_ROLE`...) và lượt truy xuất văn bản mật.
+- **Giám sát trực tuyến & Tự động làm mới:** Chỉ báo trạng thái trực tuyến `🟢 Hệ thống Trực tuyến`, bộ hẹn giờ tự động làm mới chu kỳ 10s / 30s / Tắt kèm thanh đếm ngược và nút tạm dừng / tiếp tục.
+- **Bảng kiểm toán thông minh:** Cột thời gian Monospace chính xác từng giây, badge IP mạng nội bộ/localhost, avatar quân nhân không ngắt dòng, tự động bóc tách thực thể mục tiêu (`USR-...`, `DEV-...`, `ROL-...`, `DOC-...`) từ nội dung ghi chú.
+- **Điều tra sự cố chuyên sâu (Deep Incident Inspection):** Hộp thoại Drawer / Modal kiểm toán chi tiết hiển thị toàn bộ thuộc tính, Raw JSON Payload với tính năng 1-click sao chép Clipboard.
+
+### 5. Cây Quản Lý Phân Cấp Đơn Vị Quân Khu Đa Tầng (`UnitTreeTable`)
+- **Tổ chức thứ bậc chỉ huy cây đa tầng (Command Tree Hierarchy):** Hiển thị trực quan quan hệ cơ quan cha - đơn vị con với số lượng đơn vị trực thuộc tự động tổng hợp.
+- **Cơ chế bảo vệ đơn vị "mồ côi" (Orphan Safeguarding):** Tự động phát hiện và chuyển các đơn vị có `parent_id` không hợp lệ về gốc (Root), ngăn ngừa triệt để lỗi mất dữ liệu trên giao diện.
+- **Phân loại cấp bậc tự động 6 tầng quân sự:** Nhận diện thông minh qua tên đơn vị: Cấp Quân Khu, Sư Đoàn, Trung Đoàn, Tiểu Đoàn, Nhà Trường/Học Viện và Cơ Quan/Phòng Ban.
+- **Thanh thống kê tương tác (Mini KPI Stat Pills):** Lọc nhanh đơn vị theo cấp bậc chỉ với 1 cú click chuột.
+- **Tìm kiếm tiếng Việt thông minh (Accent-Insensitive Search):** Tự động loại bỏ dấu tiếng Việt khi tìm kiếm và tự động bung (expand) tất cả các nhánh cha dẫn đến kết quả tìm kiếm.
+
+### 6. Xuất Báo Cáo Nhật Ký Kiểm Toán Chuẩn Quy Chuẩn Quân Đội (`exportAuditReportExcel`)
+- **Định dạng file Excel (.xlsx) chính quy:** Thay thế việc xuất file CSV đơn giản bằng định dạng Excel `.xlsx` chuyên nghiệp thông qua thư viện `exceljs`, tuân thủ 100% biểu mẫu công văn `Xuất báo cáo mẫu.xlsx`.
+- **Đầy đủ trường chuẩn hành chính quân sự:**
+  - Tiêu ngữ bên trái: **PHÒNG THAM MƯU HÀNH CHÍNH** / **TỔ CÔNG NGHỆ THÔNG TIN** / **Số: ....../BC-CNTT**.
+  - Quốc hiệu bên phải: **CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM** / **Độc lập - Tự do - Hạnh phúc** / Ngày tháng địa danh tự động (`TP. Hồ Chí Minh, ngày DD tháng MM năm YYYY`).
+- **Bảng dữ liệu chuẩn 9 cột:** `Mã Log`, `Thời Gian`, `Mã Quân Nhân`, `Họ Tên Quân Nhân`, `Hành Động`, `Nhóm Phân Loại`, `Đối Tượng / Văn Bản`, `Địa Chỉ IP`, `Ghi Chú` với tiêu đề màu vàng cam `#FFC000`, font `Times New Roman` và khung viền mảnh chuẩn mực.
+- **Chân trang ký duyệt quân sự:** Khối ký duyệt `NGƯỜI LẬP` và chức danh người lập báo cáo: `Thiếu tá QNCN Nguyễn Mạnh Nam`.
 
 ---
 
@@ -134,91 +128,80 @@ qk7-datahub/
 
 ### 1. Cài đặt thư viện (lần đầu)
 ```bash
-# Cách 1: Chạy từ thư mục gốc
+# Cài đặt Backend & Frontend
 npm run backend:install
 npm run frontend:install
 
-# Cách 2: Chạy trực tiếp từng thư mục
-cd backend && npm install
-cd ../frontend && npm install
+# Cài đặt Microservice AI boxchat
+cd boxchat && pip install -r requirements.txt
+
+# Cài đặt Local Fingerprint Agent
+cd ../fingerprint && pip install -r requirements.txt
 ```
 
-### 2. Chạy máy chủ Backend (Express :8000)
+### 2. Chạy toàn bộ 4 dịch vụ hệ thống
+
+Mở 4 cửa sổ Terminal riêng biệt:
+
+* **Terminal 1: Máy chủ Backend Express & WebSocket Gateway (:8000)**
+  ```bash
+  cd backend
+  npm start
+  ```
+  * Cổng Web & API: [http://localhost:8000](http://localhost:8000)
+  * Swagger UI: [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+
+* **Terminal 2: Giao diện người dùng Frontend Vite (:5173)**
+  ```bash
+  cd frontend
+  npm run dev
+  ```
+  * Truy cập ứng dụng: [http://localhost:5173](http://localhost:5173)
+
+* **Terminal 3: Microservice Trợ Lý AI boxchat (:8001)**
+  ```bash
+  cd boxchat
+  python main.py
+  ```
+  * Cổng AI Service: [http://localhost:8001](http://localhost:8001)
+
+* **Terminal 4: Local Fingerprint Hardware Agent (:9001)**
+  ```bash
+  cd fingerprint
+  python agent.py
+  ```
+  * Trạm kiểm soát vân tay: [http://127.0.0.1:9001/device-id](http://127.0.0.1:9001/device-id)
+
+### 3. Đóng gói sản phẩm (Production Build)
 ```bash
-# Cách 1: Chạy từ gốc
-npm run backend:start
-
-# Cách 2: Chạy từ thư mục backend
-cd backend
-npm start
-```
-* **Cổng API & Web:** [http://localhost:8000](http://localhost:8000)
-* **API Health Check:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
-* **Tài liệu Swagger API (UI):** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
-* **Đặc tả OpenAPI JSON:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
-
-### 3. Chạy môi trường phát triển Frontend (Hot-Reload Vite :5173)
-```bash
-# Cách 1: Chạy từ gốc
-npm run frontend:dev
-
-# Cách 2: Chạy từ thư mục frontend
-cd frontend
-npm run dev
-```
-* Truy cập giao diện: [http://localhost:5173/login](http://localhost:5173/login) hoặc [http://localhost:5173/portal](http://localhost:5173/portal)
-*(Dev server tự động proxy toàn bộ request `/api` và `/uploads` sang `http://localhost:8000`)*
-
-### 4. Đóng gói sản phẩm (Production Build xuất sang `backend/public/`)
-```bash
-# Cách 1: Chạy từ gốc
-npm run frontend:build
-
-# Cách 2: Chạy từ thư mục frontend
 cd frontend
 npm run build
 ```
-Bản build tĩnh (gồm `index.html` và thư mục `assets/`) sẽ tự động được xuất sang `backend/public/`. Máy chủ `backend/server.js` sẽ tự động phục vụ các trang thông qua SPA Fallback Middleware khi F5 ở bất kỳ URL nào.
+Bản build tĩnh sẽ tự động được xuất sang `backend/public/`. Khi đó chỉ cần chạy `npm start` tại `backend/`, máy chủ sẽ phục vụ toàn bộ ứng dụng SPA, API và WebSocket trên cổng `:8000`.
 
 ---
 
-## 📜 Tài Liệu API & Swagger UI (OpenAPI 3.0)
+## 📜 Danh Mục API & Swagger UI (OpenAPI 3.0)
 
-Hệ thống tích hợp sẵn cổng tương tác API trực tiếp qua **Swagger UI** chuẩn OpenAPI 3.0:
-
-* **URL Swagger UI:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
-* **OpenAPI 3.0 Spec JSON:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
-* **File cấu hình:** [`backend/swagger.js`](file:///d:/QK7_DataHub/qk7-datahub/backend/swagger.js)
-* **Cấu hình môi trường:** Biến `ENABLE_SWAGGER=true` (trong file `backend/.env`)
+Hệ thống tích hợp cổng tài liệu API tương tác trực tiếp:
+* **Swagger UI:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+* **OpenAPI JSON Spec:** [http://localhost:8000/api-docs.json](http://localhost:8000/api-docs.json)
 
 ### Các Nhóm Endpoint Chính (Tags)
-1. **`Auth`**: Xác thực đăng nhập (`POST /api/auth/login`) và lấy hồ sơ hiện tại (`GET /api/auth/me`).
-2. **`System`**: Kiểm tra kết nối SQL Server (`GET /api/health`), danh mục dùng chung (`GET /api/meta`) và kiểm thử mã lỗi (`GET /api/test-http-error/:code`).
-3. **`Documents`**: Quản lý tài liệu PDF — Tìm kiếm (`GET /api/documents`), Tải lên có hash SHA-256 (`POST /api/documents/upload`), Xem chi tiết, Cập nhật, Xóa.
-4. **`Files`**: Stream xem inline hoặc tải về tệp PDF đính kèm (`GET /api/files/{fileId}/view`).
-5. **`Logs`**: Tra cứu 200 bản ghi nhật ký kiểm toán an ninh (`GET /api/access-logs`).
-6. **`Admin` (Cần Clearance $\ge$ 4)**: 
-   - Thống kê KPI tổng quan (`/api/admin/stats`).
-   - CRUD Người dùng & Cấp mật khẩu (`/api/admin/users`, `/api/admin/users/{id}/credentials`).
-   - Gán & Quản lý Vai trò (`/api/admin/roles`, `/api/admin/users/{id}/roles`).
-   - Khai báo & Phân quyền (`/api/admin/permissions`, `/api/admin/roles/{id}/permissions`).
-   - CRUD Đơn vị, Loại văn bản & 5 Mức bảo mật (`/api/admin/units`, `/api/admin/document-types`, `/api/admin/security-levels`).
-   - Dọn dẹp nhật ký an ninh (`/api/admin/access-logs/clear`).
-
-### Hướng Dẫn Thử Nghiệm API Trên Swagger UI
-1. Mở trình duyệt truy cập: [http://localhost:8000/api-docs](http://localhost:8000/api-docs).
-2. Nhấn nút **Authorize 🔓** ở góc trên bên phải.
-3. Nhập giá trị xác thực:
-   - `UserHeader` (`X-User-Id`): ví dụ `USR-004` (Quản trị viên) hoặc `USR-001`.
-   - `ClearanceHeader` (`X-Clearance`): ví dụ `5` (Mức Tuyệt Mật) hoặc `4` (Tối Mật).
-4. Nhấn **Authorize** và bắt đầu bấm **Try it out** trực tiếp trên từng endpoint.
+1. **`Auth`**: Đăng nhập (`POST /api/auth/login`), hồ sơ cá nhân (`GET /api/auth/me`), xác thực vân tay (`POST /api/auth/fingerprint/verify`).
+2. **`AI`**: Hỏi đáp RAG tác chiến (`POST /api/ai/query`), biên soạn giáo trình học tập (`POST /api/ai/study-book`), kiểm tra trạng thái AI (`GET /api/ai/health`), nạp văn kiện vào vector store (`POST /api/ai/ingest`).
+3. **`Fingerprint` (Admin)**: Đăng ký mẫu vân tay quân nhân (`POST /api/admin/fingerprint/enroll/{userId}`), danh sách máy quét online (`GET /api/admin/fingerprint/agents`), xóa vân tay (`DELETE /api/admin/fingerprint/users/{userId}`).
+4. **`Documents`**: Quản lý tài liệu PDF — Tìm kiếm có kiểm soát độ mật (`GET /api/documents`), Tải lên hash SHA-256 (`POST /api/documents/upload`), Xem chi tiết, Sửa, Xóa.
+5. **`Files`**: Stream xem inline hoặc tải về tệp PDF đính kèm (`GET /api/files/{fileId}/view`, yêu cầu `X-Fingerprint-Token` nếu độ mật $\ge$ 4).
+6. **`Admin` (Cần Clearance $\ge$ 4)**: KPI thống kê (`/api/admin/stats`), CRUD Quân nhân, Phân quyền vai trò, CRUD Đơn vị, Loại văn bản, Mức bảo mật và Dọn dẹp Audit Log.
 
 ---
 
 ## 🔐 Tài Khoản Kiểm Thử Mẫu (Mật khẩu: `123456789`)
 
-* **Quản trị viên / Thủ trưởng (Cấp 5 - Tuyệt Mật):** `USR-004`
-* **Trưởng phòng / Chỉ huy (Cấp 4 - Tối Mật):** `USR-001`
-* **Cán bộ / Sĩ quan (Cấp 3 - Mật):** `USR-002`
+* **Quản trị viên / Thủ trưởng (Cấp 5 - Tuyệt Mật):** `USR-004` (Đại tá - Chính ủy)
+* **Trưởng phòng / Chỉ huy (Cấp 4 - Tối Mật):** `USR-001` (Đại tá - Trưởng phòng Tham mưu)
+* **Cán bộ / Sĩ quan (Cấp 3 - Mật):** `USR-002` (Thiếu tá - Thư ký)
 
-
+---
+*Bản quyền tài liệu thuộc Bộ Tư Lệnh Quân Khu 7 — QK7 DataHub.*

@@ -1,0 +1,1 @@
+# boxchat core package

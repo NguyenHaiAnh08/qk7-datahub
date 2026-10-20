@@ -54,4 +54,18 @@ export const userService = {
       body: JSON.stringify(data),
     });
   },
+
+  assignRole: async (userId: string, roleId: string): Promise<{ success: boolean }> => {
+    return http<{ success: boolean }>(API_ENDPOINTS.ADMIN.USER_ROLES(userId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role_id: roleId }),
+    });
+  },
+
+  revokeRole: async (userId: string, roleId: string): Promise<{ success: boolean }> => {
+    return http<{ success: boolean }>(API_ENDPOINTS.ADMIN.USER_ROLE_DETAIL(userId, roleId), {
+      method: 'DELETE',
+    });
+  },
 };

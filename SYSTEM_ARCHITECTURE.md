@@ -177,7 +177,7 @@ qk7-datahub/
 │   └── local_storage/                      # KHO VECTOR DATABASE CỤC BỘ (Qdrant Data)
 │       └── qdrant_data/                    # Dữ liệu vector embedding lưu trữ offline bảo mật
 │
-├── fingerprint-service/                    # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001 - Python)
+├── fingerprint/                            # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001 - Python)
 │   ├── agent.py                            # Local HTTP Server (:9001) & WebSocket Client kết nối Gateway
 │   ├── zk_service.py                       # CTypes wrapper kết nối trực tiếp SDK ZKTeco ZK9500 (libzkfp.dll)
 │   ├── libzkfp.dll                         # Thư viện liên kết động C++ điều khiển cảm biến quang học ZKTeco
@@ -517,7 +517,7 @@ Nhằm đạt tiêu chuẩn sẵn sàng cao (High Availability), Express Gateway
 - **Thư viện lõi:** Tích hợp trực tiếp file nhị phân `libzkfp.dll` qua module `ctypes` trong Python, thuật toán đối sánh mẫu đặc trưng vân tay quân sự **ZKFinger 10.0**.
 
 ### 8.2. Mô Hình Phân Phối Hardware Agent (:9001)
-- Trên mỗi máy trạm làm việc của quân nhân được cài đặt **Fingerprint Local Agent** (`fingerprint-service/agent.py`).
+- Trên mỗi máy trạm làm việc của quân nhân được cài đặt **Fingerprint Local Agent** (`fingerprint/agent.py`).
 - Agent chạy nền với 2 vai trò:
   1. **HTTP Micro-Server nội bộ (`http://127.0.0.1:9001`):** Cung cấp `GET /device-id` để trình duyệt nhận diện máy quét và `GET /enroll-status` để lấy tiến trình quét 3 lần theo thời gian thực.
   2. **WebSocket Client (`ws://localhost:8000/ws/fingerprint`):** Duy trì kênh kết nối an toàn 2 chiều với Backend Gateway, chờ nhận các lệnh `scan_request` hoặc `enroll_request`.
@@ -576,7 +576,7 @@ cd boxchat
 python main.py
 
 # 4. Khởi động Local Hardware Fingerprint Agent (:9001)
-cd fingerprint-service
+cd fingerprint
 python agent.py
 ```
 

@@ -62,7 +62,7 @@ export const UserCredentialsModal: React.FC<UserCredentialsModalProps> = ({
     try {
       await usersApi.updateCredentials(userId, {
         username: username.trim(),
-        password: password ? password : null,
+        ...(password.trim() ? { password: password.trim() } : {}),
       });
       onToast(`Cập nhật thông tin đăng nhập cho ${userId} thành công!`, 'success');
       onSuccess();

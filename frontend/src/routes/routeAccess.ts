@@ -33,11 +33,11 @@ export const ROUTE_ACCESS: Record<string, RouteAccessConfig> = {
     description: 'Cổng tra cứu tài liệu quân sự',
   },
 
-  // Protected - Bàn làm việc văn thư
+  // Protected - Trung tâm văn bản
   [ROUTE_PATHS.DESK]: {
     path: ROUTE_PATHS.DESK,
     requiresAuth: true,
-    description: 'Bàn làm việc văn thư và số hóa văn bản',
+    description: 'Trung tâm văn bản và số hóa tài liệu',
   },
 
   // Protected - Quản trị trung tâm (BẮT BUỘC ROLE ADMIN)

@@ -115,14 +115,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   setDuplicateInfo(null);
   setAllowOverride(false);
 
-  Promise.all([
-    documentService.parseDocument(selectedFile).catch((err) => {
-      console.warn('[parse PDF]', err);
-      return { success: false, error: err.message } as ParseDocumentResult;
-    }),
-    documentService.checkDuplicate(selectedFile).catch(() => null),
-  ])
-    .then(([parseRes, dupRes]) => {
+  // ✅ CHỈ 1 API call — parse đã trả về cả duplicate_check (SHA256 + code)
+  documentService.parseDocument(selectedFile)
+    .then((parseRes) => {
       if (parseRes.success && parseRes.parsed) {
         const p = parseRes.parsed;
         if (p.document_code) setCode(p.document_code);
@@ -141,7 +136,15 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       } else if (parseRes.error) {
         setParseError(parseRes.error);
       }
-      if (dupRes) setDuplicateInfo(dupRes);
+
+      // ✅ Map duplicate_check từ parse response → state duplicateInfo
+      if (parseRes.duplicate_check) {
+        setDuplicateInfo(parseRes.duplicate_check);
+      }
+    })
+    .catch((err) => {
+      console.warn('[parse PDF]', err);
+      setParseError(err?.message || 'Không thể đọc PDF. Vui lòng nhập tay.');
     })
     .finally(() => setParsing(false));
   // eslint-disable-next-line

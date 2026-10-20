@@ -33,10 +33,7 @@ export interface ParseDocumentResult {
     file_size?: number;
     sha256?: string;
     error?: string;
-      duplicate_check?: {
-    is_duplicate: boolean;
-    matches: DuplicateMatchDoc[];
-  };
+    duplicate_check?: CheckDuplicateResult;
 }
 
 /**

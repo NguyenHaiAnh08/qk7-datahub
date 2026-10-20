@@ -35,12 +35,11 @@ export class HttpError extends Error {
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  const userId = sessionStorage.getItem('qk7_username') || 'GUEST';
-  const clearance = sessionStorage.getItem('qk7_level') || '1';
-  return {
-    'X-User-Id': userId,
-    'X-Clearance': String(clearance),
-  };
+  const token = sessionStorage.getItem('qk7_token');
+  if (token) {
+    return { 'Authorization': `Bearer ${token}` };
+  }
+  return {};
 }
 
 export async function http<T>(url: string, options: HttpOptions = {}): Promise<T> {

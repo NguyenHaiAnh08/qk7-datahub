@@ -3,11 +3,8 @@ import { API_ENDPOINTS } from '../constants/apiEndpoints';
 
 export const fileService = {
   getViewUrl: (fileId: string, download: '0' | '1' | boolean = '0'): string => {
-    const userId = sessionStorage.getItem('qk7_username') || 'GUEST';
-    const clearance = sessionStorage.getItem('qk7_level') || '1';
-    const base = API_ENDPOINTS.FILES.VIEW(fileId, download);
-    const sep = base.includes('?') ? '&' : '?';
-    return `${base}${sep}uid=${encodeURIComponent(userId)}&clr=${encodeURIComponent(clearance)}`;
+    // ✅ Chỉ trả URL gốc — auth qua header khi fetch
+    return API_ENDPOINTS.FILES.VIEW(fileId, download);
   },
 
   fetchFileBlob: async (
@@ -50,9 +47,7 @@ export const fileService = {
     window.document.body.appendChild(a);
     a.click();
     window.document.body.removeChild(a);
-    setTimeout(() => {
-      URL.revokeObjectURL(blobUrl);
-    }, 1500);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
   },
 };
 

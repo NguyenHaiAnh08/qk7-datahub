@@ -20,7 +20,7 @@ start "Frontend - npm run dev" cmd /k "cd /d "%ROOT%frontend" && npm run dev"
 
 REM --- 3. Fingerprint Service (Python) ---
 echo [3/3] Khoi dong Fingerprint Service...
-start "Fingerprint Service - python agent.py" cmd /k "cd /d "%ROOT%fingerprint-service" && python agent.py"
+start "Fingerprint Service - python agent.py" cmd /k "cd /d "%ROOT%fingerprint" && python agent.py"
 
 echo.
 echo ========================================

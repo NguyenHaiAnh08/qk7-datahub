@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Loader2,
   CheckCircle2,
   AlertCircle,
   X,
@@ -22,6 +21,9 @@ export interface FingerprintScanModalProps {
 
 type Phase = 'scanning' | 'success' | 'error';
 
+// ⚠️ Giới hạn auto-retry để tránh spam khi user không đặt tay
+const MAX_AUTO_RETRY = 2;
+
 export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   open,
   fileId,
@@ -34,10 +36,15 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   const [needsEnroll, setNeedsEnroll] = useState(false);
   const [progress, setProgress] = useState(0);
   const [attempt, setAttempt] = useState(0);
-  const inFlightRef = React.useRef(false);
-  const autoRetryTimerRef = React.useRef<any>(null);
+  const [retryExhausted, setRetryExhausted] = useState(false);
 
-  // Progressive fill animation: 0% until finger is verified, then 100%
+  const inFlightRef = useRef(false);
+  const autoRetryTimerRef = useRef<any>(null);
+  const abortRef = useRef<AbortController | null>(null);      // ⚠️ MỚI
+  const retryCountRef = useRef(0);                             // ⚠️ MỚI
+  const mountedRef = useRef(true);
+
+  // Progressive fill animation
   useEffect(() => {
     if (phase === 'success') {
       setProgress(100);
@@ -46,9 +53,13 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     }
   }, [phase]);
 
-  // Dọn dẹp timer khi component unmount
+  // Cleanup khi unmount — abort mọi request + timer
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
+      abortRef.current?.abort();                              // ⚠️ MỚI
+      abortRef.current = null;
       if (autoRetryTimerRef.current) {
         clearTimeout(autoRetryTimerRef.current);
         autoRetryTimerRef.current = null;
@@ -56,9 +67,13 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     };
   }, []);
 
+  // Trigger scan khi mở modal hoặc retry
   useEffect(() => {
     if (!open) {
       inFlightRef.current = false;
+      retryCountRef.current = 0;
+      abortRef.current?.abort();                              // ⚠️ MỚI
+      abortRef.current = null;
       if (autoRetryTimerRef.current) {
         clearTimeout(autoRetryTimerRef.current);
         autoRetryTimerRef.current = null;
@@ -66,29 +81,43 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       return;
     }
     if (inFlightRef.current) return;
+
     inFlightRef.current = true;
     setPhase('scanning');
     setError('');
     setScore(null);
     setNeedsEnroll(false);
+    setRetryExhausted(false);
     triggerScan();
     // eslint-disable-next-line
   }, [open, fileId, attempt]);
 
   const triggerScan = async () => {
+    // ⚠️ Hủy request cũ (nếu có) trước khi bắt đầu request mới
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const signal = controller.signal;
+
     try {
       let deviceId: string;
       try {
         deviceId = await fingerprintService.getLocalDeviceId(2000);
       } catch {
-        setError(
-          'Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.'
-        );
+        // ⚠️ Nếu user đã đóng modal trong 2s lấy device-id → silent exit
+        if (signal.aborted || !mountedRef.current) return;
+        setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
         setPhase('error');
         return;
       }
 
-      const res = await fingerprintService.verify(fileId, deviceId);
+      if (signal.aborted || !mountedRef.current) return;
+
+      // ⚠️ Truyền signal — khi modal đóng, request này bị abort NGAY
+      const res = await fingerprintService.verify(fileId, deviceId, signal);
+
+      // ⚠️ Nếu bị abort trong lúc chờ verify → im lặng thoát
+      if (signal.aborted || !mountedRef.current) return;
 
       if (!res.required) {
         setPhase('success');
@@ -102,48 +131,66 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       setScore(res.score ?? null);
       setProgress(100);
       setPhase('success');
-      setTimeout(() => onSuccess(res.fingerprint_token!), 900);
+      retryCountRef.current = 0;
+
+      // ⚠️ Delay 900ms rồi mới mở file — nhưng phải check modal còn mở không
+      setTimeout(() => {
+        if (mountedRef.current && !signal.aborted) {
+          onSuccess(res.fingerprint_token!);
+        }
+      }, 900);
     } catch (err: any) {
-  const msg = err.message || 'Xác thực thất bại';
-  const isAgentOffline = Boolean(err.data?.agent_offline);
-  const isNeedsEnroll = Boolean(err.data?.needs_enroll);
-  const isCancelled = Boolean(err.data?.cancelled);
-
-    // CANCELLED: request bị request mới thay thế → KHÔNG hiện lỗi, tự retry nhanh
-    if (isCancelled) {
-      console.log('[FingerprintScan] Request bị cancel bởi job mới, retry sau 200ms');
-      if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
-      autoRetryTimerRef.current = setTimeout(() => {
-        handleRetry();
-      }, 200);
-      return;
-    }
-
-    if (isAgentOffline) {
-      setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
-      setPhase('error');
-    } else if (isNeedsEnroll) {
-      setError('Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên để đăng ký.');
-      setNeedsEnroll(true);
-      setPhase('error');
-    } else {
-      const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
-      setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
-      setPhase('error');
-
-      if (autoRetryTimerRef.current) {
-        clearTimeout(autoRetryTimerRef.current);
+      // ⚠️ QUAN TRỌNG: AbortError = user đã đóng modal
+      // → silent exit, KHÔNG setState, KHÔNG retry, KHÔNG hiện lỗi
+      if (err?.name === 'AbortError' || signal.aborted || !mountedRef.current) {
+        return;
       }
-      autoRetryTimerRef.current = setTimeout(() => {
-        handleRetry();
-      }, 1200);
-    }
-  } finally {
+
+      const msg = err.message || 'Xác thực thất bại';
+      const isAgentOffline = Boolean(err.data?.agent_offline);
+      const isNeedsEnroll = Boolean(err.data?.needs_enroll);
+      const isCancelled = Boolean(err.data?.cancelled);
+
+      if (isCancelled) {
+        if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
+        autoRetryTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) handleRetryInternal();
+        }, 200);
+        return;
+      }
+
+      if (isAgentOffline) {
+        setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
+        setPhase('error');
+      } else if (isNeedsEnroll) {
+        setError('Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên để đăng ký.');
+        setNeedsEnroll(true);
+        setPhase('error');
+      } else {
+        const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
+        setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
+        setPhase('error');
+
+        // ⚠️ Auto-retry có GIỚI HẠN (2 lần), tránh loop vô hạn
+        if (retryCountRef.current < MAX_AUTO_RETRY) {
+          retryCountRef.current += 1;
+          if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
+          const delay = 1200 * retryCountRef.current; // 1.2s, 2.4s
+          autoRetryTimerRef.current = setTimeout(() => {
+            if (mountedRef.current) handleRetryInternal();
+          }, delay);
+        } else {
+          setRetryExhausted(true);
+        }
+      }
+    } finally {
       inFlightRef.current = false;
     }
   };
 
-  const handleRetry = () => {
+  const handleRetryInternal = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     if (autoRetryTimerRef.current) {
       clearTimeout(autoRetryTimerRef.current);
       autoRetryTimerRef.current = null;
@@ -153,12 +200,22 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     setAttempt((n) => n + 1);
   };
 
+  const handleRetry = () => {
+    retryCountRef.current = 0;
+    setRetryExhausted(false);
+    handleRetryInternal();
+  };
+
   const handleCancel = () => {
+    // ⚠️ BƯỚC QUAN TRỌNG NHẤT: abort request đang bay TRƯỚC KHI đóng modal
+    abortRef.current?.abort();
+    abortRef.current = null;
     if (autoRetryTimerRef.current) {
       clearTimeout(autoRetryTimerRef.current);
       autoRetryTimerRef.current = null;
     }
     inFlightRef.current = false;
+    retryCountRef.current = 0;
     onCancel();
   };
 
@@ -196,7 +253,6 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
           </div>
 
           <div className="p-6 flex flex-col items-center text-center min-h-[310px] justify-center">
-            {/* Apple Touch ID Fingerprint Graphic */}
             <TouchIDFingerprint
               phase={phase}
               progress={progress}
@@ -244,11 +300,20 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                 <p className="text-xs text-rose-600 dark:text-rose-400 max-w-xs">
                   {error}
                 </p>
+
+                {/* ⚠️ Đổi text theo trạng thái retry */}
                 {!needsEnroll && !error.includes('Chưa kết nối') && (
-                  <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Đang tự động quét lại... Đặt ngón tay lên cảm biến</span>
-                  </div>
+                  retryExhausted ? (
+                    <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>Đã hết lượt tự động. Vui lòng bấm "Quét ngay" để thử lại.</span>
+                    </div>
+                  ) : (
+                    <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang tự động quét lại... Đặt ngón tay lên cảm biến</span>
+                    </div>
+                  )
                 )}
               </>
             )}

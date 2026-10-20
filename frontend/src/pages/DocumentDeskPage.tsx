@@ -16,6 +16,7 @@ const ITEMS_PER_PAGE = 8;
 
 export const DocumentDeskPage: React.FC = () => {
   const { user } = useAuth();
+  const canUpload = (user?.roles || []).includes('ROL-01') || (user?.roles || []).includes('ROL-04');
 
   // Metadata
   const [meta, setMeta] = useState<MetaData>({ types: [], units: [], levels: [] });
@@ -183,6 +184,7 @@ export const DocumentDeskPage: React.FC = () => {
             </p>
           </div>
 
+           {canUpload && (
           <button
             onClick={() => {
               setEditingDoc(null);
@@ -193,6 +195,7 @@ export const DocumentDeskPage: React.FC = () => {
             <Plus className="w-4 h-4" />
             <span>Tiếp Nhận Văn Bản Mới</span>
           </button>
+          )}
         </div>
 
         {/* Filters */}

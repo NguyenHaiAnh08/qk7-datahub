@@ -455,8 +455,8 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
 
         // TRƯỜNG HỢP 2: NGƯỜI DÙNG ĐÃ CÓ VAI TRÒ
         // -> Hiện nút "Gỡ vai trò" và bộ chọn nhanh để đổi sang vai trò khác
-        const isMultiRole = record.roles!.length > 1;
-        const primaryRoleId = record.roles![0];
+        const isMultiRole = (record.roles?.length || 0) > 1;
+        const primaryRoleId = record.roles?.[0] || '';
         const primaryRoleName =
           (record.role_names && record.role_names[0]) ||
           roles.find((r) => r.role_id === primaryRoleId)?.name ||
@@ -472,7 +472,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
                 value={undefined}
                 placeholder="Đổi vai trò..."
                 style={{ width: 120 }}
-                onChange={(newRoleId) => handleSwitchRole(record.user_id, primaryRoleId, newRoleId)}
+                onChange={(newRoleId) => newRoleId && handleSwitchRole(record.user_id, primaryRoleId, newRoleId)}
                 options={roles
                   .filter((r) => !record.roles!.includes(r.role_id))
                   .map((r) => ({

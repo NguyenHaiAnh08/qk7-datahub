@@ -128,18 +128,19 @@ class FingerprintAgent:
         self.device_id = device_id
         self.running = True
         self.reconnect_delay = 3
+        self.busy = False
+        self._cancel_event = threading.Event()
         self.enroll_step = 0
         self.enroll_total = 3
         self.enroll_state = "idle"
 
     def get_enroll_status(self):
         return {
-            "enrolling": bool(self.busy and self.enroll_state != "idle"),
+            "enrolling": bool(self.busy and self.enroll_state not in ("idle", "completed", "error", "timeout", "mismatch", "cancelled")),
             "step": self.enroll_step,
             "total": self.enroll_total,
             "state": self.enroll_state,
         }
-        self._cancel_event = threading.Event()
 
     async def run(self):
         ok, msg = self.svc.load_sdk()
@@ -178,7 +179,6 @@ class FingerprintAgent:
                 if t == "ping":
                     await ws.send(json.dumps({"type": "pong"}))
                 elif t == "scan_request":
-                    # Cancel job cũ (nếu có)
                     self._cancel_event.set()
                     new_event = threading.Event()
                     self._cancel_event = new_event
@@ -244,14 +244,6 @@ class FingerprintAgent:
         user_id = job.get("user_id")
         step_timeout = max(10, int(job.get("timeout_seconds", 60)) // 3)
 
-        if self.busy:
-            print(f"[Agent] ⚠️ Bỏ qua enroll {job_id} vì thiết bị đang bận.")
-            await ws.send(json.dumps({
-                "type": "enroll_result", "job_id": job_id,
-                "success": False, "error": "BUSY",
-            }))
-            return
-
         self.busy = True
         self.enroll_step = 0
         self.enroll_total = 3
@@ -263,6 +255,19 @@ class FingerprintAgent:
             for i in range(3):
                 self.enroll_step = i
                 self.enroll_state = f"waiting_touch_{i+1}"
+
+                if cancel_event.is_set():
+                    print(f"[Agent] ⏹️ Enroll {job_id} bị hủy trước lần {i+1}.")
+                    self.enroll_state = "cancelled"
+                    try:
+                        await ws.send(json.dumps({
+                            "type": "enroll_result", "job_id": job_id,
+                            "success": False, "error": "CANCELLED",
+                        }))
+                    except Exception:
+                        pass
+                    return
+
                 print(f"[Agent] 👉 Lần {i+1}/3 — Đặt tay...")
                 t = await asyncio.to_thread(
                     self.svc.wait_for_finger, step_timeout, cancel_event
@@ -270,6 +275,7 @@ class FingerprintAgent:
 
                 if cancel_event.is_set():
                     print(f"[Agent] ⏹️ Enroll {job_id} bị hủy sau lần {i+1}.")
+                    self.enroll_state = "cancelled"
                     try:
                         await ws.send(json.dumps({
                             "type": "enroll_result", "job_id": job_id,
@@ -283,7 +289,7 @@ class FingerprintAgent:
                     self.enroll_state = "timeout"
                     await ws.send(json.dumps({
                         "type": "enroll_result", "job_id": job_id,
-                        "success": False, "error": f"Quét vần tay không thành công lần {i+1}/3",
+                        "success": False, "error": f"Lần {i+1} quét không thành công sau {step_timeout}s. Vui lòng thử lại.",
                     }))
                     return
 
@@ -314,6 +320,7 @@ class FingerprintAgent:
 
             if cancel_event.is_set():
                 print(f"[Agent] ⏹️ Enroll {job_id} bị hủy trước khi merge.")
+                self.enroll_state = "cancelled"
                 return
 
             from zk_service import to_csharp_byte_array
@@ -341,6 +348,8 @@ class FingerprintAgent:
                 }))
             except Exception:
                 pass
+        finally:
+            self.busy = False
 
 
 def main():

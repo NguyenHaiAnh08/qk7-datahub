@@ -21,7 +21,10 @@ const {
   isAgentOnline, listAgents,
 } = require('./src/fingerprint-ws');
 
-const { getUserUnitScope, getSubtreeUnits, getRootUnitId, resolveUserUnitId } = require('./src/unit-scope');
+const {
+  getUserUnitScope, getSubtreeUnits, getRootUnitId,
+  resolveUserUnitId, resolveUserRoles,
+} = require('./src/unit-scope');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -529,6 +532,14 @@ app.post('/api/auth/fingerprint/verify', requireAuth, async (req, res) => {
     }
 
     if (!scanResult.match) {
+      // CANCELLED = job bị hủy bởi request mới (không phải lỗi user)
+      if (scanResult.error === 'CANCELLED') {
+        return res.status(409).json({
+          error: 'Yêu cầu đã bị hủy bởi thao tác mới. Vui lòng thử lại.',
+          cancelled: true,
+        });
+      }
+
       const note = scanResult.error ? `Lỗi: ${scanResult.error}` : `Không khớp (score=${scanResult.score})`;
       await writeAccessLog({
         userId: req.user.user_id, fileId: file_id,
@@ -537,10 +548,10 @@ app.post('/api/auth/fingerprint/verify', requireAuth, async (req, res) => {
       return res.status(403).json({
         error: scanResult.error === 'TIMEOUT'
           ? 'Hết thời gian chờ quét vân tay.'
-          : 'Vân tay không khớp. Vui lòng thử lại.',
+          : `Vân tay không khớp (score=${scanResult.score}). Vui lòng thử lại.`,
         score: scanResult.score,
       });
-    }
+    } 
 
     const fpToken = jwt.sign(
       { user_id: req.user.user_id, file_id, purpose: 'file_access' },
@@ -712,6 +723,15 @@ app.get('/api/documents', async (req, res) => {
       WHERE d.security_level_id <= @clearance
     `;
     r.input('clearance', sql.Int, req.user.clearance_level_id);
+        // ─── Search tổng hợp: q (tìm trong code + title + summary) ───
+    if (req.query.q) {
+      query += ` AND (
+        d.document_code LIKE '%' + @q + '%'
+        OR d.title LIKE N'%' + @q + N'%'
+        OR d.summary LIKE N'%' + @q + N'%'
+      )`;
+      r.input('q', sql.NVarChar(500), req.query.q);
+    }
     if (req.query.code) { query += ` AND d.document_code LIKE '%' + @code + '%'`; r.input('code', sql.NVarChar(100), req.query.code); }
     if (req.query.title) { query += ` AND d.title LIKE N'%' + @title + N'%'`; r.input('title', sql.NVarChar(500), req.query.title); }
     if (req.query.type) { query += ` AND d.doc_type_id = @type`; r.input('type', sql.VarChar(20), req.query.type); }
@@ -796,7 +816,15 @@ app.get('/api/documents/my-unit', requireAuth, async (req, res) => {
         AND d.issuing_unit_id IN (${unitParams})
     `;
     r.input('clearance', sql.Int, req.user.clearance_level_id);
-
+        // ─── Search tổng hợp: q (tìm trong code + title + summary) ───
+    if (req.query.q) {
+      query += ` AND (
+        d.document_code LIKE '%' + @q + '%'
+        OR d.title LIKE N'%' + @q + N'%'
+        OR d.summary LIKE N'%' + @q + N'%'
+      )`;
+      r.input('q', sql.NVarChar(500), req.query.q);
+    }
     if (req.query.code) { query += ` AND d.document_code LIKE '%' + @code + '%'`; r.input('code', sql.NVarChar(100), req.query.code); }
     if (req.query.title) { query += ` AND d.title LIKE N'%' + @title + N'%'`; r.input('title', sql.NVarChar(500), req.query.title); }
     if (req.query.type) { query += ` AND d.doc_type_id = @type`; r.input('type', sql.VarChar(20), req.query.type); }
@@ -918,7 +946,8 @@ app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req
     if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
 
     // ─── Chỉ Admin + Thư ký được upload ───
-    const roles = req.user.roles || [];
+    // Query roles từ DB (vì legacy auth không set req.user.roles)
+    const roles = await resolveUserRoles(req.user);
     const canUpload = roles.includes('ROL-01') || roles.includes('ROL-04');
     if (!canUpload) {
       return res.status(403).json({

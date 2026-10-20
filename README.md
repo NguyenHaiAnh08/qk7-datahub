@@ -12,7 +12,7 @@ Toàn bộ sơ đồ kiến trúc hệ thống, sơ đồ cấu trúc mã nguồ
 
 Nội dung tài liệu bao gồm:
 1. **Sơ Đồ Kiến Trúc Hệ Thống (Mermaid):** Mô hình 5 tầng: Client & Phần cứng ZK9500, Presentation React 18 SPA, Gateway Express 5 & WebSocket, Microservice AI FastAPI (:8001) và CSDL SQL Server / Qdrant Vector Storage.
-2. **Sơ Đồ Cấu Trúc Mã Nguồn:** Cây thư mục chi tiết toàn bộ dự án (`backend/`, `frontend/`, `boxchat/`, `fingerprint-service/`).
+2. **Sơ Đồ Cấu Trúc Mã Nguồn:** Cây thư mục chi tiết toàn bộ dự án (`backend/`, `frontend/`, `boxchat/`, `fingerprint/`).
 3. **Mô Hình Phân Quyền & Bảo Mật Đa Tầng:** 5 cấp độ mật quân sự, xác thực sinh trắc học 2FA và lọc ngữ cảnh an toàn trong AI RAG.
 4. **Sơ Đồ Luồng Dữ Liệu Nghiệp Vụ:** Đăng nhập, tải lên văn bản, tra cứu độ mật, xác thực vân tay xem tài liệu Mật/Tuyệt Mật, đăng ký mẫu vân tay 3 bước và hỏi đáp tác chiến AI kèm Smart SQL Fallback.
 5. **Sơ Đồ Cơ Sở Dữ Liệu (Database ERD):** Ràng buộc quan hệ giữa các bảng `USER`, `USER_FINGERPRINT`, `SECURITY_LEVEL`, `UNIT`, `DOCUMENT`, `DOCUMENT_TYPE`, `ACCESS_LOG`, `ROLE`, `PERMISSION`.
@@ -55,7 +55,7 @@ qk7-datahub/
 │   ├── local_storage/                      # Kho lưu trữ vector embedding nội bộ bảo mật
 │   └── requirements.txt                    # Dependencies: fastapi, uvicorn, qdrant-client, langchain...
 │
-├── fingerprint-service/                    # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001)
+├── fingerprint/                            # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001)
 │   ├── agent.py                            # Local HTTP Server (:9001) & WebSocket Client
 │   ├── zk_service.py                       # CTypes wrapper SDK ZKTeco ZK9500 (libzkfp.dll)
 │   ├── libzkfp.dll                         # Thư viện DLL điều khiển cảm biến quang học ZKTeco
@@ -136,7 +136,7 @@ npm run frontend:install
 cd boxchat && pip install -r requirements.txt
 
 # Cài đặt Local Fingerprint Agent
-cd ../fingerprint-service && pip install -r requirements.txt
+cd ../fingerprint && pip install -r requirements.txt
 ```
 
 ### 2. Chạy toàn bộ 4 dịch vụ hệ thống
@@ -167,7 +167,7 @@ Mở 4 cửa sổ Terminal riêng biệt:
 
 * **Terminal 4: Local Fingerprint Hardware Agent (:9001)**
   ```bash
-  cd fingerprint-service
+  cd fingerprint
   python agent.py
   ```
   * Trạm kiểm soát vân tay: [http://127.0.0.1:9001/device-id](http://127.0.0.1:9001/device-id)

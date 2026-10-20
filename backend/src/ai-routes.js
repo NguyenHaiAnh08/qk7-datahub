@@ -100,11 +100,14 @@ router.get('/health', async (req, res) => {
 });
 
 // ============================================================
-// 2. CHAT VỚI TRỢ LÝ AI (POST /api/ai/chat)
+// 2. CHAT VỚI TRỢ LÝ AI (POST /api/ai/chat & /api/ai/query)
 // ============================================================
-router.post('/chat', async (req, res) => {
+router.post(['/chat', '/query'], async (req, res) => {
     const { query, file_id } = req.body;
-    const { userId, clearance, ip } = req.aiContext;
+    const bodyClearance = req.body.user_clearance ? parseInt(req.body.user_clearance, 10) : null;
+    const userId = req.body.user_id || req.aiContext.userId;
+    const clearance = !isNaN(bodyClearance) && bodyClearance ? Math.max(1, Math.min(5, bodyClearance)) : req.aiContext.clearance;
+    const ip = req.aiContext.ip;
 
     if (!query || !query.trim()) {
         return res.status(400).json({ error: 'Thiếu nội dung câu hỏi' });
@@ -216,12 +219,14 @@ router.post('/chat', async (req, res) => {
             snippet: (d.summary || d.title || '').slice(0, 150) + '...'
         }));
 
+        const thinkContent = `[Smart SQL Fallback] Microservice 8001 đang chờ; đã truy vấn trực tiếp bảng DOCUMENT với ${docs.length} kết quả hợp lệ.`;
         return res.json({
             answer: answerText,
             citations,
+            think: thinkContent,
             reasoning: {
                 mem: `[Smart SQL Fallback] Cán bộ: ${userId} | Clearance: Cấp ${clearance}.`,
-                think: `[Smart SQL Fallback] Microservice 8001 đang chờ; đã truy vấn trực tiếp bảng DOCUMENT với ${docs.length} kết quả hợp lệ.`,
+                think: thinkContent,
                 tool_call: `[Database Grounding] Trích xuất metadata văn bản từ SQL Server.`
             }
         });

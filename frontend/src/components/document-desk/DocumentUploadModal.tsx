@@ -468,60 +468,59 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   style={{ position: 'relative', width: '100%' }}
                 >
                   <TreeSelect
-                    value={unitId || undefined}
-                    onChange={(val) => setUnitId(val || '')}
-                    treeData={unitTree}
-                    placeholder="Chọn đơn vị ban hành"
-                    allowClear
-                    treeExpandedKeys={treeExpandedKeys}
-                    onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
-                    onOpenChange={(visible) => {
-                      if (visible && rootUnitKeys.length > 0) {
-                        setTreeExpandedKeys(rootUnitKeys);
-                      }
-                    }}
-                    treeLine={{ showLeafIcon: false }}
-                    switcherIcon={(nodeProps: any) => {
-                      if (nodeProps.isLeaf) return null;
-                      const isExpanded = Boolean(nodeProps.expanded);
-                      return (
-                        <span
-                          className={`qk7-tree-switcher-btn ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
-                          title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
-                        >
-                          {isExpanded ? (
-                            <Minus className="w-3 h-3 stroke-[2.5]" />
-                          ) : (
-                            <Plus className="w-3 h-3 stroke-[2.5]" />
-                          )}
-                        </span>
-                      );
-                    }}
-                    treeNodeLabelProp="name"
-                    treeNodeFilterProp="name"
-                    filterTreeNode={(input: string, node: any) =>
-                      String(node.name || '').toLowerCase().includes(input.toLowerCase().trim())
+                  value={unitId || undefined}
+                  onChange={(val) => setUnitId(val || '')}
+                  treeData={unitTree}
+                  placeholder="Chọn đơn vị ban hành"
+                  allowClear
+                  treeExpandedKeys={treeExpandedKeys}
+                  onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
+                  onOpenChange={(visible) => {
+                    if (visible && rootUnitKeys.length > 0) {
+                      setTreeExpandedKeys(rootUnitKeys);
                     }
-                    getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
-                    className="qk7-treeselect w-full"
-                    popupClassName="qk7-unit-treeselect-popup"
-                    style={{ width: '100%', height: 38 }}
-                    popupMatchSelectWidth={false}
-                    popupStyle={{
-                      minWidth: 280,
-                      maxWidth: 'min(520px, 90vw)',
-                      maxHeight: 380,
-                      overflowX: 'hidden',
-                      overflowY: 'auto',
-                    }}
-                    dropdownStyle={{
-                      minWidth: 280,
-                      maxWidth: 'min(520px, 90vw)',
-                      maxHeight: 380,
-                      overflowX: 'hidden',
-                      overflowY: 'auto',
-                    }}
-                  />
+                  }}
+                  treeLine={{ showLeafIcon: false }}
+                  switcherIcon={(nodeProps: any) => {
+                    if (nodeProps.isLeaf) return null;
+                    const isExpanded = Boolean(nodeProps.expanded);
+                    return (
+                      <span
+                        className={`qk7-tree-switcher-btn ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+                        title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                      >
+                        {isExpanded ? (
+                          <Minus className="w-3 h-3 stroke-[2.5]" />
+                        ) : (
+                          <Plus className="w-3 h-3 stroke-[2.5]" />
+                        )}
+                      </span>
+                    );
+                  }}
+                  treeNodeLabelProp="name"
+                  treeNodeFilterProp="name"
+                  filterTreeNode={(input: string, node: any) =>
+                    String(node.name || '').toLowerCase().includes(input.toLowerCase().trim())
+                  }
+                  getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
+                  className="qk7-treeselect w-full"
+                  // ⚠️ FIX: gộp popupClassName → classNames.popup.root
+                  classNames={{ popup: { root: 'qk7-unit-treeselect-popup' } }}
+                  style={{ width: '100%', height: 38 }}
+                  popupMatchSelectWidth={false}
+                  // ⚠️ FIX: gộp popupStyle + dropdownStyle → styles.popup.root
+                  styles={{
+                    popup: {
+                      root: {
+                        minWidth: 280,
+                        maxWidth: 'min(520px, 90vw)',
+                        maxHeight: 380,
+                        overflowX: 'hidden',
+                        overflowY: 'auto',
+                      },
+                    },
+                  }}
+                />
                 </div>
               </div>
 

@@ -12,11 +12,15 @@ const swaggerSpec = {
     title: 'QK7 DataHub API',
     version: '1.0.0',
     description:
-      'API Gateway nội bộ QK7 — Quản lý tài liệu PDF phân cấp bảo mật 5 mức.\n\n' +
-      '**Xác thực:** gửi `X-User-Id` và `X-Clearance` (trừ các endpoint công khai).\n\n' +
-      '**Tài khoản test:** `USR-001/123456789` (Admin, Cấp 5) · `USR-002/123456789` (Văn thư, Cấp 3) · `USR-003/123456789` (Thủ trưởng, Cấp 4)\n\n' +
-      '**Quy tắc tải file:** Tài liệu Cấp ≥ 3 chỉ được **xem** (`download=0`), không được tải về.\n\n' +
-      '**Quyền admin:** mọi endpoint `/api/admin/*` yêu cầu `X-Clearance >= 4`.',
+  'API Gateway nội bộ QK7 — Quản lý tài liệu PDF phân cấp bảo mật 5 mức.\n\n' +
+  '**Xác thực:** JWT Bearer Token (trừ các endpoint công khai: `/api/auth/login`, `/api/health`, `/api/meta`).\n\n' +
+  '**Quy trình đăng nhập:**\n' +
+  '1. Gọi `POST /api/auth/login` với `{ user_id, password }`\n' +
+  '2. Nhận về `token` (JWT, hết hạn 8h) + `user`\n' +
+  '3. Gửi kèm header `Authorization: Bearer <token>` cho mọi request tiếp theo\n\n' +
+  '**Tài khoản test:** `USR-001/123456789` (Admin, Cấp 5) · `USR-002/123456789` (Văn thư, Cấp 3) · `USR-003/123456789` (Thủ trưởng, Cấp 4)\n\n' +
+  '**Quy tắc tải file:** Tài liệu Cấp ≥ 3 chỉ được **xem** (`download=0`), không được tải về.\n\n' +
+  '**Quyền admin:** mọi endpoint `/api/admin/*` yêu cầu JWT có `clearance_level_id >= 4`.',
     contact: { name: 'Phòng CNTT QK7' },
   },
   servers: [{ url: '/', description: 'Cùng origin Swagger UI' }],
@@ -31,7 +35,7 @@ const swaggerSpec = {
     { name: 'AI Assistant', description: 'Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded Agentic RAG)' },
   ],
 
-  security: [{ UserHeader: [], ClearanceHeader: [] }],
+  security: [{ BearerAuth: [] }],
 
   paths: {
     // ==========================================================
@@ -61,18 +65,22 @@ const swaggerSpec = {
           200: {
             description: 'Thành công — trả JWT + thông tin user',
             content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success:    { type: 'boolean', example: true },
-                    token:      { type: 'string', description: 'JWT token dùng cho header Authorization: Bearer <token>', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
-                    expires_in: { type: 'string', example: '8h' },
-                    user:       { $ref: '#/components/schemas/UserFull' },
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success:    { type: 'boolean', example: true },
+                  token:      {
+                    type: 'string',
+                    description: 'JWT token. Payload chứa `{ user_id, clearance_level_id, roles, iat, exp }`. Gửi trong header `Authorization: Bearer <token>` cho mọi request tiếp theo.',
+                    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiVVNSLTAwMSIsImNsZWFyYW5jZV9sZXZlbF9pZCI6NSwicm9sZXMiOlsiUk9MLTAxIl0sImlhdCI6MTczMDAwMDAwMCwiZXhwIjoxNzMwMDI4ODAwfQ.xxx',
                   },
+                  expires_in: { type: 'string', example: '8h', description: 'Thời gian hết hạn (JWT_EXPIRES_IN)' },
+                  user:       { $ref: '#/components/schemas/UserFull' },
                 },
               },
             },
+          },
           },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
@@ -116,7 +124,7 @@ const swaggerSpec = {
           '4. Agent quét ZK9500, so khớp template, gửi kết quả về BE\n' +
           '5. Nếu khớp → BE cấp `fingerprint_token` (JWT 5 phút, gắn file_id + user_id)\n\n' +
           '**Frontend dùng token này** để gọi `GET /api/files/{fileId}/view` qua header `X-Fingerprint-Token`.',
-        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             in: 'header',
@@ -212,7 +220,7 @@ const swaggerSpec = {
           '4. Agent chờ user đặt tay 3 lần (cùng ngón), merge template, gửi về BE\n' +
           '5. BE mã hóa template (AES-256-GCM) → lưu vào `USER_FINGERPRINT.template_enc`\n\n' +
           '**Lưu ý:** Người đặt tay PHẢI là user đích — nếu admin đặt tay của mình thì sau này user đích sẽ không quét được.',
-        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             in: 'path',
@@ -279,7 +287,7 @@ const swaggerSpec = {
         description:
           'Trả về danh sách các Agent (máy trạm có đầu đọc ZK9500) đang kết nối WebSocket tới BE.\n\n' +
           'Dùng để debug hoặc kiểm tra máy nào đang sẵn sàng quét vân tay.',
-        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        security: [{ BearerAuth: [] }],
         responses: {
           200: {
             description: 'Danh sách agent',
@@ -1895,29 +1903,17 @@ const swaggerSpec = {
   // ============================================================
   components: {
     securitySchemes: {
-  UserHeader: {
-    type: 'apiKey',
-    in: 'header',
-    name: 'X-User-Id',
-    description: 'Mã user (VD: USR-001) — legacy auth (khi ALLOW_LEGACY_AUTH=true)',
-  },
-  ClearanceHeader: {
-    type: 'apiKey',
-    in: 'header',
-    name: 'X-Clearance',
-    description: 'Mức bảo mật 1-5 — legacy auth',
-  },
   BearerAuth: {
     type: 'http',
     scheme: 'bearer',
     bearerFormat: 'JWT',
-    description: 'JWT token lấy từ POST /api/auth/login (khuyến nghị dùng thay legacy)',
+    description: 'JWT token lấy từ `POST /api/auth/login`. Header: `Authorization: Bearer <token>`. Hết hạn sau 8 giờ.',
   },
   DeviceFPHeader: {
     type: 'apiKey',
     in: 'header',
     name: 'X-Device-FP',
-    description: 'Device ID của Fingerprint Agent trên máy user — lấy từ http://127.0.0.1:9001/device-id. Bắt buộc cho các endpoint fingerprint.',
+    description: 'Device ID của Fingerprint Agent trên máy user — lấy từ `http://127.0.0.1:9001/device-id`. Bắt buộc cho các endpoint fingerprint.',
   },
   FingerprintTokenHeader: {
     type: 'apiKey',

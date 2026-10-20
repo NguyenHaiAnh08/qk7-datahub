@@ -1,0 +1,59 @@
+# QK7 DataHub - Docker Compose LAN
+# Save as UTF-8 (no BOM), LF line endings.
+
+services:
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: qk7-backend
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+    volumes:
+      - ./backend/uploads:/app/uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - qk7-net
+    depends_on:
+      - ai
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ai:
+    build:
+      context: .
+      dockerfile: boxchat/Dockerfile
+    container_name: qk7-ai
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8001:8001"
+    env_file:
+      - ./boxchat/.env
+    environment:
+      BACKEND_UPLOADS_DIR: /app/uploads
+      QDRANT_STORAGE_PATH: /app/local_storage/qdrant_data
+    volumes:
+      - ./backend/uploads:/app/uploads:ro
+      - ./boxchat/local_storage:/app/local_storage
+    networks:
+      - qk7-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8001/ai/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  qk7-net:
+    driver: bridge

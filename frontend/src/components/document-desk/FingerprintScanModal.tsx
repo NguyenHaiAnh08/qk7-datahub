@@ -104,31 +104,41 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       setPhase('success');
       setTimeout(() => onSuccess(res.fingerprint_token!), 900);
     } catch (err: any) {
-      const msg = err.message || 'Xác thực thất bại';
-      const isAgentOffline = Boolean(err.data?.agent_offline);
-      const isNeedsEnroll = Boolean(err.data?.needs_enroll);
+  const msg = err.message || 'Xác thực thất bại';
+  const isAgentOffline = Boolean(err.data?.agent_offline);
+  const isNeedsEnroll = Boolean(err.data?.needs_enroll);
+  const isCancelled = Boolean(err.data?.cancelled);
 
-      if (isAgentOffline) {
-        setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
-        setPhase('error');
-      } else if (isNeedsEnroll) {
-        setError('Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên để đăng ký.');
-        setNeedsEnroll(true);
-        setPhase('error');
-      } else {
-        const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
-        setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
-        setPhase('error');
+    // CANCELLED: request bị request mới thay thế → KHÔNG hiện lỗi, tự retry nhanh
+    if (isCancelled) {
+      console.log('[FingerprintScan] Request bị cancel bởi job mới, retry sau 200ms');
+      if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
+      autoRetryTimerRef.current = setTimeout(() => {
+        handleRetry();
+      }, 200);
+      return;
+    }
 
-        // Tự động quét lại sau 1.2s thay vì phải bấm thủ công
-        if (autoRetryTimerRef.current) {
-          clearTimeout(autoRetryTimerRef.current);
-        }
-        autoRetryTimerRef.current = setTimeout(() => {
-          handleRetry();
-        }, 1200);
+    if (isAgentOffline) {
+      setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
+      setPhase('error');
+    } else if (isNeedsEnroll) {
+      setError('Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên để đăng ký.');
+      setNeedsEnroll(true);
+      setPhase('error');
+    } else {
+      const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
+      setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
+      setPhase('error');
+
+      if (autoRetryTimerRef.current) {
+        clearTimeout(autoRetryTimerRef.current);
       }
-    } finally {
+      autoRetryTimerRef.current = setTimeout(() => {
+        handleRetry();
+      }, 1200);
+    }
+  } finally {
       inFlightRef.current = false;
     }
   };

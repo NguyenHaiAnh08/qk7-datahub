@@ -19,7 +19,9 @@ if hasattr(sys.stderr, 'reconfigure'):
 import websockets
 from dotenv import load_dotenv
 
-load_dotenv()
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_HERE, ".env"))
 
 BACKEND_WS_URL = os.getenv("BACKEND_WS_URL", "ws://localhost:8000/ws/fingerprint")
 BRIDGE_TOKEN = os.getenv("BRIDGE_TOKEN", "")
@@ -129,10 +131,10 @@ class FingerprintAgent:
         self.running = True
         self.reconnect_delay = 3
         self.busy = False
-        self._cancel_event = threading.Event()
         self.enroll_step = 0
         self.enroll_total = 3
         self.enroll_state = "idle"
+        self._cancel_event = threading.Event()
 
     def get_enroll_status(self):
         return {

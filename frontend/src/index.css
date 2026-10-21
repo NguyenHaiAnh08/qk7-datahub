@@ -21,8 +21,8 @@
   }
 
   html.dark body {
-    background-color: #020617;
-    color: #f1f5f9;
+    background-color: #0b0f19;
+    color: #f8fafc;
   }
 }
 
@@ -50,6 +50,15 @@
 }
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(212, 175, 55, 0.6);
+}
+
+/* Hide scrollbar for Chrome, Safari, Opera, Edge, Firefox */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Glassmorphism panel */
@@ -715,3 +724,115 @@ html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-node-selected {
 .qk7-unit-treeselect-popup .ant-select-tree-show-line .ant-select-tree-switcher-leaf-line::after {
   border-color: rgba(148, 163, 184, 0.3) !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   TỐI ƯU HÓA ĐẶC THÙ CHO IPADOS & IPAD AIR M4 (Zero Layout Shift)
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --app-height: 100dvh;
+}
+
+html, body, #root {
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+}
+
+/* Khi html[data-device-mode="ipad"]:
+   1. Chống Safari/Chrome/Cốc Cốc tự động phóng to làm lệch layout khi focus input bằng font 16px
+   2. Touch targets tối thiểu 38px - 40px cho các nút bấm
+*/
+html[data-device-mode="ipad"] input,
+html[data-device-mode="ipad"] select,
+html[data-device-mode="ipad"] textarea,
+html[data-device-mode="ipad"] .ant-input,
+html[data-device-mode="ipad"] .ant-select-selection-search-input,
+html[data-device-mode="ipad"] .ant-select-selection-item {
+  font-size: 16px !important;
+}
+
+html[data-device-mode="ipad"] button,
+html[data-device-mode="ipad"] .ant-btn {
+  min-height: 38px;
+}
+
+/* Hỗ trợ vuốt chạm cảm ứng ngang 1 ngón tay trên iPad */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CHUẨN HÓA BỀ MẶT NIGHT MODE / DARK MODE TÁC CHIẾN (SOC SURFACE)
+   ───────────────────────────────────────────────────────────── */
+html.dark {
+  background-color: #0b0f19;
+  color-scheme: dark;
+}
+
+/* Bảng Ant Design & Table rows hover trong Dark Mode */
+html.dark .ant-table {
+  background-color: #111827 !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .ant-table-thead > tr > th {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-bottom: 1px solid #1e293b !important;
+  font-weight: 700 !important;
+}
+
+html.dark .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .ant-table-tbody > tr:hover > td,
+html.dark .ant-table-tbody > tr.ant-table-row-selected > td {
+  background-color: rgba(114, 46, 209, 0.22) !important;
+  color: #ffffff !important;
+}
+
+/* Bảng HTML chuẩn khi hover ở Dark Mode */
+html.dark table tbody tr:hover td {
+  background-color: rgba(114, 46, 209, 0.22) !important;
+  color: #ffffff !important;
+}
+
+/* Modal & Drawer trong Dark Mode */
+html.dark .ant-modal-content,
+html.dark .ant-drawer-content {
+  background-color: #111827 !important;
+  border: 1px solid rgba(139, 92, 246, 0.25) !important;
+  color: #f8fafc !important;
+}
+
+html.dark .ant-modal-header,
+html.dark .ant-drawer-header {
+  background-color: #111827 !important;
+  border-bottom: 1px solid #1e293b !important;
+}
+
+html.dark .ant-modal-title,
+html.dark .ant-drawer-title {
+  color: #f8fafc !important;
+}
+
+/* Input & Select trong Dark Mode */
+html.dark .ant-input,
+html.dark .ant-select-selector {
+  background-color: #111827 !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  color: #f8fafc !important;
+}
+
+html.dark .ant-input::placeholder {
+  color: #64748b !important;
+}
+
+/* Drawer navigation trên iPad */
+.qk7-sidebar-drawer .ant-drawer-body {
+  padding: 0 !important;
+  background-color: #111827;
+}
+

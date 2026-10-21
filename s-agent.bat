@@ -28,7 +28,7 @@ if not exist "libzkfp.dll" (
 if not exist ".env" (
     echo [LOI] Khong tim thay file .env
     echo Tao file .env voi noi dung:
-    echo   BACKEND_WS_URL=ws://192.168.1.229:8000/ws/fingerprint
+    echo   BACKEND_WS_URL=ws://191.168.1.1:8000/ws/fingerprint
     echo   BRIDGE_TOKEN=^<copy tu server backend\.env^>
     echo   DEVICE_SERVER_HOST=127.0.0.1
     echo   DEVICE_SERVER_PORT=9001
@@ -62,7 +62,7 @@ if not errorlevel 1 (
     echo [CANH BAO] BACKEND_WS_URL dang tro ve localhost.
     echo Tren may client, localhost la chinh may nay, KHONG phai server.
     echo Sua .env thanh:
-    echo   BACKEND_WS_URL=ws://192.168.1.229:8000/ws/fingerprint
+    echo   BACKEND_WS_URL=ws://191.168.1.1:8000/ws/fingerprint
     pause
     exit /b 1
 )
@@ -71,7 +71,7 @@ if not errorlevel 1 (
     echo [CANH BAO] BACKEND_WS_URL dang tro ve 127.0.0.1.
     echo Tren may client, 127.0.0.1 la chinh may nay, KHONG phai server.
     echo Sua .env thanh:
-    echo   BACKEND_WS_URL=ws://192.168.1.229:8000/ws/fingerprint
+    echo   BACKEND_WS_URL=ws://191.168.1.1:8000/ws/fingerprint
     pause
     exit /b 1
 )
@@ -90,7 +90,7 @@ for /f "tokens=1,2 delims==" %%A in ('findstr /B "BACKEND_WS_URL= BRIDGE_TOKEN="
 echo.
 echo --- Dich vu local ---
 echo   Tram kiem soat: http://127.0.0.1:9001/device-id
-echo   Web:            http://192.168.1.229:8000
+echo   Web:            http://191.168.1.1:8000
 echo.
 echo ==========================================
 echo   Dang khoi dong Fingerprint Agent...

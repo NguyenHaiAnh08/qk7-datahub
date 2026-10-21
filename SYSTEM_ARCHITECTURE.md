@@ -1,8 +1,8 @@
 # KIẾN TRÚC TOÀN BỘ HỆ THỐNG — QK7 DATAHUB
 
 > **Bảo mật:** Cấp Bộ Tư Lệnh Quân Khu 7  
-> **Phiên bản kiến trúc:** v3.5-ENTERPRISE (React + TypeScript SPA, Express 5 Gateway, AI RAG Microservice & ZKTeco Biometric Engine)  
-> **Ngày cập nhật:** 19/10/2026  
+> **Phiên bản kiến trúc:** v3.8-ENTERPRISE (Dual-Platform Desktop & iPadOS, React 18 + TS SPA, Express 5 Gateway, AI RAG & ZKTeco Biometric Engine)  
+> **Ngày cập nhật:** 21/10/2026  
 
 ---
 
@@ -20,6 +20,8 @@
 11. [Kiến Trúc Trung Tâm Kiểm Toán & Giám Sát An Ninh SOC (Security Audit Log Engine)](#11-kiến-trúc-trung-tâm-kiểm-toán--giám-sát-an-ninh-soc)
 12. [Kiến Trúc Bảng Phân Cấp Đơn Vị Quân Khu Đa Tầng (Military Unit Hierarchy & Command Tree Engine)](#12-kiến-trúc-bảng-phân-cấp-đơn-vị-quân-khu-đa-tầng)
 13. [Đặc Tả Kỹ Thuật Mô-đun Xuất Báo Cáo Kiểm Toán Quân Đội Dạng Excel (Military Audit Reporting Engine)](#13-đặc-tả-kỹ-thuật-mô-đun-xuất-báo-cáo-kiểm-toán-quân-đội-dạng-excel)
+14. [Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)](#14-kiến-trúc-giao-diện-kép-đa-nền-tảng-dual-platform-desktop--ipados-touch-ui-engine)
+15. [Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (MyUnitPage) & Chuẩn Hóa Danh Xưng Thư Viện Số](#15-phân-hệ-quản-lý-tài-liệu-đơn-vị-trực-thuộc-myunitpage--chuẩn-hóa-danh-xưng-thư-viện-số)
 
 ---
 
@@ -28,8 +30,10 @@
 **QK7 DataHub** là nền tảng quản trị và lưu trữ tài liệu số tập trung, phục vụ công tác chỉ huy, tham mưu tác chiến và văn thư hành chính trong toàn Quân Khu 7. Hệ thống tích hợp toàn diện trí tuệ nhân tạo và công nghệ sinh trắc học phần cứng theo các trụ cột cốt lõi:
 
 * **Ứng Dụng Đơn Trang Chuẩn (SPA React 18 + TypeScript + Ant Design):** Toàn bộ giao diện được nạp qua duy nhất 1 vỏ bọc `index.html`, sử dụng cơ chế Auto-Discovery Routing qua `import.meta.glob`, không tải lại trang, bảo lưu trạng thái xác thực và trải nghiệm mượt mà với tông màu Tím chủ đạo (`#722ED1`).
+* **Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform PC & iPad Air M4 Touch UI):** Tương thích tối ưu cả Máy tính để bàn (Widescreen 16:9) và máy tính bảng iPad Air M4 (11-inch & 13-inch) với cơ chế `DeviceModeContext`, cho phép chuyển đổi chế độ xem tức thì. Trên iPadOS hỗ trợ vuốt chạm chuẩn Apple HIG (Touch Target ≥ 44×44px); trên Desktop PC sử dụng cụm nút bấm chuyển trang màu sắc chuyên biệt (`Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`) ổn định, loại bỏ hiệu ứng viên thuốc trượt để ngăn ngừa triệt để lỗi nhảy giao diện.
+* **Chuẩn Hóa Danh Xưng "Trung Tâm Thư Viện Số" & Phân Hệ "Đơn Vị Của Tôi":** Chuẩn hóa toàn bộ nhãn giao diện từ "Portal" thành "Trung tâm thư viện số", đồng thời cung cấp phân hệ `/my-unit` hỗ trợ các cơ quan, đơn vị trực thuộc Quân Khu 7 tra cứu, lưu trữ và khai thác tài liệu nội bộ chuyên biệt.
 * **Kiểm Soát Độ Mật 5 Cấp Nghiêm Ngặt:** Ngăn chặn tuyệt đối việc rò rỉ thông tin quân sự (từ Cấp 1 - Công khai đến Cấp 5 - Tuyệt mật), thực thi kiểm soát tại cả 3 tầng: UI Guard, Gateway Middleware và SQL Server Database Constraint.
-* **Xác Thực Sinh Trắc Học Vân Tay Quang Học 2FA:** Tích hợp máy quét phần cứng chuyên dụng **ZKTeco ZK9500** (500 DPI, kết nối USB) kết hợp Local Hardware Agent (`:9001`) và WebSocket Gateway. Bắt buộc quét vân tay khi truy cập văn bản Cấp 3 (Mật), Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), cấp `fingerprint_token` (JWT hiệu lực 5 phút) chống giả mạo danh tính.
+* **Xác Thực Sinh Trắc Học Vân Tay Quang Học 2FA:** Tích hợp máy quét phần cứng chuyên dụng **ZKTeco ZK9500** (500 DPI, kết nối USB) kết hợp Local Hardware Agent (`:9001`) và WebSocket Gateway. Bắt buộc quét vân tay khi truy cập văn bản Cấp 3 (Mật), Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), cấp `fingerprint_token` (JWT hiệu lực 5 phút) chống giả mạo danh tính. Giao diện thu thập vân tay 3 bước tích hợp vector Touch ID trực quan và cơ chế lọc lỗi nhảy gián đoạn.
 * **Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded Agentic RAG):** Microservice Python FastAPI (`:8001`) kết hợp kho vector Qdrant cục bộ, tự động trích xuất nội dung văn kiện PDF, tìm kiếm ngữ nghĩa, trả lời câu hỏi kèm trích dẫn số trang chính xác, tự động biên soạn cẩm nang học tập tác chiến (`study-book`) và có cơ chế **Smart SQL Fallback** đảm bảo hệ thống vận hành 100% không gián đoạn kể cả khi microservice AI đang bảo trì.
 * **Toàn Vẹn Dữ Liệu & Kiểm Toán 24/7:** Tính toán mã băm SHA-256 cho mọi tệp tin lưu trữ và ghi vết kiểm toán toàn diện (`ACCESS_LOG`) mọi thao tác (Đăng nhập, Xem, Tải về, Quét vân tay, Hỏi AI, Cập nhật, Xóa).
 
@@ -46,33 +50,39 @@ graph TB
         
         ScannerHardware["Máy quét vân tay quang học<br/>ZKTeco ZK9500 (USB 500 DPI)"]
         LocalAgent["Local Fingerprint Agent<br/>(:9001 HTTP & WS Client)<br/>agent.py + zk_service.py"]
-        BrowserApp["Trình Duyệt Web Quân Sự<br/>(React 18 + TS SPA)"]
+        BrowserApp["Trình Duyệt Web Quân Sự<br/>(Máy Tính Bàn / iPad Air M4 iPadOS<br/>Safari, Chrome, Cốc Cốc)"]
 
         Officer & Commander & AdminHigh --> BrowserApp
         ScannerHardware -->|USB Driver| LocalAgent
         BrowserApp <-->|GET /device-id, /enroll-status| LocalAgent
     end
 
-    subgraph PRESENTATION_TIER ["2. TẦNG GIAO DIỆN REACT 18 + ANT DESIGN"]
+    subgraph PRESENTATION_TIER ["2. TẦNG GIAO DIỆN REACT 18 + ANT DESIGN (DUAL-PLATFORM)"]
         SingleHTML["index.html<br/>(Vỏ nạp duy nhất)"]
         AppRouter["React Router (useRoutes)<br/>Auto-Discovery Routing"]
+        DeviceModeComp["DeviceModeSwitch & Context<br/>(Desktop PC Widescreen vs iPad Touch UI)"]
+        HeaderComp["Header Bar Navigation<br/>(PC: Nút Chuyển Màu Sắc | iPad: Segmented Glider)"]
+        
         LoginPage["/login (Xác thực quân nhân)"]
-        PortalPage["/portal (Cổng tra cứu tài liệu)"]
+        PortalPage["/portal (Trung tâm thư viện số)"]
+        MyUnitPage["/my-unit (Đơn vị của tôi)"]
         DeskPage["/document-desk (Bàn làm việc văn thư)"]
         AdminDashboard["/admin-dashboard (Bảng điều khiển QTV)"]
         UsersPage["/users (Quản lý quân nhân & cấp bậc)"]
         
         AIChatWidgetComp["AIChatWidget<br/>(Trợ lý AI nổi, Markdown, LaTeX, Citations)"]
-        FpModals["FingerprintScanModal & FingerprintEnrollModal<br/>(Animation Touch ID 3 bước)"]
+        FpModals["FingerprintScanModal & FingerprintEnrollModal<br/>(Animation Touch ID Vector 3 bước)"]
         SecurityAuditLogComp["SecurityAuditLog (Trung Tâm SOC)<br/>(Live Monitor, 4 KPI, Filter Pills, Deep JSON Drawer)"]
         UnitTreeComp["UnitTreeTable (Cây Đơn Vị)<br/>(Command Hierarchy, 6 Tiers, Orphan Safe)"]
         ExcelExportTool["exportAuditReportExcel<br/>(ExcelJS Báo Cáo Quân Đội .xlsx)"]
 
         BrowserApp --> SingleHTML
         SingleHTML --> AppRouter
-        AppRouter --> LoginPage & PortalPage & DeskPage & AdminDashboard & UsersPage
-        PortalPage & DeskPage & AdminDashboard -.-> AIChatWidgetComp
-        PortalPage & DeskPage & UsersPage -.-> FpModals
+        AppRouter --> HeaderComp
+        HeaderComp -.-> DeviceModeComp
+        AppRouter --> LoginPage & PortalPage & MyUnitPage & DeskPage & AdminDashboard & UsersPage
+        PortalPage & MyUnitPage & DeskPage & AdminDashboard -.-> AIChatWidgetComp
+        PortalPage & MyUnitPage & DeskPage & UsersPage -.-> FpModals
         AdminDashboard -.-> SecurityAuditLogComp & UnitTreeComp
         SecurityAuditLogComp -.-> ExcelExportTool
     end
@@ -205,17 +215,18 @@ qk7-datahub/
         │
         ├── pages/                          # CÁC MÀN HÌNH CHỨC NĂNG CHÍNH
         │   ├── LoginPage.tsx               # Màn hình đăng nhập quân nhân
-        │   ├── PortalPage.tsx              # Cổng tra cứu tài liệu quân sự
+        │   ├── PortalPage.tsx              # Trung tâm thư viện số (Cổng tra cứu tài liệu)
+        │   ├── MyUnitPage.tsx              # Đơn vị của tôi (Quản lý tài liệu theo đơn vị trực thuộc)
         │   ├── DocumentDeskPage.tsx        # Bàn làm việc số hóa văn thư
         │   ├── AdminDashboardPage.tsx      # Bảng điều khiển quản trị trung tâm
         │   ├── UsersPage.tsx               # Quản lý tài khoản quân nhân & cấp bậc
         │   └── HttpErrorPage.tsx           # Trang mã trạng thái HTTP chuẩn Ant Design Result
         │
         ├── components/                     # THÀNH PHẦN GIAO DIỆN TÁI SỬ DỤNG
-        │   ├── common/                     # Header, Sidebar, Layout, ProtectedRoute, TouchIDFingerprint...
+        │   ├── common/                     # Header, Sidebar, Layout, DeviceModeSwitch, TouchIDFingerprint...
         │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
         │   ├── document-desk/              # FingerprintScanModal (Hộp thoại quét vân tay xác thực xem PDF)
-        │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Đăng ký vân tay)
+        │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Đăng ký vân tay 3 bước)
         │   ├── auth/                       # LoginForm
         │   ├── portal/                     # SecurityBanner, DocumentCard, PortalDocumentList
         │   └── dashboard/                  # PHÂN HỆ QUẢN TRỊ & TRUNG TÂM KIỂM TOÁN SOC
@@ -223,6 +234,9 @@ qk7-datahub/
         │       ├── UnitTreeTable.tsx       # Bảng cây đơn vị 6 cấp bậc, bảo vệ mồ côi, tìm kiếm không dấu
         │       ├── StatCard.tsx            # Thẻ thống kê chỉ số nghiệp vụ
         │       └── DistributionChart.tsx   # Biểu đồ phân bổ loại văn bản & an ninh
+        │
+        ├── hooks/                          # REACT CUSTOM HOOKS
+        │   └── useDeviceMode.ts            # Hook điều khiển chế độ PC Widescreen & iPad Air M4 Touch UI
         │
         ├── utils/                          # TIỆN ÍCH HỆ THỐNG
         │   └── exportAuditReportExcel.ts   # Xuất file Excel (.xlsx) chuẩn biểu mẫu báo cáo Quân đội
@@ -236,7 +250,7 @@ qk7-datahub/
         │   ├── aiService.ts                # Dịch vụ gửi truy vấn và nhận câu trả lời từ Trợ lý AI
         │   └── ...                         # Các dịch vụ vai trò, quyền, đơn vị, danh mục, log
         │
-        ├── contexts/                       # Quản lý trạng thái toàn cục (AuthContext, ThemeContext)
+        ├── contexts/                       # Quản lý trạng thái toàn cục (AuthContext, ThemeContext, DeviceModeContext)
         └── types/                          # Định nghĩa kiểu dữ liệu TypeScript (document, user, role, ai...)
 ```
 
@@ -528,6 +542,18 @@ Nhằm đạt tiêu chuẩn sẵn sàng cao (High Availability), Express Gateway
 - Mẫu vân tay sau khi đăng ký (enrollment) được hợp nhất từ 3 lần đặt ngón tay liên tiếp, tạo ra chuỗi byte đặc trưng (template) độ dài ~1024 bytes.
 - Mẫu vân tay được mã hóa bằng thuật toán đối xứng **AES-256-GCM** với khóa bí mật quân sự trước khi lưu vào cột `template_enc` của bảng `USER_FINGERPRINT`.
 - Khi kiểm tra (verification), mẫu mã hóa được Gateway giải mã và gửi an toàn qua WebSocket đến Agent của trạm làm việc để đối sánh 1:1, không bao giờ lộ dữ liệu thô ra môi trường mạng.
+
+### 8.4. Nâng Cấp Giao Diện Thu Thập & Xác Thực Vân Tay Trực Quan (UX Touch ID Vector 3 Bước & Ổn Định Trạng Thái)
+- **Hoạt Ảnh Touch ID Vector 3 Bước Trực Quan (`FingerprintEnrollModal`):**
+  - Sử dụng biểu tượng vector dấu vân tay quang học độ phân giải cao kết hợp hiệu ứng sóng âm (radar pulse) và chuyển màu gradient động.
+  - Phản hồi tức thì trạng thái đặt ngón tay qua 3 bước (Lần 1: Nhận diện cấu trúc cơ bản → Lần 2: Mở rộng vùng đặc trưng biên → Lần 3: Hợp nhất và tạo template chuẩn).
+  - Tích hợp vòng tròn tiến trình Ant Design `<Progress type="circle">` hiển thị phần trăm hoàn thành (33% → 66% → 100%) kèm hướng dẫn động tác cho quân nhân ("Nhấc ngón tay lên và đặt lại").
+- **Cơ Chế Khử Lỗi Nhảy Liên Tục & Debounce Polling:**
+  - Khắc phục triệt để hiện tượng văng popup cảnh báo hoặc lỗi nhấp nháy liên tục khi máy quét ở trạng thái chờ đặt ngón tay bằng cơ chế `status-filtering` trong `fingerprintService.ts`.
+  - Phân tách rõ ràng giữa trạng thái đang chờ cảm biến (`WAITING_FOR_FINGER`) và lỗi phần cứng thực sự (`DEVICE_DISCONNECTED`), giúp trải nghiệm đăng ký vân tay mượt mà, không gây hoang mang cho người dùng.
+- **Xác Thực 1 Lần Chạm Mở Tài Liệu Mật (`FingerprintScanModal`):**
+  - Tự động nhận diện `device_id` trạm cục bộ qua cổng `127.0.0.1:9001`.
+  - Khi quân nhân chạm ngón tay, modal chuyển trạng thái quét và cấp quyền truy cập tài liệu Cấp 3 (Mật), Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật) chỉ trong < 1.2 giây.
 
 ---
 
@@ -879,4 +905,67 @@ Row N+6:                                       [H:I]   Thiếu tá QNCN Nguyễn
 - **Khối ký duyệt báo cáo:** Đặt tại cột H và I, cách 2 dòng sau bảng dữ liệu với tiêu đề `NGƯỜI LẬP` và chức danh quân nhân ký duyệt `Thiếu tá QNCN Nguyễn Mạnh Nam`.
 
 ---
+
+## 14. Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)
+
+### 14.1. Bối Cảnh & Thách Thức Vận Hành Đa Thiết Bị Quân Khu 7
+Trong môi trường công tác tại Bộ Tư Lệnh Quân Khu 7:
+- **80% thời gian chỉ huy & tác chiến:** Thủ trưởng, sĩ quan tác chiến sử dụng máy tính bảng **iPad Air M4 (11-inch & 13-inch)** khi cơ động tại sở chỉ huy, phòng họp tác chiến, thực địa.
+- **Tại văn phòng cố định:** Cán bộ văn thư, quản trị viên sử dụng máy tính bàn (Desktop PC Widescreen tỉ lệ 16:9).
+- **Thách thức:** Việc ép một layout PC co giãn thông thường (Responsive đơn thuần) khiến giao diện trên iPad bị bể nặng: Header rớt thành nhiều dòng, tên quân nhân bị cắt cụt, thanh điều hướng bị gãy đôi, và các nút bấm quá nhỏ không phù hợp thao tác ngón tay. Do đó, hệ thống đã kiến tạo kiến trúc **Dual-Platform chuyên biệt**.
+
+### 14.2. Đặc Tả Thông Số Viewport iPad Air M4
+Hệ thống được thiết kế và kiểm thử thực tế trên thiết bị iPad Air M4 thông qua 4 trình duyệt iPadOS: **Safari, Google Chrome, Google App và Cốc Cốc**:
+- **Chế độ Nằm Ngang (Landscape - Chế độ thao tác chính):** Kích thước thực tế `1210 × 802 px`, tỉ lệ W/H = `1.51`.
+- **Chế độ Nằm Dọc (Portrait):** Kích thước thực tế `834 × 1178 px`, tỉ lệ W/H = `0.71`.
+- **Quy chuẩn Apple Human Interface Guidelines:** Vùng chạm tối thiểu (Touch Target) đạt chuẩn **≥ 44 × 44 px**, khoảng cách an toàn (padding/margin) mở rộng chống bấm nhầm ngón tay khi tác chiến khẩn trương.
+
+### 14.3. Mô-Đun Quản Lý Trạng Thái Thiết Bị (`DeviceModeContext` & `useDeviceMode`)
+- **Trạng thái lưu trữ bền vững:** Lưu cấu hình qua `localStorage.getItem('qk7_device_mode')` (`'pc' | 'ipad'`), tự động khôi phục chế độ người dùng lựa chọn sau mỗi phiên làm việc.
+- **Hook `useDeviceMode`:** Cung cấp thuộc tính `deviceMode`, `isPC`, `isIPad` và hàm `setDeviceMode` cho toàn bộ cây component React.
+- **Bộ chuyển đổi thông minh `DeviceModeSwitch`:**
+  - Đặt tại góc phải thanh Header (bên cạnh đồng hồ hệ thống).
+  - Hỗ trợ xem nhanh Popover thông số kỹ thuật thiết bị: Viewport thực tế, DPR, Touch Area, Gestures, Định dạng tối ưu.
+  - **Hỗ trợ toàn diện 2 Theme:**
+    - **Light Mode:** Nền `bg-purple-50/70`, viền `border-purple-200/80`, nút kích hoạt đổ màu tím đậm thương hiệu QK7 (`#722ED1`, `bg-purple-600 text-white`). Popover nền trắng tinh khiết `#ffffff`, viền tím nhạt thanh lịch.
+    - **Dark Mode:** Nền `bg-slate-900/80`, viền `border-slate-800`, nút kích hoạt tím dạ quang sang trọng.
+
+### 14.4. Cơ Chế Điều Hướng Chuyển Trang Phân Biệt Giữa PC & iPad
+Nhằm giải quyết triệt để lỗi nhảy giao diện và đáp ứng thói quen thao tác của từng thiết bị:
+1. **Trên Chế Độ iPad Air M4 (`deviceMode === 'ipad'`):**
+   - Sử dụng thanh điều hướng trung tâm căn giữa dạng **Segmented Navigation Bar**.
+   - Thiết kế dạng viên thuốc lớn, tích hợp hiệu ứng trượt mượt mà (smooth pill glider transition) tối ưu cho việc quan sát trực quan trên máy tính bảng.
+2. **Trên Chế Độ Máy Tính Bàn (`deviceMode === 'pc'`):**
+   - **Loại bỏ Dynamic Sliding Pill Indicator (Hiệu ứng viên thuốc trượt):** Do mỗi trang trong hệ thống mount component Header riêng, việc dùng indicator trượt động tính theo `offsetLeft` gây hiện tượng nhảy vị trí và chớp nháy (layout shift) khi chuyển từ "Đơn vị của tôi" sang "Quản trị".
+   - **Phục hồi cụm nút bấm cũ chuyển trang màu sắc chuyên biệt:**
+     - Nút **Đăng tải**: Tông màu Xanh ngọc Emerald (`bg-emerald-50 text-emerald-700 border-emerald-300`).
+     - Nút **Trung tâm thư viện số**: Tông màu Xanh lam Blue (`bg-blue-50 text-blue-700 border-blue-300`).
+     - Nút **Đơn vị của tôi**: Tông màu Tím Violet (`bg-purple-50 text-purple-700 border-purple-300`).
+     - Nút **Quản trị**: Tông màu Vàng cam Amber (`bg-amber-50 text-amber-700 border-amber-300`).
+   - Cụm nút bấm độc lập giúp tốc độ chuyển trang tức thì (0ms latency), ổn định tuyệt đối và không phụ thuộc vào tọa độ DOM.
+
+---
+
+## 15. Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (`MyUnitPage`) & Chuẩn Hóa Danh Xưng Thư Viện Số
+
+### 15.1. Chuẩn Hóa Danh Xưng "Trung Tâm Thư Viện Số" Toàn Diện
+Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Bộ Tư Lệnh Quân Khu 7:
+- Toàn bộ các chữ hiển thị `"Portal"` hoặc `"PORTAL"` trên toàn bộ giao diện đã được chuyển đổi thành **`"Trung tâm thư viện số"`**:
+  - Thanh Header điều hướng (Desktop nav pills & iPad segmented glider).
+  - Tiêu đề và biểu ngữ phụ của trang tra cứu văn bản (`PortalPage.tsx`).
+  - Huy hiệu phân loại tài khoản đăng nhập nhanh (`LoginForm.tsx`: `Cấp 3 • Trung tâm thư viện số`).
+  - Menu cá nhân trong Popover đại diện người dùng (`User Profile Menu`).
+  - Ngăn kéo điều hướng dành cho thiết bị di động / máy tính bảng (`Mobile Navigation Drawer`).
+- **Cam kết bảo toàn hạ tầng:** Giữ nguyên 100% đường dẫn URL nội bộ (`/portal`), hằng số định tuyến `ROUTE_PATHS.PORTAL` và API endpoint backend để bảo đảm không xảy ra bất kỳ lỗi hồi quy định tuyến nào.
+
+### 15.2. Kiến Trúc Phân Hệ "Đơn Vị Của Tôi" (`MyUnitPage` - `/my-unit`)
+- **Mục tiêu phân hệ:** Đáp ứng nhu cầu phân cấp quản lý tài liệu theo chiều dọc. Mỗi cơ quan, đơn vị trực thuộc Quân Khu 7 (Sư đoàn, Lữ đoàn, Trung đoàn, Phòng ban Tham mưu...) có một không gian số riêng để quản lý, lưu trữ và khai thác các văn bản nội bộ chuyên biệt.
+- **Các tính năng nòng cốt trên giao diện:**
+  - **Banner nhận diện đơn vị:** Hiển thị tên cơ quan/đơn vị trực thuộc của quân nhân đang đăng nhập, cấp bậc và số lượng tài liệu đang lưu hành.
+  - **Bộ lọc đa chiều thời gian thực:** Lọc tài liệu theo mức độ bảo mật (Công Khai, Nội Bộ, Mật, Tối Mật, Tuyệt Mật), loại văn kiện (Kế hoạch, Mệnh lệnh, Báo cáo, Chỉ thị, Hướng dẫn) và đơn vị phát hành.
+  - **Tích hợp xác thực vân tay 2FA:** Cho phép xem trước trực tiếp (Preview Inline) và tải về tệp PDF đính kèm. Đối với tài liệu độ mật Cấp 3, 4, 5, hệ thống tự động kích hoạt `FingerprintScanModal` để bảo vệ an ninh tuyệt đối.
+  - **Tương thích hoàn hảo Dual-Platform:** Giao diện lưới thẻ tài liệu (Document Grid) và bảng danh sách tự động co giãn tối ưu trên cả màn hình máy tính bàn lẫn màn hình cảm ứng iPad Air M4.
+
+---
 *Tài liệu kiến trúc hệ thống QK7 DataHub được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
+

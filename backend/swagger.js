@@ -318,6 +318,43 @@ const swaggerSpec = {
       },
     },
 
+    '/api/admin/fingerprint/enroll-status': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Trạng thái tiến trình đăng ký vân tay 3 bước thời gian thực',
+        description: 'Trả về tiến trình enroll 3 bước (0/3, 1/3, 2/3, 3/3) cho máy quét chỉ định qua query deviceId hoặc header X-Device-FP.',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'deviceId',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Mã thiết bị ZK9500 (tùy chọn)',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Tiến trình enroll',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    enrolling: { type: 'boolean', example: true },
+                    step: { type: 'integer', example: 1 },
+                    total: { type: 'integer', example: 3 },
+                    state: { type: 'string', example: 'captured_1' },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
     // ==========================================================
     // SYSTEM
     // ==========================================================

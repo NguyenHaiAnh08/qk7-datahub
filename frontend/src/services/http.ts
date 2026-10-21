@@ -97,15 +97,24 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
 
     return data as T;
   } catch (err: any) {
-    // Nếu là lỗi mạng không phản hồi (fetch failed/offline)
+    // Nếu là lỗi mạng không phản hồi (fetch failed/offline/Safari Load failed)
     if (!(err instanceof HttpError)) {
-      const netError = new HttpError(503, err.message || 'Mất kết nối tới máy chủ', null, url);
+      const isLoadFailed =
+        err?.name === 'TypeError' ||
+        err?.message === 'Load failed' ||
+        (err?.message && (err.message.includes('fetch') || err.message.includes('Load failed')));
+
+      const friendlyMsg = isLoadFailed
+        ? 'Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend đang chạy!'
+        : (err.message || 'Mất kết nối tới máy chủ');
+
+      const netError = new HttpError(503, friendlyMsg, null, url);
       if (typeof window !== 'undefined' && !options.skipErrorNotification) {
         window.dispatchEvent(
           new CustomEvent<HttpErrorDetail>('qk7:http-error', {
             detail: {
               status: 503,
-              message: 'Không thể kết nối đến máy chủ Backend (Port 8000)',
+              message: friendlyMsg,
               url,
               autoRedirect: options.autoRedirectOnError ?? false,
             },

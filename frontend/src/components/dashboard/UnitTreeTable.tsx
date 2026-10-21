@@ -702,8 +702,8 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
 
       {/* ── 4. BẢNG PHÂN CẤP CÂY (TREE TABLE UI) ── */}
       <div className="bg-white dark:bg-[#111827] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-800 dark:text-slate-200 min-w-[760px]">
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left text-sm text-slate-800 dark:text-slate-200 min-w-[850px]">
             <thead className="bg-slate-100/90 dark:bg-slate-900/95 text-slate-700 dark:text-slate-300 uppercase text-xs border-b border-slate-200 dark:border-slate-800 font-bold tracking-wider">
               <tr>
                 <th className="py-4 px-4 w-[44%] min-w-[320px]">Cấu Trúc Phân Cấp & Tên Đơn Vị</th>

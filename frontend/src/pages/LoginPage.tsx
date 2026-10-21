@@ -5,15 +5,21 @@ import { ShieldCheck, HelpCircle, Building2, X } from 'lucide-react';
 import { LoginForm } from '../components/auth/LoginForm';
 import { Toast, ToastState } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
+import { DeviceModeSwitch } from '../components/common/DeviceModeSwitch';
 import { User } from '../types/user';
 import { ROUTE_PATHS } from '../routes/routePaths';
 import { useAuth } from '../hooks/useAuth';
 import { getDestinationByRole, isUserAdmin } from '../contexts/AuthContext';
 
+import { useDeviceMode } from '../contexts/DeviceModeContext';
+
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
+  const { deviceMode, orientation } = useDeviceMode();
+  const isIPadLandscape = deviceMode === 'ipad' && orientation === 'landscape';
+
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [toast, setToast] = useState<ToastState>({
     show: false,
@@ -95,17 +101,17 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-purple-600 selection:text-white transition-colors duration-200">
       {/* Background Military Grid & Glow */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b08_1px,transparent_1px),linear-gradient(to_bottom,#1e293b08_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:32px_32px]"></div>
-      <div className="absolute top-0 -left-40 w-96 h-96 bg-emerald-500/10 dark:bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-0 -right-40 w-96 h-96 bg-teal-500/10 dark:bg-teal-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-0 -left-40 w-96 h-96 bg-purple-500/10 dark:bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 -right-40 w-96 h-96 bg-indigo-500/10 dark:bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
       {/* Top Bar */}
-      <div className="relative z-10 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md">
-        <div className="flex items-center space-x-3 select-none">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center border border-emerald-400/30 shadow-md">
-            <Building2 className="w-5 h-5 text-amber-400" />
+      <div className="relative z-10 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md">
+        <div className="flex items-center space-x-2.5 select-none">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center border border-emerald-400/30 shadow-md">
+            <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
           </div>
           <div>
             <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:to-amber-400 bg-clip-text text-transparent">
@@ -114,39 +120,48 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <DeviceModeSwitch compact={deviceMode === 'ipad'} />
           <ThemeToggle size="sm" />
           <button
             onClick={() => setShowSupportModal(true)}
-            className="text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center space-x-1.5 transition cursor-pointer"
+            className="hidden sm:flex text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white items-center space-x-1.5 transition cursor-pointer"
           >
-            <HelpCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <HelpCircle className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             <span>Hỗ Trợ Kỹ Thuật</span>
           </button>
         </div>
       </div>
 
-      {/* Center Login Card */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-8">
+      {/* Center Login Card — Hỗ trợ 2 Cột Ngang cho iPad Landscape (1210 x 802) */}
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-4 sm:py-6 min-h-0">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="w-full max-w-md bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl"
+          transition={{ duration: 0.35 }}
+          className={`w-full mx-auto bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-xl ${
+            isIPadLandscape ? 'max-w-4xl' : 'max-w-md'
+          }`}
         >
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 border border-emerald-400/30 shadow-lg shadow-emerald-950/30 mb-3">
-              <ShieldCheck className="w-7 h-7 text-amber-400" />
+          {!isIPadLandscape && (
+            <div className="text-center mb-5">
+              <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 border border-emerald-400/30 shadow-lg shadow-emerald-950/20 mb-2.5">
+                <ShieldCheck className="w-6 h-6 text-amber-400" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Xác Thực Danh Tính Quân Sự
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Hệ Thống Quản Lý Dữ Liệu Tập Trung — Quân Khu 7
+              </p>
             </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Xác Thực Danh Tính Quân Sự
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Hệ Thống Quản Lý Dữ Liệu Tập Trung — Quân Khu 7
-            </p>
-          </div>
+          )}
 
-          <LoginForm onSuccess={handleLoginSuccess} onToast={showToast} />
+          <LoginForm
+            onSuccess={handleLoginSuccess}
+            onToast={showToast}
+            isSplitDeck={isIPadLandscape}
+          />
         </motion.div>
       </div>
 

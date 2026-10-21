@@ -87,22 +87,24 @@ export const AIChatWidget: React.FC = () => {
 
   const getPopupStyle = (): React.CSSProperties => {
     if (typeof window === 'undefined') {
-      return { position: 'fixed', bottom: 92, left: 24, zIndex: 99999 };
+      return { position: 'fixed', bottom: 84, right: 20, zIndex: 35 };
     }
 
     const screenW = window.innerWidth;
     const screenH = window.innerHeight;
 
     const actualW = Math.min(popupWidth, screenW - 32);
-    const actualH = Math.min(popupHeight, screenH - 110);
+    const actualH = Math.min(popupHeight, screenH - 100);
 
     return {
       position: 'fixed',
-      left: '24px',
-      bottom: '92px',
+      right: '20px',
+      bottom: '84px',
       width: `${actualW}px`,
       height: `${actualH}px`,
-      zIndex: 99999,
+      maxHeight: 'calc(100dvh - 5.5rem)',
+      maxWidth: 'calc(100vw - 32px)',
+      zIndex: 35,
       boxShadow: isDark
         ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(114, 46, 209, 0.25)'
         : '0 25px 50px -12px rgba(114, 46, 209, 0.2), 0 0 20px rgba(0,0,0,0.06)'
@@ -267,21 +269,21 @@ export const AIChatWidget: React.FC = () => {
   return (
     <>
       {/* ─────────────────────────────────────────────────────────────
-          1. NÚT TRÒN MỞ CHAT CỐ ĐỊNH Ở GÓC DƯỚI BÊN TRÁI (THEO SIDEBAR)
+          1. NÚT TRÒN MỞ CHAT CỐ ĐỊNH Ở GÓC DƯỚI BÊN PHẢI (fixed bottom-5 right-5, z-30)
       ───────────────────────────────────────────────────────────── */}
       <div
         style={{
           position: 'fixed',
-          left: '24px',
-          bottom: '24px',
-          zIndex: 99999,
+          right: '20px',
+          bottom: '20px',
+          zIndex: 30,
           userSelect: 'none',
         }}
         className="transition-transform duration-200"
       >
         <Tooltip
           title={isOpen ? 'Đóng hộp thoại AI' : 'Trợ lý AI Tác chiến & Dữ liệu QK7'}
-          placement="right"
+          placement="left"
           open={isOpen ? false : undefined}
         >
           <button
@@ -322,7 +324,7 @@ export const AIChatWidget: React.FC = () => {
         <div
           className={`
             flex flex-col overflow-hidden transition-all duration-300
-            rounded-[26px] shadow-2xl
+            rounded-[26px] shadow-2xl max-h-[calc(100dvh-5rem)]
             ${isDark ? 'bg-[#0b0c10] border border-purple-800/40 text-slate-100' : 'bg-[#fcfaff] border border-purple-200 text-slate-900'}
           `}
           style={getPopupStyle()}

@@ -138,12 +138,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div key="preview-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-sm">
+      <div key="preview-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/85 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-5xl h-[92vh] overflow-hidden shadow-2xl flex flex-col"
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-5xl max-w-[calc(100vw-32px)] h-[92vh] max-h-[calc(100dvh-2rem)] overflow-hidden shadow-2xl flex flex-col mx-auto"
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-3 overflow-hidden">
@@ -188,12 +188,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
+              {/* Nút mở PDF Toàn màn hình (Khắc phục hạn chế cuộn trang của Safari trên iPadOS) */}
               <button
                 onClick={handleOpenNewTab}
-                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:hover:text-white transition cursor-pointer"
-                title="Mở trong tab mới"
+                className="p-2 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                title="Mở PDF toàn màn hình trong tab mới (Khắc phục hạn chế cuộn trang của Safari trên iPad)"
               >
-                <ExternalLink className="w-4 h-4" />
+                <ExternalLink className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="hidden sm:inline">Toàn màn hình</span>
               </button>
               {canDownload ? (
                 <button

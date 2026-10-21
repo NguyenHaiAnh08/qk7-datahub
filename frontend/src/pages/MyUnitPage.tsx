@@ -124,7 +124,7 @@ export const MyUnitPage: React.FC = () => {
       <Header
         activeNav="myunit"
         title="QK7 DATAHUB"
-        subtitle={currentUnit ? `Đơn vị: ${currentUnit.name}` : 'Portal đơn vị'}
+        subtitle={currentUnit ? `Đơn vị: ${currentUnit.name}` : 'Trung tâm thư viện số đơn vị'}
       />
 
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
@@ -136,7 +136,7 @@ export const MyUnitPage: React.FC = () => {
             </div>
             <div className="flex-1">
               <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-                Portal Đơn Vị: {currentUnit?.name || '...'}
+                Trung tâm thư viện số: {currentUnit?.name || '...'}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {canSelectUnit

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Drawer } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -26,6 +27,7 @@ import {
   Briefcase,
   UserCheck,
 } from 'lucide-react';
+import { useDeviceMode } from '../contexts/DeviceModeContext';
 import { Header } from '../components/common/Header';
 import { Sidebar } from '../components/common/Sidebar';
 import { Toast, ToastState } from '../components/common/Toast';
@@ -99,26 +101,39 @@ const getNextPositionId = (positions: MilitaryPosition[]): string => {
   return `P-${String(candidate).padStart(2, '0')}`;
 };
 
+const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any }> = [
+  { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
+  { id: 'users', label: 'Người dùng', icon: Users },
+  { id: 'roles', label: 'Vai trò', icon: KeyRound },
+  { id: 'permissions', label: 'Quyền', icon: ShieldAlert },
+  { id: 'units', label: 'Đơn vị', icon: Building },
+  { id: 'doctypes', label: 'Loại văn bản', icon: FileText },
+  { id: 'levels', label: 'Mức bảo mật', icon: Shield },
+  { id: 'ranks', label: 'Cấp bậc', icon: Award },
+  { id: 'positions', label: 'Chức vụ', icon: Briefcase },
+  { id: 'logs', label: 'Nhật ký', icon: Activity },
+];
+
 export const AdminDashboardPage: React.FC = () => {
+  const { deviceMode, orientation, screenWidth } = useDeviceMode();
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem('qk7_sidebar_collapsed') === 'true';
-    } catch {
-      return false;
-    }
-  });
+
+  const isIPadLandscape = deviceMode === 'ipad' && orientation === 'landscape';
+  const isIPadPortrait = deviceMode === 'ipad' && orientation === 'portrait';
+
+  // Ở iPad Landscape: Dock Sidebar w-[190px], có thể bấm thu gọn về w-[68px]
+  // Ở PC: Sidebar w-[260px], có thể bấm thu gọn về w-[76px]
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const toggleSidebarCollapsed = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('qk7_sidebar_collapsed', String(next));
-      } catch {}
-      return next;
-    });
+    setSidebarCollapsed((prev) => !prev);
   };
+
+  const isPortraitMode = isIPadPortrait || (deviceMode === 'pc' && screenWidth < 1024);
+  const sidebarWidthClass = isIPadLandscape
+    ? (sidebarCollapsed ? 'w-[68px]' : 'w-[190px]')
+    : (sidebarCollapsed ? 'w-[76px]' : 'w-[260px]');
 
   // Stats
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -477,70 +492,103 @@ export const AdminDashboardPage: React.FC = () => {
 
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+    <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-purple-600 selection:text-white transition-colors duration-200">
       {/* Header */}
       <Header
         activeNav="admin"
         title="QK7 DATAHUB"
         subtitle="Hệ Thống Quản Trị Trung Tâm & Phân Quyền Quân Khu"
+        onToggleMobileMenu={() => setSidebarOpen(true)}
       />
 
       {/* Main Container */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside
-          className={`fixed inset-y-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 lg:static lg:translate-x-0 overflow-x-hidden ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } ${sidebarCollapsed ? 'w-16 sm:w-20' : 'w-64'}`}
-        >
-          <div className="lg:hidden p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-800">
-            <span className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Điều hướng</span>
-            <button onClick={() => setSidebarOpen(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Fixed Desktop Sidebar hoặc iPad Landscape Dock Sidebar (190px / 68px) */}
+        {!isPortraitMode && (
+          <aside
+            className={`flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md overflow-x-hidden transition-all duration-300 ${sidebarWidthClass}`}
+          >
+            <Sidebar
+              activeTab={activeTab as any}
+              onTabChange={(id) => {
+                setActiveTab(id);
+                setSidebarOpen(false);
+              }}
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={toggleSidebarCollapsed}
+            />
+          </aside>
+        )}
 
-          <Sidebar
-            activeTab={activeTab as any}
-            onTabChange={(id) => {
-              setActiveTab(id);
-              setSidebarOpen(false);
-            }}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={toggleSidebarCollapsed}
-          />
-        </aside>
-
-        {/* Mobile Backdrop */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-slate-950/60 z-30 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
+        {/* Drawer trượt khi ở chế độ Portrait hoặc màn hình nhỏ < 1024px */}
+        {isPortraitMode && (
+          <Drawer
+            placement="left"
+            width={270}
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            styles={{ body: { padding: 0 } }}
+            className="qk7-sidebar-drawer"
+          >
+            <Sidebar
+              activeTab={activeTab as any}
+              onTabChange={(id) => {
+                setActiveTab(id);
+                setSidebarOpen(false);
+              }}
+              onClose={() => setSidebarOpen(false)}
+              collapsed={false}
+            />
+          </Drawer>
         )}
 
         {/* Content Area */}
-        <main className="flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-5 lg:p-6 xl:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-6">
-          {/* Mobile Menu Bar */}
-          <div className="lg:hidden flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800/80">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center gap-2 text-xs shadow-sm cursor-pointer"
-            >
-              <Menu className="w-4 h-4" />
-              <span>Danh mục Quản trị</span>
-            </button>
-          </div>
+        <main className="flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-5 lg:p-6 xl:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-5">
+          {/* Mobile / iPad Portrait Menu Bar & Swipeable Tab Strip — Chuyển tab 1 chạm, không che dữ liệu */}
+          {isPortraitMode && (
+            <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800/80 select-none">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="shrink-0 p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 flex items-center gap-1.5 text-xs font-semibold shadow-xs transition cursor-pointer"
+                title="Mở toàn bộ danh mục dạng Drawer"
+              >
+                <Menu className="w-4 h-4" />
+                <span className="hidden sm:inline">Danh mục</span>
+              </button>
+
+              {/* Thanh Tab Ngang Cuộn Cảm Ứng no-scrollbar */}
+              <div className="flex-1 flex overflow-x-auto no-scrollbar gap-1.5 py-0.5">
+                {ADMIN_NAV_TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                        isActive
+                          ? 'bg-purple-600 text-white shadow-xs'
+                          : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* TAB: OVERVIEW */}
           {activeTab === 'overview' && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <LayoutDashboard className="w-5 h-5 text-amber-400" /> Tổng Quan Hệ Thống
                   </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Thống kê dữ liệu hoạt động thời gian thực</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Thống kê dữ liệu hoạt động thời gian thực</p>
                 </div>
                 <button
                   onClick={async () => {
@@ -553,8 +601,16 @@ export const AdminDashboardPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* KPI Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4">
+              {/* KPI Cards — iPad Landscape 4 cột, iPad Portrait 2x2, PC 4 cột */}
+              <div
+                className={
+                  isIPadLandscape
+                    ? 'grid grid-cols-4 gap-3'
+                    : isIPadPortrait
+                    ? 'grid grid-cols-2 gap-3'
+                    : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4'
+                }
+              >
                 <StatCard
                   label="Quân nhân & Người dùng"
                   value={stats?.users ?? '—'}
@@ -588,8 +644,16 @@ export const AdminDashboardPage: React.FC = () => {
                 />
               </div>
 
-              {/* Distribution Charts */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {/* Distribution Charts — iPad Landscape 2 cột song song, iPad Portrait dọc */}
+              <div
+                className={
+                  isIPadLandscape
+                    ? 'grid grid-cols-2 gap-4'
+                    : isIPadPortrait
+                    ? 'grid grid-cols-1 gap-4'
+                    : 'grid grid-cols-1 xl:grid-cols-2 gap-4'
+                }
+              >
                 <DistributionChart
                   title="Phân Bố Tài Liệu Theo Mức Bảo Mật"
                   icon={<Shield className="w-4 h-4 text-amber-400" />}

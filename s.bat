@@ -37,19 +37,19 @@ echo.
 echo ==========================================
 if "%FRONTEND_BUILT%"=="1" (
     echo   Server da khoi dong!
-    echo   Web:   http://192.168.1.229:8000
+    echo   Web:   http://191.168.1.1:8000
     echo.
     echo   [OK] Frontend da build san - khong can npm run dev
 ) else (
     echo   Server da khoi dong!
-    echo   Web:   http://192.168.1.229:8000
+    echo   Web:   http://191.168.1.1:8000
     echo.
     echo   [CANH BAO] Chua build frontend!
     echo   Lan dau can chay: cd frontend ^&^& npm run build
     echo   Hoac dung start-dev.bat de chay dev mode
 )
 echo.
-echo   Swagger: http://192.168.1.229:8000/api-docs
-echo   AI API:  http://192.168.1.229:8001/docs
+echo   Swagger: http://191.168.1.1:8000/api-docs
+echo   AI API:  http://191.168.1.1:8001/docs
 echo ==========================================
 timeout /t 5 >nul

@@ -106,7 +106,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
       {/* Action Footer */}
       <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
         {isRestricted ? (
-          <div className="w-full py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5">
+          <div className="w-full min-h-[40px] py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5">
             <Lock className="w-3.5 h-3.5" />
             <span>Giới hạn quyền truy cập</span>
           </div>
@@ -114,30 +114,31 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           <>
             <button
               onClick={() => onPreview(document)}
-              className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              className="flex-1 min-h-[40px] py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>Xem trước</span>
+              <span>Xem văn bản PDF</span>
             </button>
             {canDownload ? (
               <button
                 onClick={() => onDownload(document)}
-                className="py-1.5 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                className="min-h-[40px] py-2 px-3.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
                 title="Tải về máy"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-4 h-4" />
+                <span className="text-xs">Tải về</span>
               </button>
             ) : (
               <button
                 disabled
-                className="py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed opacity-60"
+                className="min-h-[40px] py-2 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed opacity-60"
                 title={
                   isSecretLevel
                     ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
                     : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
                 }
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-4 h-4" />
               </button>
             )}
           </>

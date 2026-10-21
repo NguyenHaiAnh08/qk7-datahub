@@ -222,7 +222,7 @@ export const DocumentDeskPage: React.FC = () => {
         {/* Document Table */}
         <DocumentTable
           documents={paginatedDocs}
-          userClearanceLevel={user?.clearance_level_id || 5}
+          userClearanceLevel={user?.clearance_level_id || 1}
           loading={loading}
           currentPage={currentPage}
           totalPages={totalPages}

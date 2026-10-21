@@ -32,7 +32,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const {
   setupFingerprintWS, requestScan, requestEnroll,
-  isAgentOnline, listAgents,
+  getEnrollProgress, isAgentOnline, listAgents,
 } = require('./src/fingerprint-ws');
 
 const {
@@ -878,6 +878,12 @@ app.post('/api/admin/fingerprint/enroll/:userId', requireAuth, async (req, res) 
     }
 
     if (!enrollResult.success || !enrollResult.template_b64) {
+      if (enrollResult.error === 'CANCELLED') {
+        return res.status(409).json({
+          error: 'Yêu cầu đăng ký vân tay đã bị hủy bởi thao tác mới.',
+          cancelled: true,
+        });
+      }
       return res.status(400).json({ error: enrollResult.error || 'Enroll thất bại' });
     }
 
@@ -907,6 +913,11 @@ app.post('/api/admin/fingerprint/enroll/:userId', requireAuth, async (req, res) 
     console.error('[admin/fingerprint/enroll]', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get('/api/admin/fingerprint/enroll-status', requireAuth, (req, res) => {
+  const deviceId = req.query.deviceId || req.headers['x-device-fp'];
+  res.json(getEnrollProgress(deviceId));
 });
 
 app.get('/api/admin/fingerprint/agents', requireAuth, (req, res) => {

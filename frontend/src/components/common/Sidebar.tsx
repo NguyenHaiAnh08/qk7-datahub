@@ -146,6 +146,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return buttonElement;
         })}
       </div>
+
+      {/* Quick toggle at bottom */}
+      {onToggleCollapse && (
+        <div className="p-2 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-900/60">
+          <button
+            onClick={onToggleCollapse}
+            className={`w-full flex items-center ${
+              collapsed ? 'justify-center p-2' : 'justify-start space-x-2 px-3 py-2'
+            } rounded-xl text-xs text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition cursor-pointer font-medium`}
+            title={collapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
+          >
+            {collapsed ? (
+              <ChevronRight className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            ) : (
+              <>
+                <ChevronLeft className="w-4 h-4" />
+                <span>Thu gọn danh mục</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

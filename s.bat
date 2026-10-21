@@ -1,31 +1,55 @@
 @echo off
 chcp 65001 >nul
-title Khoi dong he thong
+title QK7 DataHub - Khoi dong Server
+cd /d "%~dp0"
 
-echo ========================================
-echo   DANG KHOI DONG CAC SERVICE...
-echo ========================================
-echo.
-
-REM %~dp0 = thu muc chua file .bat nay (tu dong lay duong dan tuyet doi)
 set "ROOT=%~dp0"
+set "FRONTEND_BUILT=0"
 
-REM --- 1. Backend (Node.js) ---
-echo [1/3] Khoi dong Backend...
-start "Backend - npm start" cmd /k "cd /d "%ROOT%backend" && npm start"
+REM Kiem tra xem frontend da build chua
+if exist "%ROOT%backend\public\index.html" (
+    set "FRONTEND_BUILT=1"
+)
 
-REM --- 2. Frontend (Vite/Next...) ---
-echo [2/3] Khoi dong Frontend...
-start "Frontend - npm run dev" cmd /k "cd /d "%ROOT%frontend" && npm run dev"
+echo ==========================================
+echo   QK7 DataHub - KHOI DONG SERVER
+echo ==========================================
+echo.
 
-REM --- 3. Fingerprint Service (Python) ---
-echo [3/3] Khoi dong Fingerprint Service...
-start "Fingerprint Service - python agent.py" cmd /k "cd /d "%ROOT%fingerprint" && python agent.py"
+REM --- Backend ---
+if not exist "%ROOT%backend\node_modules" (
+    echo [LOI] Chua cai dependencies backend.
+    echo Chay: cd backend ^&^& npm install
+    pause
+    exit /b 1
+)
+echo [1/2] Khoi dong Backend (:8000)...
+start "QK7 Backend" cmd /k "cd /d "%ROOT%backend" && npm start"
+
+REM Doi backend khoi dong
+timeout /t 4 >nul
+
+REM --- AI boxchat ---
+echo [2/2] Khoi dong AI boxchat (:8001)...
+start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && python main.py"
 
 echo.
-echo ========================================
-echo   DA KHOI DONG TAT CA SERVICE!
-echo   (Moi service chay trong 1 cua so rieng)
-echo ========================================
-timeout /t 3 >nul
-exit
+echo ==========================================
+if "%FRONTEND_BUILT%"=="1" (
+    echo   Server da khoi dong!
+    echo   Web:   http://192.168.1.229:8000
+    echo.
+    echo   [OK] Frontend da build san - khong can npm run dev
+) else (
+    echo   Server da khoi dong!
+    echo   Web:   http://192.168.1.229:8000
+    echo.
+    echo   [CANH BAO] Chua build frontend!
+    echo   Lan dau can chay: cd frontend ^&^& npm run build
+    echo   Hoac dung start-dev.bat de chay dev mode
+)
+echo.
+echo   Swagger: http://192.168.1.229:8000/api-docs
+echo   AI API:  http://192.168.1.229:8001/docs
+echo ==========================================
+timeout /t 5 >nul

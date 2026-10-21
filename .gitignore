@@ -28,3 +28,18 @@ yarn-debug.log*
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+env/

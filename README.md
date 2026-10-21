@@ -14,7 +14,7 @@ Nội dung tài liệu bao gồm:
 1. **Sơ Đồ Kiến Trúc Hệ Thống (Mermaid):** Mô hình 5 tầng: Client & Phần cứng ZK9500, Presentation React 18 SPA, Gateway Express 5 & WebSocket, Microservice AI FastAPI (:8001) và CSDL SQL Server / Qdrant Vector Storage.
 2. **Sơ Đồ Cấu Trúc Mã Nguồn:** Cây thư mục chi tiết toàn bộ dự án (`backend/`, `frontend/`, `boxchat/`, `fingerprint/`).
 3. **Mô Hình Phân Quyền & Bảo Mật Đa Tầng:** 5 cấp độ mật quân sự, xác thực sinh trắc học 2FA và lọc ngữ cảnh an toàn trong AI RAG.
-4. **Sơ Đồ Luồng Dữ Liệu Nghiệp Vụ:** Đăng nhập, tải lên văn bản, tra cứu độ mật, xác thực vân tay xem tài liệu Mật/Tuyệt Mật, đăng ký mẫu vân tay 3 bước và hỏi đáp tác chiến AI kèm Smart SQL Fallback.
+4. **Sơ Đồ Luồng Dữ Liệu Nghiệp Vụ:** Đăng nhập, tải lên văn bản, tra cứu độ mật, xác thực vân tay xem tài liệu độ mật cao (Cấp 3 - Mật, Cấp 4 - Tối Mật, Cấp 5 - Tuyệt Mật), đăng ký mẫu vân tay 3 bước và hỏi đáp tác chiến AI kèm Smart SQL Fallback.
 5. **Sơ Đồ Cơ Sở Dữ Liệu (Database ERD):** Ràng buộc quan hệ giữa các bảng `USER`, `USER_FINGERPRINT`, `SECURITY_LEVEL`, `UNIT`, `DOCUMENT`, `DOCUMENT_TYPE`, `ACCESS_LOG`, `ROLE`, `PERMISSION`.
 6. **Kiến Trúc Trợ Lý AI Tác Chiến (boxchat):** RAG với trích dẫn số trang chính xác, tự động sinh cẩm nang học tập tác chiến (`study-book`) và cơ chế Smart SQL Fallback.
 7. **Kiến Trúc Sinh Trắc Học Vân Tay (ZKTeco ZK9500):** CTypes wrapper kết nối `libzkfp.dll`, Local Agent (:9001), WebSocket Gateway và mã hóa AES-256-GCM.
@@ -72,7 +72,7 @@ qk7-datahub/
         ├── pages/                          # LoginPage, PortalPage, DocumentDeskPage, AdminDashboardPage, UsersPage
         ├── components/
         │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
-        │   ├── document-desk/              # FingerprintScanModal (Xác thực vân tay xem văn bản Mật)
+        │   ├── document-desk/              # FingerprintScanModal (Xác thực vân tay xem văn bản Mật / Tối Mật / Tuyệt Mật)
         │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Touch ID SVG)
         │   ├── dashboard/                  # SecurityAuditLog (Trung tâm SOC), UnitTreeTable (Cây đơn vị), StatCard...
         │   └── common/                     # Header, Sidebar, Layout, TouchIDFingerprint...
@@ -91,7 +91,7 @@ qk7-datahub/
 - **Smart SQL Fallback:** Khi microservice AI tạm thời chưa bật, Gateway Express tự động chuyển sang chế độ dự phòng thông minh, truy vấn trực tiếp SQL Server đảm bảo không gián đoạn dịch vụ.
 
 ### 2. Xác Thực Sinh Trắc Học Vân Tay Hai Lớp (ZKTeco ZK9500)
-- **Bảo mật cấp độ cao:** Đối với văn bản Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), quân nhân bắt buộc phải xác thực vân tay quang học trên máy quét ZK9500 trước khi mở xem inline hoặc tải tệp.
+- **Bảo mật cấp độ cao:** Đối với văn bản Cấp 3 (Mật), Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), quân nhân bắt buộc phải xác thực vân tay quang học trên máy quét ZK9500 trước khi mở xem inline hoặc tải tệp.
 - **Biometric Token:** Sau khi xác thực thành công, Gateway cấp JWT `fingerprint_token` có hiệu lực 5 phút gắn với `(user_id, file_id)`.
 - **Đăng ký vân tay 3 bước trực quan:** Hộp thoại đăng ký quân nhân tích hợp hoạt ảnh Touch ID mô phỏng vector chuyển màu đỏ theo tiến trình đặt ngón tay 3 lần liên tiếp, cập nhật real-time từ cảm biến quang học.
 
@@ -192,7 +192,7 @@ Hệ thống tích hợp cổng tài liệu API tương tác trực tiếp:
 2. **`AI`**: Hỏi đáp RAG tác chiến (`POST /api/ai/query`), biên soạn giáo trình học tập (`POST /api/ai/study-book`), kiểm tra trạng thái AI (`GET /api/ai/health`), nạp văn kiện vào vector store (`POST /api/ai/ingest`).
 3. **`Fingerprint` (Admin)**: Đăng ký mẫu vân tay quân nhân (`POST /api/admin/fingerprint/enroll/{userId}`), danh sách máy quét online (`GET /api/admin/fingerprint/agents`), xóa vân tay (`DELETE /api/admin/fingerprint/users/{userId}`).
 4. **`Documents`**: Quản lý tài liệu PDF — Tìm kiếm có kiểm soát độ mật (`GET /api/documents`), Tải lên hash SHA-256 (`POST /api/documents/upload`), Xem chi tiết, Sửa, Xóa.
-5. **`Files`**: Stream xem inline hoặc tải về tệp PDF đính kèm (`GET /api/files/{fileId}/view`, yêu cầu `X-Fingerprint-Token` nếu độ mật $\ge$ 4).
+5. **`Files`**: Stream xem inline hoặc tải về tệp PDF đính kèm (`GET /api/files/{fileId}/view`, yêu cầu `X-Fingerprint-Token` nếu độ mật $\ge$ 3: Cấp 3 - Mật, Cấp 4 - Tối Mật, Cấp 5 - Tuyệt Mật).
 6. **`Admin` (Cần Clearance $\ge$ 4)**: KPI thống kê (`/api/admin/stats`), CRUD Quân nhân, Phân quyền vai trò, CRUD Đơn vị, Loại văn bản, Mức bảo mật và Dọn dẹp Audit Log.
 
 ---

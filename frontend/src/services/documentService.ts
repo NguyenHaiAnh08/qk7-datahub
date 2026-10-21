@@ -33,10 +33,7 @@ export interface ParseDocumentResult {
     file_size?: number;
     sha256?: string;
     error?: string;
-      duplicate_check?: {
-    is_duplicate: boolean;
-    matches: DuplicateMatchDoc[];
-  };
+    duplicate_check?: CheckDuplicateResult;
 }
 
 /**
@@ -62,6 +59,27 @@ export interface CheckDuplicateResult {
     by_sha256: DuplicateMatchDoc[];
     by_code: DuplicateMatchDoc[];
   };
+}
+
+
+export interface MyUnitDocumentResponse {
+  total: number;
+  items: DocumentItem[];
+  unit: { unit_id: string; name: string; parent_id?: string | null };
+  subtree_unit_ids: string[];
+  can_select_unit: boolean;
+  selected_unit_id: string;
+}
+
+export interface MyUnitDocumentParams {
+  unit_id?: string;
+  q?: string;
+  code?: string;
+  title?: string;
+  type?: string;
+  from?: string;
+  to?: string;
+  lv?: number;
 }
 
 
@@ -93,6 +111,26 @@ export const documentService = {
 
   getDocumentById: async (fileId: string): Promise<DocumentItem> => {
     return http<DocumentItem>(API_ENDPOINTS.DOCUMENTS.DETAIL(fileId));
+  },
+
+    getMyUnitDocuments: async (
+    params: MyUnitDocumentParams = {}
+  ): Promise<MyUnitDocumentResponse> => {
+    const sp = new URLSearchParams();
+    if (params.unit_id) sp.append('unit_id', params.unit_id);
+    if (params.q) sp.append('q', params.q);
+    if (params.code) sp.append('code', params.code);
+    if (params.title) sp.append('title', params.title);
+    if (params.type) sp.append('type', params.type);
+    if (params.from) sp.append('from', params.from);
+    if (params.to) sp.append('to', params.to);
+    if (params.lv !== undefined && params.lv !== null) sp.append('lv', String(params.lv));
+
+    const qs = sp.toString();
+    return http<MyUnitDocumentResponse>(
+      `/api/documents/my-unit${qs ? `?${qs}` : ''}`,
+      { skipErrorNotification: true }
+    );
   },
 
   uploadDocument: async (

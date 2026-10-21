@@ -8,13 +8,13 @@ Hệ thống quản lý, lưu trữ số hóa, phân quyền khai thác tài li�
 
 Toàn bộ sơ đồ kiến trúc hệ thống, sơ đồ cấu trúc mã nguồn, lưu đồ tuần tự nghiệp vụ, thiết kế cơ sở dữ liệu và chi tiết tích hợp AI/vân tay được trình bày tại:
 
-👉 **[SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)**
+👉 **[SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)** | **[SETUP_SERVER.md](./SETUP_SERVER.md)**
 
 Nội dung tài liệu bao gồm:
 1. **Sơ Đồ Kiến Trúc Hệ Thống (Mermaid):** Mô hình 5 tầng: Client & Phần cứng ZK9500, Presentation React 18 SPA, Gateway Express 5 & WebSocket, Microservice AI FastAPI (:8001) và CSDL SQL Server / Qdrant Vector Storage.
-2. **Sơ Đồ Cấu Trúc Mã Nguồn:** Cây thư mục chi tiết toàn bộ dự án (`backend/`, `frontend/`, `boxchat/`, `fingerprint-service/`).
+2. **Sơ Đồ Cấu Trúc Mã Nguồn:** Cây thư mục chi tiết toàn bộ dự án (`backend/`, `frontend/`, `boxchat/`, `fingerprint/`).
 3. **Mô Hình Phân Quyền & Bảo Mật Đa Tầng:** 5 cấp độ mật quân sự, xác thực sinh trắc học 2FA và lọc ngữ cảnh an toàn trong AI RAG.
-4. **Sơ Đồ Luồng Dữ Liệu Nghiệp Vụ:** Đăng nhập, tải lên văn bản, tra cứu độ mật, xác thực vân tay xem tài liệu Mật/Tuyệt Mật, đăng ký mẫu vân tay 3 bước và hỏi đáp tác chiến AI kèm Smart SQL Fallback.
+4. **Sơ Đồ Luồng Dữ Liệu Nghiệp Vụ:** Đăng nhập, tải lên văn bản, tra cứu độ mật, xác thực vân tay xem tài liệu độ mật cao (Cấp 3 - Mật, Cấp 4 - Tối Mật, Cấp 5 - Tuyệt Mật), đăng ký mẫu vân tay 3 bước và hỏi đáp tác chiến AI kèm Smart SQL Fallback.
 5. **Sơ Đồ Cơ Sở Dữ Liệu (Database ERD):** Ràng buộc quan hệ giữa các bảng `USER`, `USER_FINGERPRINT`, `SECURITY_LEVEL`, `UNIT`, `DOCUMENT`, `DOCUMENT_TYPE`, `ACCESS_LOG`, `ROLE`, `PERMISSION`.
 6. **Kiến Trúc Trợ Lý AI Tác Chiến (boxchat):** RAG với trích dẫn số trang chính xác, tự động sinh cẩm nang học tập tác chiến (`study-book`) và cơ chế Smart SQL Fallback.
 7. **Kiến Trúc Sinh Trắc Học Vân Tay (ZKTeco ZK9500):** CTypes wrapper kết nối `libzkfp.dll`, Local Agent (:9001), WebSocket Gateway và mã hóa AES-256-GCM.
@@ -29,6 +29,7 @@ Nội dung tài liệu bao gồm:
 qk7-datahub/
 ├── package.json                            # Điều phối kịch bản khởi chạy toàn bộ dự án
 ├── README.md                               # Sổ tay hướng dẫn khởi động nhanh
+├── SETUP_SERVER.md                         # Sổ tay hướng dẫn cài đặt Server & Client chi tiết
 ├── SYSTEM_ARCHITECTURE.md                  # Tài liệu kiến trúc toàn diện hệ thống
 │
 ├── backend/                                # 🟢 MÁY CHỦ EXPRESS 5 & WEBSOCKET GATEWAY (:8000)
@@ -55,7 +56,7 @@ qk7-datahub/
 │   ├── local_storage/                      # Kho lưu trữ vector embedding nội bộ bảo mật
 │   └── requirements.txt                    # Dependencies: fastapi, uvicorn, qdrant-client, langchain...
 │
-├── fingerprint-service/                    # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001)
+├── fingerprint/                            # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001)
 │   ├── agent.py                            # Local HTTP Server (:9001) & WebSocket Client
 │   ├── zk_service.py                       # CTypes wrapper SDK ZKTeco ZK9500 (libzkfp.dll)
 │   ├── libzkfp.dll                         # Thư viện DLL điều khiển cảm biến quang học ZKTeco
@@ -72,7 +73,7 @@ qk7-datahub/
         ├── pages/                          # LoginPage, PortalPage, DocumentDeskPage, AdminDashboardPage, UsersPage
         ├── components/
         │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
-        │   ├── document-desk/              # FingerprintScanModal (Xác thực vân tay xem văn bản Mật)
+        │   ├── document-desk/              # FingerprintScanModal (Xác thực vân tay xem văn bản Mật / Tối Mật / Tuyệt Mật)
         │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Touch ID SVG)
         │   ├── dashboard/                  # SecurityAuditLog (Trung tâm SOC), UnitTreeTable (Cây đơn vị), StatCard...
         │   └── common/                     # Header, Sidebar, Layout, TouchIDFingerprint...
@@ -91,7 +92,7 @@ qk7-datahub/
 - **Smart SQL Fallback:** Khi microservice AI tạm thời chưa bật, Gateway Express tự động chuyển sang chế độ dự phòng thông minh, truy vấn trực tiếp SQL Server đảm bảo không gián đoạn dịch vụ.
 
 ### 2. Xác Thực Sinh Trắc Học Vân Tay Hai Lớp (ZKTeco ZK9500)
-- **Bảo mật cấp độ cao:** Đối với văn bản Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), quân nhân bắt buộc phải xác thực vân tay quang học trên máy quét ZK9500 trước khi mở xem inline hoặc tải tệp.
+- **Bảo mật cấp độ cao:** Đối với văn bản Cấp 3 (Mật), Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), quân nhân bắt buộc phải xác thực vân tay quang học trên máy quét ZK9500 trước khi mở xem inline hoặc tải tệp.
 - **Biometric Token:** Sau khi xác thực thành công, Gateway cấp JWT `fingerprint_token` có hiệu lực 5 phút gắn với `(user_id, file_id)`.
 - **Đăng ký vân tay 3 bước trực quan:** Hộp thoại đăng ký quân nhân tích hợp hoạt ảnh Touch ID mô phỏng vector chuyển màu đỏ theo tiến trình đặt ngón tay 3 lần liên tiếp, cập nhật real-time từ cảm biến quang học.
 
@@ -124,60 +125,204 @@ qk7-datahub/
 
 ---
 
-## 🚀 Khởi Động Nhanh
+## 🚀 Hướng Dẫn Cài Đặt & Vận Hành Hệ Thống (Server & Client Setup Guide)
 
-### 1. Cài đặt thư viện (lần đầu)
-```bash
-# Cài đặt Backend & Frontend
-npm run backend:install
-npm run frontend:install
+### PHẦN A — SETUP MÁY SERVER (192.168.1.xxx)
+*(Thay `192.168.1.xxx` bằng địa chỉ IP tĩnh thực tế của máy chủ Server trong mạng LAN)*
 
-# Cài đặt Microservice AI boxchat
-cd boxchat && pip install -r requirements.txt
-
-# Cài đặt Local Fingerprint Agent
-cd ../fingerprint-service && pip install -r requirements.txt
+#### 1. Kiểm tra môi trường hệ thống
+Mở **PowerShell** và chạy:
+```powershell
+node --version        # Yêu cầu >= 22.13 (Tải tại: https://nodejs.org/)
+npm --version
+python --version      # Yêu cầu >= 3.10  (Tải tại: https://www.python.org/downloads/)
 ```
 
-### 2. Chạy toàn bộ 4 dịch vụ hệ thống
+#### 2. Kiểm tra dịch vụ Microsoft SQL Server
+```powershell
+Get-Service | Where-Object {$_.Name -like "MSSQL*"}
+```
+> **Lưu ý:** Phải có ít nhất 1 service trạng thái **Running** (ví dụ: `MSSQLSERVER` hoặc `MSSQL$SQLEXPRESS`).
 
-Mở 4 cửa sổ Terminal riêng biệt:
+#### 3. Cấu hình biến môi trường Backend (`backend/.env`)
+Tạo hoặc chỉnh sửa tệp `backend/.env`:
+```env
+# ─── Server ───
+PORT=8000
+NODE_ENV=production
 
-* **Terminal 1: Máy chủ Backend Express & WebSocket Gateway (:8000)**
-  ```bash
-  cd backend
-  npm start
-  ```
-  * Cổng Web & API: [http://localhost:8000](http://localhost:8000)
-  * Swagger UI: [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
+# ─── SQL Server ───
+# localhost nếu cùng máy. IP máy khác nếu SQL Server ở máy khác.
+DB_SERVER=localhost
+DB_PORT=1433
+DB_DATABASE=QK7_ThuVienSo
+DB_USER=sa
+DB_PASSWORD=<mật_khẩu_SQL_Server_thật_của_bạn>
+DB_ENCRYPT=false
+DB_TRUST_CERT=true
 
-* **Terminal 2: Giao diện người dùng Frontend Vite (:5173)**
-  ```bash
-  cd frontend
-  npm run dev
-  ```
-  * Truy cập ứng dụng: [http://localhost:5173](http://localhost:5173)
+# ─── Bảo vệ đăng nhập ───
+LOCKOUT_MAX_ATTEMPTS=6
+LOCKOUT_WINDOW_MINUTES=15
+IPBLOCK_MAX_ATTEMPTS=6
+IPBLOCK_WRONG_PASSWORD_MAX_ATTEMPTS=15
+IPBLOCK_WINDOW_MINUTES=15
+IPBLOCK_DURATION_MINUTES=30
 
-* **Terminal 3: Microservice Trợ Lý AI boxchat (:8001)**
-  ```bash
-  cd boxchat
-  python main.py
-  ```
-  * Cổng AI Service: [http://localhost:8001](http://localhost:8001)
+# ─── Swagger ───
+ENABLE_SWAGGER=false
 
-* **Terminal 4: Local Fingerprint Hardware Agent (:9001)**
-  ```bash
-  cd fingerprint-service
-  python agent.py
-  ```
-  * Trạm kiểm soát vân tay: [http://127.0.0.1:9001/device-id](http://127.0.0.1:9001/device-id)
+# ─── Parser ───
+PARSER_STRICT_MODE=false
 
-### 3. Đóng gói sản phẩm (Production Build)
-```bash
-cd frontend
+# ─── JWT ───
+JWT_SECRET=<sinh_ngay_bên_dưới>
+JWT_EXPIRES_IN=8h
+
+# ─── Fingerprint ───
+FP_ENC_KEY=k42yVJ1TDdgCiNX+gIFRDvddfvihwjvREJcBSPbpJkw=
+FINGERPRINT_BRIDGE_TOKEN=qk7_bridge_2026_secret_xyz9876543210abcdef
+```
+
+* **Sinh `JWT_SECRET` mới:** Chạy lệnh sau trong PowerShell, sao chép kết quả chuỗi Base64 và dán vào `JWT_SECRET` trong file `.env`:
+```powershell
+[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+```
+
+#### 4. Cấu hình biến môi trường AI boxchat (`boxchat/.env`)
+Tạo hoặc chỉnh sửa tệp `boxchat/.env` (nếu chưa có thì tạo mới):
+```env
+BACKEND_UPLOADS_DIR=../backend/uploads
+QDRANT_STORAGE_PATH=./local_storage/qdrant_data
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:7b
+```
+
+#### 5. Cài đặt dependencies (Chỉ lần đầu)
+Mở CMD chạy lần lượt:
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\backend
+npm install
+
+cd /d D:\QK7_DataHub\qk7-datahub\frontend
+npm install
+
+cd /d D:\QK7_DataHub\qk7-datahub\boxchat
+pip install -r requirements.txt
+```
+
+#### 6. Đóng gói giao diện Frontend (Production Build)
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\frontend
 npm run build
 ```
-Bản build tĩnh sẽ tự động được xuất sang `backend/public/`. Khi đó chỉ cần chạy `npm start` tại `backend/`, máy chủ sẽ phục vụ toàn bộ ứng dụng SPA, API và WebSocket trên cổng `:8000`.
+Kiểm tra file build đã tự động xuất sang `backend/public/`:
+```cmd
+dir D:\QK7_DataHub\qk7-datahub\backend\public\index.html
+```
+
+#### 7. Khởi tạo tài khoản quản trị viên
+Tại thư mục `backend`, chạy:
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\backend
+node setup-passwords.js
+```
+*(Thiết lập tài khoản: Mã `USR-001`, Mật khẩu `123456789`, Vai trò `ADMIN`)*
+
+#### 8. Mở cổng tường lửa Windows Firewall (Server)
+Chạy lệnh PowerShell (Run as Administrator) mở port 8000 cho các máy Client kết nối:
+```powershell
+New-NetFirewallRule -DisplayName "QK7 Backend 8000" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow
+```
+
+---
+
+### PHẦN B — CHẠY SERVER (HÀNG NGÀY)
+
+1. **Khởi động Server (Backend + AI boxchat):**
+   - Click đúp vào tệp `s.bat` trong thư mục gốc `D:\QK7_DataHub\qk7-datahub\s.bat`.
+2. **Khởi động trạm quét vân tay trên server (nếu máy chủ có cắm đầu đọc ZK9500):**
+   ```cmd
+   cd /d D:\QK7_DataHub\qk7-datahub\fingerprint
+   python agent.py
+   ```
+
+---
+
+### PHẦN C — SETUP MÁY CLIENT (192.168.1.X)
+
+#### 1. Cài đặt driver ZK9500 & Python
+- Cài đặt driver ZK9500 cho máy client.
+- Kiểm tra file thư viện DLL:
+  ```cmd
+  dir C:\Windows\System32\libzkfp.dll
+  ```
+- Kiểm tra phiên bản Python (yêu cầu >= 3.10, tick chọn "Add Python to PATH"):
+  ```cmd
+  python --version
+  ```
+
+#### 2. Cài đặt chứng chỉ rootCA vào Windows Root Store
+Mở PowerShell (Run as Administrator) trên máy Client:
+```powershell
+# Copy rootCA.pem từ share LAN của máy server về máy client (nếu chưa có)
+Copy-Item "\\192.168.1.229\QK7Share\rootCA.pem" "C:\QK7Agent\rootCA.pem" -Force
+
+# Cài chứng chỉ vào Windows Root Store
+Import-Certificate -FilePath "C:\QK7Agent\rootCA.pem" -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+#### 3. Tạo thư mục trạm máy quét `C:\QK7Agent\`
+Tạo thư mục `C:\QK7Agent\` trên máy Client với cấu trúc:
+```text
+C:\QK7Agent\
+├── agent.py
+├── libzkfp.dll
+├── requirements.txt
+├── s-agent.bat
+├── .env                    ← sửa ở bước C.4
+└── (chưa có device_id.txt — sẽ tự sinh khi chạy lần đầu)
+```
+
+#### 4. Cấu hình file `C:\QK7Agent\.env`
+Tạo/sửa file `.env` trên máy Client (thay IP bằng IP máy server thực tế):
+```env
+# Cấu hình cho MÁY CLIENT — KHÔNG dùng localhost
+BACKEND_WS_URL=ws://192.168.1.229:8000/ws/fingerprint
+BRIDGE_TOKEN=qk7_bridge_2026_secret_xyz9876543210abcdef
+DEVICE_SERVER_HOST=127.0.0.1
+DEVICE_SERVER_PORT=9001
+MATCH_SCORE_THRESHOLD=45
+```
+
+#### 5. Cài đặt Python dependencies
+```cmd
+cd /d C:\QK7Agent
+pip install -r requirements.txt
+```
+
+#### 6. Chạy thử nghiệm Fingerprint Agent
+```cmd
+cd /d C:\QK7Agent
+python agent.py
+```
+*(Hoặc click đúp file `s-agent.bat`)*
+
+#### 7. Đăng ký tự động chạy khi Login (Startup)
+Để quân nhân / cán bộ không phải mở CMD mỗi sáng, đặt shortcut vào Startup:
+1. Nhấn **Win + R**, nhập `shell:startup`, bấm **Enter**.
+2. Trong thư mục vừa mở, click chuột phải → **New** → **Shortcut**.
+3. Trong ô *"Type the location of the item"*, nhập:
+   ```text
+   C:\QK7Agent\s-agent.bat
+   ```
+4. Bấm **Next** → đặt tên `QK7 Fingerprint Agent` → bấm **Finish**.
+
+---
+
+### 🌐 KIỂM TRA TRUY CẬP HOÀN TẤT
+Mở trình duyệt trên máy Client hoặc Server để truy cập:
+👉 **`http://192.168.1.229:8000`** *(hoặc địa chỉ IP máy server của bạn)*
 
 ---
 
@@ -192,8 +337,8 @@ Hệ thống tích hợp cổng tài liệu API tương tác trực tiếp:
 2. **`AI`**: Hỏi đáp RAG tác chiến (`POST /api/ai/query`), biên soạn giáo trình học tập (`POST /api/ai/study-book`), kiểm tra trạng thái AI (`GET /api/ai/health`), nạp văn kiện vào vector store (`POST /api/ai/ingest`).
 3. **`Fingerprint` (Admin)**: Đăng ký mẫu vân tay quân nhân (`POST /api/admin/fingerprint/enroll/{userId}`), danh sách máy quét online (`GET /api/admin/fingerprint/agents`), xóa vân tay (`DELETE /api/admin/fingerprint/users/{userId}`).
 4. **`Documents`**: Quản lý tài liệu PDF — Tìm kiếm có kiểm soát độ mật (`GET /api/documents`), Tải lên hash SHA-256 (`POST /api/documents/upload`), Xem chi tiết, Sửa, Xóa.
-5. **`Files`**: Stream xem inline hoặc tải về tệp PDF đính kèm (`GET /api/files/{fileId}/view`, yêu cầu `X-Fingerprint-Token` nếu độ mật $\ge$ 4).
-6. **`Admin` (Cần Clearance $\ge$ 4)**: KPI thống kê (`/api/admin/stats`), CRUD Quân nhân, Phân quyền vai trò, CRUD Đơn vị, Loại văn bản, Mức bảo mật và Dọn dẹp Audit Log.
+5. **`Files`**: Stream xem inline hoặc tải về tệp PDF đính kèm (`GET /api/files/{fileId}/view`, yêu cầu `X-Fingerprint-Token` nếu độ mật ≥ 3: Cấp 3 - Mật, Cấp 4 - Tối Mật, Cấp 5 - Tuyệt Mật).
+6. **`Admin` (Cần Clearance ≥ 4)**: KPI thống kê (`/api/admin/stats`), CRUD Quân nhân, Phân quyền vai trò, CRUD Đơn vị, Loại văn bản, Mức bảo mật và Dọn dẹp Audit Log.
 
 ---
 

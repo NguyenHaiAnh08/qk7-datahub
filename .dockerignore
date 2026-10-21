@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.env
+**/.env
+*.log
+.git
+**/__pycache__
+**/*.pyc
+**/.venv
+**/venv
+backend/uploads
+boxchat/local_storage
+frontend/dist
+backend/public

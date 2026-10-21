@@ -1,22 +1,34 @@
 @echo off
 chcp 65001 >nul
 title QK7 Fingerprint Agent - Client
-
 cd /d "%~dp0"
 
-REM Kiem tra .env da cau hinh dung chua
-findstr /C:"BACKEND_WS_URL=wss://192.168.1.229:8000" .env >nul
-if errorlevel 1 (
-    echo [CANH BAO] BACKEND_WS_URL trong .env chua tro ve 192.168.1.229
-    echo Mo file .env va sua:
-    echo   BACKEND_WS_URL=ws://192.168.1.229:8000/ws/fingerprint
+echo ==========================================
+echo   QK7 FINGERPRINT AGENT - CLIENT
+echo ==========================================
+echo.
+
+if not exist "agent.py" (
+    echo [LOI] Khong tim thay agent.py trong thu muc nay.
     pause
     exit /b 1
 )
 
-echo Khoi dong Fingerprint Agent tren may client...
-echo Web: http://192.168.1.229:8000
+if not exist ".env" (
+    echo [LOI] Khong tim thay file .env.
+    echo Vui long tao file .env voi noi dung:
+    echo   BACKEND_WS_URL=ws://191.168.1.1:8000/ws/fingerprint
+    echo   BRIDGE_TOKEN=qk7_bridge_2026_secret_xyz9876543210abcdef
+    pause
+    exit /b 1
+)
+
+echo --- KIEM TRA FILE .ENV CUA BAN ---
+type .env
+echo ----------------------------------
 echo.
 
+echo Dang khoi dong Fingerprint Agent...
 python agent.py
+
 pause

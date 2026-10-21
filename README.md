@@ -63,23 +63,24 @@ qk7-datahub/
 │   ├── device_id.txt                       # Mã định danh máy quét trạm làm việc
 │   └── requirements.txt                    # Dependencies: websockets, aiohttp
 │
-└── frontend/                               # 🔵 GIAO DIỆN CLIENT REACT 18 + TYPESCRIPT + ANT DESIGN
+└── frontend/                               # 🔵 GIAO DIỆN CLIENT REACT 18 + TYPESCRIPT + ANT DESIGN (DUAL-PLATFORM)
     ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
     ├── vite.config.ts                      # Config build xuất sang ../backend/public, proxy :8000
     ├── package.json                        # Dependencies: antd, react-router-dom, lucide-react, exceljs...
     └── src/
         ├── App.tsx                         # Ant Design ConfigProvider (Màu Tím #722ED1), Auth, Theme
         ├── routes/                         # Auto-Discovery Routing & ProtectedRoute theo Cấp mật
-        ├── pages/                          # LoginPage, PortalPage, DocumentDeskPage, AdminDashboardPage, UsersPage
+        ├── pages/                          # LoginPage, PortalPage (Thư viện số), MyUnitPage, DocumentDeskPage, AdminDashboardPage, UsersPage
         ├── components/
         │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
         │   ├── document-desk/              # FingerprintScanModal (Xác thực vân tay xem văn bản Mật / Tối Mật / Tuyệt Mật)
-        │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Touch ID SVG)
+        │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Touch ID Vector 3 bước)
         │   ├── dashboard/                  # SecurityAuditLog (Trung tâm SOC), UnitTreeTable (Cây đơn vị), StatCard...
-        │   └── common/                     # Header, Sidebar, Layout, TouchIDFingerprint...
+        │   └── common/                     # Header, Sidebar, Layout, DeviceModeSwitch, TouchIDFingerprint...
+        ├── hooks/                          # useDeviceMode (Hook quản lý chế độ PC Widescreen & iPad Touch UI)
         ├── utils/                          # exportAuditReportExcel.ts (Xuất file Excel .xlsx chuẩn biểu mẫu Quân đội)
         ├── services/                       # authService, documentService, userService, fingerprintService...
-        └── contexts/                       # AuthContext, ThemeContext
+        └── contexts/                       # AuthContext, ThemeContext, DeviceModeContext
 ```
 
 ---
@@ -122,6 +123,25 @@ qk7-datahub/
   - Quốc hiệu bên phải: **CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM** / **Độc lập - Tự do - Hạnh phúc** / Ngày tháng địa danh tự động (`TP. Hồ Chí Minh, ngày DD tháng MM năm YYYY`).
 - **Bảng dữ liệu chuẩn 9 cột:** `Mã Log`, `Thời Gian`, `Mã Quân Nhân`, `Họ Tên Quân Nhân`, `Hành Động`, `Nhóm Phân Loại`, `Đối Tượng / Văn Bản`, `Địa Chỉ IP`, `Ghi Chú` với tiêu đề màu vàng cam `#FFC000`, font `Times New Roman` và khung viền mảnh chuẩn mực.
 - **Chân trang ký duyệt quân sự:** Khối ký duyệt `NGƯỜI LẬP` và chức danh người lập báo cáo: `Thiếu tá QNCN Nguyễn Mạnh Nam`.
+
+### 7. Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPad Air M4 Touch UI)
+- **Tương thích toàn diện:** Vận hành tối ưu cả Máy tính bàn (Desktop PC Widescreen 16:9) lẫn máy tính bảng iPad Air M4 (11-inch & 13-inch) trên 4 trình duyệt iPadOS: Safari, Google Chrome, Google App và Cốc Cốc.
+- **Bộ chuyển đổi chế độ thông minh (`DeviceModeSwitch`):** Cho phép thủ trưởng và cán bộ chuyển đổi tức thì giữa chế độ PC và iPad, lưu trạng thái vào `localStorage`. Hỗ trợ xem thông số thiết bị real-time (Viewport `1210x802` Landscape, `834x1178` Portrait, DPR, Touch Target Apple HIG ≥ 44×44px).
+- **Thiết kế hoàn mỹ cả Light Mode & Dark Mode:**
+  - Light Mode: Phối màu Tím `#722ED1` thương hiệu Quân Khu 7 (`bg-purple-50`, `border-purple-200`, active `bg-purple-600 text-white`), popover nền trắng sáng tương phản cao.
+  - Dark Mode: Nền `bg-slate-900/80`, viền `border-slate-800` chống chói mắt khi tác chiến ca đêm.
+- **Điều hướng phân biệt thông minh:**
+  - **Trên iPad:** Segmented Navigation Bar căn giữa với hiệu ứng trượt mượt mà.
+  - **Trên Desktop PC:** Loại bỏ hiệu ứng Dynamic Sliding Pill Indicator (viên thuốc trượt) để phục hồi cụm nút bấm cũ chuyển trang màu sắc chuyên biệt (`Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`) ổn định, tốc độ chuyển trang tức thì (0ms), loại bỏ hoàn toàn hiện tượng nhảy chớp vị trí khi chuyển trang.
+
+### 8. Chuẩn Hóa Danh Xưng "Trung Tâm Thư Viện Số" & Phân Hệ "Đơn Vị Của Tôi" (`/my-unit`)
+- **Chuẩn hóa nhận diện:** Đổi toàn bộ nhãn hiển thị từ "Portal" thành "Trung tâm thư viện số" trên toàn web (Header, Banner, User Menu, Quick login tags), bảo toàn 100% route `/portal` và API backend.
+- **Phân hệ "Đơn vị của tôi":** Trang chuyên biệt `/my-unit` quản lý và khai thác tài liệu số phân quyền nội bộ theo từng cơ quan/đơn vị trực thuộc Quân Khu 7 (Sư đoàn, Lữ đoàn, Trung đoàn, Phòng Tham mưu...).
+
+### 9. Nâng Cấp Trải Nghiệm Xác Thực Sinh Trắc Học Vân Tay Trực Quan
+- **Touch ID Vector 3 Bước:** Hoạt ảnh vector dấu vân tay quang học với vòng tròn tiến trình Ant Design và hướng dẫn thao tác trực quan (1/3, 2/3, 3/3).
+- **Khử lỗi nhảy gián đoạn:** Cơ chế debounce polling và lọc trạng thái trong `fingerprintService.ts`, phân tách trạng thái chờ ngón tay với lỗi phần cứng thật, ngăn ngừa hiện tượng văng lỗi/nhảy lỗi liên tục.
+- **Mở khóa tài liệu Mật siêu tốc:** Nhận diện nhanh máy quét nội bộ `127.0.0.1:9001` và cấp quyền xem tài liệu Cấp 3, 4, 5 chỉ trong 1 lần chạm.
 
 ---
 

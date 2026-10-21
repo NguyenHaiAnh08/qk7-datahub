@@ -506,7 +506,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
         </div>
 
         {/* Live Indicator, Auto-refresh & Quick Actions */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Live Indicator Badge */}
           <button
             onClick={() => setIsPaused(!isPaused)}
@@ -754,7 +754,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
         </div>
 
         {/* Action Dropdown & Search Input */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Dropdown hành động chi tiết */}
           <select
             value={actionFilter}
@@ -800,8 +800,8 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
 
       {/* 4. TABLE SECTION (CHUẨN CẢ LIGHT & DARK NIGHT MODE) */}
       <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm dark:bg-[#111827]/80 dark:backdrop-blur-md dark:border-slate-800 dark:shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left text-xs min-w-[980px]">
             <thead className="bg-slate-50 text-slate-600 uppercase text-[11px] border-b border-slate-200 font-semibold tracking-wider dark:bg-slate-900/90 dark:text-slate-400 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4 whitespace-nowrap">Thời Gian</th>
@@ -1080,7 +1080,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[90vh]"
+              className="relative w-full max-w-xl mx-auto w-[calc(100vw-32px)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[90vh]"
             >
               {/* Modal Header */}
               <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">

@@ -1,5 +1,5 @@
 """
-Fingerprint Agent — device-based WebSocket client
+Fingerprint Agent — device-based WebSocket client (Hỗ trợ WSS + HTTPS)
 """
 import asyncio
 import base64
@@ -7,6 +7,7 @@ import http.server
 import json
 import os
 import signal
+import ssl          # ★ SỬA: thêm import ssl
 import sys
 import threading
 import uuid
@@ -19,12 +20,18 @@ if hasattr(sys.stderr, 'reconfigure'):
 import websockets
 from dotenv import load_dotenv
 
-load_dotenv()
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_HERE, ".env"))
 
 BACKEND_WS_URL = os.getenv("BACKEND_WS_URL", "ws://localhost:8000/ws/fingerprint")
 BRIDGE_TOKEN = os.getenv("BRIDGE_TOKEN", "")
 DEVICE_SERVER_HOST = os.getenv("DEVICE_SERVER_HOST", "127.0.0.1")
 DEVICE_SERVER_PORT = int(os.getenv("DEVICE_SERVER_PORT", "9001"))
+
+# ★ SỬA: cấu hình SSL
+CA_CERT_PATH = os.getenv("CA_CERT_PATH", "rootCA.pem")
+USE_TLS = BACKEND_WS_URL.lower().startswith("wss://")
 
 if not BRIDGE_TOKEN or len(BRIDGE_TOKEN) < 16:
     print("❌ BRIDGE_TOKEN thiếu hoặc <16 ký tự trong .env")
@@ -33,6 +40,39 @@ if not BRIDGE_TOKEN or len(BRIDGE_TOKEN) < 16:
 from zk_service import ZK9500Service
 
 DEVICE_ID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "device_id.txt")
+
+
+def build_ssl_context():
+    """
+    ★ SỬA: Tạo SSL context để trust cert self-signed hoặc cert từ CA nội bộ.
+    - Nếu .env có CA_CERT_PATH (mặc định rootCA.pem) → load file đó.
+    - Nếu không có file → dùng CA hệ thống (Windows Root Store, certifi...).
+    - Nếu URL là ws:// (HTTP) → trả về None, không dùng SSL.
+    """
+    if not USE_TLS:
+        return None
+
+    ctx = ssl.create_default_context()
+
+    ca_path = CA_CERT_PATH
+    if not os.path.isabs(ca_path):
+        ca_path = os.path.join(_HERE, ca_path)
+
+    if os.path.exists(ca_path):
+        try:
+            ctx.load_verify_locations(cafile=ca_path)
+            print(f"[Agent] 🔒 Đã nạp CA: {ca_path}")
+        except Exception as e:
+            print(f"[Agent] ⚠️ Lỗi nạp CA '{ca_path}': {e}")
+            print(f"[Agent]    Sẽ dùng CA hệ thống Windows thay thế.")
+    else:
+        print(f"[Agent] ⚠️ Không tìm thấy CA file: {ca_path}")
+        print(f"[Agent]    Đang dùng CA hệ thống Windows.")
+        print(f"[Agent]    Nếu kết nối WSS lỗi certificate, làm 1 trong 2 cách:")
+        print(f"[Agent]      1. Copy 'rootCA.pem' từ server vào: {_HERE}")
+        print(f"[Agent]      2. Cài rootCA.pem vào Windows Root Store (Admin)")
+
+    return ctx
 
 
 def get_or_create_device_id() -> str:
@@ -123,23 +163,25 @@ def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None)
 
 
 class FingerprintAgent:
-    def __init__(self, device_id: str):
+    def __init__(self, device_id: str, ssl_context=None):
         self.svc = ZK9500Service()
         self.device_id = device_id
+        self.ssl_context = ssl_context    # ★ SỬA: lưu SSL context
         self.running = True
         self.reconnect_delay = 3
+        self.busy = False
         self.enroll_step = 0
         self.enroll_total = 3
         self.enroll_state = "idle"
+        self._cancel_event = threading.Event()
 
     def get_enroll_status(self):
         return {
-            "enrolling": bool(self.busy and self.enroll_state != "idle"),
+            "enrolling": bool(self.busy and self.enroll_state not in ("idle", "completed", "error", "timeout", "mismatch", "cancelled")),
             "step": self.enroll_step,
             "total": self.enroll_total,
             "state": self.enroll_state,
         }
-        self._cancel_event = threading.Event()
 
     async def run(self):
         ok, msg = self.svc.load_sdk()
@@ -154,11 +196,17 @@ class FingerprintAgent:
             return
 
         print(f"[Agent] Device ID: {self.device_id}")
+        proto_info = "WSS (TLS)" if USE_TLS else "WS (plaintext)"
+        print(f"[Agent] Giao thức: {proto_info}")
         print(f"[Agent] Sẵn sàng. Kết nối tới {BACKEND_WS_URL}...\n")
 
         while self.running:
             try:
                 await self._session()
+            except ssl.SSLError as e:
+                print(f"[Agent] ❌ Lỗi SSL: {e}")
+                print(f"[Agent]    Kiểm tra: file 'rootCA.pem' có trong {_HERE}?")
+                print(f"[Agent]    Hoặc đã cài root CA Windows bằng: Import-Certificate ...")
             except Exception as e:
                 print(f"[Agent] Session error: {type(e).__name__}: {e}")
             if self.running:
@@ -167,8 +215,14 @@ class FingerprintAgent:
 
     async def _session(self):
         url = f"{BACKEND_WS_URL}?device_id={self.device_id}&bridge_token={BRIDGE_TOKEN}"
-        async with websockets.connect(url, ping_interval=None) as ws:
-            print(f"[Agent] ✅ WS connected")
+
+        # ★ SỬA: truyền ssl context nếu là wss://
+        connect_kwargs = {"ping_interval": None}
+        if self.ssl_context is not None:
+            connect_kwargs["ssl"] = self.ssl_context
+
+        async with websockets.connect(url, **connect_kwargs) as ws:
+            print(f"[Agent] ✅ WS connected ({'wss' if USE_TLS else 'ws'}://...)")
             async for raw in ws:
                 try:
                     msg = json.loads(raw)
@@ -178,7 +232,6 @@ class FingerprintAgent:
                 if t == "ping":
                     await ws.send(json.dumps({"type": "pong"}))
                 elif t == "scan_request":
-                    # Cancel job cũ (nếu có)
                     self._cancel_event.set()
                     new_event = threading.Event()
                     self._cancel_event = new_event
@@ -244,14 +297,6 @@ class FingerprintAgent:
         user_id = job.get("user_id")
         step_timeout = max(10, int(job.get("timeout_seconds", 60)) // 3)
 
-        if self.busy:
-            print(f"[Agent] ⚠️ Bỏ qua enroll {job_id} vì thiết bị đang bận.")
-            await ws.send(json.dumps({
-                "type": "enroll_result", "job_id": job_id,
-                "success": False, "error": "BUSY",
-            }))
-            return
-
         self.busy = True
         self.enroll_step = 0
         self.enroll_total = 3
@@ -263,6 +308,19 @@ class FingerprintAgent:
             for i in range(3):
                 self.enroll_step = i
                 self.enroll_state = f"waiting_touch_{i+1}"
+
+                if cancel_event.is_set():
+                    print(f"[Agent] ⏹️ Enroll {job_id} bị hủy trước lần {i+1}.")
+                    self.enroll_state = "cancelled"
+                    try:
+                        await ws.send(json.dumps({
+                            "type": "enroll_result", "job_id": job_id,
+                            "success": False, "error": "CANCELLED",
+                        }))
+                    except Exception:
+                        pass
+                    return
+
                 print(f"[Agent] 👉 Lần {i+1}/3 — Đặt tay...")
                 t = await asyncio.to_thread(
                     self.svc.wait_for_finger, step_timeout, cancel_event
@@ -270,6 +328,7 @@ class FingerprintAgent:
 
                 if cancel_event.is_set():
                     print(f"[Agent] ⏹️ Enroll {job_id} bị hủy sau lần {i+1}.")
+                    self.enroll_state = "cancelled"
                     try:
                         await ws.send(json.dumps({
                             "type": "enroll_result", "job_id": job_id,
@@ -283,7 +342,7 @@ class FingerprintAgent:
                     self.enroll_state = "timeout"
                     await ws.send(json.dumps({
                         "type": "enroll_result", "job_id": job_id,
-                        "success": False, "error": f"Quét vần tay không thành công lần {i+1}/3",
+                        "success": False, "error": f"Lần {i+1} quét không thành công sau {step_timeout}s. Vui lòng thử lại.",
                     }))
                     return
 
@@ -314,6 +373,7 @@ class FingerprintAgent:
 
             if cancel_event.is_set():
                 print(f"[Agent] ⏹️ Enroll {job_id} bị hủy trước khi merge.")
+                self.enroll_state = "cancelled"
                 return
 
             from zk_service import to_csharp_byte_array
@@ -341,11 +401,14 @@ class FingerprintAgent:
                 }))
             except Exception:
                 pass
+        finally:
+            self.busy = False
 
 
 def main():
     device_id = get_or_create_device_id()
-    agent = FingerprintAgent(device_id)
+    ssl_ctx = build_ssl_context()        # ★ SỬA: tạo SSL context 1 lần
+    agent = FingerprintAgent(device_id, ssl_context=ssl_ctx)
     start_device_id_server(device_id, DEVICE_SERVER_HOST, DEVICE_SERVER_PORT, agent)
 
     def _stop(*_):

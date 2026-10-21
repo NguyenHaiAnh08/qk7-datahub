@@ -78,9 +78,10 @@ export const DEMO_ACCOUNTS: Record<
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast }) => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [username, setUsername] = useState('USR-001');
-  const [password, setPassword] = useState('123456789');
-  const [selectedRole, setSelectedRole] = useState<DemoRoleKey | null>('admin');
+  const isDev = import.meta.env.DEV;
+  const [username, setUsername] = useState(isDev ? 'USR-001' : '');
+  const [password, setPassword] = useState(isDev ? '123456789' : '');
+  const [selectedRole, setSelectedRole] = useState<DemoRoleKey | null>(isDev ? 'admin' : null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');

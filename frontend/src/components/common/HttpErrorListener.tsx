@@ -26,6 +26,8 @@ export const HttpErrorListener: React.FC = () => {
       const detail = customEvent.detail;
       if (!detail) return;
 
+      if (detail.url?.includes('/fingerprint/')) return;
+
       const { status, message, url, autoRedirect } = detail;
 
       // Không hiển thị popup nếu đang ở sẵn trang lỗi tương ứng
@@ -41,34 +43,33 @@ export const HttpErrorListener: React.FC = () => {
 
       if (isAlreadyOnErrorPage) return;
 
+      // frontend/src/components/common/HttpErrorListener.tsx
+// (khoảng dòng 60-110)
+
       switch (status) {
         case 401:
           notification.warning({
-            message: 'Phiên Làm Việc Hết Hạn',
+            title: 'Phiên Làm Việc Hết Hạn',        // ⚠️ message → title
             description: message || 'Bạn cần đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
             icon: <WarningOutlined className="text-amber-500" />,
             duration: 4.5,
-            closeIcon: null,
           });
           break;
 
         case 403:
           notification.error({
-            message: 'Truy Cập Bị Từ Chối',
-            description:
-              message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
+            title: 'Truy Cập Bị Từ Chối',          
+            description: message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
             icon: <StopOutlined className="text-red-500" />,
             duration: 4.5,
-            closeIcon: null,
           });
           break;
 
         case 404:
           notification.info({
-            message: 'Không Tìm Thấy Tài Nguyên',
+            title: 'Không Tìm Thấy Tài Nguyên',     
             description: message || `Không tìm thấy endpoint hoặc tài liệu yêu cầu: ${url}`,
             duration: 4.5,
-            closeIcon: null,
           });
           break;
 
@@ -77,22 +78,19 @@ export const HttpErrorListener: React.FC = () => {
         case 503:
         case 504:
           notification.error({
-            message: 'Sự Cố Máy Chủ',
-            description:
-              message || 'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
+            title: 'Sự Cố Máy Chủ',           
+            description: message || 'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
             icon: <ApiOutlined className="text-red-500" />,
             duration: 5,
-            closeIcon: null,
           });
           break;
 
         default:
           notification.warning({
-            message: 'Lỗi Phản Hồi Hệ Thống',
+            title: 'Lỗi Phản Hồi Hệ Thống',   
             description: message,
             icon: <ExclamationCircleOutlined className="text-amber-500" />,
             duration: 4.5,
-            closeIcon: null,
           });
           break;
       }

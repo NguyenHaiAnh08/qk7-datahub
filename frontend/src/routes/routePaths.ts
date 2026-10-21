@@ -5,6 +5,7 @@ export const ROUTE_PATHS = {
   INDEX: '/',
   LOGIN: '/login',
   PORTAL: '/portal',
+  MY_UNIT: '/my-unit',
   DESK: '/document-desk',
   ADMIN: '/admin-dashboard',
   USERS: '/users',

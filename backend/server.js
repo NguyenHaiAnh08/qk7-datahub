@@ -17,6 +17,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const https = require('https');
 const multer = require('multer');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
@@ -58,6 +59,17 @@ const BRIDGE_TOKEN = process.env.FINGERPRINT_BRIDGE_TOKEN || '';
 const FP_ENC_KEY = process.env.FP_ENC_KEY
   ? crypto.scryptSync(process.env.FP_ENC_KEY, 'qk7-fp-salt', 32)
   : null;
+
+// ─── HTTPS config ───
+// Bật bằng cách set USE_HTTPS=true trong backend/.env
+// File cert đặt trong backend/certs/ (mặc định), hoặc đường dẫn tùy chỉnh qua .env
+const USE_HTTPS = (process.env.USE_HTTPS || 'false').toLowerCase() === 'true';
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH
+  ? path.resolve(__dirname, process.env.SSL_KEY_PATH)
+  : path.join(__dirname, 'certs', 'private-key.pem');
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH
+  ? path.resolve(__dirname, process.env.SSL_CERT_PATH)
+  : path.join(__dirname, 'certs', 'cert.pem');
 
 // ─── Lockout & IP block config ───
 const LOCKOUT_MAX_ATTEMPTS = parseInt(process.env.LOCKOUT_MAX_ATTEMPTS || '6', 10);
@@ -1715,19 +1727,60 @@ async function start() {
     process.exit(1);
   }
 
-  const server = http.createServer(app);
+  // ─── Khởi tạo HTTP hoặc HTTPS server ───
+  let server;
+  if (USE_HTTPS) {
+    if (!fs.existsSync(SSL_KEY_PATH) || !fs.existsSync(SSL_CERT_PATH)) {
+      console.error('');
+      console.error('  ╔════════════════════════════════════════════════════╗');
+      console.error('  ║  [HTTPS] ❌ KHÔNG TÌM THẤY FILE CERT               ║');
+      console.error('  ╠════════════════════════════════════════════════════╣');
+      console.error(`  ║  Key:  ${SSL_KEY_PATH.padEnd(43).slice(0, 43)}║`);
+      console.error(`  ║  Cert: ${SSL_CERT_PATH.padEnd(43).slice(0, 43)}║`);
+      console.error('  ╚════════════════════════════════════════════════════╝');
+      console.error('');
+      console.error('  Gợi ý: Tắt HTTPS tạm thời bằng cách sửa backend/.env:');
+      console.error('         USE_HTTPS=false');
+      console.error('');
+      process.exit(1);
+    }
+
+    try {
+      server = https.createServer({
+        key: fs.readFileSync(SSL_KEY_PATH),
+        cert: fs.readFileSync(SSL_CERT_PATH),
+        // Tối ưu bảo mật TLS
+        minVersion: 'TLSv1.2',
+        honorCipherOrder: true,
+      }, app);
+      console.log('[HTTPS] 🔒 Server chạy ở chế độ HTTPS (TLS 1.2+)');
+    } catch (err) {
+      console.error('[HTTPS] ❌ Lỗi nạp cert:', err.message);
+      console.error('       Kiểm tra lại file .pem — phải là định dạng PEM (bắt đầu bằng "-----BEGIN ...")');
+      process.exit(1);
+    }
+  } else {
+    server = http.createServer(app);
+    console.log('[HTTP] ⚠️  Server chạy ở chế độ HTTP (KHÔNG mã hóa)');
+    console.log('       Để bật HTTPS: set USE_HTTPS=true trong backend/.env');
+  }
+
   setupFingerprintWS(server, { BRIDGE_TOKEN });
+
+  const protocol = USE_HTTPS ? 'https' : 'http';
+  const wsProtocol = USE_HTTPS ? 'wss' : 'ws';
 
   server.listen(PORT, () => {
     console.log('');
     console.log('  ╔════════════════════════════════════════════════════╗');
     console.log('  ║  QK7 Paperless Gateway (v3.1 — SECURITY)           ║');
     console.log('  ╠════════════════════════════════════════════════════╣');
-    console.log(`  ║  Web:       http://localhost:${PORT}                    ║`);
-    console.log(`  ║  Web:       http://0.0.0.0:${PORT} (LAN accessible) ║`);
-    console.log(`  ║  WebSocket: ws://localhost:${PORT}/ws/fingerprint      ║`);
-    console.log(`  ║  Swagger:   http://localhost:${PORT}/api-docs          ║`);
+    console.log(`  ║  Web:       ${protocol}://localhost:${PORT}                    ║`);
+    console.log(`  ║  Web:       ${protocol}://0.0.0.0:${PORT} (LAN accessible) ║`);
+    console.log(`  ║  WebSocket: ${wsProtocol}://localhost:${PORT}/ws/fingerprint      ║`);
+    console.log(`  ║  Swagger:   ${protocol}://localhost:${PORT}/api-docs          ║`);
     console.log('  ╠════════════════════════════════════════════════════╣');
+    console.log(`  ║  HTTPS:     ${USE_HTTPS ? 'ENABLED ✅' : 'DISABLED ⚠️'}                              ║`);
     console.log(`  ║  JWT:       ${process.env.JWT_SECRET ? 'SET ✅' : 'DEFAULT ⚠️'}                              ║`);
     console.log(`  ║  Bridge:    ${BRIDGE_TOKEN && BRIDGE_TOKEN.length >= 16 ? 'SET ✅' : 'MISSING ⚠️'}                              ║`);
     console.log(`  ║  FP_KEY:    ${FP_ENC_KEY ? 'SET ✅' : 'PLAINTEXT ⚠️'}                              ║`);

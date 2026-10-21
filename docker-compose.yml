@@ -1,6 +1,4 @@
 # QK7 DataHub - Docker Compose LAN
-# Save as UTF-8 (no BOM), LF line endings.
-
 services:
 
   backend:
@@ -23,12 +21,14 @@ services:
     networks:
       - qk7-net
     depends_on:
-      - ai
+      ai:
+        condition: service_healthy        # ← SỬA #1
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 20s                   # ← SỬA #8
 
   ai:
     build:
@@ -37,7 +37,8 @@ services:
     container_name: qk7-ai
     restart: unless-stopped
     ports:
-      - "0.0.0.0:8001:8001"
+      - "127.0.0.1:8001:8001"             # ← SỬA #6 (nếu backend là gateway)
+      # - "0.0.0.0:8001:8001"             # giữ nếu muốn truy cập AI trực tiếp
     env_file:
       - ./boxchat/.env
     environment:
@@ -53,6 +54,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 60s                   # ← SỬA #3
 
 networks:
   qk7-net:

@@ -114,9 +114,9 @@ const swaggerSpec = {
     '/api/auth/fingerprint/verify': {
       post: {
         tags: ['Auth'],
-        summary: 'Xác thực vân tay → cấp token tạm xem file cấp 4-5',
+        summary: 'Xác thực vân tay → cấp token tạm xem file cấp 3-5 (Mật, Tối Mật, Tuyệt Mật)',
         description:
-          'Endpoint xác thực vân tay cho tài liệu cấp Tối mật (4) / Tuyệt mật (5).\n\n' +
+          'Endpoint xác thực vân tay cho tài liệu cấp Mật (3) / Tối mật (4) / Tuyệt mật (5).\n\n' +
           '**Cách hoạt động:**\n' +
           '1. Browser lấy `device_id` từ Fingerprint Agent local (`http://127.0.0.1:9001/device-id`)\n' +
           '2. Browser gọi endpoint này kèm header `X-Device-FP: <device_id>`\n' +
@@ -656,7 +656,7 @@ const swaggerSpec = {
           name: 'X-Fingerprint-Token',
           required: false,
           schema: { type: 'string' },
-          description: 'BẮT BUỘC nếu file có security_level_id ≥ 4. Lấy từ POST /api/auth/fingerprint/verify. Token có hạn 5 phút, gắn với user_id + file_id.',
+          description: 'BẮT BUỘC nếu file có security_level_id ≥ 3 (Cấp 3 - Mật, Cấp 4 - Tối Mật, Cấp 5 - Tuyệt Mật). Lấy từ POST /api/auth/fingerprint/verify. Token có hạn 5 phút, gắn với user_id + file_id.',
           example: 'eyJhbGciOiJIUzI1NiIs...',
         },
       ],
@@ -1919,7 +1919,7 @@ const swaggerSpec = {
     type: 'apiKey',
     in: 'header',
     name: 'X-Fingerprint-Token',
-    description: 'Token tạm 5 phút cấp sau khi xác thực vân tay — BẮT BUỘC để xem file cấp 4-5.',
+    description: 'Token tạm 5 phút cấp sau khi xác thực vân tay — BẮT BUỘC để xem file cấp 3-5 (Mật, Tối Mật, Tuyệt Mật).',
   },
 },
 

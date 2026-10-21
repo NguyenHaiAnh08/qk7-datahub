@@ -140,6 +140,7 @@ graph TB
 qk7-datahub/
 ├── package.json                            # Điều phối kịch bản khởi chạy toàn hệ thống
 ├── README.md                               # Sổ tay hướng dẫn khởi động nhanh
+├── SETUP_SERVER.md                         # Sổ tay hướng dẫn cài đặt Server & Client chi tiết
 ├── SYSTEM_ARCHITECTURE.md                  # Tài liệu kiến trúc toàn diện hệ thống
 │
 ├── backend/                                # 🟢 MÁY CHỦ BACKEND EXPRESS 5 & WEBSOCKET GATEWAY
@@ -254,17 +255,18 @@ qk7-datahub/
 | **Cấp 5** | `TUYETMAT` | **Tuyệt Mật** | Bộ Tư Lệnh, Tham mưu trưởng, Quản trị viên tối cao. | **Bắt buộc quét vân tay ZK9500** |
 
 ### 4.2. Hàng Rào Xác Thực Sinh Trắc Học Vân Tay Hai Lớp (Biometric 2FA)
-1. **Truy Cập Văn Bản Cấp 3, 4 & 5 (Mật, Tối Mật, Tuyệt Mật):** Khi quân nhân yêu cầu xem hoặc tải tệp PDF có độ mật cao (`security_level_id >= 3`, bao gồm Cấp 3 - Mật, Cấp 4 - Tối Mật và Cấp 5 - Tuyệt Mật), Gateway yêu cầu kèm theo header:
-   $$\text{Header: } X\text{-}Fingerprint\text{-}Token$$
+1. **Truy Cập Văn Bản Cấp 3, 4 & 5 (Mật, Tối Mật, Tuyệt Mật):** Khi quân nhân yêu cầu xem hoặc tải tệp PDF có độ mật cao (`security_level_id >= 3`, bao gồm Cấp 3 - Mật, Cấp 4 - Tối Mật và Cấp 5 - Tuyệt Mật), Gateway yêu cầu kèm theo HTTP Header:
+   > `X-Fingerprint-Token: <token_jwt>`
 2. **Cơ Chế Cấp Biometric Token:**
    - Trình duyệt yêu cầu trạm quét `agent.py` trên máy người dùng đặt ngón tay lên máy quét ZKTeco ZK9500.
-   - Khi dấu vân tay quét được khớp với mẫu lưu trữ của quân nhân (thuật toán zkfinger10 với điểm tương đồng $\ge 60\%$), Gateway sinh ra một JWT `fingerprint_token` ký bằng mật mã quân sự, có thời hạn hiệu lực **5 phút**, gắn chặt với cặp `(user_id, file_id)`.
+   - Khi dấu vân tay quét được khớp với mẫu lưu trữ của quân nhân (thuật toán zkfinger10 với điểm tương đồng ≥ 60%), Gateway sinh ra một JWT `fingerprint_token` ký bằng mật mã quân sự, có thời hạn hiệu lực **5 phút**, gắn chặt với cặp `(user_id, file_id)`.
    - Nếu không có hoặc token hết hạn/sai lệch, Gateway từ chối phục vụ ngay lập tức với mã lỗi `403 Forbidden`.
 
 ### 4.3. Kiểm Soát Độ Mật Trong Luồng RAG Của Trợ Lý AI
 1. **Lọc Dữ Liệu Ngữ Cảnh (Clearance-Aware Context Filtering):** Khi người dùng đặt câu hỏi cho AI qua `/api/ai/query`, Gateway luôn gửi kèm `user_clearance`.
-2. Kho vector và RAG Agent tự động áp bộ lọc metadata:
-   $$\text{doc.security\_level\_id} \le \text{user\_clearance}$$
+2. **Áp bộ lọc Metadata an toàn:** Kho vector Qdrant và RAG Agent tự động áp điều kiện lọc dữ liệu:
+   > `doc.security_level_id <= user_clearance`
+
    Ngăn chặn hoàn toàn việc AI trích dẫn hoặc tổng hợp thông tin từ văn bản vượt quá cấp mật của người hỏi.
 
 ---
@@ -513,7 +515,7 @@ Nhằm đạt tiêu chuẩn sẵn sàng cao (High Availability), Express Gateway
 
 ### 8.1. Thông Số Phần Cứng & Giao Tiếp Driver
 - **Thiết bị:** Máy quét vân tay quang học chuyên dụng **ZKTeco ZK9500**.
-- **Cảm biến:** Cảm biến quang học chống trầy xước, độ phân giải **500 DPI**, vùng quét $16.5 \times 24\text{ mm}$, chuẩn giao tiếp USB 2.0.
+- **Cảm biến:** Cảm biến quang học chống trầy xước, độ phân giải **500 DPI**, vùng quét 16.5 × 24 mm, chuẩn giao tiếp USB 2.0.
 - **Thư viện lõi:** Tích hợp trực tiếp file nhị phân `libzkfp.dll` qua module `ctypes` trong Python, thuật toán đối sánh mẫu đặc trưng vân tay quân sự **ZKFinger 10.0**.
 
 ### 8.2. Mô Hình Phân Phối Hardware Agent (:9001)
@@ -556,35 +558,203 @@ Toàn bộ API được đặc tả chi tiết tại Swagger UI: **[http://local
 
 ---
 
-## 10. Hướng Dẫn Triển Khai & Vận Hành
+## 10. Hướng Dẫn Triển Khai & Vận Hành (Operations Runbook)
 
-### 10.1. Khởi Động Đồng Thời 4 Dịch Vụ Của Hệ Thống
+### 10.1. Thiết Lập Máy Chủ Server (192.168.1.xxx)
+*(Thay `192.168.1.xxx` bằng địa chỉ IP server thực tế trong mạng nội bộ)*
 
-Để vận hành đầy đủ 100% tính năng (Web, Gateway, AI RAG và Quét vân tay), quản trị viên chạy các terminal độc lập:
-
-```bash
-# 1. Khởi động Máy chủ Backend Express & WebSocket Gateway (:8000)
-cd backend
-npm start
-
-# 2. Khởi động Giao diện người dùng Frontend Vite (:5173)
-cd frontend
-npm run dev
-
-# 3. Khởi động Microservice Trợ Lý AI boxchat (:8001)
-cd boxchat
-python main.py
-
-# 4. Khởi động Local Hardware Fingerprint Agent (:9001)
-cd fingerprint
-python agent.py
+#### 1. Kiểm tra môi trường hệ thống
+Mở PowerShell và kiểm tra phiên bản:
+```powershell
+node --version        # Yêu cầu >= 22.13 (https://nodejs.org/)
+npm --version
+python --version      # Yêu cầu >= 3.10  (https://www.python.org/downloads/)
 ```
 
-### 10.2. Địa Chỉ Truy Cập Dịch Vụ Trong Mạng Nội Bộ
-* **Giao diện người dùng Web:** [http://localhost:5173](http://localhost:5173) (hoặc [http://localhost:8000](http://localhost:8000) khi chạy production build)
-* **Tài liệu Swagger API Spec:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
-* **API Trợ lý AI boxchat:** [http://localhost:8001/docs](http://localhost:8001/docs)
-* **Trạm kiểm soát vân tay nội bộ:** [http://127.0.0.1:9001/device-id](http://127.0.0.1:9001/device-id)
+#### 2. Kiểm tra dịch vụ Microsoft SQL Server
+```powershell
+Get-Service | Where-Object {$_.Name -like "MSSQL*"}
+```
+> **Yêu cầu:** Phải có ít nhất 1 service trạng thái **Running** (ví dụ: `MSSQLSERVER` hoặc `MSSQL$SQLEXPRESS`).
+
+#### 3. Cấu hình biến môi trường Backend (`backend/.env`)
+Tạo hoặc chỉnh sửa tệp `backend/.env`:
+```env
+# ─── Server ───
+PORT=8000
+NODE_ENV=production
+
+# ─── SQL Server ───
+# localhost nếu cùng máy. IP máy khác nếu SQL Server ở máy khác.
+DB_SERVER=localhost
+DB_PORT=1433
+DB_DATABASE=QK7_ThuVienSo
+DB_USER=sa
+DB_PASSWORD=<mật_khẩu_SQL_Server_thật_của_bạn>
+DB_ENCRYPT=false
+DB_TRUST_CERT=true
+
+# ─── Bảo vệ đăng nhập ───
+LOCKOUT_MAX_ATTEMPTS=6
+LOCKOUT_WINDOW_MINUTES=15
+IPBLOCK_MAX_ATTEMPTS=6
+IPBLOCK_WRONG_PASSWORD_MAX_ATTEMPTS=15
+IPBLOCK_WINDOW_MINUTES=15
+IPBLOCK_DURATION_MINUTES=30
+
+# ─── Swagger ───
+ENABLE_SWAGGER=false
+
+# ─── Parser ───
+PARSER_STRICT_MODE=false
+
+# ─── JWT ───
+JWT_SECRET=<sinh_ngay_bên_dưới>
+JWT_EXPIRES_IN=8h
+
+# ─── Fingerprint ───
+FP_ENC_KEY=k42yVJ1TDdgCiNX+gIFRDvddfvihwjvREJcBSPbpJkw=
+FINGERPRINT_BRIDGE_TOKEN=qk7_bridge_2026_secret_xyz9876543210abcdef
+```
+
+* **Sinh `JWT_SECRET` mới:** Chạy lệnh PowerShell và dán chuỗi sinh được vào `JWT_SECRET`:
+```powershell
+[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+```
+
+#### 4. Cấu hình biến môi trường AI boxchat (`boxchat/.env`)
+Tạo hoặc chỉnh sửa tệp `boxchat/.env`:
+```env
+BACKEND_UPLOADS_DIR=../backend/uploads
+QDRANT_STORAGE_PATH=./local_storage/qdrant_data
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:7b
+```
+
+#### 5. Cài đặt dependencies (Chỉ chạy lần đầu)
+Mở CMD thực thi lần lượt:
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\backend
+npm install
+
+cd /d D:\QK7_DataHub\qk7-datahub\frontend
+npm install
+
+cd /d D:\QK7_DataHub\qk7-datahub\boxchat
+pip install -r requirements.txt
+```
+
+#### 6. Đóng gói giao diện Frontend (Production Build)
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\frontend
+npm run build
+```
+Kiểm tra file build đã tự động xuất sang `backend/public/`:
+```cmd
+dir D:\QK7_DataHub\qk7-datahub\backend\public\index.html
+```
+
+#### 7. Khởi tạo tài khoản quản trị viên
+Tại thư mục `backend`, chạy:
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\backend
+node setup-passwords.js
+```
+*(Thiết lập tài khoản: Mã `USR-001`, Mật khẩu `123456789`, Vai trò `ADMIN`)*
+
+#### 8. Mở cổng tường lửa Windows Firewall (Server)
+Chạy lệnh PowerShell (Run as Administrator) mở port 8000:
+```powershell
+New-NetFirewallRule -DisplayName "QK7 Backend 8000" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow
+```
+
+---
+
+### 10.2. Quy Trình Khởi Động Server Hàng Ngày
+
+1. **Khởi động hệ thống máy chủ (Backend + AI boxchat):**
+   - Click đúp vào tệp `s.bat` tại thư mục gốc `D:\QK7_DataHub\qk7-datahub\s.bat`.
+2. **Khởi động trạm quét vân tay trên server (nếu máy server có gắn ZK9500):**
+   ```cmd
+   cd /d D:\QK7_DataHub\qk7-datahub\fingerprint
+   python agent.py
+   ```
+
+---
+
+### 10.3. Thiết Lập Máy Trạm Client Quét Vân Tay (192.168.1.X)
+
+#### 1. Cài đặt driver ZK9500 & Python
+- Cài driver ZK9500 trên máy client và kiểm tra:
+  ```cmd
+  dir C:\Windows\System32\libzkfp.dll
+  ```
+- Kiểm tra Python (yêu cầu >= 3.10):
+  ```cmd
+  python --version
+  ```
+
+#### 2. Cài chứng chỉ rootCA vào Windows Root Store
+Mở PowerShell (Run as Administrator) trên máy Client:
+```powershell
+# Copy rootCA.pem từ thư mục chia sẻ LAN về client
+Copy-Item "\\192.168.1.229\QK7Share\rootCA.pem" "C:\QK7Agent\rootCA.pem" -Force
+
+# Cài chứng chỉ vào Windows Root Store
+Import-Certificate -FilePath "C:\QK7Agent\rootCA.pem" -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+#### 3. Tạo thư mục trạm máy quét `C:\QK7Agent\`
+```text
+C:\QK7Agent\
+├── agent.py
+├── libzkfp.dll
+├── requirements.txt
+├── s-agent.bat
+├── .env                    ← sửa ở bước 4
+└── (chưa có device_id.txt — sẽ tự sinh khi chạy lần đầu)
+```
+
+#### 4. Cấu hình file `C:\QK7Agent\.env`
+Tạo/sửa file `.env` trên máy Client (thay IP bằng IP máy server thực tế):
+```env
+# Cấu hình cho MÁY CLIENT — KHÔNG dùng localhost
+BACKEND_WS_URL=ws://192.168.1.229:8000/ws/fingerprint
+BRIDGE_TOKEN=qk7_bridge_2026_secret_xyz9876543210abcdef
+DEVICE_SERVER_HOST=127.0.0.1
+DEVICE_SERVER_PORT=9001
+MATCH_SCORE_THRESHOLD=45
+```
+
+#### 5. Cài đặt Python dependencies
+```cmd
+cd /d C:\QK7Agent
+pip install -r requirements.txt
+```
+
+#### 6. Chạy thử nghiệm Fingerprint Agent
+```cmd
+cd /d C:\QK7Agent
+python agent.py
+```
+*(Hoặc click đúp file `s-agent.bat`)*
+
+#### 7. Đăng ký tự động chạy khi Login (Startup)
+1. Nhấn **Win + R**, nhập `shell:startup`, bấm **Enter**.
+2. Trong thư mục vừa mở, click chuột phải → **New** → **Shortcut**.
+3. Trong ô *"Type the location of the item"*, nhập:
+   ```text
+   C:\QK7Agent\s-agent.bat
+   ```
+4. Bấm **Next** → đặt tên `QK7 Fingerprint Agent` → bấm **Finish**.
+
+---
+
+### 10.4. Kiểm Tra & Giám Sát Truy Cập Toàn Mạng
+* **Cổng giao diện người dùng:** `http://192.168.1.229:8000` *(hoặc IP máy server)*
+* **Tài liệu Swagger API:** `http://192.168.1.229:8000/api-docs`
+* **API Trợ lý AI boxchat:** `http://192.168.1.229:8001/docs`
+* **Trạm kiểm soát vân tay nội bộ:** `http://127.0.0.1:9001/device-id`
 
 ---
 
@@ -603,9 +773,9 @@ Phân hệ **SecurityAuditLog** (`frontend/src/components/dashboard/SecurityAudi
 Hệ thống tự động phân loại và tính toán 4 chỉ số KPI ngay trên dữ liệu nhật ký kiểm toán:
 1. **Tổng Hoạt Động (Total Activities):** Thống kê tổng số lượng bản ghi kiểm toán trong hệ thống kèm tỷ lệ phát sinh trong 24 giờ qua.
 2. **Cảnh Báo An Ninh & Vi Phạm Chính Sách (Security Alerts):** Tự động lọc và đếm các hành vi nguy cơ cao:
-   $$\text{Security Alert Actions} = \{\text{'FINGERPRINT\_FAIL'}, \text{'ACCESS\_DENIED'}, \text{'CLEARANCE\_VIOLATION'}, \text{'SUSPICIOUS\_LOGIN'}\}$$
+   > `Security Alert Actions`: `FINGERPRINT_FAIL`, `ACCESS_DENIED`, `CLEARANCE_VIOLATION`, `SUSPICIOUS_LOGIN`
 3. **Thay Đổi Vai Trò & Đặc Quyền (Privilege Mutations):** Giám sát các can thiệp nhạy cảm về phân quyền quân nhân:
-   $$\text{Privilege Actions} = \{\text{'ASSIGN\_ROLE'}, \text{'ENROLL\_FINGERPRINT'}, \text{'REVOKE\_PERMISSION'}, \text{'UPDATE\_USER'}\}$$
+   > `Privilege Actions`: `ASSIGN_ROLE`, `ENROLL_FINGERPRINT`, `REVOKE_PERMISSION`, `UPDATE_USER`
 4. **Truy Xuất Văn Bản Mật (Document Access Events):** Theo dõi lưu lượng xem và tải các tài liệu quân sự cấp độ Mật, Tối Mật và Tuyệt Mật.
 
 ### 11.3. Cơ Chế Giám Sát Trực Tuyến & Tự Động Làm Mới (Live SOC Monitor)

@@ -38,6 +38,7 @@ export function getActionCategory(action: string = '', note: string = ''): 'ALER
   if (
     act.includes('FAIL') ||
     act.includes('DENIED') ||
+    act.includes('BLOCK') ||   
     act.includes('ERROR') ||
     lowerNote.includes('sai mật khẩu') ||
     lowerNote.includes('thất bại') ||

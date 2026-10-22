@@ -17,7 +17,7 @@ import { fileService } from '../../services/fileService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { useAuth } from '../../hooks/useAuth';
-import { FingerprintScanModal } from './FingerprintScanModal';
+import { FingerprintScanModal } from '../users/FingerprintScanModal';
 
 export interface DocumentPreviewModalProps {
   open: boolean;

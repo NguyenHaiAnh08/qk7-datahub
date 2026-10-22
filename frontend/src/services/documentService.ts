@@ -1,7 +1,7 @@
 import { http } from './http';
 import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { DocumentItem, DocumentFilterParams } from '../types/document';
-import { fileService } from './fileService';
+import fileService from './fileService';
 
 
 export interface ParsedDocumentMetadata {
@@ -144,24 +144,26 @@ export const documentService = {
 
 
   /**
-   * Check for duplicate documents based on SHA256 and document code
-   * 
-   * 
-   */
-    checkDuplicate: async (
-      file: File,
-      documentCode?: string
-    ): Promise<CheckDuplicateResult> => {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (documentCode) formData.append('document_code', documentCode);
+ * @deprecated Từ v2026.10, dùng `parseDocument()` — API parse đã trả về
+ * `duplicate_check` (SHA-256 + document_code) trong cùng 1 request,
+ * tránh 2 round-trip. Hàm này chỉ giữ để tương thích ngược với code cũ.
+ *
+ * Check for duplicate documents based on SHA256 and document code
+ */
+  checkDuplicate: async (
+    file: File,
+    documentCode?: string
+  ): Promise<CheckDuplicateResult> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (documentCode) formData.append('document_code', documentCode);
 
-      return http<CheckDuplicateResult>('/api/documents/check-duplicate', {
-        method: 'POST',
-        body: formData,
-        skipErrorNotification: true,
-      });
-    },
+    return http<CheckDuplicateResult>('/api/documents/check-duplicate', {
+      method: 'POST',
+      body: formData,
+      skipErrorNotification: true,
+    });
+  },
 
 
   /**

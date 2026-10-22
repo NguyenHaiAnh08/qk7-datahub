@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { fingerprintService } from '../../services/fingerprintService';
 import { TouchIDFingerprint } from '../common/TouchIDFingerprint';
-import { CircularSpinner } from '../users/FingerprintEnrollModal';
+import { CircularSpinner } from './FingerprintEnrollModal';
 
 export interface FingerprintScanModalProps {
   open: boolean;
@@ -21,7 +21,6 @@ export interface FingerprintScanModalProps {
 
 type Phase = 'scanning' | 'success' | 'error';
 
-// ⚠️ Giới hạn auto-retry để tránh spam khi user không đặt tay
 const MAX_AUTO_RETRY = 2;
 
 export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
@@ -40,11 +39,10 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
 
   const inFlightRef = useRef(false);
   const autoRetryTimerRef = useRef<any>(null);
-  const abortRef = useRef<AbortController | null>(null);      // ⚠️ MỚI
-  const retryCountRef = useRef(0);                             // ⚠️ MỚI
+  const abortRef = useRef<AbortController | null>(null);
+  const retryCountRef = useRef(0);
   const mountedRef = useRef(true);
 
-  // Progressive fill animation
   useEffect(() => {
     if (phase === 'success') {
       setProgress(100);
@@ -53,12 +51,11 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     }
   }, [phase]);
 
-  // Cleanup khi unmount — abort mọi request + timer
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      abortRef.current?.abort();                              // ⚠️ MỚI
+      abortRef.current?.abort();
       abortRef.current = null;
       if (autoRetryTimerRef.current) {
         clearTimeout(autoRetryTimerRef.current);
@@ -67,12 +64,11 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     };
   }, []);
 
-  // Trigger scan khi mở modal hoặc retry
   useEffect(() => {
     if (!open) {
       inFlightRef.current = false;
       retryCountRef.current = 0;
-      abortRef.current?.abort();                              // ⚠️ MỚI
+      abortRef.current?.abort();
       abortRef.current = null;
       if (autoRetryTimerRef.current) {
         clearTimeout(autoRetryTimerRef.current);
@@ -93,7 +89,6 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   }, [open, fileId, attempt]);
 
   const triggerScan = async () => {
-    // ⚠️ Hủy request cũ (nếu có) trước khi bắt đầu request mới
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -104,19 +99,18 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       try {
         deviceId = await fingerprintService.getLocalDeviceId(2000);
       } catch {
-        // ⚠️ Nếu user đã đóng modal trong 2s lấy device-id → silent exit
         if (signal.aborted || !mountedRef.current) return;
-        setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
+        setError(
+          'Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.'
+        );
         setPhase('error');
         return;
       }
 
       if (signal.aborted || !mountedRef.current) return;
 
-      // ⚠️ Truyền signal — khi modal đóng, request này bị abort NGAY
       const res = await fingerprintService.verify(fileId, deviceId, signal);
 
-      // ⚠️ Nếu bị abort trong lúc chờ verify → im lặng thoát
       if (signal.aborted || !mountedRef.current) return;
 
       if (!res.required) {
@@ -133,15 +127,12 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       setPhase('success');
       retryCountRef.current = 0;
 
-      // ⚠️ Delay 900ms rồi mới mở file — nhưng phải check modal còn mở không
       setTimeout(() => {
         if (mountedRef.current && !signal.aborted) {
           onSuccess(res.fingerprint_token!);
         }
       }, 900);
     } catch (err: any) {
-      // ⚠️ QUAN TRỌNG: AbortError = user đã đóng modal
-      // → silent exit, KHÔNG setState, KHÔNG retry, KHÔNG hiện lỗi
       if (err?.name === 'AbortError' || signal.aborted || !mountedRef.current) {
         return;
       }
@@ -149,7 +140,8 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       const msg = err.message || 'Xác thực thất bại';
       const isAgentOffline = Boolean(err.data?.agent_offline);
       const isNeedsEnroll = Boolean(err.data?.needs_enroll);
-      const isCancelled = Boolean(err.data?.cancelled) || err.message === 'CANCELLED';
+      const isCancelled =
+        Boolean(err.data?.cancelled) || err.message === 'CANCELLED';
 
       if (isCancelled) {
         if (retryCountRef.current < 1) {
@@ -167,10 +159,14 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       }
 
       if (isAgentOffline) {
-        setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
+        setError(
+          'Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.'
+        );
         setPhase('error');
       } else if (isNeedsEnroll) {
-        setError('Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên để đăng ký.');
+        setError(
+          'Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên để đăng ký.'
+        );
         setNeedsEnroll(true);
         setPhase('error');
       } else {
@@ -178,11 +174,10 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
         setPhase('error');
 
-        // ⚠️ Auto-retry có GIỚI HẠN (2 lần), tránh loop vô hạn
         if (retryCountRef.current < MAX_AUTO_RETRY) {
           retryCountRef.current += 1;
           if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
-          const delay = 1200 * retryCountRef.current; // 1.2s, 2.4s
+          const delay = 1200 * retryCountRef.current;
           autoRetryTimerRef.current = setTimeout(() => {
             if (mountedRef.current) handleRetryInternal();
           }, delay);
@@ -214,7 +209,6 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   };
 
   const handleCancel = () => {
-    // ⚠️ BƯỚC QUAN TRỌNG NHẤT: abort request đang bay TRƯỚC KHI đóng modal
     abortRef.current?.abort();
     abortRef.current = null;
     if (autoRetryTimerRef.current) {
@@ -276,7 +270,11 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                   Vui lòng đặt ngón tay đã đăng ký lên đầu đọc ZK9500
                 </p>
                 <div className="inline-flex items-center gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-1.5 rounded-full font-medium">
-                  <CircularSpinner size={12} className="text-red-500 shrink-0" strokeWidth={2.8} />
+                  <CircularSpinner
+                    size={12}
+                    className="text-red-500 shrink-0"
+                    strokeWidth={2.8}
+                  />
                   <span>Đang nhận diện vân tay...</span>
                 </div>
               </>
@@ -302,18 +300,21 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                   ) : (
                     <AlertCircle className="w-5 h-5" />
                   )}
-                  <span>{needsEnroll ? 'Chưa đăng ký vân tay' : 'Xác thực thất bại'}</span>
+                  <span>
+                    {needsEnroll ? 'Chưa đăng ký vân tay' : 'Xác thực thất bại'}
+                  </span>
                 </div>
                 <p className="text-xs text-rose-600 dark:text-rose-400 max-w-xs">
                   {error}
                 </p>
 
-                {/* ⚠️ Đổi text theo trạng thái retry */}
                 {!needsEnroll && !error.includes('Chưa kết nối') && (
                   retryExhausted ? (
                     <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">
                       <AlertCircle className="w-3.5 h-3.5" />
-                      <span>Đã hết lượt tự động. Vui lòng bấm "Quét ngay" để thử lại.</span>
+                      <span>
+                        Đã hết lượt tự động. Vui lòng bấm "Quét ngay" để thử lại.
+                      </span>
                     </div>
                   ) : (
                     <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
@@ -348,3 +349,5 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     </AnimatePresence>
   );
 };
+
+export default FingerprintScanModal;

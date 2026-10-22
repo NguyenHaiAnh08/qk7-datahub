@@ -10,17 +10,25 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true
+        target: 'https://localhost:8000',
+        changeOrigin: true,
+        secure: false,         
       },
       '/uploads': {
-        target: 'http://localhost:8000',
-        changeOrigin: true
-      }
-    }
+        target: 'https://localhost:8000',
+        changeOrigin: true,
+        secure: false,     
+      },
+      '/ws': {
+        target: 'wss://localhost:8000',
+        ws: true,
+        changeOrigin: true,
+        secure: false,          
+      },
+    },
   },
   build: {
     outDir: resolve(__dirname, '../backend/public'),
     emptyOutDir: true,
-  }
+  },
 });

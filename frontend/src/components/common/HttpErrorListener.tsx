@@ -8,12 +8,13 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { HttpErrorDetail } from '../../services/http';
+import { authService } from '../../services/authService';
 import { ROUTE_PATHS } from '../../routes/routePaths';
 
 /**
  * Global HTTP Error Listener
- * Bắt các mã trạng thái HTTP từ các cuộc gọi API Backend (http.ts)
- * và tự động thông báo qua Ant Design Notification / điều hướng trang mã trạng thái.
+ * - 401 (không phải login) → Xóa session + dispatch 'qk7:session-expired' để AuthContext reset
+ * - Các mã khác → Ant Design Notification (dùng `message`, KHÔNG dùng `title` vì AntD v5)
  */
 export const HttpErrorListener: React.FC = () => {
   const navigate = useNavigate();
@@ -26,11 +27,35 @@ export const HttpErrorListener: React.FC = () => {
       const detail = customEvent.detail;
       if (!detail) return;
 
+      // Endpoint fingerprint tự xử lý lỗi riêng (agent offline, timeout...)
       if (detail.url?.includes('/fingerprint/')) return;
 
       const { status, message, url, autoRedirect } = detail;
 
-      // Không hiển thị popup nếu đang ở sẵn trang lỗi tương ứng
+      // 401 trên chính request login = sai mật khẩu — KHÔNG redirect để user nhập lại
+      const isLoginRequest = url?.includes('/auth/login');
+
+      // === 401: session hết hạn — clear + redirect ===
+      if (status === 401 && !isLoginRequest) {
+        try {
+          authService.clearSession();
+        } catch {
+          /* ignore */
+        }
+        // Báo cho AuthProvider biết để reset state + navigate
+        window.dispatchEvent(new CustomEvent('qk7:session-expired'));
+
+        notification.warning({
+          message: 'Phiên Làm Việc Hết Hạn',
+          description:
+            message || 'Vui lòng đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
+          icon: <WarningOutlined className="text-amber-500" />,
+          duration: 4.5,
+        });
+        return;
+      }
+
+      // Không hiển thị popup nếu đang ở trang lỗi tương ứng
       const isAlreadyOnErrorPage =
         location.pathname === `/error/${status}` ||
         location.pathname === `/${status}` ||
@@ -43,23 +68,13 @@ export const HttpErrorListener: React.FC = () => {
 
       if (isAlreadyOnErrorPage) return;
 
-      // frontend/src/components/common/HttpErrorListener.tsx
-// (khoảng dòng 60-110)
-
       switch (status) {
-        case 401:
-          notification.warning({
-            title: 'Phiên Làm Việc Hết Hạn',        // ⚠️ message → title
-            description: message || 'Bạn cần đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
-            icon: <WarningOutlined className="text-amber-500" />,
-            duration: 4.5,
-          });
-          break;
-
         case 403:
           notification.error({
-            title: 'Truy Cập Bị Từ Chối',          
-            description: message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
+            message: 'Truy Cập Bị Từ Chối',
+            description:
+              message ||
+              'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
             icon: <StopOutlined className="text-red-500" />,
             duration: 4.5,
           });
@@ -67,7 +82,7 @@ export const HttpErrorListener: React.FC = () => {
 
         case 404:
           notification.info({
-            title: 'Không Tìm Thấy Tài Nguyên',     
+            message: 'Không Tìm Thấy Tài Nguyên',
             description: message || `Không tìm thấy endpoint hoặc tài liệu yêu cầu: ${url}`,
             duration: 4.5,
           });
@@ -78,8 +93,10 @@ export const HttpErrorListener: React.FC = () => {
         case 503:
         case 504:
           notification.error({
-            title: 'Sự Cố Máy Chủ',           
-            description: message || 'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
+            message: 'Sự Cố Máy Chủ',
+            description:
+              message ||
+              'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
             icon: <ApiOutlined className="text-red-500" />,
             duration: 5,
           });
@@ -87,7 +104,7 @@ export const HttpErrorListener: React.FC = () => {
 
         default:
           notification.warning({
-            title: 'Lỗi Phản Hồi Hệ Thống',   
+            message: 'Lỗi Phản Hồi Hệ Thống',
             description: message,
             icon: <ExclamationCircleOutlined className="text-amber-500" />,
             duration: 4.5,

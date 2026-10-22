@@ -122,6 +122,8 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
     currentStepRef.current = 0;
 
     pollTimerRef.current = setInterval(async () => {
+      if (!deviceIdRef.current) return;
+
       const status = await fingerprintService.getEnrollStatus(deviceIdRef.current);
       if (!status || !status.enrolling) return;
 

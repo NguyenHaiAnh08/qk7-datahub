@@ -116,6 +116,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [refreshProfile]);
 
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      authService.clearSession();
+      setUser(null);
+      navigate(ROUTE_PATHS.LOGIN, { replace: true });
+    };
+
+    window.addEventListener('qk7:session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('qk7:session-expired', handleSessionExpired);
+    };
+  }, [navigate]);
+
   const login = useCallback(async (userId: string, password: string) => {
     const res = await authService.login(userId, password);
     if (res.success && res.user) {

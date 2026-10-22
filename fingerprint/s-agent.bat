@@ -15,10 +15,17 @@ if not exist "..\.env" (
     exit /b 1
 )
 
+REM ─── Doc .env root ───
 for /f "usebackq eol=# tokens=1,* delims==" %%a in ("..\.env") do (
     call set "%%a=%%b"
 )
 
+REM ─── Trim khoang trang thua (an toan) ───
+for /f "tokens=* delims= " %%a in ("%SERVER_IP%") do set "SERVER_IP=%%a"
+for /f "tokens=* delims= " %%a in ("%FINGERPRINT_BRIDGE_TOKEN%") do set "FINGERPRINT_BRIDGE_TOKEN=%%a"
+for /f "tokens=* delims= " %%a in ("%USE_HTTPS%") do set "USE_HTTPS=%%a"
+
+REM ─── Validate ───
 if not defined SERVER_IP (
     echo [LOI] Khong doc duoc SERVER_IP tu ..\.env
     pause
@@ -33,7 +40,8 @@ if not defined PORT_BACKEND set "PORT_BACKEND=8000"
 if not defined PORT_CLIENT_AGENT set "PORT_CLIENT_AGENT=9001"
 if not defined MATCH_SCORE_THRESHOLD set "MATCH_SCORE_THRESHOLD=45"
 
-if "%USE_HTTPS%"=="true" (
+REM ─── Xac dinh protocol ───
+if /i "%USE_HTTPS%"=="true" (
     if defined SERVER_DOMAIN (
         set "WS_URL=wss://%SERVER_DOMAIN%/ws/fingerprint"
     ) else (
@@ -45,17 +53,29 @@ if "%USE_HTTPS%"=="true" (
     set "PROTO=WS (plaintext)"
 )
 
+REM ─── [FIX] Kiem tra CA cert khi bat HTTPS ───
 set "CA_PATH="
-if "%USE_HTTPS%"=="true" (
-    if exist "rootCA.pem" set "CA_PATH=rootCA.pem"
+if /i "%USE_HTTPS%"=="true" (
+    if exist "rootCA.pem" (
+        set "CA_PATH=rootCA.pem"
+    ) else (
+        echo [CANH BAO] USE_HTTPS=true nhung thieu rootCA.pem
+        echo    Agent se dung Windows Trust Store ^(phai cai cert truoc^)
+        echo    Hoac copy rootCA.pem vao: %CD%
+    )
 )
 
+REM ─── Kiem tra file bat buoc ───
 if not exist "agent.py" (
     echo [LOI] Khong tim thay agent.py trong %CD%
     pause
     exit /b 1
 )
-
+if not exist "zk_service.py" (
+    echo [LOI] Khong tim thay zk_service.py trong %CD%
+    pause
+    exit /b 1
+)
 if not exist "libzkfp.dll" (
     echo [LOI] Khong tim thay libzkfp.dll
     echo Copy tu: C:\Windows\System32\libzkfp.dll
@@ -63,9 +83,10 @@ if not exist "libzkfp.dll" (
     exit /b 1
 )
 
+REM ─── Sinh .env cho agent ───
 echo [INFO] Dang dong bo .env tu ..\.env...
 (
-    echo # Auto-generated tu s-agent.bat - KHONG sua tay
+    echo # Auto-generated tu s-agent.bat ^(SERVER^) - KHONG sua tay
     echo # Sinh luc: %DATE% %TIME%
     echo BACKEND_WS_URL=%WS_URL%
     echo BRIDGE_TOKEN=%FINGERPRINT_BRIDGE_TOKEN%
@@ -78,6 +99,7 @@ if defined CA_PATH echo CA_CERT_PATH=%CA_PATH%>> ".env"
 
 echo [OK] Da sinh .env
 
+REM ─── Kiem tra Python + pyzkfp ───
 where python >nul 2>&1
 if errorlevel 1 (
     echo [LOI] Khong tim thay Python trong PATH
@@ -93,7 +115,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "T=%FINGERPRINT_BRIDGE_TOKEN:~0,12%"
+REM ─── Hien thi cau hinh ───
+set "T=%FINGERPRINT_BRIDGE_TOKEN:~0,16%"
 
 echo.
 echo --- Cau hinh hien tai ---
@@ -105,7 +128,7 @@ echo   Protocol:      %PROTO%
 if defined CA_PATH (
     echo   CA Cert:       %CA_PATH%
 ) else (
-    if "%USE_HTTPS%"=="true" echo   CA Cert:       ^(Windows Trust Store^)
+    if /i "%USE_HTTPS%"=="true" echo   CA Cert:       ^(Windows Trust Store^)
 )
 echo   Device Port:   %PORT_CLIENT_AGENT%
 echo   Bridge Token:  %T%...

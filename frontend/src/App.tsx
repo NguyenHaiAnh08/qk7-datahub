@@ -7,7 +7,7 @@ import { DeviceModeProvider } from './contexts/DeviceModeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { RouterProvider } from './routes/RouterProvider';
 import { HttpErrorListener } from './components/common/HttpErrorListener';
-import { AIChatWidget } from './components/ai-chat/AIChatWidget';
+import AIChatWidget from './components/ai-chat/AIChatWidget';
 import './index.css';
 
 /**

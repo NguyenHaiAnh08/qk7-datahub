@@ -345,15 +345,18 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Save User
   const handleSaveUser = async (userData: Partial<User>) => {
-    if (selectedUser?.user_id) {
-      await usersApi.updateUser(selectedUser.user_id, userData);
-      showToast('Đã cập nhật thông tin quân nhân');
-    } else {
-      await usersApi.createUser(userData as any);
-      showToast('Đã tạo quân nhân mới thành công');
-    }
-    loadUsers();
-  };
+  if (selectedUser?.user_id) {
+    await usersApi.updateUser(selectedUser.user_id, userData);
+  } else {
+    await usersApi.createUser(userData as any);
+  }
+  await loadUsers();               
+  showToast(
+    selectedUser?.user_id
+      ? 'Đã cập nhật thông tin quân nhân'
+      : 'Đã tạo quân nhân mới thành công'
+  );
+};
 
   // Delete User
   const handleDeleteUser = (u: User) => {
@@ -434,45 +437,65 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  // Generic Delete
-  const handleGenericDelete = (type: string, id: string | number, name: string) => {
-    setDeleteConfirm({
-      open: true,
-      title: `Xóa ${type}`,
-      message: `Bạn có chắc chắn muốn xóa bản ghi "${name}" (${id})?`,
-      onConfirm: async () => {
-        try {
-          if (type === 'roles') {
-            await dashboardApi.deleteRole(String(id));
-            loadRoles();
-          } else if (type === 'permissions') {
-            await dashboardApi.deletePermission(String(id));
-            loadPermissions();
-          } else if (type === 'units') {
-            await dashboardApi.deleteUnit(String(id));
-            loadUnits();
-          } else if (type === 'doctypes') {
-            await dashboardApi.deleteDocumentType(String(id));
-            loadDocTypes();
-          } else if (type === 'levels') {
-            await dashboardApi.deleteSecurityLevel(Number(id));
-            loadLevels();
-          } else if (type === 'ranks') {
-            await dashboardApi.deleteRank(String(id));
-            loadRanks();
-          } else if (type === 'positions') {
-            await dashboardApi.deletePosition(String(id));
-            loadPositions();
+      // Generic Delete
+    const handleGenericDelete = (type: string, id: string | number, name: string) => {
+      setDeleteConfirm({
+        open: true,
+        title: `Xóa ${type}`,
+        message: `Bạn có chắc chắn muốn xóa bản ghi "${name}" (${id})?`,
+        onConfirm: async () => {
+          try {
+            if (type === 'roles') {
+              await dashboardApi.deleteRole(String(id));
+              loadRoles();
+              showToast(`Đã xóa vai trò ${id}`);
+            } else if (type === 'permissions') {
+              await dashboardApi.deletePermission(String(id));
+              loadPermissions();
+              showToast(`Đã xóa quyền ${id}`);
+            } else if (type === 'units') {
+              await dashboardApi.deleteUnit(String(id));
+              loadUnits();
+              showToast(`Đã xóa đơn vị ${id}`);
+            } else if (type === 'doctypes') {
+              await dashboardApi.deleteDocumentType(String(id));
+              loadDocTypes();
+              showToast(`Đã xóa loại văn bản ${id}`);
+            } else if (type === 'levels') {
+              await dashboardApi.deleteSecurityLevel(Number(id));
+              loadLevels();
+              showToast(`Đã xóa mức bảo mật ${id}`);
+            } else if (type === 'ranks') {
+              const res: any = await dashboardApi.deleteRank(String(id));
+              loadRanks();
+              if (res?.soft_deleted) {
+                showToast(
+                  `Đã ẩn cấp bậc "${name}" khỏi dropdown (${res.note || 'đang được quân nhân sử dụng'})`,
+                  'info',
+                );
+              } else {
+                showToast(`Đã xóa cấp bậc ${id}`);
+              }
+            } else if (type === 'positions') {
+              const res: any = await dashboardApi.deletePosition(String(id));
+              loadPositions();
+              if (res?.soft_deleted) {
+                showToast(
+                  `Đã ẩn chức vụ "${name}" khỏi dropdown (${res.note || 'đang được quân nhân sử dụng'})`,
+                  'info',
+                );
+              } else {
+                showToast(`Đã xóa chức vụ ${id}`);
+              }
+            }
+          } catch (err: any) {
+            showToast('Lỗi: ' + err.message, 'error');
+          } finally {
+            setDeleteConfirm((prev) => ({ ...prev, open: false }));
           }
-          showToast(`Đã xóa thành công ${id}`);
-        } catch (err: any) {
-          showToast('Lỗi: ' + err.message, 'error');
-        } finally {
-          setDeleteConfirm((prev) => ({ ...prev, open: false }));
-        }
-      }
-    });
-  };
+        },
+      });
+    };
 
   // Filtered lists
   const filteredUsers = useMemo(() => {

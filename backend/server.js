@@ -28,7 +28,12 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf } = require('./pdf-parser');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({
+  path: [
+    path.join(__dirname, '..', '..', '.env'),
+    path.join(__dirname, '..', '.env'),
+  ],
+});
 
 const {
   setupFingerprintWS, requestScan, requestEnroll,

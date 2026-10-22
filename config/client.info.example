@@ -1,0 +1,13 @@
+# ============================================================
+# QK7 CLIENT CONFIG — Template
+# File thật (client.info) được sinh bởi generate-client-config.bat
+# trên server, sau đó copy sang C:\QK7Agent\config\client.info
+# ============================================================
+
+SERVER_IP=192.168.1.229
+SERVER_DOMAIN=
+USE_HTTPS=false
+PORT_BACKEND=8000
+PORT_CLIENT_AGENT=9001
+BRIDGE_TOKEN=CHANGE_ME_COPY_FROM_SERVER
+MATCH_SCORE_THRESHOLD=45

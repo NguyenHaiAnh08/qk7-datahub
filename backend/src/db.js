@@ -1,7 +1,12 @@
 // src/db.js
 const sql = require('mssql');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config({
+  path: [
+    path.join(__dirname, '..', '..', '.env'),   // root
+    path.join(__dirname, '..', '.env'),         // backend/.env
+  ],
+});
 
 const config = {
   user:     process.env.DB_USER,

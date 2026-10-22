@@ -594,11 +594,20 @@ app.post('/api/auth/login', async (req, res) => {
     const user = r.recordset[0];
 
     if (user.status !== 'active') {
-      await writeLoginAttempt({ ip, username, result: 'LOCKED' });
-      return res.status(403).json({
-        error: user.status === 'locked' ? 'Tài khoản đã bị khóa.' : 'Tài khoản đã bị vô hiệu hóa.',
-      });
-    }
+    await writeLoginAttempt({ ip, username, result: 'LOCKED' });
+    await writeAccessLog({
+      userId: user.user_id,
+      fileId: null,
+      action: 'LOGIN_BLOCKED',
+      ip,
+      note: user.status === 'locked'
+        ? 'Tài khoản đang bị khóa — từ chối đăng nhập'
+        : 'Tài khoản đã bị vô hiệu hóa — từ chối đăng nhập',
+    });
+    return res.status(403).json({
+      error: user.status === 'locked' ? 'Tài khoản đã bị khóa.' : 'Tài khoản đã bị vô hiệu hóa.',
+    });
+  }
 
     let currentFailed = user.failed_attempts || 0;
     if (user.last_failed_at && currentFailed > 0) {
@@ -637,7 +646,17 @@ app.post('/api/auth/login', async (req, res) => {
         .query(query);
 
       await writeLoginAttempt({ ip, username, result: 'WRONG_PASSWORD' });
-      // 🔒 Chặn IP nếu sai password quá nhiều lần
+
+      // Ghi nhật ký kiểm toán SOC để SecurityAuditLog KPI "Cảnh báo An ninh" bắt được
+      await writeAccessLog({
+        userId: user.user_id,
+        fileId: null,
+        action: 'LOGIN_FAIL',
+        ip,
+        note: `Sai mật khẩu lần ${newFailed}/${LOCKOUT_MAX_ATTEMPTS}${willLock ? ' — TÀI KHOẢN ĐÃ BỊ KHÓA' : ''}`,
+      });
+
+      // Chặn IP nếu sai password quá nhiều lần
       await checkAndBlockIp(ip, 'wrong_password');
 
       if (willLock) {

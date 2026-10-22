@@ -91,28 +91,29 @@ export const UsersPage: React.FC = () => {
     loadData();
   }, []);
 
-  const handleSaveUser = async (userData: Partial<User>) => {
+    const handleSaveUser = async (userData: Partial<User>) => {
     if (selectedUser?.user_id) {
       await usersApi.updateUser(selectedUser.user_id, userData);
+      await loadData();
       showToast('Đã cập nhật thông tin quân nhân');
     } else {
       await usersApi.createUser(userData as any);
+      await loadData();
       showToast('Đã thêm quân nhân mới thành công');
     }
-    loadData();
   };
 
   const handleDeleteUser = async () => {
-    if (!deleteConfirm.user) return;
-    try {
-      await usersApi.deleteUser(deleteConfirm.user.user_id);
-      showToast(`Đã xóa quân nhân ${deleteConfirm.user.full_name}`);
-      setDeleteConfirm({ open: false, user: null });
-      loadData();
-    } catch (err: any) {
-      showToast('Lỗi: ' + err.message, 'error');
-    }
-  };
+  if (!deleteConfirm.user) return;
+  try {
+    await usersApi.deleteUser(deleteConfirm.user.user_id);
+    setDeleteConfirm({ open: false, user: null });
+    await loadData();                          // ← await trước
+    showToast(`Đã xóa quân nhân ${deleteConfirm.user.full_name}`);
+  } catch (err: any) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+};
 
   const filteredUsers = useMemo(() => {
     if (!userSearch.trim()) return usersList;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Popover } from 'antd';
+import { Popover, Tooltip } from 'antd';
 import {
   Building2,
   Building,
@@ -366,13 +366,13 @@ export const Header: React.FC<HeaderProps> = ({
   // BRANCH 2: GIAO DIỆN MÁY TÍNH TIÊU CHUẨN (deviceMode === 'pc')
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-6 h-16 flex items-center justify-between gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
+    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none max-w-full">
       {/* Vùng Trái: Brand & Optional Drawer Hamburger Button */}
       <div className="shrink-0 flex items-center space-x-2 sm:space-x-3">
         {onToggleMobileMenu && (
           <button
             onClick={onToggleMobileMenu}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer flex lg:hidden"
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer flex lg:hidden shrink-0"
             title="Mở thanh điều hướng"
             aria-label="Mở danh mục menu"
           >
@@ -381,19 +381,19 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         <div
-          className="flex items-center space-x-3 cursor-pointer group"
+          className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group shrink-0"
           onClick={() => navigate(isAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white border border-emerald-400/40 shadow-md group-hover:scale-105 transition-transform">
-            <Building2 className="w-5 h-5 text-amber-400" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white border border-emerald-400/40 shadow-md group-hover:scale-105 transition-transform shrink-0">
+            <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center space-x-2">
-              <span className="font-extrabold text-base sm:text-lg tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:via-slate-100 dark:to-amber-400 bg-clip-text text-transparent">
+              <span className="font-extrabold text-sm sm:text-base lg:text-lg tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:via-slate-100 dark:to-amber-400 bg-clip-text text-transparent whitespace-nowrap">
                 {title}
               </span>
             </div>
-            <span className="hidden sm:block text-[10px] text-slate-500 dark:text-slate-400 font-medium -mt-0.5 tracking-wider uppercase">
+            <span className="hidden xl:block text-[10px] text-slate-500 dark:text-slate-400 font-medium -mt-0.5 tracking-wider uppercase truncate max-w-[220px] 2xl:max-w-none">
               {subtitle}
             </span>
           </div>
@@ -401,10 +401,10 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Vùng Phải: Quick Nav Links & Controls */}
-      <div className="flex items-center space-x-2 sm:space-x-3">
-        {/* Live Clock */}
+      <div className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0">
+        {/* Live Clock (Chỉ hiện ở màn hình rộng để tiết kiệm diện tích khi zoom) */}
         {showClock && (
-          <div className="hidden xl:flex items-center space-x-2 text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="hidden 2xl:flex items-center space-x-2 text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 shrink-0">
             <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
             <span>{liveClock || '--:--:--'}</span>
           </div>
@@ -412,83 +412,97 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Quick Nav Links (Nút bấm chuyển trang tiêu chuẩn trên Máy tính) */}
         {(isStaff || isAdmin) && (
-          <Link
-            to={ROUTE_PATHS.DESK}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-              activeNav === 'desk'
-                ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
-          >
-            <UploadCloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Đăng tải</span>
-          </Link>
+          <Tooltip title="Đăng tải văn bản" placement="bottom" mouseEnterDelay={0.3}>
+            <Link
+              to={ROUTE_PATHS.DESK}
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
+                activeNav === 'desk'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+              }`}
+            >
+              <UploadCloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="hidden xl:inline">Đăng tải</span>
+            </Link>
+          </Tooltip>
         )}
 
-        <Link
-          to={ROUTE_PATHS.PORTAL}
-          className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-            activeNav === 'portal'
-              ? 'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-500/50 shadow-sm'
-              : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-          }`}
-        >
-          <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-          <span>Trung tâm thư viện số</span>
-        </Link>
-
-        {user && user.user_id !== 'GUEST' && (
+        <Tooltip title="Trung tâm thư viện số" placement="bottom" mouseEnterDelay={0.3}>
           <Link
-            to={ROUTE_PATHS.MY_UNIT}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-              activeNav === 'myunit'
-                ? 'bg-violet-50 dark:bg-violet-950/80 text-violet-700 dark:text-violet-400 border-violet-300 dark:border-violet-500/50 shadow-sm'
+            to={ROUTE_PATHS.PORTAL}
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
+              activeNav === 'portal'
+                ? 'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-500/50 shadow-sm'
                 : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
             }`}
           >
-            <Building className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-            <span>Đơn vị của tôi</span>
+            <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span className="hidden 2xl:inline">Trung tâm thư viện số</span>
+            <span className="hidden xl:inline 2xl:hidden">Thư viện số</span>
           </Link>
+        </Tooltip>
+
+        {user && user.user_id !== 'GUEST' && (
+          <Tooltip title="Đơn vị của tôi" placement="bottom" mouseEnterDelay={0.3}>
+            <Link
+              to={ROUTE_PATHS.MY_UNIT}
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
+                activeNav === 'myunit'
+                  ? 'bg-violet-50 dark:bg-violet-950/80 text-violet-700 dark:text-violet-400 border-violet-300 dark:border-violet-500/50 shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+              }`}
+            >
+              <Building className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
+              <span className="hidden 2xl:inline">Đơn vị của tôi</span>
+              <span className="hidden xl:inline 2xl:hidden">Đơn vị</span>
+            </Link>
+          </Tooltip>
         )}
 
         {isAdmin && (
-          <Link
-            to={ROUTE_PATHS.ADMIN}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-              activeNav === 'admin'
-                ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/50 shadow-sm'
-                : 'bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/40 dark:hover:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
-            }`}
-          >
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            <span>Quản trị</span>
-          </Link>
+          <Tooltip title="Trung tâm quản trị" placement="bottom" mouseEnterDelay={0.3}>
+            <Link
+              to={ROUTE_PATHS.ADMIN}
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold border transition whitespace-nowrap shrink-0 ${
+                activeNav === 'admin'
+                  ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/50 shadow-sm'
+                  : 'bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/40 dark:hover:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="hidden xl:inline">Quản trị</span>
+            </Link>
+          </Tooltip>
         )}
 
         {/* Nút gạt chuyển đổi Máy tính / iPad Air M4 (Gọn trên Header) */}
-        <DeviceModeSwitch compact />
+        <div className="shrink-0">
+          <DeviceModeSwitch compact />
+        </div>
 
         {/* Dark / Light Mode Animated Toggle */}
-        <ThemeToggle />
+        <div className="shrink-0">
+          <ThemeToggle />
+        </div>
 
         {/* User profile menu Desktop */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+            className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
           >
-            <div className="w-7 h-7 rounded-lg bg-emerald-600/20 dark:bg-emerald-600/30 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+            <div className="w-7 h-7 rounded-lg bg-emerald-600/20 dark:bg-emerald-600/30 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
               {user?.full_name ? user.full_name[0] : 'K'}
             </div>
-            <div className="text-left hidden md:block">
-              <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
+            <div className="text-left hidden 2xl:block max-w-[120px]">
+              <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight truncate">
                 {user?.full_name || 'Khách'}
               </span>
-              <span className="block text-[10px] text-amber-600 dark:text-amber-400 leading-tight">
+              <span className="block text-[10px] text-amber-600 dark:text-amber-400 leading-tight truncate">
                 {user?.clearance_name || `Mức ${user?.clearance_level_id || 1}`}
               </span>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
           </button>
 
           <AnimatePresence>

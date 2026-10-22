@@ -80,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 select-none overflow-x-hidden">
-      <div className="p-2 sm:p-2.5 pb-24 space-y-1 overflow-y-auto overflow-x-hidden">
+      <div className="p-2 sm:p-2.5 pb-4 space-y-1 overflow-y-auto overflow-x-hidden">
         {/* Sidebar Header with Toggle button */}
         <div
           className={`py-2 px-1 flex items-center ${
@@ -146,28 +146,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return buttonElement;
         })}
       </div>
-
-      {/* Quick toggle at bottom */}
-      {onToggleCollapse && (
-        <div className="p-2 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-900/60">
-          <button
-            onClick={onToggleCollapse}
-            className={`w-full flex items-center ${
-              collapsed ? 'justify-center p-2' : 'justify-start space-x-2 px-3 py-2'
-            } rounded-xl text-xs text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition cursor-pointer font-medium`}
-            title={collapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
-          >
-            {collapsed ? (
-              <ChevronRight className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            ) : (
-              <>
-                <ChevronLeft className="w-4 h-4" />
-                <span>Thu gọn danh mục</span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
     </div>
   );
 };

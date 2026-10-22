@@ -22,6 +22,7 @@
 13. [Đặc Tả Kỹ Thuật Mô-đun Xuất Báo Cáo Kiểm Toán Quân Đội Dạng Excel (Military Audit Reporting Engine)](#13-đặc-tả-kỹ-thuật-mô-đun-xuất-báo-cáo-kiểm-toán-quân-đội-dạng-excel)
 14. [Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)](#14-kiến-trúc-giao-diện-kép-đa-nền-tảng-dual-platform-desktop--ipados-touch-ui-engine)
 15. [Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (MyUnitPage) & Chuẩn Hóa Danh Xưng Thư Viện Số](#15-phân-hệ-quản-lý-tài-liệu-đơn-vị-trực-thuộc-myunitpage--chuẩn-hóa-danh-xưng-thư-viện-số)
+16. [Kiến Trúc Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout Engine)](#16-kiến-trúc-giao-diện-tự-thích-ứng-chống-bể-layout-mọi-mức-phóng-to-adaptive-zoom-proof-layout-engine)
 
 ---
 
@@ -965,6 +966,44 @@ Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Bộ Tư Lệnh 
   - **Bộ lọc đa chiều thời gian thực:** Lọc tài liệu theo mức độ bảo mật (Công Khai, Nội Bộ, Mật, Tối Mật, Tuyệt Mật), loại văn kiện (Kế hoạch, Mệnh lệnh, Báo cáo, Chỉ thị, Hướng dẫn) và đơn vị phát hành.
   - **Tích hợp xác thực vân tay 2FA:** Cho phép xem trước trực tiếp (Preview Inline) và tải về tệp PDF đính kèm. Đối với tài liệu độ mật Cấp 3, 4, 5, hệ thống tự động kích hoạt `FingerprintScanModal` để bảo vệ an ninh tuyệt đối.
   - **Tương thích hoàn hảo Dual-Platform:** Giao diện lưới thẻ tài liệu (Document Grid) và bảng danh sách tự động co giãn tối ưu trên cả màn hình máy tính bàn lẫn màn hình cảm ứng iPad Air M4.
+
+---
+
+## 16. Kiến Trúc Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout Engine)
+
+### 16.1. Bối Cảnh & Thách Thức Khi Phóng To Màn Hình (Browser Zooming 125% – 200%)
+Trong môi trường công tác thực tế tại Bộ Tư Lệnh Quân Khu 7:
+- Cán bộ và chỉ huy thường phóng to trình duyệt (125%, 150%, 175%, 200%) để theo dõi chi tiết văn bản hoặc sử dụng màn hình laptop có độ phân giải phổ thông (1366×768, 1536×864).
+- Khi phóng to 175% trên màn hình Full HD (1920×1080), kích thước viewport thực tế co hẹp chỉ còn **~1097px** (trên màn hình 1536px chỉ còn ~877px).
+- **Hệ quả của layout cũ khi chưa tối ưu:**
+  - Nút điều hướng không có `whitespace-nowrap`, dẫn đến khi bị co hẹp, chữ bị ngắt dòng thành 2–3 tầng (*"Trung / tâm thư / viện số"*, *"Đơn / vị của / tôi"*).
+  - Chiều rộng cố định của các thành phần vượt quá viewport khiến nút `DeviceModeSwitch` bị cắt đôi, nút `ThemeToggle` và `User Profile` bị đẩy mất khỏi mép phải màn hình.
+  - Thanh tab phụ chuyển sang chế độ cuộn ẩn thanh cuộn (`no-scrollbar`) nhưng không có nút điều hướng, khiến người dùng dùng chuột máy tính không cuộn được và các tab chức năng cuối bị ẩn.
+
+### 16.2. Giải Pháp Kiến Trúc Header Đa Tầng Thích Ứng (3-Tier Adaptive Header Engine)
+Hệ thống thiết kế giải pháp phản hồi kích thước viewport theo 3 tầng trạng thái tự động:
+1. **Tier 1 — Widescreen Mode (Viewport ≥ 1536px / Zoom 100%):**
+   - Hiển thị đầy đủ Logo, Tên hệ thống, Phụ đề quân sự và Đồng hồ số thời gian thực (`liveClock`).
+   - Cụm nút điều hướng nhanh hiển thị đầy đủ icon và nhãn dài chính quy: `Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`.
+   - Nút đại diện quân nhân hiển thị đầy đủ Họ tên và Cấp độ bảo mật.
+2. **Tier 2 — Compact Text Mode (1280px ≤ Viewport < 1536px / Zoom 125% – 150%):**
+   - Phụ đề quân sự áp dụng cơ chế `truncate max-w-[220px]`.
+   - Nút điều hướng tự động rút ngắn nhãn: *"Thư viện số"*, *"Đơn vị"*, tiết kiệm hơn 120px bề ngang.
+   - Giữ nguyên các thao tác trực tiếp mà không cần ẩn bớt công cụ.
+3. **Tier 3 — Icon-Only Tooltip Mode (Viewport < 1280px / Zoom 175% – 200%):**
+   - Ẩn phụ đề đơn vị và đồng hồ số để nhường toàn bộ không gian cho tác vụ chính.
+   - Cụm điều hướng nhanh chuyển sang dạng **Icon Button chuẩn kích thước 36×36px**, tích hợp **Ant Design `<Tooltip>`** hiển thị nhãn đầy đủ khi rê chuột.
+   - Cụm điều khiển trọng yếu (`DeviceModeSwitch`, `ThemeToggle`, `User Profile`) được bảo vệ bằng `shrink-0`, cam kết **100% hiển thị đầy đủ trên mọi mức phóng to (kể cả zoom 200%)**.
+
+### 16.3. Kiến Trúc Thanh Tab Quản Trị Tương Tác Hai Chiều (Smart Horizontal Tab Strip)
+- **Cơ chế cuộn bánh xe chuột (`onWheel`):** Bắt sự kiện cuộn chuột dọc trên desktop và chuyển hóa mượt mà thành cuộn ngang (`tabStripRef.current.scrollLeft += e.deltaY`).
+- **Nút điều hướng hai đầu:** Bổ sung nút cuộn trái (`ChevronLeft`) và nút cuộn phải (`ChevronRight`) cho phép di chuyển tức thì 220px mỗi lần bấm (`scrollBy({ behavior: 'smooth' })`).
+- **Tự động căn giữa tab kích hoạt (`scrollIntoView`):** Khi chuyển tab (bằng click hoặc từ sidebar), tab mục tiêu tự động trượt vào trung tâm khung nhìn (`inline: 'center'`).
+- **Chuẩn hóa tinh gọn:** Loại bỏ nút `[ ≡ Danh mục ]` trùng lặp ở hàng thứ 2, nhường toàn bộ không gian ngang cho 10 tab chức năng quản trị.
+
+### 16.4. Tối Ưu Hóa Giao Diện Thanh Bên Sidebar
+- Loại bỏ nút toggle `< Thu gọn danh mục` ở đáy sidebar (vốn bị trùng lặp với nút gạt ở đầu header sidebar).
+- Điều chỉnh khoảng đệm chân trang (`pb-4`), mang lại trải nghiệm thị giác gọn gàng, liền mạch và tập trung hoàn toàn vào 10 danh mục quản trị.
 
 ---
 *Tài liệu kiến trúc hệ thống QK7 DataHub được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*

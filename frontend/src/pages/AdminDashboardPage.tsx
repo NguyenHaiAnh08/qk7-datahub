@@ -20,7 +20,6 @@ import {
   HardDrive,
   History,
   Save,
-  Menu,
   ChevronLeft,
   ChevronRight,
   Award,
@@ -135,8 +134,33 @@ export const AdminDashboardPage: React.FC = () => {
     ? (sidebarCollapsed ? 'w-[68px]' : 'w-[190px]')
     : (sidebarCollapsed ? 'w-[76px]' : 'w-[260px]');
 
-  // Stats
   const [stats, setStats] = useState<AdminStats | null>(null);
+
+  const tabStripRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollTabStrip = (direction: 'left' | 'right') => {
+    if (tabStripRef.current) {
+      tabStripRef.current.scrollBy({
+        left: direction === 'left' ? -220 : 220,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  const handleTabStripWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY !== 0 && tabStripRef.current) {
+      tabStripRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  useEffect(() => {
+    if (tabStripRef.current) {
+      const activeEl = tabStripRef.current.querySelector<HTMLElement>(`[data-tab-id="${activeTab}"]`);
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [activeTab]);
 
   // Entities Data
   const [usersList, setUsersList] = useState<User[]>([]);
@@ -569,24 +593,32 @@ export const AdminDashboardPage: React.FC = () => {
         <main className="flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-5 lg:p-6 xl:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-5">
           {/* Mobile / iPad Portrait Menu Bar & Swipeable Tab Strip — Chuyển tab 1 chạm, không che dữ liệu */}
           {isPortraitMode && (
-            <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800/80 select-none">
+            <div className="flex items-center gap-1.5 sm:gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800/80 select-none">
+
+              {/* Nút cuộn danh mục sang trái trên desktop */}
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="shrink-0 p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 flex items-center gap-1.5 text-xs font-semibold shadow-xs transition cursor-pointer"
-                title="Mở toàn bộ danh mục dạng Drawer"
+                type="button"
+                onClick={() => scrollTabStrip('left')}
+                className="shrink-0 p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
+                title="Cuộn danh mục sang trái"
+                aria-label="Cuộn sang trái"
               >
-                <Menu className="w-4 h-4" />
-                <span className="hidden sm:inline">Danh mục</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
 
-              {/* Thanh Tab Ngang Cuộn Cảm Ứng no-scrollbar */}
-              <div className="flex-1 flex overflow-x-auto no-scrollbar gap-1.5 py-0.5">
+              {/* Thanh Tab Ngang Cuộn Cảm Ứng & Lăn Bánh Xe Chuột */}
+              <div
+                ref={tabStripRef}
+                onWheel={handleTabStripWheel}
+                className="flex-1 flex overflow-x-auto no-scrollbar gap-1.5 py-0.5 scroll-smooth"
+              >
                 {ADMIN_NAV_TABS.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
                   return (
                     <button
                       key={tab.id}
+                      data-tab-id={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={`whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
                         isActive
@@ -600,6 +632,17 @@ export const AdminDashboardPage: React.FC = () => {
                   );
                 })}
               </div>
+
+              {/* Nút cuộn danh mục sang phải trên desktop */}
+              <button
+                type="button"
+                onClick={() => scrollTabStrip('right')}
+                className="shrink-0 p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
+                title="Cuộn danh mục sang phải"
+                aria-label="Cuộn sang phải"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
 

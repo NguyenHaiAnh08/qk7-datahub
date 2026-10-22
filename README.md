@@ -143,6 +143,22 @@ qk7-datahub/
 - **Khử lỗi nhảy gián đoạn:** Cơ chế debounce polling và lọc trạng thái trong `fingerprintService.ts`, phân tách trạng thái chờ ngón tay với lỗi phần cứng thật, ngăn ngừa hiện tượng văng lỗi/nhảy lỗi liên tục.
 - **Mở khóa tài liệu Mật siêu tốc:** Nhận diện nhanh máy quét nội bộ `127.0.0.1:9001` và cấp quyền xem tài liệu Cấp 3, 4, 5 chỉ trong 1 lần chạm.
 
+### 10. Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout)
+- **Tương thích hoàn hảo mọi tỷ lệ Zoom (100% – 200%):** Giải quyết triệt để sự cố co ép giao diện khi người dùng phóng to trình duyệt (150%, 175%, 200%) hoặc trên màn hình laptop có độ phân giải nhỏ (1366×768, 1536×864):
+  - **Khử lỗi ngắt dòng:** Toàn bộ nút điều hướng trên thanh Header được áp dụng `whitespace-nowrap shrink-0`, ngăn hoàn toàn hiện tượng vỡ dòng chữ thành nhiều tầng.
+  - **Cơ chế nhãn thích ứng 3 tầng thông minh:**
+    - `>= 1536px (Zoom 100%):` Hiển thị đầy đủ nhãn dài (*Đăng tải, Trung tâm thư viện số, Đơn vị của tôi, Quản trị*) cùng phụ đề đơn vị.
+    - `1280px - 1535px (Zoom 125% - 150%):` Tự động chuyển sang nhãn ngắn gọn (*"Thư viện số"*, *"Đơn vị"*).
+    - `< 1280px (Zoom 175% - 200%):` Tự động chuyển sang dạng **Icon Button tinh gọn kết hợp Ant Design Tooltip** hiển thị tên đầy đủ khi hover, tự ẩn phụ đề dài để tiết kiệm không gian.
+  - **Bảo toàn hiển thị 100% cho bộ công cụ điều khiển:** Nút gạt chế độ thiết bị (`DeviceModeSwitch`), nút chế độ Sáng/Tối (`ThemeToggle`) và Menu người dùng được gán `shrink-0`, không bao giờ bị cắt xén hay tràn ra mép phải màn hình.
+- **Thanh Tab quản trị phụ cuộn mượt mà (Smart Subnav Strip):**
+  - **Bổ sung nút điều hướng cuộn:** Tích hợp 2 nút cuộn `<` (`ChevronLeft`) và `>` (`ChevronRight`) ở hai đầu thanh tab.
+  - **Hỗ trợ lăn bánh xe chuột (`onWheel`):** Cho phép lăn chuột dọc để cuộn ngang danh mục tự nhiên trên máy tính bàn.
+  - **Tự động căn giữa (`scrollIntoView`):** Đảm bảo tab danh mục đang chọn luôn nằm gọn trong tầm nhìn người dùng.
+- **Tinh giản cấu trúc giao diện & loại bỏ nút trùng lặp:**
+  - Loại bỏ nút `[ ≡ Danh mục ]` ở hàng thứ 2 vì Header đã có sẵn nút Menu Hamburger `[ ≡ ]`.
+  - Loại bỏ nút `< Thu gọn danh mục` ở đáy sidebar (trùng lặp với nút gạt ở đầu sidebar), tối ưu khoảng đệm `pb-4` giúp sidebar thoáng và liền mạch.
+
 ---
 
 ## 🚀 Hướng Dẫn Cài Đặt & Vận Hành Hệ Thống (Server & Client Setup Guide)

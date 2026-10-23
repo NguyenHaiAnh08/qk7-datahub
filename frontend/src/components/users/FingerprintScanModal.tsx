@@ -233,7 +233,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         >
           <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
                 <Fingerprint className="w-5 h-5" />
               </div>
               <div>
@@ -317,7 +317,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                       </span>
                     </div>
                   ) : (
-                    <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                    <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       <span>Đang tự động quét lại... Đặt ngón tay lên cảm biến</span>
                     </div>
@@ -337,7 +337,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
             {phase === 'error' && !needsEnroll && (
               <button
                 onClick={handleRetry}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-purple-600/30 cursor-pointer"
+                className="px-4 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-emerald-950/20 border border-amber-500/25 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Quét ngay

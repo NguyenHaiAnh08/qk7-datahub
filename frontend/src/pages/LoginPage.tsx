@@ -101,11 +101,11 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-purple-600 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
       {/* Background Military Grid: Loại bỏ ở chế độ sáng theo yêu cầu, chỉ giữ lại ở Dark Mode */}
       <div className="absolute inset-0 hidden dark:block dark:bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none"></div>
-      <div className="absolute top-0 -left-40 w-96 h-96 bg-purple-500/10 dark:bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-0 -right-40 w-96 h-96 bg-indigo-500/10 dark:bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-0 -left-40 w-96 h-96 bg-emerald-500/10 dark:bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 -right-40 w-96 h-96 bg-amber-500/10 dark:bg-amber-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
       {/* Rotating Bronze Drum Watermark — Nằm chìm phía sau khung đăng nhập chính */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0 select-none">
@@ -149,7 +149,7 @@ export const LoginPage: React.FC = () => {
             onClick={() => setShowSupportModal(true)}
             className="hidden sm:flex text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white items-center space-x-1.5 transition cursor-pointer"
           >
-            <HelpCircle className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <HelpCircle className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
             <span>Hỗ Trợ Kỹ Thuật</span>
           </button>
         </div>

@@ -40,28 +40,29 @@ export const UserTable: React.FC<UserTableProps> = ({
   return (
     <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
       <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[720px]">
+        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[980px]">
           <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 text-[11px] uppercase border-b border-slate-200 dark:border-slate-800 tracking-wider">
             <tr>
-              <th className="py-3 px-4">Mã</th>
-              <th className="py-3 px-4">Họ tên</th>
-              <th className="py-3 px-4">Cấp bậc / Chức vụ</th>
-              <th className="py-3 px-4">Đơn vị</th>
-              <th className="py-3 px-4">Mức bảo mật</th>
-              <th className="py-3 px-4">Trạng thái</th>
-              <th className="py-3 px-4 text-right">Thao tác</th>
+              <th className="py-3 px-4 whitespace-nowrap">Mã</th>
+              <th className="py-3 px-4 whitespace-nowrap">Họ và tên</th>
+              <th className="py-3 px-4 whitespace-nowrap">Cấp bậc</th>
+              <th className="py-3 px-4 whitespace-nowrap">Chức vụ</th>
+              <th className="py-3 px-4 whitespace-nowrap">Đơn vị</th>
+              <th className="py-3 px-4 whitespace-nowrap">Mức bảo mật</th>
+              <th className="py-3 px-4 whitespace-nowrap">Trạng thái</th>
+              <th className="py-3 px-4 text-right whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                <td colSpan={8} className="py-12 text-center text-slate-500 dark:text-slate-400">
                   Đang tải danh sách người dùng...
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
                   Không tìm thấy người dùng nào phù hợp
                 </td>
               </tr>
@@ -71,26 +72,39 @@ export const UserTable: React.FC<UserTableProps> = ({
                   key={u.user_id}
                   className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">
-                    {u.user_id}
+                  <td className="py-3 px-4 font-mono font-semibold whitespace-nowrap">
+                    <span className="font-mono text-xs px-2.5 py-1 rounded-md text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-bold tracking-wider inline-block">
+                      {u.user_id}
+                    </span>
                   </td>
-                  <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">
+                  <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
                     {u.full_name}
                   </td>
-                  <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                    {u.rank_name || ''} {u.position ? `— ${u.position}` : ''}
+                  <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
+                    {u.rank_name || '—'}
+                  </td>
+                  <td className="py-3 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    {u.position || '—'}
                   </td>
                   <td className="py-3 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                     {u.unit_name || '—'}
                   </td>
-                  <td className="py-3 px-4">
-                    <span className="bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/30 text-[10px] font-bold px-2 py-0.5 rounded">
+                  <td className="py-3 px-4 whitespace-nowrap">
+                    <span
+                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
+                        (u.clearance_level_id || 1) >= 4
+                          ? 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30'
+                          : (u.clearance_level_id || 1) === 3
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30'
+                          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+                      }`}
+                    >
                       {u.clearance_name || `Mức ${u.clearance_level_id}`}
                     </span>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 whitespace-nowrap">
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
                         u.status === 'active'
                           ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
                           : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
@@ -106,7 +120,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                         className={`p-1.5 rounded-lg mr-1.5 transition cursor-pointer ${
                           u.has_fingerprint
                             ? 'bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 dark:border-emerald-800/50'
-                            : 'bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/70 dark:text-purple-300 dark:border-transparent'
+                            : 'bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/70 dark:text-amber-300 dark:border-amber-800/50'
                         }`}
                         title={
                           u.has_fingerprint

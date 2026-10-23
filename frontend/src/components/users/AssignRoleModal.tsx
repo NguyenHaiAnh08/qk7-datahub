@@ -320,7 +320,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
       key: 'user_id',
       width: 100,
       render: (id: string) => (
-        <span className="font-mono text-amber-600 dark:text-amber-400 font-bold text-xs">{id}</span>
+        <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 whitespace-nowrap">{id}</span>
       ),
     },
     {
@@ -374,8 +374,8 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
               return (
                 <Tag
                   key={rId}
-                  color="purple"
-                  className="font-semibold text-xs px-2.5 py-0.5 rounded-md inline-flex items-center shadow-2xs"
+                  color="gold"
+                  className="font-semibold text-xs px-2.5 py-0.5 rounded-md inline-flex items-center shadow-2xs font-mono"
                 >
                   {rName}
                 </Tag>
@@ -529,7 +529,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
       className="assign-role-modal"
       title={
         <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
-          <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-500/15 border border-purple-200 dark:border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-xs">
+          <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shadow-xs">
             <UserCheck className="w-5 h-5" />
           </div>
           <div>
@@ -564,7 +564,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
             </Radio.Button>
             <Radio.Button value="assigned">
               <span className="inline-flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-purple-500 inline-block"></span>
+                <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
                 Đã có vai trò ({stats.assigned})
               </span>
             </Radio.Button>
@@ -598,21 +598,21 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
         </div>
 
         {/* Hướng dẫn thao tác nhanh & nút Làm mới */}
-        <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 rounded-xl p-3 px-4 text-xs text-slate-700 dark:text-purple-200 flex items-center justify-between gap-3 shadow-xs">
+        <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-xl p-3 px-4 text-xs text-slate-700 dark:text-amber-200 flex items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-2.5 min-w-0">
-            <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+            <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
             <span className="leading-relaxed">
-              <strong className="text-purple-700 dark:text-purple-300 font-semibold">Gợi ý:</strong> Chọn vai trò rồi bấm <strong className="text-purple-700 dark:text-purple-300 font-semibold">"Gán vai trò"</strong> đối với người chưa có vai trò. Bấm <strong className="text-rose-600 dark:text-rose-400 font-semibold">"Gỡ vai trò"</strong> đối với người đã có vai trò để thu hồi hoặc chuyển sang vai trò khác.
+              <strong className="text-amber-800 dark:text-amber-300 font-semibold">Gợi ý:</strong> Chọn vai trò rồi bấm <strong className="text-emerald-700 dark:text-emerald-300 font-semibold">"Gán vai trò"</strong> đối với người chưa có vai trò. Bấm <strong className="text-rose-600 dark:text-rose-400 font-semibold">"Gỡ vai trò"</strong> đối với người đã có vai trò để thu hồi hoặc chuyển sang vai trò khác.
             </span>
           </div>
           <button
             type="button"
             disabled={isRefreshing}
             onClick={handleRefreshModal}
-            className="px-2.5 py-1 text-xs rounded-lg bg-white dark:bg-purple-900/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700/50 flex items-center gap-1.5 font-medium cursor-pointer whitespace-nowrap flex-shrink-0 transition-colors shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-2.5 py-1 text-xs rounded-lg bg-white dark:bg-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 flex items-center gap-1.5 font-medium cursor-pointer whitespace-nowrap flex-shrink-0 transition-colors shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
             title="Tải lại danh sách"
           >
-            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-purple-600 dark:text-purple-400' : ''}`} />
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-amber-600 dark:text-amber-400' : ''}`} />
             <span>{isRefreshing ? 'Đang tải...' : 'Làm mới'}</span>
           </button>
         </div>

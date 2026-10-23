@@ -35,11 +35,11 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
     <div className={`w-[290px] text-xs space-y-2 select-none ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
       <div
         className={`flex items-center justify-between border-b pb-1.5 font-bold ${
-          isDark ? 'border-slate-700/80 text-white' : 'border-purple-100 text-slate-900'
+          isDark ? 'border-slate-700/80 text-white' : 'border-slate-200 text-slate-900'
         }`}
       >
-        <span className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
-          <Cpu className={`w-3.5 h-3.5 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
+        <span className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+          <Cpu className={`w-3.5 h-3.5 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`} />
           Nhận diện Thiết bị & Tỉ lệ
         </span>
         <span
@@ -60,13 +60,13 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
       <div className={`text-xs space-y-1.5 pt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
         <div className="flex items-center justify-between gap-3 whitespace-nowrap text-xs">
           <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Chế độ đang chạy:</span>
-          <strong className={`font-semibold ${isDark ? 'text-white' : 'text-purple-800'}`}>
+          <strong className={`font-semibold ${isDark ? 'text-white' : 'text-emerald-800'}`}>
             {isPC ? '💻 Máy tính (16:9)' : '📱 iPad Air M4 (4:3 / 10:7)'}
           </strong>
         </div>
         <div className="flex items-center justify-between gap-3 whitespace-nowrap text-xs">
           <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Trình duyệt:</span>
-          <span className={`font-semibold ${isDark ? 'text-purple-300' : 'text-purple-600'}`}>{browserName}</span>
+          <span className={`font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>{browserName}</span>
         </div>
         <div className="flex items-center justify-between gap-3 whitespace-nowrap text-xs">
           <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Kích thước thực:</span>
@@ -81,15 +81,15 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
       </div>
 
       {!isAutoDetected && (
-        <div className={`pt-2 border-t mt-1 ${isDark ? 'border-slate-700/80' : 'border-purple-100'}`}>
+        <div className={`pt-2 border-t mt-1 ${isDark ? 'border-slate-700/80' : 'border-slate-200'}`}>
           <button
             onClick={(e) => {
               e.stopPropagation();
               resetToAutoDetect();
             }}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-purple-200" />
+            <RefreshCw className="w-3.5 h-3.5 text-emerald-200" />
             <span>Bật lại Tự động nhận diện</span>
           </button>
         </div>
@@ -108,10 +108,10 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
         padding: '12px 14px',
         borderRadius: '16px',
         backgroundColor: isDark ? '#0f172a' : '#ffffff',
-        border: isDark ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid rgba(147, 51, 234, 0.25)',
+        border: isDark ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(22, 101, 52, 0.25)',
         boxShadow: isDark
           ? '0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5)'
-          : '0 20px 25px -5px rgba(114, 46, 209, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+          : '0 20px 25px -5px rgba(22, 101, 52, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
         width: '320px',
         maxWidth: '340px',
       }}
@@ -120,7 +120,7 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
         className={`inline-flex items-center p-0.5 sm:p-1 rounded-xl transition-all select-none ${
           isDark
             ? 'bg-slate-900 border border-slate-800 shadow-xs'
-            : 'bg-purple-50/70 border border-purple-200/80 shadow-xs'
+            : 'bg-slate-100 border border-slate-200/80 shadow-xs'
         } ${className}`}
       >
         {/* Nút 1: Máy tính */}
@@ -130,11 +130,11 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
           className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer ${
             isPC
               ? isDark
-                ? 'bg-[#722ED1] text-white shadow-xs border border-purple-400/30'
-                : 'bg-purple-600 text-white shadow-xs border border-purple-600'
+                ? 'bg-emerald-600/25 text-emerald-300 shadow-xs border border-emerald-500/40'
+                : 'bg-[#166534] text-white shadow-xs border border-emerald-700'
               : isDark
                 ? 'text-slate-400 hover:text-slate-200'
-                : 'text-purple-700/70 hover:text-purple-900 hover:bg-purple-100/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
           }`}
           aria-label="Chế độ Máy tính"
         >
@@ -149,11 +149,11 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
           className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer ${
             isIPad
               ? isDark
-                ? 'bg-[#722ED1] text-white shadow-xs border border-purple-400/30'
-                : 'bg-purple-600 text-white shadow-xs border border-purple-600'
+                ? 'bg-emerald-600/25 text-emerald-300 shadow-xs border border-emerald-500/40'
+                : 'bg-[#166534] text-white shadow-xs border border-emerald-700'
               : isDark
                 ? 'text-slate-400 hover:text-slate-200'
-                : 'text-purple-700/70 hover:text-purple-900 hover:bg-purple-100/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
           }`}
           aria-label="Chế độ iPad Air M4"
         >
@@ -164,7 +164,7 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
         {/* Huy hiệu trạng thái Auto / Tay */}
         <div
           className={`ml-1 pl-1 border-l flex items-center ${
-            isDark ? 'border-slate-800' : 'border-purple-200/80'
+            isDark ? 'border-slate-800' : 'border-slate-300'
           }`}
         >
           {isAutoDetected ? (
@@ -177,7 +177,7 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
               title="Đang tự động nhận diện theo tỉ lệ khung hình & User-Agent"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Auto</span>
+              <span className={compact ? 'hidden sm:inline' : ''}>Auto</span>
             </span>
           ) : (
             <button
@@ -191,7 +191,7 @@ export const DeviceModeSwitch: React.FC<DeviceModeSwitchProps> = ({
               title="Đang gạt tay thủ công. Bấm để trở về chế độ Tự động"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              <span>Tay</span>
+              <span className={compact ? 'hidden sm:inline' : ''}>Tay</span>
             </button>
           )}
         </div>

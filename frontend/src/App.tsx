@@ -32,7 +32,7 @@ const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
           colorLink: '#722ED1',
           colorLinkHover: '#9254de',
           borderRadius: 8,
-          fontFamily: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
+          fontFamily: `'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
           // Phân lớp bề mặt Dark Mode chuẩn SOC
           ...(isDark
             ? {

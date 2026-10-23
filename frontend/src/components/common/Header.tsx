@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Popover, Tooltip } from 'antd';
 import {
-  Building2,
   Building,
   Clock,
   ShieldAlert,
@@ -160,8 +159,8 @@ const NavigationGlider: React.FC<{
 };
 
 export const Header: React.FC<HeaderProps> = ({
-  title = 'QK7 DATAHUB',
-  subtitle = 'Trung Tâm Quản Lý Dữ Liệu Tập Trung',
+  title = 'Trường Quân Sự Quân Khu 7',
+  subtitle = 'Trung tâm dữ liệu số',
   showClock = true,
   activeNav,
   onToggleMobileMenu,
@@ -308,15 +307,23 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           <div
-            className="flex items-center gap-2 cursor-pointer group"
+            className="flex items-center gap-2.5 cursor-pointer group shrink-0"
             onClick={() => navigate(isAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white border border-emerald-400/40 shadow-xs">
-              <Building2 className="w-4 h-4 text-amber-400" />
+            <img
+              src="/Logo_QSQK7.png"
+              alt="Logo Trường Quân Sự Quân Khu 7"
+              style={{ aspectRatio: '1074 / 1465' }}
+              className="h-8 sm:h-9 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform drop-shadow-xs"
+            />
+            <div className="min-w-0">
+              <span className="block font-extrabold text-xs sm:text-sm tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:via-slate-100 dark:to-amber-400 bg-clip-text text-transparent whitespace-nowrap">
+                {title}
+              </span>
+              <span className="block text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-medium -mt-0.5 tracking-wider uppercase truncate max-w-[150px] sm:max-w-none">
+                {subtitle}
+              </span>
             </div>
-            <span className="font-extrabold text-sm sm:text-base tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:via-slate-100 dark:to-amber-400 bg-clip-text text-transparent whitespace-nowrap">
-              QK7 DATAHUB
-            </span>
           </div>
         </div>
 
@@ -384,16 +391,19 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group shrink-0"
           onClick={() => navigate(isAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
         >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white border border-emerald-400/40 shadow-md group-hover:scale-105 transition-transform shrink-0">
-            <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
-          </div>
+          <img
+            src="/Logo_QSQK7.png"
+            alt="Logo Trường Quân Sự Quân Khu 7"
+            style={{ aspectRatio: '1074 / 1465' }}
+            className="h-9 sm:h-10 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform drop-shadow-sm"
+          />
           <div className="min-w-0">
             <div className="flex items-center space-x-2">
               <span className="font-extrabold text-sm sm:text-base lg:text-lg tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:via-slate-100 dark:to-amber-400 bg-clip-text text-transparent whitespace-nowrap">
                 {title}
               </span>
             </div>
-            <span className="hidden xl:block text-[10px] text-slate-500 dark:text-slate-400 font-medium -mt-0.5 tracking-wider uppercase truncate max-w-[220px] 2xl:max-w-none">
+            <span className="block text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium -mt-0.5 tracking-wider uppercase truncate max-w-[220px] sm:max-w-[300px] 2xl:max-w-none">
               {subtitle}
             </span>
           </div>

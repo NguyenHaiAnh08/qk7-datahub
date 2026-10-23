@@ -155,8 +155,8 @@ export const PortalPage: React.FC = () => {
       {/* Header */}
       <Header
         activeNav="portal"
-        title="QK7 DATAHUB"
-        subtitle="Trung Tâm Thư Viện Số Quân Sự Tập Trung"
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle="Trung tâm dữ liệu số"
       />
 
       {/* Main Container */}

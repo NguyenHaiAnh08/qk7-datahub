@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, HelpCircle, Building2, X } from 'lucide-react';
+import { HelpCircle, X } from 'lucide-react';
 import { LoginForm } from '../components/auth/LoginForm';
 import { Toast, ToastState } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
@@ -110,12 +110,18 @@ export const LoginPage: React.FC = () => {
       {/* Top Bar */}
       <div className="relative z-10 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md">
         <div className="flex items-center space-x-2.5 select-none">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center border border-emerald-400/30 shadow-md">
-            <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
-          </div>
+          <img
+            src="/Logo_QSQK7.png"
+            alt="Logo Trường Quân Sự Quân Khu 7"
+            style={{ aspectRatio: '1074 / 1465' }}
+            className="h-8 sm:h-9 w-auto object-contain shrink-0 drop-shadow-sm"
+          />
           <div>
-            <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:to-amber-400 bg-clip-text text-transparent">
-              QK7 DATAHUB
+            <span className="block font-extrabold text-sm tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:via-slate-100 dark:to-amber-400 bg-clip-text text-transparent whitespace-nowrap">
+              Trường Quân Sự Quân Khu 7
+            </span>
+            <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wider uppercase">
+              Trung tâm dữ liệu số
             </span>
           </div>
         </div>
@@ -145,14 +151,19 @@ export const LoginPage: React.FC = () => {
         >
           {!isIPadLandscape && (
             <div className="text-center mb-5">
-              <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 border border-emerald-400/30 shadow-lg shadow-emerald-950/20 mb-2.5">
-                <ShieldCheck className="w-6 h-6 text-amber-400" />
+              <div className="inline-flex items-center justify-center mb-2.5">
+                <img
+                  src="/Logo_QSQK7.png"
+                  alt="Logo Trường Quân Sự Quân Khu 7"
+                  style={{ aspectRatio: '1074 / 1465' }}
+                  className="h-16 w-auto object-contain drop-shadow-md"
+                />
               </div>
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                Xác Thực Danh Tính Quân Sự
+                Đăng nhập
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Hệ Thống Quản Lý Dữ Liệu Tập Trung — Quân Khu 7
+                Hệ Thống Quản Lý Dữ Liệu Tập Trung
               </p>
             </div>
           )}
@@ -183,7 +194,7 @@ export const LoginPage: React.FC = () => {
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <HelpCircle className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                  Hỗ Trợ Kỹ Thuật Đăng Nhập
+                  Hỗ Trợ Kỹ Thuật
                 </h3>
                 <button
                   onClick={() => setShowSupportModal(false)}
@@ -193,16 +204,15 @@ export const LoginPage: React.FC = () => {
                 </button>
               </div>
               <p>
-                Trường hợp quên mật khẩu, không nhận dạng vân tay hoặc cần nâng cấp phân quyền truy cập,
-                vui lòng liên hệ:
+                Trường hợp quên mật khẩu, cài đặt vân tay hoặc không nhận dạng vân tay vui lòng liên hệ:
               </p>
               <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-1.5 font-mono text-[11px]">
-                <div>Tổ CNTT, Tham mưu - Hành Chính </div>
+                <div className="font-semibold text-slate-800 dark:text-slate-200">Tổ CNTT - Phòng TM-HC - Trường Quân sự QK7</div>
                 <div>
-                  • Đường dây nóng nội bộ:{' '}
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">789-2244</span>
+                  • Số điện thoại:{' '}
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">08.68.38.78.68</span>
+                  {' '}- Đ/c Nam - CNTT
                 </div>
-                
               </div>
               <button
                 onClick={() => setShowSupportModal(false)}

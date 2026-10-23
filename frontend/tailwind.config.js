@@ -28,7 +28,16 @@ export default {
       fontFamily: {
         sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
-      }
+      },
+      animation: {
+        'spin-slow': 'spin-slow 120s linear infinite',
+      },
+      keyframes: {
+        'spin-slow': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
+      },
     }
   },
   plugins: []

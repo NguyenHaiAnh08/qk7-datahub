@@ -166,8 +166,8 @@ export const DocumentDeskPage: React.FC = () => {
       {/* Header */}
       <Header
         activeNav="desk"
-        title="QK7 DATAHUB"
-        subtitle="Trung tâm văn bản — Quản Lý Lưu Trữ Văn Bản"
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle="Trung tâm dữ liệu số"
       />
 
       {/* Main Container */}

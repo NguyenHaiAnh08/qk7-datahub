@@ -543,8 +543,8 @@ export const AdminDashboardPage: React.FC = () => {
       {/* Header */}
       <Header
         activeNav="admin"
-        title="QK7 DATAHUB"
-        subtitle="Hệ Thống Quản Trị Trung Tâm & Phân Quyền Quân Khu"
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle="Trung tâm dữ liệu số"
         onToggleMobileMenu={() => setSidebarOpen(true)}
       />
 

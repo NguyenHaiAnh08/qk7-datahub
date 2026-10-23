@@ -26,7 +26,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+        sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
       }
     }
   },

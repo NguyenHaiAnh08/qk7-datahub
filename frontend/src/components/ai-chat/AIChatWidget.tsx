@@ -349,7 +349,7 @@ export const AIChatWidget: React.FC = () => {
                   />
                 </div>
                 <div className="text-[11px] opacity-75 truncate flex items-center space-x-1">
-                  <span>QK7 DataHub</span>
+                  <span>Trường Quân Sự QK7</span>
                   <span>•</span>
                   <span className="text-purple-400 font-medium">
                     {user?.clearance_name || `Cấp ${user?.clearance_level_id || 1}`}

@@ -22,7 +22,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   const getLevelBadgeClass = (lv: number) => {
     switch (lv) {
       case 5:
-        return 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30';
+        return 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30';
       case 4:
         return 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
       case 3:
@@ -44,7 +44,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
       <div>
         {/* Top Badges */}
         <div className="flex items-center justify-between gap-2 mb-2.5">
-          <span className="font-mono text-purple-600 dark:text-purple-400 font-semibold text-xs tracking-wide truncate">
+          <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 tracking-wide truncate">
             {document.document_code}
           </span>
           <span
@@ -57,7 +57,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         </div>
 
         {/* Title */}
-        <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors line-clamp-2 mb-2">
+        <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors line-clamp-2 mb-2">
           {document.title}
         </h4>
 
@@ -122,7 +122,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             {canDownload ? (
               <button
                 onClick={() => onDownload(document)}
-                className="min-h-[40px] py-2 px-3.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                className="min-h-[40px] py-2 px-3.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
                 title="Tải về máy"
               >
                 <Download className="w-4 h-4" />

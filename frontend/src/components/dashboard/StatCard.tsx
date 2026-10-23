@@ -22,8 +22,8 @@ const colorMap = {
     valueText: 'text-slate-900 dark:text-white'
   },
   purple: {
-    border: 'border-l-purple-500',
-    iconBg: 'bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400',
+    border: 'border-l-amber-500',
+    iconBg: 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400',
     valueText: 'text-slate-900 dark:text-white'
   },
   red: {

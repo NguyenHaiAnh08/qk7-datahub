@@ -133,18 +133,18 @@ export const UsersPage: React.FC = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
       <Header
         activeNav="admin"
-        title="QK7 DATAHUB"
-        subtitle="Quản Lý Quân Nhân & Phân Quyền Bảo Mật"
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle="Trung tâm dữ liệu số"
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-              <Users className="w-6 h-6 text-amber-500 dark:text-amber-400" />
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div className="shrink-0">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5 whitespace-nowrap">
+              <Users className="w-6 h-6 text-amber-500 dark:text-amber-400 shrink-0" />
               <span>Danh Sách Quân Nhân & Cán Bộ</span>
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 whitespace-nowrap">
               Phân cấp độ bảo mật (Cấp 1 - 5), tài khoản xác thực và đơn vị công tác
             </p>
           </div>

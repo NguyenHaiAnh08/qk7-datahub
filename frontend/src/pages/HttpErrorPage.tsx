@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Result, Button, Typography, Tag, Card } from 'antd';
-import { HomeOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { HomeOutlined, ReloadOutlined } from '@ant-design/icons';
 import { ROUTE_PATHS } from '../routes/routePaths';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { useAuth } from '../hooks/useAuth';
@@ -49,7 +49,7 @@ const ERROR_CONFIG_MAP: Record<string, ErrorConfig> = {
   '404': {
     status: '404',
     badge: 'NOT FOUND',
-    badgeColor: 'purple',
+    badgeColor: 'gold',
     title: '404 — Không Tìm Thấy Trang Hoặc Tài Liệu',
     subTitle: 'Đường dẫn bạn yêu cầu không tồn tại trên hệ thống hoặc văn bản đã được thu hồi / hủy bỏ.',
   },
@@ -124,7 +124,7 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
       ERROR_CONFIG_MAP[statusCode] || {
         status: 'error' as const,
         badge: `HTTP ${statusCode}`,
-        badgeColor: 'purple',
+        badgeColor: 'gold',
         title: `Lỗi Mã Trạng Thái ${statusCode}`,
         subTitle: 'Đã xảy ra lỗi không xác định trong quá trình điều hướng hệ thống.',
       }
@@ -144,15 +144,17 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
           className="flex items-center space-x-3 cursor-pointer select-none"
           onClick={() => navigate(ROUTE_PATHS.PORTAL)}
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
-            <SafetyCertificateOutlined className="text-lg text-amber-400" />
-          </div>
+          <img
+            src="/Logo_QSQK7.png"
+            alt="Logo Trường Quân Sự Quân Khu 7"
+            className="h-9 w-auto max-w-[38px] object-contain shrink-0 drop-shadow-sm"
+          />
           <div>
-            <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-500 dark:from-purple-300 dark:to-indigo-300 bg-clip-text text-transparent">
-              QK7 DATAHUB
+            <span className="block font-extrabold text-sm tracking-wider bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] dark:from-emerald-300 dark:to-emerald-400 bg-clip-text text-transparent">
+              Trường Quân Sự Quân Khu 7
             </span>
-            <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-              CỔNG QUẢN LÝ DỮ LIỆU BẢO MẬT
+            <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">
+              Trung tâm dữ liệu số
             </span>
           </div>
         </div>
@@ -190,7 +192,7 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
                   icon={<HomeOutlined />}
                   size="large"
                   onClick={() => navigate(getDestinationByRole(user))}
-                  className="font-semibold shadow-md shadow-purple-600/25 bg-purple-600 hover:bg-purple-500 px-6 h-11 rounded-xl"
+                  className="font-semibold shadow-md shadow-emerald-950/20 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] border border-amber-500/25 text-white px-6 h-11 rounded-xl"
                 >
                   Về Khu Vực Làm Việc
                 </Button>

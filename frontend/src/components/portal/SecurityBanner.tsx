@@ -19,7 +19,7 @@ export const SecurityBanner: React.FC<SecurityBannerProps> = ({ user, onOpenPoli
         return {
           title: 'TUYỆT MẬT (Cấp 5)',
           desc: 'Toàn quyền tra cứu và truy xuất tài liệu tối mật quân khu',
-          badgeClass: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
+          badgeClass: 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30',
         };
       case 4:
         return {
@@ -81,7 +81,7 @@ export const SecurityBanner: React.FC<SecurityBannerProps> = ({ user, onOpenPoli
         {isGuest ? (
           <Link
             to={ROUTE_PATHS.LOGIN}
-            className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm"
+            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-md shadow-emerald-950/20 border border-amber-500/25"
           >
             <span>Đăng nhập nâng cấp quyền</span>
           </Link>

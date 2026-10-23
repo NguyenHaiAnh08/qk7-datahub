@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, HelpCircle, Building2, X } from 'lucide-react';
+import { HelpCircle, X } from 'lucide-react';
 import { LoginForm } from '../components/auth/LoginForm';
 import { Toast, ToastState } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
@@ -101,21 +101,43 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-purple-600 selection:text-white transition-colors duration-200">
-      {/* Background Military Grid & Glow */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b08_1px,transparent_1px),linear-gradient(to_bottom,#1e293b08_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:32px_32px]"></div>
-      <div className="absolute top-0 -left-40 w-96 h-96 bg-purple-500/10 dark:bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-0 -right-40 w-96 h-96 bg-indigo-500/10 dark:bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+      {/* Background Military Grid: Loại bỏ ở chế độ sáng theo yêu cầu, chỉ giữ lại ở Dark Mode */}
+      <div className="absolute inset-0 hidden dark:block dark:bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none"></div>
+      <div className="absolute top-0 -left-40 w-96 h-96 bg-emerald-500/10 dark:bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 -right-40 w-96 h-96 bg-amber-500/10 dark:bg-amber-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      {/* Rotating Bronze Drum Watermark — Nằm chìm phía sau khung đăng nhập chính */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0 select-none">
+        <div className="relative w-[680px] h-[680px] sm:w-[840px] sm:h-[840px] md:w-[1020px] md:h-[1020px] lg:w-[1180px] lg:h-[1180px] xl:w-[1280px] xl:h-[1280px] shrink-0 flex items-center justify-center">
+          {/* Vầng sáng vàng đồng trang nghiêm */}
+          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/15 via-yellow-600/10 to-amber-400/5 dark:from-amber-500/10 dark:via-yellow-500/5 dark:to-transparent blur-3xl scale-95 pointer-events-none" />
+
+          {/* Hình ảnh Trống đồng xoay chậm 120s mượt mà */}
+          <img
+            src="/bronze-drum.png"
+            alt="Họa tiết Trống đồng Quân khu 7"
+            className="w-full h-full object-contain animate-spin-slow select-none opacity-25 sm:opacity-28 dark:opacity-12 sm:dark:opacity-15 sepia-[0.35] brightness-[0.88] contrast-[1.15] dark:sepia-[0.35] dark:brightness-[0.95] dark:contrast-[1.25] drop-shadow-[0_0_40px_rgba(212,175,55,0.22)]"
+            style={{ willChange: 'transform' }}
+          />
+        </div>
+      </div>
 
       {/* Top Bar */}
       <div className="relative z-10 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md">
         <div className="flex items-center space-x-2.5 select-none">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center border border-emerald-400/30 shadow-md">
-            <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
-          </div>
+          <img
+            src="/Logo_QSQK7.png"
+            alt="Logo Trường Quân Sự Quân Khu 7"
+            style={{ aspectRatio: '1074 / 1465' }}
+            className="h-8 sm:h-9 w-auto object-contain shrink-0 drop-shadow-sm"
+          />
           <div>
-            <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:to-amber-400 bg-clip-text text-transparent">
-              QK7 DATAHUB
+            <span className="block font-extrabold text-sm tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:via-slate-100 dark:to-amber-400 bg-clip-text text-transparent whitespace-nowrap">
+              Trường Quân Sự Quân Khu 7
+            </span>
+            <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wider uppercase">
+              Trung tâm dữ liệu số
             </span>
           </div>
         </div>
@@ -127,7 +149,7 @@ export const LoginPage: React.FC = () => {
             onClick={() => setShowSupportModal(true)}
             className="hidden sm:flex text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white items-center space-x-1.5 transition cursor-pointer"
           >
-            <HelpCircle className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <HelpCircle className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
             <span>Hỗ Trợ Kỹ Thuật</span>
           </button>
         </div>
@@ -145,14 +167,19 @@ export const LoginPage: React.FC = () => {
         >
           {!isIPadLandscape && (
             <div className="text-center mb-5">
-              <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 border border-emerald-400/30 shadow-lg shadow-emerald-950/20 mb-2.5">
-                <ShieldCheck className="w-6 h-6 text-amber-400" />
+              <div className="inline-flex items-center justify-center mb-2.5">
+                <img
+                  src="/Logo_QSQK7.png"
+                  alt="Logo Trường Quân Sự Quân Khu 7"
+                  style={{ aspectRatio: '1074 / 1465' }}
+                  className="h-16 w-auto object-contain drop-shadow-md"
+                />
               </div>
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                Xác Thực Danh Tính Quân Sự
+                Đăng nhập
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Hệ Thống Quản Lý Dữ Liệu Tập Trung — Quân Khu 7
+                Hệ Thống Quản Lý Dữ Liệu Tập Trung
               </p>
             </div>
           )}
@@ -183,7 +210,7 @@ export const LoginPage: React.FC = () => {
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <HelpCircle className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                  Hỗ Trợ Kỹ Thuật Đăng Nhập
+                  Hỗ Trợ Kỹ Thuật
                 </h3>
                 <button
                   onClick={() => setShowSupportModal(false)}
@@ -193,16 +220,15 @@ export const LoginPage: React.FC = () => {
                 </button>
               </div>
               <p>
-                Trường hợp quên mật khẩu, không nhận dạng vân tay hoặc cần nâng cấp phân quyền truy cập,
-                vui lòng liên hệ:
+                Trường hợp quên mật khẩu, cài đặt vân tay hoặc không nhận dạng vân tay vui lòng liên hệ:
               </p>
               <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-1.5 font-mono text-[11px]">
-                <div>Tổ CNTT, Tham mưu - Hành Chính </div>
+                <div className="font-semibold text-slate-800 dark:text-slate-200">Tổ CNTT - Phòng TM-HC - Trường Quân sự QK7</div>
                 <div>
-                  • Đường dây nóng nội bộ:{' '}
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">789-2244</span>
+                  • Số điện thoại:{' '}
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">08.68.38.78.68</span>
+                  {' '}- Đ/c Nam - CNTT
                 </div>
-                
               </div>
               <button
                 onClick={() => setShowSupportModal(false)}

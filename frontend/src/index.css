@@ -11,6 +11,22 @@
     color-scheme: dark;
   }
 
+  *,
+  *::before,
+  *::after {
+    font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  html,
+  body,
+  input,
+  button,
+  select,
+  textarea,
+  optgroup {
+    font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+
   body {
     @apply font-sans antialiased selection:bg-amber-500 selection:text-slate-900;
   }
@@ -21,8 +37,8 @@
   }
 
   html.dark body {
-    background-color: #0b0f19;
-    color: #f8fafc;
+    background-color: #090e17;
+    color: #f1f5f9;
   }
 }
 
@@ -235,9 +251,19 @@ html:not(.dark) tbody tr:hover {
 .bg-amber-600, .bg-amber-500,
 .bg-blue-600, .bg-blue-500,
 .bg-rose-600, .bg-rose-500,
-.bg-purple-600, .bg-purple-500,
-.gold-gradient-btn, .emerald-gradient-btn {
+.gold-gradient-btn, .emerald-gradient-btn, .military-btn-primary {
   color: #ffffff !important;
+}
+
+.military-btn-primary {
+  background: linear-gradient(to right, #14532d, #166534, #15803d) !important;
+  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+  box-shadow: 0 4px 6px -1px rgba(6, 78, 59, 0.2), 0 2px 4px -2px rgba(6, 78, 59, 0.1) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.military-btn-primary:hover {
+  background: linear-gradient(to right, #166534, #15803d) !important;
+  box-shadow: 0 6px 14px -2px rgba(16, 185, 129, 0.35) !important;
 }
 
 /* Secondary Buttons in Light Mode */
@@ -291,7 +317,7 @@ html:not(.dark) textarea::placeholder {
 }
 
 /* ── QK7 TreeSelect Custom UI/UX for Unit Hierarchy ── */
-/* Đồng bộ 100% màu sắc, viền, bo góc và placeholder với các ô input khác trong Modal */
+/* Đồng bộ 100% màu sắc, viền, bo góc, font-size và placeholder với các ô input khác trong Modal */
 .qk7-treeselect,
 .qk7-treeselect.ant-select,
 .unit-treeselect-wrapper .ant-select {
@@ -299,10 +325,12 @@ html:not(.dark) textarea::placeholder {
   height: 38px !important;
   min-height: 38px !important;
   border-radius: 0.75rem !important; /* rounded-xl (12px) */
-  font-size: 0.75rem !important; /* text-xs */
+  font-family: 'Be Vietnam Pro', sans-serif !important;
+  font-size: 0.875rem !important; /* text-sm (14px) - đồng bộ hoàn hảo với các input/select khác */
   line-height: 1.25rem !important;
   box-sizing: border-box !important;
   transition: all 0.2s ease-in-out !important;
+  position: relative !important;
 }
 
 /* Đảm bảo khung bên trong selector Ant Design (v5 và v6) khớp hoàn hảo */
@@ -311,19 +339,92 @@ html:not(.dark) textarea::placeholder {
   border-radius: 0.75rem !important;
   height: 38px !important;
   min-height: 38px !important;
-  padding: 0 12px !important;
+  padding: 0 40px 0 12px !important; /* khoảng trống 40px an toàn bên phải để chữ không bao giờ bị sát dấu X */
   display: flex !important;
   align-items: center !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+  font-family: 'Be Vietnam Pro', sans-serif !important;
+  font-size: 0.875rem !important;
+  overflow: hidden !important;
 }
 
 .qk7-treeselect .ant-select-content,
-.unit-treeselect-wrapper .ant-select-content {
+.unit-treeselect-wrapper .ant-select-content,
+.qk7-treeselect .ant-select-selection-wrap,
+.unit-treeselect-wrapper .ant-select-selection-wrap {
   display: flex !important;
   align-items: center !important;
   height: 100% !important;
+  font-size: 0.875rem !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Suffix icon / Arrow & Clear Căn Giữa Chuẩn Xác Trục Y */
+.qk7-treeselect .ant-select-clear,
+.unit-treeselect-wrapper .ant-select-clear,
+.qk7-treeselect .ant-select-arrow,
+.unit-treeselect-wrapper .ant-select-arrow,
+.qk7-treeselect .ant-select-suffix,
+.unit-treeselect-wrapper .ant-select-suffix {
+  position: absolute !important;
+  top: 50% !important;
+  bottom: auto !important;
+  right: 12px !important;
+  inset-inline-end: 12px !important;
+  transform: translateY(-50%) !important;
+  margin: 0 !important;
+  margin-top: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 16px !important;
+  height: 16px !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+}
+
+.qk7-treeselect .ant-select-clear,
+.unit-treeselect-wrapper .ant-select-clear {
+  z-index: 10 !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  opacity: 0.85 !important;
+  transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease !important;
+}
+
+.qk7-treeselect .ant-select-clear:hover,
+.unit-treeselect-wrapper .ant-select-clear:hover {
+  opacity: 1 !important;
+}
+
+.qk7-treeselect .ant-select-arrow,
+.unit-treeselect-wrapper .ant-select-arrow,
+.qk7-treeselect .ant-select-suffix,
+.unit-treeselect-wrapper .ant-select-suffix {
+  z-index: 5 !important;
+  pointer-events: none !important;
+}
+
+.qk7-treeselect .ant-select-clear svg,
+.unit-treeselect-wrapper .ant-select-clear svg,
+.qk7-treeselect .ant-select-clear .anticon,
+.unit-treeselect-wrapper .ant-select-clear .anticon,
+.qk7-treeselect .ant-select-arrow svg,
+.unit-treeselect-wrapper .ant-select-arrow svg,
+.qk7-treeselect .ant-select-arrow .anticon,
+.unit-treeselect-wrapper .ant-select-arrow .anticon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin: 0 !important;
+  line-height: 1 !important;
 }
 
 /* Dark Mode: Đồng bộ màu bg-slate-950 (#020617) và border-slate-700 (#334155) */
@@ -337,13 +438,14 @@ html.dark .unit-treeselect-wrapper .ant-select,
   --ant-select-border-color: #334155 !important;
   --ant-select-border-radius: 0.75rem !important;
   --ant-select-height: 38px !important;
-  --ant-select-font-size: 0.75rem !important;
+  --ant-select-font-size: 0.875rem !important;
   --ant-select-color: #f1f5f9 !important;
   background-color: #020617 !important;
   background: #020617 !important;
   border: 1px solid #334155 !important;
   border-radius: 0.75rem !important;
   color: #f1f5f9 !important;
+  font-size: 0.875rem !important;
 }
 
 html.dark .qk7-treeselect .ant-select-selector,
@@ -355,6 +457,7 @@ html.dark .unit-treeselect-wrapper .ant-select-selector,
   border: none !important;
   color: #f1f5f9 !important;
   box-shadow: none !important;
+  font-size: 0.875rem !important;
 }
 
 /* Placeholder trong Dark Mode (text-slate-400 / text-slate-500) */
@@ -367,13 +470,14 @@ html.dark .unit-treeselect-wrapper .ant-select-selection-placeholder,
 .dark .unit-treeselect-wrapper .ant-select-placeholder,
 .dark .unit-treeselect-wrapper .ant-select-selection-placeholder {
   color: #64748b !important;
-  font-size: 0.75rem !important;
+  font-size: 0.875rem !important;
   line-height: normal !important;
   display: flex !important;
   align-items: center !important;
+  font-family: 'Be Vietnam Pro', sans-serif !important;
 }
 
-/* Suffix icon / Arrow & Clear trong Dark Mode */
+/* Suffix icon / Arrow & Clear trong Dark Mode: Dịu nhẹ, thanh thoát */
 html.dark .qk7-treeselect .ant-select-suffix,
 html.dark .qk7-treeselect .ant-select-arrow,
 html.dark .qk7-treeselect .ant-select-clear,
@@ -390,15 +494,28 @@ html.dark .unit-treeselect-wrapper .ant-select-clear,
   background: transparent !important;
 }
 
+html.dark .qk7-treeselect .ant-select-clear:hover,
+html.dark .unit-treeselect-wrapper .ant-select-clear:hover,
+.dark .qk7-treeselect .ant-select-clear:hover,
+.dark .unit-treeselect-wrapper .ant-select-clear:hover {
+  color: #94a3b8 !important;
+}
+
 html.dark .qk7-treeselect .ant-select-selection-item,
 html.dark .unit-treeselect-wrapper .ant-select-selection-item,
 .dark .qk7-treeselect .ant-select-selection-item,
 .dark .unit-treeselect-wrapper .ant-select-selection-item {
   color: #f1f5f9 !important;
-  font-size: 0.75rem !important;
-  line-height: normal !important;
-  display: flex !important;
-  align-items: center !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  line-height: 38px !important;
+  height: 38px !important;
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  padding-right: 8px !important;
+  font-family: 'Be Vietnam Pro', sans-serif !important;
 }
 
 html.dark .qk7-treeselect .ant-select-selection-search-input,
@@ -406,6 +523,8 @@ html.dark .unit-treeselect-wrapper .ant-select-selection-search-input,
 .dark .qk7-treeselect .ant-select-selection-search-input,
 .dark .unit-treeselect-wrapper .ant-select-selection-search-input {
   color: #f1f5f9 !important;
+  font-size: 0.875rem !important;
+  font-family: 'Be Vietnam Pro', sans-serif !important;
 }
 
 /* Light Mode: Đồng bộ màu bg-slate-50 (#f8fafc) và border-slate-300 (#cbd5e1) */
@@ -419,13 +538,14 @@ html.light .unit-treeselect-wrapper .ant-select {
   --ant-select-border-color: #cbd5e1 !important;
   --ant-select-border-radius: 0.75rem !important;
   --ant-select-height: 38px !important;
-  --ant-select-font-size: 0.75rem !important;
+  --ant-select-font-size: 0.875rem !important;
   --ant-select-color: #0f172a !important;
   background-color: #f8fafc !important;
   background: #f8fafc !important;
   border: 1px solid #cbd5e1 !important;
   border-radius: 0.75rem !important;
   color: #0f172a !important;
+  font-size: 0.875rem !important;
 }
 
 html:not(.dark) .qk7-treeselect .ant-select-selector,
@@ -437,6 +557,7 @@ html.light .unit-treeselect-wrapper .ant-select-selector {
   border: none !important;
   color: #0f172a !important;
   box-shadow: none !important;
+  font-size: 0.875rem !important;
 }
 
 /* Placeholder trong Light Mode (placeholder-slate-400 / #94a3b8) */
@@ -449,13 +570,14 @@ html.light .qk7-treeselect .ant-select-selection-placeholder,
 html.light .unit-treeselect-wrapper .ant-select-placeholder,
 html.light .unit-treeselect-wrapper .ant-select-selection-placeholder {
   color: #94a3b8 !important;
-  font-size: 0.75rem !important;
+  font-size: 0.875rem !important;
   line-height: normal !important;
   display: flex !important;
   align-items: center !important;
+  font-family: 'Be Vietnam Pro', sans-serif !important;
 }
 
-/* Suffix icon / Arrow & Clear trong Light Mode */
+/* Suffix icon / Arrow & Clear trong Light Mode: Dịu nhẹ, không bị đậm/nặng */
 html:not(.dark) .qk7-treeselect .ant-select-suffix,
 html:not(.dark) .qk7-treeselect .ant-select-arrow,
 html:not(.dark) .qk7-treeselect .ant-select-clear,
@@ -472,15 +594,28 @@ html.light .unit-treeselect-wrapper .ant-select-clear {
   background: transparent !important;
 }
 
+html:not(.dark) .qk7-treeselect .ant-select-clear:hover,
+html:not(.dark) .unit-treeselect-wrapper .ant-select-clear:hover,
+html.light .qk7-treeselect .ant-select-clear:hover,
+html.light .unit-treeselect-wrapper .ant-select-clear:hover {
+  color: #64748b !important;
+}
+
 html:not(.dark) .qk7-treeselect .ant-select-selection-item,
 html:not(.dark) .unit-treeselect-wrapper .ant-select-selection-item,
 html.light .qk7-treeselect .ant-select-selection-item,
 html.light .unit-treeselect-wrapper .ant-select-selection-item {
   color: #0f172a !important;
-  font-size: 0.75rem !important;
-  line-height: normal !important;
-  display: flex !important;
-  align-items: center !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  line-height: 38px !important;
+  height: 38px !important;
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  padding-right: 8px !important;
+  font-family: 'Be Vietnam Pro', sans-serif !important;
 }
 
 html:not(.dark) .qk7-treeselect .ant-select-selection-search-input,
@@ -488,6 +623,8 @@ html:not(.dark) .unit-treeselect-wrapper .ant-select-selection-search-input,
 html.light .qk7-treeselect .ant-select-selection-search-input,
 html.light .unit-treeselect-wrapper .ant-select-selection-search-input {
   color: #0f172a !important;
+  font-size: 0.875rem !important;
+  font-family: 'Be Vietnam Pro', sans-serif !important;
 }
 
 /* Hover & Focus state: focus:border-emerald-500 (#10b981) */
@@ -634,48 +771,48 @@ html.light .qk7-unit-treeselect-popup .ant-select-tree-title {
 
 /* Dark mode nút dấu cộng / trừ */
 html.dark .qk7-tree-switcher-btn {
-  background-color: rgba(114, 46, 209, 0.16) !important;
-  border: 1px solid rgba(168, 85, 247, 0.4) !important;
-  color: #c084fc !important;
+  background-color: rgba(16, 185, 129, 0.16) !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
+  color: #34d399 !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
 }
 
 html.dark .qk7-unit-treeselect-popup .ant-select-tree-switcher:hover .qk7-tree-switcher-btn,
 html.dark .qk7-tree-switcher-btn:hover {
-  background-color: rgba(114, 46, 209, 0.38) !important;
-  border-color: rgba(192, 132, 252, 0.8) !important;
+  background-color: rgba(16, 185, 129, 0.38) !important;
+  border-color: rgba(52, 211, 153, 0.8) !important;
   color: #ffffff !important;
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.45) !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.45) !important;
   transform: scale(1.08) !important;
 }
 
 html.dark .qk7-tree-switcher-btn.is-expanded {
-  background-color: rgba(114, 46, 209, 0.25) !important;
-  border-color: rgba(168, 85, 247, 0.5) !important;
-  color: #e9d5ff !important;
+  background-color: rgba(16, 185, 129, 0.25) !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  color: #a7f3d0 !important;
 }
 
 /* Light mode nút dấu cộng / trừ */
 html:not(.dark) .qk7-tree-switcher-btn {
-  background-color: #f5f3ff !important;
-  border: 1px solid #d8b4fe !important;
-  color: #722ed1 !important;
-  box-shadow: 0 1px 2px rgba(114, 46, 209, 0.08) !important;
+  background-color: #f0fdf4 !important;
+  border: 1px solid #86efac !important;
+  color: #166534 !important;
+  box-shadow: 0 1px 2px rgba(22, 101, 52, 0.08) !important;
 }
 
 html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-switcher:hover .qk7-tree-switcher-btn,
 html:not(.dark) .qk7-tree-switcher-btn:hover {
-  background-color: #ede9fe !important;
-  border-color: #a855f7 !important;
-  color: #581c87 !important;
-  box-shadow: 0 0 8px rgba(114, 46, 209, 0.25) !important;
+  background-color: #dcfce7 !important;
+  border-color: #22c55e !important;
+  color: #14532d !important;
+  box-shadow: 0 0 8px rgba(22, 101, 52, 0.25) !important;
   transform: scale(1.08) !important;
 }
 
 html:not(.dark) .qk7-tree-switcher-btn.is-expanded {
-  background-color: #ede9fe !important;
-  border-color: #a855f7 !important;
-  color: #6b21a8 !important;
+  background-color: #dcfce7 !important;
+  border-color: #22c55e !important;
+  color: #14532d !important;
 }
 
 /* Fallback căn giữa icon mặc định */
@@ -698,21 +835,21 @@ html:not(.dark) .qk7-tree-switcher-btn.is-expanded {
 }
 
 html.dark .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper:hover {
-  background-color: rgba(114, 46, 209, 0.16) !important;
+  background-color: rgba(16, 185, 129, 0.16) !important;
 }
 
 html.dark .qk7-unit-treeselect-popup .ant-select-tree-node-selected {
-  background-color: rgba(114, 46, 209, 0.3) !important;
-  border: 1px solid rgba(168, 85, 247, 0.4) !important;
+  background-color: rgba(16, 185, 129, 0.25) !important;
+  border: 1px solid rgba(16, 185, 129, 0.45) !important;
 }
 
 html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-node-content-wrapper:hover {
-  background-color: rgba(114, 46, 209, 0.08) !important;
+  background-color: rgba(22, 101, 52, 0.08) !important;
 }
 
 html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-node-selected {
-  background-color: rgba(114, 46, 209, 0.15) !important;
-  border: 1px solid rgba(114, 46, 209, 0.35) !important;
+  background-color: rgba(22, 101, 52, 0.14) !important;
+  border: 1px solid rgba(22, 101, 52, 0.35) !important;
 }
 
 /* Tree line guide styling */
@@ -765,7 +902,7 @@ html[data-device-mode="ipad"] .ant-btn {
    CHUẨN HÓA BỀ MẶT NIGHT MODE / DARK MODE TÁC CHIẾN (SOC SURFACE)
    ───────────────────────────────────────────────────────────── */
 html.dark {
-  background-color: #0b0f19;
+  background-color: #090e17;
   color-scheme: dark;
 }
 
@@ -789,13 +926,13 @@ html.dark .ant-table-tbody > tr > td {
 
 html.dark .ant-table-tbody > tr:hover > td,
 html.dark .ant-table-tbody > tr.ant-table-row-selected > td {
-  background-color: rgba(114, 46, 209, 0.22) !important;
+  background-color: rgba(16, 185, 129, 0.12) !important;
   color: #ffffff !important;
 }
 
 /* Bảng HTML chuẩn khi hover ở Dark Mode */
 html.dark table tbody tr:hover td {
-  background-color: rgba(114, 46, 209, 0.22) !important;
+  background-color: rgba(16, 185, 129, 0.12) !important;
   color: #ffffff !important;
 }
 
@@ -803,7 +940,7 @@ html.dark table tbody tr:hover td {
 html.dark .ant-modal-content,
 html.dark .ant-drawer-content {
   background-color: #111827 !important;
-  border: 1px solid rgba(139, 92, 246, 0.25) !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
   color: #f8fafc !important;
 }
 
@@ -822,7 +959,7 @@ html.dark .ant-drawer-title {
 html.dark .ant-input,
 html.dark .ant-select-selector {
   background-color: #111827 !important;
-  border-color: rgba(139, 92, 246, 0.3) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
   color: #f8fafc !important;
 }
 
@@ -834,5 +971,28 @@ html.dark .ant-input::placeholder {
 .qk7-sidebar-drawer .ant-drawer-body {
   padding: 0 !important;
   background-color: #111827;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MILITARY BRONZE DRUM SLOW ROTATION (120s / turn, Ultra-smooth)
+   ══════════════════════════════════════════════════════════════════════ */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 120s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-slow {
+    animation: none;
+  }
 }
 

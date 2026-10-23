@@ -30,15 +30,15 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
   const barColorClasses = {
     amber: 'bg-amber-500',
     emerald: 'bg-emerald-500',
-    blue: 'bg-blue-500',
-    purple: 'bg-purple-500',
+    blue: 'bg-emerald-600',
+    purple: 'bg-[#166534] dark:bg-emerald-500',
   }[barColor];
 
   const countColorClasses = {
     amber: 'text-amber-600 dark:text-amber-400',
     emerald: 'text-emerald-600 dark:text-emerald-400',
-    blue: 'text-blue-600 dark:text-blue-400',
-    purple: 'text-purple-600 dark:text-purple-400',
+    blue: 'text-emerald-600 dark:text-emerald-400',
+    purple: 'text-[#166534] dark:text-emerald-400',
   }[barColor];
 
   return (

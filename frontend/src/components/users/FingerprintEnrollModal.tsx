@@ -377,7 +377,7 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
             {/* Checking status */}
             {phase === 'checking' && (
               <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                <CircularSpinner size={32} className="text-purple-600 dark:text-purple-400" strokeWidth={2.5} />
+                <CircularSpinner size={32} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2.5} />
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Đang kiểm tra dữ liệu vân tay của người dùng...
                 </p>
@@ -509,7 +509,7 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
                 </button>
                 <button
                   onClick={handleConfirmOverwrite}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-purple-600/30 cursor-pointer"
+                  className="px-4 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-emerald-950/20 border border-amber-500/25 cursor-pointer"
                 >
                   <Fingerprint className="w-3.5 h-3.5" />
                   Thay thế vân tay cũ
@@ -526,7 +526,7 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
                 {phase === 'error' && (
                   <button
                     onClick={handleRetry}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-purple-600/30 cursor-pointer"
+                    className="px-4 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-emerald-950/20 border border-amber-500/25 cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     Thử lại

@@ -18,11 +18,34 @@ export default {
           950: '#061019'
         },
         military: {
+          green: {
+            DEFAULT: '#166534',
+            light: '#166534',
+            hover: '#14532d',
+            active: '#15803d',
+            dark: '#10b981',
+            darkHover: '#059669',
+            darkText: '#34d399',
+          },
+          gold: {
+            DEFAULT: '#d97706',
+            light: '#b45309',
+            badgeBg: '#fef3c7',
+            border: 'rgba(245, 158, 11, 0.4)',
+            dark: '#fbbf24',
+            darkHover: '#f59e0b',
+          },
+          red: {
+            DEFAULT: '#dc2626',
+            light: '#b91c1c',
+            badgeBg: '#fee2e2',
+            dark: '#f87171',
+          },
           600: '#1e4d3a',
           700: '#143628',
           800: '#0b2017',
-          gold: '#d4af37',
-          amber: '#f59e0b'
+          gold_accent: '#d4af37',
+          amber_accent: '#f59e0b'
         }
       },
       fontFamily: {

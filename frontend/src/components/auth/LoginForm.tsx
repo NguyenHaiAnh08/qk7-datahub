@@ -215,7 +215,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   }}
                   placeholder="Nhập tài khoản quân nhân..."
                   required
-                  className="block w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 text-xs font-sans"
+                  className="block w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-xs font-sans"
                 />
               </div>
             </div>
@@ -235,7 +235,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Nhập mật khẩu..."
                   required
-                  className="block w-full pl-9 pr-9 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 text-xs"
+                  className="block w-full pl-9 pr-9 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-xs"
                 />
                 <button
                   type="button"
@@ -251,7 +251,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-purple-900/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-semibold text-xs shadow-md shadow-emerald-950/20 border border-amber-500/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition cursor-pointer"
             >
               {loading ? (
                 <>
@@ -280,7 +280,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
           <div className="col-span-5 flex flex-col justify-between border-l border-slate-200 dark:border-slate-800/80 pl-6 space-y-2">
             <div>
               <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">
-                <span className="font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">
+                <span className="font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
                   Tài khoản kiểm thử nhanh
                 </span>
                 <span className="text-[10px] font-mono text-slate-400">Pass: 123456789</span>
@@ -313,7 +313,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   onClick={() => quickFillRole('thutruong')}
                   className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                     selectedRole === 'thutruong'
-                      ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-500/60 text-purple-800 dark:text-purple-300 ring-1 ring-purple-500/40 shadow-xs'
+                      ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-xs'
                       : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
                   }`}
                 >
@@ -324,7 +324,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 4 • Tối Mật</div>
                   </div>
-                  <Zap className="w-4 h-4 text-purple-500 dark:text-purple-400 shrink-0 fill-purple-400/20" />
+                  <Zap className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0 fill-red-400/20" />
                 </button>
 
                 {/* 3. Văn thư */}
@@ -437,7 +437,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             }}
             placeholder="Nhập tài khoản quân nhân..."
             required
-            className="block w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all font-sans"
+            className="block w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-sm transition-all font-sans"
           />
         </div>
       </div>
@@ -456,7 +456,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Nhập mật khẩu..."
             required
-            className="block w-full pl-10 pr-10 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all"
+            className="block w-full pl-10 pr-10 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-sm transition-all"
           />
           <button
             type="button"
@@ -472,7 +472,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       <div className="space-y-2 pt-1">
         <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
           <span className="font-semibold uppercase tracking-wider">Tài khoản kiểm thử nhanh:</span>
-          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-medium">Mật khẩu: 123456789</span>
+          <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono font-medium">Mật khẩu: 123456789</span>
         </div>
 
         {/* 4 Roles in 2x2 Grid */}
@@ -503,7 +503,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             onClick={() => quickFillRole('thutruong')}
             className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
               selectedRole === 'thutruong'
-                ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-500/60 text-purple-800 dark:text-purple-300 ring-1 ring-purple-500/40 shadow-sm'
+                ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-sm'
                 : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
             }`}
           >
@@ -514,7 +514,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
               </div>
               <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 4 • Tối Mật</div>
             </div>
-            <Zap className="w-4 h-4 text-purple-500 dark:text-purple-400 shrink-0 fill-purple-400/20" />
+            <Zap className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0 fill-red-400/20" />
           </button>
 
           {/* 3. Văn thư */}
@@ -582,7 +582,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium text-sm shadow-lg shadow-purple-900/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition-all duration-200 cursor-pointer"
+        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-medium text-sm shadow-md shadow-emerald-950/20 border border-amber-500/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition-all duration-200 cursor-pointer"
       >
         {loading ? (
           <>

@@ -123,8 +123,8 @@ export const MyUnitPage: React.FC = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       <Header
         activeNav="myunit"
-        title="QK7 DATAHUB"
-        subtitle={currentUnit ? `Đơn vị: ${currentUnit.name}` : 'Trung tâm thư viện số đơn vị'}
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle={currentUnit ? `Đơn vị: ${currentUnit.name}` : 'Trung tâm dữ liệu số'}
       />
 
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">

@@ -166,8 +166,8 @@ export const DocumentDeskPage: React.FC = () => {
       {/* Header */}
       <Header
         activeNav="desk"
-        title="QK7 DATAHUB"
-        subtitle="Trung tâm văn bản — Quản Lý Lưu Trữ Văn Bản"
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle="Trung tâm dữ liệu số"
       />
 
       {/* Main Container */}
@@ -190,7 +190,7 @@ export const DocumentDeskPage: React.FC = () => {
               setEditingDoc(null);
               setUploadModalOpen(true);
             }}
-            className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition cursor-pointer shrink-0"
+            className="px-4 py-2.5 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-950/20 border border-amber-500/25 transition cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>Tiếp Nhận Văn Bản Mới</span>

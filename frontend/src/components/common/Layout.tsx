@@ -56,7 +56,7 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-purple-600 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
       <Header
         activeNav={activeNav}
         title={title}
@@ -99,7 +99,7 @@ export const Layout: React.FC<LayoutProps> = ({
         )}
 
         {/* Main Content Area — Chiếm 100% không gian còn lại, không tràn khung hình */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 bg-slate-50/70 dark:bg-slate-950/70 p-3 sm:p-5 lg:p-6 xl:p-8">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 bg-slate-50/70 dark:bg-[#090e17]/70 p-3 sm:p-5 lg:p-6 xl:p-8">
           <div className="max-w-7xl mx-auto space-y-6">{children}</div>
         </main>
       </div>

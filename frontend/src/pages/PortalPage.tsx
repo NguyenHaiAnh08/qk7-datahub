@@ -155,8 +155,8 @@ export const PortalPage: React.FC = () => {
       {/* Header */}
       <Header
         activeNav="portal"
-        title="QK7 DATAHUB"
-        subtitle="Trung Tâm Thư Viện Số Quân Sự Tập Trung"
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle="Trung tâm dữ liệu số"
       />
 
       {/* Main Container */}
@@ -178,7 +178,7 @@ export const PortalPage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm số hiệu, trích yếu..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"
               />
             </div>
 
@@ -187,7 +187,7 @@ export const PortalPage: React.FC = () => {
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"
               >
                 <option value="">Tất cả thể loại văn bản</option>
                 {meta.types.map((t) => (
@@ -203,7 +203,7 @@ export const PortalPage: React.FC = () => {
               <select
                 value={selectedUnit}
                 onChange={(e) => setSelectedUnit(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"
               >
                 <option value="">Tất cả đơn vị ban hành</option>
                 {meta.units.map((u) => (
@@ -219,7 +219,7 @@ export const PortalPage: React.FC = () => {
               <select
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"
               >
                 {meta.levels.map((l) => (
                   <option key={l.level_id} value={l.level_id}>
@@ -257,7 +257,7 @@ export const PortalPage: React.FC = () => {
                   onClick={() => setViewMode('grid')}
                   className={`p-1.5 rounded transition ${
                     viewMode === 'grid'
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                      ? 'bg-[#166534] dark:bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
                   }`}
                   title="Dạng lưới thẻ"
@@ -269,7 +269,7 @@ export const PortalPage: React.FC = () => {
                   onClick={() => setViewMode('table')}
                   className={`p-1.5 rounded transition ${
                     viewMode === 'table'
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                      ? 'bg-[#166534] dark:bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
                   }`}
                   title="Dạng bảng chi tiết"

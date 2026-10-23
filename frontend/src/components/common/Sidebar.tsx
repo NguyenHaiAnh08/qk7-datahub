@@ -105,7 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 aria-label={collapsed ? 'Mở rộng danh mục quản trị' : 'Thu gọn danh mục quản trị'}
               >
                 {collapsed ? (
-                  <ChevronRight className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <ChevronRight className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                 ) : (
                   <ChevronLeft className="w-4 h-4" />
                 )}
@@ -126,7 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 collapsed ? 'justify-center p-2.5' : 'justify-start space-x-3 px-3 py-2.5'
               } rounded-xl text-xs transition cursor-pointer ${
                 isActive
-                  ? 'bg-purple-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/30 font-semibold shadow-sm'
+                  ? 'bg-[#166534] text-white border-l-4 border-amber-400 dark:bg-emerald-600/20 dark:text-emerald-400 dark:border dark:border-emerald-500/30 dark:border-l-4 dark:border-l-amber-400 font-semibold shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium'
               }`}
             >

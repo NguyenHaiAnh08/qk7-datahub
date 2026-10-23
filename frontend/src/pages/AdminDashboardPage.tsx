@@ -539,12 +539,12 @@ export const AdminDashboardPage: React.FC = () => {
 
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-purple-600 selection:text-white transition-colors duration-200">
+    <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
       {/* Header */}
       <Header
         activeNav="admin"
-        title="QK7 DATAHUB"
-        subtitle="Hệ Thống Quản Trị Trung Tâm & Phân Quyền Quân Khu"
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle="Trung tâm dữ liệu số"
         onToggleMobileMenu={() => setSidebarOpen(true)}
       />
 
@@ -599,7 +599,7 @@ export const AdminDashboardPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => scrollTabStrip('left')}
-                className="shrink-0 p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
+                className="shrink-0 p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400 transition cursor-pointer"
                 title="Cuộn danh mục sang trái"
                 aria-label="Cuộn sang trái"
               >
@@ -622,7 +622,7 @@ export const AdminDashboardPage: React.FC = () => {
                       onClick={() => setActiveTab(tab.id)}
                       className={`whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
                         isActive
-                          ? 'bg-purple-600 text-white shadow-xs'
+                          ? 'bg-[#166534] text-white shadow-xs dark:bg-emerald-600/25 dark:text-emerald-300 dark:border dark:border-emerald-500/40'
                           : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
@@ -637,7 +637,7 @@ export const AdminDashboardPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => scrollTabStrip('right')}
-                className="shrink-0 p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
+                className="shrink-0 p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400 transition cursor-pointer"
                 title="Cuộn danh mục sang phải"
                 aria-label="Cuộn sang phải"
               >
@@ -696,7 +696,7 @@ export const AdminDashboardPage: React.FC = () => {
                   label="Tổng dung lượng tệp"
                   value={stats ? formatFileSize(stats.totalSize) : '—'}
                   icon={<HardDrive className="w-6 h-6" />}
-                  color="purple"
+                  color="amber"
                   subtext="Ổ đĩa dữ liệu an toàn"
                   delay={0.1}
                 />
@@ -747,29 +747,30 @@ export const AdminDashboardPage: React.FC = () => {
           {/* TAB: USERS */}
           {activeTab === 'users' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Users className="w-5 h-5 text-amber-400" /> Quản Lý Danh Sách Quân Nhân
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 sm:gap-4">
+                <div className="shrink-0">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2 whitespace-nowrap">
+                    <Users className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0" />
+                    <span>Quản Lý Danh Sách Quân Nhân</span>
                   </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
                     Tổng số: {usersList.length} quân nhân • Phân quyền bảo mật theo cấp bậc
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                  <div className="relative flex-1 sm:flex-initial">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     <input
                       type="text"
                       value={userSearch}
                       onChange={(e) => setUserSearch(e.target.value)}
                       placeholder="Tìm theo mã, tên, đơn vị..."
-                      className="w-full sm:w-64 pl-9 pr-8 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition"
+                      className="w-full sm:w-64 pl-9 pr-8 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-amber-500 transition shadow-2xs"
                     />
                     {userSearch && (
                       <button
                         onClick={() => setUserSearch('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -780,7 +781,7 @@ export const AdminDashboardPage: React.FC = () => {
                       setSelectedUser(null);
                       setUserModalOpen(true);
                     }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-xs whitespace-nowrap"
                   >
                     <Plus className="w-4 h-4" /> Thêm người dùng
                   </button>
@@ -822,7 +823,7 @@ export const AdminDashboardPage: React.FC = () => {
                       loadUsers();
                       setAssignRoleModal({ open: true, selectedRole: null });
                     }}
-                    className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-purple-600/30"
+                    className="px-3.5 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-emerald-950/20 border border-amber-500/25"
                   >
                     <UserCheck className="w-4 h-4" /> Gán vai trò
                   </button>
@@ -1419,7 +1420,7 @@ export const AdminDashboardPage: React.FC = () => {
                       <select
                         value={genericFormData.parent_id || ''}
                         onChange={(e) => setGenericFormData({ ...genericFormData, parent_id: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 font-medium text-sm cursor-pointer"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-medium text-sm cursor-pointer"
                       >
                         <option value="">Cấp cao nhất</option>
                         {[...unitsList]

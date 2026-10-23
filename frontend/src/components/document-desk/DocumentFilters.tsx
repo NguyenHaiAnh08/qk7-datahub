@@ -81,7 +81,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Tìm theo số hiệu, trích yếu..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"
           />
         </div>
 
@@ -90,7 +90,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <select
             value={selectedType}
             onChange={(e) => onTypeChange(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"
           >
             <option value="">Tất cả loại văn bản</option>
             {types.map((t) => (
@@ -106,7 +106,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <select
             value={selectedUnit}
             onChange={(e) => onUnitChange(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition cursor-pointer"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition cursor-pointer"
           >
             <option value="">Tất cả đơn vị ban hành</option>
             {groupedUnits.map((group) =>
@@ -135,7 +135,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <select
             value={selectedLevel}
             onChange={(e) => onLevelChange(Number(e.target.value))}
-            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"
           >
             <option value={0}>Mức bảo mật</option>
             {levels.map((l) => (
@@ -183,7 +183,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <button
             type="button"
             onClick={onRefresh}
-            className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-600/20 hover:bg-emerald-100 dark:hover:bg-emerald-600/30 border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-600/20 hover:bg-emerald-100 dark:hover:bg-emerald-600/30 border border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Làm mới</span>

@@ -860,7 +860,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                         {/* ── CỘT 2: MÃ ĐỊNH DANH (BADGE MONOSPACE AMBER) ── */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span
-                            className="bg-amber-100/90 text-amber-900 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25 font-mono text-sm px-3 py-1 rounded-lg font-bold tracking-wider inline-flex items-center shadow-2xs"
+                            className="bg-amber-100/90 text-amber-900 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25 font-mono tabular-nums text-sm px-3 py-1 rounded-lg font-bold tracking-wider inline-flex items-center shadow-2xs"
                             title={`Mã định danh đơn vị: ${unit.unit_id}`}
                           >
                             {renderHighlightedText(unit.unit_id, true)}

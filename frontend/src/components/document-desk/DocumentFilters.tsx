@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, RotateCw, Eraser, Calendar } from 'lucide-react';
 import { DocumentType, Unit, SecurityLevel } from '../../types';
+import { DateRangePicker } from '../common/DateRangePicker';
 
 export interface DocumentFiltersProps {
   searchQuery: string;
@@ -150,25 +151,18 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
       {/* Date Filters & Action Buttons */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2.5 border-t border-slate-200 dark:border-slate-800/80">
         <div className="flex flex-wrap items-center gap-2.5 text-xs">
-          <div className="flex items-center space-x-1.5">
-            <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-            <span className="text-slate-600 dark:text-slate-400 text-[11px] shrink-0">Từ ngày:</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => onDateFromChange(e.target.value)}
-              className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="text-slate-600 dark:text-slate-400 text-[11px] shrink-0">Đến:</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => onDateToChange(e.target.value)}
-              className="px-2.5 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
+          <DateRangePicker
+            startDate={dateFrom}
+            endDate={dateTo}
+            onChange={(start, end) => {
+              onDateFromChange(start);
+              onDateToChange(end);
+            }}
+            onClear={() => {
+              onDateFromChange('');
+              onDateToChange('');
+            }}
+          />
         </div>
 
         <div className="flex items-center gap-2 justify-end shrink-0">

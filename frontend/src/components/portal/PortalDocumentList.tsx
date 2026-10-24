@@ -2,6 +2,7 @@ import React from 'react';
 import { Loader2, Inbox, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DocumentItem } from '../../types';
 import { DocumentCard } from './DocumentCard';
+import { TacticalEmptyState } from '../common/TacticalEmptyState';
 
 export interface PortalDocumentListProps {
   documents: DocumentItem[];
@@ -10,6 +11,8 @@ export interface PortalDocumentListProps {
   currentPage: number;
   totalPages: number;
   totalItems: number;
+  searchQuery?: string;
+  onClearFilters?: () => void;
   onPageChange: (page: number) => void;
   onPreview: (doc: DocumentItem) => void;
   onDownload: (doc: DocumentItem) => void;
@@ -22,6 +25,8 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
   currentPage,
   totalPages,
   totalItems,
+  searchQuery,
+  onClearFilters,
   onPageChange,
   onPreview,
   onDownload,
@@ -39,16 +44,13 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
 
   if (documents.length === 0) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center space-y-3 bg-white/60 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 text-center px-4">
-        <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500">
-          <Inbox className="w-7 h-7" />
-        </div>
-        <h4 className="text-base font-bold text-slate-900 dark:text-white">
-          Không tìm thấy tài liệu phù hợp
-        </h4>
-        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
-          Vui lòng thử lại với từ khóa khác hoặc điều chỉnh các tiêu chí bộ lọc (loại văn bản, đơn vị, khoảng thời gian).
-        </p>
+      <div className="bg-white/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md overflow-hidden">
+        <TacticalEmptyState
+          title="Không tìm thấy văn bản phù hợp"
+          description="Không có tài liệu nào khớp với từ khóa tìm kiếm hoặc bộ lọc hiện tại. Đồng chí vui lòng kiểm tra lại từ khóa hoặc xóa bộ lọc."
+          searchQuery={searchQuery}
+          onClearFilters={onClearFilters}
+        />
       </div>
     );
   }
@@ -56,14 +58,20 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {documents.map((doc) => (
-          <DocumentCard
+        {documents.map((doc, idx) => (
+          <div
             key={doc.file_id}
-            document={doc}
-            userClearanceLevel={userClearanceLevel}
-            onPreview={onPreview}
-            onDownload={onDownload}
-          />
+            id={idx === 0 ? 'tour-document-card' : undefined}
+            data-tour={idx === 0 ? 'document-card' : undefined}
+            className="h-full"
+          >
+            <DocumentCard
+              document={doc}
+              userClearanceLevel={userClearanceLevel}
+              onPreview={onPreview}
+              onDownload={onDownload}
+            />
+          </div>
         ))}
       </div>
 

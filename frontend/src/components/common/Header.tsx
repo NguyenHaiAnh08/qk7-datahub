@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
+import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { ThemeToggle } from './ThemeToggle';
 import { DeviceModeSwitch } from './DeviceModeSwitch';
 import { ROUTE_PATHS } from '../../routes/routePaths';
@@ -188,10 +189,11 @@ const NavigationGlider: React.FC<{
         return (
           <Link
             key={tab.key}
+            id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
             ref={(el) => {
               tabRefs.current[tab.key] = el;
             }}
-              to={tab.to}
+            to={tab.to}
               onClick={() => {
                 const el = tabRefs.current[tab.key];
                 const container = containerRef.current;
@@ -251,6 +253,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, isAdmin, isStaff, logout } = useAuth();
   const { deviceMode, orientation } = useDeviceMode();
+  const { isOnline, checkConnection } = useNetworkStatus();
   const navigate = useNavigate();
   const [liveClock, setLiveClock] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -417,7 +420,28 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Cụm Phải (shrink-0 z-20 flex items-center gap-1.5 sm:gap-2): Switch + Theme + User Profile Pill */}
-        <div className="shrink-0 z-20 flex items-center gap-1.5 sm:gap-2">
+        <div id="tour-header-controls-ipad" className="shrink-0 z-20 flex items-center gap-1.5 sm:gap-2">
+          {/* Live Indicator Trạng Thái Kết Nối */}
+          {isOnline ? (
+            <div
+              className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-mono shrink-0 select-none"
+              title="Máy chủ LAN hoạt động bình thường"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <span>Trực tuyến</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => checkConnection()}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/40 text-[10px] font-mono font-bold shrink-0 animate-pulse cursor-pointer select-none"
+              title="Mất kết nối máy chủ LAN. Bấm để thử kết nối lại!"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping shrink-0" />
+              <span>Mất kết nối</span>
+            </button>
+          )}
+
           <DeviceModeSwitch compact />
           <ThemeToggle size="sm" />
 
@@ -502,7 +526,28 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Vùng Phải: Quick Nav Links & Controls */}
-      <div className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0 z-20">
+      <div id="tour-header-controls" className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0 z-20">
+        {/* Live Network Indicator */}
+        {isOnline ? (
+          <div
+            className="hidden xl:flex items-center space-x-1.5 text-xs font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 shrink-0 select-none"
+            title="Kết nối máy chủ LAN cổng 8000 trực tuyến ổn định"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <span>Đang trực tuyến</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => checkConnection()}
+            className="flex items-center space-x-1.5 text-xs font-mono font-bold text-rose-700 dark:text-rose-400 bg-rose-500/15 px-2.5 py-1.5 rounded-lg border border-rose-500/40 shrink-0 animate-pulse cursor-pointer select-none"
+            title="Mất kết nối máy chủ LAN. Bấm để thử kết nối lại ngay!"
+          >
+            <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping shrink-0" />
+            <span>Mất kết nối máy chủ</span>
+          </button>
+        )}
+
         {/* Live Clock (Chỉ hiện ở màn hình rộng để tiết kiệm diện tích khi zoom) */}
         {showClock && (
           <div className="hidden 2xl:flex items-center space-x-2 text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 shrink-0">

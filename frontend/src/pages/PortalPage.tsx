@@ -11,7 +11,8 @@ import {
   List,
   AlertTriangle,
   X,
-  FileCheck
+  FileCheck,
+  Compass,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
 import { toast } from '../components/common/Toast';
@@ -19,6 +20,8 @@ import { SecurityBanner } from '../components/portal/SecurityBanner';
 import { PortalDocumentList } from '../components/portal/PortalDocumentList';
 import { DocumentTable } from '../components/document-desk/DocumentTable';
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
+import { DateRangePicker } from '../components/common/DateRangePicker';
+import { SpotlightTour } from '../components/common/SpotlightTour';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
@@ -50,11 +53,37 @@ export const PortalPage: React.FC = () => {
   // Modals
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [showSecurityPolicy, setShowSecurityPolicy] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
+
+  // Auto-launch spotlight tour for first-time guest visitors
+  useEffect(() => {
+    const isGuest = !user || user.user_id === 'GUEST';
+    if (isGuest) {
+      const tourSeen = localStorage.getItem('qk7_guest_tour_seen');
+      if (!tourSeen) {
+        const timer = setTimeout(() => {
+          setIsTourOpen(true);
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [user]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     if (type === 'error') toast.error(message);
     else if (type === 'info') toast.info(message);
     else toast.success(message);
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedType('');
+    setSelectedUnit('');
+    setSelectedDepartment('');
+    setSelectedLevel('');
+    setDateFrom('');
+    setDateTo('');
+    setCurrentPage(1);
   };
 
   // Load Metadata
@@ -198,10 +227,14 @@ export const PortalPage: React.FC = () => {
         <SecurityBanner
           user={user}
           onOpenPolicy={() => setShowSecurityPolicy(true)}
+          onStartTour={() => setIsTourOpen(true)}
         />
 
         {/* Filter & View Mode Controls */}
-        <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-4 transition-colors duration-200">
+        <div
+          id="tour-filter-bar"
+          className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-4 transition-colors duration-200"
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
             {/* Search Input */}
             <div className="relative">
@@ -271,21 +304,18 @@ export const PortalPage: React.FC = () => {
           <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
               {/* Col 1 & 2: Khung ngày (bên trái) */}
-              <div className="sm:col-span-2 flex items-center space-x-2 text-xs">
-                <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-                <span className="text-slate-600 dark:text-slate-400 text-[11px] shrink-0">Từ ngày:</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
-                />
-                <span className="text-slate-600 dark:text-slate-400 text-[11px] shrink-0">Đến:</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+              <div id="tour-date-range" className="sm:col-span-2 flex items-center space-x-2 text-xs">
+                <DateRangePicker
+                  startDate={dateFrom}
+                  endDate={dateTo}
+                  onChange={(start, end) => {
+                    setDateFrom(start);
+                    setDateTo(end);
+                  }}
+                  onClear={() => {
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
                 />
               </div>
 
@@ -356,6 +386,15 @@ export const PortalPage: React.FC = () => {
                   <RotateCw className="w-3.5 h-3.5" />
                   <span>Làm mới</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTourOpen(true)}
+                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 dark:bg-amber-400/15 hover:bg-amber-500/20 dark:hover:bg-amber-400/25 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center gap-1 transition cursor-pointer shrink-0 whitespace-nowrap select-none"
+                  title="Xem hướng dẫn nhanh hệ thống (Spotlight Tour)"
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Hướng dẫn nhanh</span>
+                </button>
               </div>
             </div>
           </div>
@@ -423,6 +462,8 @@ export const PortalPage: React.FC = () => {
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={documents.length}
+            searchQuery={searchQuery}
+            onClearFilters={handleClearFilters}
             onPageChange={setCurrentPage}
             onPreview={(doc) => setPreviewDoc(doc)}
             onDownload={handleDownload}
@@ -435,6 +476,7 @@ export const PortalPage: React.FC = () => {
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={documents.length}
+            onClearFilters={handleClearFilters}
             onPageChange={setCurrentPage}
             onPreview={(doc) => setPreviewDoc(doc)}
             onDownload={handleDownload}
@@ -493,6 +535,12 @@ export const PortalPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Spotlight Tour for Guests */}
+      <SpotlightTour
+        isOpen={isTourOpen}
+        onClose={() => setIsTourOpen(false)}
+      />
     </div>
   );
 };

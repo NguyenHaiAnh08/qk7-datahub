@@ -151,27 +151,43 @@ html.theme-transition *::after {
   transition-delay: 0s !important;
 }
 
-/* View Transitions API circular reveal */
+/* <!-- Lucian UX/UI Prompt #219 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#219 --> */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
+  animation: none !important;
+  mix-blend-mode: normal !important;
 }
 
 ::view-transition-old(root) {
-  z-index: 1;
+  z-index: 1 !important;
 }
 
 ::view-transition-new(root) {
-  z-index: 9999;
+  z-index: 9999 !important;
 }
 
-.dark::view-transition-old(root) {
-  z-index: 9999;
+.u219-tg {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
 }
 
-.dark::view-transition-new(root) {
-  z-index: 1;
+.u219-tg svg {
+  transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.is-dark .u219-tg svg,
+.dark .u219-tg svg {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u219-dk,
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* =========================================================================
@@ -995,4 +1011,360 @@ html.dark .ant-input::placeholder {
     animation: none;
   }
 }
+
+/* Hiệu ứng làm mờ dần đều ra viền ngoài của Trống đồng (ở giữa rõ nét, viền mờ dần hòa vào nền) */
+.bronze-drum-radial-fade {
+  -webkit-mask-image: radial-gradient(circle closest-side at center, #000 32%, rgba(0, 0, 0, 0.88) 52%, rgba(0, 0, 0, 0.45) 72%, rgba(0, 0, 0, 0) 89%);
+  mask-image: radial-gradient(circle closest-side at center, #000 32%, rgba(0, 0, 0, 0.88) 52%, rgba(0, 0, 0, 0.45) 72%, rgba(0, 0, 0, 0) 89%);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #219 · Circular-reveal Dark Mode (Navigation)
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#219
+   ══════════════════════════════════════════════════════════════════════ */
+.u219-dk {
+  clip-path: circle(0px at var(--cx, 300px) var(--cy, 30px));
+  transition: clip-path 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+  pointer-events: none;
+}
+
+.u219.is-on .u219-dk {
+  clip-path: circle(150vmax at var(--cx, 300px) var(--cy, 30px));
+  pointer-events: auto;
+}
+
+.u219-tg {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.u219-tg svg {
+  display: block;
+  flex-shrink: 0;
+  transform-origin: center;
+  transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.is-dark .u219-tg svg,
+.dark .u219-tg svg {
+  transform: rotate(-90deg);
+}
+
+/* View Transitions API overrides to eliminate default cross-fade during circular clip-path expansion */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none !important;
+  mix-blend-mode: normal !important;
+}
+
+::view-transition-old(root) {
+  z-index: 1 !important;
+}
+
+::view-transition-new(root) {
+  z-index: 9999 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u219-dk,
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #025 · Notched floating label field & Shake Error
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#025
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --ux-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ux-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --u025-surface: #ffffff;
+  --u025-ink: #0f172a;
+  --u025-ink-2: #166534;
+  --u025-ink-3: #64748b;
+  --u025-line: #cbd5e1;
+  --u025-accent: #166534;
+  --u025-danger: #dc2626;
+  --u025-mint: #166534;
+}
+
+:root.dark, html.dark {
+  --u025-surface: #0b1320;
+  --u025-ink: #f8fafc;
+  --u025-ink-2: #34d399;
+  --u025-ink-3: #94a3b8;
+  --u025-line: #334155;
+  --u025-accent: #10b981;
+  --u025-danger: #ef4444;
+  --u025-mint: #10b981;
+}
+
+.u025-f {
+  position: relative;
+  width: 100%;
+}
+
+.u025-box {
+  position: relative;
+  height: 52px;
+  background: var(--u025-surface);
+  border-radius: 14px;
+  transition: background-color 0.2s var(--ux-ease);
+}
+
+.u025-compact .u025-box {
+  height: 46px;
+}
+
+.u025-in {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 44px 0 42px;
+  border: 0;
+  outline: 0;
+  border-radius: 14px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 560;
+  color: var(--u025-ink);
+  letter-spacing: -0.01em;
+  z-index: 2;
+}
+
+.u025-compact .u025-in {
+  font-size: 13px;
+  padding: 0 40px 0 38px;
+}
+
+.u025-line {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+  border-radius: 14px;
+  z-index: 1;
+}
+
+.u025-line i {
+  display: block;
+  border: 1.5px solid var(--u025-line);
+  transition: border-color 0.3s var(--ux-ease), border-width 0.2s ease;
+}
+
+.u025-line .l {
+  width: 14px;
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
+}
+
+.u025-line .g {
+  width: var(--gap, 0px);
+  border-left: 0;
+  border-right: 0;
+  transition: width 0.35s var(--ux-ease), border-color 0.3s var(--ux-ease);
+}
+
+.u025-line .r {
+  flex: 1;
+  border-left: 0;
+  border-radius: 0 14px 14px 0;
+}
+
+.u025-f.is-up .u025-line .g {
+  border-top-color: transparent !important;
+}
+
+.u025-f.is-focus .u025-line i {
+  border-color: var(--u025-accent);
+  border-width: 2px;
+}
+
+.u025-f.is-bad .u025-line i {
+  border-color: var(--u025-danger) !important;
+  border-width: 2px;
+}
+
+.u025-f.is-ok .u025-line i {
+  border-color: var(--u025-mint);
+}
+
+.u025-lab {
+  position: absolute;
+  left: 42px;
+  top: 16px;
+  padding: 0 4px;
+  margin-left: -4px;
+  font-size: 14px;
+  font-weight: 560;
+  color: var(--u025-ink-3);
+  transform-origin: 0 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: transform 0.35s var(--ux-ease), color 0.3s var(--ux-ease), left 0.35s var(--ux-ease);
+  z-index: 3;
+}
+
+.u025-compact .u025-lab {
+  left: 38px;
+  top: 13px;
+  font-size: 13px;
+}
+
+.u025-f.is-up .u025-lab {
+  left: 18px;
+  transform: translate(0, -25px) scale(0.8);
+  color: var(--u025-ink-2);
+  font-weight: 650;
+}
+
+.u025-compact.u025-f.is-up .u025-lab {
+  left: 18px;
+  transform: translate(0, -22px) scale(0.8);
+}
+
+.u025-f.is-focus .u025-lab {
+  color: var(--u025-accent);
+}
+
+.u025-f.is-bad .u025-lab {
+  color: var(--u025-danger) !important;
+}
+
+.u025-icon-left {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--u025-ink-3);
+  transition: color 0.3s var(--ux-ease);
+}
+
+.u025-compact .u025-icon-left {
+  left: 12px;
+}
+
+.u025-f.is-focus .u025-icon-left {
+  color: var(--u025-accent);
+}
+
+.u025-f.is-bad .u025-icon-left {
+  color: var(--u025-danger);
+}
+
+.u025-ok {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--u025-mint);
+  color: #fff;
+  transform: scale(0);
+  transition: transform 0.45s var(--ux-spring);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.u025-ok svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.u025-ok path {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  transition: stroke-dashoffset 0.35s var(--ux-ease) 0.15s;
+}
+
+.u025-f.is-ok .u025-ok {
+  transform: scale(1);
+}
+
+.u025-f.is-ok .u025-ok path {
+  stroke-dashoffset: 0;
+}
+
+.u025-f.is-shake .u025-box {
+  animation: u025-shake 0.42s var(--ux-ease);
+}
+
+@keyframes u025-shake {
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+
+.u025-help {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s var(--ux-ease);
+}
+
+.u025-help > span {
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u025-danger);
+}
+
+.u025-help > span::before {
+  content: "!";
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--u025-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.u025-f.is-bad .u025-help {
+  grid-template-rows: 1fr;
+}
+
+.u025-f.is-bad .u025-help > span {
+  padding-top: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u025-f,
+  .u025-f *,
+  .u025-f *::before,
+  .u025-f *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+
 

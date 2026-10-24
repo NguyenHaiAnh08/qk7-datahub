@@ -43,7 +43,7 @@ export const DEMO_ACCOUNTS: Record<
   canbo: {
     id: 'USR-005',
     title: 'Cán bộ',
-    subtitle: 'Cấp 3 • Trung tâm thư viện số',
+    subtitle: 'Cấp 3 • Dữ liệu số',
     label: 'Cán bộ tuyên huấn (USR-005 - Cấp 3)',
     roleName: 'Cán bộ',
   },
@@ -330,7 +330,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                       <span>Cán bộ</span>
                       <span className="text-[10px] font-mono text-slate-400">005</span>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 3 • Trung tâm thư viện số</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 3 • Dữ liệu số</div>
                   </div>
                   <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
                 </button>
@@ -488,7 +488,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                 <span>Cán bộ</span>
                 <span className="text-[10px] font-mono text-slate-400">005</span>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 3 • Trung tâm thư viện số</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 3 • Dữ liệu số</div>
             </div>
             <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
           </button>

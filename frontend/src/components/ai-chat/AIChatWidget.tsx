@@ -35,6 +35,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { aiService, AIChatResponse, AICitation, AIStudyBookResponse, AIQuizQuestion } from '../../services/aiService';
 import { fileService } from '../../services/fileService';
+import { toast } from '../common/Toast';
 
 const { Text, Paragraph, Title } = Typography;
 
@@ -205,7 +206,7 @@ export const AIChatWidget: React.FC = () => {
       const targetUrl = `${url}#page=${page}`;
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } catch (err: any) {
-      message.error(`Không thể mở tệp: ${err.message}`);
+      toast.error(`Không thể mở tệp: ${err.message}`, { title: 'TRUY CẬP TỆP THẤT BẠI' });
     }
   };
 
@@ -219,7 +220,7 @@ export const AIChatWidget: React.FC = () => {
       setSubmittedQuiz(false);
       return data;
     } catch (err: any) {
-      message.error(`Lỗi tải dữ liệu cuốn sách: ${err.message}`);
+      toast.error(`Lỗi tải dữ liệu cuốn sách: ${err.message}`, { title: 'LỖI STUDY BOOK' });
       return null;
     } finally {
       setLoadingStudyBook(false);
@@ -248,7 +249,10 @@ export const AIChatWidget: React.FC = () => {
     if (!studyBookData?.tab_quiz) return;
     const answeredCount = Object.keys(selectedAnswers).length;
     if (answeredCount < studyBookData.tab_quiz.length) {
-      message.warning(`Đồng chí vui lòng hoàn thành tất cả ${studyBookData.tab_quiz.length} câu hỏi trước khi nộp bài.`);
+      toast.warning(`Đồng chí vui lòng hoàn thành tất cả ${studyBookData.tab_quiz.length} câu hỏi trước khi nộp bài.`, {
+        title: 'CHƯA HOÀN THÀNH BÀI THI',
+        badge: 'QUIZ',
+      });
       return;
     }
     setSubmittedQuiz(true);
@@ -363,9 +367,9 @@ export const AIChatWidget: React.FC = () => {
                 <button
                   onClick={() => {
                     setMessages([]);
-                    message.success('Đã làm mới phiên hội thoại.');
+                    toast.success('Đã làm mới phiên hội thoại với Trợ lý AI.', { title: 'PHIÊN MỚI', badge: 'AI-RESET' });
                   }}
-                  className="p-1.5 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors btn-tactile active:scale-95 cursor-pointer"
                 >
                   <ReloadOutlined className="text-xs" />
                 </button>
@@ -668,7 +672,7 @@ export const AIChatWidget: React.FC = () => {
                   icon={<CopyOutlined />}
                   onClick={() => {
                     navigator.clipboard.writeText(studyBookData.tab_diagram.mermaid_code);
-                    message.success('Đã sao chép mã Mermaid.js vào clipboard.');
+                    toast.success('Đã sao chép mã Mermaid.js vào clipboard.', { title: 'ĐÃ SAO CHÉP', badge: 'MERMAID' });
                   }}
                 >
                   Sao chép mã

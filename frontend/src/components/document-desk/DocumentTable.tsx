@@ -57,10 +57,10 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col transition-colors duration-200">
+    <div className="bg-white dark:bg-[#111827] rounded-xl overflow-hidden border border-slate-200 dark:border-white/[0.08] flex flex-col transition-colors duration-200">
       <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[800px]">
-          <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 text-[11px] uppercase border-b border-slate-200 dark:border-slate-800 tracking-wider">
+          <thead className="bg-slate-50/80 dark:bg-white/[0.02] text-slate-500 dark:text-slate-400 text-xs font-semibold border-b border-slate-200 dark:border-white/[0.06]">
             <tr>
               <th className="py-3 px-4">Số hiệu</th>
               <th className="py-3 px-4">Trích yếu nội dung</th>

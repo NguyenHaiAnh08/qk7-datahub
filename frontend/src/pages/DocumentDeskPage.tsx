@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, RotateCw, FileCheck } from 'lucide-react';
 import { Header } from '../components/common/Header';
-import { Toast, ToastState } from '../components/common/Toast';
+import { Toast, ToastState, toast } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { DocumentFilters } from '../components/document-desk/DocumentFilters';
 import { DocumentTable } from '../components/document-desk/DocumentTable';
@@ -40,18 +40,11 @@ export const DocumentDeskPage: React.FC = () => {
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<DocumentItem | null>(null);
 
-  // Toast
-  const [toast, setToast] = useState<ToastState>({
-    show: false,
-    message: '',
-    type: 'success',
-  });
-
+  // Toast Dispatcher (Global AnimatedToast)
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast((prev) => ({ ...prev, show: false }));
-    }, 2800);
+    if (type === 'error') toast.error(message);
+    else if (type === 'info') toast.info(message);
+    else toast.success(message);
   };
 
   // Load Metadata
@@ -119,11 +112,17 @@ export const DocumentDeskPage: React.FC = () => {
     if (!deleteConfirmDoc) return;
     try {
       await documentsApi.deleteDocument(deleteConfirmDoc.file_id);
-      showToast(`Đã xóa văn bản ${deleteConfirmDoc.document_code} thành công`);
+      toast.success(`Đã xóa văn bản ${deleteConfirmDoc.document_code} khỏi hệ thống văn thư.`, {
+        title: 'XÓA TÀI LIỆU THÀNH CÔNG',
+        badge: deleteConfirmDoc.document_code,
+      });
       setDeleteConfirmDoc(null);
       await loadDocuments();
     } catch (err: any) {
-      showToast('Lỗi xóa văn bản: ' + err.message, 'error');
+      toast.error('Lỗi xóa văn bản: ' + err.message, {
+        title: 'LỖI THAO TÁC',
+        badge: 'DELETE-ERR',
+      });
     }
   };
 
@@ -134,23 +133,36 @@ export const DocumentDeskPage: React.FC = () => {
 
     // Quy định bảo mật: Từ Cấp 3 trở đi chỉ duy nhất cho phép xem, không được tải về
     if (docLevel >= 3) {
-      showToast('Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy.', 'info');
+      toast.securityAlert(
+        'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp có xác thực vân tay 2FA, tuyệt đối không được phép tải về máy.',
+        { title: 'QUY ĐỊNH BẢO MẬT VĂN THƯ', badge: 'LEVEL-3+' }
+      );
       return;
     }
 
     if (docLevel > userClearance) {
-      showToast(
-        `Cấp độ bảo mật hiện tại của bạn (Cấp ${userClearance}) không đủ để tải văn bản Cấp ${docLevel}`,
-        'error'
+      toast.securityAlert(
+        `Cấp độ bảo mật hiện tại của đồng chí (Cấp ${userClearance}) không đủ để tải văn bản Cấp ${docLevel}.`,
+        { title: 'TỪ CHỐI TRUY CẬP', badge: 'CLEARANCE-DENIED' }
       );
       return;
     }
     try {
-      showToast(`Đang tải văn bản ${doc.document_code}...`, 'info');
+      toast.info(`Đang tải văn bản ${doc.document_code}...`, {
+        title: 'ĐANG XỬ LÝ TỆP',
+        badge: 'STREAMING',
+        duration: 2500,
+      });
       await documentsApi.downloadDocument(doc.file_id, doc.original_name || `${doc.document_code}.pdf`);
-      showToast(`Đã tải xuống văn bản ${doc.document_code}`, 'success');
+      toast.success(`Đã tải xuống thành công văn bản ${doc.document_code}`, {
+        title: 'TẢI TỆP HOÀN TẤT',
+        badge: 'PDF-READY',
+      });
     } catch (err: any) {
-      showToast('Lỗi tải văn bản: ' + (err.message || 'Không có quyền truy cập'), 'error');
+      toast.error('Lỗi tải văn bản: ' + (err.message || 'Không có quyền truy cập'), {
+        title: 'THẤT BẠI',
+        badge: 'DOWNLOAD-ERR',
+      });
     }
   };
 
@@ -190,7 +202,7 @@ export const DocumentDeskPage: React.FC = () => {
               setEditingDoc(null);
               setUploadModalOpen(true);
             }}
-            className="px-4 py-2.5 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-950/20 border border-amber-500/25 transition cursor-pointer shrink-0"
+            className="px-4 py-2.5 bg-[#166534] hover:bg-[#15803d] text-white font-semibold rounded-lg text-xs flex items-center gap-2 border border-emerald-600/40 transition-colors cursor-pointer shrink-0 active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             <span>Tiếp Nhận Văn Bản Mới</span>
@@ -271,9 +283,6 @@ export const DocumentDeskPage: React.FC = () => {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteConfirmDoc(null)}
       />
-
-      {/* Toast Notification */}
-      <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
     </div>
   );
 };

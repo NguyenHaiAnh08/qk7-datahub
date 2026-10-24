@@ -1,7 +1,8 @@
+/* <!-- Lucian UX/UI Prompt #058 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#058 --> */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Popover, Tooltip } from 'antd';
+import { Popover } from 'antd';
 import {
   Building,
   Clock,
@@ -27,14 +28,33 @@ interface HeaderProps {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt (Dynamic Sliding Pill Glider)
-// Đăng tải • Trung tâm thư viện số • Đơn vị của tôi • Quản trị
+// COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058)
+// Đăng tải • Dữ liệu số • Đơn vị của tôi • Quản trị
 // ══════════════════════════════════════════════════════════════════════
+// Lưu trữ vị trí Pill gần nhất giữa các lần chuyển trang để duy trì chuyển động 2 chiều liên tục (Bidirectional motion)
+let lastKnownPillCoords: { left: number; width: number } | null = null;
+
 const NavigationGlider: React.FC<{
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
-}> = ({ activeNav }) => {
+}> = ({ activeNav: explicitActiveNav }) => {
   const { user, isAdmin, isStaff } = useAuth();
   const { deviceMode } = useDeviceMode();
+  const location = useLocation();
+
+  // Tự động nhận diện tab đang mở nếu activeNav không được truyền từ page
+  const getEffectiveActiveNav = () => {
+    if (explicitActiveNav) return explicitActiveNav;
+    const path = location.pathname;
+    if (path.startsWith(ROUTE_PATHS.DESK)) return 'desk';
+    if (path.startsWith(ROUTE_PATHS.MY_UNIT)) return 'myunit';
+    if (path.startsWith(ROUTE_PATHS.ADMIN)) return 'admin';
+    if (path.startsWith(ROUTE_PATHS.PORTAL)) return 'portal';
+    return undefined;
+  };
+
+  const activeNav = getEffectiveActiveNav();
+
+  const userUnitName = user?.unit_name?.trim() || 'Đơn vị của tôi';
 
   const allNavTabs = [
     {
@@ -43,27 +63,27 @@ const NavigationGlider: React.FC<{
       label: 'Đăng tải',
       shortLabel: 'Đăng tải',
       icon: UploadCloud,
-      activeColor: 'text-emerald-600 dark:text-emerald-300',
-      inactiveColor: 'text-emerald-500',
+      activeColor: 'text-white',
+      inactiveColor: 'text-emerald-600 dark:text-emerald-400',
       visible: Boolean(isStaff || isAdmin),
     },
     {
       key: 'portal',
       to: ROUTE_PATHS.PORTAL,
-      label: 'Trung tâm thư viện số',
-      shortLabel: 'Thư viện số',
+      label: 'Dữ liệu số',
+      shortLabel: 'Dữ liệu số',
       icon: BookOpen,
-      activeColor: 'text-[#166534] dark:text-emerald-300',
+      activeColor: 'text-white',
       inactiveColor: 'text-emerald-700 dark:text-emerald-400',
       visible: true,
     },
     {
       key: 'myunit',
       to: ROUTE_PATHS.MY_UNIT,
-      label: 'Đơn vị của tôi',
-      shortLabel: 'Đơn vị',
+      label: userUnitName,
+      shortLabel: userUnitName,
       icon: Building,
-      activeColor: 'text-amber-800 dark:text-amber-300',
+      activeColor: 'text-white',
       inactiveColor: 'text-amber-600 dark:text-amber-500',
       visible: Boolean(user && user.user_id !== 'GUEST'),
     },
@@ -73,7 +93,7 @@ const NavigationGlider: React.FC<{
       label: 'Quản trị',
       shortLabel: 'Quản trị',
       icon: ShieldAlert,
-      activeColor: 'text-amber-800 dark:text-amber-300',
+      activeColor: 'text-white',
       inactiveColor: 'text-amber-600 dark:text-amber-500',
       visible: Boolean(isAdmin),
     },
@@ -81,23 +101,39 @@ const NavigationGlider: React.FC<{
 
   const visibleTabs = allNavTabs.filter((t) => t.visible);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLElement>(null);
   const tabRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
-  const isInitialMount = useRef(true);
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>(() => {
+    return lastKnownPillCoords || { left: 0, width: 0 };
+  });
+  const isInitialMount = useRef(!lastKnownPillCoords);
 
+  // Chuẩn hóa tính toán tọa độ offset thực tế chính xác tuyệt đối từ container cha
   const updateIndicator = useCallback(() => {
-    if (!activeNav || !containerRef.current) return;
-    const activeEl = tabRefs.current[activeNav];
+    const container = containerRef.current;
+    if (!container) return;
+    const activeEl = tabRefs.current[activeNav || ''];
+
     if (activeEl) {
-      setIndicatorStyle({
-        left: activeEl.offsetLeft,
-        width: activeEl.offsetWidth,
-      });
+      const containerRect = container.getBoundingClientRect();
+      const activeRect = activeEl.getBoundingClientRect();
+      const x = Math.round(activeRect.left - containerRect.left);
+      const w = Math.round(activeRect.width);
+
+      if (w > 0) {
+        lastKnownPillCoords = { left: x, width: w };
+        // Gán trực tiếp vào CSS variable của DOM node để loại bỏ độ trễ và giật khung hình
+        container.style.setProperty('--x', `${x}px`);
+        container.style.setProperty('--w', `${w}px`);
+        container.style.setProperty('--pill-opacity', '1');
+
+        setIndicatorStyle({ left: x, width: w });
+      }
     } else {
+      container.style.setProperty('--pill-opacity', '0');
       setIndicatorStyle({ left: 0, width: 0 });
     }
-  }, [activeNav, visibleTabs.length]);
+  }, [activeNav, visibleTabs.length, userUnitName]);
 
   useEffect(() => {
     updateIndicator();
@@ -106,7 +142,7 @@ const NavigationGlider: React.FC<{
       isInitialMount.current = false;
     });
 
-    // ResizeObserver đảm bảo Glider cập nhật chuẩn xác khi font chữ, zoom, hoặc breakpoint thay đổi
+    // ResizeObserver đảm bảo Pill cập nhật chuẩn xác khi font chữ, zoom, hoặc breakpoint thay đổi
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       ro = new ResizeObserver(() => {
@@ -131,54 +167,78 @@ const NavigationGlider: React.FC<{
   }, [updateIndicator, deviceMode, activeNav]);
 
   return (
-    <div
-      ref={containerRef}
-      className="relative flex items-center bg-slate-200/70 dark:bg-slate-800/80 p-1 sm:p-1.5 rounded-2xl border border-slate-300/50 dark:border-slate-700/60 shadow-xs w-fit max-w-full mx-auto"
+    <nav
+      ref={containerRef as any}
+      aria-label="Điều hướng hệ thống"
+      className={`u058-nav relative flex items-center bg-slate-200/80 dark:bg-[#111827]/80 dark:bg-slate-900/80 backdrop-blur-md p-1 sm:p-1.5 rounded-2xl border border-slate-300/70 dark:border-slate-800 shadow-xs w-fit max-w-full select-none ${
+        isInitialMount.current ? 'no-transition' : ''
+      }`}
+      style={{
+        '--x': `${indicatorStyle.left}px`,
+        '--w': `${indicatorStyle.width}px`,
+        '--pill-opacity': indicatorStyle.width > 0 ? 1 : 0,
+      } as React.CSSProperties}
     >
-      {/* Sliding Pill Glider Indicator */}
-      <div
-        className={`
-          pointer-events-none absolute top-1 bottom-1 sm:top-1.5 sm:bottom-1.5 rounded-xl
-          bg-white dark:bg-[#166534]
-          shadow-[0_2px_10px_rgba(22,101,52,0.18)] dark:shadow-[0_4px_16px_rgba(16,185,129,0.35)]
-          border border-emerald-600/20 dark:border-amber-400/30
-          ${isInitialMount.current ? '' : 'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'}
-        `}
-        style={{
-          left: `${indicatorStyle.left}px`,
-          width: `${indicatorStyle.width}px`,
-          opacity: indicatorStyle.width > 0 ? 1 : 0,
-        }}
-      />
+      {/* Sliding Pill Highlight Indicator (#058) */}
+      <span className="u058-pill" aria-hidden="true" />
 
       {visibleTabs.map((tab) => {
         const isActive = activeNav === tab.key;
         const IconComponent = tab.icon;
         return (
-          <Tooltip key={tab.key} title={tab.label} placement="bottom" mouseEnterDelay={0.3}>
-            <Link
-              ref={(el) => {
-                tabRefs.current[tab.key] = el;
-              }}
+          <Link
+            key={tab.key}
+            ref={(el) => {
+              tabRefs.current[tab.key] = el;
+            }}
               to={tab.to}
-              className={`relative z-10 shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 2xl:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors duration-200 select-none ${
+              onClick={() => {
+                const el = tabRefs.current[tab.key];
+                const container = containerRef.current;
+                if (el && container) {
+                  const containerRect = container.getBoundingClientRect();
+                  const activeRect = el.getBoundingClientRect();
+                  const x = Math.round(activeRect.left - containerRect.left);
+                  const w = Math.round(activeRect.width);
+                  if (w > 0) {
+                    lastKnownPillCoords = { left: x, width: w };
+                    container.style.setProperty('--x', `${x}px`);
+                    container.style.setProperty('--w', `${w}px`);
+                    container.style.setProperty('--pill-opacity', '1');
+                    setIndicatorStyle({ left: x, width: w });
+                  }
+                }
+              }}
+              data-active={isActive ? 'true' : 'false'}
+              className={`u058-tab relative z-10 shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 2xl:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors duration-200 select-none ${
                 isActive
-                  ? 'text-[#166534] dark:text-white font-bold'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-[#166534] dark:hover:text-emerald-300'
+                  ? 'is-active !text-white font-bold'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
+              style={isActive ? { color: '#ffffff' } : undefined}
             >
               <IconComponent
                 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 transition-transform duration-300 ${
-                  isActive ? `scale-110 ${tab.activeColor}` : tab.inactiveColor
+                  isActive ? 'scale-110 !text-white' : tab.inactiveColor
                 }`}
+                style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
               />
-              <span className="hidden 2xl:inline whitespace-nowrap">{tab.label}</span>
-              <span className="hidden lg:inline 2xl:hidden whitespace-nowrap">{tab.shortLabel}</span>
+              <span
+                className="hidden 2xl:inline whitespace-nowrap"
+                style={isActive ? { color: '#ffffff' } : undefined}
+              >
+                {tab.label}
+              </span>
+              <span
+                className="hidden lg:inline 2xl:hidden whitespace-nowrap"
+                style={isActive ? { color: '#ffffff' } : undefined}
+              >
+                {tab.shortLabel}
+              </span>
             </Link>
-          </Tooltip>
         );
       })}
-    </div>
+    </nav>
   );
 };
 
@@ -249,7 +309,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
         >
           <BookOpen className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 mr-2" />
-          <span>Trung tâm thư viện số</span>
+          <span>Dữ liệu số</span>
         </Link>
 
         {user && user.user_id !== 'GUEST' && (
@@ -261,8 +321,8 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
           >
-            <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mr-2" />
-            <span>Đơn vị của tôi</span>
+            <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mr-2 shrink-0" />
+            <span className="truncate">{user.unit_name || 'Đơn vị của tôi'}</span>
           </Link>
         )}
 
@@ -451,70 +511,10 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
 
-        {/* Quick Nav Links (Nút bấm chuyển trang tiêu chuẩn trên Máy tính) */}
-        {(isStaff || isAdmin) && (
-          <Tooltip title="Đăng tải văn bản" placement="bottom" mouseEnterDelay={0.3}>
-            <Link
-              to={ROUTE_PATHS.DESK}
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
-                activeNav === 'desk'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              <UploadCloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="hidden xl:inline">Đăng tải</span>
-            </Link>
-          </Tooltip>
-        )}
-
-        <Tooltip title="Trung tâm thư viện số" placement="bottom" mouseEnterDelay={0.3}>
-          <Link
-            to={ROUTE_PATHS.PORTAL}
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
-              activeNav === 'portal'
-                ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="hidden 2xl:inline">Trung tâm thư viện số</span>
-            <span className="hidden xl:inline 2xl:hidden">Thư viện số</span>
-          </Link>
-        </Tooltip>
-
-        {user && user.user_id !== 'GUEST' && (
-          <Tooltip title="Đơn vị của tôi" placement="bottom" mouseEnterDelay={0.3}>
-            <Link
-              to={ROUTE_PATHS.MY_UNIT}
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
-                activeNav === 'myunit'
-                  ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-500/50 shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="hidden 2xl:inline">Đơn vị của tôi</span>
-              <span className="hidden xl:inline 2xl:hidden">Đơn vị</span>
-            </Link>
-          </Tooltip>
-        )}
-
-        {isAdmin && (
-          <Tooltip title="Trung tâm quản trị" placement="bottom" mouseEnterDelay={0.3}>
-            <Link
-              to={ROUTE_PATHS.ADMIN}
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold border transition whitespace-nowrap shrink-0 ${
-                activeNav === 'admin'
-                  ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/50 shadow-sm'
-                  : 'bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/40 dark:hover:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="hidden xl:inline">Quản trị</span>
-            </Link>
-          </Tooltip>
-        )}
+        {/* Cụm Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058) */}
+        <div className="hidden sm:flex items-center shrink-0">
+          <NavigationGlider activeNav={activeNav} />
+        </div>
 
         {/* Nút gạt chuyển đổi Máy tính / iPad Air M4 (Gọn trên Header) */}
         <div className="shrink-0">

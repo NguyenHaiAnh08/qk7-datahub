@@ -72,8 +72,8 @@ export const UserTable: React.FC<UserTableProps> = ({
                   key={u.user_id}
                   className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <td className="py-3 px-4 font-mono font-semibold whitespace-nowrap">
-                    <span className="font-mono text-xs px-2.5 py-1 rounded-md text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-bold tracking-wider inline-block">
+                  <td className="py-3 px-4 font-mono tabular-nums font-semibold whitespace-nowrap">
+                    <span className="font-mono tabular-nums text-xs px-2.5 py-1 rounded-md text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-bold tracking-wider inline-block">
                       {u.user_id}
                     </span>
                   </td>
@@ -93,7 +93,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                     <span
                       className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
                         (u.clearance_level_id || 1) >= 4
-                          ? 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30'
+                           ? 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30'
                           : (u.clearance_level_id || 1) === 3
                           ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30'
                           : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
@@ -117,7 +117,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                     {onEnrollFingerprint && (
                       <button
                         onClick={() => onEnrollFingerprint(u)}
-                        className={`p-1.5 rounded-lg mr-1.5 transition cursor-pointer ${
+                        className={`p-1.5 rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95 ${
                           u.has_fingerprint
                             ? 'bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 dark:border-emerald-800/50'
                             : 'bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/70 dark:text-amber-300 dark:border-amber-800/50'
@@ -133,21 +133,21 @@ export const UserTable: React.FC<UserTableProps> = ({
                     )}
                     <button
                       onClick={() => onEdit(u)}
-                      className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                      className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
                       title="Sửa thông tin"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => onUpdateCredentials(u)}
-                      className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-900/40 dark:hover:bg-amber-900/70 dark:text-amber-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                      className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-900/40 dark:hover:bg-amber-900/70 dark:text-amber-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
                       title="Cập nhật tài khoản & mật khẩu"
                     >
                       <KeyRound className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => onDelete(u)}
-                      className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                      className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                       title="Xóa người dùng"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

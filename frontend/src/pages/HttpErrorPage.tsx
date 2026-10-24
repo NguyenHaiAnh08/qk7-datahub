@@ -150,7 +150,7 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
             className="h-9 w-auto max-w-[38px] object-contain shrink-0 drop-shadow-sm"
           />
           <div>
-            <span className="block font-extrabold text-sm tracking-wider bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] dark:from-emerald-300 dark:to-emerald-400 bg-clip-text text-transparent">
+            <span className="block font-extrabold text-sm tracking-wider text-slate-900 dark:text-white">
               Trường Quân Sự Quân Khu 7
             </span>
             <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">
@@ -192,7 +192,7 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
                   icon={<HomeOutlined />}
                   size="large"
                   onClick={() => navigate(getDestinationByRole(user))}
-                  className="font-semibold shadow-md shadow-emerald-950/20 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] border border-amber-500/25 text-white px-6 h-11 rounded-xl"
+                  className="font-semibold bg-[#166534] hover:bg-[#15803d] border border-emerald-600/40 text-white px-6 h-11 rounded-xl transition-colors"
                 >
                   Về Khu Vực Làm Việc
                 </Button>

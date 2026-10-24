@@ -1,3 +1,4 @@
+/* <!-- Lucian UX/UI Prompt #025 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#025 --> */
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,6 +20,7 @@ import { isUserAdmin, getDestinationByRole } from '../../contexts/AuthContext';
 import { User } from '../../types/user';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../routes/routePaths';
+import { NotchedInput } from './NotchedInput';
 
 export interface LoginFormProps {
   onSuccess?: (user: User) => void;
@@ -84,11 +86,34 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   const [selectedRole, setSelectedRole] = useState<DemoRoleKey | null>(isDev ? 'admin' : null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+
+  // States quản lý lỗi và rung lắc (Shake UX #025) cho từng ô
+  const [usernameError, setUsernameError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [usernameShake, setUsernameShake] = useState(0);
+  const [passwordShake, setPasswordShake] = useState(0);
+
+  const handleUsernameChange = (val: string) => {
+    setUsername(val);
+    if (usernameError) setUsernameError('');
+    const upper = val.trim().toUpperCase();
+    if (upper === 'USR-001') setSelectedRole('admin');
+    else if (upper === 'USR-002') setSelectedRole('vanthu');
+    else if (upper === 'USR-003' || upper === 'USR-006') setSelectedRole('thutruong');
+    else if (upper === 'USR-004') setSelectedRole('thuky');
+    else if (upper === 'USR-005') setSelectedRole('canbo');
+    else setSelectedRole(null);
+  };
+
+  const handlePasswordChange = (val: string) => {
+    setPassword(val);
+    if (passwordError) setPasswordError('');
+  };
 
   const quickFillRole = (role: DemoRoleKey) => {
     setSelectedRole(role);
-    setErrorMessage('');
+    setUsernameError('');
+    setPasswordError('');
     const target = DEMO_ACCOUNTS[role];
     if (target) {
       setUsername(target.id);
@@ -99,12 +124,27 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) {
-      setErrorMessage('Vui lòng điền đầy đủ Mã định danh và Mật khẩu!');
+    let hasError = false;
+
+    // Kích hoạt rung lắc ngang nếu để trống tài khoản hoặc mật khẩu
+    if (!username.trim()) {
+      setUsernameError('Vui lòng nhập tài khoản quân nhân!');
+      setUsernameShake((prev) => prev + 1);
+      hasError = true;
+    }
+
+    if (!password.trim()) {
+      setPasswordError('Mật khẩu không được để trống!');
+      setPasswordShake((prev) => prev + 1);
+      hasError = true;
+    }
+
+    if (hasError) {
       return;
     }
 
-    setErrorMessage('');
+    setUsernameError('');
+    setPasswordError('');
     setLoading(true);
 
     try {
@@ -130,10 +170,31 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
         err?.name === 'TypeError' ||
         err?.message === 'Load failed' ||
         (err?.message && (err.message.includes('fetch') || err.message.includes('Load failed')));
-      const friendlyMsg = isLoadFailed
-        ? 'Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend đang chạy!'
-        : (err.message || 'Mã định danh hoặc mật khẩu không chính xác!');
-      setErrorMessage(friendlyMsg);
+      // Kích hoạt rung lắc và hiển thị dòng lỗi trượt mượt (.u025-help) trực tiếp dưới ô bị lỗi
+      const rawMsg = err?.message || '';
+      const isPasswordSpecific =
+        rawMsg.toLowerCase().includes('mật khẩu') || rawMsg.toLowerCase().includes('password');
+      const isUsernameSpecific =
+        rawMsg.toLowerCase().includes('tài khoản') ||
+        rawMsg.toLowerCase().includes('username') ||
+        rawMsg.toLowerCase().includes('mã định danh');
+
+      if (isPasswordSpecific && !isUsernameSpecific) {
+        setPasswordError(rawMsg || 'Mật khẩu không đúng. Vui lòng kiểm tra lại!');
+        setPasswordShake((prev) => prev + 1);
+      } else if (isUsernameSpecific && !isPasswordSpecific) {
+        setUsernameError(rawMsg || 'Tài khoản quân nhân không chính xác!');
+        setUsernameShake((prev) => prev + 1);
+      } else {
+        setUsernameError('Sai tài khoản hoặc mật khẩu quân nhân');
+        setPasswordError('Vui lòng kiểm tra lại thông tin mật khẩu');
+        setUsernameShake((prev) => prev + 1);
+        setPasswordShake((prev) => prev + 1);
+      }
+
+      if (isLoadFailed && onToast) {
+        onToast('Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend đang chạy!', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -175,77 +236,44 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
               </div>
             </div>
 
-            {/* Thông báo lỗi nếu có */}
-            <AnimatePresence>
-              {errorMessage && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center space-x-2 text-rose-600 dark:text-rose-400 text-xs font-medium"
-                >
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{errorMessage}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Input Mã định danh */}
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                Tài khoản quân nhân
-              </label>
-              <div className="relative rounded-xl shadow-xs">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                  <UserIcon className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setUsername(val);
-                    const upper = val.trim().toUpperCase();
-                    if (upper === 'USR-001') setSelectedRole('admin');
-                    else if (upper === 'USR-002') setSelectedRole('vanthu');
-                    else if (upper === 'USR-003' || upper === 'USR-006') setSelectedRole('thutruong');
-                    else if (upper === 'USR-004') setSelectedRole('thuky');
-                    else if (upper === 'USR-005') setSelectedRole('canbo');
-                    else setSelectedRole(null);
-                  }}
-                  placeholder="Nhập tài khoản quân nhân..."
-                  required
-                  className="block w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-xs font-sans"
-                />
-              </div>
-            </div>
+            {/* Input Tài khoản quân nhân */}
+            <NotchedInput
+              id="username-split"
+              label="Tài khoản quân nhân"
+              value={username}
+              onChange={handleUsernameChange}
+              icon={<UserIcon className="w-4 h-4" />}
+              errorMessage={usernameError}
+              shakeKey={usernameShake}
+              isValid={username.trim().length >= 4}
+              compact={true}
+              required
+            />
 
             {/* Input Mật khẩu */}
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                Mật khẩu
-              </label>
-              <div className="relative rounded-xl shadow-xs">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Nhập mật khẩu..."
-                  required
-                  className="block w-full pl-9 pr-9 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-xs"
-                />
+            <NotchedInput
+              id="password-split"
+              label="Mật khẩu"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={handlePasswordChange}
+              icon={<Lock className="w-4 h-4" />}
+              rightElement={
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 >
                   {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
-              </div>
-            </div>
+              }
+              errorMessage={passwordError}
+              shakeKey={passwordShake}
+              isValid={password.length >= 6}
+              compact={true}
+              required
+            />
 
             {/* Nút Đăng nhập */}
             <button
@@ -399,74 +427,42 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   // ══════════════════════════════════════════════════════════════════════
   return (
     <form onSubmit={handleLoginSubmit} className="space-y-4">
-      <AnimatePresence>
-        {errorMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center space-x-3 text-rose-600 dark:text-rose-400 text-xs font-medium"
-          >
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{errorMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Input Tài khoản quân nhân */}
+      <NotchedInput
+        id="username-vertical"
+        label="Tài khoản quân nhân"
+        value={username}
+        onChange={handleUsernameChange}
+        icon={<UserIcon className="w-4.5 h-4.5" />}
+        errorMessage={usernameError}
+        shakeKey={usernameShake}
+        isValid={username.trim().length >= 4}
+        required
+      />
 
-      <div>
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-          Tài khoản quân nhân
-        </label>
-        <div className="relative rounded-xl shadow-sm">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-            <UserIcon className="w-5 h-5" />
-          </div>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => {
-              const val = e.target.value;
-              setUsername(val);
-              const upper = val.trim().toUpperCase();
-              if (upper === 'USR-001') setSelectedRole('admin');
-              else if (upper === 'USR-002') setSelectedRole('vanthu');
-              else if (upper === 'USR-003' || upper === 'USR-006') setSelectedRole('thutruong');
-              else if (upper === 'USR-004') setSelectedRole('thuky');
-              else if (upper === 'USR-005') setSelectedRole('canbo');
-              else setSelectedRole(null);
-            }}
-            placeholder="Nhập tài khoản quân nhân..."
-            required
-            className="block w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-sm transition-all font-sans"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-          Mật khẩu
-        </label>
-        <div className="relative rounded-xl shadow-sm">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-            <Lock className="w-5 h-5" />
-          </div>
-          <input
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Nhập mật khẩu..."
-            required
-            className="block w-full pl-10 pr-10 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-sm transition-all"
-          />
+      {/* Input Mật khẩu */}
+      <NotchedInput
+        id="password-vertical"
+        label="Mật khẩu"
+        type={showPassword ? 'text' : 'password'}
+        value={password}
+        onChange={handlePasswordChange}
+        icon={<Lock className="w-4.5 h-4.5" />}
+        rightElement={
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
           >
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
-        </div>
-      </div>
+        }
+        errorMessage={passwordError}
+        shakeKey={passwordShake}
+        isValid={password.length >= 6}
+        required
+      />
 
       {/* Quick Fill Demo Roles - 5 Roles: Cán bộ, Thủ trưởng, Admin, Văn thư, Thư ký */}
       <div className="space-y-2 pt-1">

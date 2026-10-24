@@ -98,6 +98,7 @@ export const documentService = {
     if (type) searchParams.append('type', type);
     const unit = params.unit || params.issuing_unit_id;
     if (unit) searchParams.append('unit', unit);
+    if (params.include_children) searchParams.append('include_children', 'true');
     if (params.from) searchParams.append('from', params.from);
     if (params.to) searchParams.append('to', params.to);
     const lv = params.lv ?? params.security_level_id;

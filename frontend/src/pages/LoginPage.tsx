@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HelpCircle, X } from 'lucide-react';
 import { LoginForm } from '../components/auth/LoginForm';
-import { Toast, ToastState } from '../components/common/Toast';
+import { Toast, ToastState, toast } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { DeviceModeSwitch } from '../components/common/DeviceModeSwitch';
 import { User } from '../types/user';
@@ -23,11 +23,6 @@ export const LoginPage: React.FC = () => {
   const isIPadLandscape = deviceMode === 'ipad' && orientation === 'landscape';
 
   const [showSupportModal, setShowSupportModal] = useState(false);
-  const [toast, setToast] = useState<ToastState>({
-    show: false,
-    message: '',
-    type: 'success',
-  });
 
   // Nếu user đã đăng nhập hợp lệ, tự động chuyển về trang tương ứng theo Role
   useEffect(() => {
@@ -62,18 +57,23 @@ export const LoginPage: React.FC = () => {
   }, [isAuthenticated, user, navigate, location.state]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast((prev) => ({ ...prev, show: false }));
-    }, 3000);
+    if (type === 'error') toast.error(message);
+    else if (type === 'info') toast.info(message);
+    else toast.success(message);
   };
 
   const handleLoginSuccess = (loggedInUser: User) => {
+    toast.success(`Chào mừng đồng chí ${loggedInUser.full_name || loggedInUser.user_id} đã đăng nhập thành công vào Trung Tâm Dữ Liệu Số.`, {
+      title: 'XÁC THỰC THÀNH CÔNG',
+      badge: loggedInUser.clearance_name || `CẤP ${loggedInUser.clearance_level_id || 1}`,
+      duration: 4000,
+    });
+
     // Khi đăng nhập Admin thì vô thẳng admin-dashboard luôn
     if (isUserAdmin(loggedInUser)) {
       setTimeout(() => {
         navigate(ROUTE_PATHS.ADMIN, { replace: true });
-      }, 400);
+      }, 500);
       return;
     }
 
@@ -127,7 +127,7 @@ export const LoginPage: React.FC = () => {
             className="h-8 sm:h-9 w-auto object-contain shrink-0 drop-shadow-sm"
           />
           <div>
-            <span className="block font-extrabold text-sm tracking-wider bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 dark:from-white dark:via-slate-100 dark:to-amber-400 bg-clip-text text-transparent whitespace-nowrap">
+            <span className="block font-extrabold text-sm tracking-wider text-slate-900 dark:text-white whitespace-nowrap">
               Trường Quân Sự Quân Khu 7
             </span>
             <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wider uppercase">
@@ -235,8 +235,6 @@ export const LoginPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Toast */}
-      <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
     </div>
   );
 };

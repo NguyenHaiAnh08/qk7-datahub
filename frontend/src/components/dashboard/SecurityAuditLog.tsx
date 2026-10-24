@@ -581,7 +581,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
               if (showToast) showToast('Đã làm mới dữ liệu nhật ký an ninh!', 'success');
             }}
             disabled={loading || isRefreshing}
-            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:border-slate-800 dark:text-slate-300 rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
+            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:border-slate-800 dark:text-slate-300 rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50 btn-tactile active:scale-95"
             title="Làm mới ngay"
           >
             <RotateCw className={`w-4 h-4 ${isRefreshing || loading ? 'animate-spin text-emerald-600 dark:text-emerald-400' : ''}`} />
@@ -591,7 +591,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
           <button
             onClick={handleExportExcel}
             disabled={isExporting}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] disabled:opacity-60 text-white text-xs font-semibold rounded-xl transition shadow-md shadow-emerald-950/20 cursor-pointer border border-amber-500/25"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] disabled:opacity-60 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-emerald-950/20 cursor-pointer border border-amber-500/25 btn-tactile active:scale-95"
             title="Xuất file báo cáo Excel (.xlsx) chuẩn Quân đội"
           >
             <Download className={`w-3.5 h-3.5 ${isExporting ? 'animate-bounce' : ''}`} />
@@ -866,7 +866,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                       }`}
                     >
                       {/* Cột THỜI GIAN */}
-                      <td className="py-3 px-4 whitespace-nowrap font-mono">
+                      <td className="py-3 px-4 whitespace-nowrap font-mono tabular-nums">
                         <div className={`font-bold text-xs ${isAlert ? 'text-rose-700 dark:text-red-300' : 'text-slate-800 dark:text-slate-200'}`}>
                           {timeFormatted}
                         </div>
@@ -895,7 +895,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                           {/* User ID Badge */}
                           {l.user_id && (
                             <span
-                              className={`font-mono text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap shadow-2xs font-semibold ${
+                              className={`font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap shadow-2xs font-semibold ${
                                 isAlert
                                   ? 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-red-900/40 dark:text-rose-300 dark:border-red-500/30'
                                   : 'text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25'
@@ -918,7 +918,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                       </td>
 
                       {/* Cột ĐỊA CHỈ IP */}
-                      <td className="py-3 px-4 whitespace-nowrap font-mono text-xs">
+                      <td className="py-3 px-4 whitespace-nowrap font-mono tabular-nums text-xs">
                         {isLocalhost ? (
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] ${

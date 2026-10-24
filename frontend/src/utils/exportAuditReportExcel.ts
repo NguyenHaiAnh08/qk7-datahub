@@ -10,7 +10,7 @@ import { extractTargets, getActionCategory } from '../components/dashboard/Secur
  * - A1:D1: PHÒNG THAM MƯU HÀNH CHÍNH | E1:I1: CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
  * - A2:D2: TỔ CÔNG NGHỆ THÔNG TIN   | E2:I2: Độc lập - Tự do - Hạnh phúc
  * - A3:D3: Số: ……/BC-CNTT           | E3:I3: Thành phố Hồ Chí Minh, ngày ... tháng ... năm ...
- * - A5:I5: NHẬT KÝ HOẠT ĐỘNG - THƯ VIỆN SỐ (Tiêu đề lớn)
+ * - A5:I5: NHẬT KÝ HOẠT ĐỘNG - DỮ LIỆU SỐ (Tiêu đề lớn)
  * - Row 6: Tiêu đề các cột (Nền cam vàng #FFC000, viền mảnh, căn giữa)
  * - Row 7+: Dữ liệu nhật ký
  * - Footer: NGƯỜI LẬP -> Thiếu tá QNCN Nguyễn Mạnh Nam
@@ -96,7 +96,7 @@ export async function exportAuditReportExcel(logs: AccessLog[]): Promise<void> {
   // ─── ROW 5: TIÊU ĐỀ BÁO CÁO ───
   worksheet.mergeCells('A5:I5');
   const cellA5 = worksheet.getCell('A5');
-  cellA5.value = 'NHẬT KÝ HOẠT ĐỘNG - THƯ VIỆN SỐ';
+  cellA5.value = 'NHẬT KÝ HOẠT ĐỘNG - DỮ LIỆU SỐ';
   cellA5.font = { name: 'Times New Roman', size: 14, bold: true };
   cellA5.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(5).height = 28;

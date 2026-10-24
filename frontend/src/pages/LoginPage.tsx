@@ -12,6 +12,8 @@ import { useAuth } from '../hooks/useAuth';
 import { getDestinationByRole, isUserAdmin } from '../contexts/AuthContext';
 
 import { useDeviceMode } from '../contexts/DeviceModeContext';
+import { TechVideoBackground } from '../components/auth/TechVideoBackground';
+import { DongSonDrumBackground } from '../components/auth/DongSonDrumBackground';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -102,29 +104,21 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
-      {/* Background Military Grid: Loại bỏ ở chế độ sáng theo yêu cầu, chỉ giữ lại ở Dark Mode */}
-      <div className="absolute inset-0 hidden dark:block dark:bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none"></div>
-      <div className="absolute top-0 -left-40 w-96 h-96 bg-emerald-500/10 dark:bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-0 -right-40 w-96 h-96 bg-amber-500/10 dark:bg-amber-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      {/* ══════════════════════════════════════════════════════════════════
+          LỚP z-0 (ĐÁY): THẺ VIDEO NỀN CÔNG NGHỆ CHẠY VÒNG LẶP (HTML5 VIDEO)
+          ══════════════════════════════════════════════════════════════════ */}
+      <TechVideoBackground />
 
-      {/* Rotating Bronze Drum Watermark — Nằm chìm phía sau khung đăng nhập chính */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0 select-none">
-        <div className="relative w-[680px] h-[680px] sm:w-[840px] sm:h-[840px] md:w-[1020px] md:h-[1020px] lg:w-[1180px] lg:h-[1180px] xl:w-[1280px] xl:h-[1280px] shrink-0 flex items-center justify-center">
-          {/* Vầng sáng vàng đồng trang nghiêm */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/15 via-yellow-600/10 to-amber-400/5 dark:from-amber-500/10 dark:via-yellow-500/5 dark:to-transparent blur-3xl scale-95 pointer-events-none" />
+      {/* ══════════════════════════════════════════════════════════════════
+          LỚP z-10 (GIỮA): TRỐNG ĐỒNG ĐÔNG SƠN & BẢN ĐỒ CHỮ S VIỆT NAM
+          ══════════════════════════════════════════════════════════════════ */}
+      <DongSonDrumBackground />
 
-          {/* Hình ảnh Trống đồng xoay chậm 120s mượt mà */}
-          <img
-            src="/bronze-drum.png"
-            alt="Họa tiết Trống đồng Quân khu 7"
-            className="w-full h-full object-contain animate-spin-slow select-none opacity-25 sm:opacity-28 dark:opacity-12 sm:dark:opacity-15 sepia-[0.35] brightness-[0.88] contrast-[1.15] dark:sepia-[0.35] dark:brightness-[0.95] dark:contrast-[1.25] drop-shadow-[0_0_40px_rgba(212,175,55,0.22)]"
-            style={{ willChange: 'transform' }}
-          />
-        </div>
-      </div>
-
+      {/* ══════════════════════════════════════════════════════════════════
+          LỚP z-20 (TRÊN CÙNG): TOP BAR, KHUNG ĐĂNG NHẬP (LOGIN CARD) & UI
+          ══════════════════════════════════════════════════════════════════ */}
       {/* Top Bar */}
-      <div className="relative z-10 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md">
+      <div className="relative z-20 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md">
         <div className="flex items-center space-x-2.5 select-none">
           <img
             src="/Logo_QSQK7.png"
@@ -156,7 +150,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Center Login Card — Hỗ trợ 2 Cột Ngang cho iPad Landscape (1210 x 802) */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-4 sm:py-6 min-h-0">
+      <div className="relative z-20 flex-1 flex items-center justify-center px-4 py-4 sm:py-6 min-h-0">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -193,7 +187,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <footer className="relative z-10 px-6 py-4 border-t border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md flex items-center justify-center text-[11px] text-slate-500 text-center">
+      <footer className="relative z-20 px-6 py-4 border-t border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md flex items-center justify-center text-[11px] text-slate-500 text-center">
         <div>Bản quyền © 2026 Trường Quân sự Quân khu 7.</div>
       </footer>
 

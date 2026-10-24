@@ -135,6 +135,7 @@ export const AdminDashboardPage: React.FC = () => {
     : (sidebarCollapsed ? 'w-[76px]' : 'w-[260px]');
 
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [overviewRefreshKey, setOverviewRefreshKey] = useState(0);
 
   const tabStripRef = React.useRef<HTMLDivElement>(null);
 
@@ -658,6 +659,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
                 <button
                   onClick={async () => {
+                    setOverviewRefreshKey((prev) => prev + 1);
                     await loadStats();
                     showToast('Đã làm mới dữ liệu tổng quan!', 'success');
                   }}
@@ -683,6 +685,7 @@ export const AdminDashboardPage: React.FC = () => {
                   icon={<Users className="w-6 h-6" />}
                   color="blue"
                   subtext="Đã kích hoạt trên hệ thống"
+                  refreshKey={overviewRefreshKey}
                 />
                 <StatCard
                   label="Văn bản & Tài liệu"
@@ -691,6 +694,7 @@ export const AdminDashboardPage: React.FC = () => {
                   color="emerald"
                   subtext="Lưu trữ trong kho số"
                   delay={0.05}
+                  refreshKey={overviewRefreshKey}
                 />
                 <StatCard
                   label="Tổng dung lượng tệp"
@@ -699,6 +703,7 @@ export const AdminDashboardPage: React.FC = () => {
                   color="amber"
                   subtext="Ổ đĩa dữ liệu an toàn"
                   delay={0.1}
+                  refreshKey={overviewRefreshKey}
                 />
                 <StatCard
                   label="Truy cập nhật ký 24h"
@@ -707,6 +712,7 @@ export const AdminDashboardPage: React.FC = () => {
                   color="red"
                   subtext="Bản ghi kiểm toán an ninh"
                   delay={0.15}
+                  refreshKey={overviewRefreshKey}
                 />
               </div>
 
@@ -729,6 +735,7 @@ export const AdminDashboardPage: React.FC = () => {
                     label: x.lvName,
                     count: x.n,
                   }))}
+                  refreshKey={overviewRefreshKey}
                 />
                 <DistributionChart
                   title="Phân Bố Tài Liệu Theo Thể Loại Văn Bản"
@@ -739,6 +746,7 @@ export const AdminDashboardPage: React.FC = () => {
                     label: t.name,
                     count: t.n,
                   }))}
+                  refreshKey={overviewRefreshKey}
                 />
               </div>
             </div>
@@ -852,7 +860,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {rolesList.map((r) => (
                         <tr key={r.role_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.role_id}</td>
+                          <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{r.role_id}</td>
                           <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <button
@@ -860,14 +868,14 @@ export const AdminDashboardPage: React.FC = () => {
                                 setGenericFormData({ ...r });
                                 setGenericModal({ open: true, type: 'roles', item: r });
                               }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
                               title="Sửa vai trò"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                               title="Xóa vai trò"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -918,13 +926,13 @@ export const AdminDashboardPage: React.FC = () => {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {permsList.map((p) => (
                         <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.permission_id}</td>
+                          <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{p.permission_id}</td>
                           <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name || p.code || p.permission_id}</td>
                           <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <button
                               onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                               title="Xóa quyền"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -995,7 +1003,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {docTypesList.map((dt) => (
                         <tr key={dt.type_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{dt.type_id}</td>
+                          <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{dt.type_id}</td>
                           <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{dt.name}</td>
                           <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{dt.description || '—'}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -1004,14 +1012,14 @@ export const AdminDashboardPage: React.FC = () => {
                                 setGenericFormData({ ...dt });
                                 setGenericModal({ open: true, type: 'doctypes', item: dt });
                               }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
                               title="Sửa loại văn bản"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleGenericDelete('doctypes', dt.type_id, dt.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                               title="Xóa loại văn bản"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1061,8 +1069,8 @@ export const AdminDashboardPage: React.FC = () => {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {levelsList.map((lvl) => (
                         <tr key={lvl.level_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-bold">Cấp {lvl.level_id}</td>
-                          <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{lvl.code}</td>
+                          <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-bold">Cấp {lvl.level_id}</td>
+                          <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-mono tabular-nums">{lvl.code}</td>
                           <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{lvl.name}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <button
@@ -1070,14 +1078,14 @@ export const AdminDashboardPage: React.FC = () => {
                                 setGenericFormData({ ...lvl });
                                 setGenericModal({ open: true, type: 'levels', item: lvl });
                               }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
                               title="Sửa mức bảo mật"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleGenericDelete('levels', lvl.level_id, lvl.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                               title="Xóa mức bảo mật"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1137,9 +1145,9 @@ export const AdminDashboardPage: React.FC = () => {
                       ) : (
                         ranksList.map((r) => (
                           <tr key={r.rank_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.rank_id}</td>
+                            <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{r.rank_id}</td>
                             <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
-                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{r.sort_order ?? 0}</td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-mono tabular-nums">{r.sort_order ?? 0}</td>
                             <td className="py-3 px-4">
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
@@ -1157,14 +1165,14 @@ export const AdminDashboardPage: React.FC = () => {
                                   setGenericFormData({ ...r });
                                   setGenericModal({ open: true, type: 'ranks', item: r });
                                 }}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
                                 title="Sửa cấp bậc"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleGenericDelete('ranks', r.rank_id, r.name)}
-                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                                 title="Xóa cấp bậc"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1225,9 +1233,9 @@ export const AdminDashboardPage: React.FC = () => {
                       ) : (
                         positionsList.map((p) => (
                           <tr key={p.position_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.position_id}</td>
+                            <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{p.position_id}</td>
                             <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name}</td>
-                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.sort_order ?? 0}</td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-mono tabular-nums">{p.sort_order ?? 0}</td>
                             <td className="py-3 px-4">
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
@@ -1245,14 +1253,14 @@ export const AdminDashboardPage: React.FC = () => {
                                   setGenericFormData({ ...p });
                                   setGenericModal({ open: true, type: 'positions', item: p });
                                 }}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
                                 title="Sửa chức vụ"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleGenericDelete('positions', p.position_id, p.name)}
-                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                                 title="Xóa chức vụ"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />

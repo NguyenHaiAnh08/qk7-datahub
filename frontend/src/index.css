@@ -5,6 +5,9 @@
 @layer base {
   :root {
     color-scheme: light;
+    --ux-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+    --ux-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ux-tactile: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   :root.dark {
@@ -19,12 +22,25 @@
 
   html,
   body,
-  input,
-  button,
+  input:not(.font-mono):not([class*="font-mono"]),
+  button:not(.font-mono):not([class*="font-mono"]),
   select,
   textarea,
   optgroup {
     font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre,
+  .font-mono,
+  [class*="font-mono"] {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
   body {
@@ -111,9 +127,10 @@
 .gold-gradient-btn:hover {
   background: linear-gradient(135deg, #f59e0b 0%, #d4af37 100%);
   box-shadow: 0 4px 20px -2px rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
 }
 .gold-gradient-btn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 /* Emerald Gradient Buttons */
@@ -126,6 +143,29 @@
 .emerald-gradient-btn:hover {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   box-shadow: 0 4px 20px -2px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+}
+.emerald-gradient-btn:active {
+  transform: scale(0.97);
+}
+
+/* Tactile Micro-Interactions (Lucian Physics & Taste-Skill) */
+.btn-tactile {
+  transition: transform 0.15s cubic-bezier(0.34, 1.45, 0.64, 1), box-shadow 0.15s ease, background-color 0.15s ease;
+  will-change: transform;
+}
+.btn-tactile:hover {
+  transform: translateY(-1px);
+}
+.btn-tactile:active {
+  transform: scale(0.97);
+}
+
+.command-card {
+  transition: transform 0.22s cubic-bezier(0.34, 1.45, 0.64, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.command-card:hover {
+  transform: translateY(-2px);
 }
 
 /* Ambient glow background */
@@ -1365,6 +1405,235 @@ html.dark .ant-input::placeholder {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #058 · Sliding Highlight Pill Navigation
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#058
+   ══════════════════════════════════════════════════════════════════════ */
+.u058-nav {
+  --x: 0px;
+  --w: 0px;
+  --pill-opacity: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.u058-nav a,
+.u058-nav a:link,
+.u058-nav a:visited {
+  text-decoration: none;
+}
+
+/* Đảm bảo tab ĐANG CHỌN (Active) luôn hiển thị chữ TRẮNG TUYỆT ĐỐI trên nền xanh quân đội #166534 */
+/* Ngăn chặn triệt để Ant Design a { color: #166534 } hoặc a:hover đè màu làm chìm chữ */
+.u058-nav a.is-active,
+.u058-nav a.is-active:hover,
+.u058-nav a.is-active:focus,
+.u058-nav a[data-active="true"],
+.u058-nav a[data-active="true"]:hover,
+.u058-nav a[data-active="true"]:focus,
+.u058-nav a.is-active span,
+.u058-nav a[data-active="true"] span {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45) !important;
+}
+
+.u058-nav a.is-active svg,
+.u058-nav a.is-active:hover svg,
+.u058-nav a[data-active="true"] svg,
+.u058-nav a[data-active="true"]:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) !important;
+}
+
+.u058-pill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--w, 60px);
+  transform: translateX(var(--x, 0px));
+  opacity: var(--pill-opacity, 0);
+  transition: transform 0.45s cubic-bezier(0.34, 1.45, 0.64, 1),
+              width 0.45s cubic-bezier(0.34, 1.45, 0.64, 1),
+              opacity 0.2s ease;
+  will-change: transform, width;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 999px;
+  background-color: #166534; /* Xanh Lục Quân chủ đạo */
+  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.3), 0 2px 10px rgba(22, 101, 52, 0.25);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+:root.dark .u058-pill,
+html.dark .u058-pill {
+  background-color: #166534;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+  border: 1px solid rgba(251, 191, 36, 0.35); /* Viền ánh Vàng Kim Quân Hiệu */
+}
+
+@media (min-width: 640px) {
+  .u058-pill {
+    top: 6px;
+    bottom: 6px;
+  }
+}
+
+.u058-nav.no-transition .u058-pill {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u058-pill {
+    transition: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #004 · Compact Progress Download Button
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#004
+   ══════════════════════════════════════════════════════════════════════ */
+.u004-btn {
+  --ux-mint: #10b981;
+  --bar: linear-gradient(90deg, #166534, #10b981, #22c3a6);
+  --p: 0%;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  isolation: isolate;
+  transition: transform 0.25s cubic-bezier(0.34, 1.45, 0.64, 1),
+              box-shadow 0.25s ease,
+              border-color 0.25s ease,
+              width 0.25s ease;
+}
+
+.u004-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.u004-btn.is-fold {
+  transform: scale(0.92);
+  transition: transform 0.28s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.u004-track {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.u004-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--p, 0%);
+  background: var(--bar);
+  border-radius: inherit;
+  transition: width 0.1s linear;
+}
+
+.u004-shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: u004-shine 1.4s infinite linear;
+}
+
+@keyframes u004-shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260px); }
+}
+
+.u004-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.u004-check {
+  animation: u004-pop-check 0.4s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+@keyframes u004-pop-check {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  70% { transform: scale(1.2) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u004-btn,
+  .u004-btn.is-fold,
+  .u004-bar,
+  .u004-shine,
+  .u004-check {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Lucian UX/UI Prompt #098 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#098 */
+.u098-num {
+  --row-h: 1.15em;
+  display: inline-flex;
+  align-items: flex-start;
+  height: var(--row-h);
+  line-height: var(--row-h);
+  overflow: hidden;
+  vertical-align: baseline;
+  -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.u098-col {
+  display: inline-flex;
+  flex-direction: column;
+  transform: translateY(calc(var(--d, 0) * -1 * var(--row-h)));
+  transition: transform 0.9s cubic-bezier(0.3, 1.25, 0.5, 1);
+  transition-delay: calc(var(--i, 0) * 45ms);
+  will-change: transform;
+}
+
+.u098-col > span {
+  height: var(--row-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.u098-sym {
+  display: inline-flex;
+  align-items: center;
+  height: var(--row-h);
+  white-space: pre;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u098-col {
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+
+
 
 
 

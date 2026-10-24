@@ -51,28 +51,28 @@ export const SecurityBanner: React.FC<SecurityBannerProps> = ({ user, onOpenPoli
   const badgeInfo = getLevelBadge();
 
   return (
-    <div className="bg-white dark:bg-gradient-to-r dark:from-slate-900 dark:via-slate-900/90 dark:to-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm transition-colors duration-200">
+    <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-colors duration-200">
       <div className="flex items-center space-x-3.5">
-        <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-emerald-600/10 dark:bg-emerald-500/10 border border-emerald-600/20 dark:border-emerald-500/25 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
           {level >= 3 ? (
-            <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            <ShieldCheck className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
           ) : (
-            <Lock className="w-6 h-6 text-slate-400" />
+            <Lock className="w-5 h-5 text-slate-500 dark:text-slate-400" />
           )}
         </div>
         <div>
           <div className="flex items-center space-x-2">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              Phạm Vi Tra Cứu Tài Liệu Quân Sự
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
+              Phạm vi tra cứu tài liệu quân sự
             </h3>
             <span
-              className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${badgeInfo.badgeClass}`}
+              className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeInfo.badgeClass}`}
             >
               {badgeInfo.title}
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {badgeInfo.desc} • Mọi thao tác tải về và sao chép đều được ghi nhật ký hệ thống.
+            {badgeInfo.desc} • Mọi thao tác đều được kiểm toán và ghi nhận nhật ký an ninh.
           </p>
         </div>
       </div>

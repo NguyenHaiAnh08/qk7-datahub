@@ -13,6 +13,7 @@ import {
 import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
+import { TacticalEmptyState } from '../common/TacticalEmptyState';
 
 export interface DocumentTableProps {
   documents: DocumentItem[];
@@ -21,6 +22,8 @@ export interface DocumentTableProps {
   currentPage: number;
   totalPages: number;
   totalItems: number;
+  searchQuery?: string;
+  onClearFilters?: () => void;
   onPageChange: (page: number) => void;
   onPreview: (doc: DocumentItem) => void;
   onDownload: (doc: DocumentItem) => void;
@@ -35,6 +38,8 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   currentPage,
   totalPages,
   totalItems,
+  searchQuery,
+  onClearFilters,
   onPageChange,
   onPreview,
   onDownload,
@@ -81,17 +86,24 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               </tr>
             ) : documents.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                  Không tìm thấy tài liệu nào phù hợp với bộ lọc
+                <td colSpan={8} className="py-6 text-center">
+                  <TacticalEmptyState
+                    title="Không tìm thấy tài liệu phù hợp với bộ lọc"
+                    description="Không có tài liệu nào khớp với từ khóa tìm kiếm hoặc bộ lọc văn bản hiện tại."
+                    searchQuery={searchQuery}
+                    onClearFilters={onClearFilters}
+                    compact
+                  />
                 </td>
               </tr>
             ) : (
-              documents.map((doc) => {
+              documents.map((doc, idx) => {
                 const isRestricted = (doc.security_level_id || 1) > userClearanceLevel;
 
                 return (
                   <tr
                     key={doc.file_id}
+                    id={idx === 0 ? 'tour-document-card' : undefined}
                     className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                   >
                     <td className="py-3 px-4 whitespace-nowrap">

@@ -1023,6 +1023,65 @@ html.dark .ant-input::placeholder {
   color: #64748b !important;
 }
 
+/* Ant Design Dropdown / Select popup & Popover trong Dark Mode */
+html.dark .ant-select-dropdown {
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .ant-select-item {
+  color: #cbd5e1 !important;
+}
+
+html.dark .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  color: #34d399 !important;
+  font-weight: 600;
+}
+
+html.dark .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   NATIVE SELECT & OPTION TRONG DARK MODE & LIGHT MODE
+   Khắc phục triệt để lỗi White-on-White của dropdown options trên Chromium/Windows
+   ───────────────────────────────────────────────────────────── */
+select {
+  color-scheme: light;
+}
+
+select option,
+select optgroup {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+html.dark select,
+.dark select,
+[data-theme='dark'] select {
+  color-scheme: dark !important;
+}
+
+html.dark select option,
+html.dark select optgroup,
+.dark select option,
+.dark select optgroup,
+[data-theme='dark'] select option,
+[data-theme='dark'] select optgroup {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+html.dark select option:checked,
+.dark select option:checked,
+[data-theme='dark'] select option:checked {
+  background-color: #166534 !important;
+  color: #ffffff !important;
+}
+
 /* Drawer navigation trên iPad */
 .qk7-sidebar-drawer .ant-drawer-body {
   padding: 0 !important;

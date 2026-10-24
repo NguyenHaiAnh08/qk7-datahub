@@ -271,14 +271,35 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Nội dung Popover User Profile cho iPad và Desktop
   const userPopoverContent = (
-    <div className="w-64 p-1 text-slate-800 dark:text-slate-200 text-xs">
-      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-            {user?.user_id || 'Tài khoản'}
-          </span>
+    <div className="w-72 p-1 text-slate-800 dark:text-slate-200 text-xs">
+      <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider shrink-0">
+              {user?.user_id || 'Tài khoản'}
+            </span>
+            {isOnline ? (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 select-none shrink-0"
+                title="Kết nối máy chủ LAN cổng 8000 ổn định"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                <span>Đang trực tuyến</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => checkConnection()}
+                className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-rose-700 dark:text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded border border-rose-500/40 animate-pulse cursor-pointer select-none shrink-0"
+                title="Mất kết nối máy chủ LAN. Bấm để thử kết nối lại!"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
+                <span>Mất kết nối</span>
+              </button>
+            )}
+          </div>
           <span
-            className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+            className={`text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 ${
               (user?.clearance_level_id || 1) >= 4
                 ? 'bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30'
                 : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
@@ -287,7 +308,7 @@ export const Header: React.FC<HeaderProps> = ({
             {user?.clearance_name || 'Công khai'}
           </span>
         </div>
-        <div className="font-bold text-slate-900 dark:text-white mt-1 text-sm">
+        <div className="font-bold text-slate-900 dark:text-white mt-1.5 text-sm">
           {user?.full_name || 'Khách tra cứu'}
         </div>
         {(user?.rank_name || user?.position) && (
@@ -296,7 +317,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
         {user?.unit_name && (
-          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
+          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 font-medium">
             {user.unit_name}
           </div>
         )}
@@ -421,16 +442,8 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Cụm Phải (shrink-0 z-20 flex items-center gap-1.5 sm:gap-2): Switch + Theme + User Profile Pill */}
         <div id="tour-header-controls-ipad" className="shrink-0 z-20 flex items-center gap-1.5 sm:gap-2">
-          {/* Live Indicator Trạng Thái Kết Nối */}
-          {isOnline ? (
-            <div
-              className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-mono shrink-0 select-none"
-              title="Máy chủ LAN hoạt động bình thường"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-              <span>Trực tuyến</span>
-            </div>
-          ) : (
+          {/* Live Indicator Trạng Thái Kết Nối - Chỉ cảnh báo khi mất kết nối máy chủ */}
+          {!isOnline && (
             <button
               type="button"
               onClick={() => checkConnection()}
@@ -459,7 +472,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
             >
               <div
-                className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
+                className="relative w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
               >
                 <span
                   className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
@@ -467,6 +480,12 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {user?.full_name ? user.full_name[0].toUpperCase() : 'K'}
                 </span>
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-white dark:ring-slate-800 ${
+                    isOnline ? 'bg-emerald-500' : 'bg-rose-500'
+                  }`}
+                  title={isOnline ? 'Đang trực tuyến' : 'Mất kết nối máy chủ'}
+                />
               </div>
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap leading-none">
                 {user?.full_name || 'Khách'}
@@ -527,16 +546,8 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Vùng Phải: Quick Nav Links & Controls */}
       <div id="tour-header-controls" className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0 z-20">
-        {/* Live Network Indicator */}
-        {isOnline ? (
-          <div
-            className="hidden xl:flex items-center space-x-1.5 text-xs font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 shrink-0 select-none"
-            title="Kết nối máy chủ LAN cổng 8000 trực tuyến ổn định"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            <span>Đang trực tuyến</span>
-          </div>
-        ) : (
+        {/* Live Network Indicator - Chỉ hiển thị nút cảnh báo nếu mất kết nối máy chủ (trạng thái bình thường chuyển vào bản thông tin user để tiết kiệm diện tích khung hình) */}
+        {!isOnline && (
           <button
             type="button"
             onClick={() => checkConnection()}
@@ -586,7 +597,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
             >
               <div
-                className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
+                className="relative w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
               >
                 <span
                   className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
@@ -594,6 +605,12 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {user?.full_name ? user.full_name[0].toUpperCase() : 'K'}
                 </span>
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-800 ${
+                    isOnline ? 'bg-emerald-500' : 'bg-rose-500'
+                  }`}
+                  title={isOnline ? 'Đang trực tuyến' : 'Mất kết nối máy chủ'}
+                />
               </div>
               <div className="text-left hidden md:block whitespace-nowrap">
                 <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">

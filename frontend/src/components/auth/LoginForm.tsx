@@ -96,6 +96,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   const handleUsernameChange = (val: string) => {
     setUsername(val);
     if (usernameError) setUsernameError('');
+    if (passwordError) setPasswordError('');
     const upper = val.trim().toUpperCase();
     if (upper === 'USR-001') setSelectedRole('admin');
     else if (upper === 'USR-002') setSelectedRole('vanthu');
@@ -108,6 +109,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   const handlePasswordChange = (val: string) => {
     setPassword(val);
     if (passwordError) setPasswordError('');
+    if (usernameError) setUsernameError('');
   };
 
   const quickFillRole = (role: DemoRoleKey) => {
@@ -172,14 +174,40 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
         (err?.message && (err.message.includes('fetch') || err.message.includes('Load failed')));
       // Kích hoạt rung lắc và hiển thị dòng lỗi trượt mượt (.u025-help) trực tiếp dưới ô bị lỗi
       const rawMsg = err?.message || '';
-      const isPasswordSpecific =
-        rawMsg.toLowerCase().includes('mật khẩu') || rawMsg.toLowerCase().includes('password');
-      const isUsernameSpecific =
-        rawMsg.toLowerCase().includes('tài khoản') ||
-        rawMsg.toLowerCase().includes('username') ||
-        rawMsg.toLowerCase().includes('mã định danh');
+      const lower = rawMsg.toLowerCase();
 
-      if (isPasswordSpecific && !isUsernameSpecific) {
+      // 1. Lỗi xác thực tài khoản/mật khẩu chung (chống user enumeration hoặc sai cặp thông tin)
+      const isGeneralAuthFail =
+        lower.includes('tên đăng nhập hoặc mật khẩu') ||
+        lower.includes('tài khoản hoặc mật khẩu') ||
+        lower.includes('sai tài khoản') ||
+        lower.includes('không chính xác') ||
+        lower.includes('invalid credential') ||
+        (lower.includes('đăng nhập') && lower.includes('mật khẩu'));
+
+      // 2. Lỗi riêng mật khẩu (chỉ khi tài khoản đúng nhưng mật khẩu sai)
+      const isPasswordSpecific =
+        !isGeneralAuthFail &&
+        (lower.includes('mật khẩu không đúng') ||
+          lower.includes('sai mật khẩu') ||
+          (lower.includes('mật khẩu') && !lower.includes('tài khoản') && !lower.includes('đăng nhập')));
+
+      // 3. Lỗi riêng tài khoản (tài khoản bị khóa, vô hiệu hóa...)
+      const isUsernameSpecific =
+        !isGeneralAuthFail &&
+        (lower.includes('bị khóa') ||
+          lower.includes('vô hiệu hóa') ||
+          lower.includes('không tìm thấy') ||
+          ((lower.includes('tài khoản') || lower.includes('tên đăng nhập') || lower.includes('username')) &&
+            !lower.includes('mật khẩu')));
+
+      if (isGeneralAuthFail) {
+        // Cả 2 ô đều chuyển sang trạng thái lỗi và rung lắc đồng bộ
+        setUsernameError('Tên đăng nhập hoặc mật khẩu không chính xác');
+        setPasswordError('Vui lòng kiểm tra lại tài khoản và mật khẩu');
+        setUsernameShake((prev) => prev + 1);
+        setPasswordShake((prev) => prev + 1);
+      } else if (isPasswordSpecific && !isUsernameSpecific) {
         setPasswordError(rawMsg || 'Mật khẩu không đúng. Vui lòng kiểm tra lại!');
         setPasswordShake((prev) => prev + 1);
       } else if (isUsernameSpecific && !isPasswordSpecific) {
@@ -245,7 +273,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
               icon={<UserIcon className="w-4 h-4" />}
               errorMessage={usernameError}
               shakeKey={usernameShake}
-              isValid={username.trim().length >= 4}
               compact={true}
               required
             />
@@ -270,7 +297,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
               }
               errorMessage={passwordError}
               shakeKey={passwordShake}
-              isValid={password.length >= 6}
               compact={true}
               required
             />
@@ -436,7 +462,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
         icon={<UserIcon className="w-4.5 h-4.5" />}
         errorMessage={usernameError}
         shakeKey={usernameShake}
-        isValid={username.trim().length >= 4}
         required
       />
 
@@ -460,7 +485,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
         }
         errorMessage={passwordError}
         shakeKey={passwordShake}
-        isValid={password.length >= 6}
         required
       />
 

@@ -104,13 +104,13 @@ export const UserTable: React.FC<UserTableProps> = ({
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
                     <span
-                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
-                        u.status === 'active'
-                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-                          : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
+                        u.status === 'active' || !u.status
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+                          : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30'
                       }`}
                     >
-                      {u.status || 'active'}
+                      {u.status === 'active' || !u.status ? 'Hoạt động' : 'Khóa'}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right whitespace-nowrap">

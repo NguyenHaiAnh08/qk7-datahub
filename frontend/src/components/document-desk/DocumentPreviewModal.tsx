@@ -19,6 +19,7 @@ import { formatFileSize } from '../../utils/formatFileSize';
 import { useAuth } from '../../hooks/useAuth';
 import { FingerprintScanModal } from '../users/FingerprintScanModal';
 import { CompactDownloadButton } from '../common/CompactDownloadButton';
+import { AccessDeniedCard } from '../common/AccessDeniedCard';
 
 export interface DocumentPreviewModalProps {
   open: boolean;
@@ -225,7 +226,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               </div>
             )}
 
-            {!loading && error && (
+            {!loading && error && !canView && (
+              <div className="p-4 sm:p-6 w-full flex items-center justify-center">
+                <AccessDeniedCard
+                  compact
+                  requiredClearanceLevel={docLevel}
+                  requiredClearanceName={document?.security_name || document?.security_level_name || `Cấp ${docLevel}`}
+                  documentTitle={document?.title}
+                  documentCode={document?.document_code}
+                  onClose={onClose}
+                />
+              </div>
+            )}
+
+            {!loading && error && canView && (
               <div className="p-6 max-w-md mx-auto text-center space-y-4 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/50 rounded-2xl shadow-lg">
                 <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-500">
                   <AlertCircle className="w-6 h-6" />

@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
-import { Loader2, Inbox } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { TacticalEmptyState } from './TacticalEmptyState';
 
 export interface Column<T> {
   key: string;
@@ -16,6 +17,7 @@ export interface DataTableProps<T> {
   loading?: boolean;
   emptyMessage?: string;
   emptySubtext?: string;
+  onClearFilters?: () => void;
   pagination?: {
     currentPage: number;
     totalPages: number;
@@ -34,6 +36,7 @@ export function DataTable<T>({
   loading = false,
   emptyMessage = 'Không có dữ liệu',
   emptySubtext = 'Không tìm thấy bản ghi nào phù hợp với bộ lọc hiện tại',
+  onClearFilters,
   pagination,
   rowClassName,
   onRowClick
@@ -67,14 +70,13 @@ export function DataTable<T>({
               </tr>
             ) : data.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-16 text-center">
-                  <div className="flex flex-col items-center justify-center space-y-2">
-                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
-                      <Inbox className="w-6 h-6" />
-                    </div>
-                    <p className="text-base font-medium text-slate-700 dark:text-slate-300">{emptyMessage}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm">{emptySubtext}</p>
-                  </div>
+                <td colSpan={columns.length} className="px-4 py-6 text-center">
+                  <TacticalEmptyState
+                    title={emptyMessage}
+                    description={emptySubtext}
+                    onClearFilters={onClearFilters}
+                    compact
+                  />
                 </td>
               </tr>
             ) : (

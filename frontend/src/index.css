@@ -1128,7 +1128,7 @@ html.dark .ant-input::placeholder {
   --u025-ink-3: #64748b;
   --u025-line: #cbd5e1;
   --u025-accent: #166534;
-  --u025-danger: #dc2626;
+  --u025-danger: #b91c1c;
   --u025-mint: #166534;
 }
 
@@ -1139,7 +1139,7 @@ html.dark .ant-input::placeholder {
   --u025-ink-3: #94a3b8;
   --u025-line: #334155;
   --u025-accent: #10b981;
-  --u025-danger: #ef4444;
+  --u025-danger: #f87171;
   --u025-mint: #10b981;
 }
 
@@ -1631,6 +1631,297 @@ html.dark .u058-pill {
     transition-delay: 0ms !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #089 · Interactive Compass 404 & Auto-Correct URL
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#089
+   ══════════════════════════════════════════════════════════════════════ */
+.u089-wrap {
+  perspective: 1200px;
+}
+
+.u089-card {
+  transition: transform 0.25s var(--ux-smooth), box-shadow 0.25s var(--ux-smooth);
+}
+
+.u089-num {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  transform: perspective(600px) rotateX(calc(var(--tilt-y, 0) * -8deg)) rotateY(calc(var(--tilt-x, 0) * 10deg));
+  transition: transform 0.12s ease-out;
+  display: inline-block;
+  user-select: none;
+}
+
+.u089-cp {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(185, 28, 28, 0.08) 0%, transparent 70%);
+}
+
+.u089-needle {
+  transform-origin: center center;
+  transition: transform 0.2s var(--ux-spring);
+  will-change: transform;
+}
+
+.u089-needle.is-snapping {
+  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.u089-url-bar {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.u089-wavy {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #b91c1c;
+  text-decoration-thickness: 2.5px;
+  text-underline-offset: 4px;
+}
+
+@keyframes u089-radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes u089-radar-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.95); }
+  50% { opacity: 0.85; transform: scale(1.05); }
+}
+
+.radar-sweep-line {
+  transform-origin: 50% 50%;
+  animation: u089-radar-sweep 3.5s linear infinite;
+}
+
+.radar-pulse-ring {
+  animation: u089-radar-pulse 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u089-num,
+  .u089-needle,
+  .radar-sweep-line,
+  .radar-pulse-ring {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #030 · Advanced Date Range Picker Calendar
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#030
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --u030-accent: #166534;
+  --u030-accent-hover: #15803d;
+  --u030-accent-light: rgba(22, 101, 52, 0.12);
+  --u030-accent-band: rgba(22, 101, 52, 0.15);
+  --u030-accent-ring: rgba(22, 101, 52, 0.35);
+}
+
+.dark {
+  --u030-accent: #10b981;
+  --u030-accent-hover: #059669;
+  --u030-accent-light: rgba(16, 185, 129, 0.16);
+  --u030-accent-band: rgba(16, 185, 129, 0.22);
+  --u030-accent-ring: rgba(16, 185, 129, 0.45);
+}
+
+@keyframes u030-pick {
+  0% { transform: scale(0.85); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.u030-cell {
+  position: relative;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.u030-cell.is-start,
+.u030-cell.is-end {
+  animation: u030-pick 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  background-color: var(--u030-accent) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.u030-cell.is-start {
+  border-top-left-radius: 9999px !important;
+  border-bottom-left-radius: 9999px !important;
+}
+
+.u030-cell.is-end {
+  border-top-right-radius: 9999px !important;
+  border-bottom-right-radius: 9999px !important;
+}
+
+.u030-cell.is-single {
+  border-radius: 9999px !important;
+}
+
+.u030-cell.in-range {
+  background-color: var(--u030-accent-light) !important;
+  color: inherit !important;
+  border-radius: 0 !important;
+}
+
+.u030-cell.is-hover-range {
+  background-color: var(--u030-accent-band) !important;
+  color: inherit !important;
+  border-radius: 0 !important;
+}
+
+.u030-slide-left-enter {
+  transform: translateX(18px);
+  opacity: 0;
+}
+.u030-slide-left-active {
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.45s ease;
+}
+
+.u030-slide-right-enter {
+  transform: translateX(-18px);
+  opacity: 0;
+}
+.u030-slide-right-active {
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.45s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u030-cell.is-start,
+  .u030-cell.is-end {
+    animation: none !important;
+  }
+  .u030-slide-left-active,
+  .u030-slide-right-active {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* ==========================================================================
+   Lucian UX/UI Prompt #197 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#197
+   Guided Spotlight Tour for Guest Users (Military QK7 Command Center System)
+   ========================================================================== */
+
+:root {
+  --u197-amber: #f59e0b;
+  --u197-amber-dark: #b45309;
+  --u197-emerald: #10b981;
+  --u197-emerald-dark: #166534;
+  --u197-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.u197-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.u197-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: d 0.35s var(--u197-ease);
+}
+
+.u197-ring {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9995;
+  border-radius: 14px;
+  border: 2px solid rgba(245, 158, 11, 0.85);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.35), inset 0 0 14px rgba(245, 158, 11, 0.2);
+  transition: top 0.35s var(--u197-ease), left 0.35s var(--u197-ease), width 0.35s var(--u197-ease), height 0.35s var(--u197-ease);
+  animation: u197-pulse 2.2s infinite ease-in-out;
+}
+
+@keyframes u197-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45), inset 0 0 12px rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.85);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0), inset 0 0 20px rgba(245, 158, 11, 0.35);
+    border-color: rgba(251, 191, 36, 1);
+  }
+}
+
+.u197-tip {
+  position: fixed;
+  z-index: 9999;
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(180, 83, 9, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: top 0.35s var(--u197-ease), left 0.35s var(--u197-ease), opacity 0.25s ease, transform 0.25s ease;
+}
+
+.u197-arrow {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+  background: inherit;
+  border: inherit;
+}
+
+.u197-arrow-top {
+  top: -8px;
+  border-bottom: none !important;
+  border-right: none !important;
+}
+
+.u197-arrow-bottom {
+  bottom: -8px;
+  border-top: none !important;
+  border-left: none !important;
+}
+
+.u197-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  transition: all 0.25s ease;
+}
+
+.u197-dot.is-active {
+  width: 22px;
+  background-color: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u197-ring {
+    animation: none !important;
+    transition: none !important;
+  }
+  .u197-tip,
+  .u197-svg {
+    transition: none !important;
+  }
+}
+
+
+
 
 
 

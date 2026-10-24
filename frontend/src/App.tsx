@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { RouterProvider } from './routes/RouterProvider';
 import { HttpErrorListener } from './components/common/HttpErrorListener';
 import { ToastProvider } from './components/common/Toast';
+import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
 import AIChatWidget from './components/ai-chat/AIChatWidget';
 import './index.css';
 
@@ -143,10 +144,12 @@ export const App: React.FC = () => {
         <DeviceModeProvider>
           <AntdAppWrapper>
             <ToastProvider>
-              <AuthProvider>
-                <RouterProvider />
-                <AIChatWrapper />
-              </AuthProvider>
+              <NetworkStatusProvider>
+                <AuthProvider>
+                  <RouterProvider />
+                  <AIChatWrapper />
+                </AuthProvider>
+              </NetworkStatusProvider>
             </ToastProvider>
           </AntdAppWrapper>
         </DeviceModeProvider>

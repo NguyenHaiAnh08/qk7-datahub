@@ -4,7 +4,6 @@ import {
   Search, RotateCw, Eraser, Calendar, Building,
   LayoutGrid, List, BarChart2, ChevronDown, Shield, FileText,
 } from 'lucide-react';
-import { TreeSelect } from 'antd';
 import { Header } from '../components/common/Header';
 import { toast } from '../components/common/Toast';
 import { UnitOverviewStrip } from '../components/portal/UnitOverviewStrip';
@@ -12,12 +11,12 @@ import { DistributionChart } from '../components/dashboard/DistributionChart';
 import { PortalDocumentList } from '../components/portal/PortalDocumentList';
 import { DocumentTable } from '../components/document-desk/DocumentTable';
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
+import { DateRangePicker } from '../components/common/DateRangePicker';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { documentService, MyUnitDocumentResponse } from '../services/documentService';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData } from '../types';
-import { buildUnitTree } from '../utils/unitTree';
 
 const ITEMS_PER_PAGE = 9;
 
@@ -69,7 +68,6 @@ export const MyUnitPage: React.FC = () => {
     dashboardApi.getMeta().then(setMeta).catch((err) => console.error('[meta]', err));
   }, []);
 
-  const unitTree = useMemo(() => buildUnitTree(meta.units), [meta.units]);
 
   const loadDocuments = async () => {
     setLoading(true);
@@ -125,7 +123,7 @@ export const MyUnitPage: React.FC = () => {
     setSelectedLevel('');
     setDateFrom('');
     setDateTo('');
-    if (!canSelectUnit && user?.unit_id) {
+    if (user?.unit_id) {
       setSelectedUnitId(user.unit_id);
     }
   };
@@ -247,7 +245,7 @@ export const MyUnitPage: React.FC = () => {
       <Header
         activeNav="myunit"
         title="Trường Quân Sự Quân Khu 7"
-        subtitle={currentUnit ? `Đơn vị: ${currentUnit.name}` : 'Trung tâm dữ liệu số'}
+        subtitle="Trung tâm dữ liệu số"
       />
 
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
@@ -264,12 +262,10 @@ export const MyUnitPage: React.FC = () => {
                 <span className="text-slate-600 dark:text-slate-300">Đơn vị trực thuộc</span>
               </div>
               <h1 className="text-lg font-bold text-slate-900 dark:text-white truncate mt-0.5">
-                Dữ liệu số: {currentUnit?.name || '...'}
+                {currentUnit?.name || 'Trường Quân sự Quân khu 7'}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                {canSelectUnit
-                  ? 'Bạn có quyền chọn đơn vị để xem tài liệu. Mặc định hiển thị đơn vị của bạn.'
-                  : 'Chỉ hiển thị tài liệu của đơn vị bạn trực thuộc.'}
+                Hệ thống hiển thị theo đơn vị của bạn.
               </p>
             </div>
           </div>
@@ -353,35 +349,18 @@ export const MyUnitPage: React.FC = () => {
         {/* Filter */}
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {canSelectUnit ? (
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                  Đơn vị
-                </label>
-                <TreeSelect
-                  value={selectedUnitId || undefined}
-                  onChange={(val) => setSelectedUnitId(val || '')}
-                  treeData={unitTree}
-                  placeholder="Chọn đơn vị..."
-                  allowClear
-                  treeDefaultExpandAll
-                  treeNodeLabelProp="name"
-                  treeNodeFilterProp="name"
-                  showSearch
-                  style={{ width: '100%' }}
-                />
-              </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                  Đơn vị (cố định)
-                </label>
-                <div className="w-full px-3 py-2 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <Building className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="truncate">{currentUnit?.name || '—'}</span>
-                </div>
-              </div>
-            )}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                Đơn vị
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none cursor-default select-none truncate"
+                title={currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
+              />
+            </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
@@ -406,7 +385,7 @@ export const MyUnitPage: React.FC = () => {
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
               >
                 <option value="">Tất cả thể loại</option>
                 {meta.types.map((t) => (
@@ -422,7 +401,7 @@ export const MyUnitPage: React.FC = () => {
               <select
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value ? Number(e.target.value) : '')}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
               >
                 <option value="">Tất cả cấp độ</option>
                 {meta.levels.map((l) => (
@@ -434,20 +413,17 @@ export const MyUnitPage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-white/[0.06]">
             <div className="flex items-center space-x-2 text-xs">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-xs text-slate-500 dark:text-slate-400">Từ:</span>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="px-2 py-1 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-800 dark:text-slate-200"
-              />
-              <span className="text-xs text-slate-500 dark:text-slate-400">Đến:</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="px-2 py-1 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-800 dark:text-slate-200"
+              <DateRangePicker
+                startDate={dateFrom}
+                endDate={dateTo}
+                onChange={(start, end) => {
+                  setDateFrom(start);
+                  setDateTo(end);
+                }}
+                onClear={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                }}
               />
             </div>
 
@@ -539,6 +515,8 @@ export const MyUnitPage: React.FC = () => {
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={documents.length}
+            searchQuery={searchQuery}
+            onClearFilters={handleResetFilters}
             onPageChange={setCurrentPage}
             onPreview={(doc) => setPreviewDoc(doc)}
             onDownload={handleDownload}
@@ -551,6 +529,8 @@ export const MyUnitPage: React.FC = () => {
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={documents.length}
+            searchQuery={searchQuery}
+            onClearFilters={handleResetFilters}
             onPageChange={setCurrentPage}
             onPreview={(doc) => setPreviewDoc(doc)}
             onDownload={handleDownload}

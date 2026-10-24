@@ -547,13 +547,12 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Trạng thái tài khoản</label>
                 <select
-                  value={formData.status || 'active'}
+                  value={formData.status === 'locked' ? 'locked' : 'active'}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                   className="w-full h-9.5 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-sm"
                 >
                   <option value="active">Hoạt động</option>
-                  <option value="locked">Khóa tạm thời</option>
-                  <option value="inactive">Ngừng sử dụng</option>
+                  <option value="locked">Khóa</option>
                 </select>
               </div>
             </div>

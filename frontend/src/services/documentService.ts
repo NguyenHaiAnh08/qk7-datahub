@@ -129,7 +129,7 @@ export const documentService = {
 
     const qs = sp.toString();
     return http<MyUnitDocumentResponse>(
-      `/api/documents/my-unit${qs ? `?${qs}` : ''}`,
+      `${API_ENDPOINTS.DOCUMENTS.MY_UNIT}${qs ? `?${qs}` : ''}`, 
       { skipErrorNotification: true }
     );
   },
@@ -198,5 +198,31 @@ export const documentService = {
   getViewUrl: fileService.getViewUrl,
   fetchDocumentBlob: fileService.fetchFileBlob,
   downloadDocument: fileService.downloadFile,
+
+  // ═══════════════════════════════════════════════════════════
+  // SOFT DELETE / TRASH / RESTORE / PURGE
+  // ═══════════════════════════════════════════════════════════
+
+  getTrash: async (): Promise<{ total: number; items: DocumentItem[] }> => {
+    return http<{ total: number; items: DocumentItem[] }>(API_ENDPOINTS.DOCUMENTS.TRASH);
+  },
+
+  restoreDocument: async (
+    fileId: string
+  ): Promise<{ success: boolean; file_id: string; restored: boolean }> => {
+    return http(API_ENDPOINTS.DOCUMENTS.RESTORE(fileId), { method: 'POST' });
+  },
+
+  purgeDocument: async (
+    fileId: string
+  ): Promise<{ success: boolean; file_id: string; purged: boolean }> => {
+    return http(API_ENDPOINTS.DOCUMENTS.PURGE(fileId), {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: fileId }),
+    });
+  },
+
+
 };
 

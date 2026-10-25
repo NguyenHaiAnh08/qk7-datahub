@@ -14,6 +14,7 @@ export * from './securityLevelService';
 export * from './logService';
 export * from './systemService';
 export * from './aiService';
+export * from './sessionService';
 
 // Compatibility Aliases
 export * from './documentsApi';

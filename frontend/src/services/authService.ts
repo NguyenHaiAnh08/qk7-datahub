@@ -312,4 +312,23 @@ export const authService = {
       role_names: roleNames,
     };
   },
+
+
+  /**
+   * Logout — gọi backend để revoke session, sau đó clear local.
+   * Nếu backend lỗi vẫn phải clear local để user không bị treo.
+   */
+  logout: async (): Promise<void> => {
+    try {
+      await http(API_ENDPOINTS.AUTH.LOGOUT, {
+        method: 'POST',
+        skipErrorNotification: true,
+        silent: true,
+      });
+    } catch {
+      // ignore
+    } finally {
+      authService.clearSession();
+    }
+  },
 };

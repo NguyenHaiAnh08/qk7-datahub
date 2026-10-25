@@ -7,11 +7,12 @@ import {
   Input,
   Button,
   Radio,
-  Space,
-  Popconfirm,
-  Badge,
   Dropdown,
   type TableColumnsType,
+  Segmented,
+  DatePicker,
+  Alert,
+  Tooltip,
 } from 'antd';
 import {
   Search,
@@ -20,13 +21,16 @@ import {
   UserPlus,
   Shield,
   RotateCw,
-  X,
-  ArrowRightLeft,
-  Filter,
+  Clock,
+  Calendar,
+  Infinity as InfinityIcon,
 } from 'lucide-react';
+import dayjs, { Dayjs } from 'dayjs';
+
 import { User, Role } from '../../types';
 import { roleService } from '../../services/roleService';
 import { usersApi } from '../../services/usersApi';
+import { isProtectedAdminRole, isProtectedUser } from '../../constants/protectedAccounts';
 
 export interface AssignRoleModalProps {
   open: boolean;
@@ -38,6 +42,16 @@ export interface AssignRoleModalProps {
   onToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
+// ─── Định nghĩa kiểu dữ liệu cho Modal chọn thời hạn ───
+type DurationMode = 'permanent' | 'duration' | 'custom_date';
+interface AssignTarget {
+  userId: string;
+  roleId: string;
+  currentExpiry?: string | null;
+  isSwitch?: boolean;
+  oldRoleId?: string;
+}
+
 export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
   open,
   roles,
@@ -47,39 +61,45 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
   onRefresh,
   onToast,
 }) => {
-  // Local list of users to enable instant optimistic UI update
+  // State quản lý danh sách & bộ lọc
   const [usersList, setUsersList] = useState<User[]>([]);
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'unassigned' | 'assigned'>('all');
   const [filterRoleId, setFilterRoleId] = useState<string>('all');
 
-  // Loading state per user row
+  // State loading
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
-
-  // Key để reset triệt để ô chọn đổi vai trò về trống
-  const [switchRoleKey, setSwitchRoleKey] = useState<number>(0);
-
-  // Trạng thái đang làm mới dữ liệu
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Quản lý trang hiện tại (5 người dùng / trang)
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  // Reset trang về 1 khi thay đổi tìm kiếm, bộ lọc hoặc mở modal
+  // State cho Sub-modal chọn thời hạn
+  const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
+  const [durationMode, setDurationMode] = useState<DurationMode>('permanent');
+  const [durationDays, setDurationDays] = useState<number>(3);
+  const [customDate, setCustomDate] = useState<Dayjs | null>(null);
+
+  // Reset trang khi đổi bộ lọc
   useEffect(() => {
     setCurrentPage(1);
   }, [searchText, filterStatus, filterRoleId, open]);
 
-  // Hàm xử lý làm mới danh sách dữ liệu trong modal
+  // Sync users when modal opens
+  useEffect(() => {
+    if (open) {
+      setUsersList([...initialUsers]);
+      setSearchText('');
+      setFilterStatus('all');
+      setFilterRoleId(targetRole ? targetRole.role_id : 'all');
+      setAssignTarget(null); // Reset sub-modal
+    }
+  }, [open, initialUsers, targetRole]);
+
+  // Hàm làm mới
   const handleRefreshModal = async () => {
     setIsRefreshing(true);
     try {
-      // 1. Tải trực tiếp danh sách người dùng mới nhất từ backend
       const res = await usersApi.getUsers();
-      if (res && res.items) {
-        setUsersList(res.items);
-      }
-      // 2. Đồng bộ callback với component cha
+      if (res && res.items) setUsersList(res.items);
       await onRefresh();
       onToast('Đã làm mới danh sách quân nhân thành công!', 'success');
     } catch (err: any) {
@@ -89,39 +109,16 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     }
   };
 
-  // Sync users when modal opens or initialUsers changes
-  useEffect(() => {
-    if (open) {
-      setUsersList([...initialUsers]);
-      setSearchText('');
-      setFilterStatus('all');
-      if (targetRole) {
-        setFilterRoleId(targetRole.role_id);
-      } else {
-        setFilterRoleId('all');
-      }
-    }
-  }, [open, initialUsers, targetRole]);
-
-  // Default role ID to assign if user doesn't pick one
-  const defaultAssignRoleId = useMemo(() => {
-    if (targetRole) return targetRole.role_id;
-    if (roles.length > 0) return roles[0].role_id;
-    return '';
-  }, [targetRole, roles]);
-
-  // Statistics
+  // Thống kê
   const stats = useMemo(() => {
     const total = usersList.length;
     const assigned = usersList.filter((u) => u.roles && u.roles.length > 0).length;
-    const unassigned = total - assigned;
-    return { total, assigned, unassigned };
+    return { total, assigned, unassigned: total - assigned };
   }, [usersList]);
 
-  // Filtered users
+  // Lọc danh sách
   const filteredUsers = useMemo(() => {
     return usersList.filter((u) => {
-      // 1. Text Search
       if (searchText.trim()) {
         const q = searchText.toLowerCase().trim();
         const matchId = (u.user_id || '').toLowerCase().includes(q);
@@ -130,64 +127,81 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
         const matchPos = (u.position || '').toLowerCase().includes(q);
         const matchUnit = (u.unit_name || '').toLowerCase().includes(q);
         const matchRole = (u.role_names || []).some((r) => r.toLowerCase().includes(q));
-        if (!matchId && !matchName && !matchRank && !matchPos && !matchUnit && !matchRole) {
-          return false;
-        }
+        if (!matchId && !matchName && !matchRank && !matchPos && !matchUnit && !matchRole) return false;
       }
 
-      // 2. Filter status: all, unassigned, assigned
       const hasRole = Boolean(u.roles && u.roles.length > 0);
       if (filterStatus === 'unassigned' && hasRole) return false;
       if (filterStatus === 'assigned' && !hasRole) return false;
 
-      // 3. Filter specific role
       if (filterRoleId !== 'all') {
-        const hasSpecificRole = (u.roles || []).includes(filterRoleId);
-        if (!hasSpecificRole) return false;
+        if (!(u.roles || []).includes(filterRoleId)) return false;
       }
-
       return true;
     });
   }, [usersList, searchText, filterStatus, filterRoleId]);
 
-  // Gán vai trò cho user
-  const handleAssignRole = async (userId: string, roleIdToAssign: string) => {
-    if (!roleIdToAssign) {
-      onToast('Vui lòng chọn vai trò cần gán!', 'error');
-      return;
+  // ═══════════════════════════════════════════════════
+  // XỬ LÝ GÁN VAI TRÒ (Có thời hạn)
+  // ═══════════════════════════════════════════════════
+  const handleConfirmAssign = async () => {
+    if (!assignTarget) return;
+
+    let expiresAt: string | undefined;
+    let durationParam: number | undefined;
+
+    if (durationMode === 'duration') {
+      durationParam = durationDays;
+    } else if (durationMode === 'custom_date') {
+      if (!customDate) return onToast('Vui lòng chọn ngày hết hạn!', 'error');
+      // Set về cuối ngày 23:59:59
+      expiresAt = customDate.hour(23).minute(59).second(59).toISOString();
     }
 
-    const roleObj = roles.find((r) => r.role_id === roleIdToAssign);
-    const roleName = roleObj ? roleObj.name : roleIdToAssign;
+    const { userId, roleId, isSwitch, oldRoleId } = assignTarget;
+    const roleObj = roles.find((r) => r.role_id === roleId);
+    const roleName = roleObj?.name || roleId;
     const targetUser = usersList.find((u) => u.user_id === userId);
 
     setLoadingUserId(userId);
     try {
-      await roleService.assignRoleToUser(userId, roleIdToAssign);
+      // Nếu là đổi vai trò, gỡ cũ trước
+      if (isSwitch && oldRoleId) {
+        await roleService.revokeRoleFromUser(userId, oldRoleId);
+      }
 
-      // Cập nhật optimistic local state ngay lập tức
+      // Gán mới (hoặc cập nhật hạn)
+      await roleService.assignRoleToUser(userId, roleId, {
+        durationDays: durationParam,
+        expiresAt: expiresAt,
+      });
+
+      // Optimistic UI (cập nhật tạm thời, chờ onRefresh đồng bộ)
       setUsersList((prev) =>
         prev.map((u) => {
           if (u.user_id === userId) {
-            const currentRoles = u.roles || [];
-            const currentRoleNames = u.role_names || [];
-            const newRoles = Array.from(new Set([...currentRoles, roleIdToAssign]));
-            const newRoleNames = Array.from(new Set([...currentRoleNames, roleName]));
-            return {
-              ...u,
-              roles: newRoles,
-              role_names: newRoleNames,
-            };
+            let newRoles = [...(u.roles || [])];
+            let newRoleNames = [...(u.role_names || [])];
+
+            if (isSwitch && oldRoleId) {
+              newRoles = newRoles.filter((r) => r !== oldRoleId);
+            }
+            if (!newRoles.includes(roleId)) {
+              newRoles.push(roleId);
+              newRoleNames.push(roleName);
+            }
+            return { ...u, roles: newRoles, role_names: newRoleNames };
           }
           return u;
         })
       );
 
       onToast(
-        `Đã gán vai trò "${roleName}" cho quân nhân ${targetUser?.full_name || userId} thành công!`,
+        `Đã gán vai trò "${roleName}" cho ${targetUser?.full_name || userId} thành công!`,
         'success'
       );
-      // Đồng bộ dữ liệu gốc ngầm
+      
+      setAssignTarget(null); // Đóng sub-modal
       onRefresh();
     } catch (err: any) {
       onToast(`Lỗi gán vai trò: ${err.message || 'Không thể thực hiện'}`, 'error');
@@ -196,7 +210,9 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     }
   };
 
-  // Gỡ 1 vai trò cụ thể của user
+  // ═══════════════════════════════════════════════════
+  // XỬ LÝ GỠ VAI TRÒ
+  // ═══════════════════════════════════════════════════
   const handleRevokeRole = async (userId: string, roleIdToRevoke: string, roleName?: string) => {
     const targetUser = usersList.find((u) => u.user_id === userId);
     const rName = roleName || roles.find((r) => r.role_id === roleIdToRevoke)?.name || roleIdToRevoke;
@@ -204,27 +220,19 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     setLoadingUserId(userId);
     try {
       await roleService.revokeRoleFromUser(userId, roleIdToRevoke);
-
-      // Cập nhật optimistic local state ngay lập tức
       setUsersList((prev) =>
         prev.map((u) => {
           if (u.user_id === userId) {
-            const newRoles = (u.roles || []).filter((r) => r !== roleIdToRevoke);
-            const newRoleNames = (u.role_names || []).filter((rn) => rn !== rName);
             return {
               ...u,
-              roles: newRoles,
-              role_names: newRoleNames,
+              roles: (u.roles || []).filter((r) => r !== roleIdToRevoke),
+              role_names: (u.role_names || []).filter((rn) => rn !== rName),
             };
           }
           return u;
         })
       );
-
-      onToast(
-        `Đã gỡ vai trò "${rName}" của quân nhân ${targetUser?.full_name || userId} thành công!`,
-        'info'
-      );
+      onToast(`Đã gỡ vai trò "${rName}" của ${targetUser?.full_name || userId}!`, 'info');
       onRefresh();
     } catch (err: any) {
       onToast(`Lỗi gỡ vai trò: ${err.message || 'Không thể thực hiện'}`, 'error');
@@ -233,86 +241,9 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     }
   };
 
-  // Gỡ toàn bộ vai trò của user (áp dụng khi user có nhiều vai trò)
-  const handleRevokeAllRoles = async (userId: string) => {
-    const targetUser = usersList.find((u) => u.user_id === userId);
-    const userRoles = targetUser?.roles || [];
-    if (!userRoles.length) return;
-
-    setLoadingUserId(userId);
-    try {
-      for (const rId of userRoles) {
-        await roleService.revokeRoleFromUser(userId, rId);
-      }
-
-      setUsersList((prev) =>
-        prev.map((u) => {
-          if (u.user_id === userId) {
-            return {
-              ...u,
-              roles: [],
-              role_names: [],
-            };
-          }
-          return u;
-        })
-      );
-
-      onToast(`Đã gỡ toàn bộ vai trò của quân nhân ${targetUser?.full_name || userId}!`, 'info');
-      onRefresh();
-    } catch (err: any) {
-      onToast(`Lỗi gỡ vai trò: ${err.message || 'Không thể thực hiện'}`, 'error');
-    } finally {
-      setLoadingUserId(null);
-    }
-  };
-
-  // Đổi vai trò trực tiếp (gỡ vai trò cũ và gán vai trò mới)
-  const handleSwitchRole = async (userId: string, oldRoleId: string, newRoleId: string) => {
-    if (!newRoleId || oldRoleId === newRoleId) return;
-    const oldRoleName = roles.find((r) => r.role_id === oldRoleId)?.name || oldRoleId;
-    const newRoleName = roles.find((r) => r.role_id === newRoleId)?.name || newRoleId;
-    const targetUser = usersList.find((u) => u.user_id === userId);
-
-    setLoadingUserId(userId);
-    try {
-      // 1. Gỡ vai trò cũ
-      await roleService.revokeRoleFromUser(userId, oldRoleId);
-      // 2. Gán vai trò mới
-      await roleService.assignRoleToUser(userId, newRoleId);
-
-      // Cập nhật local state
-      setUsersList((prev) =>
-        prev.map((u) => {
-          if (u.user_id === userId) {
-            const filteredRoles = (u.roles || []).filter((r) => r !== oldRoleId);
-            const filteredNames = (u.role_names || []).filter((rn) => rn !== oldRoleName);
-            return {
-              ...u,
-              roles: [...filteredRoles, newRoleId],
-              role_names: [...filteredNames, newRoleName],
-            };
-          }
-          return u;
-        })
-      );
-
-      // Reset ô chuyển vai trò về trạng thái trống hoàn toàn
-      setSwitchRoleKey((prev) => prev + 1);
-
-      onToast(
-        `Đã chuyển vai trò từ "${oldRoleName}" sang "${newRoleName}" cho ${targetUser?.full_name || userId}!`,
-        'success'
-      );
-      onRefresh();
-    } catch (err: any) {
-      onToast(`Lỗi đổi vai trò: ${err.message || 'Không thể thực hiện'}`, 'error');
-    } finally {
-      setLoadingUserId(null);
-    }
-  };
-
-  // Cấu hình các cột của Ant Design Table
+  // ═══════════════════════════════════════════════════
+  // CẤU HÌNH CỘT BẢNG
+  // ═══════════════════════════════════════════════════
   const columns: TableColumnsType<User> = [
     {
       title: 'Mã QN',
@@ -320,14 +251,16 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
       key: 'user_id',
       width: 100,
       render: (id: string) => (
-        <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 whitespace-nowrap">{id}</span>
+        <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 whitespace-nowrap">
+          {id}
+        </span>
       ),
     },
     {
       title: 'Họ và tên',
       dataIndex: 'full_name',
       key: 'full_name',
-      width: 230,
+      width: 200,
       render: (name: string, record: User) => (
         <div>
           <div className="font-semibold text-slate-900 dark:text-white text-xs">{name}</div>
@@ -341,9 +274,9 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
       title: 'Đơn vị',
       dataIndex: 'unit_name',
       key: 'unit_name',
-      width: 220,
+      width: 180,
       render: (unit: string) => (
-        <span className="text-slate-600 dark:text-slate-300 text-xs whitespace-nowrap inline-block" title={unit || '—'}>
+        <span className="text-slate-600 dark:text-slate-300 text-xs truncate inline-block max-w-[170px]" title={unit || '—'}>
           {unit || '—'}
         </span>
       ),
@@ -351,34 +284,58 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     {
       title: 'Vai trò hiện tại',
       key: 'roles',
-      width: 200,
+      width: 300,
       render: (_: any, record: User) => {
         const hasRoles = record.roles && record.roles.length > 0;
         if (!hasRoles) {
           return (
-            <Tag
-              className="text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700 font-medium text-xs px-2.5 py-0.5 rounded-md"
-              style={{ borderStyle: 'dashed' }}
-            >
+            <Tag className="text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700 font-medium text-xs px-2.5 py-0.5 rounded-md" style={{ borderStyle: 'dashed' }}>
               Chưa có vai trò
             </Tag>
           );
         }
+
+        // Giả sử backend trả về mảng `role_details` chứa {role_id, name, expires_at}
+        // Nếu chưa có, fallback về hiển thị cơ bản
+        const roleDetails = (record as any).role_details || [];
+        const isBusy = loadingUserId === record.user_id;
+
         return (
           <div className="flex flex-wrap gap-1.5 items-center">
             {record.roles!.map((rId, idx) => {
-              const rName =
-                record.role_names && record.role_names[idx]
-                  ? record.role_names[idx]
-                  : roles.find((r) => r.role_id === rId)?.name || rId;
+              const rName = record.role_names?.[idx] || roles.find((r) => r.role_id === rId)?.name || rId;
+              const detail = roleDetails.find((d: any) => d.role_id === rId);
+              const expiresAt = detail?.expires_at;
+              const isProtected = isProtectedAdminRole(record.user_id, rId);
+
               return (
-                <Tag
+                <Tooltip
                   key={rId}
-                  color="gold"
-                  className="font-semibold text-xs px-2.5 py-0.5 rounded-md inline-flex items-center shadow-2xs font-mono"
+                  title={
+                    isProtected
+                      ? '🔒 Vai trò Admin của tài khoản quản trị tối cao — Được bảo vệ hệ thống, không thể gỡ'
+                      : expiresAt
+                      ? `Quyền tạm thời. Hết hạn: ${dayjs(expiresAt).format('DD/MM/YYYY HH:mm')} — Bấm X để gỡ`
+                      : 'Quyền vĩnh viễn — Bấm X để gỡ'
+                  }
                 >
-                  {rName}
-                </Tag>
+                  <Tag
+                    color={isProtected ? 'red' : expiresAt ? 'orange' : 'gold'}
+                    closable={!isBusy && !isProtected}
+                    onClose={() => {
+                      if (window.confirm(`Gỡ vai trò "${rName}" của ${record.full_name}?`)) {
+                        handleRevokeRole(record.user_id, rId, rName);
+                      }
+                    }}
+                    className={`font-semibold text-xs px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 shadow-2xs font-mono m-0 ${
+                      isProtected ? 'cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {isProtected && <Shield className="w-3 h-3" />}
+                    {rName}
+                    {expiresAt && !isProtected && <Clock className="w-3 h-3" />}
+                  </Tag>
+                </Tooltip>
               );
             })}
           </div>
@@ -388,32 +345,23 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     {
       title: 'Thao tác gán / gỡ',
       key: 'actions',
-      width: 250,
+      width: 220,
       align: 'right',
       render: (_: any, record: User) => {
         const hasRoles = record.roles && record.roles.length > 0;
         const isCurrentLoading = loadingUserId === record.user_id;
+        const protectedUser = isProtectedUser(record.user_id);
 
-        // TRƯỜNG HỢP 1: NGƯỜI DÙNG CHƯA CÓ VAI TRÒ
-        // -> CHỈ hiện duy nhất nút "Gán vai trò", KHÔNG hiện ô chọn vai trò.
         if (!hasRoles) {
-          // Nếu đang lọc theo 1 vai trò cụ thể: gán ngay vai trò đó
+          // Người chưa có vai trò
           if (filterRoleId !== 'all') {
-            const roleObj = roles.find((r) => r.role_id === filterRoleId);
-            const roleName = roleObj ? roleObj.name : filterRoleId;
             return (
               <div className="flex items-center justify-end">
                 <Button
-                  type="primary"
-                  size="small"
-                  icon={<UserPlus className="w-3.5 h-3.5" />}
+                  type="primary" size="small" icon={<UserPlus className="w-3.5 h-3.5" />}
                   loading={isCurrentLoading}
-                  onClick={() => handleAssignRole(record.user_id, filterRoleId)}
-                  style={{
-                    fontWeight: 600,
-                    borderRadius: 6,
-                  }}
-                  title={`Gán vai trò "${roleName}"`}
+                  onClick={() => setAssignTarget({ userId: record.user_id, roleId: filterRoleId, currentExpiry: null })}
+                  style={{ fontWeight: 600, borderRadius: 6 }}
                 >
                   Gán vai trò
                 </Button>
@@ -421,31 +369,16 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
             );
           }
 
-          // Khi lọc tất cả vai trò: bấm "Gán vai trò" xổ menu danh sách vai trò để chọn gán
           const roleMenuItems = roles.map((r) => ({
             key: r.role_id,
-            label: (
-              <div className="flex items-center justify-between gap-3 py-0.5 px-1 min-w-[130px]">
-                <span className="font-semibold text-xs text-slate-800 dark:text-slate-100">{r.name}</span>
-                <span className="text-[10px] text-slate-400 font-mono">({r.role_id})</span>
-              </div>
-            ),
-            onClick: () => handleAssignRole(record.user_id, r.role_id),
+            label: <div className="flex items-center justify-between gap-3 py-0.5 px-1 min-w-[130px]"><span className="font-semibold text-xs text-slate-800 dark:text-slate-100">{r.name}</span><span className="text-[10px] text-slate-400 font-mono">({r.role_id})</span></div>,
+            onClick: () => setAssignTarget({ userId: record.user_id, roleId: r.role_id, currentExpiry: null }),
           }));
 
           return (
             <div className="flex items-center justify-end">
               <Dropdown menu={{ items: roleMenuItems }} trigger={['click']}>
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<UserPlus className="w-3.5 h-3.5" />}
-                  loading={isCurrentLoading}
-                  style={{
-                    fontWeight: 600,
-                    borderRadius: 6,
-                  }}
-                >
+                <Button type="primary" size="small" icon={<UserPlus className="w-3.5 h-3.5" />} loading={isCurrentLoading} style={{ fontWeight: 600, borderRadius: 6 }}>
                   Gán vai trò
                 </Button>
               </Dropdown>
@@ -453,197 +386,271 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
           );
         }
 
-        // TRƯỜNG HỢP 2: NGƯỜI DÙNG ĐÃ CÓ VAI TRÒ
-        // -> Hiện nút "Gỡ vai trò" và bộ chọn nhanh để đổi sang vai trò khác
-        const isMultiRole = (record.roles?.length || 0) > 1;
-        const primaryRoleId = record.roles?.[0] || '';
-        const primaryRoleName =
-          (record.role_names && record.role_names[0]) ||
-          roles.find((r) => r.role_id === primaryRoleId)?.name ||
-          primaryRoleId;
+        // ═══════════════════════════════════════════════════
+        // Người đã có vai trò
+        // ═══════════════════════════════════════════════════
+        const roleCount = record.roles?.length || 0;
+
+        // Chỉ các role KHÔNG bị bảo vệ mới có thể gỡ
+        const revokableRoles = (record.roles || []).filter(
+          (rId) => !isProtectedAdminRole(record.user_id, rId)
+        );
+        const revokableRoleCount = revokableRoles.length;
+
+        // Điều kiện để nút "Gỡ" active:
+        //  - Còn ít nhất 1 role không bị protect có thể gỡ
+        //  - Sau khi gỡ vẫn còn ≥1 role trên user (không vi phạm LAST_ROLE_PROTECTED)
+        const finalCanRevoke = revokableRoleCount > 0 && roleCount > 1;
 
         return (
           <div className="flex items-center justify-end gap-2">
-            {/* Đổi nhanh sang vai trò khác (nếu chỉ có 1 vai trò) */}
-            {!isMultiRole && (
-              <Select
-                key={`switch-${record.user_id}-${primaryRoleId}-${switchRoleKey}`}
-                size="small"
-                value={undefined}
-                placeholder="Đổi vai trò..."
-                style={{ width: 120 }}
-                onChange={(newRoleId) => newRoleId && handleSwitchRole(record.user_id, primaryRoleId, newRoleId)}
-                options={roles
-                  .filter((r) => !record.roles!.includes(r.role_id))
-                  .map((r) => ({
-                    value: r.role_id,
-                    label: r.name,
-                  }))}
-              />
-            )}
-
-            {/* Nút Gỡ vai trò */}
-            <Popconfirm
-              title={isMultiRole ? 'Xác nhận gỡ tất cả vai trò' : 'Xác nhận gỡ vai trò'}
-              description={
-                isMultiRole
-                  ? `Quân nhân đang có ${record.roles!.length} vai trò. Bạn có chắc muốn gỡ toàn bộ vai trò của ${record.full_name}?`
-                  : `Bạn có chắc muốn gỡ vai trò "${primaryRoleName}" của ${record.full_name}?`
-              }
-              onConfirm={() =>
-                isMultiRole
-                  ? handleRevokeAllRoles(record.user_id)
-                  : handleRevokeRole(record.user_id, primaryRoleId, primaryRoleName)
-              }
-              okText={isMultiRole ? 'Gỡ tất cả' : 'Gỡ vai trò'}
-              cancelText="Hủy"
-              okButtonProps={{ danger: true }}
-            >
-              <Button
-                danger
-                size="small"
-                icon={<UserMinus className="w-3.5 h-3.5" />}
-                loading={isCurrentLoading}
-                style={{
-                  fontWeight: 600,
-                  borderRadius: 6,
+            {/* Gán thêm role (chỉ hiện nếu còn role chưa gán) */}
+            {roles.filter(r => !record.roles?.includes(r.role_id)).length > 0 && (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: roles
+                    .filter(r => !record.roles?.includes(r.role_id))
+                    .map(r => ({
+                      key: r.role_id,
+                      label: r.name,
+                      onClick: () => setAssignTarget({ userId: record.user_id, roleId: r.role_id, currentExpiry: null })
+                    }))
                 }}
               >
-                {isMultiRole ? 'Gỡ tất cả' : 'Gỡ vai trò'}
-              </Button>
-            </Popconfirm>
+                <Button size="small" icon={<UserPlus className="w-3.5 h-3.5" />} title="Gán thêm vai trò" />
+              </Dropdown>
+            )}
+
+            {/* Gỡ role */}
+            {!finalCanRevoke ? (
+              <Tooltip
+                title={
+                  protectedUser && roleCount === 1
+                    ? '🔒 Tài khoản quản trị tối cao — Không thể gỡ role Admin duy nhất'
+                    : roleCount === 1
+                    ? 'Không thể gỡ — mỗi quân nhân phải có ít nhất 1 vai trò'
+                    : 'Không có vai trò nào có thể gỡ'
+                }
+              >
+                <Button
+                  danger
+                  size="small"
+                  icon={<UserMinus className="w-3.5 h-3.5" />}
+                  disabled
+                  style={{ cursor: 'not-allowed', opacity: 0.4 }}
+                />
+              </Tooltip>
+            ) : (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: revokableRoles.map((rId) => {
+                    const idx = (record.roles || []).indexOf(rId);
+                    const rName = record.role_names?.[idx] || roles.find((r) => r.role_id === rId)?.name || rId;
+                    return {
+                      key: rId,
+                      label: <span>Gỡ: <strong>{rName}</strong></span>,
+                      onClick: () => {
+                        if (window.confirm(`Gỡ vai trò "${rName}" của ${record.full_name}?`)) {
+                          handleRevokeRole(record.user_id, rId, rName);
+                        }
+                      },
+                    };
+                  }),
+                }}
+              >
+                <Button
+                  danger
+                  size="small"
+                  icon={<UserMinus className="w-3.5 h-3.5" />}
+                  loading={isCurrentLoading}
+                  title={`Gỡ vai trò (${revokableRoleCount} role có thể gỡ)`}
+                >
+                  Gỡ ▼
+                </Button>
+              </Dropdown>
+            )}
           </div>
         );
       },
     },
   ];
 
+  // ═══════════════════════════════════════════════════
+  // RENDER GIAO DIỆN
+  // ═══════════════════════════════════════════════════
   return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={980}
-      centered
-      destroyOnHidden
-      className="assign-role-modal"
-      title={
-        <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
-          <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shadow-xs">
-            <UserCheck className="w-5 h-5" />
+    <>
+      <Modal
+        open={open && !assignTarget}
+        onCancel={onClose}
+        footer={null}
+        width={1000}
+        centered
+        destroyOnHidden
+        className="assign-role-modal"
+        title={
+          <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shadow-xs">
+              <UserCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-slate-900 dark:text-white leading-tight">Phân Quyền & Gán Vai Trò</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Quản lý vai trò vĩnh viễn và tạm thời cho quân nhân</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-white leading-tight">
-              Phân Quyền & Gán Vai Trò Người Dùng
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Quản lý gán vai trò cho quân nhân và thu hồi / luân chuyển vai trò trong hệ thống
-            </p>
+        }
+      >
+        <div className="space-y-4 pt-3">
+          {/* Thanh công cụ */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-100/70 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+            <Radio.Group value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} buttonStyle="solid" size="middle">
+              <Radio.Button value="all">Tất cả ({stats.total})</Radio.Button>
+              <Radio.Button value="unassigned">Chưa có ({stats.unassigned})</Radio.Button>
+              <Radio.Button value="assigned">Đã có ({stats.assigned})</Radio.Button>
+            </Radio.Group>
+
+            <div className="flex items-center gap-2 flex-grow sm:flex-grow-0">
+              <Select
+                value={filterRoleId} onChange={setFilterRoleId} style={{ width: 160 }}
+                options={[{ value: 'all', label: 'Tất cả vai trò' }, ...roles.map((r) => ({ value: r.role_id, label: r.name }))]}
+              />
+              <Input
+                placeholder="Tìm tên, mã QN..." prefix={<Search className="w-3.5 h-3.5 text-slate-400" />}
+                value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear style={{ width: 220 }}
+              />
+            </div>
           </div>
-        </div>
-      }
-    >
-      <div className="space-y-4 pt-3">
-        {/* Thanh công cụ lọc & tìm kiếm */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-100/70 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-          {/* Radio lọc trạng thái */}
-          <Radio.Group
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            buttonStyle="solid"
-            size="middle"
-          >
-            <Radio.Button value="all">
-              Tất cả ({stats.total})
-            </Radio.Button>
-            <Radio.Button value="unassigned">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                Chưa có vai trò ({stats.unassigned})
-              </span>
-            </Radio.Button>
-            <Radio.Button value="assigned">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
-                Đã có vai trò ({stats.assigned})
-              </span>
-            </Radio.Button>
-          </Radio.Group>
 
-          {/* Lọc theo vai trò cụ thể & Tìm kiếm */}
-          <div className="flex items-center gap-2 flex-grow sm:flex-grow-0">
-            <Select
-              value={filterRoleId}
-              onChange={setFilterRoleId}
-              style={{ width: 160 }}
-              options={[
-                { value: 'all', label: 'Tất cả vai trò' },
-                ...roles.map((r) => ({
-                  value: r.role_id,
-                  label: r.name,
-                })),
-              ]}
-              placeholder="Lọc vai trò"
-            />
+          {/* Hướng dẫn & Làm mới */}
+          <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-xl p-3 px-4 text-xs text-slate-700 dark:text-amber-200 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>Bạn có thể chọn thời hạn (1 ngày, 3 ngày... hoặc đến ngày cụ thể) khi gán vai trò.</span>
+            </div>
+            <Button size="small" onClick={handleRefreshModal} loading={isRefreshing} icon={<RotateCw className="w-3.5 h-3.5" />}>Làm mới</Button>
+          </div>
 
-            <Input
-              placeholder="Tìm tên, mã QN, đơn vị..."
-              prefix={<Search className="w-3.5 h-3.5 text-slate-400" />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-              style={{ width: 220 }}
+          {/* Bảng */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs bg-white dark:bg-transparent [&_.ant-pagination]:px-3 [&_.ant-pagination]:py-2">
+            <Table<User>
+              columns={columns}
+              dataSource={filteredUsers}
+              rowKey="user_id"
+              size="small"
+              pagination={{
+                current: Math.min(Math.max(1, currentPage), Math.ceil(filteredUsers.length / 5) || 1),
+                pageSize: 5,
+                onChange: (page) => setCurrentPage(page),
+                showSizeChanger: false,
+                showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} quân nhân`,
+              }}
+              locale={{ emptyText: 'Không tìm thấy quân nhân nào' }}
             />
           </div>
         </div>
+      </Modal>
 
-        {/* Hướng dẫn thao tác nhanh & nút Làm mới */}
-        <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-xl p-3 px-4 text-xs text-slate-700 dark:text-amber-200 flex items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-            <span className="leading-relaxed">
-              <strong className="text-amber-800 dark:text-amber-300 font-semibold">Gợi ý:</strong> Chọn vai trò rồi bấm <strong className="text-emerald-700 dark:text-emerald-300 font-semibold">"Gán vai trò"</strong> đối với người chưa có vai trò. Bấm <strong className="text-rose-600 dark:text-rose-400 font-semibold">"Gỡ vai trò"</strong> đối với người đã có vai trò để thu hồi hoặc chuyển sang vai trò khác.
-            </span>
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* SUB-MODAL: CHỌN THỜI HẠN GÁN VAI TRÒ             */}
+      {/* ═══════════════════════════════════════════════════ */}
+      <Modal
+        open={!!assignTarget}
+        onCancel={() => setAssignTarget(null)}
+        width={480}
+        centered
+        zIndex={1050}
+        title={
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
+            <Clock className="w-5 h-5 text-emerald-600" />
+            <span className="font-bold text-base text-slate-900 dark:text-white">Chọn Thời Hạn Hiệu Lực</span>
           </div>
-          <button
-            type="button"
-            disabled={isRefreshing}
-            onClick={handleRefreshModal}
-            className="px-2.5 py-1 text-xs rounded-lg bg-white dark:bg-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 flex items-center gap-1.5 font-medium cursor-pointer whitespace-nowrap flex-shrink-0 transition-colors shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
-            title="Tải lại danh sách"
+        }
+        footer={[
+          <Button key="cancel" onClick={() => setAssignTarget(null)}>Hủy</Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={!!loadingUserId}
+            onClick={handleConfirmAssign}
+            className="bg-emerald-600 hover:bg-emerald-500 border-none font-semibold"
           >
-            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-amber-600 dark:text-amber-400' : ''}`} />
-            <span>{isRefreshing ? 'Đang tải...' : 'Làm mới'}</span>
-          </button>
-        </div>
-
-        {/* Bảng danh sách người dùng */}
-        <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs bg-white dark:bg-transparent [&_.ant-pagination]:px-3 [&_.ant-pagination]:py-2">
-          <Table<User>
-            columns={columns}
-            dataSource={filteredUsers}
-            rowKey="user_id"
-            size="small"
-            pagination={{
-              current: Math.min(Math.max(1, currentPage), Math.ceil(filteredUsers.length / 5) || 1),
-              pageSize: 5,
-              onChange: (page) => setCurrentPage(page),
-              showSizeChanger: false,
-              showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} người dùng`,
-            }}
-            locale={{
-              emptyText: 'Không tìm thấy người dùng nào phù hợp',
-            }}
+            Xác Nhận Gán Quyền
+          </Button>,
+        ]}
+      >
+        <div className="py-4 space-y-4">
+          <Alert
+            type="info"
+            showIcon
+            message={
+              <span className="text-xs">
+                Đang gán vai trò <b>{roles.find(r => r.role_id === assignTarget?.roleId)?.name}</b> cho quân nhân <b>{usersList.find(u => u.user_id === assignTarget?.userId)?.full_name}</b>
+              </span>
+            }
           />
-        </div>
 
-        {/* Footer actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500">
-          <span>
-            Hiển thị <strong>{filteredUsers.length}</strong> / <strong>{usersList.length}</strong> quân nhân
-          </span>
+          {/* Chọn chế độ thời hạn */}
+          <Segmented
+            block
+            value={durationMode}
+            onChange={(val) => setDurationMode(val as DurationMode)}
+            options={[
+              { label: <div className="flex items-center gap-1"><InfinityIcon className="w-4 h-4" /> Vĩnh viễn</div>, value: 'permanent' },
+              { label: <div className="flex items-center gap-1"><Clock className="w-4 h-4" /> Số ngày</div>, value: 'duration' },
+              { label: <div className="flex items-center gap-1"><Calendar className="w-4 h-4" /> Chọn ngày</div>, value: 'custom_date' },
+            ]}
+          />
+
+          {/* Render UI theo chế độ */}
+          {durationMode === 'duration' && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Số ngày hiệu lực:</span>
+              <Select
+                value={durationDays}
+                onChange={setDurationDays}
+                style={{ width: 140 }}
+                options={[
+                  { label: '1 ngày', value: 1 },
+                  { label: '3 ngày', value: 3 },
+                  { label: '7 ngày', value: 7 },
+                  { label: '14 ngày', value: 14 },
+                  { label: '30 ngày', value: 30 },
+                ]}
+              />
+            </div>
+          )}
+
+          {durationMode === 'custom_date' && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Ngày hết hạn:</span>
+              <DatePicker
+                value={customDate}
+                onChange={setCustomDate}
+                format="DD/MM/YYYY"
+                placeholder="Chọn ngày"
+                style={{ width: 180 }}
+                disabledDate={(current) => current && current < dayjs().startOf('day').add(1, 'day')}
+              />
+            </div>
+          )}
+
+          {/* Preview ngày hết hạn */}
+          {durationMode !== 'permanent' && (
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-lg">
+              <p className="text-xs text-emerald-800 dark:text-emerald-300">
+                {(() => {
+                  if (durationMode === 'custom_date' && !customDate) return '⚠️ Vui lòng chọn ngày cụ thể.';
+                  const expDate = durationMode === 'custom_date' ? customDate : dayjs().add(durationDays, 'day');
+                  const daysLeft = expDate ? expDate.diff(dayjs(), 'day') : 0;
+                  return <>⏰ Quyền sẽ hết hạn lúc <b>23:59 ngày {expDate?.format('DD/MM/YYYY')}</b> (còn <b>{daysLeft} ngày</b>).</>;
+                })()}
+              </p>
+            </div>
+          )}
         </div>
-      </div>
-    </Modal>
+      </Modal>
+    </>
   );
 };

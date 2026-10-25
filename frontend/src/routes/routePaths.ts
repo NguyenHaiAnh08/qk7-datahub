@@ -9,6 +9,8 @@ export const ROUTE_PATHS = {
   DESK: '/document-desk',
   ADMIN: '/admin-dashboard',
   USERS: '/users',
+  ADMIN_TRASH: '/admin/trash',
+  ADMIN_SESSIONS: '/admin/sessions',
   ERROR_400: '/400',
   ERROR_401: '/401',
   ERROR_403: '/403',

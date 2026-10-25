@@ -1,4 +1,4 @@
-# QK7 DATAHUB — Cổng Quản Lý Dữ Liệu Tập Trung Quân Khu 7
+# TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB — Cổng Quản Lý Dữ Liệu Tập Trung Quân Khu 7
 
 Hệ thống quản lý, lưu trữ số hóa, phân quyền khai thác tài liệu quân sự bảo mật đa cấp độ, tích hợp Trợ lý Trí Tuệ Nhân Tạo (AI RAG) và Xác Thực Sinh Trắc Học Vân Tay (ZKTeco ZK9500) của Bộ Tư Lệnh Quân Khu 7.
 
@@ -385,4 +385,4 @@ Hệ thống tích hợp cổng tài liệu API tương tác trực tiếp:
 * **Cán bộ / Sĩ quan (Cấp 3 - Mật):** `USR-002` (Thiếu tá - Thư ký)
 
 ---
-*Bản quyền tài liệu thuộc Bộ Tư Lệnh Quân Khu 7 — QK7 DataHub.*
+*Bản quyền tài liệu thuộc Bộ Tư Lệnh Quân Khu 7 — TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB.*

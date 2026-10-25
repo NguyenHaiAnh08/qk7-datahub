@@ -44,13 +44,14 @@ export const UserTable: React.FC<UserTableProps> = ({
   return (
     <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
       <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[980px]">
+        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[1060px]">
           <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 text-[11px] uppercase border-b border-slate-200 dark:border-slate-800 tracking-wider">
             <tr>
               <th className="py-3 px-4 whitespace-nowrap">Mã</th>
               <th className="py-3 px-4 whitespace-nowrap">Họ và tên</th>
               <th className="py-3 px-4 whitespace-nowrap">Cấp bậc</th>
               <th className="py-3 px-4 whitespace-nowrap">Chức vụ</th>
+              <th className="py-3 px-4 whitespace-nowrap">Vai trò</th>
               <th className="py-3 px-4 whitespace-nowrap">Đơn vị</th>
               <th className="py-3 px-4 whitespace-nowrap">Mức bảo mật</th>
               <th className="py-3 px-4">Quyền</th>
@@ -61,13 +62,13 @@ export const UserTable: React.FC<UserTableProps> = ({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                <td colSpan={10} className="py-12 text-center text-slate-500 dark:text-slate-400">
                   Đang tải danh sách người dùng...
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                <td colSpan={10} className="py-12 text-center text-slate-400 dark:text-slate-500">
                   Không tìm thấy người dùng nào phù hợp
                 </td>
               </tr>
@@ -90,6 +91,37 @@ export const UserTable: React.FC<UserTableProps> = ({
                   </td>
                   <td className="py-3 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
                     {u.position || '—'}
+                  </td>
+                  <td className="py-3 px-4 whitespace-nowrap">
+                    {(() => {
+                      const roles = (u.role_names && u.role_names.length > 0)
+                        ? u.role_names
+                        : (u.roles && u.roles.length > 0)
+                        ? u.roles
+                        : [];
+                      if (roles.length === 0) {
+                        return <span className="text-slate-400 dark:text-slate-600">—</span>;
+                      }
+                      return (
+                        <div className="flex flex-wrap items-center gap-1 max-w-[200px]">
+                          {roles.map((rn, idx) => {
+                            const isAdmin = rn.toLowerCase().includes('admin');
+                            return (
+                              <span
+                                key={idx}
+                                className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
+                                  isAdmin
+                                    ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                                    : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25'
+                                }`}
+                              >
+                                {rn}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="py-3 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                     {u.unit_name || '—'}

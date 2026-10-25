@@ -1,4 +1,4 @@
-# KIẾN TRÚC TOÀN BỘ HỆ THỐNG — QK7 DATAHUB
+# KIẾN TRÚC TOÀN BỘ HỆ THỐNG — TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB
 
 > **Bảo mật:** Cấp Bộ Tư Lệnh Quân Khu 7  
 > **Phiên bản kiến trúc:** v3.8-ENTERPRISE (Dual-Platform Desktop & iPadOS, React 18 + TS SPA, Express 5 Gateway, AI RAG & ZKTeco Biometric Engine)  
@@ -28,7 +28,7 @@
 
 ## 1. Tổng Quan Hệ Thống
 
-**QK7 DataHub** là nền tảng quản trị và lưu trữ tài liệu số tập trung, phục vụ công tác chỉ huy, tham mưu tác chiến và văn thư hành chính trong toàn Quân Khu 7. Hệ thống tích hợp toàn diện trí tuệ nhân tạo và công nghệ sinh trắc học phần cứng theo các trụ cột cốt lõi:
+**TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB** là nền tảng quản trị và lưu trữ tài liệu số tập trung, phục vụ công tác chỉ huy, tham mưu tác chiến và văn thư hành chính trong toàn Quân Khu 7. Hệ thống tích hợp toàn diện trí tuệ nhân tạo và công nghệ sinh trắc học phần cứng theo các trụ cột cốt lõi:
 
 * **Ứng Dụng Đơn Trang Chuẩn (SPA React 18 + TypeScript + Ant Design):** Toàn bộ giao diện được nạp qua duy nhất 1 vỏ bọc `index.html`, sử dụng cơ chế Auto-Discovery Routing qua `import.meta.glob`, không tải lại trang, bảo lưu trạng thái xác thực và trải nghiệm mượt mà với tông màu Tím chủ đạo (`#722ED1`).
 * **Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform PC & iPad Air M4 Touch UI):** Tương thích tối ưu cả Máy tính để bàn (Widescreen 16:9) và máy tính bảng iPad Air M4 (11-inch & 13-inch) với cơ chế `DeviceModeContext`, cho phép chuyển đổi chế độ xem tức thì. Trên iPadOS hỗ trợ vuốt chạm chuẩn Apple HIG (Touch Target ≥ 44×44px); trên Desktop PC sử dụng cụm nút bấm chuyển trang màu sắc chuyên biệt (`Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`) ổn định, loại bỏ hiệu ứng viên thuốc trượt để ngăn ngừa triệt để lỗi nhảy giao diện.
@@ -1006,5 +1006,5 @@ Hệ thống thiết kế giải pháp phản hồi kích thước viewport theo
 - Điều chỉnh khoảng đệm chân trang (`pb-4`), mang lại trải nghiệm thị giác gọn gàng, liền mạch và tập trung hoàn toàn vào 10 danh mục quản trị.
 
 ---
-*Tài liệu kiến trúc hệ thống QK7 DataHub được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
+*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
 

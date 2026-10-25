@@ -60,55 +60,56 @@ const NavigationGlider: React.FC<{
   const userUnitName = user?.unit_name?.trim() || 'Đơn vị của tôi';
 
   const allNavTabs = [
-  {
-    key: 'desk',
-    to: ROUTE_PATHS.DESK,
-    label: 'Đăng tải',
-    shortLabel: 'Đăng tải',
-    icon: UploadCloud,
-    activeColor: 'text-white',
-    inactiveColor: 'text-emerald-600 dark:text-emerald-400',
-    visible:
-      hasPermission('DOC_UPLOAD') ||
-      hasPermission('DOC_EDIT') ||
-      hasPermission('DOC_PARSE'),
-  },
-  {
-    key: 'portal',
-    to: ROUTE_PATHS.PORTAL,
-    label: 'Dữ liệu số',
-    shortLabel: 'Dữ liệu số',
-    icon: BookOpen,
-    activeColor: 'text-white',
-    inactiveColor: 'text-emerald-700 dark:text-emerald-400',
-    visible: true,
-  },
-  {
-    key: 'myunit',
-    to: ROUTE_PATHS.MY_UNIT,
-    label: userUnitName,
-    shortLabel: userUnitName,
-    icon: Building,
-    activeColor: 'text-white',
-    inactiveColor: 'text-amber-600 dark:text-amber-500',
-    visible: Boolean(user && user.user_id !== 'GUEST'),
-  },
-  {
-    key: 'admin',
-    to: ROUTE_PATHS.ADMIN,
-    label: 'Quản trị',
-    shortLabel: 'Quản trị',
-    icon: ShieldAlert,
-    activeColor: 'text-white',
-    inactiveColor: 'text-amber-600 dark:text-amber-500',
-    visible: Boolean(isAdmin),
-  },
-];
+    {
+      key: 'desk',
+      to: ROUTE_PATHS.DESK,
+      label: 'Đăng tải',
+      shortLabel: 'Đăng tải',
+      icon: UploadCloud,
+      activeColor: 'text-white',
+      inactiveColor: 'text-amber-700 dark:text-amber-400',
+      visible:
+        hasPermission('DOC_UPLOAD') ||
+        hasPermission('DOC_EDIT') ||
+        hasPermission('DOC_PARSE'),
+    },
+    {
+      key: 'portal',
+      to: ROUTE_PATHS.PORTAL,
+      label: 'Dữ liệu số',
+      shortLabel: 'Dữ liệu số',
+      icon: BookOpen,
+      activeColor: 'text-white',
+      inactiveColor: 'text-amber-700 dark:text-amber-400',
+      visible: true,
+    },
+    {
+      key: 'myunit',
+      to: ROUTE_PATHS.MY_UNIT,
+      label: userUnitName,
+      shortLabel: userUnitName,
+      icon: Building,
+      activeColor: 'text-white',
+      inactiveColor: 'text-amber-700 dark:text-amber-400',
+      visible: Boolean(user && user.user_id !== 'GUEST'),
+    },
+    {
+      key: 'admin',
+      to: ROUTE_PATHS.ADMIN,
+      label: 'Quản trị',
+      shortLabel: 'Quản trị',
+      icon: ShieldAlert,
+      activeColor: 'text-white',
+      inactiveColor: 'text-amber-700 dark:text-amber-400',
+      visible: Boolean(isAdmin),
+    },
+  ];
 
   const visibleTabs = allNavTabs.filter((t) => t.visible);
 
   const containerRef = useRef<HTMLElement>(null);
   const tabRefs = useRef<Record<string, HTMLElement | null>>({});
+  const labelRefs = useRef<Record<string, HTMLElement | null>>({});
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>(() => {
     return lastKnownPillCoords || { left: 0, width: 0 };
   });
@@ -148,16 +149,18 @@ const NavigationGlider: React.FC<{
       isInitialMount.current = false;
     });
 
-    // ResizeObserver đảm bảo Pill cập nhật chuẩn xác khi font chữ, zoom, hoặc breakpoint thay đổi
+    // Sau khi CSS transition của morphing pill hoàn tất (400-450ms), tinh chỉnh lại vị trí chuẩn xác 100%
+    const settleTimer = setTimeout(() => {
+      updateIndicator();
+    }, 450);
+
+    // ResizeObserver đảm bảo Pill cập nhật chuẩn xác khi font chữ, zoom, hoặc container thay đổi
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       ro = new ResizeObserver(() => {
         updateIndicator();
       });
       ro.observe(containerRef.current);
-      Object.values(tabRefs.current).forEach((el) => {
-        if (el) ro?.observe(el);
-      });
     }
 
     if (typeof document !== 'undefined' && document.fonts) {
@@ -167,6 +170,7 @@ const NavigationGlider: React.FC<{
     window.addEventListener('resize', updateIndicator);
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(settleTimer);
       window.removeEventListener('resize', updateIndicator);
       if (ro) ro.disconnect();
     };
@@ -176,7 +180,7 @@ const NavigationGlider: React.FC<{
     <nav
       ref={containerRef as any}
       aria-label="Điều hướng hệ thống"
-      className={`u058-nav relative flex items-center bg-slate-200/80 dark:bg-[#111827]/80 dark:bg-slate-900/80 backdrop-blur-md p-1 sm:p-1.5 rounded-2xl border border-slate-300/70 dark:border-slate-800 shadow-xs w-fit max-w-full select-none ${
+      className={`u058-nav relative flex items-center gap-1.5 sm:gap-2 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-2xl rounded-full px-2 sm:px-2.5 py-1.5 select-none w-fit max-w-full ${
         isInitialMount.current ? 'no-transition' : ''
       }`}
       style={{
@@ -185,64 +189,77 @@ const NavigationGlider: React.FC<{
         '--pill-opacity': indicatorStyle.width > 0 ? 1 : 0,
       } as React.CSSProperties}
     >
-      {/* Sliding Pill Highlight Indicator (#058) */}
+      {/* Sliding Pill Highlight Indicator (#058 Morphing Dock) */}
       <span className="u058-pill" aria-hidden="true" />
 
-      {visibleTabs.map((tab) => {
+      {visibleTabs.map((tab, index) => {
         const isActive = activeNav === tab.key;
         const IconComponent = tab.icon;
         return (
-          <Link
+          <Tooltip
             key={tab.key}
-            id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
-            ref={(el) => {
-              tabRefs.current[tab.key] = el;
-            }}
-            to={tab.to}
+            title={!isActive ? tab.label : ''}
+            placement="bottom"
+            mouseEnterDelay={0.25}
+            arrow={{ pointAtCenter: true }}
+          >
+            <Link
+              id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
+              ref={(el) => {
+                tabRefs.current[tab.key] = el;
+              }}
+              to={tab.to}
               onClick={() => {
-                const el = tabRefs.current[tab.key];
+                if (isActive) return;
                 const container = containerRef.current;
-                if (el && container) {
-                  const containerRect = container.getBoundingClientRect();
-                  const activeRect = el.getBoundingClientRect();
-                  const x = Math.round(activeRect.left - containerRect.left);
-                  const w = Math.round(activeRect.width);
-                  if (w > 0) {
-                    lastKnownPillCoords = { left: x, width: w };
-                    container.style.setProperty('--x', `${x}px`);
-                    container.style.setProperty('--w', `${w}px`);
+                if (container) {
+                  const labelEl = labelRefs.current[tab.key];
+                  const textW = labelEl ? labelEl.scrollWidth : 60;
+                  // targetW = icon (20) + gap (8) + textW + horizontal padding (32)
+                  const targetW = Math.round(20 + 8 + textW + 32);
+                  // targetX ước tính = container padding left (8px-10px) + index * (collapsed width 40px + gap 8px)
+                  const targetX = Math.round(10 + index * (40 + 8));
+
+                  if (targetW > 0) {
+                    lastKnownPillCoords = { left: targetX, width: targetW };
+                    container.style.setProperty('--x', `${targetX}px`);
+                    container.style.setProperty('--w', `${targetW}px`);
                     container.style.setProperty('--pill-opacity', '1');
-                    setIndicatorStyle({ left: x, width: w });
+                    setIndicatorStyle({ left: targetX, width: targetW });
                   }
                 }
               }}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={tab.label}
               data-active={isActive ? 'true' : 'false'}
-              className={`u058-tab relative z-10 shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 2xl:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors duration-200 select-none ${
+              className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 select-none h-10 ${
                 isActive
-                  ? 'is-active !text-white font-bold'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  ? 'is-active !text-white font-bold px-4 py-2 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0'
               }`}
               style={isActive ? { color: '#ffffff' } : undefined}
             >
               <IconComponent
-                className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 transition-transform duration-300 ${
-                  isActive ? 'scale-110 !text-white' : tab.inactiveColor
+                className={`w-5 h-5 shrink-0 transition-transform duration-300 ${
+                  isActive ? 'scale-105 !text-white stroke-white' : tab.inactiveColor
                 }`}
                 style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
               />
               <span
-                className="hidden 2xl:inline whitespace-nowrap"
+                ref={(el) => {
+                  labelRefs.current[tab.key] = el;
+                }}
+                className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-400 ease-[cubic-bezier(.34,1.45,.64,1)] ${
+                  isActive
+                    ? 'max-w-[280px] opacity-100 ml-2 font-bold !text-white'
+                    : 'max-w-0 opacity-0 ml-0 pointer-events-none'
+                }`}
                 style={isActive ? { color: '#ffffff' } : undefined}
               >
                 {tab.label}
               </span>
-              <span
-                className="hidden lg:inline 2xl:hidden whitespace-nowrap"
-                style={isActive ? { color: '#ffffff' } : undefined}
-              >
-                {tab.shortLabel}
-              </span>
             </Link>
+          </Tooltip>
         );
       })}
     </nav>
@@ -598,7 +615,12 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Vùng Phải: Quick Nav Links & Controls */}
+      {/* Vùng Giữa: Thanh Điều Hướng Morphing Pill Dock (Ở Giữa Màn Hình) */}
+      <div className="hidden sm:flex flex-1 justify-center items-center px-2 sm:px-4 min-w-0 z-10">
+        <NavigationGlider activeNav={activeNav} />
+      </div>
+
+      {/* Vùng Phải: Controls & User Profile */}
       <div id="tour-header-controls" className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0 z-20">
         {/* Live Network Indicator - Chỉ hiển thị nút cảnh báo nếu mất kết nối máy chủ (trạng thái bình thường chuyển vào bản thông tin user để tiết kiệm diện tích khung hình) */}
         {!isOnline && (
@@ -612,11 +634,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Mất kết nối máy chủ</span>
           </button>
         )}
-
-        {/* Cụm Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058) */}
-        <div className="hidden sm:flex items-center shrink-0">
-          <NavigationGlider activeNav={activeNav} />
-        </div>
 
         {/* Nút gạt chuyển đổi Máy tính / iPad Air M4 (Gọn trên Header) */}
         <div className="shrink-0">

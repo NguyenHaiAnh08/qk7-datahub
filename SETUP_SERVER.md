@@ -1,4 +1,4 @@
-# HƯỚNG DẪN SETUP MÁY CHỦ SERVER & MÁY TRẠM CLIENT — QK7 DATAHUB
+# HƯỚNG DẪN SETUP MÁY CHỦ SERVER & MÁY TRẠM CLIENT — TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB
 
 Tài liệu hướng dẫn chi tiết quy trình thiết lập máy chủ (Server), cấu hình biến môi trường, khởi động hệ thống hàng ngày và cài đặt trạm máy quét sinh trắc học vân tay Client (ZKTeco ZK9500) trong mạng nội bộ Quân Khu 7.
 
@@ -216,7 +216,7 @@ python agent.py
 ## 🌐 KIỂM TRA TRUY CẬP HOÀN TẤT
 
 Sau khi thiết lập hoàn tất, mở trình duyệt từ máy Client hoặc Server để kiểm tra:
-* **Giao diện Web QK7 DataHub:** 👉 **`http://192.168.1.229:8000`** *(hoặc IP máy server của bạn)*
+* **Giao diện Web TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB:** 👉 **`http://192.168.1.229:8000`** *(hoặc IP máy server của bạn)*
 * **Tài liệu Swagger API:** `http://192.168.1.229:8000/api-docs`
 * **Microservice AI boxchat:** `http://192.168.1.229:8001/docs`
 * **Trạm kiểm soát vân tay nội bộ:** `http://127.0.0.1:9001/device-id`

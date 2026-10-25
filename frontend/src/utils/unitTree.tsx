@@ -56,11 +56,11 @@ export function buildUnitTree(units: Unit[]): UnitTreeNode[] {
       title: (
         <div className="flex items-center w-full py-0.5 pr-1 gap-2.5 select-none leading-none">
           {depth === 0 ? (
-            <div className="w-5 h-5 rounded-md bg-purple-500/15 dark:bg-purple-900/40 border border-purple-500/30 flex items-center justify-center shrink-0 text-purple-600 dark:text-purple-300 shadow-xs">
+            <div className="w-5 h-5 rounded-md bg-amber-500/15 dark:bg-amber-900/40 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-700 dark:text-amber-300 shadow-xs">
               <Landmark className="w-3.5 h-3.5" />
             </div>
           ) : isParent ? (
-            <div className="w-4 h-4 rounded-md bg-purple-500/15 dark:bg-purple-900/40 border border-purple-500/30 flex items-center justify-center shrink-0 text-purple-600 dark:text-purple-300">
+            <div className="w-4 h-4 rounded-md bg-emerald-500/15 dark:bg-emerald-900/40 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-700 dark:text-emerald-300">
               <Building className="w-2.5 h-2.5" />
             </div>
           ) : (

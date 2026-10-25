@@ -270,7 +270,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <UserIcon className="w-4 h-4" />
               </div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
@@ -305,7 +305,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   value={formData.user_id || ''}
                   placeholder="Ví dụ: USR-005"
                   required
-                  className="w-full h-9 px-3 py-1.5 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80 text-xs"
+                  className="w-full h-9.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80 text-sm"
                   title="Mã định danh quân nhân được hệ thống tự động khởi tạo theo thứ tự"
                 />
               </div>
@@ -320,15 +320,15 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   placeholder="Nguyễn Văn A"
                   required
-                  className="w-full h-9 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 text-xs"
+                  className="w-full h-9.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-sm"
                 />
               </div>
             </div>
 
             {/* Tài khoản xác thực cho user mới */}
             {!isEdit && (
-              <div className="p-3.5 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 rounded-xl space-y-3">
-                <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-bold text-xs">
+              <div className="p-3.5 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl space-y-3">
+                <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-bold text-xs">
                   <KeyRound className="w-3.5 h-3.5" />
                   <span>Thông Tin Đăng Nhập Hệ Thống</span>
                 </div>
@@ -344,7 +344,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                       onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                       placeholder="Ví dụ: usr-005"
                       required
-                      className="w-full h-9 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 font-mono text-xs"
+                      className="w-full h-9.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-mono text-sm"
                     />
                   </div>
 
@@ -360,13 +360,13 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                         placeholder="Mặc định: 123456789"
                         required
                         minLength={8}
-                        className="w-full h-9 pl-3 pr-14 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 font-mono text-xs"
+                        className="w-full h-9.5 pl-3 pr-14 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-mono text-sm"
                       />
                       <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center space-x-0.5">
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="p-1 text-slate-400 hover:text-purple-500 dark:hover:text-purple-400 transition cursor-pointer"
+                          className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition cursor-pointer"
                           title={showPassword ? 'Ẩn mật khẩu' : 'Xem mật khẩu'}
                         >
                           {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -375,7 +375,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                           <button
                             type="button"
                             onClick={copyPassword}
-                            className="p-1 text-slate-400 hover:text-purple-500 dark:hover:text-purple-400 transition cursor-pointer"
+                            className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition cursor-pointer"
                             title="Sao chép mật khẩu"
                           >
                             {copied ? (
@@ -398,7 +398,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 <select
                   value={formData.rank_name || ''}
                   onChange={(e) => setFormData({ ...formData, rank_name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+                  className="w-full h-9.5 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 cursor-pointer text-sm"
                 >
                   <option value=""> Chọn cấp bậc </option>
                   {formData.rank_name && !availableRanks.some((r) => r.name === formData.rank_name) && (
@@ -417,7 +417,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 <select
                   value={formData.position || ''}
                   onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+                  className="w-full h-9.5 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 cursor-pointer text-sm"
                 >
                   <option value=""> Chọn chức vụ </option>
                   {formData.position && !availablePositions.some((p) => p.name === formData.position) && (
@@ -446,7 +446,16 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   onChange={(val) => setFormData({ ...formData, unit_id: val || '' })}
                   treeData={unitTree}
                   placeholder="Chọn đơn vị công tác"
-                  allowClear
+                  allowClear={{
+                    clearIcon: (
+                      <span
+                        className="flex items-center justify-center w-4 h-4 rounded-full bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-700/70 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 transition-all cursor-pointer"
+                        title="Xóa lựa chọn đơn vị"
+                      >
+                        <X className="w-2.5 h-2.5 stroke-[2]" />
+                      </span>
+                    ),
+                  }}
                   treeExpandedKeys={treeExpandedKeys}
                   onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
                   onOpenChange={(visible) => {
@@ -506,7 +515,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                     setFormData({ ...formData, clearance_level_id: e.target.value ? Number(e.target.value) : undefined })
                   }
                   required
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+                  className="w-full h-9.5 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 cursor-pointer text-sm"
                 >
                   <option value=""> Chọn độ bảo mật </option>
                   {securityLevels.map((lvl) => (
@@ -524,7 +533,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 <select
                   value={formData.role_id || ''}
                   onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+                  className="w-full h-9.5 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 cursor-pointer text-sm"
                 >
                   <option value=""> Chọn vai trò</option>
                   {availableRoles.map((r) => (
@@ -538,13 +547,12 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Trạng thái tài khoản</label>
                 <select
-                  value={formData.status || 'active'}
+                  value={formData.status === 'locked' ? 'locked' : 'active'}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 text-xs"
+                  className="w-full h-9.5 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 text-sm"
                 >
                   <option value="active">Hoạt động</option>
-                  <option value="locked">Khóa tạm thời</option>
-                  <option value="inactive">Ngừng sử dụng</option>
+                  <option value="locked">Khóa</option>
                 </select>
               </div>
             </div>
@@ -560,7 +568,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-md shadow-purple-600/30"
+                className="px-4 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-bold rounded-xl flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-md shadow-emerald-950/20 border border-amber-500/25"
               >
                 <Save className="w-3.5 h-3.5" />
                 {submitting ? 'Đang lưu...' : 'Lưu thông tin'}

@@ -1,7 +1,7 @@
 import { http } from './http';
 import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { DocumentItem, DocumentFilterParams } from '../types/document';
-import { fileService } from './fileService';
+import fileService from './fileService';
 
 
 export interface ParsedDocumentMetadata {
@@ -98,6 +98,7 @@ export const documentService = {
     if (type) searchParams.append('type', type);
     const unit = params.unit || params.issuing_unit_id;
     if (unit) searchParams.append('unit', unit);
+    if (params.include_children) searchParams.append('include_children', 'true');
     if (params.from) searchParams.append('from', params.from);
     if (params.to) searchParams.append('to', params.to);
     const lv = params.lv ?? params.security_level_id;
@@ -128,7 +129,7 @@ export const documentService = {
 
     const qs = sp.toString();
     return http<MyUnitDocumentResponse>(
-      `/api/documents/my-unit${qs ? `?${qs}` : ''}`,
+      `${API_ENDPOINTS.DOCUMENTS.MY_UNIT}${qs ? `?${qs}` : ''}`, 
       { skipErrorNotification: true }
     );
   },
@@ -144,24 +145,26 @@ export const documentService = {
 
 
   /**
-   * Check for duplicate documents based on SHA256 and document code
-   * 
-   * 
-   */
-    checkDuplicate: async (
-      file: File,
-      documentCode?: string
-    ): Promise<CheckDuplicateResult> => {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (documentCode) formData.append('document_code', documentCode);
+ * @deprecated Từ v2026.10, dùng `parseDocument()` — API parse đã trả về
+ * `duplicate_check` (SHA-256 + document_code) trong cùng 1 request,
+ * tránh 2 round-trip. Hàm này chỉ giữ để tương thích ngược với code cũ.
+ *
+ * Check for duplicate documents based on SHA256 and document code
+ */
+  checkDuplicate: async (
+    file: File,
+    documentCode?: string
+  ): Promise<CheckDuplicateResult> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (documentCode) formData.append('document_code', documentCode);
 
-      return http<CheckDuplicateResult>('/api/documents/check-duplicate', {
-        method: 'POST',
-        body: formData,
-        skipErrorNotification: true,
-      });
-    },
+    return http<CheckDuplicateResult>('/api/documents/check-duplicate', {
+      method: 'POST',
+      body: formData,
+      skipErrorNotification: true,
+    });
+  },
 
 
   /**
@@ -195,5 +198,31 @@ export const documentService = {
   getViewUrl: fileService.getViewUrl,
   fetchDocumentBlob: fileService.fetchFileBlob,
   downloadDocument: fileService.downloadFile,
+
+  // ═══════════════════════════════════════════════════════════
+  // SOFT DELETE / TRASH / RESTORE / PURGE
+  // ═══════════════════════════════════════════════════════════
+
+  getTrash: async (): Promise<{ total: number; items: DocumentItem[] }> => {
+    return http<{ total: number; items: DocumentItem[] }>(API_ENDPOINTS.DOCUMENTS.TRASH);
+  },
+
+  restoreDocument: async (
+    fileId: string
+  ): Promise<{ success: boolean; file_id: string; restored: boolean }> => {
+    return http(API_ENDPOINTS.DOCUMENTS.RESTORE(fileId), { method: 'POST' });
+  },
+
+  purgeDocument: async (
+    fileId: string
+  ): Promise<{ success: boolean; file_id: string; purged: boolean }> => {
+    return http(API_ENDPOINTS.DOCUMENTS.PURGE(fileId), {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: fileId }),
+    });
+  },
+
+
 };
 

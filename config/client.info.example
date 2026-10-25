@@ -1,0 +1,11 @@
+# ============================================================
+# QK7 CLIENT CONFIG - Sinh tu server .env
+# Generated: 22/10/2026 16:59:18.58
+# Copy vao: C:\QK7Agent\.env
+# ============================================================
+
+BACKEND_WS_URL=wss://localhost:8000/ws/fingerprint
+BRIDGE_TOKEN=qk7_fp_04560ac25f709b7e1c2e2ac38fa4b5aa5360c2e8969fe73c
+DEVICE_SERVER_HOST=127.0.0.1
+DEVICE_SERVER_PORT=9001
+MATCH_SCORE_THRESHOLD=45

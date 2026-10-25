@@ -11,16 +11,24 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true
+        changeOrigin: true,
+        secure: false,         
       },
       '/uploads': {
         target: 'http://localhost:8000',
-        changeOrigin: true
-      }
-    }
+        changeOrigin: true,
+        secure: false,     
+      },
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true,
+        changeOrigin: true,
+        secure: false,          
+      },
+    },
   },
   build: {
     outDir: resolve(__dirname, '../backend/public'),
     emptyOutDir: true,
-  }
+  },
 });

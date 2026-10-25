@@ -119,3 +119,53 @@ export function getUnitFullPath(units: Unit[], unitId: string): string {
   }
   return parts.join(' — ');
 }
+
+/**
+ * Lọc danh sách đơn vị cho phạm vi Trường Quân sự Quân khu 7:
+ * - Giữ lại "Quân khu 7" (cha)
+ * - "Trường Quân sự Quân khu 7" (con)
+ * - Toàn bộ các phòng ban / đơn vị trực thuộc Trường Quân sự Quân khu 7
+ * - Ẩn các đơn vị khác (Sư đoàn 309, Sư đoàn 5, các trung đoàn/tiểu đoàn khác...)
+ */
+export function filterSchoolUnits(units: Unit[], currentUnitId?: string): Unit[] {
+  if (!units || units.length === 0) return [];
+
+  // 1. Tìm đơn vị Trường Quân sự Quân khu 7 (TQS)
+  const tqsUnit = units.find(
+    (u) =>
+      u.unit_id === 'TQS' ||
+      u.name.toLowerCase().includes('trường quân sự')
+  );
+
+  if (!tqsUnit) return units;
+
+  // 2. Thu thập toàn bộ ID các đơn vị con cháu trực thuộc TQS
+  const allowedUnitIds = new Set<string>();
+  allowedUnitIds.add(tqsUnit.unit_id);
+
+  let addedMore = true;
+  while (addedMore) {
+    addedMore = false;
+    for (const u of units) {
+      if (u.parent_id && allowedUnitIds.has(u.parent_id) && !allowedUnitIds.has(u.unit_id)) {
+        allowedUnitIds.add(u.unit_id);
+        addedMore = true;
+      }
+    }
+  }
+
+  // 3. Thu thập các cấp cha của TQS (Quân khu 7)
+  let currParentId = tqsUnit.parent_id;
+  while (currParentId) {
+    allowedUnitIds.add(currParentId);
+    const parentUnit = units.find((u) => u.unit_id === currParentId);
+    currParentId = parentUnit?.parent_id;
+  }
+
+  // 4. Giữ lại currentUnitId nếu có để tránh mất lựa chọn khi edit user cũ
+  if (currentUnitId) {
+    allowedUnitIds.add(currentUnitId);
+  }
+
+  return units.filter((u) => allowedUnitIds.has(u.unit_id));
+}

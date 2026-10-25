@@ -43,3 +43,7 @@ htmlcov/
 venv/
 .venv/
 env/
+
+# AI Vector Storage Lock & Cache
+boxchat/local_storage/qdrant_data/.lock
+*.lock

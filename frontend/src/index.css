@@ -1466,8 +1466,8 @@ html.dark select option:checked,
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   Lucian UX/UI Prompt #058 · Sliding Highlight Pill Navigation
-   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#058
+   Morphing Pill Dock Navigation Bar (Expanding Active Tab #058)
+   Design System Reference: DESIGN.md & Military Triad Color System
    ══════════════════════════════════════════════════════════════════════ */
 .u058-nav {
   --x: 0px;
@@ -1484,8 +1484,7 @@ html.dark select option:checked,
   text-decoration: none;
 }
 
-/* Đảm bảo tab ĐANG CHỌN (Active) luôn hiển thị chữ TRẮNG TUYỆT ĐỐI trên nền xanh quân đội #166534 */
-/* Ngăn chặn triệt để Ant Design a { color: #166534 } hoặc a:hover đè màu làm chìm chữ */
+/* Đảm bảo tab ĐANG CHỌN (Active) luôn hiển thị chữ TRẮNG TUYỆT ĐỐI trên nền xanh quân đội #166534 / emerald-600 */
 .u058-nav a.is-active,
 .u058-nav a.is-active:hover,
 .u058-nav a.is-active:focus,
@@ -1508,12 +1507,13 @@ html.dark select option:checked,
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) !important;
 }
 
+/* Khung nền nổi trượt & mở rộng vật lý đàn hồi (Morphing Active Pill) */
 .u058-pill {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
+  top: 6px;
+  bottom: 6px;
   left: 0;
-  width: var(--w, 60px);
+  width: var(--w, 36px);
   transform: translateX(var(--x, 0px));
   opacity: var(--pill-opacity, 0);
   transition: transform 0.45s cubic-bezier(0.34, 1.45, 0.64, 1),
@@ -1522,33 +1522,42 @@ html.dark select option:checked,
   will-change: transform, width;
   pointer-events: none;
   z-index: 1;
-  border-radius: 999px;
+  border-radius: 9999px;
   background-color: #166534; /* Xanh Lục Quân chủ đạo */
-  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.3), 0 2px 10px rgba(22, 101, 52, 0.25);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
 :root.dark .u058-pill,
 html.dark .u058-pill {
-  background-color: #166534;
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
-  border: 1px solid rgba(251, 191, 36, 0.35); /* Viền ánh Vàng Kim Quân Hiệu */
+  background-color: #059669; /* emerald-600 */
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35), 0 0 12px rgba(5, 150, 105, 0.25);
+  border: 1px solid rgba(251, 191, 36, 0.45); /* Viền ánh Vàng Kim Quân Hiệu */
 }
 
-@media (min-width: 640px) {
-  .u058-pill {
-    top: 6px;
-    bottom: 6px;
-  }
+/* Morphing Pill Label Transition */
+.morphing-pill-label {
+  display: inline-block;
+  vertical-align: middle;
+  transition: max-width 0.45s cubic-bezier(0.34, 1.45, 0.64, 1),
+              opacity 0.25s ease,
+              margin-left 0.35s ease;
+  will-change: max-width, opacity;
 }
 
-.u058-nav.no-transition .u058-pill {
+.u058-nav.no-transition .u058-pill,
+.u058-nav.no-transition .morphing-pill-label {
   transition: none !important;
 }
 
+/* Hỗ trợ chế độ giảm chuyển động theo tiêu chuẩn Accessibility WCAG */
 @media (prefers-reduced-motion: reduce) {
-  .u058-pill {
+  .u058-pill,
+  .morphing-pill-label,
+  .u058-tab,
+  .u058-tab svg {
     transition: none !important;
+    animation: none !important;
   }
 }
 

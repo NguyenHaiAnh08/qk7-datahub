@@ -6,7 +6,7 @@
 ---
 
 ## 0. QUY TRÌNH TƯ DUY & TÌM KIẾM UX/UI BẮT BUỘC (MANDATORY UX/UI DISCOVERY WORKFLOW)
-> **BẮT BUỘC THỰC HIỆN TRƯỚC KHI VIẾT CODE:** Bất kỳ khi nào kỹ sư hoặc AI Agent nhận yêu cầu thiết kế mới, sửa đổi giao diện, thêm component hay tối ưu UX/UI trong dự án QK7 DataHub, **BẮT BUỘC** phải tuân thủ nghiêm ngặt quy trình 3 bước sau đây:
+> **BẮT BUỘC THỰC HIỆN TRƯỚC KHI VIẾT CODE:** Bất kỳ khi nào kỹ sư hoặc AI Agent nhận yêu cầu thiết kế mới, sửa đổi giao diện, thêm component hay tối ưu UX/UI trong dự án TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB, **BẮT BUỘC** phải tuân thủ nghiêm ngặt quy trình 3 bước sau đây:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -83,7 +83,7 @@ Toàn bộ pattern tiếp thu từ bên ngoài bắt buộc phải "khoác áo" 
 ## 1. TÔN CHỈ THIẾT KẾ: BẢN SẮC TRUNG TÂM CHỈ HUY QUÂN KHU HIỆN ĐẠI
 *(Modern Military Tactical & Command Center Aesthetic)*
 
-Mục tiêu tối thượng của giao diện **QK7 DataHub** là: **Có chiều sâu, có hồn, mang cá tính thiết kế thủ công tinh xảo (Human-crafted & Bespoke UI), tuyệt đối không mang dáng dấp công nghiệp, vô hồn hay rập khuôn do AI tạo ra.**
+Mục tiêu tối thượng của giao diện **TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB** là: **Có chiều sâu, có hồn, mang cá tính thiết kế thủ công tinh xảo (Human-crafted & Bespoke UI), tuyệt đối không mang dáng dấp công nghiệp, vô hồn hay rập khuôn do AI tạo ra.**
 
 ### 1.1. Bản Sắc Quân Đội & Truyền Thống Dân Tộc
 - **Biểu tượng Trống đồng Đông Sơn & Bản đồ chữ S:** Họa tiết trống đồng ngàn năm lịch sử kết hợp cùng dải đất hình chữ S Việt Nam và quần đảo Hoàng Sa - Trường Sa, chuyển động quay chậm tự nhiên theo chiều kim đồng hồ (120s/vòng), thể hiện sự vững chãi, chủ quyền bất khả xâm phạm và dòng chảy thông tin dữ liệu số liên tục.

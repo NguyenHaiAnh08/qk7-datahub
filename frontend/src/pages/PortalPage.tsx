@@ -505,7 +505,7 @@ export const PortalPage: React.FC = () => {
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <Shield className="w-4 h-4 text-amber-500" />
-                  Quy Chế An Ninh Dữ Liệu Quân Khu 7
+                  Quy chế an ninh dữ liệu Trường Quân sự Quân khu 7
                 </h3>
                 <button
                   onClick={() => setShowSecurityPolicy(false)}
@@ -529,7 +529,7 @@ export const PortalPage: React.FC = () => {
                 onClick={() => setShowSecurityPolicy(false)}
                 className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition cursor-pointer shadow-md shadow-emerald-600/30"
               >
-                Tôi Đã Hiểu Và Cam Kết Tuân Thủ
+                Tôi đã hiểu và cam kết tuân thủ
               </button>
             </motion.div>
           </div>

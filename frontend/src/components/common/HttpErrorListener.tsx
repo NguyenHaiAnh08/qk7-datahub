@@ -1,25 +1,18 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { App as AntApp } from 'antd';
-import {
-  WarningOutlined,
-  StopOutlined,
-  ApiOutlined,
-  ExclamationCircleOutlined,
-} from '@ant-design/icons';
 import { HttpErrorDetail } from '../../services/http';
 import { authService } from '../../services/authService';
 import { ROUTE_PATHS } from '../../routes/routePaths';
+import { toast } from './Toast';
 
 /**
  * Global HTTP Error Listener
  * - 401 (không phải login) → Xóa session + dispatch 'qk7:session-expired' để AuthContext reset
- * - Các mã khác → Ant Design Notification (dùng `message`, KHÔNG dùng `title` vì AntD v5)
+ * - Các mã khác → JolyUI Animated Toast với âm hưởng chỉ huy tác chiến quân sự
  */
 export const HttpErrorListener: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { notification } = AntApp.useApp();
 
   useEffect(() => {
     const handleHttpError = (event: Event) => {
@@ -45,13 +38,10 @@ export const HttpErrorListener: React.FC = () => {
         // Báo cho AuthProvider biết để reset state + navigate
         window.dispatchEvent(new CustomEvent('qk7:session-expired'));
 
-        notification.warning({
-          message: 'Phiên Làm Việc Hết Hạn',
-          description:
-            message || 'Vui lòng đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
-          icon: <WarningOutlined className="text-amber-500" />,
-          duration: 4.5,
-        });
+        toast.warning(
+          message || 'Vui lòng đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
+          { title: 'Phiên Làm Việc Hết Hạn', badge: 'AUTH-401' }
+        );
         return;
       }
 
@@ -70,44 +60,33 @@ export const HttpErrorListener: React.FC = () => {
 
       switch (status) {
         case 403:
-          notification.error({
-            message: 'Truy Cập Bị Từ Chối',
-            description:
-              message ||
-              'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
-            icon: <StopOutlined className="text-red-500" />,
-            duration: 4.5,
-          });
+          toast.securityAlert(
+            message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
+            { title: 'Truy Cập Bị Từ Chối', badge: 'CLEARANCE-403' }
+          );
           break;
 
         case 404:
-          notification.info({
-            message: 'Không Tìm Thấy Tài Nguyên',
-            description: message || `Không tìm thấy endpoint hoặc tài liệu yêu cầu: ${url}`,
-            duration: 4.5,
-          });
+          toast.info(
+            message || `Không tìm thấy endpoint hoặc tài liệu yêu cầu: ${url}`,
+            { title: 'Không Tìm Thấy Tài Nguyên', badge: '404' }
+          );
           break;
 
         case 500:
         case 502:
         case 503:
         case 504:
-          notification.error({
-            message: 'Sự Cố Máy Chủ',
-            description:
-              message ||
-              'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
-            icon: <ApiOutlined className="text-red-500" />,
-            duration: 5,
-          });
+          toast.error(
+            message || 'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
+            { title: 'Sự Cố Máy Chủ', badge: `ERR-${status}` }
+          );
           break;
 
         default:
-          notification.warning({
-            message: 'Lỗi Phản Hồi Hệ Thống',
-            description: message,
-            icon: <ExclamationCircleOutlined className="text-amber-500" />,
-            duration: 4.5,
+          toast.warning(message || 'Đã xảy ra sự cố không xác định', {
+            title: 'Lỗi Phản Hồi Hệ Thống',
+            badge: `HTTP-${status}`,
           });
           break;
       }
@@ -117,7 +96,7 @@ export const HttpErrorListener: React.FC = () => {
     return () => {
       window.removeEventListener('qk7:http-error', handleHttpError);
     };
-  }, [navigate, location.pathname, notification]);
+  }, [navigate, location.pathname]);
 
   return null;
 };

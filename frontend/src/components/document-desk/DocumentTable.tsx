@@ -13,6 +13,7 @@ import {
 import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
+import { TacticalEmptyState } from '../common/TacticalEmptyState';
 
 export interface DocumentTableProps {
   documents: DocumentItem[];
@@ -21,6 +22,8 @@ export interface DocumentTableProps {
   currentPage: number;
   totalPages: number;
   totalItems: number;
+  searchQuery?: string;
+  onClearFilters?: () => void;
   onPageChange: (page: number) => void;
   onPreview: (doc: DocumentItem) => void;
   onDownload: (doc: DocumentItem) => void;
@@ -35,6 +38,8 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   currentPage,
   totalPages,
   totalItems,
+  searchQuery,
+  onClearFilters,
   onPageChange,
   onPreview,
   onDownload,
@@ -57,10 +62,10 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col transition-colors duration-200">
+    <div className="bg-white dark:bg-[#111827] rounded-xl overflow-hidden border border-slate-200 dark:border-white/[0.08] flex flex-col transition-colors duration-200">
       <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[800px]">
-          <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 text-[11px] uppercase border-b border-slate-200 dark:border-slate-800 tracking-wider">
+          <thead className="bg-slate-50/80 dark:bg-white/[0.02] text-slate-500 dark:text-slate-400 text-xs font-semibold border-b border-slate-200 dark:border-white/[0.06]">
             <tr>
               <th className="py-3 px-4">Số hiệu</th>
               <th className="py-3 px-4">Trích yếu nội dung</th>
@@ -81,17 +86,24 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               </tr>
             ) : documents.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                  Không tìm thấy tài liệu nào phù hợp với bộ lọc
+                <td colSpan={8} className="py-6 text-center">
+                  <TacticalEmptyState
+                    title="Không tìm thấy tài liệu phù hợp với bộ lọc"
+                    description="Không có tài liệu nào khớp với từ khóa tìm kiếm hoặc bộ lọc văn bản hiện tại."
+                    searchQuery={searchQuery}
+                    onClearFilters={onClearFilters}
+                    compact
+                  />
                 </td>
               </tr>
             ) : (
-              documents.map((doc) => {
+              documents.map((doc, idx) => {
                 const isRestricted = (doc.security_level_id || 1) > userClearanceLevel;
 
                 return (
                   <tr
                     key={doc.file_id}
+                    id={idx === 0 ? 'tour-document-card' : undefined}
                     className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                   >
                     <td className="py-3 px-4 whitespace-nowrap">

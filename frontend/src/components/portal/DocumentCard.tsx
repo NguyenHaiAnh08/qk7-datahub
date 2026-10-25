@@ -3,6 +3,7 @@ import { FileText, Eye, Download, Lock, Calendar, Building, HardDrive } from 'lu
 import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
+import { CompactDownloadButton } from '../common/CompactDownloadButton';
 
 export interface DocumentCardProps {
   document: DocumentItem;
@@ -40,7 +41,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   const isSecretLevel = docLevel >= 3;
 
   return (
-    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all duration-200 group">
+    <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col justify-between hover:border-emerald-600/40 dark:hover:border-emerald-500/40 transition-colors duration-150 group">
       <div>
         {/* Top Badges */}
         <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -119,28 +120,17 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               <Eye className="w-3.5 h-3.5" />
               <span>Xem văn bản PDF</span>
             </button>
-            {canDownload ? (
-              <button
-                onClick={() => onDownload(document)}
-                className="min-h-[40px] py-2 px-3.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                title="Tải về máy"
-              >
-                <Download className="w-4 h-4" />
-                <span className="text-xs">Tải về</span>
-              </button>
-            ) : (
-              <button
-                disabled
-                className="min-h-[40px] py-2 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed opacity-60"
-                title={
-                  isSecretLevel
-                    ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
-                    : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
-                }
-              >
-                <Download className="w-4 h-4" />
-              </button>
-            )}
+            <CompactDownloadButton
+              onDownload={() => onDownload(document)}
+              disabled={!canDownload}
+              disabledTitle={
+                isSecretLevel
+                  ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
+                  : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
+              }
+              fileSize={formatFileSize(document.file_size ?? document.file_size_bytes)}
+              size="normal"
+            />
           </>
         )}
       </div>

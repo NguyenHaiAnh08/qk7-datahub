@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, X, Users } from 'lucide-react';
 import { Header } from '../components/common/Header';
-import { Toast, ToastState } from '../components/common/Toast';
+import { toast } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { UserTable } from '../components/users/UserTable';
 import { UserFormModal } from '../components/users/UserFormModal';
@@ -45,16 +45,10 @@ export const UsersPage: React.FC = () => {
     user: null
   });
 
-  // Toast
-  const [toast, setToast] = useState<ToastState>({
-    show: false,
-    message: '',
-    type: 'success'
-  });
-
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2800);
+    if (type === 'error') toast.error(message);
+    else if (type === 'info') toast.info(message);
+    else toast.success(message);
   };
 
   const loadData = async () => {
@@ -91,26 +85,41 @@ export const UsersPage: React.FC = () => {
     loadData();
   }, []);
 
-  const handleSaveUser = async (userData: Partial<User>) => {
+    const handleSaveUser = async (userData: Partial<User>) => {
     if (selectedUser?.user_id) {
       await usersApi.updateUser(selectedUser.user_id, userData);
-      showToast('Đã cập nhật thông tin quân nhân');
+      await loadData();
+      toast.success(`Đã cập nhật thông tin quân nhân ${selectedUser.full_name || selectedUser.user_id}`, {
+        title: 'HỒ SƠ ĐÃ LƯU',
+        badge: selectedUser.user_id,
+      });
     } else {
       await usersApi.createUser(userData as any);
-      showToast('Đã thêm quân nhân mới thành công');
+      await loadData();
+      toast.success('Đã thêm quân nhân mới thành công vào hệ thống dữ liệu.', {
+        title: 'THÊM THÀNH CÔNG',
+        badge: 'NEW-USER',
+      });
     }
-    loadData();
   };
 
   const handleDeleteUser = async () => {
     if (!deleteConfirm.user) return;
     try {
       await usersApi.deleteUser(deleteConfirm.user.user_id);
-      showToast(`Đã xóa quân nhân ${deleteConfirm.user.full_name}`);
+      const deletedName = deleteConfirm.user.full_name;
+      const deletedId = deleteConfirm.user.user_id;
       setDeleteConfirm({ open: false, user: null });
-      loadData();
+      await loadData();
+      toast.success(`Đã xóa quân nhân ${deletedName} khỏi danh bạ đơn vị.`, {
+        title: 'XÓA QUÂN NHÂN',
+        badge: deletedId,
+      });
     } catch (err: any) {
-      showToast('Lỗi: ' + err.message, 'error');
+      toast.error('Lỗi khi xóa quân nhân: ' + err.message, {
+        title: 'LỖI THAO TÁC',
+        badge: 'USER-ERR',
+      });
     }
   };
 
@@ -132,18 +141,18 @@ export const UsersPage: React.FC = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
       <Header
         activeNav="admin"
-        title="QK7 DATAHUB"
-        subtitle="Quản Lý Quân Nhân & Phân Quyền Bảo Mật"
+        title="Trường Quân Sự Quân Khu 7"
+        subtitle="Trung tâm dữ liệu số"
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-              <Users className="w-6 h-6 text-amber-500 dark:text-amber-400" />
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div className="shrink-0">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5 whitespace-nowrap">
+              <Users className="w-6 h-6 text-amber-500 dark:text-amber-400 shrink-0" />
               <span>Danh Sách Quân Nhân & Cán Bộ</span>
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 whitespace-nowrap">
               Phân cấp độ bảo mật (Cấp 1 - 5), tài khoản xác thực và đơn vị công tác
             </p>
           </div>
@@ -232,8 +241,6 @@ export const UsersPage: React.FC = () => {
         onConfirm={handleDeleteUser}
         onCancel={() => setDeleteConfirm({ open: false, user: null })}
       />
-
-      <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
     </div>
   );
 };

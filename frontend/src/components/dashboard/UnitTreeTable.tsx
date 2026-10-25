@@ -103,9 +103,9 @@ export const CATEGORY_CONFIG: Record<
     label: 'Sư đoàn',
     icon: Shield,
     badgeClass:
-      'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30',
+      'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
     iconBgClass:
-      'bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30',
+      'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30',
   },
   trung_doan: {
     label: 'Trung đoàn',
@@ -127,9 +127,9 @@ export const CATEGORY_CONFIG: Record<
     label: 'Nhà trường / Viện',
     icon: GraduationCap,
     badgeClass:
-      'bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/30',
+      'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
     iconBgClass:
-      'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/30',
+      'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
   },
   phong_ban: {
     label: 'Phòng / Ban / Cơ quan',
@@ -459,7 +459,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
           className={`rounded px-1 py-0.5 font-bold ${
             isCode
               ? 'bg-amber-300/80 text-amber-950 dark:bg-amber-400/40 dark:text-amber-200'
-              : 'bg-purple-200 text-purple-900 dark:bg-purple-600/40 dark:text-purple-100'
+              : 'bg-emerald-200 text-emerald-900 dark:bg-emerald-600/40 dark:text-emerald-100'
           }`}
         >
           {matched}
@@ -493,11 +493,11 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900/40 dark:border-purple-500/30 dark:text-purple-300 flex items-center justify-center shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/40 dark:border-emerald-500/30 dark:text-emerald-300 flex items-center justify-center shadow-xs">
               <Building className="w-5 h-5" />
             </div>
             <span>Danh Mục Đơn Vị Quân Khu</span>
-            <span className="text-xs px-3 py-1 rounded-full font-mono font-bold bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30">
+            <span className="text-xs px-3 py-1 rounded-full font-mono font-bold bg-emerald-500/10 text-emerald-800 border border-emerald-600/25 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
               {units.length} đơn vị
             </span>
           </h2>
@@ -508,7 +508,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
 
         <button
           onClick={onAddRoot}
-          className="px-3 py-1.5 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 border border-purple-500/30 active:scale-95"
+          className="px-3.5 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/20 hover:shadow-xs transition-all cursor-pointer shrink-0 border border-amber-500/25 active:scale-95"
           title="Tạo mới đơn vị cấp cao hoặc đơn vị độc lập"
         >
           <Plus className="w-3.5 h-3.5" /> Thêm đơn vị mới
@@ -522,7 +522,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
           onClick={() => setSelectedCategory('all')}
           className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
             selectedCategory === 'all'
-              ? 'bg-purple-100/90 border-purple-400 text-purple-950 dark:bg-purple-950/50 dark:border-purple-500/50 dark:text-white shadow-xs'
+              ? 'bg-emerald-100/90 border-emerald-400 text-emerald-950 dark:bg-emerald-950/50 dark:border-emerald-500/50 dark:text-white shadow-xs'
               : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
           }`}
         >
@@ -538,7 +538,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
             </div>
           </div>
           {selectedCategory === 'all' && (
-            <div className="w-2.5 h-2.5 rounded-full bg-purple-600 dark:bg-purple-400 animate-pulse" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
           )}
         </div>
 
@@ -549,24 +549,24 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
           }
           className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
             selectedCategory === 'su_doan' || selectedCategory === 'quan_khu'
-              ? 'bg-purple-100/90 border-purple-400 text-purple-950 dark:bg-purple-950/50 dark:border-purple-500/50 dark:text-purple-300 shadow-xs'
+              ? 'bg-amber-100/90 border-amber-400 text-amber-950 dark:bg-amber-950/50 dark:border-amber-500/50 dark:text-amber-300 shadow-xs'
               : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
           }`}
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/15 dark:border-purple-500/30 dark:text-purple-300 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:border-amber-500/30 dark:text-amber-300 flex items-center justify-center shrink-0">
               <Shield className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">QK & Sư đoàn</p>
-              <p className="text-xl font-bold text-purple-700 dark:text-purple-400 leading-tight">
+              <p className="text-xl font-bold text-amber-700 dark:text-amber-400 leading-tight">
                 {stats.commandAndDivision}{' '}
                 <span className="text-xs font-normal text-slate-500">đầu mối</span>
               </p>
             </div>
           </div>
           {(selectedCategory === 'su_doan' || selectedCategory === 'quan_khu') && (
-            <div className="w-2.5 h-2.5 rounded-full bg-purple-600 dark:bg-purple-400" />
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-600 dark:bg-amber-400" />
           )}
         </div>
 
@@ -649,7 +649,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo mã (QK7, TD4...) hoặc tên đơn vị..."
-              className="w-full pl-10 pr-9 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-all font-medium"
+              className="w-full pl-10 pr-9 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-all font-medium"
             />
             {searchQuery && (
               <button
@@ -668,7 +668,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value as UnitCategory)}
-              className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 transition-all font-semibold cursor-pointer"
+              className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-all font-semibold cursor-pointer"
             >
               <option value="all">Tất cả các cấp đơn vị</option>
               <option value="quan_khu">Cấp Quân khu</option>
@@ -688,7 +688,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
             className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl text-sm flex items-center gap-2 transition-all cursor-pointer border border-slate-300 dark:border-slate-700"
             title="Mở rộng tất cả các nhánh cấp dưới"
           >
-            <FolderOpen className="w-4 h-4 text-purple-600 dark:text-purple-400" /> Mở rộng
+            <FolderOpen className="w-4 h-4 text-emerald-700 dark:text-emerald-400" /> Mở rộng
           </button>
           <button
             onClick={handleCollapseAll}
@@ -702,8 +702,8 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
 
       {/* ── 4. BẢNG PHÂN CẤP CÂY (TREE TABLE UI) ── */}
       <div className="bg-white dark:bg-[#111827] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-800 dark:text-slate-200 min-w-[760px]">
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left text-sm text-slate-800 dark:text-slate-200 min-w-[850px]">
             <thead className="bg-slate-100/90 dark:bg-slate-900/95 text-slate-700 dark:text-slate-300 uppercase text-xs border-b border-slate-200 dark:border-slate-800 font-bold tracking-wider">
               <tr>
                 <th className="py-4 px-4 w-[44%] min-w-[320px]">Cấu Trúc Phân Cấp & Tên Đơn Vị</th>
@@ -732,7 +732,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                             setSearchQuery('');
                             setSelectedCategory('all');
                           }}
-                          className="mt-2 px-3 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-400 bg-purple-100 hover:bg-purple-200 dark:bg-purple-500/10 dark:hover:bg-purple-500/20 border border-purple-300 dark:border-purple-500/30 rounded-lg transition"
+                          className="mt-2 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/30 rounded-lg transition"
                         >
                           Xóa bộ lọc tìm kiếm
                         </button>
@@ -758,8 +758,8 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                         key={unit.unit_id}
                         className={`group transition-all duration-200 ${
                           isSelfMatched
-                            ? 'bg-purple-100/60 dark:bg-purple-950/30 border-l-4 border-l-purple-600'
-                            : 'hover:bg-purple-50/40 dark:hover:bg-slate-800/50'
+                            ? 'bg-emerald-100/60 dark:bg-emerald-950/30 border-l-4 border-l-emerald-600'
+                            : 'hover:bg-emerald-50/40 dark:hover:bg-slate-800/50'
                         }`}
                       >
                         {/* ── CỘT 1: CẤU TRÚC PHÂN CẤP & TÊN ĐƠN VỊ ── */}
@@ -801,7 +801,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                                     e.stopPropagation();
                                     toggleExpand(unit.unit_id);
                                   }}
-                                  className="w-5.5 h-5.5 flex items-center justify-center rounded-md bg-white hover:bg-purple-50 border border-slate-300 text-slate-700 hover:text-purple-700 dark:bg-slate-800 dark:hover:bg-purple-900/60 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white transition-all cursor-pointer shadow-2xs"
+                                  className="w-5.5 h-5.5 flex items-center justify-center rounded-md bg-white hover:bg-emerald-50 border border-slate-300 text-slate-700 hover:text-emerald-700 dark:bg-slate-800 dark:hover:bg-emerald-900/60 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white transition-all cursor-pointer shadow-2xs"
                                   title={isExpanded ? 'Thu gọn cấp con' : 'Mở rộng cấp con'}
                                 >
                                   {isExpanded ? (
@@ -860,7 +860,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                         {/* ── CỘT 2: MÃ ĐỊNH DANH (BADGE MONOSPACE AMBER) ── */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span
-                            className="bg-amber-100/90 text-amber-900 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25 font-mono text-sm px-3 py-1 rounded-lg font-bold tracking-wider inline-flex items-center shadow-2xs"
+                            className="bg-amber-100/90 text-amber-900 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25 font-mono tabular-nums text-sm px-3 py-1 rounded-lg font-bold tracking-wider inline-flex items-center shadow-2xs"
                             title={`Mã định danh đơn vị: ${unit.unit_id}`}
                           >
                             {renderHighlightedText(unit.unit_id, true)}
@@ -895,10 +895,10 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
                           {directChildCount > 0 ? (
                             <span
-                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/25 shadow-2xs"
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-800 border border-emerald-600/25 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/25 shadow-2xs"
                               title={`${directChildCount} đơn vị cấp dưới trực tiếp (${node.totalDescendants} đơn vị tất cả các cấp con)`}
                             >
-                              <Users className="w-3.5 h-3.5 text-purple-700 dark:text-purple-400" />
+                              <Users className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
                               {directChildCount} đơn vị
                             </span>
                           ) : (
@@ -913,7 +913,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                             <button
                               type="button"
                               onClick={() => onAddChild(unit)}
-                              className="p-2 bg-purple-100 hover:bg-purple-200 border border-purple-300 text-purple-800 dark:bg-purple-500/15 dark:hover:bg-purple-500/25 dark:text-purple-300 dark:border-purple-500/30 rounded-lg transition-all cursor-pointer shadow-2xs active:scale-95"
+                              className="p-2 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 text-emerald-800 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 dark:text-emerald-300 dark:border-emerald-500/30 rounded-lg transition-all cursor-pointer shadow-2xs active:scale-95"
                               title={`Thêm đơn vị con trực thuộc "${unit.name}"`}
                             >
                               <Plus className="w-4 h-4" />
@@ -964,7 +964,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               Đang hiển thị <strong className="text-slate-900 dark:text-slate-100 font-bold">{flatRows.length}</strong> / {units.length} đơn vị
             </span>
             {selectedCategory !== 'all' && (
-              <span className="text-purple-700 dark:text-purple-400 font-semibold">
+              <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
                 (Đang lọc theo: {CATEGORY_CONFIG[selectedCategory]?.label})
               </span>
             )}
@@ -975,7 +975,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
             )}
           </div>
           <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
-            <span>Nhấp vào nút <strong className="text-purple-600 dark:text-purple-400 font-bold">+</strong> ở từng dòng để thêm cấp con</span>
+            <span>Nhấp vào nút <strong className="text-emerald-700 dark:text-emerald-400 font-bold">+</strong> ở từng dòng để thêm cấp con</span>
           </div>
         </div>
       </div>

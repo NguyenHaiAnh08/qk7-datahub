@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Result, Button, Typography, Tag, Card } from 'antd';
-import { HomeOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { Button, Typography, Tag, Card } from 'antd';
+import { HomeOutlined, ReloadOutlined } from '@ant-design/icons';
 import { ROUTE_PATHS } from '../routes/routePaths';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { useAuth } from '../hooks/useAuth';
 import { getDestinationByRole } from '../contexts/AuthContext';
+import { InteractiveCompass404 } from '../components/common/InteractiveCompass404';
+import { AccessDeniedCard } from '../components/common/AccessDeniedCard';
 
 const { Paragraph } = Typography;
 
@@ -49,7 +51,7 @@ const ERROR_CONFIG_MAP: Record<string, ErrorConfig> = {
   '404': {
     status: '404',
     badge: 'NOT FOUND',
-    badgeColor: 'purple',
+    badgeColor: 'gold',
     title: '404 — Không Tìm Thấy Trang Hoặc Tài Liệu',
     subTitle: 'Đường dẫn bạn yêu cầu không tồn tại trên hệ thống hoặc văn bản đã được thu hồi / hủy bỏ.',
   },
@@ -108,23 +110,12 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
     return '404';
   }, [propCode, paramCode, location.pathname, location.search, location.state]);
 
-  // Nếu người dùng đã đăng nhập mà rơi vào trang 403: Tự động điều hướng về khu vực làm việc theo vai trò
-  React.useEffect(() => {
-    if (statusCode === '403' && user && user.user_id !== 'GUEST') {
-      const dest = getDestinationByRole(user);
-      const timer = setTimeout(() => {
-        navigate(dest, { replace: true });
-      }, 600);
-      return () => clearTimeout(timer);
-    }
-  }, [statusCode, user, navigate]);
-
   const config = useMemo(() => {
     return (
       ERROR_CONFIG_MAP[statusCode] || {
         status: 'error' as const,
         badge: `HTTP ${statusCode}`,
-        badgeColor: 'purple',
+        badgeColor: 'gold',
         title: `Lỗi Mã Trạng Thái ${statusCode}`,
         subTitle: 'Đã xảy ra lỗi không xác định trong quá trình điều hướng hệ thống.',
       }
@@ -132,7 +123,6 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
   }, [statusCode]);
 
   const stateMessage = (location.state as any)?.message;
-
   const displayTitle = propTitle || config.title;
   const displaySubTitle = propSubTitle || propMessage || stateMessage || config.subTitle;
 
@@ -144,15 +134,17 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
           className="flex items-center space-x-3 cursor-pointer select-none"
           onClick={() => navigate(ROUTE_PATHS.PORTAL)}
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
-            <SafetyCertificateOutlined className="text-lg text-amber-400" />
-          </div>
+          <img
+            src="/Logo_QSQK7.png"
+            alt="Logo Trường Quân Sự Quân Khu 7"
+            className="h-9 w-auto max-w-[38px] object-contain shrink-0 drop-shadow-sm"
+          />
           <div>
-            <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-500 dark:from-purple-300 dark:to-indigo-300 bg-clip-text text-transparent">
-              QK7 DATAHUB
+            <span className="block font-extrabold text-sm tracking-wider text-slate-900 dark:text-white">
+              Trường Quân Sự Quân Khu 7
             </span>
-            <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-              CỔNG QUẢN LÝ DỮ LIỆU BẢO MẬT
+            <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">
+              Trung tâm dữ liệu số
             </span>
           </div>
         </div>
@@ -167,30 +159,36 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
-        <Card
-          className="w-full max-w-2xl border-slate-200 dark:border-slate-800 shadow-xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl overflow-hidden"
-          styles={{ body: { padding: '40px 32px' } }}
-        >
-          <Result
-            status={config.status}
-            title={
-              <span className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {displayTitle}
-              </span>
-            }
-            subTitle={
-              <Paragraph className="text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed mt-2 mb-0 max-w-lg mx-auto">
-                {displaySubTitle}
-              </Paragraph>
-            }
-            extra={
+        {statusCode === '404' ? (
+          <InteractiveCompass404 />
+        ) : statusCode === '403' ? (
+          <AccessDeniedCard />
+        ) : (
+          <Card
+            className="w-full max-w-2xl border-slate-200 dark:border-slate-800 shadow-xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl overflow-hidden"
+            styles={{ body: { padding: '40px 32px' } }}
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                <span className="font-mono font-black text-2xl">{statusCode}</span>
+              </div>
+
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {displayTitle}
+                </h2>
+                <Paragraph className="text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed mt-2 mb-0 max-w-lg mx-auto">
+                  {displaySubTitle}
+                </Paragraph>
+              </div>
+
               <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
                 <Button
                   type="primary"
                   icon={<HomeOutlined />}
                   size="large"
                   onClick={() => navigate(getDestinationByRole(user))}
-                  className="font-semibold shadow-md shadow-purple-600/25 bg-purple-600 hover:bg-purple-500 px-6 h-11 rounded-xl"
+                  className="font-semibold bg-[#166534] hover:bg-[#15803d] border border-emerald-600/40 text-white px-6 h-11 rounded-xl transition-colors"
                 >
                   Về Khu Vực Làm Việc
                 </Button>
@@ -206,9 +204,9 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
                   </Button>
                 )}
               </div>
-            }
-          />
-        </Card>
+            </div>
+          </Card>
+        )}
       </main>
 
       {/* Footer */}

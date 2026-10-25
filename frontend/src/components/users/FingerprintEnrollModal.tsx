@@ -69,13 +69,14 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
 }) => {
   const [phase, setPhase] = useState<Phase>('checking');
   const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
   const [enrollStep, setEnrollStep] = useState(0); // 0: chờ lần 1, 1: xong lần 1, 2: xong lần 2, 3: xong lần 3
   const [progress, setProgress] = useState(0);
 
   const inFlightRef = useRef(false);
   const progressRef = useRef(0);
   const currentStepRef = useRef(0);
+  const deviceIdRef = useRef<string>('');
+  const abortControllerRef = useRef<AbortController | null>(null);
   const animControlsRef = useRef<any>(null);
   const pollTimerRef = useRef<any>(null);
 
@@ -121,10 +122,12 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
     currentStepRef.current = 0;
 
     pollTimerRef.current = setInterval(async () => {
-      const status = await fingerprintService.getEnrollStatus();
+      if (!deviceIdRef.current) return;
+
+      const status = await fingerprintService.getEnrollStatus(deviceIdRef.current);
       if (!status || !status.enrolling) return;
 
-      const newStep = status.step;
+      const newStep = Number(status.step) || 0;
       if (newStep > currentStepRef.current) {
         currentStepRef.current = newStep;
         setEnrollStep(newStep);
@@ -137,9 +140,14 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
         } else if (newStep >= 3) {
           // Lần 3: fill đầy 100% màu đỏ
           animateToProgress(100, 0.5);
+          // Đã đủ 3 lần -> dừng polling ngay
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
         }
       }
-    }, 200);
+    }, 600);
 
     return () => {
       if (pollTimerRef.current) {
@@ -153,6 +161,14 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
   useEffect(() => {
     if (!open) {
       inFlightRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
       return;
     }
 
@@ -192,25 +208,48 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
     };
 
     checkAndStart();
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
     // eslint-disable-next-line
-  }, [open, userId, attempt]);
+  }, [open, userId]);
 
   const triggerEnroll = async () => {
-    if (inFlightRef.current) return;
     inFlightRef.current = true;
     setError('');
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const ctrl = new AbortController();
+    abortControllerRef.current = ctrl;
 
     try {
       let deviceId: string;
       try {
         deviceId = await fingerprintService.getLocalDeviceId(2000);
+        deviceIdRef.current = deviceId;
       } catch {
-        setError('Máy chưa bật Fingerprint Agent. Vui lòng bật Agent trước khi thực hiện thao tác.');
+        if (ctrl.signal.aborted) return;
+        setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trước khi thực hiện thao tác.');
         setPhase('error');
         return;
       }
 
-      await fingerprintService.enrollForUser(userId, deviceId);
+      if (ctrl.signal.aborted) return;
+
+      await fingerprintService.enrollForUser(userId, deviceId, ctrl.signal);
+
+      if (ctrl.signal.aborted) return;
+
       currentStepRef.current = 3;
       setEnrollStep(3);
       animateToProgress(100, 0.4);
@@ -222,6 +261,13 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current);
         pollTimerRef.current = null;
+      }
+      if (ctrl.signal.aborted || err?.name === 'AbortError') {
+        return;
+      }
+      if (err?.data?.cancelled || err?.message === 'CANCELLED') {
+        // Bị hủy do yêu cầu mới hoặc thiết bị bận, không spam error
+        return;
       }
       const msg = err.message || 'Enroll thất bại';
       if (err.data?.agent_offline) {
@@ -243,18 +289,40 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
     triggerEnroll();
   };
 
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    if (animControlsRef.current) {
+      animControlsRef.current.stop();
+    }
+    inFlightRef.current = false;
+    onCancel();
+  };
+
   const handleRetry = () => {
     if (animControlsRef.current) animControlsRef.current.stop();
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
     }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     inFlightRef.current = false;
     progressRef.current = 0;
     currentStepRef.current = 0;
     setProgress(0);
     setEnrollStep(0);
-    setAttempt((n) => n + 1);
+    setError('');
+    setPhase('scanning');
+    triggerEnroll();
   };
 
   if (!open) return null;
@@ -270,7 +338,7 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
           initial={{ opacity: 0, scale: 0.94 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.94 }}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md max-w-[calc(100vw-32px)] mx-auto overflow-hidden shadow-2xl"
         >
           <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -297,7 +365,7 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
               </div>
             </div>
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -308,7 +376,7 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
             {/* Checking status */}
             {phase === 'checking' && (
               <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                <CircularSpinner size={32} className="text-purple-600 dark:text-purple-400" strokeWidth={2.5} />
+                <CircularSpinner size={32} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2.5} />
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Đang kiểm tra dữ liệu vân tay của người dùng...
                 </p>
@@ -433,14 +501,14 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
             {phase === 'confirm_overwrite' ? (
               <>
                 <button
-                  onClick={onCancel}
+                  onClick={handleCancel}
                   className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
                 >
                   Không, Thoát
                 </button>
                 <button
                   onClick={handleConfirmOverwrite}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-purple-600/30 cursor-pointer"
+                  className="px-4 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-emerald-950/20 border border-amber-500/25 cursor-pointer"
                 >
                   <Fingerprint className="w-3.5 h-3.5" />
                   Thay thế vân tay cũ
@@ -449,7 +517,7 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
             ) : (
               <>
                 <button
-                  onClick={onCancel}
+                  onClick={handleCancel}
                   className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
                 >
                   {phase === 'success' ? 'Hoàn tất' : 'Hủy bỏ'}
@@ -457,7 +525,7 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
                 {phase === 'error' && (
                   <button
                     onClick={handleRetry}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-purple-600/30 cursor-pointer"
+                    className="px-4 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-md shadow-emerald-950/20 border border-amber-500/25 cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     Thử lại

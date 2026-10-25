@@ -220,3 +220,19 @@ Sau khi thiết lập hoàn tất, mở trình duyệt từ máy Client hoặc S
 * **Tài liệu Swagger API:** `http://192.168.1.229:8000/api-docs`
 * **Microservice AI boxchat:** `http://192.168.1.229:8001/docs`
 * **Trạm kiểm soát vân tay nội bộ:** `http://127.0.0.1:9001/device-id`
+
+---
+
+## PHẦN D — TRẢI NGHIỆM TRÊN MÁY TÍNH BẢNG IPAD AIR M4 (IPADOS)
+
+### 1. Kết nối mạng WiFi quân khu
+- Kết nối máy tính bảng iPad Air M4 (11-inch hoặc 13-inch) vào mạng WiFi nội bộ cùng dải mạng LAN với máy chủ Server (ví dụ: `192.168.1.xxx`).
+
+### 2. Truy cập qua trình duyệt iPadOS
+- Mở một trong các trình duyệt: **Safari**, **Google Chrome**, **Google App** hoặc **Cốc Cốc**.
+- Nhập địa chỉ: **`http://192.168.1.229:8000`** *(thay bằng IP máy chủ Server)*.
+
+### 3. Tùy chỉnh chế độ hiển thị
+- Chạm vào nút **Chuyển chế độ thiết bị** trên thanh Header (icon Máy tính / Tablet) để chuyển sang chế độ **iPad Touch UI** tối ưu thao tác ngón tay (Touch Target ≥ 44×44px, thanh điều hướng dạng viên thuốc căn giữa).
+- Hỗ trợ hoàn hảo cả **Chế độ để ngang (Landscape - 1210×802px)** và **Chế độ để dọc (Portrait - 834×1178px)** mà không bị vỡ layout, tràn chữ hay lệch khung hình.
+- Khi cần xem trên màn hình máy tính bàn, chạm chuyển sang chế độ **PC Widescreen** để sử dụng cụm nút bấm chuyển trang màu sắc chuyên biệt (`Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`) ổn định, không bị nhảy vị trí khi chuyển trang.

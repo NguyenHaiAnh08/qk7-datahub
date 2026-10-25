@@ -13,6 +13,7 @@ import {
 import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
+import { TacticalEmptyState } from '../common/TacticalEmptyState';
 
 export interface DocumentTableProps {
   documents: DocumentItem[];
@@ -21,6 +22,8 @@ export interface DocumentTableProps {
   currentPage: number;
   totalPages: number;
   totalItems: number;
+  searchQuery?: string;
+  onClearFilters?: () => void;
   onPageChange: (page: number) => void;
   onPreview: (doc: DocumentItem) => void;
   onDownload: (doc: DocumentItem) => void;
@@ -35,6 +38,8 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   currentPage,
   totalPages,
   totalItems,
+  searchQuery,
+  onClearFilters,
   onPageChange,
   onPreview,
   onDownload,
@@ -44,7 +49,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   const getLevelBadgeClass = (lv: number) => {
     switch (lv) {
       case 5:
-        return 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30';
+        return 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30';
       case 4:
         return 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
       case 3:
@@ -57,10 +62,10 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col transition-colors duration-200">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[760px]">
-          <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 text-[11px] uppercase border-b border-slate-200 dark:border-slate-800 tracking-wider">
+    <div className="bg-white dark:bg-[#111827] rounded-xl overflow-hidden border border-slate-200 dark:border-white/[0.08] flex flex-col transition-colors duration-200">
+      <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[800px]">
+          <thead className="bg-slate-50/80 dark:bg-white/[0.02] text-slate-500 dark:text-slate-400 text-xs font-semibold border-b border-slate-200 dark:border-white/[0.06]">
             <tr>
               <th className="py-3 px-4">Số hiệu</th>
               <th className="py-3 px-4">Trích yếu nội dung</th>
@@ -81,21 +86,30 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               </tr>
             ) : documents.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                  Không tìm thấy tài liệu nào phù hợp với bộ lọc
+                <td colSpan={8} className="py-6 text-center">
+                  <TacticalEmptyState
+                    title="Không tìm thấy tài liệu phù hợp với bộ lọc"
+                    description="Không có tài liệu nào khớp với từ khóa tìm kiếm hoặc bộ lọc văn bản hiện tại."
+                    searchQuery={searchQuery}
+                    onClearFilters={onClearFilters}
+                    compact
+                  />
                 </td>
               </tr>
             ) : (
-              documents.map((doc) => {
+              documents.map((doc, idx) => {
                 const isRestricted = (doc.security_level_id || 1) > userClearanceLevel;
 
                 return (
                   <tr
                     key={doc.file_id}
+                    id={idx === 0 ? 'tour-document-card' : undefined}
                     className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                   >
-                    <td className="py-3 px-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                      {doc.document_code || '—'}
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25">
+                        {doc.document_code || '—'}
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900 dark:text-white max-w-xs sm:max-w-md line-clamp-2">
@@ -159,7 +173,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                               return (
                                 <button
                                   onClick={() => onDownload(doc)}
-                                  className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800/60 rounded-lg transition cursor-pointer"
+                                  className="p-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800/60 rounded-lg transition cursor-pointer"
                                   title="Tải về tệp gốc"
                                 >
                                   <Download className="w-3.5 h-3.5" />
@@ -238,7 +252,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                       onClick={() => onPageChange(p)}
                       className={`px-2.5 py-1 rounded transition text-xs ${
                         currentPage === p
-                          ? 'bg-emerald-600 text-white font-bold'
+                          ? 'bg-[#166534] dark:bg-emerald-600 text-white font-bold shadow-xs'
                           : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
                       }`}
                     >

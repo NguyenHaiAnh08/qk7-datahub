@@ -5,6 +5,9 @@
 @layer base {
   :root {
     color-scheme: light;
+    --ux-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+    --ux-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ux-tactile: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   :root.dark {
@@ -19,12 +22,25 @@
 
   html,
   body,
-  input,
-  button,
+  input:not(.font-mono):not([class*="font-mono"]),
+  button:not(.font-mono):not([class*="font-mono"]),
   select,
   textarea,
   optgroup {
     font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre,
+  .font-mono,
+  [class*="font-mono"] {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
   body {
@@ -111,9 +127,10 @@
 .gold-gradient-btn:hover {
   background: linear-gradient(135deg, #f59e0b 0%, #d4af37 100%);
   box-shadow: 0 4px 20px -2px rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
 }
 .gold-gradient-btn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 /* Emerald Gradient Buttons */
@@ -126,6 +143,29 @@
 .emerald-gradient-btn:hover {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   box-shadow: 0 4px 20px -2px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+}
+.emerald-gradient-btn:active {
+  transform: scale(0.97);
+}
+
+/* Tactile Micro-Interactions (Lucian Physics & Taste-Skill) */
+.btn-tactile {
+  transition: transform 0.15s cubic-bezier(0.34, 1.45, 0.64, 1), box-shadow 0.15s ease, background-color 0.15s ease;
+  will-change: transform;
+}
+.btn-tactile:hover {
+  transform: translateY(-1px);
+}
+.btn-tactile:active {
+  transform: scale(0.97);
+}
+
+.command-card {
+  transition: transform 0.22s cubic-bezier(0.34, 1.45, 0.64, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.command-card:hover {
+  transform: translateY(-2px);
 }
 
 /* Ambient glow background */
@@ -151,27 +191,43 @@ html.theme-transition *::after {
   transition-delay: 0s !important;
 }
 
-/* View Transitions API circular reveal */
+/* <!-- Lucian UX/UI Prompt #219 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#219 --> */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
+  animation: none !important;
+  mix-blend-mode: normal !important;
 }
 
 ::view-transition-old(root) {
-  z-index: 1;
+  z-index: 1 !important;
 }
 
 ::view-transition-new(root) {
-  z-index: 9999;
+  z-index: 9999 !important;
 }
 
-.dark::view-transition-old(root) {
-  z-index: 9999;
+.u219-tg {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
 }
 
-.dark::view-transition-new(root) {
-  z-index: 1;
+.u219-tg svg {
+  transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.is-dark .u219-tg svg,
+.dark .u219-tg svg {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u219-dk,
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* =========================================================================
@@ -967,6 +1023,65 @@ html.dark .ant-input::placeholder {
   color: #64748b !important;
 }
 
+/* Ant Design Dropdown / Select popup & Popover trong Dark Mode */
+html.dark .ant-select-dropdown {
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .ant-select-item {
+  color: #cbd5e1 !important;
+}
+
+html.dark .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  color: #34d399 !important;
+  font-weight: 600;
+}
+
+html.dark .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   NATIVE SELECT & OPTION TRONG DARK MODE & LIGHT MODE
+   Khắc phục triệt để lỗi White-on-White của dropdown options trên Chromium/Windows
+   ───────────────────────────────────────────────────────────── */
+select {
+  color-scheme: light;
+}
+
+select option,
+select optgroup {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+html.dark select,
+.dark select,
+[data-theme='dark'] select {
+  color-scheme: dark !important;
+}
+
+html.dark select option,
+html.dark select optgroup,
+.dark select option,
+.dark select optgroup,
+[data-theme='dark'] select option,
+[data-theme='dark'] select optgroup {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+html.dark select option:checked,
+.dark select option:checked,
+[data-theme='dark'] select option:checked {
+  background-color: #166534 !important;
+  color: #ffffff !important;
+}
+
 /* Drawer navigation trên iPad */
 .qk7-sidebar-drawer .ant-drawer-body {
   padding: 0 !important;
@@ -995,4 +1110,880 @@ html.dark .ant-input::placeholder {
     animation: none;
   }
 }
+
+/* Hiệu ứng làm mờ dần đều ra viền ngoài của Trống đồng (ở giữa rõ nét, viền mờ dần hòa vào nền) */
+.bronze-drum-radial-fade {
+  -webkit-mask-image: radial-gradient(circle closest-side at center, #000 32%, rgba(0, 0, 0, 0.88) 52%, rgba(0, 0, 0, 0.45) 72%, rgba(0, 0, 0, 0) 89%);
+  mask-image: radial-gradient(circle closest-side at center, #000 32%, rgba(0, 0, 0, 0.88) 52%, rgba(0, 0, 0, 0.45) 72%, rgba(0, 0, 0, 0) 89%);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #219 · Circular-reveal Dark Mode (Navigation)
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#219
+   ══════════════════════════════════════════════════════════════════════ */
+.u219-dk {
+  clip-path: circle(0px at var(--cx, 300px) var(--cy, 30px));
+  transition: clip-path 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+  pointer-events: none;
+}
+
+.u219.is-on .u219-dk {
+  clip-path: circle(150vmax at var(--cx, 300px) var(--cy, 30px));
+  pointer-events: auto;
+}
+
+.u219-tg {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.u219-tg svg {
+  display: block;
+  flex-shrink: 0;
+  transform-origin: center;
+  transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.is-dark .u219-tg svg,
+.dark .u219-tg svg {
+  transform: rotate(-90deg);
+}
+
+/* View Transitions API overrides to eliminate default cross-fade during circular clip-path expansion */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none !important;
+  mix-blend-mode: normal !important;
+}
+
+::view-transition-old(root) {
+  z-index: 1 !important;
+}
+
+::view-transition-new(root) {
+  z-index: 9999 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u219-dk,
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #025 · Notched floating label field & Shake Error
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#025
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --ux-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ux-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --u025-surface: #ffffff;
+  --u025-ink: #0f172a;
+  --u025-ink-2: #166534;
+  --u025-ink-3: #64748b;
+  --u025-line: #cbd5e1;
+  --u025-accent: #166534;
+  --u025-danger: #b91c1c;
+  --u025-mint: #166534;
+}
+
+:root.dark, html.dark {
+  --u025-surface: #0b1320;
+  --u025-ink: #f8fafc;
+  --u025-ink-2: #34d399;
+  --u025-ink-3: #94a3b8;
+  --u025-line: #334155;
+  --u025-accent: #10b981;
+  --u025-danger: #f87171;
+  --u025-mint: #10b981;
+}
+
+.u025-f {
+  position: relative;
+  width: 100%;
+}
+
+.u025-box {
+  position: relative;
+  height: 52px;
+  background: var(--u025-surface);
+  border-radius: 14px;
+  transition: background-color 0.2s var(--ux-ease);
+}
+
+.u025-compact .u025-box {
+  height: 46px;
+}
+
+.u025-in {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 44px 0 42px;
+  border: 0;
+  outline: 0;
+  border-radius: 14px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 560;
+  color: var(--u025-ink);
+  letter-spacing: -0.01em;
+  z-index: 2;
+}
+
+.u025-compact .u025-in {
+  font-size: 13px;
+  padding: 0 40px 0 38px;
+}
+
+.u025-line {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+  border-radius: 14px;
+  z-index: 1;
+}
+
+.u025-line i {
+  display: block;
+  border: 1.5px solid var(--u025-line);
+  transition: border-color 0.3s var(--ux-ease), border-width 0.2s ease;
+}
+
+.u025-line .l {
+  width: 14px;
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
+}
+
+.u025-line .g {
+  width: var(--gap, 0px);
+  border-left: 0;
+  border-right: 0;
+  transition: width 0.35s var(--ux-ease), border-color 0.3s var(--ux-ease);
+}
+
+.u025-line .r {
+  flex: 1;
+  border-left: 0;
+  border-radius: 0 14px 14px 0;
+}
+
+.u025-f.is-up .u025-line .g {
+  border-top-color: transparent !important;
+}
+
+.u025-f.is-focus .u025-line i {
+  border-color: var(--u025-accent);
+  border-width: 2px;
+}
+
+.u025-f.is-bad .u025-line i {
+  border-color: var(--u025-danger) !important;
+  border-width: 2px;
+}
+
+.u025-f.is-ok .u025-line i {
+  border-color: var(--u025-mint);
+}
+
+.u025-lab {
+  position: absolute;
+  left: 42px;
+  top: 16px;
+  padding: 0 4px;
+  margin-left: -4px;
+  font-size: 14px;
+  font-weight: 560;
+  color: var(--u025-ink-3);
+  transform-origin: 0 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: transform 0.35s var(--ux-ease), color 0.3s var(--ux-ease), left 0.35s var(--ux-ease);
+  z-index: 3;
+}
+
+.u025-compact .u025-lab {
+  left: 38px;
+  top: 13px;
+  font-size: 13px;
+}
+
+.u025-f.is-up .u025-lab {
+  left: 18px;
+  transform: translate(0, -25px) scale(0.8);
+  color: var(--u025-ink-2);
+  font-weight: 650;
+}
+
+.u025-compact.u025-f.is-up .u025-lab {
+  left: 18px;
+  transform: translate(0, -22px) scale(0.8);
+}
+
+.u025-f.is-focus .u025-lab {
+  color: var(--u025-accent);
+}
+
+.u025-f.is-bad .u025-lab {
+  color: var(--u025-danger) !important;
+}
+
+.u025-icon-left {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--u025-ink-3);
+  transition: color 0.3s var(--ux-ease);
+}
+
+.u025-compact .u025-icon-left {
+  left: 12px;
+}
+
+.u025-f.is-focus .u025-icon-left {
+  color: var(--u025-accent);
+}
+
+.u025-f.is-bad .u025-icon-left {
+  color: var(--u025-danger);
+}
+
+.u025-ok {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--u025-mint);
+  color: #fff;
+  transform: scale(0);
+  transition: transform 0.45s var(--ux-spring);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.u025-ok svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.u025-ok path {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  transition: stroke-dashoffset 0.35s var(--ux-ease) 0.15s;
+}
+
+.u025-f.is-ok .u025-ok {
+  transform: scale(1);
+}
+
+.u025-f.is-ok .u025-ok path {
+  stroke-dashoffset: 0;
+}
+
+.u025-f.is-shake .u025-box {
+  animation: u025-shake 0.42s var(--ux-ease);
+}
+
+@keyframes u025-shake {
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+
+.u025-help {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s var(--ux-ease);
+}
+
+.u025-help > span {
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u025-danger);
+}
+
+.u025-help > span::before {
+  content: "!";
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--u025-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.u025-f.is-bad .u025-help {
+  grid-template-rows: 1fr;
+}
+
+.u025-f.is-bad .u025-help > span {
+  padding-top: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u025-f,
+  .u025-f *,
+  .u025-f *::before,
+  .u025-f *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #058 · Sliding Highlight Pill Navigation
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#058
+   ══════════════════════════════════════════════════════════════════════ */
+.u058-nav {
+  --x: 0px;
+  --w: 0px;
+  --pill-opacity: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.u058-nav a,
+.u058-nav a:link,
+.u058-nav a:visited {
+  text-decoration: none;
+}
+
+/* Đảm bảo tab ĐANG CHỌN (Active) luôn hiển thị chữ TRẮNG TUYỆT ĐỐI trên nền xanh quân đội #166534 */
+/* Ngăn chặn triệt để Ant Design a { color: #166534 } hoặc a:hover đè màu làm chìm chữ */
+.u058-nav a.is-active,
+.u058-nav a.is-active:hover,
+.u058-nav a.is-active:focus,
+.u058-nav a[data-active="true"],
+.u058-nav a[data-active="true"]:hover,
+.u058-nav a[data-active="true"]:focus,
+.u058-nav a.is-active span,
+.u058-nav a[data-active="true"] span {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45) !important;
+}
+
+.u058-nav a.is-active svg,
+.u058-nav a.is-active:hover svg,
+.u058-nav a[data-active="true"] svg,
+.u058-nav a[data-active="true"]:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) !important;
+}
+
+.u058-pill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--w, 60px);
+  transform: translateX(var(--x, 0px));
+  opacity: var(--pill-opacity, 0);
+  transition: transform 0.45s cubic-bezier(0.34, 1.45, 0.64, 1),
+              width 0.45s cubic-bezier(0.34, 1.45, 0.64, 1),
+              opacity 0.2s ease;
+  will-change: transform, width;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 999px;
+  background-color: #166534; /* Xanh Lục Quân chủ đạo */
+  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.3), 0 2px 10px rgba(22, 101, 52, 0.25);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+:root.dark .u058-pill,
+html.dark .u058-pill {
+  background-color: #166534;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+  border: 1px solid rgba(251, 191, 36, 0.35); /* Viền ánh Vàng Kim Quân Hiệu */
+}
+
+@media (min-width: 640px) {
+  .u058-pill {
+    top: 6px;
+    bottom: 6px;
+  }
+}
+
+.u058-nav.no-transition .u058-pill {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u058-pill {
+    transition: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #004 · Compact Progress Download Button
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#004
+   ══════════════════════════════════════════════════════════════════════ */
+.u004-btn {
+  --ux-mint: #10b981;
+  --bar: linear-gradient(90deg, #166534, #10b981, #22c3a6);
+  --p: 0%;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  isolation: isolate;
+  transition: transform 0.25s cubic-bezier(0.34, 1.45, 0.64, 1),
+              box-shadow 0.25s ease,
+              border-color 0.25s ease,
+              width 0.25s ease;
+}
+
+.u004-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.u004-btn.is-fold {
+  transform: scale(0.92);
+  transition: transform 0.28s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.u004-track {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.u004-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--p, 0%);
+  background: var(--bar);
+  border-radius: inherit;
+  transition: width 0.1s linear;
+}
+
+.u004-shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: u004-shine 1.4s infinite linear;
+}
+
+@keyframes u004-shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260px); }
+}
+
+.u004-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.u004-check {
+  animation: u004-pop-check 0.4s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+@keyframes u004-pop-check {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  70% { transform: scale(1.2) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u004-btn,
+  .u004-btn.is-fold,
+  .u004-bar,
+  .u004-shine,
+  .u004-check {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Lucian UX/UI Prompt #098 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#098 */
+.u098-num {
+  --row-h: 1.15em;
+  display: inline-flex;
+  align-items: flex-start;
+  height: var(--row-h);
+  line-height: var(--row-h);
+  overflow: hidden;
+  vertical-align: baseline;
+  -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.u098-col {
+  display: inline-flex;
+  flex-direction: column;
+  transform: translateY(calc(var(--d, 0) * -1 * var(--row-h)));
+  transition: transform 0.9s cubic-bezier(0.3, 1.25, 0.5, 1);
+  transition-delay: calc(var(--i, 0) * 45ms);
+  will-change: transform;
+}
+
+.u098-col > span {
+  height: var(--row-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.u098-sym {
+  display: inline-flex;
+  align-items: center;
+  height: var(--row-h);
+  white-space: pre;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u098-col {
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #089 · Interactive Compass 404 & Auto-Correct URL
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#089
+   ══════════════════════════════════════════════════════════════════════ */
+.u089-wrap {
+  perspective: 1200px;
+}
+
+.u089-card {
+  transition: transform 0.25s var(--ux-smooth), box-shadow 0.25s var(--ux-smooth);
+}
+
+.u089-num {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  transform: perspective(600px) rotateX(calc(var(--tilt-y, 0) * -8deg)) rotateY(calc(var(--tilt-x, 0) * 10deg));
+  transition: transform 0.12s ease-out;
+  display: inline-block;
+  user-select: none;
+}
+
+.u089-cp {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(185, 28, 28, 0.08) 0%, transparent 70%);
+}
+
+.u089-needle {
+  transform-origin: center center;
+  transition: transform 0.2s var(--ux-spring);
+  will-change: transform;
+}
+
+.u089-needle.is-snapping {
+  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.u089-url-bar {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.u089-wavy {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #b91c1c;
+  text-decoration-thickness: 2.5px;
+  text-underline-offset: 4px;
+}
+
+@keyframes u089-radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes u089-radar-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.95); }
+  50% { opacity: 0.85; transform: scale(1.05); }
+}
+
+.radar-sweep-line {
+  transform-origin: 50% 50%;
+  animation: u089-radar-sweep 3.5s linear infinite;
+}
+
+.radar-pulse-ring {
+  animation: u089-radar-pulse 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u089-num,
+  .u089-needle,
+  .radar-sweep-line,
+  .radar-pulse-ring {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Lucian UX/UI Prompt #030 · Advanced Date Range Picker Calendar
+   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#030
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --u030-accent: #166534;
+  --u030-accent-hover: #15803d;
+  --u030-accent-light: rgba(22, 101, 52, 0.12);
+  --u030-accent-band: rgba(22, 101, 52, 0.15);
+  --u030-accent-ring: rgba(22, 101, 52, 0.35);
+}
+
+.dark {
+  --u030-accent: #10b981;
+  --u030-accent-hover: #059669;
+  --u030-accent-light: rgba(16, 185, 129, 0.16);
+  --u030-accent-band: rgba(16, 185, 129, 0.22);
+  --u030-accent-ring: rgba(16, 185, 129, 0.45);
+}
+
+@keyframes u030-pick {
+  0% { transform: scale(0.85); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.u030-cell {
+  position: relative;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.u030-cell.is-start,
+.u030-cell.is-end {
+  animation: u030-pick 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  background-color: var(--u030-accent) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.u030-cell.is-start {
+  border-top-left-radius: 9999px !important;
+  border-bottom-left-radius: 9999px !important;
+}
+
+.u030-cell.is-end {
+  border-top-right-radius: 9999px !important;
+  border-bottom-right-radius: 9999px !important;
+}
+
+.u030-cell.is-single {
+  border-radius: 9999px !important;
+}
+
+.u030-cell.in-range {
+  background-color: var(--u030-accent-light) !important;
+  color: inherit !important;
+  border-radius: 0 !important;
+}
+
+.u030-cell.is-hover-range {
+  background-color: var(--u030-accent-band) !important;
+  color: inherit !important;
+  border-radius: 0 !important;
+}
+
+.u030-slide-left-enter {
+  transform: translateX(18px);
+  opacity: 0;
+}
+.u030-slide-left-active {
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.45s ease;
+}
+
+.u030-slide-right-enter {
+  transform: translateX(-18px);
+  opacity: 0;
+}
+.u030-slide-right-active {
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.45s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u030-cell.is-start,
+  .u030-cell.is-end {
+    animation: none !important;
+  }
+  .u030-slide-left-active,
+  .u030-slide-right-active {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* ==========================================================================
+   Lucian UX/UI Prompt #197 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#197
+   Guided Spotlight Tour for Guest Users (Military QK7 Command Center System)
+   ========================================================================== */
+
+:root {
+  --u197-amber: #f59e0b;
+  --u197-amber-dark: #b45309;
+  --u197-emerald: #10b981;
+  --u197-emerald-dark: #166534;
+  --u197-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.u197-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.u197-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: d 0.35s var(--u197-ease);
+}
+
+.u197-ring {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9995;
+  border-radius: 14px;
+  border: 2px solid rgba(245, 158, 11, 0.85);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.35), inset 0 0 14px rgba(245, 158, 11, 0.2);
+  transition: top 0.35s var(--u197-ease), left 0.35s var(--u197-ease), width 0.35s var(--u197-ease), height 0.35s var(--u197-ease);
+  animation: u197-pulse 2.2s infinite ease-in-out;
+}
+
+@keyframes u197-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45), inset 0 0 12px rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.85);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0), inset 0 0 20px rgba(245, 158, 11, 0.35);
+    border-color: rgba(251, 191, 36, 1);
+  }
+}
+
+.u197-tip {
+  position: fixed;
+  z-index: 9999;
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(180, 83, 9, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: top 0.35s var(--u197-ease), left 0.35s var(--u197-ease), opacity 0.25s ease, transform 0.25s ease;
+}
+
+.u197-arrow {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+  background: inherit;
+  border: inherit;
+}
+
+.u197-arrow-top {
+  top: -8px;
+  border-bottom: none !important;
+  border-right: none !important;
+}
+
+.u197-arrow-bottom {
+  bottom: -8px;
+  border-top: none !important;
+  border-left: none !important;
+}
+
+.u197-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  transition: all 0.25s ease;
+}
+
+.u197-dot.is-active {
+  width: 22px;
+  background-color: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u197-ring {
+    animation: none !important;
+    transition: none !important;
+  }
+  .u197-tip,
+  .u197-svg {
+    transition: none !important;
+  }
+}
+
+
+
+
+
+
+
+
 

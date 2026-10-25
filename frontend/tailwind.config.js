@@ -50,7 +50,12 @@ export default {
       },
       fontFamily: {
         sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+      },
+      transitionTimingFunction: {
+        'spring': 'cubic-bezier(0.34, 1.45, 0.64, 1)',
+        'smooth': 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+        'tactile': 'cubic-bezier(0.16, 1, 0.3, 1)',
       },
       animation: {
         'spin-slow': 'spin-slow 120s linear infinite',

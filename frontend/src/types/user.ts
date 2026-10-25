@@ -7,7 +7,7 @@ export interface User {
   position?: string;
   unit_id?: string;
   unit_name?: string;
-  status?: 'active' | 'locked' | 'inactive' | string;
+  status?: 'active' | 'locked' | string;
   clearance_level_id: number;
   clearance_name?: string;
   clearance_code?: string;

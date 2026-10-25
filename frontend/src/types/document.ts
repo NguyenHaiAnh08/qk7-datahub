@@ -65,6 +65,7 @@ export interface DocumentFilterParams {
   doc_type_id?: string;
   unit?: string;
   issuing_unit_id?: string;
+  include_children?: boolean | string;
   from?: string;
   to?: string;
   lv?: number | string;

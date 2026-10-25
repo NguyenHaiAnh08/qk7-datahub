@@ -1,7 +1,8 @@
+/* <!-- Lucian UX/UI Prompt #058 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#058 --> */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Popover, Tooltip } from 'antd';
+import { Popover } from 'antd';
 import {
   Building,
   Clock,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
+import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { ThemeToggle } from './ThemeToggle';
 import { DeviceModeSwitch } from './DeviceModeSwitch';
 import { ROUTE_PATHS } from '../../routes/routePaths';
@@ -29,15 +31,38 @@ interface HeaderProps {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt (Dynamic Sliding Pill Glider)
-// Đăng tải • Trung tâm thư viện số • Đơn vị của tôi • Quản trị
+// COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058)
+// Đăng tải • Dữ liệu số • Đơn vị của tôi • Quản trị
 // ══════════════════════════════════════════════════════════════════════
+// Lưu trữ vị trí Pill gần nhất giữa các lần chuyển trang để duy trì chuyển động 2 chiều liên tục (Bidirectional motion)
+let lastKnownPillCoords: { left: number; width: number } | null = null;
+
 const NavigationGlider: React.FC<{
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
 }> = ({ activeNav }) => {
   const { user, isAdmin, isStaff, hasPermission, logout } = useAuth();
   const { deviceMode } = useDeviceMode();
   
+}> = ({ activeNav: explicitActiveNav }) => {
+  const { user, isAdmin, isStaff } = useAuth();
+  const { deviceMode } = useDeviceMode();
+  const location = useLocation();
+
+  // Tự động nhận diện tab đang mở nếu activeNav không được truyền từ page
+  const getEffectiveActiveNav = () => {
+    if (explicitActiveNav) return explicitActiveNav;
+    const path = location.pathname;
+    if (path.startsWith(ROUTE_PATHS.DESK)) return 'desk';
+    if (path.startsWith(ROUTE_PATHS.MY_UNIT)) return 'myunit';
+    if (path.startsWith(ROUTE_PATHS.ADMIN)) return 'admin';
+    if (path.startsWith(ROUTE_PATHS.PORTAL)) return 'portal';
+    return undefined;
+  };
+
+  const activeNav = getEffectiveActiveNav();
+
+  const userUnitName = user?.unit_name?.trim() || 'Đơn vị của tôi';
+
   const allNavTabs = [
     {
       key: 'desk',
@@ -51,25 +76,33 @@ const NavigationGlider: React.FC<{
         hasPermission('DOC_UPLOAD') ||
         hasPermission('DOC_EDIT') ||
         hasPermission('DOC_PARSE'),
+      activeColor: 'text-white',
+      inactiveColor: 'text-emerald-600 dark:text-emerald-400',
+      visible: Boolean(isStaff || isAdmin),
     },
     {
       key: 'portal',
       to: ROUTE_PATHS.PORTAL,
-      label: 'Trung tâm thư viện số',
-      shortLabel: 'Thư viện số',
+      label: 'Dữ liệu số',
+      shortLabel: 'Dữ liệu số',
       icon: BookOpen,
       activeColor: 'text-purple-600 dark:text-purple-300',
       inactiveColor: 'text-blue-500',
       visible: true, // ai cũng vào được
+      activeColor: 'text-white',
+      inactiveColor: 'text-emerald-700 dark:text-emerald-400',
+      visible: true,
     },
     {
       key: 'myunit',
       to: ROUTE_PATHS.MY_UNIT,
-      label: 'Đơn vị của tôi',
-      shortLabel: 'Đơn vị',
+      label: userUnitName,
+      shortLabel: userUnitName,
       icon: Building,
       activeColor: 'text-violet-600 dark:text-violet-300',
       inactiveColor: 'text-violet-500',
+      activeColor: 'text-white',
+      inactiveColor: 'text-amber-600 dark:text-amber-500',
       visible: Boolean(user && user.user_id !== 'GUEST'),
     },
     {
@@ -87,28 +120,47 @@ const NavigationGlider: React.FC<{
         hasPermission('AUDIT_VIEW') ||
         hasPermission('SESSION_VIEW') ||
         isAdmin,
+      activeColor: 'text-white',
+      inactiveColor: 'text-amber-600 dark:text-amber-500',
+      visible: Boolean(isAdmin),
     },
   ];
 
   const visibleTabs = allNavTabs.filter((t) => t.visible);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLElement>(null);
   const tabRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
-  const isInitialMount = useRef(true);
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>(() => {
+    return lastKnownPillCoords || { left: 0, width: 0 };
+  });
+  const isInitialMount = useRef(!lastKnownPillCoords);
 
+  // Chuẩn hóa tính toán tọa độ offset thực tế chính xác tuyệt đối từ container cha
   const updateIndicator = useCallback(() => {
-    if (!activeNav || !containerRef.current) return;
-    const activeEl = tabRefs.current[activeNav];
+    const container = containerRef.current;
+    if (!container) return;
+    const activeEl = tabRefs.current[activeNav || ''];
+
     if (activeEl) {
-      setIndicatorStyle({
-        left: activeEl.offsetLeft,
-        width: activeEl.offsetWidth,
-      });
+      const containerRect = container.getBoundingClientRect();
+      const activeRect = activeEl.getBoundingClientRect();
+      const x = Math.round(activeRect.left - containerRect.left);
+      const w = Math.round(activeRect.width);
+
+      if (w > 0) {
+        lastKnownPillCoords = { left: x, width: w };
+        // Gán trực tiếp vào CSS variable của DOM node để loại bỏ độ trễ và giật khung hình
+        container.style.setProperty('--x', `${x}px`);
+        container.style.setProperty('--w', `${w}px`);
+        container.style.setProperty('--pill-opacity', '1');
+
+        setIndicatorStyle({ left: x, width: w });
+      }
     } else {
+      container.style.setProperty('--pill-opacity', '0');
       setIndicatorStyle({ left: 0, width: 0 });
     }
-  }, [activeNav, visibleTabs.length]);
+  }, [activeNav, visibleTabs.length, userUnitName]);
 
   useEffect(() => {
     updateIndicator();
@@ -117,7 +169,7 @@ const NavigationGlider: React.FC<{
       isInitialMount.current = false;
     });
 
-    // ResizeObserver đảm bảo Glider cập nhật chuẩn xác khi font chữ, zoom, hoặc breakpoint thay đổi
+    // ResizeObserver đảm bảo Pill cập nhật chuẩn xác khi font chữ, zoom, hoặc breakpoint thay đổi
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       ro = new ResizeObserver(() => {
@@ -142,54 +194,79 @@ const NavigationGlider: React.FC<{
   }, [updateIndicator, deviceMode, activeNav]);
 
   return (
-    <div
-      ref={containerRef}
-      className="relative flex items-center bg-slate-200/70 dark:bg-slate-800/80 p-1 sm:p-1.5 rounded-2xl border border-slate-300/50 dark:border-slate-700/60 shadow-xs w-fit max-w-full mx-auto"
+    <nav
+      ref={containerRef as any}
+      aria-label="Điều hướng hệ thống"
+      className={`u058-nav relative flex items-center bg-slate-200/80 dark:bg-[#111827]/80 dark:bg-slate-900/80 backdrop-blur-md p-1 sm:p-1.5 rounded-2xl border border-slate-300/70 dark:border-slate-800 shadow-xs w-fit max-w-full select-none ${
+        isInitialMount.current ? 'no-transition' : ''
+      }`}
+      style={{
+        '--x': `${indicatorStyle.left}px`,
+        '--w': `${indicatorStyle.width}px`,
+        '--pill-opacity': indicatorStyle.width > 0 ? 1 : 0,
+      } as React.CSSProperties}
     >
-      {/* Sliding Pill Glider Indicator */}
-      <div
-        className={`
-          pointer-events-none absolute top-1 bottom-1 sm:top-1.5 sm:bottom-1.5 rounded-xl
-          bg-white dark:bg-[#166534]
-          shadow-[0_2px_10px_rgba(22,101,52,0.18)] dark:shadow-[0_4px_16px_rgba(16,185,129,0.35)]
-          border border-emerald-600/20 dark:border-amber-400/30
-          ${isInitialMount.current ? '' : 'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'}
-        `}
-        style={{
-          left: `${indicatorStyle.left}px`,
-          width: `${indicatorStyle.width}px`,
-          opacity: indicatorStyle.width > 0 ? 1 : 0,
-        }}
-      />
+      {/* Sliding Pill Highlight Indicator (#058) */}
+      <span className="u058-pill" aria-hidden="true" />
 
       {visibleTabs.map((tab) => {
         const isActive = activeNav === tab.key;
         const IconComponent = tab.icon;
         return (
-          <Tooltip key={tab.key} title={tab.label} placement="bottom" mouseEnterDelay={0.3}>
-            <Link
-              ref={(el) => {
-                tabRefs.current[tab.key] = el;
+          <Link
+            key={tab.key}
+            id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
+            ref={(el) => {
+              tabRefs.current[tab.key] = el;
+            }}
+            to={tab.to}
+              onClick={() => {
+                const el = tabRefs.current[tab.key];
+                const container = containerRef.current;
+                if (el && container) {
+                  const containerRect = container.getBoundingClientRect();
+                  const activeRect = el.getBoundingClientRect();
+                  const x = Math.round(activeRect.left - containerRect.left);
+                  const w = Math.round(activeRect.width);
+                  if (w > 0) {
+                    lastKnownPillCoords = { left: x, width: w };
+                    container.style.setProperty('--x', `${x}px`);
+                    container.style.setProperty('--w', `${w}px`);
+                    container.style.setProperty('--pill-opacity', '1');
+                    setIndicatorStyle({ left: x, width: w });
+                  }
+                }
               }}
-              to={tab.to}
-              className={`relative z-10 shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 2xl:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors duration-200 select-none ${
+              data-active={isActive ? 'true' : 'false'}
+              className={`u058-tab relative z-10 shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 2xl:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors duration-200 select-none ${
                 isActive
-                  ? 'text-[#166534] dark:text-white font-bold'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-[#166534] dark:hover:text-emerald-300'
+                  ? 'is-active !text-white font-bold'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
+              style={isActive ? { color: '#ffffff' } : undefined}
             >
               <IconComponent
                 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 transition-transform duration-300 ${
-                  isActive ? `scale-110 ${tab.activeColor}` : tab.inactiveColor
+                  isActive ? 'scale-110 !text-white' : tab.inactiveColor
                 }`}
+                style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
               />
-              <span className="hidden 2xl:inline whitespace-nowrap">{tab.label}</span>
-              <span className="hidden lg:inline 2xl:hidden whitespace-nowrap">{tab.shortLabel}</span>
+              <span
+                className="hidden 2xl:inline whitespace-nowrap"
+                style={isActive ? { color: '#ffffff' } : undefined}
+              >
+                {tab.label}
+              </span>
+              <span
+                className="hidden lg:inline 2xl:hidden whitespace-nowrap"
+                style={isActive ? { color: '#ffffff' } : undefined}
+              >
+                {tab.shortLabel}
+              </span>
             </Link>
-          </Tooltip>
         );
       })}
-    </div>
+    </nav>
   );
 };
 
@@ -202,6 +279,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, isAdmin, logout, hasPermission } = useAuth();
   const { deviceMode, orientation } = useDeviceMode();
+  const { isOnline, checkConnection } = useNetworkStatus();
   const navigate = useNavigate();
   const [liveClock, setLiveClock] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -238,14 +316,35 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Nội dung Popover User Profile cho iPad và Desktop
   const userPopoverContent = (
-    <div className="w-64 p-1 text-slate-800 dark:text-slate-200 text-xs">
-      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-            {user?.user_id || 'Tài khoản'}
-          </span>
+    <div className="w-72 p-1 text-slate-800 dark:text-slate-200 text-xs">
+      <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider shrink-0">
+              {user?.user_id || 'Tài khoản'}
+            </span>
+            {isOnline ? (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 select-none shrink-0"
+                title="Kết nối máy chủ LAN cổng 8000 ổn định"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                <span>Đang trực tuyến</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => checkConnection()}
+                className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-rose-700 dark:text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded border border-rose-500/40 animate-pulse cursor-pointer select-none shrink-0"
+                title="Mất kết nối máy chủ LAN. Bấm để thử kết nối lại!"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
+                <span>Mất kết nối</span>
+              </button>
+            )}
+          </div>
           <span
-            className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+            className={`text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 ${
               (user?.clearance_level_id || 1) >= 4
                 ? 'bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30'
                 : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
@@ -254,7 +353,7 @@ export const Header: React.FC<HeaderProps> = ({
             {user?.clearance_name || 'Công khai'}
           </span>
         </div>
-        <div className="font-bold text-slate-900 dark:text-white mt-1 text-sm">
+        <div className="font-bold text-slate-900 dark:text-white mt-1.5 text-sm">
           {user?.full_name || 'Khách tra cứu'}
         </div>
         {(user?.rank_name || user?.position) && (
@@ -263,7 +362,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
         {user?.unit_name && (
-          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
+          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 font-medium">
             {user.unit_name}
           </div>
         )}
@@ -279,7 +378,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
         >
           <BookOpen className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 mr-2" />
-          <span>Trung tâm thư viện số</span>
+          <span>Dữ liệu số</span>
         </Link>
 
         {user && user.user_id !== 'GUEST' && (
@@ -291,8 +390,8 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
           >
-            <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mr-2" />
-            <span>Đơn vị của tôi</span>
+            <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mr-2 shrink-0" />
+            <span className="truncate">{user.unit_name || 'Đơn vị của tôi'}</span>
           </Link>
         )}
 
@@ -417,7 +516,20 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Cụm Phải (shrink-0 z-20 flex items-center gap-1.5 sm:gap-2): Switch + Theme + User Profile Pill */}
-        <div className="shrink-0 z-20 flex items-center gap-1.5 sm:gap-2">
+        <div id="tour-header-controls-ipad" className="shrink-0 z-20 flex items-center gap-1.5 sm:gap-2">
+          {/* Live Indicator Trạng Thái Kết Nối - Chỉ cảnh báo khi mất kết nối máy chủ */}
+          {!isOnline && (
+            <button
+              type="button"
+              onClick={() => checkConnection()}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/40 text-[10px] font-mono font-bold shrink-0 animate-pulse cursor-pointer select-none"
+              title="Mất kết nối máy chủ LAN. Bấm để thử kết nối lại!"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping shrink-0" />
+              <span>Mất kết nối</span>
+            </button>
+          )}
+
           <DeviceModeSwitch compact />
           <ThemeToggle size="sm" />
 
@@ -435,7 +547,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
             >
               <div
-                className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
+                className="relative w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
               >
                 <span
                   className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
@@ -443,6 +555,12 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {user?.full_name ? user.full_name[0].toUpperCase() : 'K'}
                 </span>
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-white dark:ring-slate-800 ${
+                    isOnline ? 'bg-emerald-500' : 'bg-rose-500'
+                  }`}
+                  title={isOnline ? 'Đang trực tuyến' : 'Mất kết nối máy chủ'}
+                />
               </div>
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap leading-none">
                 {user?.full_name || 'Khách'}
@@ -502,7 +620,20 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Vùng Phải: Quick Nav Links & Controls */}
-      <div className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0 z-20">
+      <div id="tour-header-controls" className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0 z-20">
+        {/* Live Network Indicator - Chỉ hiển thị nút cảnh báo nếu mất kết nối máy chủ (trạng thái bình thường chuyển vào bản thông tin user để tiết kiệm diện tích khung hình) */}
+        {!isOnline && (
+          <button
+            type="button"
+            onClick={() => checkConnection()}
+            className="flex items-center space-x-1.5 text-xs font-mono font-bold text-rose-700 dark:text-rose-400 bg-rose-500/15 px-2.5 py-1.5 rounded-lg border border-rose-500/40 shrink-0 animate-pulse cursor-pointer select-none"
+            title="Mất kết nối máy chủ LAN. Bấm để thử kết nối lại ngay!"
+          >
+            <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping shrink-0" />
+            <span>Mất kết nối máy chủ</span>
+          </button>
+        )}
+
         {/* Live Clock (Chỉ hiện ở màn hình rộng để tiết kiệm diện tích khi zoom) */}
         {showClock && (
           <div className="hidden 2xl:flex items-center space-x-2 text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 shrink-0">
@@ -575,6 +706,10 @@ export const Header: React.FC<HeaderProps> = ({
             </Link>
           </Tooltip>
         )}
+        {/* Cụm Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058) */}
+        <div className="hidden sm:flex items-center shrink-0">
+          <NavigationGlider activeNav={activeNav} />
+        </div>
 
         {/* Nút gạt chuyển đổi Máy tính / iPad Air M4 (Gọn trên Header) */}
         <div className="shrink-0">
@@ -601,7 +736,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
             >
               <div
-                className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
+                className="relative w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
               >
                 <span
                   className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
@@ -609,6 +744,12 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {user?.full_name ? user.full_name[0].toUpperCase() : 'K'}
                 </span>
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-800 ${
+                    isOnline ? 'bg-emerald-500' : 'bg-rose-500'
+                  }`}
+                  title={isOnline ? 'Đang trực tuyến' : 'Mất kết nối máy chủ'}
+                />
               </div>
               <div className="text-left hidden md:block whitespace-nowrap">
                 <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">

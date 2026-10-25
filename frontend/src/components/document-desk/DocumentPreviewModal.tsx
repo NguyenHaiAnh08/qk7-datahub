@@ -18,6 +18,8 @@ import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { useAuth } from '../../hooks/useAuth';
 import { FingerprintScanModal } from '../users/FingerprintScanModal';
+import { CompactDownloadButton } from '../common/CompactDownloadButton';
+import { AccessDeniedCard } from '../common/AccessDeniedCard';
 
 export interface DocumentPreviewModalProps {
   open: boolean;
@@ -197,34 +199,16 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 <ExternalLink className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                 <span className="hidden sm:inline">Toàn màn hình</span>
               </button>
-              {canDownload ? (
-                <button
-                  onClick={handleDownload}
-                  disabled={downloading}
-                  className="p-2 rounded-lg bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-medium text-xs flex items-center gap-1.5 transition shadow-md shadow-emerald-950/20 border border-amber-500/25 cursor-pointer disabled:opacity-50"
-                  title="Tải về máy"
-                >
-                  {downloading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4" />
-                  )}
-                  <span className="hidden sm:inline">Tải về</span>
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-not-allowed opacity-60 shadow-none"
-                  title={
-                    isSecretLevel
-                      ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
-                      : `Cấp độ bảo mật của bạn (Cấp ${clearanceLevel}) không đủ điều kiện tải về văn bản Cấp ${docLevel}`
-                  }
-                >
-                  <Download className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                  <span className="hidden sm:inline">Tải về</span>
-                </button>
-              )}
+              <CompactDownloadButton
+                onDownload={handleDownload}
+                disabled={!canDownload}
+                disabledTitle={
+                  isSecretLevel
+                    ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
+                    : `Cấp độ bảo mật của bạn (Cấp ${clearanceLevel}) không đủ điều kiện tải về văn bản Cấp ${docLevel}`
+                }
+                size="compact"
+              />
               <button
                 onClick={onClose}
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
@@ -242,7 +226,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               </div>
             )}
 
-            {!loading && error && (
+            {!loading && error && !canView && (
+              <div className="p-4 sm:p-6 w-full flex items-center justify-center">
+                <AccessDeniedCard
+                  compact
+                  requiredClearanceLevel={docLevel}
+                  requiredClearanceName={document?.security_name || document?.security_level_name || `Cấp ${docLevel}`}
+                  documentTitle={document?.title}
+                  documentCode={document?.document_code}
+                  onClose={onClose}
+                />
+              </div>
+            )}
+
+            {!loading && error && canView && (
               <div className="p-6 max-w-md mx-auto text-center space-y-4 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/50 rounded-2xl shadow-lg">
                 <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-500">
                   <AlertCircle className="w-6 h-6" />

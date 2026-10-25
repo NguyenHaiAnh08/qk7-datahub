@@ -75,7 +75,7 @@ async function getSubtreeUnits(unitId) {
 async function getRootUnitId() {
   const pool = await getPool();
   const res = await pool.request().query(
-    `SELECT TOP 1 unit_id FROM UNIT WHERE parent_id IS NULL ORDER BY unit_id`
+    `SELECT TOP 1 unit_id FROM UNIT WHERE parent_id IS NULL ORDER BY CASE WHEN unit_id = 'QK7' THEN 0 ELSE 1 END, unit_id`
   );
   return res.recordset[0]?.unit_id || null;
 }

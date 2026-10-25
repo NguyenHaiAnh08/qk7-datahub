@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, X, Users } from 'lucide-react';
 import { Header } from '../components/common/Header';
-import { Toast, ToastState } from '../components/common/Toast';
+import { toast } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { UserTable } from '../components/users/UserTable';
 import { UserFormModal } from '../components/users/UserFormModal';
@@ -45,16 +45,10 @@ export const UsersPage: React.FC = () => {
     user: null
   });
 
-  // Toast
-  const [toast, setToast] = useState<ToastState>({
-    show: false,
-    message: '',
-    type: 'success'
-  });
-
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2800);
+    if (type === 'error') toast.error(message);
+    else if (type === 'info') toast.info(message);
+    else toast.success(message);
   };
 
   const loadData = async () => {
@@ -95,25 +89,39 @@ export const UsersPage: React.FC = () => {
     if (selectedUser?.user_id) {
       await usersApi.updateUser(selectedUser.user_id, userData);
       await loadData();
-      showToast('Đã cập nhật thông tin quân nhân');
+      toast.success(`Đã cập nhật thông tin quân nhân ${selectedUser.full_name || selectedUser.user_id}`, {
+        title: 'HỒ SƠ ĐÃ LƯU',
+        badge: selectedUser.user_id,
+      });
     } else {
       await usersApi.createUser(userData as any);
       await loadData();
-      showToast('Đã thêm quân nhân mới thành công');
+      toast.success('Đã thêm quân nhân mới thành công vào hệ thống dữ liệu.', {
+        title: 'THÊM THÀNH CÔNG',
+        badge: 'NEW-USER',
+      });
     }
   };
 
   const handleDeleteUser = async () => {
-  if (!deleteConfirm.user) return;
-  try {
-    await usersApi.deleteUser(deleteConfirm.user.user_id);
-    setDeleteConfirm({ open: false, user: null });
-    await loadData();                          // ← await trước
-    showToast(`Đã xóa quân nhân ${deleteConfirm.user.full_name}`);
-  } catch (err: any) {
-    showToast('Lỗi: ' + err.message, 'error');
-  }
-};
+    if (!deleteConfirm.user) return;
+    try {
+      await usersApi.deleteUser(deleteConfirm.user.user_id);
+      const deletedName = deleteConfirm.user.full_name;
+      const deletedId = deleteConfirm.user.user_id;
+      setDeleteConfirm({ open: false, user: null });
+      await loadData();
+      toast.success(`Đã xóa quân nhân ${deletedName} khỏi danh bạ đơn vị.`, {
+        title: 'XÓA QUÂN NHÂN',
+        badge: deletedId,
+      });
+    } catch (err: any) {
+      toast.error('Lỗi khi xóa quân nhân: ' + err.message, {
+        title: 'LỖI THAO TÁC',
+        badge: 'USER-ERR',
+      });
+    }
+  };
 
   const filteredUsers = useMemo(() => {
     if (!userSearch.trim()) return usersList;
@@ -233,8 +241,6 @@ export const UsersPage: React.FC = () => {
         onConfirm={handleDeleteUser}
         onCancel={() => setDeleteConfirm({ open: false, user: null })}
       />
-
-      <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
     </div>
   );
 };

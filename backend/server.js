@@ -918,13 +918,32 @@ app.get('/api/documents', requireAuth, requirePermission('DOC_VIEW'), async (req
     if (req.query.code) { query += ` AND d.document_code LIKE '%' + @code + '%'`; r.input('code', sql.NVarChar(100), req.query.code); }
     if (req.query.title) { query += ` AND d.title LIKE N'%' + @title + N'%'`; r.input('title', sql.NVarChar(500), req.query.title); }
     if (req.query.type) { query += ` AND d.doc_type_id = @type`; r.input('type', sql.VarChar(20), req.query.type); }
-    if (req.query.unit) { query += ` AND d.issuing_unit_id = @unit`; r.input('unit', sql.VarChar(50), req.query.unit); }
+    if (req.query.unit) {
+      if (req.query.include_children === 'true' || req.query.include_children === '1') {
+        const subtree = await getSubtreeUnits(req.query.unit);
+        if (subtree.length > 0) {
+          const params = subtree.map((_, i) => `@u_${i}`);
+          query += ` AND d.issuing_unit_id IN (${params.join(', ')})`;
+          subtree.forEach((uId, i) => r.input(`u_${i}`, sql.VarChar(50), uId));
+        } else {
+          query += ` AND d.issuing_unit_id = @unit`;
+          r.input('unit', sql.VarChar(50), req.query.unit);
+        }
+      } else {
+        query += ` AND d.issuing_unit_id = @unit`;
+        r.input('unit', sql.VarChar(50), req.query.unit);
+      }
+    }
     if (req.query.from) { query += ` AND d.issued_date >= @from`; r.input('from', sql.Date, req.query.from); }
     if (req.query.to) { query += ` AND d.issued_date <= @to`; r.input('to', sql.Date, req.query.to); }
     if (req.query.lv) {
-      const maxAllowed = Math.min(parseInt(req.query.lv, 10), req.user.clearance_level_id);
-      query += ` AND d.security_level_id <= @lv`;
-      r.input('lv', sql.Int, maxAllowed);
+      const requestedLv = parseInt(req.query.lv, 10);
+      if (requestedLv <= req.user.clearance_level_id) {
+        query += ` AND d.security_level_id = @lv`;
+        r.input('lv', sql.Int, requestedLv);
+      } else {
+        query += ` AND 1 = 0`;
+      }
     }
     query += ` ORDER BY d.issued_date DESC, d.document_code`;
     const result = await r.query(query);
@@ -978,9 +997,13 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
     if (req.query.from) { query += ` AND d.issued_date >= @from`; r.input('from', sql.Date, req.query.from); }
     if (req.query.to) { query += ` AND d.issued_date <= @to`; r.input('to', sql.Date, req.query.to); }
     if (req.query.lv) {
-      const maxAllowed = Math.min(parseInt(req.query.lv, 10), req.user.clearance_level_id);
-      query += ` AND d.security_level_id <= @lv`;
-      r.input('lv', sql.Int, maxAllowed);
+      const requestedLv = parseInt(req.query.lv, 10);
+      if (requestedLv <= req.user.clearance_level_id) {
+        query += ` AND d.security_level_id = @lv`;
+        r.input('lv', sql.Int, requestedLv);
+      } else {
+        query += ` AND 1 = 0`;
+      }
     }
     query += ` ORDER BY d.issued_date DESC, d.document_code`;
     const result = await r.query(query);

@@ -1,8 +1,14 @@
 /**
- * HTTP Client Wrapper dùng chung cho toàn bộ frontend
- * Đảm bảo 100% header xác thực theo chuẩn server.js:
- *   - X-User-Id
- *   - X-Clearance
+ * HTTP Client Wrapper dùng chung cho toàn bộ frontend.
+ *
+ * Cơ chế xác thực:
+ *   - FE gửi duy nhất: `Authorization: Bearer <JWT>` (qua getAuthHeaders())
+ *   - Backend Express (:8000) verify JWT và tự inject X-User-Id / X-Clearance
+ *     khi proxy sang AI microservice (:8001) — FE KHÔNG được tự set các header này
+ *     để tránh giả mạo quyền hạn.
+ *
+ * Response lỗi (401, 403, 5xx) sẽ phát sự kiện `qk7:http-error` để
+ * HttpErrorListener (mounted toàn cục) hiển thị notification + điều hướng.
  */
 
 export interface HttpOptions extends RequestInit {

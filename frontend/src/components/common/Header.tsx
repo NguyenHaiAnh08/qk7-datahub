@@ -12,6 +12,8 @@ import {
   LogOut,
   ChevronDown,
   Menu,
+  Trash2,      // ⭐ MỚI
+  Activity,    // ⭐ MỚI
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
@@ -37,6 +39,10 @@ let lastKnownPillCoords: { left: number; width: number } | null = null;
 
 const NavigationGlider: React.FC<{
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
+}> = ({ activeNav }) => {
+  const { user, isAdmin, isStaff, hasPermission, logout } = useAuth();
+  const { deviceMode } = useDeviceMode();
+  
 }> = ({ activeNav: explicitActiveNav }) => {
   const { user, isAdmin, isStaff } = useAuth();
   const { deviceMode } = useDeviceMode();
@@ -64,6 +70,12 @@ const NavigationGlider: React.FC<{
       label: 'Đăng tải',
       shortLabel: 'Đăng tải',
       icon: UploadCloud,
+      activeColor: 'text-emerald-600 dark:text-emerald-300',
+      inactiveColor: 'text-emerald-500',
+      visible:
+        hasPermission('DOC_UPLOAD') ||
+        hasPermission('DOC_EDIT') ||
+        hasPermission('DOC_PARSE'),
       activeColor: 'text-white',
       inactiveColor: 'text-emerald-600 dark:text-emerald-400',
       visible: Boolean(isStaff || isAdmin),
@@ -74,6 +86,9 @@ const NavigationGlider: React.FC<{
       label: 'Dữ liệu số',
       shortLabel: 'Dữ liệu số',
       icon: BookOpen,
+      activeColor: 'text-purple-600 dark:text-purple-300',
+      inactiveColor: 'text-blue-500',
+      visible: true, // ai cũng vào được
       activeColor: 'text-white',
       inactiveColor: 'text-emerald-700 dark:text-emerald-400',
       visible: true,
@@ -84,6 +99,8 @@ const NavigationGlider: React.FC<{
       label: userUnitName,
       shortLabel: userUnitName,
       icon: Building,
+      activeColor: 'text-violet-600 dark:text-violet-300',
+      inactiveColor: 'text-violet-500',
       activeColor: 'text-white',
       inactiveColor: 'text-amber-600 dark:text-amber-500',
       visible: Boolean(user && user.user_id !== 'GUEST'),
@@ -94,6 +111,15 @@ const NavigationGlider: React.FC<{
       label: 'Quản trị',
       shortLabel: 'Quản trị',
       icon: ShieldAlert,
+      activeColor: 'text-amber-600 dark:text-amber-400',
+      inactiveColor: 'text-amber-500',
+      visible:
+        hasPermission('SYSTEM_STATS_VIEW') ||
+        hasPermission('USER_VIEW') ||
+        hasPermission('ROLE_VIEW') ||
+        hasPermission('AUDIT_VIEW') ||
+        hasPermission('SESSION_VIEW') ||
+        isAdmin,
       activeColor: 'text-white',
       inactiveColor: 'text-amber-600 dark:text-amber-500',
       visible: Boolean(isAdmin),
@@ -251,7 +277,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeNav,
   onToggleMobileMenu,
 }) => {
-  const { user, isAdmin, isStaff, logout } = useAuth();
+  const { user, isAdmin, logout, hasPermission } = useAuth();
   const { deviceMode, orientation } = useDeviceMode();
   const { isOnline, checkConnection } = useNetworkStatus();
   const navigate = useNavigate();
@@ -268,6 +294,25 @@ export const Header: React.FC<HeaderProps> = ({
   }, [showClock]);
 
   const isIPadPortrait = deviceMode === 'ipad' && orientation === 'portrait';
+
+  // ══════════════════════════════════════════════════════════════════════
+  // PERMISSION GATES — dùng chung cho Popover, Desktop quick nav và logo click
+  // ══════════════════════════════════════════════════════════════════════
+  const canAccessDesk =
+    hasPermission('DOC_UPLOAD') ||
+    hasPermission('DOC_EDIT') ||
+    hasPermission('DOC_PARSE');
+
+  const canAccessAdmin =
+    hasPermission('SYSTEM_STATS_VIEW') ||
+    hasPermission('USER_VIEW') ||
+    hasPermission('ROLE_VIEW') ||
+    hasPermission('AUDIT_VIEW') ||
+    hasPermission('SESSION_VIEW') ||
+    isAdmin;
+
+  const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
+  const canAccessSessions = hasPermission('SESSION_VIEW');
 
   // Nội dung Popover User Profile cho iPad và Desktop
   const userPopoverContent = (
@@ -350,7 +395,7 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
 
-        {(isStaff || isAdmin) && (
+        {canAccessDesk && (
           <Link
             to={ROUTE_PATHS.DESK}
             onClick={() => {
@@ -364,7 +409,22 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
 
-        {isAdmin && (
+        {/* ⭐ MỚI — Thùng rác tài liệu */}
+        {canAccessTrash && (
+          <Link
+            to={ROUTE_PATHS.ADMIN_TRASH}
+            onClick={() => {
+              setUserPopoverOpen(false);
+              setDropdownOpen(false);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-500 mr-2" />
+            <span>Thùng rác tài liệu</span>
+          </Link>
+        )}
+
+        {canAccessAdmin && (
           <Link
             to={ROUTE_PATHS.ADMIN}
             onClick={() => {
@@ -377,6 +437,21 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Trung tâm quản trị hệ thống</span>
           </Link>
         )}
+
+        {/* ⭐ MỚI — Phiên đang hoạt động */}
+        {canAccessSessions && (
+          <Link
+            to={ROUTE_PATHS.ADMIN_SESSIONS}
+            onClick={() => {
+              setUserPopoverOpen(false);
+              setDropdownOpen(false);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+          >
+            <Activity className="w-3.5 h-3.5 text-cyan-500 mr-2" />
+            <span>Phiên đang hoạt động</span>
+          </Link>
+        )}
       </div>
 
       <div className="border-t border-slate-100 dark:border-slate-800 pt-1">
@@ -384,7 +459,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => {
             setUserPopoverOpen(false);
             setDropdownOpen(false);
-            logout();
+            void logout();
           }}
           className="w-full flex items-center px-3 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition text-left cursor-pointer"
         >
@@ -416,7 +491,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div
             className="flex items-center gap-2.5 cursor-pointer group shrink-0"
-            onClick={() => navigate(isAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
+            onClick={() => navigate(canAccessAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
           >
             <img
               src="/Logo_QSQK7.png"
@@ -523,7 +598,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div
           className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group shrink-0"
-          onClick={() => navigate(isAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
+          onClick={() => navigate(canAccessAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
         >
           <img
             src="/Logo_QSQK7.png"
@@ -567,6 +642,70 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
 
+        {/* Quick Nav Links (Nút bấm chuyển trang tiêu chuẩn trên Máy tính) */}
+        {canAccessDesk && (
+          <Tooltip title="Đăng tải văn bản" placement="bottom" mouseEnterDelay={0.3}>
+            <Link
+              to={ROUTE_PATHS.DESK}
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
+                activeNav === 'desk'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+              }`}
+            >
+              <UploadCloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="hidden xl:inline">Đăng tải</span>
+            </Link>
+          </Tooltip>
+        )}
+
+        <Tooltip title="Trung tâm thư viện số" placement="bottom" mouseEnterDelay={0.3}>
+          <Link
+            to={ROUTE_PATHS.PORTAL}
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
+              activeNav === 'portal'
+                ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
+                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="hidden 2xl:inline">Trung tâm thư viện số</span>
+            <span className="hidden xl:inline 2xl:hidden">Thư viện số</span>
+          </Link>
+        </Tooltip>
+
+        {user && user.user_id !== 'GUEST' && (
+          <Tooltip title="Đơn vị của tôi" placement="bottom" mouseEnterDelay={0.3}>
+            <Link
+              to={ROUTE_PATHS.MY_UNIT}
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
+                activeNav === 'myunit'
+                  ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-500/50 shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+              }`}
+            >
+              <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="hidden 2xl:inline">Đơn vị của tôi</span>
+              <span className="hidden xl:inline 2xl:hidden">Đơn vị</span>
+            </Link>
+          </Tooltip>
+        )}
+
+        {canAccessAdmin && (
+          <Tooltip title="Trung tâm quản trị" placement="bottom" mouseEnterDelay={0.3}>
+            <Link
+              to={ROUTE_PATHS.ADMIN}
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold border transition whitespace-nowrap shrink-0 ${
+                activeNav === 'admin'
+                  ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/50 shadow-sm'
+                  : 'bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/40 dark:hover:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="hidden xl:inline">Quản trị</span>
+            </Link>
+          </Tooltip>
+        )}
         {/* Cụm Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058) */}
         <div className="hidden sm:flex items-center shrink-0">
           <NavigationGlider activeNav={activeNav} />

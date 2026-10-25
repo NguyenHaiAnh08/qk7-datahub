@@ -5,7 +5,7 @@ import { unitService } from './unitService';
 import { documentTypeService } from './documentTypeService';
 import { securityLevelService } from './securityLevelService';
 import { logService } from './logService';
-import { militaryService } from './militaryService.ts';       // ← THÊM
+import { militaryService } from './militaryService';       // ← THÊM
 
 /**
  * Dashboard API (Aggregator Service)

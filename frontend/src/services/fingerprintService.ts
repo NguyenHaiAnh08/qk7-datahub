@@ -47,7 +47,7 @@ export const fingerprintService = {
    * - Trên iPad Air M4 (hoặc khi Local Agent chưa bật): Tự động fallback sang Express Gateway (:8000)
    *   gọi /api/admin/fingerprint/agents để lấy máy quét ZK9500 đang trực tuyến tại Server/bàn thuyết trình.
    */
-  async getLocalDeviceId(timeoutMs: number = 1200): Promise<string> {
+    async getLocalDeviceId(timeoutMs: number = 1200): Promise<string> {
     const isIPad =
       typeof document !== 'undefined' &&
       (document.documentElement.getAttribute('data-device-mode') === 'ipad' ||
@@ -56,10 +56,10 @@ export const fingerprintService = {
             /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1))));
 
-    // 1. Nếu không phải iPad, thử gọi Local Agent trước (timeout 800ms)
+    // 1. Nếu không phải iPad, thử gọi Local Agent trước
     if (!isIPad) {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), Math.min(timeoutMs, 800));
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);   // ← Honor full timeout (F6)
       try {
         const res = await fetch(DEVICE_ID_URL, { signal: ctrl.signal });
         if (res.ok) {
@@ -67,7 +67,7 @@ export const fingerprintService = {
           if (data.device_id) return data.device_id;
         }
       } catch {
-        // Local agent không có trên máy này -> tiếp tục fallback sang Server (silent)
+        // Local agent không có trên máy này -> fallback sang Server (silent)
       } finally {
         clearTimeout(timer);
       }
@@ -77,13 +77,9 @@ export const fingerprintService = {
     try {
       const serverAgents = await http<{ items: Array<{ device_id: string }> }>(
         '/api/admin/fingerprint/agents',
-        {
-          method: 'GET',
-          skipErrorNotification: true,
-        }
+        { method: 'GET', skipErrorNotification: true }
       );
-
-      if (serverAgents?.items && serverAgents.items.length > 0 && serverAgents.items[0].device_id) {
+      if (serverAgents?.items?.length > 0 && serverAgents.items[0].device_id) {
         return serverAgents.items[0].device_id;
       }
     } catch {
@@ -108,7 +104,7 @@ export const fingerprintService = {
         'Content-Type': 'application/json',
         'X-Device-FP': deviceId,
       },
-      body: JSON.stringify({ file_id: fileId }),
+      body: JSON.stringify({ file_id: fileId, device_id: deviceId }),
       skipErrorNotification: true,
       signal,
     });

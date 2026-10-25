@@ -39,6 +39,10 @@ if not defined FINGERPRINT_BRIDGE_TOKEN (
 if not defined PORT_BACKEND set "PORT_BACKEND=8000"
 if not defined PORT_CLIENT_AGENT set "PORT_CLIENT_AGENT=9001"
 if not defined MATCH_SCORE_THRESHOLD set "MATCH_SCORE_THRESHOLD=45"
+if not defined MATCH_SCORE_THRESHOLD set "MATCH_SCORE_THRESHOLD=45"
+REM ★ MỚI: idle timeout + full reset
+if not defined DEVICE_IDLE_TIMEOUT set "DEVICE_IDLE_TIMEOUT=60"
+if not defined DEVICE_FULL_RESET_ON_CLOSE set "DEVICE_FULL_RESET_ON_CLOSE=true"
 
 REM ─── Xac dinh protocol ───
 if /i "%USE_HTTPS%"=="true" (
@@ -93,6 +97,9 @@ echo [INFO] Dang dong bo .env tu ..\.env...
     echo DEVICE_SERVER_HOST=127.0.0.1
     echo DEVICE_SERVER_PORT=%PORT_CLIENT_AGENT%
     echo MATCH_SCORE_THRESHOLD=%MATCH_SCORE_THRESHOLD%
+    echo MATCH_SCORE_THRESHOLD=%MATCH_SCORE_THRESHOLD%
+    echo DEVICE_IDLE_TIMEOUT=%DEVICE_IDLE_TIMEOUT%
+    echo DEVICE_FULL_RESET_ON_CLOSE=%DEVICE_FULL_RESET_ON_CLOSE%
 ) > ".env"
 
 if defined CA_PATH echo CA_CERT_PATH=%CA_PATH%>> ".env"

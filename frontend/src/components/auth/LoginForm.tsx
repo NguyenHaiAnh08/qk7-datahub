@@ -79,7 +79,7 @@ export const DEMO_ACCOUNTS: Record<
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSplitDeck = false }) => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, continueAsGuest: authContinueAsGuest } = useAuth();
   const isDev = import.meta.env.DEV;
   const [username, setUsername] = useState(isDev ? 'USR-001' : '');
   const [password, setPassword] = useState(isDev ? '123456789' : '');
@@ -228,12 +228,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
     }
   };
 
-  const continueAsGuest = () => {
-    authService.clearSession();
+    const handleContinueAsGuest = () => {
     if (onToast) onToast('Đang chuyển hướng chế độ Đại biểu (Dữ liệu công khai)...', 'info');
-    setTimeout(() => {
-      navigate(ROUTE_PATHS.PORTAL);
-    }, 600);
+    authContinueAsGuest();
   };
 
   // ══════════════════════════════════════════════════════════════════════
@@ -323,7 +320,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             {/* Nút Khách Tra Cứu */}
             <button
               type="button"
-              onClick={continueAsGuest}
+              onClick={handleContinueAsGuest}
               className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 font-medium text-xs border border-slate-200 dark:border-slate-700/60 transition cursor-pointer"
             >
               Đại biểu (Dữ liệu công khai)
@@ -625,7 +622,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
 
       <button
         type="button"
-        onClick={continueAsGuest}
+        onClick={handleContinueAsGuest}
         className="w-full py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-white font-medium text-xs border border-slate-200 dark:border-slate-700/60 transition-colors cursor-pointer"
       >
         Đại biểu (Dữ liệu công khai)

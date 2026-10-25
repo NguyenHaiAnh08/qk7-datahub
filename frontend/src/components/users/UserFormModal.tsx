@@ -17,7 +17,7 @@ import { User, MilitaryRank, MilitaryPosition } from '../../types/user';
 import { Unit, SecurityLevel, Role } from '../../types';
 import { usersApi } from '../../services/usersApi';
 import { dashboardApi } from '../../services/dashboardApi';
-import { buildUnitTree } from '../../utils/unitTree';
+import { buildUnitTree, filterSchoolUnits } from '../../utils/unitTree';
 
 export interface UserFormModalProps {
   open: boolean;
@@ -121,16 +121,6 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     }
   }, [units, open]);
 
-  const unitTree = React.useMemo(() => buildUnitTree(availableUnits), [availableUnits]);
-  const rootUnitKeys = React.useMemo(() => unitTree.map((node) => String(node.key)), [unitTree]);
-  const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (rootUnitKeys.length > 0) {
-      setTreeExpandedKeys(rootUnitKeys);
-    }
-  }, [rootUnitKeys]);
-
   const [formData, setFormData] = useState<Partial<User> & { username?: string; password?: string; role_id?: string }>({
     user_id: '',
     username: '',
@@ -143,6 +133,35 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     status: 'active',
     role_id: '',
   });
+
+  const filteredUnits = React.useMemo(
+    () => filterSchoolUnits(availableUnits, formData.unit_id),
+    [availableUnits, formData.unit_id]
+  );
+  const unitTree = React.useMemo(() => buildUnitTree(filteredUnits), [filteredUnits]);
+
+  // Thu thập các cấp cha để tự động mở rộng (Quân khu 7, Trường Quân sự QK7)
+  const defaultExpandedKeys = React.useMemo(() => {
+    const keys: string[] = [];
+    const collectParentKeys = (nodes: any[]) => {
+      for (const n of nodes) {
+        if (n.children && n.children.length > 0) {
+          keys.push(String(n.key));
+          collectParentKeys(n.children);
+        }
+      }
+    };
+    collectParentKeys(unitTree);
+    return keys;
+  }, [unitTree]);
+
+  const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (defaultExpandedKeys.length > 0) {
+      setTreeExpandedKeys(defaultExpandedKeys);
+    }
+  }, [defaultExpandedKeys]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -459,8 +478,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   treeExpandedKeys={treeExpandedKeys}
                   onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
                   onOpenChange={(visible) => {
-                    if (visible && rootUnitKeys.length > 0) {
-                      setTreeExpandedKeys(rootUnitKeys);
+                    if (visible && defaultExpandedKeys.length > 0) {
+                      setTreeExpandedKeys(defaultExpandedKeys);
                     }
                   }}
                   treeLine={{ showLeafIcon: false }}

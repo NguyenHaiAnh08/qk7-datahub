@@ -236,9 +236,9 @@ class ZK9500Service:
                     return None
                 t = self._capture_once()
                 if t is not None:
-                    time.sleep(0.05)
+                    time.sleep(0.01)  # wait for LED off
                     return t
-                time.sleep(0.06)
+                time.sleep(0.02)
             return None
         finally:
             self._scan_lock.release()

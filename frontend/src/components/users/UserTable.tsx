@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Pagination } from 'antd';
 import { User } from '../../types/user';
-import { Pencil, KeyRound, Trash2, Fingerprint } from 'lucide-react';
+import { Pencil, KeyRound, Trash2, Fingerprint, Shield } from 'lucide-react';
 
 export interface UserTableProps {
   users: User[];
@@ -9,6 +9,8 @@ export interface UserTableProps {
   onUpdateCredentials: (user: User) => void;
   onDelete: (user: User) => void;
   onEnrollFingerprint?: (user: User) => void;
+  onGrantPermission?: (user: User) => void; // ⭐ MỚI
+  onViewPermissions?: (user: User) => void; // ⭐ MỚI
   loading?: boolean;
   pageSize?: number;
 }
@@ -19,6 +21,8 @@ export const UserTable: React.FC<UserTableProps> = ({
   onUpdateCredentials,
   onDelete,
   onEnrollFingerprint,
+  onGrantPermission,
+  onViewPermissions,
   loading = false,
   pageSize = 5,
 }) => {
@@ -49,6 +53,7 @@ export const UserTable: React.FC<UserTableProps> = ({
               <th className="py-3 px-4 whitespace-nowrap">Chức vụ</th>
               <th className="py-3 px-4 whitespace-nowrap">Đơn vị</th>
               <th className="py-3 px-4 whitespace-nowrap">Mức bảo mật</th>
+              <th className="py-3 px-4">Quyền</th>
               <th className="py-3 px-4 whitespace-nowrap">Trạng thái</th>
               <th className="py-3 px-4 text-right whitespace-nowrap">Thao tác</th>
             </tr>
@@ -56,13 +61,13 @@ export const UserTable: React.FC<UserTableProps> = ({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                <td colSpan={9} className="py-12 text-center text-slate-500 dark:text-slate-400">
                   Đang tải danh sách người dùng...
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                <td colSpan={9} className="py-12 text-center text-slate-400 dark:text-slate-500">
                   Không tìm thấy người dùng nào phù hợp
                 </td>
               </tr>
@@ -102,6 +107,28 @@ export const UserTable: React.FC<UserTableProps> = ({
                       {u.clearance_name || `Mức ${u.clearance_level_id}`}
                     </span>
                   </td>
+                  {/* ⭐ Cột Quyền — click để xem chi tiết (nếu có onViewPermissions) */}
+                  <td className="py-3 px-4">
+                    <div
+                      className={`flex items-center gap-1.5 ${
+                        onViewPermissions
+                          ? 'cursor-pointer hover:opacity-80 transition'
+                          : ''
+                      }`}
+                      onClick={onViewPermissions ? () => onViewPermissions(u) : undefined}
+                      title={onViewPermissions ? 'Xem chi tiết quyền' : undefined}
+                      role={onViewPermissions ? 'button' : undefined}
+                    >
+                      <span className="text-[11px] font-mono font-bold text-purple-600 dark:text-purple-400">
+                        {(u.permissions || []).length}
+                      </span>
+                      {(u.roles || []).length > 0 && (
+                        <span className="text-[10px] text-slate-400">
+                          +{(u.roles || []).length} role
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-3 px-4 whitespace-nowrap">
                     <span
                       className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
@@ -131,6 +158,18 @@ export const UserTable: React.FC<UserTableProps> = ({
                         <Fingerprint className="w-3.5 h-3.5" />
                       </button>
                     )}
+
+                    {/* ⭐ MỚI — Nút Gán quyền trực tiếp */}
+                    {onGrantPermission && (
+                      <button
+                        onClick={() => onGrantPermission(u)}
+                        className="p-1.5 rounded-lg mr-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/70 dark:text-indigo-300 dark:border-indigo-800/50 transition cursor-pointer"
+                        title="Gán quyền trực tiếp"
+                      >
+                        <Shield className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     <button
                       onClick={() => onEdit(u)}
                       className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"

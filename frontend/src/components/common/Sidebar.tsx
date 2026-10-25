@@ -13,8 +13,12 @@ import {
   Briefcase,
   ChevronLeft,
   ChevronRight,
+  Trash2,
+  Monitor,
 } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
+/** @deprecated Dùng chuỗi id trực tiếp — giữ type cũ để tương thích caller legacy. */
 export type AdminTab =
   | 'overview'
   | 'users'
@@ -23,26 +27,22 @@ export type AdminTab =
   | 'units'
   | 'doctypes'
   | 'levels'
+  | 'ranks'
+  | 'positions'
   | 'logs'
+  | 'sessions'
+  | 'trash'
   | string;
 
 export interface SidebarProps {
-  activeTab?: AdminTab;
+  activeTab?: string;
   activeId?: string;
   onTabChange?: (tab: any) => void;
   onSelect?: (id: any) => void;
+  /** @deprecated Không còn dùng trong render — giữ để tương thích caller cũ. */
   open?: boolean;
   onClose?: () => void;
-  counts?: {
-    users?: number;
-    roles?: number;
-    permissions?: number;
-    units?: number;
-    doctypes?: number;
-    levels?: number;
-    ranks?: number;
-    positions?: number;
-  };
+  counts?: Record<string, number>;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -52,31 +52,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeId,
   onTabChange,
   onSelect,
-  open = true,
   onClose,
   counts,
   collapsed = false,
   onToggleCollapse,
 }) => {
+  const { hasPermission } = useAuth();
   const currentTab = activeTab || activeId || 'overview';
+
   const handleSelect = (id: string) => {
-    if (onTabChange) onTabChange(id);
-    if (onSelect) onSelect(id);
-    if (onClose) onClose();
+    onTabChange?.(id);
+    onSelect?.(id);
+    onClose?.();
   };
 
-  const navItems: Array<{ id: string; label: string; icon: any }> = [
-    { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
-    { id: 'users', label: 'Người dùng', icon: Users },
-    { id: 'roles', label: 'Vai trò', icon: KeyRound },
-    { id: 'permissions', label: 'Quyền', icon: ShieldAlert },
-    { id: 'units', label: 'Đơn vị', icon: Building },
-    { id: 'doctypes', label: 'Loại văn bản', icon: FileText },
-    { id: 'levels', label: 'Mức bảo mật', icon: Shield },
-    { id: 'ranks', label: 'Cấp bậc', icon: Award },
-    { id: 'positions', label: 'Chức vụ', icon: Briefcase },
-    { id: 'logs', label: 'Nhật ký', icon: Activity },
+  const navItems: Array<{ id: string; label: string; icon: any; permission?: string }> = [
+    { id: 'overview',    label: 'Tổng quan',    icon: LayoutDashboard, permission: 'SYSTEM_STATS_VIEW' },
+    { id: 'users',       label: 'Người dùng',   icon: Users,           permission: 'USER_VIEW' },
+    { id: 'roles',       label: 'Vai trò',      icon: KeyRound,        permission: 'ROLE_VIEW' },
+    { id: 'permissions', label: 'Quyền',        icon: ShieldAlert,     permission: 'PERMISSION_VIEW' },
+    { id: 'units',       label: 'Đơn vị',       icon: Building,        permission: 'UNIT_VIEW' },
+    { id: 'doctypes',    label: 'Loại văn bản', icon: FileText,        permission: 'DOCTYPE_VIEW' },
+    { id: 'levels',      label: 'Mức bảo mật',  icon: Shield,          permission: 'SECLEVEL_VIEW' },
+    { id: 'ranks',       label: 'Cấp bậc',      icon: Award,           permission: 'RANK_VIEW' },
+    { id: 'positions',   label: 'Chức vụ',      icon: Briefcase,       permission: 'POSITION_VIEW' },
+    { id: 'logs',        label: 'Nhật ký',      icon: Activity,        permission: 'AUDIT_VIEW' },
+    { id: 'sessions',    label: 'Phiên online', icon: Monitor,         permission: 'SESSION_VIEW' },
+    { id: 'trash',       label: 'Thùng rác',    icon: Trash2,          permission: 'DOC_TRASH_VIEW' },
   ];
+
+  // Ẩn item nếu user không có quyền tương ứng (item không khai báo permission → luôn hiện)
+  const visibleItems = navItems.filter(
+    (item) => !item.permission || hasPermission(item.permission)
+  );
 
   return (
     <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 select-none overflow-x-hidden">
@@ -115,7 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Nav Items */}
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
           const buttonElement = (
@@ -126,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 collapsed ? 'justify-center p-2.5' : 'justify-start space-x-3 px-3 py-2.5'
               } rounded-xl text-xs transition cursor-pointer ${
                 isActive
-                  ? 'bg-[#166534] text-white border-l-4 border-amber-400 dark:bg-emerald-600/20 dark:text-emerald-400 dark:border dark:border-emerald-500/30 dark:border-l-4 dark:border-l-amber-400 font-semibold shadow-xs'
+                  ? 'bg-purple-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/30 font-semibold shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium'
               }`}
             >

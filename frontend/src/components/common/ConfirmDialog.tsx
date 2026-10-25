@@ -27,7 +27,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel
 }) => {
-  const isDanger = isDestructive || confirmVariant === 'danger';
+  const isDanger = confirmVariant ? confirmVariant === 'danger' : isDestructive;
   const displayText = message || description || '';
 
   return (

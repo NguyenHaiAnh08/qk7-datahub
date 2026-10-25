@@ -36,7 +36,7 @@ export const PortalPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('');
-  const [selectedLevel, setSelectedLevel] = useState<number>(user?.clearance_level_id || 1);
+  const [selectedLevel, setSelectedLevel] = useState<number>(0);  // 0 means all levels, otherwise filter by specific level
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 

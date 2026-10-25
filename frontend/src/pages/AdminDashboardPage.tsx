@@ -990,6 +990,7 @@ export const AdminDashboardPage: React.FC = () => {
                         <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
                     </thead>
+                    {/* ✅ FIX #3 — tbody Roles đã vá */}
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {rolesList.length === 0 ? (
                         <tr>
@@ -999,28 +1000,6 @@ export const AdminDashboardPage: React.FC = () => {
                               <span className="text-sm font-semibold">Chưa có vai trò nào</span>
                               <span className="text-xs">Bấm "Thêm vai trò" để tạo vai trò đầu tiên.</span>
                             </div>
-                      {rolesList.map((r) => (
-                        <tr key={r.role_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{r.role_id}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => {
-                                setGenericFormData({ ...r });
-                                setGenericModal({ open: true, type: 'roles', item: r });
-                              }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
-                              title="Sửa vai trò"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
-                              title="Xóa vai trò"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
                           </td>
                         </tr>
                       ) : (
@@ -1032,36 +1011,34 @@ export const AdminDashboardPage: React.FC = () => {
                               </span>
                             </td>
                             <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
-                                                <td className="py-3 px-4 text-right whitespace-nowrap">
-                      {/* ✅ NÚT PHÂN QUYỀN CHO ROLE */}
-                      {r.role_id === 'ROL-01' ? (
-                        <button
-                          disabled
-                          className="p-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 rounded-lg mr-1.5 cursor-not-allowed opacity-60"
-                          title="Role Admin bypass toàn quyền — không cần phân quyền"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setRolePermModal({ open: true, role: r })}
-                          className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 dark:border-amber-500/30 rounded-lg mr-1.5 transition cursor-pointer"
-                          title="Phân quyền cho vai trò"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => {
-                          setGenericFormData({ ...r });
-                          setGenericModal({ open: true, type: 'roles', item: r });
-                        }}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                        title="Sửa vai trò"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              {r.role_id === 'ROL-01' ? (
+                                <button
+                                  disabled
+                                  className="p-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 rounded-lg mr-1.5 cursor-not-allowed opacity-60"
+                                  title="Role Admin bypass toàn quyền — không cần phân quyền"
+                                >
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setRolePermModal({ open: true, role: r })}
+                                  className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 dark:border-amber-500/30 rounded-lg mr-1.5 transition cursor-pointer"
+                                  title="Phân quyền cho vai trò"
+                                >
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setGenericFormData({ ...r });
+                                  setGenericModal({ open: true, type: 'roles', item: r });
+                                }}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                                title="Sửa vai trò"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
                                 className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
@@ -1129,24 +1106,12 @@ export const AdminDashboardPage: React.FC = () => {
                         <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
                     </thead>
+                    {/* ✅ FIX #4 — tbody Permissions đã vá */}
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {permsList.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
                             Chưa có quyền nào
-                      {permsList.map((p) => (
-                        <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{p.permission_id}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name || p.code || p.permission_id}</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
-                              title="Xóa quyền"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
                           </td>
                         </tr>
                       ) : (

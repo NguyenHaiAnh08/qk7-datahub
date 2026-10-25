@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Popover } from 'antd';
+import { Popover, Tooltip } from 'antd';
 import {
   Building,
   Clock,
@@ -39,12 +39,8 @@ let lastKnownPillCoords: { left: number; width: number } | null = null;
 
 const NavigationGlider: React.FC<{
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
-}> = ({ activeNav }) => {
-  const { user, isAdmin, isStaff, hasPermission, logout } = useAuth();
-  const { deviceMode } = useDeviceMode();
-  
 }> = ({ activeNav: explicitActiveNav }) => {
-  const { user, isAdmin, isStaff } = useAuth();
+  const { user, isAdmin, isStaff, hasPermission } = useAuth();
   const { deviceMode } = useDeviceMode();
   const location = useLocation();
 
@@ -64,67 +60,50 @@ const NavigationGlider: React.FC<{
   const userUnitName = user?.unit_name?.trim() || 'Đơn vị của tôi';
 
   const allNavTabs = [
-    {
-      key: 'desk',
-      to: ROUTE_PATHS.DESK,
-      label: 'Đăng tải',
-      shortLabel: 'Đăng tải',
-      icon: UploadCloud,
-      activeColor: 'text-emerald-600 dark:text-emerald-300',
-      inactiveColor: 'text-emerald-500',
-      visible:
-        hasPermission('DOC_UPLOAD') ||
-        hasPermission('DOC_EDIT') ||
-        hasPermission('DOC_PARSE'),
-      activeColor: 'text-white',
-      inactiveColor: 'text-emerald-600 dark:text-emerald-400',
-      visible: Boolean(isStaff || isAdmin),
-    },
-    {
-      key: 'portal',
-      to: ROUTE_PATHS.PORTAL,
-      label: 'Dữ liệu số',
-      shortLabel: 'Dữ liệu số',
-      icon: BookOpen,
-      activeColor: 'text-purple-600 dark:text-purple-300',
-      inactiveColor: 'text-blue-500',
-      visible: true, // ai cũng vào được
-      activeColor: 'text-white',
-      inactiveColor: 'text-emerald-700 dark:text-emerald-400',
-      visible: true,
-    },
-    {
-      key: 'myunit',
-      to: ROUTE_PATHS.MY_UNIT,
-      label: userUnitName,
-      shortLabel: userUnitName,
-      icon: Building,
-      activeColor: 'text-violet-600 dark:text-violet-300',
-      inactiveColor: 'text-violet-500',
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-600 dark:text-amber-500',
-      visible: Boolean(user && user.user_id !== 'GUEST'),
-    },
-    {
-      key: 'admin',
-      to: ROUTE_PATHS.ADMIN,
-      label: 'Quản trị',
-      shortLabel: 'Quản trị',
-      icon: ShieldAlert,
-      activeColor: 'text-amber-600 dark:text-amber-400',
-      inactiveColor: 'text-amber-500',
-      visible:
-        hasPermission('SYSTEM_STATS_VIEW') ||
-        hasPermission('USER_VIEW') ||
-        hasPermission('ROLE_VIEW') ||
-        hasPermission('AUDIT_VIEW') ||
-        hasPermission('SESSION_VIEW') ||
-        isAdmin,
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-600 dark:text-amber-500',
-      visible: Boolean(isAdmin),
-    },
-  ];
+  {
+    key: 'desk',
+    to: ROUTE_PATHS.DESK,
+    label: 'Đăng tải',
+    shortLabel: 'Đăng tải',
+    icon: UploadCloud,
+    activeColor: 'text-white',
+    inactiveColor: 'text-emerald-600 dark:text-emerald-400',
+    visible:
+      hasPermission('DOC_UPLOAD') ||
+      hasPermission('DOC_EDIT') ||
+      hasPermission('DOC_PARSE'),
+  },
+  {
+    key: 'portal',
+    to: ROUTE_PATHS.PORTAL,
+    label: 'Dữ liệu số',
+    shortLabel: 'Dữ liệu số',
+    icon: BookOpen,
+    activeColor: 'text-white',
+    inactiveColor: 'text-emerald-700 dark:text-emerald-400',
+    visible: true,
+  },
+  {
+    key: 'myunit',
+    to: ROUTE_PATHS.MY_UNIT,
+    label: userUnitName,
+    shortLabel: userUnitName,
+    icon: Building,
+    activeColor: 'text-white',
+    inactiveColor: 'text-amber-600 dark:text-amber-500',
+    visible: Boolean(user && user.user_id !== 'GUEST'),
+  },
+  {
+    key: 'admin',
+    to: ROUTE_PATHS.ADMIN,
+    label: 'Quản trị',
+    shortLabel: 'Quản trị',
+    icon: ShieldAlert,
+    activeColor: 'text-white',
+    inactiveColor: 'text-amber-600 dark:text-amber-500',
+    visible: Boolean(isAdmin),
+  },
+];
 
   const visibleTabs = allNavTabs.filter((t) => t.visible);
 
@@ -634,78 +613,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* Live Clock (Chỉ hiện ở màn hình rộng để tiết kiệm diện tích khi zoom) */}
-        {showClock && (
-          <div className="hidden 2xl:flex items-center space-x-2 text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 shrink-0">
-            <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-            <span>{liveClock || '--:--:--'}</span>
-          </div>
-        )}
-
-        {/* Quick Nav Links (Nút bấm chuyển trang tiêu chuẩn trên Máy tính) */}
-        {canAccessDesk && (
-          <Tooltip title="Đăng tải văn bản" placement="bottom" mouseEnterDelay={0.3}>
-            <Link
-              to={ROUTE_PATHS.DESK}
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
-                activeNav === 'desk'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              <UploadCloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="hidden xl:inline">Đăng tải</span>
-            </Link>
-          </Tooltip>
-        )}
-
-        <Tooltip title="Trung tâm thư viện số" placement="bottom" mouseEnterDelay={0.3}>
-          <Link
-            to={ROUTE_PATHS.PORTAL}
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
-              activeNav === 'portal'
-                ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/50 shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="hidden 2xl:inline">Trung tâm thư viện số</span>
-            <span className="hidden xl:inline 2xl:hidden">Thư viện số</span>
-          </Link>
-        </Tooltip>
-
-        {user && user.user_id !== 'GUEST' && (
-          <Tooltip title="Đơn vị của tôi" placement="bottom" mouseEnterDelay={0.3}>
-            <Link
-              to={ROUTE_PATHS.MY_UNIT}
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition whitespace-nowrap shrink-0 ${
-                activeNav === 'myunit'
-                  ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-500/50 shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="hidden 2xl:inline">Đơn vị của tôi</span>
-              <span className="hidden xl:inline 2xl:hidden">Đơn vị</span>
-            </Link>
-          </Tooltip>
-        )}
-
-        {canAccessAdmin && (
-          <Tooltip title="Trung tâm quản trị" placement="bottom" mouseEnterDelay={0.3}>
-            <Link
-              to={ROUTE_PATHS.ADMIN}
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold border transition whitespace-nowrap shrink-0 ${
-                activeNav === 'admin'
-                  ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/50 shadow-sm'
-                  : 'bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/40 dark:hover:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="hidden xl:inline">Quản trị</span>
-            </Link>
-          </Tooltip>
-        )}
         {/* Cụm Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058) */}
         <div className="hidden sm:flex items-center shrink-0">
           <NavigationGlider activeNav={activeNav} />

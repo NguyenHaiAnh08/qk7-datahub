@@ -28,8 +28,12 @@ export const HttpErrorListener: React.FC = () => {
       // 401 trên chính request login = sai mật khẩu — KHÔNG redirect để user nhập lại
       const isLoginRequest = url?.includes('/auth/login');
 
+      // Nếu đang là khách (Guest), không cần redirect khi 401 (do API yêu cầu auth)
+      const currentUser = authService.getCurrentSession();
+      const isGuest = currentUser?.user_id === 'GUEST';
+
       // === 401: session hết hạn — clear + redirect ===
-      if (status === 401 && !isLoginRequest) {
+      if (status === 401 && !isLoginRequest && !isGuest) {
         try {
           authService.clearSession();
         } catch {

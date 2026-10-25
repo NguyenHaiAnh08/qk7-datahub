@@ -11,6 +11,8 @@ import {
   LogOut,
   ChevronDown,
   Menu,
+  Trash2,      // ⭐ MỚI
+  Activity,    // ⭐ MỚI
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
@@ -33,9 +35,9 @@ interface HeaderProps {
 const NavigationGlider: React.FC<{
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
 }> = ({ activeNav }) => {
-  const { user, isAdmin, isStaff } = useAuth();
+  const { user, isAdmin, isStaff, hasPermission, logout } = useAuth();
   const { deviceMode } = useDeviceMode();
-
+  
   const allNavTabs = [
     {
       key: 'desk',
@@ -45,7 +47,10 @@ const NavigationGlider: React.FC<{
       icon: UploadCloud,
       activeColor: 'text-emerald-600 dark:text-emerald-300',
       inactiveColor: 'text-emerald-500',
-      visible: Boolean(isStaff || isAdmin),
+      visible:
+        hasPermission('DOC_UPLOAD') ||
+        hasPermission('DOC_EDIT') ||
+        hasPermission('DOC_PARSE'),
     },
     {
       key: 'portal',
@@ -53,9 +58,9 @@ const NavigationGlider: React.FC<{
       label: 'Trung tâm thư viện số',
       shortLabel: 'Thư viện số',
       icon: BookOpen,
-      activeColor: 'text-[#166534] dark:text-emerald-300',
-      inactiveColor: 'text-emerald-700 dark:text-emerald-400',
-      visible: true,
+      activeColor: 'text-purple-600 dark:text-purple-300',
+      inactiveColor: 'text-blue-500',
+      visible: true, // ai cũng vào được
     },
     {
       key: 'myunit',
@@ -63,8 +68,8 @@ const NavigationGlider: React.FC<{
       label: 'Đơn vị của tôi',
       shortLabel: 'Đơn vị',
       icon: Building,
-      activeColor: 'text-amber-800 dark:text-amber-300',
-      inactiveColor: 'text-amber-600 dark:text-amber-500',
+      activeColor: 'text-violet-600 dark:text-violet-300',
+      inactiveColor: 'text-violet-500',
       visible: Boolean(user && user.user_id !== 'GUEST'),
     },
     {
@@ -73,9 +78,15 @@ const NavigationGlider: React.FC<{
       label: 'Quản trị',
       shortLabel: 'Quản trị',
       icon: ShieldAlert,
-      activeColor: 'text-amber-800 dark:text-amber-300',
-      inactiveColor: 'text-amber-600 dark:text-amber-500',
-      visible: Boolean(isAdmin),
+      activeColor: 'text-amber-600 dark:text-amber-400',
+      inactiveColor: 'text-amber-500',
+      visible:
+        hasPermission('SYSTEM_STATS_VIEW') ||
+        hasPermission('USER_VIEW') ||
+        hasPermission('ROLE_VIEW') ||
+        hasPermission('AUDIT_VIEW') ||
+        hasPermission('SESSION_VIEW') ||
+        isAdmin,
     },
   ];
 
@@ -189,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeNav,
   onToggleMobileMenu,
 }) => {
-  const { user, isAdmin, isStaff, logout } = useAuth();
+  const { user, isAdmin, logout, hasPermission } = useAuth();
   const { deviceMode, orientation } = useDeviceMode();
   const navigate = useNavigate();
   const [liveClock, setLiveClock] = useState('');
@@ -205,6 +216,25 @@ export const Header: React.FC<HeaderProps> = ({
   }, [showClock]);
 
   const isIPadPortrait = deviceMode === 'ipad' && orientation === 'portrait';
+
+  // ══════════════════════════════════════════════════════════════════════
+  // PERMISSION GATES — dùng chung cho Popover, Desktop quick nav và logo click
+  // ══════════════════════════════════════════════════════════════════════
+  const canAccessDesk =
+    hasPermission('DOC_UPLOAD') ||
+    hasPermission('DOC_EDIT') ||
+    hasPermission('DOC_PARSE');
+
+  const canAccessAdmin =
+    hasPermission('SYSTEM_STATS_VIEW') ||
+    hasPermission('USER_VIEW') ||
+    hasPermission('ROLE_VIEW') ||
+    hasPermission('AUDIT_VIEW') ||
+    hasPermission('SESSION_VIEW') ||
+    isAdmin;
+
+  const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
+  const canAccessSessions = hasPermission('SESSION_VIEW');
 
   // Nội dung Popover User Profile cho iPad và Desktop
   const userPopoverContent = (
@@ -266,7 +296,7 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
 
-        {(isStaff || isAdmin) && (
+        {canAccessDesk && (
           <Link
             to={ROUTE_PATHS.DESK}
             onClick={() => {
@@ -280,7 +310,22 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
 
-        {isAdmin && (
+        {/* ⭐ MỚI — Thùng rác tài liệu */}
+        {canAccessTrash && (
+          <Link
+            to={ROUTE_PATHS.ADMIN_TRASH}
+            onClick={() => {
+              setUserPopoverOpen(false);
+              setDropdownOpen(false);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-500 mr-2" />
+            <span>Thùng rác tài liệu</span>
+          </Link>
+        )}
+
+        {canAccessAdmin && (
           <Link
             to={ROUTE_PATHS.ADMIN}
             onClick={() => {
@@ -293,6 +338,21 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Trung tâm quản trị hệ thống</span>
           </Link>
         )}
+
+        {/* ⭐ MỚI — Phiên đang hoạt động */}
+        {canAccessSessions && (
+          <Link
+            to={ROUTE_PATHS.ADMIN_SESSIONS}
+            onClick={() => {
+              setUserPopoverOpen(false);
+              setDropdownOpen(false);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+          >
+            <Activity className="w-3.5 h-3.5 text-cyan-500 mr-2" />
+            <span>Phiên đang hoạt động</span>
+          </Link>
+        )}
       </div>
 
       <div className="border-t border-slate-100 dark:border-slate-800 pt-1">
@@ -300,7 +360,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => {
             setUserPopoverOpen(false);
             setDropdownOpen(false);
-            logout();
+            void logout();
           }}
           className="w-full flex items-center px-3 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition text-left cursor-pointer"
         >
@@ -332,7 +392,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div
             className="flex items-center gap-2.5 cursor-pointer group shrink-0"
-            onClick={() => navigate(isAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
+            onClick={() => navigate(canAccessAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
           >
             <img
               src="/Logo_QSQK7.png"
@@ -420,7 +480,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div
           className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group shrink-0"
-          onClick={() => navigate(isAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
+          onClick={() => navigate(canAccessAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
         >
           <img
             src="/Logo_QSQK7.png"
@@ -452,7 +512,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Quick Nav Links (Nút bấm chuyển trang tiêu chuẩn trên Máy tính) */}
-        {(isStaff || isAdmin) && (
+        {canAccessDesk && (
           <Tooltip title="Đăng tải văn bản" placement="bottom" mouseEnterDelay={0.3}>
             <Link
               to={ROUTE_PATHS.DESK}
@@ -500,7 +560,7 @@ export const Header: React.FC<HeaderProps> = ({
           </Tooltip>
         )}
 
-        {isAdmin && (
+        {canAccessAdmin && (
           <Tooltip title="Trung tâm quản trị" placement="bottom" mouseEnterDelay={0.3}>
             <Link
               to={ROUTE_PATHS.ADMIN}

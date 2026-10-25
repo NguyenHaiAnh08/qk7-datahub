@@ -223,7 +223,6 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
   }, [open, userId]);
 
   const triggerEnroll = async () => {
-    if (inFlightRef.current) return;
     inFlightRef.current = true;
     setError('');
 

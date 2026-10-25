@@ -1,6 +1,10 @@
+import { TrashPage } from './TrashPage';
+import { SessionsPage } from './SessionsPage';
+import { useAuth } from '../hooks/useAuth';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Drawer } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
+
 import {
   LayoutDashboard,
   Users,
@@ -25,6 +29,8 @@ import {
   Award,
   Briefcase,
   UserCheck,
+  Monitor,
+  ShieldCheck,
 } from 'lucide-react';
 import { useDeviceMode } from '../contexts/DeviceModeContext';
 import { Header } from '../components/common/Header';
@@ -40,11 +46,12 @@ import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
 import { AssignRoleModal } from '../components/users/AssignRoleModal';
 import { FingerprintEnrollModal } from '../components/users/FingerprintEnrollModal';
+import { GrantPermissionModal } from '../components/users/GrantPermissionModal';
+import { RolePermissionModal } from '../components/users/RolePermissionModal';
 
 import { dashboardApi } from '../services/dashboardApi';
 import { usersApi } from '../services/usersApi';
 import { formatFileSize } from '../utils/formatFileSize';
-import { formatDate } from '../utils/dateUtils';
 import {
   User,
   AdminStats,
@@ -53,7 +60,6 @@ import {
   Unit,
   DocumentType,
   SecurityLevel,
-  AccessLog,
   MilitaryRank,
   MilitaryPosition
 } from '../types';
@@ -100,29 +106,95 @@ const getNextPositionId = (positions: MilitaryPosition[]): string => {
   return `P-${String(candidate).padStart(2, '0')}`;
 };
 
-const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any }> = [
-  { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
-  { id: 'users', label: 'Người dùng', icon: Users },
-  { id: 'roles', label: 'Vai trò', icon: KeyRound },
-  { id: 'permissions', label: 'Quyền', icon: ShieldAlert },
-  { id: 'units', label: 'Đơn vị', icon: Building },
-  { id: 'doctypes', label: 'Loại văn bản', icon: FileText },
-  { id: 'levels', label: 'Mức bảo mật', icon: Shield },
-  { id: 'ranks', label: 'Cấp bậc', icon: Award },
-  { id: 'positions', label: 'Chức vụ', icon: Briefcase },
-  { id: 'logs', label: 'Nhật ký', icon: Activity },
+const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any; permission?: string }> = [
+  { id: 'overview',    label: 'Tổng quan',     icon: LayoutDashboard, permission: 'SYSTEM_STATS_VIEW' },
+  { id: 'users',       label: 'Người dùng',    icon: Users,           permission: 'USER_VIEW' },
+  { id: 'roles',       label: 'Vai trò',       icon: KeyRound,        permission: 'ROLE_VIEW' },
+  { id: 'permissions', label: 'Quyền',         icon: ShieldAlert,     permission: 'PERMISSION_VIEW' },
+  { id: 'units',       label: 'Đơn vị',        icon: Building,        permission: 'UNIT_VIEW' },
+  { id: 'doctypes',    label: 'Loại văn bản',  icon: FileText,        permission: 'DOCTYPE_VIEW' },
+  { id: 'levels',      label: 'Mức bảo mật',   icon: Shield,          permission: 'SECLEVEL_VIEW' },
+  { id: 'ranks',       label: 'Cấp bậc',       icon: Award,           permission: 'RANK_VIEW' },
+  { id: 'positions',   label: 'Chức vụ',       icon: Briefcase,       permission: 'POSITION_VIEW' },
+  { id: 'logs',        label: 'Nhật ký',       icon: Activity,        permission: 'AUDIT_VIEW' },
+  { id: 'sessions',    label: 'Phiên online',  icon: Monitor,         permission: 'SESSION_VIEW' },
+  { id: 'trash',       label: 'Thùng rác',     icon: Trash2,          permission: 'DOC_TRASH_VIEW' },
 ];
+
+// ═══════════════════════════════════════════════════════════
+// CONST: Group options + tone options cho form permission
+// ═══════════════════════════════════════════════════════════
+const PERMISSION_GROUPS = [
+  { value: 'DOCUMENT',    label: '📄 Văn bản' },
+  { value: 'USER',        label: '👤 Người dùng' },
+  { value: 'ROLE',        label: '🔑 Vai trò' },
+  { value: 'PERMISSION',  label: '🛡️ Quyền' },
+  { value: 'CATALOG',     label: '📚 Danh mục' },
+  { value: 'FINGERPRINT', label: '🔒 Sinh trắc' },
+  { value: 'AUDIT',       label: '📊 Kiểm toán' },
+  { value: 'AI',          label: '🤖 Trợ lý AI' },
+  { value: 'SYSTEM',      label: '⚙️ Hệ thống' },
+  { value: 'SESSION',     label: '🖥️ Phiên' },
+];
+
+const PERMISSION_TONES = [
+  { value: 'read',     label: '🟢 Read — Xem / tra cứu (an toàn)' },
+  { value: 'write',    label: '🟡 Write — Ghi / chỉnh sửa' },
+  { value: 'security', label: '🟣 Security — Bảo mật / phân quyền' },
+  { value: 'danger',   label: '🔴 Danger — Nguy hiểm / xóa' },
+];
+
+// Helper khởi tạo form data cho permission (new hoặc edit)
+const buildPermissionFormData = (item?: Permission | null) => {
+  if (!item) {
+    return {
+      permission_id: '',
+      code: '',
+      description: '',
+      group_code: 'DOCUMENT',
+      subgroup_key: '',
+      subgroup_label: '',
+      subgroup_order: 50,
+      subgroup_tone: 'read',
+      sort_order: 0,
+    };
+  }
+  return {
+    ...item,
+    group_code:     (item as any).group_code     || 'SYSTEM',
+    subgroup_key:   (item as any).subgroup_key   || '',
+    subgroup_label: (item as any).subgroup_label || '',
+    subgroup_order: (item as any).subgroup_order ?? 50,
+    subgroup_tone:  (item as any).subgroup_tone  || 'read',
+    sort_order:     (item as any).sort_order     ?? 0,
+  };
+};
 
 export const AdminDashboardPage: React.FC = () => {
   const { deviceMode, orientation, screenWidth } = useDeviceMode();
+  const { hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Filter tabs theo quyền — ẩn tab user không có permission
+  const visibleTabs = useMemo(
+    () => ADMIN_NAV_TABS.filter((t) => !t.permission || hasPermission(t.permission)),
+    [hasPermission]
+  );
+
+  // Đảm bảo activeTab hợp lệ — nếu user đang ở tab không có quyền (VD: bị thu hồi),
+  // tự động chuyển về tab đầu tiên họ được phép truy cập.
+  useEffect(() => {
+    if (visibleTabs.length === 0) return;
+    const ids = visibleTabs.map((t) => t.id);
+    if (!ids.includes(activeTab)) {
+      setActiveTab(ids[0]);
+    }
+  }, [visibleTabs, activeTab]);
 
   const isIPadLandscape = deviceMode === 'ipad' && orientation === 'landscape';
   const isIPadPortrait = deviceMode === 'ipad' && orientation === 'portrait';
 
-  // Ở iPad Landscape: Dock Sidebar w-[190px], có thể bấm thu gọn về w-[68px]
-  // Ở PC: Sidebar w-[260px], có thể bấm thu gọn về w-[76px]
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const toggleSidebarCollapsed = () => {
@@ -194,13 +266,23 @@ export const AdminDashboardPage: React.FC = () => {
   });
 
   const [fpEnrollModal, setFpEnrollModal] = useState<{ open: boolean; user: User | null }>({
-  open: false, user: null,
+    open: false, user: null,
   });
 
-  // Generic Edit Modal for Roles, Units, DocTypes, Levels, Ranks, Positions
+  const [grantPermModal, setGrantPermModal] = useState<{ open: boolean; user: User | null }>({
+    open: false,
+    user: null,
+  });
+
+    const [rolePermModal, setRolePermModal] = useState<{ open: boolean; role: Role | null }>({
+    open: false,
+    role: null,
+  });
+
+  // Generic Edit Modal for Roles, Units, DocTypes, Levels, Ranks, Positions, Permissions
   const [genericModal, setGenericModal] = useState<{
     open: boolean;
-    type: 'roles' | 'units' | 'doctypes' | 'levels' | 'ranks' | 'positions' | null;
+    type: 'roles' | 'units' | 'doctypes' | 'levels' | 'ranks' | 'positions' | 'permissions' | null;
     item: any;
   }>({
     open: false,
@@ -323,8 +405,6 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-
-
   useEffect(() => {
     switch (activeTab) {
       case 'overview':
@@ -362,25 +442,27 @@ export const AdminDashboardPage: React.FC = () => {
         break;
       case 'logs':
         break;
+      case 'sessions':
+        break;
+      case 'trash':
+        break;
     }
   }, [activeTab]);
 
-
-
   // Save User
   const handleSaveUser = async (userData: Partial<User>) => {
-  if (selectedUser?.user_id) {
-    await usersApi.updateUser(selectedUser.user_id, userData);
-  } else {
-    await usersApi.createUser(userData as any);
-  }
-  await loadUsers();               
-  showToast(
-    selectedUser?.user_id
-      ? 'Đã cập nhật thông tin quân nhân'
-      : 'Đã tạo quân nhân mới thành công'
-  );
-};
+    if (selectedUser?.user_id) {
+      await usersApi.updateUser(selectedUser.user_id, userData);
+    } else {
+      await usersApi.createUser(userData as any);
+    }
+    await loadUsers();
+    showToast(
+      selectedUser?.user_id
+        ? 'Đã cập nhật thông tin quân nhân'
+        : 'Đã tạo quân nhân mới thành công'
+    );
+  };
 
   // Delete User
   const handleDeleteUser = (u: User) => {
@@ -391,8 +473,8 @@ export const AdminDashboardPage: React.FC = () => {
       onConfirm: async () => {
         try {
           await usersApi.deleteUser(u.user_id);
+          await loadUsers();
           showToast(`Đã xóa tài khoản ${u.user_id}`);
-          loadUsers();
         } catch (err: any) {
           showToast('Lỗi: ' + err.message, 'error');
         } finally {
@@ -453,6 +535,53 @@ export const AdminDashboardPage: React.FC = () => {
           await dashboardApi.createPosition(genericFormData);
         }
         loadPositions();
+      } else if (type === 'permissions') {
+        // ══════════════════════════════════════════════════
+        // PERMISSION: gồm 4 cột subgroup_* + group_code
+        // ══════════════════════════════════════════════════
+        const payload = {
+          permission_id:  String(genericFormData.permission_id || '').trim(),
+          code:           String(genericFormData.code || '').trim().toUpperCase(),
+          description:    genericFormData.description?.trim() || null,
+          group_code:     genericFormData.group_code || 'SYSTEM',
+          subgroup_key:   genericFormData.subgroup_key?.trim()   || null,
+          subgroup_label: genericFormData.subgroup_label?.trim() || null,
+          subgroup_order: Number(genericFormData.subgroup_order) || 0,
+          subgroup_tone:  genericFormData.subgroup_tone || 'read',
+          sort_order:     Number(genericFormData.sort_order) || 0,
+        };
+
+        const api = dashboardApi as any;
+        if (item) {
+          if (typeof api.updatePermission !== 'function') {
+            showToast(
+              'Backend chưa hỗ trợ sửa quyền — cần thêm PUT /api/admin/permissions/:id',
+              'error'
+            );
+            return;
+          }
+          // Không cho sửa permission_id / code (đã disable ở form)
+          const { permission_id, code, ...updateBody } = payload;
+          await api.updatePermission(item.permission_id, updateBody);
+        } else {
+          if (typeof api.createPermission !== 'function') {
+            showToast(
+              'Thiếu dashboardApi.createPermission — kiểm tra services/dashboardApi.ts',
+              'error'
+            );
+            return;
+          }
+          if (!payload.permission_id) {
+            showToast('Thiếu Permission ID', 'error');
+            return;
+          }
+          if (!payload.code) {
+            showToast('Thiếu mã code', 'error');
+            return;
+          }
+          await api.createPermission(payload);
+        }
+        loadPermissions();
       }
       showToast('Đã lưu thành công');
       setGenericModal({ open: false, type: null, item: null });
@@ -461,65 +590,65 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-      // Generic Delete
-    const handleGenericDelete = (type: string, id: string | number, name: string) => {
-      setDeleteConfirm({
-        open: true,
-        title: `Xóa ${type}`,
-        message: `Bạn có chắc chắn muốn xóa bản ghi "${name}" (${id})?`,
-        onConfirm: async () => {
-          try {
-            if (type === 'roles') {
-              await dashboardApi.deleteRole(String(id));
-              loadRoles();
-              showToast(`Đã xóa vai trò ${id}`);
-            } else if (type === 'permissions') {
-              await dashboardApi.deletePermission(String(id));
-              loadPermissions();
-              showToast(`Đã xóa quyền ${id}`);
-            } else if (type === 'units') {
-              await dashboardApi.deleteUnit(String(id));
-              loadUnits();
-              showToast(`Đã xóa đơn vị ${id}`);
-            } else if (type === 'doctypes') {
-              await dashboardApi.deleteDocumentType(String(id));
-              loadDocTypes();
-              showToast(`Đã xóa loại văn bản ${id}`);
-            } else if (type === 'levels') {
-              await dashboardApi.deleteSecurityLevel(Number(id));
-              loadLevels();
-              showToast(`Đã xóa mức bảo mật ${id}`);
-            } else if (type === 'ranks') {
-              const res: any = await dashboardApi.deleteRank(String(id));
-              loadRanks();
-              if (res?.soft_deleted) {
-                showToast(
-                  `Đã ẩn cấp bậc "${name}" khỏi dropdown (${res.note || 'đang được quân nhân sử dụng'})`,
-                  'info',
-                );
-              } else {
-                showToast(`Đã xóa cấp bậc ${id}`);
-              }
-            } else if (type === 'positions') {
-              const res: any = await dashboardApi.deletePosition(String(id));
-              loadPositions();
-              if (res?.soft_deleted) {
-                showToast(
-                  `Đã ẩn chức vụ "${name}" khỏi dropdown (${res.note || 'đang được quân nhân sử dụng'})`,
-                  'info',
-                );
-              } else {
-                showToast(`Đã xóa chức vụ ${id}`);
-              }
+  // Generic Delete
+  const handleGenericDelete = (type: string, id: string | number, name: string) => {
+    setDeleteConfirm({
+      open: true,
+      title: `Xóa ${type}`,
+      message: `Bạn có chắc chắn muốn xóa bản ghi "${name}" (${id})?`,
+      onConfirm: async () => {
+        try {
+          if (type === 'roles') {
+            await dashboardApi.deleteRole(String(id));
+            loadRoles();
+            showToast(`Đã xóa vai trò ${id}`);
+          } else if (type === 'permissions') {
+            await dashboardApi.deletePermission(String(id));
+            loadPermissions();
+            showToast(`Đã xóa quyền ${id}`);
+          } else if (type === 'units') {
+            await dashboardApi.deleteUnit(String(id));
+            loadUnits();
+            showToast(`Đã xóa đơn vị ${id}`);
+          } else if (type === 'doctypes') {
+            await dashboardApi.deleteDocumentType(String(id));
+            loadDocTypes();
+            showToast(`Đã xóa loại văn bản ${id}`);
+          } else if (type === 'levels') {
+            await dashboardApi.deleteSecurityLevel(Number(id));
+            loadLevels();
+            showToast(`Đã xóa mức bảo mật ${id}`);
+          } else if (type === 'ranks') {
+            const res: any = await dashboardApi.deleteRank(String(id));
+            loadRanks();
+            if (res?.soft_deleted) {
+              showToast(
+                `Đã ẩn cấp bậc "${name}" khỏi dropdown (${res.note || 'đang được quân nhân sử dụng'})`,
+                'info',
+              );
+            } else {
+              showToast(`Đã xóa cấp bậc ${id}`);
             }
-          } catch (err: any) {
-            showToast('Lỗi: ' + err.message, 'error');
-          } finally {
-            setDeleteConfirm((prev) => ({ ...prev, open: false }));
+          } else if (type === 'positions') {
+            const res: any = await dashboardApi.deletePosition(String(id));
+            loadPositions();
+            if (res?.soft_deleted) {
+              showToast(
+                `Đã ẩn chức vụ "${name}" khỏi dropdown (${res.note || 'đang được quân nhân sử dụng'})`,
+                'info',
+              );
+            } else {
+              showToast(`Đã xóa chức vụ ${id}`);
+            }
           }
-        },
-      });
-    };
+        } catch (err: any) {
+          showToast('Lỗi: ' + err.message, 'error');
+        } finally {
+          setDeleteConfirm((prev) => ({ ...prev, open: false }));
+        }
+      },
+    });
+  };
 
   // Filtered lists
   const filteredUsers = useMemo(() => {
@@ -535,8 +664,6 @@ export const AdminDashboardPage: React.FC = () => {
         (u.role_names || []).some((rn) => rn.toLowerCase().includes(q))
     );
   }, [usersList, userSearch]);
-
-
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
@@ -606,13 +733,13 @@ export const AdminDashboardPage: React.FC = () => {
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
 
-              {/* Thanh Tab Ngang Cuộn Cảm Ứng & Lăn Bánh Xe Chuột */}
+              {/* Thanh Tab Ngang Cuộn Cảm Ứng & Lăn Bánh Xe Chuột — dùng visibleTabs (đã filter theo quyền) */}
               <div
                 ref={tabStripRef}
                 onWheel={handleTabStripWheel}
                 className="flex-1 flex overflow-x-auto no-scrollbar gap-1.5 py-0.5 scroll-smooth"
               >
-                {ADMIN_NAV_TABS.map((tab) => {
+                {visibleTabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
                   return (
@@ -652,7 +779,7 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <LayoutDashboard className="w-5 h-5 text-amber-400" /> Tổng Quan Hệ Thống
+                    <LayoutDashboard className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Tổng Quan Hệ Thống
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Thống kê dữ liệu hoạt động thời gian thực</p>
                 </div>
@@ -722,7 +849,7 @@ export const AdminDashboardPage: React.FC = () => {
               >
                 <DistributionChart
                   title="Phân Bố Tài Liệu Theo Mức Bảo Mật"
-                  icon={<Shield className="w-4 h-4 text-amber-400" />}
+                  icon={<Shield className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
                   barColor="amber"
                   items={(stats?.byLevel || []).map((x) => ({
                     id: x.lv,
@@ -732,7 +859,7 @@ export const AdminDashboardPage: React.FC = () => {
                 />
                 <DistributionChart
                   title="Phân Bố Tài Liệu Theo Thể Loại Văn Bản"
-                  icon={<FileText className="w-4 h-4 text-emerald-400" />}
+                  icon={<FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
                   barColor="emerald"
                   items={(stats?.byType || []).map((t) => ({
                     id: t.id,
@@ -789,21 +916,23 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
 
               <UserTable
-                  users={filteredUsers}
-                  onEdit={(u) => {
-                    setSelectedUser(u);
-                    setUserModalOpen(true);
-                  }}
-                  onUpdateCredentials={(u) => {
-                    setCredModal({
-                      open: true,
-                      userId: u.user_id,
-                      username: u.username || u.user_id.toLowerCase()
-                    });
-                  }}
-                  onDelete={handleDeleteUser}
-                  onEnrollFingerprint={(u) => setFpEnrollModal({ open: true, user: u })}
-                />
+                users={filteredUsers}
+                onEdit={(u) => {
+                  setSelectedUser(u);
+                  setUserModalOpen(true);
+                }}
+                onUpdateCredentials={(u) => {
+                  setCredModal({
+                    open: true,
+                    userId: u.user_id,
+                    username: u.username || u.user_id.toLowerCase()
+                  });
+                }}
+                onDelete={handleDeleteUser}
+                onEnrollFingerprint={(u) => setFpEnrollModal({ open: true, user: u })}
+                onGrantPermission={(u) => setGrantPermModal({ open: true, user: u })}
+                onViewPermissions={(u) => setGrantPermModal({ open: true, user: u })}
+              />
             </div>
           )}
 
@@ -812,10 +941,14 @@ export const AdminDashboardPage: React.FC = () => {
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <KeyRound className="w-5 h-5 text-amber-400" /> Quản Lý Vai Trò (Roles)
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <KeyRound className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+                    <span>Quản Lý Vai Trò (Roles)</span>
                   </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Phân quyền vai trò chức năng hệ thống</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Phân quyền vai trò chức năng hệ thống • Tổng số:{' '}
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">{rolesList.length}</span> vai trò
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
@@ -850,31 +983,66 @@ export const AdminDashboardPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {rolesList.map((r) => (
-                        <tr key={r.role_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{r.role_id}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => {
-                                setGenericFormData({ ...r });
-                                setGenericModal({ open: true, type: 'roles', item: r });
-                              }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                              title="Sửa vai trò"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                              title="Xóa vai trò"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                      {rolesList.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            <div className="flex flex-col items-center gap-2">
+                              <KeyRound className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                              <span className="text-sm font-semibold">Chưa có vai trò nào</span>
+                              <span className="text-xs">Bấm "Thêm vai trò" để tạo vai trò đầu tiên.</span>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        rolesList.map((r) => (
+                          <tr key={r.role_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <span className="font-mono text-xs px-2.5 py-1 rounded-md text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-bold tracking-wider inline-block">
+                                {r.role_id}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
+                                                <td className="py-3 px-4 text-right whitespace-nowrap">
+                      {/* ✅ NÚT PHÂN QUYỀN CHO ROLE */}
+                      {r.role_id === 'ROL-01' ? (
+                        <button
+                          disabled
+                          className="p-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 rounded-lg mr-1.5 cursor-not-allowed opacity-60"
+                          title="Role Admin bypass toàn quyền — không cần phân quyền"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setRolePermModal({ open: true, role: r })}
+                          className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 dark:border-amber-500/30 rounded-lg mr-1.5 transition cursor-pointer"
+                          title="Phân quyền cho vai trò"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setGenericFormData({ ...r });
+                          setGenericModal({ open: true, type: 'roles', item: r });
+                        }}
+                        className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                        title="Sửa vai trò"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                              <button
+                                onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                title="Xóa vai trò"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -890,48 +1058,91 @@ export const AdminDashboardPage: React.FC = () => {
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <ShieldAlert className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Sách Quyền (Permissions)
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Các quyền hạn truy xuất trong hệ thống</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Các quyền hạn truy xuất trong hệ thống • Tổng số:{' '}
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">{permsList.length}</span> quyền
+                  </p>
                 </div>
-                <button
-                  onClick={async () => {
-                    await loadPermissions();
-                    showToast('Đã làm mới danh sách quyền!', 'success');
-                  }}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                  title="Làm mới quyền"
-                >
-                  <RotateCw className="w-3.5 h-3.5" /> Làm mới
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={async () => {
+                      await loadPermissions();
+                      showToast('Đã làm mới danh sách quyền!', 'success');
+                    }}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                    title="Làm mới quyền"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" /> Làm mới
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGenericFormData(buildPermissionFormData(null));
+                      setGenericModal({ open: true, type: 'permissions', item: null });
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                    title="Thêm quyền mới"
+                  >
+                    <Plus className="w-4 h-4" /> Thêm quyền
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[640px]">
                     <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
                       <tr>
                         <th className="py-3 px-4">Mã Quyền</th>
                         <th className="py-3 px-4">Tên quyền</th>
                         <th className="py-3 px-4">Mô tả</th>
+                        <th className="py-3 px-4">Nhóm</th>
                         <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {permsList.map((p) => (
-                        <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.permission_id}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name || p.code || p.permission_id}</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                              title="Xóa quyền"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                      {permsList.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            Chưa có quyền nào
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        permsList.map((p) => (
+                          <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold whitespace-nowrap">
+                              {p.permission_id}
+                            </td>
+                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold whitespace-nowrap">
+                              {p.name || p.code || p.permission_id}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">
+                                {(p as any).group_code || '—'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => {
+                                  setGenericFormData(buildPermissionFormData(p));
+                                  setGenericModal({ open: true, type: 'permissions', item: p });
+                                }}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                                title="Sửa quyền"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                title="Xóa quyền"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1272,6 +1483,8 @@ export const AdminDashboardPage: React.FC = () => {
           {activeTab === 'logs' && (
             <SecurityAuditLog showToast={showToast} />
           )}
+          {activeTab === 'sessions' && <SessionsPage embedded />}
+          {activeTab === 'trash' && <TrashPage embedded />}
         </main>
       </div>
 
@@ -1329,7 +1542,7 @@ export const AdminDashboardPage: React.FC = () => {
         />
       )}
 
-      {/* Generic Modal (Roles, Units, DocTypes, Levels, Ranks, Positions) */}
+      {/* Generic Modal (Roles, Units, DocTypes, Levels, Ranks, Positions, Permissions) */}
       <AnimatePresence>
         {genericModal.open && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -1337,7 +1550,9 @@ export const AdminDashboardPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl text-xs space-y-4"
+              className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${
+                genericModal.type === 'permissions' ? 'max-w-2xl' : 'max-w-md'
+              } p-6 shadow-2xl text-xs space-y-4`}
             >
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <h3 className="font-bold text-base text-slate-900 dark:text-white">
@@ -1354,6 +1569,8 @@ export const AdminDashboardPage: React.FC = () => {
                     ? 'Cấp Bậc'
                     : genericModal.type === 'positions'
                     ? 'Chức Vụ'
+                    : genericModal.type === 'permissions'
+                    ? 'Quyền (Permission)'
                     : genericModal.type}
                 </h3>
                 <button
@@ -1365,243 +1582,399 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
 
               <form onSubmit={handleGenericSave} className="space-y-3">
-                {genericModal.type === 'roles' && (
-                  <>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Mã Vai Trò (Tự động)</label>
-                      <input
-                        type="text"
-                        readOnly
-                        disabled
-                        value={genericFormData.role_id || ''}
-                        placeholder="VD: ROL-07"
-                        className="w-full px-3 py-2 bg-slate-950/60 border border-slate-700 rounded-xl text-slate-400 font-mono cursor-not-allowed opacity-80"
-                        title="Mã vai trò được hệ thống tự động sinh theo thứ tự"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Tên Vai Trò *</label>
-                      <input
-                        type="text"
-                        value={genericFormData.name || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                  </>
-                )}
+                <div className="max-h-[65vh] overflow-y-auto pr-1 space-y-3">
 
-                {genericModal.type === 'units' && (
-                  <>
-                    <div>
-                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Mã Đơn Vị *</label>
-                      <input
-                        type="text"
-                        disabled={Boolean(genericModal.item)}
-                        value={genericFormData.unit_id || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, unit_id: e.target.value })}
-                        required
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 text-sm font-mono font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Tên Đơn Vị *</label>
-                      <input
-                        type="text"
-                        value={genericFormData.name || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                        required
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Đơn Vị Cấp Trên</label>
-                      <select
-                        value={genericFormData.parent_id || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, parent_id: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-medium text-sm cursor-pointer"
-                      >
-                        <option value="">Cấp cao nhất</option>
-                        {[...unitsList]
-                          .filter((u) => !genericModal.item || u.unit_id !== genericModal.item.unit_id)
-                          .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-                          .map((u) => (
-                            <option key={u.unit_id} value={u.unit_id}>
-                              {u.name}
-                            </option>
+                  {genericModal.type === 'roles' && (
+                    <>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Vai Trò (Tự động)</label>
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={genericFormData.role_id || ''}
+                          placeholder="VD: ROL-07"
+                          className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80"
+                          title="Mã vai trò được hệ thống tự động sinh theo thứ tự"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Vai Trò *</label>
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {genericModal.type === 'units' && (
+                    <>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Mã Đơn Vị *</label>
+                        <input
+                          type="text"
+                          disabled={Boolean(genericModal.item)}
+                          value={genericFormData.unit_id || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, unit_id: e.target.value })}
+                          required
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 text-sm font-mono font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Tên Đơn Vị *</label>
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          required
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Đơn Vị Cấp Trên</label>
+                        <select
+                          value={genericFormData.parent_id || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, parent_id: e.target.value })}
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-medium text-sm cursor-pointer"
+                        >
+                          <option value="">Cấp cao nhất</option>
+                          {[...unitsList]
+                            .filter((u) => !genericModal.item || u.unit_id !== genericModal.item.unit_id)
+                            .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+                            .map((u) => (
+                              <option key={u.unit_id} value={u.unit_id}>
+                                {u.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {genericModal.type === 'doctypes' && (
+                    <>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Loại *</label>
+                        <input
+                          type="text"
+                          disabled={Boolean(genericModal.item)}
+                          value={genericFormData.type_id || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, type_id: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Loại Văn Bản *</label>
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mô Tả</label>
+                        <input
+                          type="text"
+                          value={genericFormData.description || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, description: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {genericModal.type === 'levels' && (
+                    <>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Cấp Độ (1 - 5) *</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="5"
+                          disabled={Boolean(genericModal.item)}
+                          value={genericFormData.level_id || 1}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, level_id: Number(e.target.value) })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Ký Hiệu *</label>
+                        <input
+                          type="text"
+                          value={genericFormData.code || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, code: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Mức Bảo Mật *</label>
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {genericModal.type === 'ranks' && (
+                    <>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Cấp Bậc (Tự động)</label>
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={genericFormData.rank_id || ''}
+                          placeholder="VD: R-21"
+                          className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80"
+                          title="Mã cấp bậc được hệ thống tự động sinh theo thứ tự"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Cấp Bậc *</label>
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          placeholder="VD: Trung sĩ QNCN"
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Thứ tự</label>
+                        <input
+                          type="number"
+                          value={genericFormData.sort_order ?? 0}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      {genericModal.item && (
+                        <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold">
+                          <input
+                            type="checkbox"
+                            checked={genericFormData.active !== false}
+                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                          />
+                          <span>Đang kích hoạt</span>
+                        </label>
+                      )}
+                    </>
+                  )}
+
+                  {genericModal.type === 'positions' && (
+                    <>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Chức Vụ (Tự động)</label>
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={genericFormData.position_id || ''}
+                          placeholder="VD: P-19"
+                          className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80"
+                          title="Mã chức vụ được hệ thống tự động sinh theo thứ tự"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Chức Vụ *</label>
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          placeholder="VD: Phó phòng Kỹ thuật"
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Thứ tự</label>
+                        <input
+                          type="number"
+                          value={genericFormData.sort_order ?? 0}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      {genericModal.item && (
+                        <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold">
+                          <input
+                            type="checkbox"
+                            checked={genericFormData.active !== false}
+                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                          />
+                          <span>Đang kích hoạt</span>
+                        </label>
+                      )}
+                    </>
+                  )}
+
+                  {genericModal.type === 'permissions' && (
+                    <>
+                      {/* ─── 1. Cơ bản ─── */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                            Mã Permission ID *
+                          </label>
+                          <input
+                            type="text"
+                            value={genericFormData.permission_id || ''}
+                            onChange={(e) => setGenericFormData({ ...genericFormData, permission_id: e.target.value })}
+                            disabled={Boolean(genericModal.item)}
+                            placeholder="PERM-DOC-10"
+                            required
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                            Mã code (UPPER_SNAKE) *
+                          </label>
+                          <input
+                            type="text"
+                            value={genericFormData.code || ''}
+                            onChange={(e) =>
+                              setGenericFormData({ ...genericFormData, code: e.target.value.toUpperCase() })
+                            }
+                            disabled={Boolean(genericModal.item)}
+                            placeholder="DOC_EXPORT"
+                            required
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mô tả</label>
+                        <input
+                          type="text"
+                          value={genericFormData.description || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, description: e.target.value })}
+                          placeholder="Xuất văn bản ra PDF..."
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                          Nhóm (group_code) *
+                        </label>
+                        <select
+                          value={genericFormData.group_code || 'DOCUMENT'}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, group_code: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        >
+                          {PERMISSION_GROUPS.map((g) => (
+                            <option key={g.value} value={g.value}>{g.label}</option>
                           ))}
-                      </select>
-                    </div>
-                  </>
-                )}
+                        </select>
+                      </div>
 
-                {genericModal.type === 'doctypes' && (
-                  <>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Mã Loại *</label>
-                      <input
-                        type="text"
-                        disabled={Boolean(genericModal.item)}
-                        value={genericFormData.type_id || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, type_id: e.target.value })}
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 disabled:opacity-50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Tên Loại Văn Bản *</label>
-                      <input
-                        type="text"
-                        value={genericFormData.name || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Mô Tả</label>
-                      <input
-                        type="text"
-                        value={genericFormData.description || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, description: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                  </>
-                )}
+                      {/* ─── 2. Phân loại con ─── */}
+                      <fieldset className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2.5">
+                        <legend className="px-2 text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                          Phân loại con (Subgroup)
+                        </legend>
 
-                {genericModal.type === 'levels' && (
-                  <>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Cấp Độ (1 - 5) *</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="5"
-                        disabled={Boolean(genericModal.item)}
-                        value={genericFormData.level_id || 1}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, level_id: Number(e.target.value) })}
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 disabled:opacity-50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Mã Ký Hiệu *</label>
-                      <input
-                        type="text"
-                        value={genericFormData.code || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, code: e.target.value })}
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Tên Mức Bảo Mật *</label>
-                      <input
-                        type="text"
-                        value={genericFormData.name || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                  </>
-                )}
+                        <div>
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                            Subgroup key
+                          </label>
+                          <input
+                            type="text"
+                            value={genericFormData.subgroup_key || ''}
+                            onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_key: e.target.value })}
+                            placeholder="doc-view, doc-edit, doc-danger..."
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                          />
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                            Dùng chung với quyền khác trong cùng nhóm. VD: <code className="font-mono">doc-view</code>
+                          </p>
+                        </div>
 
-                {genericModal.type === 'ranks' && (
-                  <>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Mã Cấp Bậc (Tự động)</label>
-                      <input
-                        type="text"
-                        readOnly
-                        disabled
-                        value={genericFormData.rank_id || ''}
-                        placeholder="VD: R-21"
-                        className="w-full px-3 py-2 bg-slate-950/60 border border-slate-700 rounded-xl text-slate-400 font-mono cursor-not-allowed opacity-80"
-                        title="Mã cấp bậc được hệ thống tự động sinh theo thứ tự"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Tên Cấp Bậc *</label>
-                      <input
-                        type="text"
-                        value={genericFormData.name || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                        placeholder="VD: Trung sĩ QNCN"
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Thứ tự</label>
-                      <input
-                        type="number"
-                        value={genericFormData.sort_order ?? 0}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                    {genericModal.item && (
-                      <label className="flex items-center gap-2 text-slate-300 font-semibold">
+                        <div>
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                            Nhãn hiển thị
+                          </label>
+                          <input
+                            type="text"
+                            value={genericFormData.subgroup_label || ''}
+                            onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_label: e.target.value })}
+                            placeholder="Xem & Tra cứu"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                              Thứ tự trong nhóm
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={999}
+                              value={genericFormData.subgroup_order ?? 50}
+                              onChange={(e) =>
+                                setGenericFormData({ ...genericFormData, subgroup_order: Number(e.target.value) })
+                              }
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                            />
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              10 = đầu, 99 = cuối
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                              Mức độ nguy hiểm (tone)
+                            </label>
+                            <select
+                              value={genericFormData.subgroup_tone || 'read'}
+                              onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_tone: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                            >
+                              {PERMISSION_TONES.map((t) => (
+                                <option key={t.value} value={t.value}>{t.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      {/* ─── 3. Sort order tổng ─── */}
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                          Sort order tổng (thanh tab)
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={genericFormData.active !== false}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                          type="number"
+                          value={genericFormData.sort_order ?? 0}
+                          onChange={(e) =>
+                            setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })
+                          }
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
                         />
-                        <span>Đang kích hoạt</span>
-                      </label>
-                    )}
-                  </>
-                )}
+                      </div>
+                    </>
+                  )}
 
-                {genericModal.type === 'positions' && (
-                  <>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Mã Chức Vụ (Tự động)</label>
-                      <input
-                        type="text"
-                        readOnly
-                        disabled
-                        value={genericFormData.position_id || ''}
-                        placeholder="VD: P-19"
-                        className="w-full px-3 py-2 bg-slate-950/60 border border-slate-700 rounded-xl text-slate-400 font-mono cursor-not-allowed opacity-80"
-                        title="Mã chức vụ được hệ thống tự động sinh theo thứ tự"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Tên Chức Vụ *</label>
-                      <input
-                        type="text"
-                        value={genericFormData.name || ''}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                        placeholder="VD: Phó phòng Kỹ thuật"
-                        required
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Thứ tự</label>
-                      <input
-                        type="number"
-                        value={genericFormData.sort_order ?? 0}
-                        onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100"
-                      />
-                    </div>
-                    {genericModal.item && (
-                      <label className="flex items-center gap-2 text-slate-300 font-semibold">
-                        <input
-                          type="checkbox"
-                          checked={genericFormData.active !== false}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
-                        />
-                        <span>Đang kích hoạt</span>
-                      </label>
-                    )}
-                  </>
-                )}
+                </div>
 
                 <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-2">
                   <button
@@ -1633,6 +2006,22 @@ export const AdminDashboardPage: React.FC = () => {
         confirmVariant="danger"
         onConfirm={deleteConfirm.onConfirm}
         onCancel={() => setDeleteConfirm((prev) => ({ ...prev, open: false }))}
+      />
+
+      <GrantPermissionModal
+        open={grantPermModal.open}
+        user={grantPermModal.user}
+        onClose={() => setGrantPermModal({ open: false, user: null })}
+        onSaved={loadUsers}
+        onToast={showToast}
+      />
+
+      <RolePermissionModal
+        open={rolePermModal.open}
+        role={rolePermModal.role}
+        onClose={() => setRolePermModal({ open: false, role: null })}
+        onSaved={loadRoles}
+        onToast={showToast}
       />
 
       {/* Toast Notification */}

@@ -892,7 +892,7 @@ app.get('/api/meta', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // DOCUMENT ROUTES
 // ═══════════════════════════════════════════════════════════════
-app.get('/api/documents', requireAuth, requirePermission('DOC_VIEW'), async (req, res) => {
+app.get('/api/documents', async (req, res) => {
   try {
     const pool = await getPool();
     const r = pool.request();
@@ -1411,7 +1411,7 @@ app.delete('/api/documents/:fileId/purge', requireAuth, requirePermission('DOC_P
 // ═══════════════════════════════════════════════════════════════
 // FILE VIEW/DOWNLOAD
 // ═══════════════════════════════════════════════════════════════
-app.get('/api/files/:fileId/view', requireAuth, async (req, res) => {
+app.get('/api/files/:fileId/view', async (req, res) => {
   const ip = getClientIp(req);
   const fileId = req.params.fileId;
   const isDownload = req.query.download === '1';

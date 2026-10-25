@@ -110,6 +110,7 @@ export const PortalPage: React.FC = () => {
 
   // Load Documents
   const loadDocuments = async () => {
+    
     setLoading(true);
     try {
       let queryUnit: string | undefined = undefined;
@@ -140,6 +141,10 @@ export const PortalPage: React.FC = () => {
       setDocuments(res.items || []);
       setCurrentPage(1);
     } catch (err: any) {
+      if (err?.status === 401) {
+        // Đã xử lý global bởi HttpErrorListener, bỏ qua local toast
+        return;
+      }
       showToast('Lỗi tải tài liệu: ' + err.message, 'error');
     } finally {
       setLoading(false);

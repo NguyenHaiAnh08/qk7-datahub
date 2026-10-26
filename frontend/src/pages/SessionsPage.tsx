@@ -83,10 +83,20 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
             <Monitor className="w-6 h-6 text-cyan-500" />
-            Phiên Đang Hoạt Động
+            Phiên Đang Trực Tuyến
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {sessions.length} phiên • Tự động làm mới mỗi 15 giây
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+              {sessions.length}
+            </span>{' '}
+            phiên đang hoạt động
+            <span className="text-slate-400 ml-1">
+              (tương tác trong 3 giờ gần nhất)
+            </span>
+            {' • '}
+            <span className="text-rose-500 dark:text-rose-400">
+              Tự động thoát nếu treo máy 180 phút
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -164,14 +174,28 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
                     <td className="py-3 px-4 text-[11px] font-mono text-slate-500">
                       {new Date(s.last_seen_at).toLocaleString('vi-VN')}
                     </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`text-[11px] font-bold ${
-                          s.minutes_idle > 30 ? 'text-amber-600' : 'text-emerald-600'
-                        }`}
-                      >
-                        {s.minutes_idle} phút
-                      </span>
+                                        <td className="py-3 px-4">
+                      {s.minutes_idle <= 2 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Đang trực
+                        </span>
+                      ) : s.minutes_idle <= 120 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          {Math.floor(s.minutes_idle / 60) > 0
+                            ? `${Math.floor(s.minutes_idle / 60)}h ${s.minutes_idle % 60}p`
+                            : `${s.minutes_idle} phút`}
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30"
+                          title={`Sắp auto-logout trong ${Math.max(0, 180 - s.minutes_idle)} phút nữa`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                          {Math.floor(s.minutes_idle / 60)}h {s.minutes_idle % 60}p · sắp hết
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
                       {hasPermission('SESSION_KILL') && (

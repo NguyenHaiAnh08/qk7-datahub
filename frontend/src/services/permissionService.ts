@@ -8,6 +8,30 @@ export const permissionService = {
     return http<{ total: number; items: Permission[] }>(API_ENDPOINTS.ADMIN.PERMISSIONS);
   },
 
+  createPermission: async (data: any): Promise<{ success: boolean }> => {
+    return http(API_ENDPOINTS.ADMIN.PERMISSIONS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  updatePermission: async (permId: string, data: any): Promise<{ success: boolean }> => {
+    return http(API_ENDPOINTS.ADMIN.PERMISSION_DETAIL(permId), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  reorderPermissions: async (items: Array<{ permission_id: string; sort_order: number }>): Promise<{ success: boolean; updated: number }> => {
+    return http(API_ENDPOINTS.ADMIN.PERMISSION_REORDER, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+  },
+
   deletePermission: async (permId: string): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.PERMISSION_DETAIL(permId), { method: 'DELETE' });
   },

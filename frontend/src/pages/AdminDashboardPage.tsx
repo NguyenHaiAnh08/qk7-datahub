@@ -31,6 +31,7 @@ import {
   UserCheck,
   Monitor,
   ShieldCheck,
+  GripVertical,
 } from 'lucide-react';
 import { useDeviceMode } from '../contexts/DeviceModeContext';
 import { Header } from '../components/common/Header';
@@ -50,6 +51,7 @@ import { GrantPermissionModal } from '../components/users/GrantPermissionModal';
 import { RolePermissionModal } from '../components/users/RolePermissionModal';
 
 import { dashboardApi } from '../services/dashboardApi';
+import { permissionService } from '../services/permissionService';
 import { usersApi } from '../services/usersApi';
 import { formatFileSize } from '../utils/formatFileSize';
 import {
@@ -139,13 +141,34 @@ const PERMISSION_GROUPS = [
 
 const PERMISSION_TONES = [
   { value: 'read',     label: '🟢 Read — Xem / tra cứu (an toàn)' },
-  { value: 'write',    label: '🟡 Write — Ghi / chỉnh sửa' },
+  { value: 'write',    label: '🟡 Write / Edit — Ghi / chỉnh sửa (cảnh báo)' },
   { value: 'security', label: '🟣 Security — Bảo mật / phân quyền' },
-  { value: 'danger',   label: '🔴 Danger — Nguy hiểm / xóa' },
+  { value: 'danger',   label: '🔴 Delete / Danger — Xóa / nguy hiểm (Đỏ Quân Kỳ)' },
 ];
 
+// Helper ánh xạ màu sắc chuẩn quân đội cho Group Badge
+const getPermissionGroupBadge = (groupCode?: string) => {
+  const g = (groupCode || '').toUpperCase();
+  if (g === 'DOCUMENT') {
+    return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+  }
+  if (g === 'SYSTEM') {
+    return 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30';
+  }
+  if (g === 'ROLE') {
+    return 'bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30';
+  }
+  if (g === 'FINGERPRINT') {
+    return 'bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30';
+  }
+  if (g === 'AUDIT') {
+    return 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/30';
+  }
+  return 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30';
+};
+
 // Helper khởi tạo form data cho permission (new hoặc edit)
-const buildPermissionFormData = (item?: Permission | null) => {
+const buildPermissionFormData = (item?: Permission | null, defaultOrder = 0) => {
   if (!item) {
     return {
       permission_id: '',
@@ -156,12 +179,12 @@ const buildPermissionFormData = (item?: Permission | null) => {
       subgroup_label: '',
       subgroup_order: 50,
       subgroup_tone: 'read',
-      sort_order: 0,
+      sort_order: defaultOrder,
     };
   }
   return {
     ...item,
-    group_code:     (item as any).group_code     || 'SYSTEM',
+    group_code:     (item as any).group_code     || 'DOCUMENT',
     subgroup_key:   (item as any).subgroup_key   || '',
     subgroup_label: (item as any).subgroup_label || '',
     subgroup_order: (item as any).subgroup_order ?? 50,
@@ -239,6 +262,9 @@ export const AdminDashboardPage: React.FC = () => {
   const [usersList, setUsersList] = useState<User[]>([]);
   const [rolesList, setRolesList] = useState<Role[]>([]);
   const [permsList, setPermsList] = useState<Permission[]>([]);
+  const [draggedPermIndex, setDraggedPermIndex] = useState<number | null>(null);
+  const [dragOverPermIndex, setDragOverPermIndex] = useState<number | null>(null);
+  const [isReorderingPerms, setIsReorderingPerms] = useState<boolean>(false);
   const [unitsList, setUnitsList] = useState<Unit[]>([]);
   const [docTypesList, setDocTypesList] = useState<DocumentType[]>([]);
   const [levelsList, setLevelsList] = useState<SecurityLevel[]>([]);
@@ -358,6 +384,40 @@ export const AdminDashboardPage: React.FC = () => {
       setPermsList(data.items || []);
     } catch (err: any) {
       showToast('Lỗi tải quyền: ' + err.message, 'error');
+    }
+  };
+
+  const handleReorderPerms = async (targetIndex: number) => {
+    if (draggedPermIndex === null || draggedPermIndex === targetIndex) {
+      setDraggedPermIndex(null);
+      setDragOverPermIndex(null);
+      return;
+    }
+
+    const fromIndex = draggedPermIndex;
+    setDraggedPermIndex(null);
+    setDragOverPermIndex(null);
+
+    const updatedList = [...permsList];
+    const [movedItem] = updatedList.splice(fromIndex, 1);
+    updatedList.splice(targetIndex, 0, movedItem);
+
+    // Optimistic UI update
+    setPermsList(updatedList);
+    setIsReorderingPerms(true);
+
+    try {
+      const payload = updatedList.map((item, idx) => ({
+        permission_id: item.permission_id,
+        sort_order: (idx + 1) * 10,
+      }));
+      await permissionService.reorderPermissions(payload);
+      showToast('Đã lưu thứ tự sắp xếp quyền thành công!', 'success');
+    } catch (err: any) {
+      showToast('Lỗi khi lưu thứ tự quyền: ' + (err.message || 'Thao tác thất bại'), 'error');
+      await loadPermissions();
+    } finally {
+      setIsReorderingPerms(false);
     }
   };
 
@@ -951,7 +1011,7 @@ export const AdminDashboardPage: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <KeyRound className="w-5 h-5 text-amber-500 dark:text-amber-400" />
-                    <span>Quản Lý Vai Trò (Roles)</span>
+                    <span>Quản Lý Vai Trò</span>
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     Phân quyền vai trò chức năng hệ thống • Tổng số:{' '}
@@ -1063,11 +1123,16 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Sách Quyền (Permissions)
+                    <ShieldAlert className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Sách Quyền
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     Các quyền hạn truy xuất trong hệ thống • Tổng số:{' '}
                     <span className="font-semibold text-slate-700 dark:text-slate-200">{permsList.length}</span> quyền
+                    {isReorderingPerms && (
+                      <span className="ml-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse">
+                        • Đang lưu thứ tự mới...
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1076,80 +1141,147 @@ export const AdminDashboardPage: React.FC = () => {
                       await loadPermissions();
                       showToast('Đã làm mới danh sách quyền!', 'success');
                     }}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-                    title="Làm mới quyền"
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95"
+                    title="Làm mới danh sách quyền"
                   >
                     <RotateCw className="w-3.5 h-3.5" /> Làm mới
                   </button>
                   <button
                     onClick={() => {
-                      setGenericFormData(buildPermissionFormData(null));
+                      const nextOrder = (permsList.length + 1) * 10;
+                      setGenericFormData(buildPermissionFormData(null, nextOrder));
                       setGenericModal({ open: true, type: 'permissions', item: null });
                     }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-                    title="Thêm quyền mới"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm active:scale-95"
+                    title="Thêm quyền mới vào hệ thống"
                   >
                     <Plus className="w-4 h-4" /> Thêm quyền
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div className="bg-white dark:bg-slate-900/90 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[640px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[700px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/95 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
                       <tr>
-                        <th className="py-3 px-4">Mã Quyền</th>
-                        <th className="py-3 px-4">Tên quyền</th>
+                        <th className="py-3 px-3 text-center w-12" title="Kéo thả để sắp xếp thứ tự">
+                          <GripVertical className="w-4 h-4 mx-auto text-slate-400" />
+                        </th>
+                        <th className="py-3 px-4 whitespace-nowrap">Mã Quyền</th>
+                        <th className="py-3 px-4 whitespace-nowrap">Tên quyền</th>
                         <th className="py-3 px-4">Mô tả</th>
-                        <th className="py-3 px-4">Nhóm</th>
-                        <th className="py-3 px-4 text-right">Thao tác</th>
+                        <th className="py-3 px-4 whitespace-nowrap">Nhóm</th>
+                        <th className="py-3 px-4 text-right whitespace-nowrap">Thao tác</th>
                       </tr>
                     </thead>
-                    {/* ✅ FIX #4 — tbody Permissions đã vá */}
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {permsList.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                          <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500">
                             Chưa có quyền nào
                           </td>
                         </tr>
                       ) : (
-                        permsList.map((p) => (
-                          <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold whitespace-nowrap">
-                              {p.permission_id}
-                            </td>
-                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold whitespace-nowrap">
-                              {p.name || p.code || p.permission_id}
-                            </td>
-                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">
-                                {(p as any).group_code || '—'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-right whitespace-nowrap">
-                              <button
-                                onClick={() => {
-                                  setGenericFormData(buildPermissionFormData(p));
-                                  setGenericModal({ open: true, type: 'permissions', item: p });
-                                }}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                                title="Sửa quyền"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
-                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                                title="Xóa quyền"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                        permsList.map((p, index) => {
+                          const isBeingDragged = draggedPermIndex === index;
+                          const isOver = dragOverPermIndex === index;
+
+                          return (
+                            <tr
+                              key={p.permission_id}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                if (dragOverPermIndex !== index) {
+                                  setDragOverPermIndex(index);
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                handleReorderPerms(index);
+                              }}
+                              className={`transition-colors duration-150 ${
+                                isBeingDragged
+                                  ? 'opacity-30 bg-emerald-500/10 dark:bg-emerald-500/20'
+                                  : isOver
+                                  ? 'border-t-2 border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                              }`}
+                            >
+                              {/* 0. Cột Thao tác Kéo Thả (Drag Handle) */}
+                              <td className="py-3 px-3 text-center w-12">
+                                <div
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData('text/plain', String(index));
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    setDraggedPermIndex(index);
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedPermIndex(null);
+                                    setDragOverPermIndex(null);
+                                  }}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
+                                  title="Bấm giữ và kéo thả để đổi thứ tự quyền"
+                                >
+                                  <GripVertical className="w-4 h-4" />
+                                </div>
+                              </td>
+
+                              {/* 1. Mã Quyền: font-mono tabular-nums text-sm font-semibold text-amber-500 */}
+                              <td className="py-3 px-4 font-mono tabular-nums text-sm text-amber-600 dark:text-amber-400 font-semibold whitespace-nowrap">
+                                {p.permission_id}
+                              </td>
+
+                              {/* 2. Tên quyền (Mã code UPPER_SNAKE): font-mono text-sm text-amber-400 font-medium */}
+                              <td className="py-3 px-4 font-mono text-sm text-slate-800 dark:text-amber-400 font-medium whitespace-nowrap">
+                                {p.code || p.name || p.permission_id}
+                              </td>
+
+                              {/* 3. Mô tả */}
+                              <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                                {p.description || '—'}
+                              </td>
+
+                              {/* 4. Nhóm (Group Badge với màu sắc động chuẩn quân đội) */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-xs ${getPermissionGroupBadge(
+                                    (p as any).group_code
+                                  )}`}
+                                >
+                                  {(p as any).group_code || 'SYSTEM'}
+                                </span>
+                              </td>
+
+                              {/* 5. Cột Thao tác */}
+                              <td className="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setGenericFormData(buildPermissionFormData(p));
+                                    setGenericModal({ open: true, type: 'permissions', item: p });
+                                  }}
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg transition cursor-pointer shadow-xs active:scale-95"
+                                  title="Chỉnh sửa quyền này"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)
+                                  }
+                                  className="p-1.5 border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/20 rounded-lg transition cursor-pointer shadow-xs active:scale-95"
+                                  title="Xóa quyền này"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -1553,12 +1685,12 @@ export const AdminDashboardPage: React.FC = () => {
       {/* Generic Modal (Roles, Units, DocTypes, Levels, Ranks, Positions, Permissions) */}
       <AnimatePresence>
         {genericModal.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${
+              className={`bg-white dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${
                 genericModal.type === 'permissions' ? 'max-w-2xl' : 'max-w-md'
               } p-6 shadow-2xl text-xs space-y-4`}
             >
@@ -1893,9 +2025,9 @@ export const AdminDashboardPage: React.FC = () => {
                         </select>
                       </div>
 
-                      {/* ─── 2. Phân loại con ─── */}
-                      <fieldset className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2.5">
-                        <legend className="px-2 text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                      {/* ─── 2. Phân loại con (Subgroup) ─── */}
+                      <fieldset className="border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 rounded-xl p-3.5 space-y-3">
+                        <legend className="px-2 text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
                           Phân loại con (Subgroup)
                         </legend>
 
@@ -1908,10 +2040,10 @@ export const AdminDashboardPage: React.FC = () => {
                             value={genericFormData.subgroup_key || ''}
                             onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_key: e.target.value })}
                             placeholder="doc-view, doc-edit, doc-danger..."
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
                           />
                           <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                            Dùng chung với quyền khác trong cùng nhóm. VD: <code className="font-mono">doc-view</code>
+                            Dùng chung với quyền khác trong cùng nhóm. VD: <code className="font-mono text-amber-500">doc-view</code>
                           </p>
                         </div>
 
@@ -1924,11 +2056,11 @@ export const AdminDashboardPage: React.FC = () => {
                             value={genericFormData.subgroup_label || ''}
                             onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_label: e.target.value })}
                             placeholder="Xem & Tra cứu"
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                               Thứ tự trong nhóm
@@ -1941,7 +2073,7 @@ export const AdminDashboardPage: React.FC = () => {
                               onChange={(e) =>
                                 setGenericFormData({ ...genericFormData, subgroup_order: Number(e.target.value) })
                               }
-                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
                             />
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                               10 = đầu, 99 = cuối
@@ -1955,7 +2087,7 @@ export const AdminDashboardPage: React.FC = () => {
                             <select
                               value={genericFormData.subgroup_tone || 'read'}
                               onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_tone: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
                             >
                               {PERMISSION_TONES.map((t) => (
                                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -1964,21 +2096,6 @@ export const AdminDashboardPage: React.FC = () => {
                           </div>
                         </div>
                       </fieldset>
-
-                      {/* ─── 3. Sort order tổng ─── */}
-                      <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                          Sort order tổng (thanh tab)
-                        </label>
-                        <input
-                          type="number"
-                          value={genericFormData.sort_order ?? 0}
-                          onChange={(e) =>
-                            setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })
-                          }
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
-                        />
-                      </div>
                     </>
                   )}
 

@@ -299,25 +299,25 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
       {/* 2. Bảng Dữ Liệu High-craft Data Grid */}
       <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors duration-200">
         <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <table className="w-full text-xs text-left min-w-[960px] table-fixed">
+          <table className="w-full text-xs text-left min-w-[1150px]">
             <colgroup>
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '30%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '14%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '6%' }} />
+              <col style={{ width: '160px' }} />
+              <col style={{ width: '260px' }} />
+              <col style={{ width: '110px' }} />
+              <col style={{ width: '160px' }} />
+              <col style={{ width: '180px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '140px' }} />
             </colgroup>
             <thead className="bg-slate-50 dark:bg-slate-800/60 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800/80">
               <tr>
-                <th className="py-3 px-4">Số hiệu</th>
-                <th className="py-3 px-4">Trích yếu</th>
-                <th className="py-3 px-4">Độ mật</th>
-                <th className="py-3 px-4">Đơn vị</th>
-                <th className="py-3 px-4">Xóa lúc</th>
-                <th className="py-3 px-4">Người xóa</th>
-                <th className="py-3 px-4 text-right">Thao tác</th>
+                <th className="py-3 px-4 whitespace-nowrap">Số hiệu</th>
+                <th className="py-3 px-4 whitespace-nowrap">Trích yếu</th>
+                <th className="py-3 px-4 whitespace-nowrap">Độ mật</th>
+                <th className="py-3 px-4 whitespace-nowrap">Đơn vị</th>
+                <th className="py-3 px-4 whitespace-nowrap">Xóa lúc</th>
+                <th className="py-3 px-4 whitespace-nowrap">Người xóa</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">

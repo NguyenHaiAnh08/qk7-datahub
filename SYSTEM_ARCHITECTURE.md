@@ -23,6 +23,10 @@
 14. [Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)](#14-kiến-trúc-giao-diện-kép-đa-nền-tảng-dual-platform-desktop--ipados-touch-ui-engine)
 15. [Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (MyUnitPage) & Chuẩn Hóa Danh Xưng Thư Viện Số](#15-phân-hệ-quản-lý-tài-liệu-đơn-vị-trực-thuộc-myunitpage--chuẩn-hóa-danh-xưng-thư-viện-số)
 16. [Kiến Trúc Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout Engine)](#16-kiến-trúc-giao-diện-tự-thích-ứng-chống-bể-layout-mọi-mức-phóng-to-adaptive-zoom-proof-layout-engine)
+17. [Kiến Trúc Phân Hệ Giám Sát Phiên Đang Trực Tuyến (Active Online Sessions Real-time Monitoring Engine)](#17-kiến-trúc-phân-hệ-giám-sát-phiên-đang-trực-tuyến-active-online-sessions-real-time-monitoring-engine)
+18. [Kiến Trúc Thùng Rác Tài Liệu Tác Chiến & Khôi Phục Dữ Liệu An Toàn 2 Bước (Tactical Trash Bin & Double-Safety Recovery Engine)](#18-kiến-trúc-thùng-rác-tài-liệu-tác-chiến--khôi-phục-dữ-liệu-an-toàn-2-bước-tactical-trash-bin--double-safety-recovery-engine)
+19. [Kiến Trúc Quản Lý Phân Quyền Nâng Cao & Kéo Thả Thứ Tự Trực Quan (Granular Permissions, Subgroups & Drag-and-Drop Order Engine)](#19-kiến-trúc-quản-lý-phân-quyền-nâng-cao--kéo-thả-thứ-tự-trực-quan-granular-permissions-subgroups--drag-and-drop-order-engine)
+20. [Kiến Trúc Header AI Slide-Over Drawer & Khám Phá Hệ Thống Tự Động (Header AI Drawer & Guided Tour Engine)](#20-kiến-trúc-header-ai-slide-over-drawer--khám-phá-hệ-thống-tự-động-header-ai-drawer--guided-tour-engine)
 
 ---
 
@@ -422,6 +426,8 @@ erDiagram
     USER ||--o{ USER_ROLE : "sở hữu vai trò"
     ROLE ||--o{ ROLE_PERMISSION : "chứa đựng"
     PERMISSION ||--o{ ROLE_PERMISSION : "thuộc về"
+    USER ||--o{ USER_PERMISSION : "nhận quyền trực tiếp"
+    PERMISSION ||--o{ USER_PERMISSION : "gán cho người dùng"
     USER ||--o| USER_FINGERPRINT : "sở hữu dữ liệu sinh trắc học"
 
     USER {
@@ -479,6 +485,9 @@ erDiagram
         string sha256 "Mã băm SHA-256 chống chỉnh sửa"
         string stored_path "Đường dẫn tệp vật lý trong uploads/"
         string summary "Tóm tắt nội dung chính"
+        int is_deleted "Cờ xóa mềm (0: hiệu lực, 1: thùng rác)"
+        datetime deleted_at "Thời điểm chuyển vào thùng rác"
+        string deleted_by "Quân nhân thực hiện xóa"
         datetime created_at "Dấu thời gian số hóa tệp"
     }
 
@@ -508,10 +517,26 @@ erDiagram
         string name "Tên gọi vai trò"
     }
 
+    USER_PERMISSION {
+        string user_id PK,FK "Mã quân nhân nhận quyền trực tiếp"
+        string permission_id PK,FK "Mã quyền hạn được cấp"
+        datetime granted_at "Thời điểm cấp phát quyền hạn"
+        string granted_by "Quân nhân cấp phát"
+        datetime expires_at "Thời hạn hiệu lực (null: vô thời hạn)"
+        string note "Ghi chú mục đích nghiệp vụ"
+    }
+
     PERMISSION {
-        string permission_id PK "Mã quyền thao tác"
-        string code "Mã ký hiệu quyền hạn"
+        string permission_id PK "Mã quyền thao tác (PERM-DOC-01...)"
+        string code "Mã ký hiệu quyền hạn (UPPER_SNAKE)"
         string description "Diễn giải chi tiết quyền hạn"
+        string group_code "Mã nhóm (DOCUMENT, SYSTEM, USER, ROLE...)"
+        int sort_order "Thứ tự sắp xếp (hỗ trợ kéo thả Drag & Drop)"
+        string subgroup_key "Khóa phân loại con (doc-view, doc-edit...)"
+        string subgroup_label "Nhãn phân loại con"
+        int subgroup_order "Thứ tự phân loại con"
+        string subgroup_tone "Mức độ nguy hiểm (read, write, security, danger)"
+        int is_system "Cờ bảo vệ quyền hệ thống (1: không thể xóa)"
     }
 ```
 
@@ -591,8 +616,40 @@ Toàn bộ API được đặc tả chi tiết tại Swagger UI: **[http://local
 | `GET` | `/api/admin/fingerprint/agents` | QTV (Cấp ≥ 4) | — | Giám sát danh sách các máy quét vân tay vật lý (Agents) đang trực tuyến trong toàn mạng quân khu. |
 | `WS` | `/ws/fingerprint` | Máy trạm nội bộ | Query: `device_id, bridge_token` | Kênh kết nối thời gian thực 2 chiều giữa Express Gateway và Local Fingerprint Agent. |
 
-### 9.3. Nhóm Nghiệp Vụ Cốt Lõi (Auth, Documents, Files, Logs, Admin)
-*(Chi tiết đặc tả các endpoint xem, tải văn bản, phân quyền và kiểm toán tương tự các mục tiêu chuẩn của hệ thống)*
+### 9.3. Nhóm Quản Trị Phân Quyền & Vai Trò (Permissions & Role Assignment)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/admin/permissions` | `PERMISSION_VIEW` | — | Lấy toàn bộ danh mục quyền hạn hệ thống, sắp xếp theo `sort_order` tăng dần. |
+| `POST` | `/api/admin/permissions` | `PERMISSION_CREATE` | `{ permission_id, name, description, group_code, subgroup_code, subgroup_name, subgroup_order, severity }` | Tạo quyền mới trong danh mục hệ thống với phân vùng nhóm, phân loại con và mức độ nghiêm trọng. |
+| `PUT` | `/api/admin/permissions/{id}` | `PERMISSION_EDIT` | Path: `id`<br/>Body: `{ name, description, group_code, subgroup_code, subgroup_name, subgroup_order, severity }` | Cập nhật thông tin chi tiết của một quyền. |
+| `DELETE`| `/api/admin/permissions/{id}` | `PERMISSION_DELETE` | Path: `id` | Xóa quyền khỏi hệ thống (nghiêm cấm xóa quyền hệ thống `is_system = 1`). |
+| `PUT` | `/api/admin/permissions/reorder` | `PERMISSION_EDIT` | `{ orders: [{ permission_id, sort_order }] }` | **Sắp xếp thứ tự hiển thị bằng Kéo - Thả (Drag & Drop):** Cập nhật hàng loạt `sort_order` trong một SQL Transaction nguyên tử, tự động ghi vết kiểm toán `writeAccessLog`. |
+| `GET` | `/api/admin/roles` | `ROLE_VIEW` | — | Danh sách các vai trò trong hệ thống (ROL-01 Quản trị, ROL-02 Chỉ huy, ROL-03 Văn thư...). |
+| `GET` | `/api/admin/roles/{id}/permissions` | `ROLE_VIEW` | Path: `id` | Danh sách mã quyền đã được gán cho vai trò. |
+| `POST` | `/api/admin/roles/{id}/permissions` | `ROLE_ASSIGN` | Path: `id`<br/>Body: `{ permission_ids: [...] }` | Cập nhật tập quyền được cấp cho vai trò (đồng bộ bảng `ROLE_PERMISSION`). |
+| `GET` | `/api/admin/users/{id}/permissions` | `USER_VIEW` | Path: `id` | Tra cứu danh sách quyền được cấp trực tiếp cho cá nhân quân nhân (bảng `USER_PERMISSION`). |
+| `POST` | `/api/admin/users/{id}/permissions` | `USER_EDIT` | Path: `id`<br/>Body: `{ permission_id, expires_at, note }` | Cấp quyền đặc thù trực tiếp cho cá nhân có thời hạn hoặc vĩnh viễn. |
+| `DELETE`| `/api/admin/users/{id}/permissions/{permId}` | `USER_EDIT` | Path: `id`, `permId` | Thu hồi quyền được gán trực tiếp của cá nhân quân nhân. |
+
+### 9.4. Nhóm Giám Sát Phiên Đang Trực Tuyến (Active Online Sessions)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/admin/sessions` | `SESSION_VIEW` | — | Lấy toàn bộ danh sách phiên làm việc đang trực tuyến kèm địa chỉ IP, User-Agent parsed (HĐH, trình duyệt, loại thiết bị), `login_time`, `last_activity`, tính toán `idle_seconds` và cờ cảnh báo phiên treo. |
+| `GET` | `/api/admin/sessions/{id}` | `SESSION_VIEW` | Path: `id` | Tra cứu chi tiết một phiên làm việc cụ thể. |
+| `GET` | `/api/admin/sessions/user/{userId}` | `SESSION_VIEW` | Path: `userId` | Tra cứu toàn bộ các phiên hoạt động trên mọi thiết bị của một quân nhân. |
+| `POST` | `/api/admin/sessions/{id}/kill` | `SESSION_KILL` | Path: `id` | **Ngắt phiên làm việc cưỡng bức:** Hủy session token và giải phóng tài nguyên. Có cơ chế bảo vệ phiên hiện hành của Quản trị viên (`is_current` guard). |
+| `POST` | `/api/admin/sessions/user/{userId}/revoke-all` | `SESSION_KILL` | Path: `userId` | **Thu hồi toàn bộ phiên đa thiết bị:** Cưỡng bức đăng xuất quân nhân khỏi mọi máy tính bàn, iPad và thiết bị di động trong toàn quân khu. |
+
+### 9.5. Nhóm Thùng Rác Tài Liệu Tác Chiến & Khôi Phục (Tactical Trash Bin & Data Recovery)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/documents/trash` | `DOC_TRASH_VIEW` | — | Danh sách tài liệu quân sự đã bị xóa tạm thời (`deleted_at IS NOT NULL`), có lọc theo cấp độ mật người dùng `security_level_id <= clearance`. |
+| `DELETE`| `/api/documents/{fileId}` | `DOC_DELETE` | Path: `fileId`<br/>Body: `{ reason }` | **Xóa mềm (Soft Delete):** Đánh dấu `deleted_at = GETDATE()`, lưu `deleted_by`, `deleted_reason`, bảo toàn tệp vật lý trên ổ đĩa. |
+| `POST` | `/api/documents/{fileId}/restore` | `DOC_RESTORE` | Path: `fileId` | **Khôi phục tài liệu:** Chuyển tài liệu từ thùng rác trở lại kho lưu trữ hoạt động bình thường (`deleted_at = NULL`). |
+| `DELETE`| `/api/documents/{fileId}/purge` | `DOC_PURGE` | Path: `fileId`<br/>Body: `{ confirm: fileId }` | **Xóa vĩnh viễn (Double-Safety Purge):** Xóa tệp PDF vật lý khỏi ổ đĩa (`uploads/YYYY/MM/...`) và xóa triệt để bản ghi khỏi CSDL SQL Server. Yêu cầu mã xác nhận khớp chính xác `fileId`. |
+
+### 9.6. Nhóm Nghiệp Vụ Cốt Lõi (Auth, Documents, Files, Logs, Admin)
+*(Chi tiết đặc tả các endpoint xem, tải văn bản, phân loại đơn vị và kiểm toán an ninh tương tự các mục tiêu chuẩn của hệ thống)*
 
 ---
 
@@ -1017,5 +1074,125 @@ Hệ thống thiết kế giải pháp phản hồi kích thước viewport theo
 - Điều chỉnh khoảng đệm chân trang (`pb-4`), mang lại trải nghiệm thị giác gọn gàng, liền mạch và tập trung hoàn toàn vào 10 danh mục quản trị.
 
 ---
+
+## 17. Kiến Trúc Phân Hệ Giám Sát Phiên Đang Trực Tuyến (Active Online Sessions Real-time Monitoring Engine)
+
+### 17.1. Bối Cảnh Tác Chiến & Yêu Cầu An Ninh Mạng Quân Khu
+Trong môi trường mạng quân sự nội bộ của Bộ Tư Lệnh Quân Khu 7:
+- Các cán bộ, sĩ quan và nhân viên tác chiến đồng thời kết nối vào hệ thống từ nhiều loại thiết bị: máy tính bàn văn phòng (Desktop PC Widescreen), máy tính bảng tác chiến di động (**iPad Air M4**) và thiết bị đầu cuối chuyên dụng.
+- Nhằm phòng chống rủi ro chiếm đoạt phiên làm việc (Session Hijacking), tài khoản bị chia sẻ trái phép hoặc cán bộ rời vị trí quên đăng xuất, hệ thống triển khai phân hệ **Giám Sát Phiên Đang Trực Tuyến (`SessionsPage.tsx` - `/sessions`)** cung cấp bảng điều khiển trung tâm (Command Center Telemetry) cho kíp trực tác chiến mạng.
+
+### 17.2. Chu Kỳ Thăm Dò Thời Gian Thực (Live 15s Polling) & Chỉ Báo Xung Nhịp
+- **Thăm dò trực tiếp tự động:** Cứ mỗi **15 giây**, giao diện tự động gửi truy vấn `GET /api/admin/sessions` để cập nhật trạng thái các phiên đang kết nối, hiển thị nhãn trạng thái `LIVE 15s` với hiệu ứng nhấp nháy phát quang (`animate-ping`).
+- **Phân loại 3 mức độ nhịp đập phiên làm việc:**
+  1. 🟢 **Đang hoạt động (Active):** `idle_seconds <= 120s` (có thao tác trong vòng 2 phút). Điểm sáng nhấp nháy xanh lục, nhãn `"Đang trực"`.
+  2. 🟡 **Chờ thao tác (Idle):** `120s < idle_seconds <= 7200s` (từ 2 đến 120 phút không phát sinh thao tác mới). Điểm sáng vàng kim, hiển thị số phút chờ dạng `tabular-nums`.
+  3. 🔴 **Cảnh báo treo (Hanging / Warning):** `idle_seconds > 7200s` (quá 2 giờ không hoạt động). Điểm sáng đỏ nhấp nháy, cảnh báo máy trạm không người trông coi. Hệ thống tự động thu hồi phiên sau 180 phút (`sessionIdleTimeoutMinutes`).
+
+### 17.3. Trình Bóc Tách User-Agent Quân Sự (Military User-Agent Parsing Engine)
+Hệ thống tích hợp bộ phân tích chuỗi User-Agent trực tiếp tại frontend và backend:
+- Loại bỏ chuỗi User-Agent kỹ thuật thô dài dòng và rối mắt (`Mozilla/5.0 (Windows NT 10.0; Win64; x64)...`).
+- Chuyển đổi thành định dạng thông tin thiết bị chuẩn mực:
+  - **Biểu tượng thiết bị:** Máy tính để bàn (`Monitor` / `Laptop`), Máy tính bảng iPad (`Tablet`), Điện thoại di động (`Smartphone`).
+  - **Hệ điều hành nhận diện:** Windows, macOS, iPadOS, iOS, Android, Linux.
+  - **Trình duyệt nhận diện:** Chrome, Microsoft Edge, Safari, Mozilla Firefox, Opera, Cốc Cốc.
+  - **Hiển thị trực quan:** Định dạng `Windows • Chrome` hoặc `iPadOS • Safari` với icon minh họa rõ ràng.
+
+### 17.4. Quy Chuẩn Typography Tabular-Nums & Cân Xứng Bảng Toàn Diện
+- **Ép kiểu số liệu đơn cự ly (`font-mono tabular-nums text-sm`):** Áp dụng cho toàn bộ cột Địa chỉ IP, Thời gian đăng nhập (`login_time`), Hoạt động cuối (`last_activity`) và Thời gian chờ (`idle_time`), bảo đảm các con số luôn thẳng hàng tuyệt đối như màn hình radar quân sự.
+- **Cân giữa đồng bộ 100% (`text-center`):** Toàn bộ tiêu đề cột (`<th>`) và ô dữ liệu (`<td>`) từ Trạng thái, Quân nhân, Thiết bị, IP, Thời gian đăng nhập, Hoạt động cuối, Thời gian chờ đến Thao tác đều được căn giữa, loại bỏ hoàn toàn cảm giác lệch trục thị giác.
+- **Quy chuẩn độ rộng bảng an toàn (`min-w-[1280px]` & `table-auto`):** Ngăn chặn triệt để hiện tượng co ép chữ hoặc tràn mép bảng trên màn hình độ phân giải thấp và khi phóng to màn hình 150% - 200%.
+
+### 17.5. Cơ Chế Ngắt Phiên Cưỡng Bức (Kill Session Engine) & Bảo Vệ Quản Trị Viên
+- **Ngắt phiên đơn lẻ (`killSessionById`):** Gọi endpoint `POST /api/admin/sessions/:id/kill`. Quản trị viên có thể ngắt kết nối của bất kỳ phiên làm việc nào bị nghi vấn an ninh chỉ với một thao tác.
+- **Thu hồi toàn bộ phiên đa thiết bị (`revokeAllUserSessions`):** Gọi endpoint `POST /api/admin/sessions/user/:userId/revoke-all` để cưỡng bức đăng xuất tài khoản quân nhân khỏi mọi máy tính và iPad trong toàn mạng quân khu khi phát hiện sự cố bảo mật nghiêm trọng.
+- **Cơ chế tự bảo vệ an toàn (Self-Kill Protection):** Phiên làm việc hiện tại của chính Quản trị viên đang đăng nhập được gán cờ `is_current: true`. Hệ thống hiển thị huy hiệu `Phiên hiện tại` với icon `ShieldCheck` màu xanh ngọc và vô hiệu hóa nút hủy, ngăn chặn tuyệt đối tình huống Quản trị viên tự khóa chính mình ra khỏi hệ thống.
+- **Ghi nhận vết kiểm toán:** Mọi hành vi ngắt phiên đều được ghi nhận vào `ACCESS_LOG` với hành động `SESSION_KILL` kèm IP và mã người thực hiện.
+
+---
+
+## 18. Kiến Trúc Thùng Rác Tài Liệu Tác Chiến & Khôi Phục Dữ Liệu An Toàn 2 Bước (Tactical Trash Bin & Double-Safety Recovery Engine)
+
+### 18.1. Vòng Đời Xóa Mềm Tài Liệu Quân Sự (Soft Delete Lifecycle)
+Tài liệu số trong Quân Khu 7 mang tính bảo mật và pháp lý cao, không thể tùy tiện xóa bỏ hoàn toàn ngay lập tức:
+- Khi người dùng có thẩm quyền thực hiện thao tác xóa văn bản (`DELETE /api/documents/:fileId`), hệ thống áp dụng cơ chế **Xóa Mềm (Soft Delete)**:
+  - Cập nhật bản ghi trong SQL Server: `deleted_at = GETDATE()`, `deleted_by = @uid`, `deleted_reason = @reason`.
+  - Tệp tin PDF vật lý trên ổ đĩa (`uploads/YYYY/MM/...`) vẫn được bảo toàn nguyên vẹn với mã băm SHA-256.
+  - Tài liệu ngay lập tức ẩn khỏi Trung tâm thư viện số (`/portal`), Bàn làm việc văn thư (`/document-desk`) và Đơn vị của tôi (`/my-unit`), đồng thời chuyển vào danh sách lưu trữ của Thùng rác tài liệu (`TrashPage.tsx` - `/trash`).
+- **Kiểm soát độ mật:** Endpoint `GET /api/documents/trash` chỉ mở cho người có quyền `DOC_TRASH_VIEW` (hoặc Quản trị viên `ROL-01`) và bắt buộc lọc theo cấp độ mật: `d.security_level_id <= @clearance`.
+
+### 18.2. Khôi Phục Tài Liệu Tác Chiến (Single & Batch Restore Actions)
+- **Khôi phục đơn lẻ (`POST /api/documents/:fileId/restore`):** Đặt lại `deleted_at = NULL, deleted_by = NULL, deleted_reason = NULL`, tài liệu lập tức xuất hiện trở lại trong thư viện số, ghi log `DOC_RESTORE`.
+- **Khôi phục hàng loạt (Batch Restore):** Cho phép Quản trị viên chọn checkbox nhiều tài liệu cùng lúc và khôi phục toàn bộ trong một thao tác duy nhất, tiết kiệm thời gian xử lý khi cần phục hồi nhiều hồ sơ tác chiến.
+
+### 18.3. Cơ Chế Xóa Vĩnh Viễn An Toàn 2 Bước (Double-Safety Purge Engine)
+Xóa vĩnh viễn (`DELETE /api/documents/:fileId/purge`) là hành động phá hủy dữ liệu không thể hoàn tác. Để loại trừ hoàn toàn nguy cơ bấm nhầm do thao tác vội vàng:
+- **Hộp thoại cảnh báo màu Đỏ Quân Kỳ (`#b91c1c` / red-600):** Cảnh báo mức độ rủi ro tối cao, hiển thị rõ ràng mã tài liệu, trích yếu văn bản, dung lượng tệp và hậu quả không thể đảo ngược.
+- **Xác nhận 2 bước nghiêm ngặt:**
+  - *Bước 1:* Quản trị viên bấm nút `Xóa vĩnh viễn`. Hộp thoại an toàn xuất hiện với thông điệp cảnh báo quân sự.
+  - *Bước 2:* Bắt buộc gửi mã xác nhận `confirm === fileId` (hoặc nhập chính xác từ khóa bảo vệ `XAC NHAN XOA` khi dọn sạch thùng rác). Nếu chuỗi xác nhận không khớp, Gateway lập tức từ chối `400 Bad Request`.
+- **Thực thi phá hủy vật lý:** Khi xác thực hợp lệ, máy chủ xóa tệp tin PDF trên đĩa vật lý bằng `fs.unlinkSync`, sau đó xóa bản ghi khỏi bảng `DOCUMENT` trong SQL Server và ghi vết `ACCESS_LOG` với mức cảnh báo `DOC_PURGE` (Critical).
+
+### 18.4. Loại Bỏ Tàn Dư Màu AI Mặc Định & Bố Cục Bảng Rộng Rãi
+- **Đồng bộ bảng màu Quân đội:** Xóa bỏ hoàn toàn màu tím AI mặc định ở tab sidebar và nút bấm của Thùng rác, thay thế bằng bảng màu chuẩn: Xanh Lục Quân (`#166534`), Vàng Kim (`#fbbf24`), Đỏ Quân Kỳ (`#b91c1c`).
+- **Bố cục bảng tối ưu:** Thiết lập `min-w-[1150px]` và `table-auto`, các cột Trích yếu, Mã hiệu, Đơn vị phát hành, Người xóa, Ngày xóa và Thao tác có khoảng đệm rộng rãi, chống hiện tượng tràn dòng hoặc đè chữ.
+
+---
+
+## 19. Kiến Trúc Quản Lý Phân Quyền Nâng Cao & Kéo Thả Thứ Tự Trực Quan (Granular Permissions, Subgroups & Drag-and-Drop Order Engine)
+
+### 19.1. Mô Hình Phân Quyền Kép: Vai Trò (`ROLE_PERMISSION`) & Cá Nhân Trực Tiếp (`USER_PERMISSION`)
+Hệ thống áp dụng mô hình phân quyền ma trận đáp ứng yêu cầu linh hoạt trong quân đội:
+1. **Phân quyền theo Vai trò (Role-Based Access Control):** Gán tập quyền chuẩn cho các nhóm chức danh thông qua bảng `ROLE_PERMISSION` (Quản trị viên, Thủ trưởng đơn vị, Sĩ quan tác chiến, Cán bộ văn thư, Chiến sĩ độc giả).
+2. **Phân quyền Trực tiếp Cá nhân (Direct User Permissions):** Cho phép chỉ định quyền đặc thù cho một cá nhân quân nhân thông qua bảng `USER_PERMISSION`. Mô hình hỗ trợ:
+   - `expires_at`: Cấp quyền có thời hạn phục vụ nhiệm vụ đột xuất hoặc chiến dịch ngắn ngày, tự động hết hạn mà không cần thu hồi thủ công.
+   - `note`: Ghi chú lý do phê duyệt giao quyền phục vụ công tác thanh tra.
+   - Trong quá trình xác thực (`getUserPermissions`), hệ thống tự động gộp (Union) quyền từ vai trò và quyền cá nhân trực tiếp còn hiệu lực.
+
+### 19.2. Cơ Chế Kéo - Thả (Drag & Drop) Sắp Xếp Thứ Tự Trực Quan
+- **Xóa bỏ Pain-point "Sort Order":** Trước đây, việc nhập số thứ tự `Sort order tổng` thủ công trong form gây bối rối lớn cho người dùng (phải nhớ các số thứ tự cũ, dễ gây trùng lặp hoặc nhảy thứ tự lộn xộn).
+- **Tích hợp cơ chế Kéo - Thả chuẩn HTML5:**
+  - Mỗi hàng quyền trong Bảng danh mục quyền (`AdminDashboardPage.tsx`) được tích hợp tay cầm kéo-thả chuyên dụng (`GripVertical` icon) với tooltip hướng dẫn trực quan.
+  - Hiệu ứng phản hồi trạng thái kéo: Hàng đang được kéo giảm độ mờ (`opacity-40 scale-[0.99]`), viền vàng hổ phách phát sáng, đường viền trên hàng đích hiển thị rõ vị trí thả mới.
+  - **Cập nhật giao diện tức thì (Optimistic UI Update):** Thứ tự các quyền trên bảng lập tức thay đổi ngay khi nhả chuột, mang lại cảm giác mượt mà 0ms độ trễ.
+  - **Đồng bộ giao dịch Backend (`PUT /api/admin/permissions/reorder`):** Gửi mảng `[{ permission_id, sort_order }]` về Gateway. Máy chủ Express mở một **SQL Transaction nguyên tử** cập nhật tuần tự toàn bộ thứ tự mới trong CSDL và ghi nhận vết `writeAccessLog`. Nếu có sự cố, hệ thống tự động rollback trạng thái trên UI và hiển thị thông báo `AnimatedToast`.
+
+### 19.3. Tối Ưu Form Modal Thêm/Sửa Quyền (Intuitive Split Grid Modal)
+Form nhập liệu quyền được tái cấu trúc hoàn toàn:
+- **Lưới 2 cột (`grid grid-cols-2 gap-4`):** Bố trí gọn gàng các trường Mã quyền (`permission_id`), Tên quyền (`name`), Nhóm quyền (`group_code`) và Mức độ nghiêm trọng (`severity`).
+- **Phân vùng Phân loại con (Subgroup Partition):** Được đóng khung trong một khối Fieldset chuyên biệt với viền màu hổ phách nhạt (`border-amber-500/20 bg-amber-500/5`), tiêu đề Legend rõ ràng, nhóm 3 trường: Mã phân loại con (`subgroup_code`), Tên phân loại con (`subgroup_name`) và Thứ tự trong nhóm (`subgroup_order`).
+- **Loại bỏ hoàn toàn ô nhập `Sort order tổng`** trong modal để tránh gây nhầm lẫn cho cán bộ quản trị.
+
+### 19.4. Bảng Phân Cấp Mức Độ Rủi Ro 4 Tông Màu & Huy Hiệu Nhóm Quyền Quân Sự
+- **Dropdown mức độ rủi ro (`severity`) chuẩn 4 cấp:**
+  - 🟢 **READ (Chỉ đọc / Xem):** Mức độ an toàn cao nhất, điểm chấm màu xanh lục Emerald.
+  - 🟡 **WRITE (Ghi / Thêm mới):** Mức độ nghiệp vụ thông thường, điểm chấm màu vàng kim Amber.
+  - 🟣 **SECURITY (Bảo mật / Cấu hình):** Mức độ tác động cấu hình hệ thống, điểm chấm màu tím Violet.
+  - 🔴 **DELETE (Xóa / Nguy hiểm):** Mức độ rủi ro tối cao, điểm chấm màu đỏ quân đội Red.
+- **Hệ thống Huy hiệu Nhóm quyền động (Dynamic Group Badges):**
+  - `DOCUMENT`: Xanh lam Blue (`bg-blue-500/10 text-blue-600 border-blue-500/20`).
+  - `SYSTEM`: Tím Slate (`bg-purple-500/10 text-purple-600 border-purple-500/20`).
+  - `USER`: Xanh lục Emerald (`bg-emerald-500/10 text-emerald-600 border-emerald-500/20`).
+  - `ROLE`: Hổ phách Amber (`bg-amber-500/10 text-amber-600 border-amber-500/20`).
+  - `FINGERPRINT`: Tím Fuchsia (`bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20`).
+  - `AUDIT`: Đỏ Rose (`bg-rose-500/10 text-rose-600 border-rose-500/20`).
+
+---
+
+## 20. Kiến Trúc Header AI Slide-Over Drawer & Khám Phá Hệ Thống Tự Động (Header AI Drawer & Guided Tour Engine)
+
+### 20.1. Ngăn Kéo Trợ Lý AI Tác Chiến Nổi (Header AI Slide-Over Drawer)
+Nhằm hỗ trợ thủ trưởng và cán bộ tác chiến tra cứu nhanh điều lệnh và chỉ thị mà không cần rời khỏi màn hình làm việc hiện tại:
+- **Cơ chế trượt tức thì (Slide-Over Drawer 380px):** Kích hoạt bằng nút bấm Trợ lý AI trên Header hoặc phím tắt. Ngăn kéo trượt ra êm ái nhờ cơ chế lò xo vật lý (`--ux-spring`), tích hợp lớp kính mờ `backdrop-blur-md`.
+- **Tương tác đàm thoại tác chiến:** Hỗ trợ đầy đủ định dạng văn bản Markdown, hiển thị công thức, bảng biểu, danh sách tài liệu trích dẫn (`citations`) kèm số trang PDF và quá trình suy luận quân sự (`think`).
+- **Gợi ý tác chiến nhanh (Quick Prompts):** Cung cấp sẵn các nút bấm câu hỏi thông dụng về phương án tác chiến, bảo mật tài liệu và hướng dẫn nghiệp vụ.
+
+### 20.2. Cơ Chế Khám Phá Hệ Thống Tự Động (Guided Tour Engine)
+- **Tự động kích hoạt cho Khách vãng lai (Guest):** Đối với các tài khoản dùng thử, khách tham quan hoặc cán bộ đăng nhập lần đầu, hệ thống tự động kích hoạt chuỗi hướng dẫn trực quan (Step-by-step Spotlight Tour) giới thiệu từng khu vực trọng yếu: Thanh tìm kiếm tài liệu, Bộ lọc độ mật, Bàn làm việc văn thư và Trợ lý AI.
+- **Nút khám phá La bàn (`Compass` button) trên `SecurityBanner`:** Cán bộ có thể chủ động bấm nút La bàn tác chiến trên biểu ngữ an ninh bất kỳ lúc nào để kích hoạt lại tour hướng dẫn.
+- **Tinh giản giao diện Header:** Loại bỏ nút hướng dẫn nhanh thừa thãi trên Header bar để nhường không gian cho các công cụ điều khiển trọng yếu (`DeviceModeSwitch`, `ThemeToggle`, `User Profile`), chuyển toàn bộ điểm nhấn khám phá về đúng ngữ cảnh của Banner tác chiến.
+
+---
 *Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
+
 

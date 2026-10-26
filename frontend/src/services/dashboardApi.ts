@@ -19,6 +19,8 @@ export const dashboardApi = {
 
   // Logs
   getAccessLogs: logService.getAccessLogs,
+  getAccessLogStats: logService.getStats,
+  triggerArchiveRun: logService.triggerArchiveRun,
 
   // Roles
   getRoles: roleService.getRoles,

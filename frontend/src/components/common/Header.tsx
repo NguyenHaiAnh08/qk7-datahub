@@ -14,6 +14,7 @@ import {
   Menu,
   Trash2,      // ⭐ MỚI
   Activity,    // ⭐ MỚI
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
@@ -28,6 +29,17 @@ interface HeaderProps {
   showClock?: boolean;
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
   onToggleMobileMenu?: () => void;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// HELPER: Lấy chữ cái đầu của tên cuối (tên chính) theo quy chuẩn tiếng Việt
+// Ví dụ: "Lương Nhật Thăng" -> "T", "Nguyễn Mạnh Nam" -> "N"
+// ══════════════════════════════════════════════════════════════════════
+export function getAvatarInitial(name?: string, fallback = 'K'): string {
+  if (!name || !name.trim()) return fallback;
+  const parts = name.trim().split(/\s+/);
+  const lastName = parts[parts.length - 1];
+  return lastName ? lastName.charAt(0).toUpperCase() : fallback;
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -362,6 +374,26 @@ export const Header: React.FC<HeaderProps> = ({
             {user.unit_name}
           </div>
         )}
+        {((user?.role_names && user.role_names.length > 0) || (user?.roles && user.roles.length > 0)) && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/60">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 shrink-0 font-medium">
+              <Shield className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+              <span>Vai trò hệ thống:</span>
+            </span>
+            {(user.role_names && user.role_names.length > 0 ? user.role_names : user.roles || []).map((roleName, idx) => {
+              const roleId = user.roles?.[idx];
+              return (
+                <span
+                  key={idx}
+                  className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25 whitespace-nowrap shadow-2xs"
+                  title={roleId ? `Mã vai trò: ${roleId}` : undefined}
+                >
+                  {roleName}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="py-1">
@@ -549,7 +581,7 @@ export const Header: React.FC<HeaderProps> = ({
                   className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
                   style={{ color: '#ffffff' }}
                 >
-                  {user?.full_name ? user.full_name[0].toUpperCase() : 'K'}
+                  {getAvatarInitial(user?.full_name)}
                 </span>
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-white dark:ring-slate-800 ${
@@ -666,7 +698,7 @@ export const Header: React.FC<HeaderProps> = ({
                   className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
                   style={{ color: '#ffffff' }}
                 >
-                  {user?.full_name ? user.full_name[0].toUpperCase() : 'K'}
+                  {getAvatarInitial(user?.full_name)}
                 </span>
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-800 ${

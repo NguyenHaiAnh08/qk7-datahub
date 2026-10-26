@@ -170,8 +170,8 @@ export const PortalPage: React.FC = () => {
     setDateTo('');
   };
 
-  // Download Handler
-  const handleDownload = async (doc: DocumentItem) => {
+  // Download Handler with deferred release when UI/UX finishes
+  const handleDownload = async (doc: DocumentItem, signal?: AbortSignal) => {
     const userClearance = user?.clearance_level_id || 1;
     const docLevel = doc.security_level_id || 1;
 
@@ -181,7 +181,7 @@ export const PortalPage: React.FC = () => {
         'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp có xác thực vân tay 2FA, tuyệt đối không được phép tải về máy theo quy định tác chiến.',
         { title: 'QUY ĐỊNH BẢO MẬT QUÂN KHU', badge: 'LEVEL-3+' }
       );
-      return;
+      throw new Error('Tài liệu Cấp 3+ không được phép tải về');
     }
 
     if (docLevel > userClearance) {
@@ -189,24 +189,54 @@ export const PortalPage: React.FC = () => {
         `Cấp độ bảo mật hiện tại của đồng chí (Cấp ${userClearance}) không đủ để tải văn bản Cấp ${docLevel}.`,
         { title: 'TỪ CHỐI TRUY CẬP', badge: 'CLEARANCE-DENIED' }
       );
-      return;
+      throw new Error('Không đủ cấp độ bảo mật');
     }
-    try {
-      toast.info(`Đang truyền phát và tải văn bản ${doc.document_code}...`, {
-        title: 'ĐANG XỬ LÝ TỆP',
-        badge: 'STREAMING',
-        duration: 2500,
-      });
-      await documentsApi.downloadDocument(doc.file_id, doc.original_name || `${doc.document_code}.pdf`);
+
+    toast.info(`Đang truyền phát và chuẩn bị văn bản ${doc.document_code}...`, {
+      title: 'ĐANG XỬ LÝ TỆP',
+      badge: 'STREAMING',
+      duration: 3200,
+    });
+
+    // Chuẩn bị tệp tải về và giữ lại (hold) cho đến khi thanh tiến trình UI hoàn tất 100%
+    const release = await documentsApi.prepareDownload(
+      doc.file_id,
+      doc.original_name || `${doc.document_code}.pdf`,
+      undefined,
+      signal
+    );
+
+    // Trả về hàm release để CompactDownloadButton chỉ kích hoạt tải file về máy khi UI đã 'done'
+    return () => {
+      release();
       toast.success(`Đã tải xuống thành công văn bản ${doc.document_code}`, {
         title: 'TẢI TỆP HOÀN TẤT',
         badge: 'PDF-READY',
       });
+    };
+  };
+
+  const handleCancelDownload = (doc: DocumentItem) => {
+    toast.info(`Đã hủy tải văn bản ${doc.document_code}`, {
+      title: 'ĐÃ HỦY TẢI',
+      badge: 'CANCELLED',
+      duration: 2000,
+    });
+  };
+
+  const handleDirectDownload = async (doc: DocumentItem) => {
+    try {
+      const release = await handleDownload(doc);
+      if (typeof release === 'function') {
+        release();
+      }
     } catch (err: any) {
-      toast.error('Lỗi tải văn bản: ' + (err.message || 'Không có quyền truy cập'), {
-        title: 'THẤT BẠI',
-        badge: 'DOWNLOAD-ERR',
-      });
+      if (err?.name !== 'AbortError') {
+        toast.error('Lỗi tải văn bản: ' + (err.message || 'Không có quyền truy cập'), {
+          title: 'THẤT BẠI',
+          badge: 'DOWNLOAD-ERR',
+        });
+      }
     }
   };
 
@@ -472,6 +502,7 @@ export const PortalPage: React.FC = () => {
             onPageChange={setCurrentPage}
             onPreview={(doc) => setPreviewDoc(doc)}
             onDownload={handleDownload}
+            onCancelDownload={handleCancelDownload}
           />
         ) : (
           <DocumentTable
@@ -485,6 +516,7 @@ export const PortalPage: React.FC = () => {
             onPageChange={setCurrentPage}
             onPreview={(doc) => setPreviewDoc(doc)}
             onDownload={handleDownload}
+            onCancelDownload={handleCancelDownload}
           />
         )}
       </main>

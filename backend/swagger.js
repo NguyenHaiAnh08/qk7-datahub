@@ -712,15 +712,25 @@ const swaggerSpec = {
     '/api/access-logs': {
       get: {
         tags: ['Logs'],
-        summary: 'Nhật ký truy cập (200 bản ghi gần nhất)',
+        summary: 'Nhật ký truy cập & kiểm toán an ninh (Không giới hạn, tự động làm sạch đầu tháng)',
         parameters: [
-          { in: 'query', name: 'user',   schema: { type: 'string' } },
+          { in: 'query', name: 'user',   schema: { type: 'string' }, description: 'Lọc theo mã quân nhân (user_id)' },
           {
             in: 'query', name: 'action',
             schema: {
               type: 'string',
               enum: ['LOGIN', 'LOGIN_FAIL', 'VIEW', 'DOWNLOAD', 'UPLOAD', 'UPDATE', 'DELETE', 'DENIED', 'ERROR'],
             },
+            description: 'Lọc theo loại hành động',
+          },
+          {
+            in: 'query', name: 'scope',
+            schema: {
+              type: 'string',
+              enum: ['active', 'archive', 'all'],
+              default: 'active',
+            },
+            description: 'Phạm vi: active (tháng hiện tại), archive (kho lưu trữ các tháng cũ), all (tất cả)',
           },
         ],
         responses: {
@@ -733,6 +743,66 @@ const swaggerSpec = {
                   properties: {
                     total: { type: 'integer' },
                     items: { type: 'array', items: { $ref: '#/components/schemas/AccessLog' } },
+                    cycle: {
+                      type: 'object',
+                      properties: {
+                        scope: { type: 'string' },
+                        current_month: { type: 'string' },
+                        reset_policy: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    '/api/access-logs/stats': {
+      get: {
+        tags: ['Logs'],
+        summary: 'Thống kê trạng thái chu kỳ nhật ký và kho lưu trữ',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    current_month: { type: 'string' },
+                    active_month_count: { type: 'integer' },
+                    total_active_table_count: { type: 'integer' },
+                    archive_count: { type: 'integer' },
+                    last_archived_at: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    '/api/access-logs/archive-run': {
+      post: {
+        tags: ['Logs'],
+        summary: 'Kích hoạt lưu trữ và làm sạch nhật ký tháng cũ thủ công',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string' },
+                    archivedCount: { type: 'integer' },
+                    cutoffDate: { type: 'string', format: 'date-time' },
                   },
                 },
               },

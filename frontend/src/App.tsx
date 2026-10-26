@@ -9,7 +9,8 @@ import { RouterProvider } from './routes/RouterProvider';
 import { HttpErrorListener } from './components/common/HttpErrorListener';
 import { ToastProvider } from './components/common/Toast';
 import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
-import AIChatWidget from './components/ai-chat/AIChatWidget';
+import { AIChatProvider } from './contexts/AIChatContext';
+import AIChatDrawer from './components/ai-chat/AIChatDrawer';
 import './index.css';
 
 /**
@@ -129,12 +130,12 @@ const AIChatWrapper: React.FC = () => {
     return null;
   }
 
-  return <AIChatWidget />;
+  return <AIChatDrawer />;
 };
 
 /**
  * Root Application Component
- * Sets up global context providers (Theme, DeviceMode, Ant Design, Auth) and BrowserRouter.
+ * Sets up global context providers (Theme, DeviceMode, Ant Design, Auth, AIChat) and BrowserRouter.
  * Route definitions are fully delegated to RouterProvider (auto-discovered routes).
  */
 export const App: React.FC = () => {
@@ -146,8 +147,10 @@ export const App: React.FC = () => {
             <ToastProvider>
               <NetworkStatusProvider>
                 <AuthProvider>
-                  <RouterProvider />
-                  <AIChatWrapper />
+                  <AIChatProvider>
+                    <RouterProvider />
+                    <AIChatWrapper />
+                  </AIChatProvider>
                 </AuthProvider>
               </NetworkStatusProvider>
             </ToastProvider>

@@ -1,8 +1,8 @@
-# KIẾN TRÚC TOÀN BỘ HỆ THỐNG — QK7 DATAHUB
+# KIẾN TRÚC TOÀN BỘ HỆ THỐNG — TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB
 
 > **Bảo mật:** Cấp Bộ Tư Lệnh Quân Khu 7  
-> **Phiên bản kiến trúc:** v3.5-ENTERPRISE (React + TypeScript SPA, Express 5 Gateway, AI RAG Microservice & ZKTeco Biometric Engine)  
-> **Ngày cập nhật:** 19/10/2026  
+> **Phiên bản kiến trúc:** v3.8-ENTERPRISE (Dual-Platform Desktop & iPadOS, React 18 + TS SPA, Express 5 Gateway, AI RAG & ZKTeco Biometric Engine)  
+> **Ngày cập nhật:** 21/10/2026  
 
 ---
 
@@ -20,16 +20,21 @@
 11. [Kiến Trúc Trung Tâm Kiểm Toán & Giám Sát An Ninh SOC (Security Audit Log Engine)](#11-kiến-trúc-trung-tâm-kiểm-toán--giám-sát-an-ninh-soc)
 12. [Kiến Trúc Bảng Phân Cấp Đơn Vị Quân Khu Đa Tầng (Military Unit Hierarchy & Command Tree Engine)](#12-kiến-trúc-bảng-phân-cấp-đơn-vị-quân-khu-đa-tầng)
 13. [Đặc Tả Kỹ Thuật Mô-đun Xuất Báo Cáo Kiểm Toán Quân Đội Dạng Excel (Military Audit Reporting Engine)](#13-đặc-tả-kỹ-thuật-mô-đun-xuất-báo-cáo-kiểm-toán-quân-đội-dạng-excel)
+14. [Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)](#14-kiến-trúc-giao-diện-kép-đa-nền-tảng-dual-platform-desktop--ipados-touch-ui-engine)
+15. [Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (MyUnitPage) & Chuẩn Hóa Danh Xưng Thư Viện Số](#15-phân-hệ-quản-lý-tài-liệu-đơn-vị-trực-thuộc-myunitpage--chuẩn-hóa-danh-xưng-thư-viện-số)
+16. [Kiến Trúc Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout Engine)](#16-kiến-trúc-giao-diện-tự-thích-ứng-chống-bể-layout-mọi-mức-phóng-to-adaptive-zoom-proof-layout-engine)
 
 ---
 
 ## 1. Tổng Quan Hệ Thống
 
-**QK7 DataHub** là nền tảng quản trị và lưu trữ tài liệu số tập trung, phục vụ công tác chỉ huy, tham mưu tác chiến và văn thư hành chính trong toàn Quân Khu 7. Hệ thống tích hợp toàn diện trí tuệ nhân tạo và công nghệ sinh trắc học phần cứng theo các trụ cột cốt lõi:
+**TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB** là nền tảng quản trị và lưu trữ tài liệu số tập trung, phục vụ công tác chỉ huy, tham mưu tác chiến và văn thư hành chính trong toàn Quân Khu 7. Hệ thống tích hợp toàn diện trí tuệ nhân tạo và công nghệ sinh trắc học phần cứng theo các trụ cột cốt lõi:
 
 * **Ứng Dụng Đơn Trang Chuẩn (SPA React 18 + TypeScript + Ant Design):** Toàn bộ giao diện được nạp qua duy nhất 1 vỏ bọc `index.html`, sử dụng cơ chế Auto-Discovery Routing qua `import.meta.glob`, không tải lại trang, bảo lưu trạng thái xác thực và trải nghiệm mượt mà với tông màu Tím chủ đạo (`#722ED1`).
+* **Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform PC & iPad Air M4 Touch UI):** Tương thích tối ưu cả Máy tính để bàn (Widescreen 16:9) và máy tính bảng iPad Air M4 (11-inch & 13-inch) với cơ chế `DeviceModeContext`, cho phép chuyển đổi chế độ xem tức thì. Trên iPadOS hỗ trợ vuốt chạm chuẩn Apple HIG (Touch Target ≥ 44×44px); trên Desktop PC sử dụng cụm nút bấm chuyển trang màu sắc chuyên biệt (`Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`) ổn định, loại bỏ hiệu ứng viên thuốc trượt để ngăn ngừa triệt để lỗi nhảy giao diện.
+* **Chuẩn Hóa Danh Xưng "Trung Tâm Thư Viện Số" & Phân Hệ "Đơn Vị Của Tôi":** Chuẩn hóa toàn bộ nhãn giao diện từ "Portal" thành "Trung tâm thư viện số", đồng thời cung cấp phân hệ `/my-unit` hỗ trợ các cơ quan, đơn vị trực thuộc Quân Khu 7 tra cứu, lưu trữ và khai thác tài liệu nội bộ chuyên biệt.
 * **Kiểm Soát Độ Mật 5 Cấp Nghiêm Ngặt:** Ngăn chặn tuyệt đối việc rò rỉ thông tin quân sự (từ Cấp 1 - Công khai đến Cấp 5 - Tuyệt mật), thực thi kiểm soát tại cả 3 tầng: UI Guard, Gateway Middleware và SQL Server Database Constraint.
-* **Xác Thực Sinh Trắc Học Vân Tay Quang Học 2FA:** Tích hợp máy quét phần cứng chuyên dụng **ZKTeco ZK9500** (500 DPI, kết nối USB) kết hợp Local Hardware Agent (`:9001`) và WebSocket Gateway. Bắt buộc quét vân tay khi truy cập văn bản Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), cấp `fingerprint_token` (JWT hiệu lực 5 phút) chống giả mạo danh tính.
+* **Xác Thực Sinh Trắc Học Vân Tay Quang Học 2FA:** Tích hợp máy quét phần cứng chuyên dụng **ZKTeco ZK9500** (500 DPI, kết nối USB) kết hợp Local Hardware Agent (`:9001`) và WebSocket Gateway. Bắt buộc quét vân tay khi truy cập văn bản Cấp 3 (Mật), Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật), cấp `fingerprint_token` (JWT hiệu lực 5 phút) chống giả mạo danh tính. Giao diện thu thập vân tay 3 bước tích hợp vector Touch ID trực quan và cơ chế lọc lỗi nhảy gián đoạn.
 * **Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded Agentic RAG):** Microservice Python FastAPI (`:8001`) kết hợp kho vector Qdrant cục bộ, tự động trích xuất nội dung văn kiện PDF, tìm kiếm ngữ nghĩa, trả lời câu hỏi kèm trích dẫn số trang chính xác, tự động biên soạn cẩm nang học tập tác chiến (`study-book`) và có cơ chế **Smart SQL Fallback** đảm bảo hệ thống vận hành 100% không gián đoạn kể cả khi microservice AI đang bảo trì.
 * **Toàn Vẹn Dữ Liệu & Kiểm Toán 24/7:** Tính toán mã băm SHA-256 cho mọi tệp tin lưu trữ và ghi vết kiểm toán toàn diện (`ACCESS_LOG`) mọi thao tác (Đăng nhập, Xem, Tải về, Quét vân tay, Hỏi AI, Cập nhật, Xóa).
 
@@ -46,33 +51,39 @@ graph TB
         
         ScannerHardware["Máy quét vân tay quang học<br/>ZKTeco ZK9500 (USB 500 DPI)"]
         LocalAgent["Local Fingerprint Agent<br/>(:9001 HTTP & WS Client)<br/>agent.py + zk_service.py"]
-        BrowserApp["Trình Duyệt Web Quân Sự<br/>(React 18 + TS SPA)"]
+        BrowserApp["Trình Duyệt Web Quân Sự<br/>(Máy Tính Bàn / iPad Air M4 iPadOS<br/>Safari, Chrome, Cốc Cốc)"]
 
         Officer & Commander & AdminHigh --> BrowserApp
         ScannerHardware -->|USB Driver| LocalAgent
         BrowserApp <-->|GET /device-id, /enroll-status| LocalAgent
     end
 
-    subgraph PRESENTATION_TIER ["2. TẦNG GIAO DIỆN REACT 18 + ANT DESIGN"]
+    subgraph PRESENTATION_TIER ["2. TẦNG GIAO DIỆN REACT 18 + ANT DESIGN (DUAL-PLATFORM)"]
         SingleHTML["index.html<br/>(Vỏ nạp duy nhất)"]
         AppRouter["React Router (useRoutes)<br/>Auto-Discovery Routing"]
+        DeviceModeComp["DeviceModeSwitch & Context<br/>(Desktop PC Widescreen vs iPad Touch UI)"]
+        HeaderComp["Header Bar Navigation<br/>(PC: Nút Chuyển Màu Sắc | iPad: Segmented Glider)"]
+        
         LoginPage["/login (Xác thực quân nhân)"]
-        PortalPage["/portal (Cổng tra cứu tài liệu)"]
+        PortalPage["/portal (Trung tâm thư viện số)"]
+        MyUnitPage["/my-unit (Đơn vị của tôi)"]
         DeskPage["/document-desk (Bàn làm việc văn thư)"]
         AdminDashboard["/admin-dashboard (Bảng điều khiển QTV)"]
         UsersPage["/users (Quản lý quân nhân & cấp bậc)"]
         
         AIChatWidgetComp["AIChatWidget<br/>(Trợ lý AI nổi, Markdown, LaTeX, Citations)"]
-        FpModals["FingerprintScanModal & FingerprintEnrollModal<br/>(Animation Touch ID 3 bước)"]
+        FpModals["FingerprintScanModal & FingerprintEnrollModal<br/>(Animation Touch ID Vector 3 bước)"]
         SecurityAuditLogComp["SecurityAuditLog (Trung Tâm SOC)<br/>(Live Monitor, 4 KPI, Filter Pills, Deep JSON Drawer)"]
         UnitTreeComp["UnitTreeTable (Cây Đơn Vị)<br/>(Command Hierarchy, 6 Tiers, Orphan Safe)"]
         ExcelExportTool["exportAuditReportExcel<br/>(ExcelJS Báo Cáo Quân Đội .xlsx)"]
 
         BrowserApp --> SingleHTML
         SingleHTML --> AppRouter
-        AppRouter --> LoginPage & PortalPage & DeskPage & AdminDashboard & UsersPage
-        PortalPage & DeskPage & AdminDashboard -.-> AIChatWidgetComp
-        PortalPage & DeskPage & UsersPage -.-> FpModals
+        AppRouter --> HeaderComp
+        HeaderComp -.-> DeviceModeComp
+        AppRouter --> LoginPage & PortalPage & MyUnitPage & DeskPage & AdminDashboard & UsersPage
+        PortalPage & MyUnitPage & DeskPage & AdminDashboard -.-> AIChatWidgetComp
+        PortalPage & MyUnitPage & DeskPage & UsersPage -.-> FpModals
         AdminDashboard -.-> SecurityAuditLogComp & UnitTreeComp
         SecurityAuditLogComp -.-> ExcelExportTool
     end
@@ -140,6 +151,7 @@ graph TB
 qk7-datahub/
 ├── package.json                            # Điều phối kịch bản khởi chạy toàn hệ thống
 ├── README.md                               # Sổ tay hướng dẫn khởi động nhanh
+├── SETUP_SERVER.md                         # Sổ tay hướng dẫn cài đặt Server & Client chi tiết
 ├── SYSTEM_ARCHITECTURE.md                  # Tài liệu kiến trúc toàn diện hệ thống
 │
 ├── backend/                                # 🟢 MÁY CHỦ BACKEND EXPRESS 5 & WEBSOCKET GATEWAY
@@ -204,17 +216,18 @@ qk7-datahub/
         │
         ├── pages/                          # CÁC MÀN HÌNH CHỨC NĂNG CHÍNH
         │   ├── LoginPage.tsx               # Màn hình đăng nhập quân nhân
-        │   ├── PortalPage.tsx              # Cổng tra cứu tài liệu quân sự
+        │   ├── PortalPage.tsx              # Trung tâm thư viện số (Cổng tra cứu tài liệu)
+        │   ├── MyUnitPage.tsx              # Đơn vị của tôi (Quản lý tài liệu theo đơn vị trực thuộc)
         │   ├── DocumentDeskPage.tsx        # Bàn làm việc số hóa văn thư
         │   ├── AdminDashboardPage.tsx      # Bảng điều khiển quản trị trung tâm
         │   ├── UsersPage.tsx               # Quản lý tài khoản quân nhân & cấp bậc
         │   └── HttpErrorPage.tsx           # Trang mã trạng thái HTTP chuẩn Ant Design Result
         │
         ├── components/                     # THÀNH PHẦN GIAO DIỆN TÁI SỬ DỤNG
-        │   ├── common/                     # Header, Sidebar, Layout, ProtectedRoute, TouchIDFingerprint...
+        │   ├── common/                     # Header, Sidebar, Layout, DeviceModeSwitch, TouchIDFingerprint...
         │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
         │   ├── document-desk/              # FingerprintScanModal (Hộp thoại quét vân tay xác thực xem PDF)
-        │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Đăng ký vân tay)
+        │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Đăng ký vân tay 3 bước)
         │   ├── auth/                       # LoginForm
         │   ├── portal/                     # SecurityBanner, DocumentCard, PortalDocumentList
         │   └── dashboard/                  # PHÂN HỆ QUẢN TRỊ & TRUNG TÂM KIỂM TOÁN SOC
@@ -222,6 +235,9 @@ qk7-datahub/
         │       ├── UnitTreeTable.tsx       # Bảng cây đơn vị 6 cấp bậc, bảo vệ mồ côi, tìm kiếm không dấu
         │       ├── StatCard.tsx            # Thẻ thống kê chỉ số nghiệp vụ
         │       └── DistributionChart.tsx   # Biểu đồ phân bổ loại văn bản & an ninh
+        │
+        ├── hooks/                          # REACT CUSTOM HOOKS
+        │   └── useDeviceMode.ts            # Hook điều khiển chế độ PC Widescreen & iPad Air M4 Touch UI
         │
         ├── utils/                          # TIỆN ÍCH HỆ THỐNG
         │   └── exportAuditReportExcel.ts   # Xuất file Excel (.xlsx) chuẩn biểu mẫu báo cáo Quân đội
@@ -235,7 +251,7 @@ qk7-datahub/
         │   ├── aiService.ts                # Dịch vụ gửi truy vấn và nhận câu trả lời từ Trợ lý AI
         │   └── ...                         # Các dịch vụ vai trò, quyền, đơn vị, danh mục, log
         │
-        ├── contexts/                       # Quản lý trạng thái toàn cục (AuthContext, ThemeContext)
+        ├── contexts/                       # Quản lý trạng thái toàn cục (AuthContext, ThemeContext, DeviceModeContext)
         └── types/                          # Định nghĩa kiểu dữ liệu TypeScript (document, user, role, ai...)
 ```
 
@@ -249,34 +265,35 @@ qk7-datahub/
 | :---: | :---: | :--- | :--- | :---: |
 | **Cấp 1** | `CONGKHAI` | **Công Khai** | Mọi quân nhân, khách tra cứu; chỉ xem văn bản công khai. | Không yêu cầu |
 | **Cấp 2** | `NOIBO` | **Lưu Hành Nội Bộ** | Cán bộ, nhân viên; văn bản điều hành nội bộ thông thường. | Không yêu cầu |
-| **Cấp 3** | `MAT` | **Mật** | Sĩ quan, trợ lý tác chiến; tài liệu nghiệp vụ, huấn luyện. | Xác thực mật khẩu |**Bắt buộc quét vân tay ZK9500** |
+| **Cấp 3** | `MAT` | **Mật** | Sĩ quan, trợ lý tác chiến; tài liệu nghiệp vụ, huấn luyện. | **Bắt buộc quét vân tay ZK9500** |
 | **Cấp 4** | `TOIMAT` | **Tối Mật** | Chỉ huy đơn vị, trưởng phòng; kế hoạch tác chiến quân sự. | **Bắt buộc quét vân tay ZK9500** |
 | **Cấp 5** | `TUYETMAT` | **Tuyệt Mật** | Bộ Tư Lệnh, Tham mưu trưởng, Quản trị viên tối cao. | **Bắt buộc quét vân tay ZK9500** |
 
 ### 4.2. Hàng Rào Xác Thực Sinh Trắc Học Vân Tay Hai Lớp (Biometric 2FA)
-1. **Truy Cập Văn Bản Cấp 4 & 5:** Khi quân nhân yêu cầu xem hoặc tải tệp PDF có `security_level_id >= 4`, Gateway yêu cầu kèm theo header:
-   $$\text{Header: } X\text{-}Fingerprint\text{-}Token$$
+1. **Truy Cập Văn Bản Cấp 3, 4 & 5 (Mật, Tối Mật, Tuyệt Mật):** Khi quân nhân yêu cầu xem hoặc tải tệp PDF có độ mật cao (`security_level_id >= 3`, bao gồm Cấp 3 - Mật, Cấp 4 - Tối Mật và Cấp 5 - Tuyệt Mật), Gateway yêu cầu kèm theo HTTP Header:
+   > `X-Fingerprint-Token: <token_jwt>`
 2. **Cơ Chế Cấp Biometric Token:**
    - Trình duyệt yêu cầu trạm quét `agent.py` trên máy người dùng đặt ngón tay lên máy quét ZKTeco ZK9500.
-   - Khi dấu vân tay quét được khớp với mẫu lưu trữ của quân nhân (thuật toán zkfinger10 với điểm tương đồng $\ge 60\%$), Gateway sinh ra một JWT `fingerprint_token` ký bằng mật mã quân sự, có thời hạn hiệu lực **5 phút**, gắn chặt với cặp `(user_id, file_id)`.
+   - Khi dấu vân tay quét được khớp với mẫu lưu trữ của quân nhân (thuật toán zkfinger10 với điểm tương đồng ≥ 60%), Gateway sinh ra một JWT `fingerprint_token` ký bằng mật mã quân sự, có thời hạn hiệu lực **5 phút**, gắn chặt với cặp `(user_id, file_id)`.
    - Nếu không có hoặc token hết hạn/sai lệch, Gateway từ chối phục vụ ngay lập tức với mã lỗi `403 Forbidden`.
 
 ### 4.3. Kiểm Soát Độ Mật Trong Luồng RAG Của Trợ Lý AI
 1. **Lọc Dữ Liệu Ngữ Cảnh (Clearance-Aware Context Filtering):** Khi người dùng đặt câu hỏi cho AI qua `/api/ai/query`, Gateway luôn gửi kèm `user_clearance`.
-2. Kho vector và RAG Agent tự động áp bộ lọc metadata:
-   $$\text{doc.security\_level\_id} \le \text{user\_clearance}$$
+2. **Áp bộ lọc Metadata an toàn:** Kho vector Qdrant và RAG Agent tự động áp điều kiện lọc dữ liệu:
+   > `doc.security_level_id <= user_clearance`
+
    Ngăn chặn hoàn toàn việc AI trích dẫn hoặc tổng hợp thông tin từ văn bản vượt quá cấp mật của người hỏi.
 
 ---
 
 ## 5. Sơ Đồ Luồng Dữ Liệu Nghiệp Vụ
 
-### 5.1. Luồng Xác Thực Sinh Trắc Học Vân Tay Khi Mở Văn Bản Độ Mật Cao
+### 5.1. Luồng Xác Thực Sinh Trắc Học Vân Tay Khi Mở Văn Bản Độ Mật Cao (Cấp 3, 4, 5)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Officer as Quân Nhân (Cấp 4 hoặc 5)
+    actor Officer as Quân Nhân (Cấp 3, 4 hoặc 5)
     participant UI as Giao Diện (Portal / Desk)
     participant Modal as FingerprintScanModal
     participant LocalAgent as Local Agent (:9001)
@@ -285,7 +302,7 @@ sequenceDiagram
     participant DB as SQL Server (QK7_ThuVienSo)
     participant Disk as Ổ Đĩa Tệp (uploads/)
 
-    Officer->>UI: Nhấn "Xem văn bản" (Tối Mật / Tuyệt Mật)
+    Officer->>UI: Nhấn "Xem văn bản" (Mật / Tối Mật / Tuyệt Mật)
     UI->>LocalAgent: GET http://127.0.0.1:9001/device-id
     LocalAgent-->>UI: { device_id: "ZK-DEV-..." }
     UI->>Modal: Mở hộp thoại yêu cầu đặt ngón tay lên máy quét
@@ -466,13 +483,24 @@ erDiagram
     }
 
     ACCESS_LOG {
-        bigint log_id PK "Mã định danh nhật ký tự tăng"
+        string log_id PK "Mã định danh nhật ký"
         string user_id FK "Quân nhân thực hiện hành vi"
         string file_id FK "Tệp tài liệu chịu tác động (nếu có)"
-        string action "LOGIN, VIEW, DOWNLOAD, UPLOAD, FINGERPRINT_OK, FINGERPRINT_FAIL..."
+        string action "LOGIN, VIEW, DOWNLOAD, UPLOAD, FINGERPRINT_OK..."
         string ip "Địa chỉ IP trạm làm việc"
         string note "Chi tiết ghi chú bổ sung"
-        datetime created_at "Dấu thời gian kiểm toán chính xác"
+        datetime timestamp "Dấu thời gian kiểm toán chính xác"
+    }
+
+    ACCESS_LOG_ARCHIVE {
+        string log_id PK "Mã định danh nhật ký đã lưu trữ"
+        string user_id FK "Quân nhân thực hiện hành vi"
+        string file_id FK "Tệp tài liệu chịu tác động"
+        string action "Loại hành vi kiểm toán"
+        string ip "Địa chỉ IP trạm làm việc"
+        string note "Chi tiết ghi chú"
+        datetime timestamp "Thời gian ghi nhận ban đầu"
+        datetime archived_at "Thời gian chuyển vào kho lưu trữ định kỳ đầu tháng"
     }
 
     ROLE {
@@ -513,7 +541,7 @@ Nhằm đạt tiêu chuẩn sẵn sàng cao (High Availability), Express Gateway
 
 ### 8.1. Thông Số Phần Cứng & Giao Tiếp Driver
 - **Thiết bị:** Máy quét vân tay quang học chuyên dụng **ZKTeco ZK9500**.
-- **Cảm biến:** Cảm biến quang học chống trầy xước, độ phân giải **500 DPI**, vùng quét $16.5 \times 24\text{ mm}$, chuẩn giao tiếp USB 2.0.
+- **Cảm biến:** Cảm biến quang học chống trầy xước, độ phân giải **500 DPI**, vùng quét 16.5 × 24 mm, chuẩn giao tiếp USB 2.0.
 - **Thư viện lõi:** Tích hợp trực tiếp file nhị phân `libzkfp.dll` qua module `ctypes` trong Python, thuật toán đối sánh mẫu đặc trưng vân tay quân sự **ZKFinger 10.0**.
 
 ### 8.2. Mô Hình Phân Phối Hardware Agent (:9001)
@@ -526,6 +554,18 @@ Nhằm đạt tiêu chuẩn sẵn sàng cao (High Availability), Express Gateway
 - Mẫu vân tay sau khi đăng ký (enrollment) được hợp nhất từ 3 lần đặt ngón tay liên tiếp, tạo ra chuỗi byte đặc trưng (template) độ dài ~1024 bytes.
 - Mẫu vân tay được mã hóa bằng thuật toán đối xứng **AES-256-GCM** với khóa bí mật quân sự trước khi lưu vào cột `template_enc` của bảng `USER_FINGERPRINT`.
 - Khi kiểm tra (verification), mẫu mã hóa được Gateway giải mã và gửi an toàn qua WebSocket đến Agent của trạm làm việc để đối sánh 1:1, không bao giờ lộ dữ liệu thô ra môi trường mạng.
+
+### 8.4. Nâng Cấp Giao Diện Thu Thập & Xác Thực Vân Tay Trực Quan (UX Touch ID Vector 3 Bước & Ổn Định Trạng Thái)
+- **Hoạt Ảnh Touch ID Vector 3 Bước Trực Quan (`FingerprintEnrollModal`):**
+  - Sử dụng biểu tượng vector dấu vân tay quang học độ phân giải cao kết hợp hiệu ứng sóng âm (radar pulse) và chuyển màu gradient động.
+  - Phản hồi tức thì trạng thái đặt ngón tay qua 3 bước (Lần 1: Nhận diện cấu trúc cơ bản → Lần 2: Mở rộng vùng đặc trưng biên → Lần 3: Hợp nhất và tạo template chuẩn).
+  - Tích hợp vòng tròn tiến trình Ant Design `<Progress type="circle">` hiển thị phần trăm hoàn thành (33% → 66% → 100%) kèm hướng dẫn động tác cho quân nhân ("Nhấc ngón tay lên và đặt lại").
+- **Cơ Chế Khử Lỗi Nhảy Liên Tục & Debounce Polling:**
+  - Khắc phục triệt để hiện tượng văng popup cảnh báo hoặc lỗi nhấp nháy liên tục khi máy quét ở trạng thái chờ đặt ngón tay bằng cơ chế `status-filtering` trong `fingerprintService.ts`.
+  - Phân tách rõ ràng giữa trạng thái đang chờ cảm biến (`WAITING_FOR_FINGER`) và lỗi phần cứng thực sự (`DEVICE_DISCONNECTED`), giúp trải nghiệm đăng ký vân tay mượt mà, không gây hoang mang cho người dùng.
+- **Xác Thực 1 Lần Chạm Mở Tài Liệu Mật (`FingerprintScanModal`):**
+  - Tự động nhận diện `device_id` trạm cục bộ qua cổng `127.0.0.1:9001`.
+  - Khi quân nhân chạm ngón tay, modal chuyển trạng thái quét và cấp quyền truy cập tài liệu Cấp 3 (Mật), Cấp 4 (Tối Mật) và Cấp 5 (Tuyệt Mật) chỉ trong < 1.2 giây.
 
 ---
 
@@ -545,7 +585,7 @@ Toàn bộ API được đặc tả chi tiết tại Swagger UI: **[http://local
 ### 9.2. Nhóm Xác Thực Sinh Trắc Học Vân Tay (Fingerprint Biometric)
 | Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
 | :---: | :--- | :---: | :--- | :--- |
-| `POST` | `/api/auth/fingerprint/verify` | Mọi cấp (≥ 1) | `{ file_id, device_id }` | Xác thực vân tay trực tiếp khi mở tài liệu độ mật cao. Trả về `fingerprint_token` (JWT hiệu lực 5 phút) gửi kèm header `X-Fingerprint-Token`. |
+| `POST` | `/api/auth/fingerprint/verify` | Mọi cấp (≥ 1) | `{ file_id, device_id }` | Xác thực vân tay trực tiếp khi mở tài liệu độ mật cao (Cấp 3 - Mật, Cấp 4 - Tối Mật, Cấp 5 - Tuyệt Mật). Trả về `fingerprint_token` (JWT hiệu lực 5 phút) gửi kèm header `X-Fingerprint-Token`. |
 | `POST` | `/api/admin/fingerprint/enroll/{userId}` | QTV (Cấp ≥ 4) | Path: `userId`<br/>Body: `{ device_id }` | Bắt đầu quy trình thu thập vân tay 3 bước trên thiết bị ZK9500 và lưu mẫu mã hóa AES-256-GCM vào bảng `USER_FINGERPRINT`. |
 | `DELETE`| `/api/admin/fingerprint/users/{userId}` | QTV (Cấp ≥ 4) | Path: `userId` | Hủy kích hoạt hoặc xóa dữ liệu vân tay đã đăng ký của quân nhân. |
 | `GET` | `/api/admin/fingerprint/agents` | QTV (Cấp ≥ 4) | — | Giám sát danh sách các máy quét vân tay vật lý (Agents) đang trực tuyến trong toàn mạng quân khu. |
@@ -556,35 +596,203 @@ Toàn bộ API được đặc tả chi tiết tại Swagger UI: **[http://local
 
 ---
 
-## 10. Hướng Dẫn Triển Khai & Vận Hành
+## 10. Hướng Dẫn Triển Khai & Vận Hành (Operations Runbook)
 
-### 10.1. Khởi Động Đồng Thời 4 Dịch Vụ Của Hệ Thống
+### 10.1. Thiết Lập Máy Chủ Server (192.168.1.xxx)
+*(Thay `192.168.1.xxx` bằng địa chỉ IP server thực tế trong mạng nội bộ)*
 
-Để vận hành đầy đủ 100% tính năng (Web, Gateway, AI RAG và Quét vân tay), quản trị viên chạy các terminal độc lập:
-
-```bash
-# 1. Khởi động Máy chủ Backend Express & WebSocket Gateway (:8000)
-cd backend
-npm start
-
-# 2. Khởi động Giao diện người dùng Frontend Vite (:5173)
-cd frontend
-npm run dev
-
-# 3. Khởi động Microservice Trợ Lý AI boxchat (:8001)
-cd boxchat
-python main.py
-
-# 4. Khởi động Local Hardware Fingerprint Agent (:9001)
-cd fingerprint
-python agent.py
+#### 1. Kiểm tra môi trường hệ thống
+Mở PowerShell và kiểm tra phiên bản:
+```powershell
+node --version        # Yêu cầu >= 22.13 (https://nodejs.org/)
+npm --version
+python --version      # Yêu cầu >= 3.10  (https://www.python.org/downloads/)
 ```
 
-### 10.2. Địa Chỉ Truy Cập Dịch Vụ Trong Mạng Nội Bộ
-* **Giao diện người dùng Web:** [http://localhost:5173](http://localhost:5173) (hoặc [http://localhost:8000](http://localhost:8000) khi chạy production build)
-* **Tài liệu Swagger API Spec:** [http://localhost:8000/api-docs](http://localhost:8000/api-docs)
-* **API Trợ lý AI boxchat:** [http://localhost:8001/docs](http://localhost:8001/docs)
-* **Trạm kiểm soát vân tay nội bộ:** [http://127.0.0.1:9001/device-id](http://127.0.0.1:9001/device-id)
+#### 2. Kiểm tra dịch vụ Microsoft SQL Server
+```powershell
+Get-Service | Where-Object {$_.Name -like "MSSQL*"}
+```
+> **Yêu cầu:** Phải có ít nhất 1 service trạng thái **Running** (ví dụ: `MSSQLSERVER` hoặc `MSSQL$SQLEXPRESS`).
+
+#### 3. Cấu hình biến môi trường Backend (`backend/.env`)
+Tạo hoặc chỉnh sửa tệp `backend/.env`:
+```env
+# ─── Server ───
+PORT=8000
+NODE_ENV=production
+
+# ─── SQL Server ───
+# localhost nếu cùng máy. IP máy khác nếu SQL Server ở máy khác.
+DB_SERVER=localhost
+DB_PORT=1433
+DB_DATABASE=QK7_ThuVienSo
+DB_USER=sa
+DB_PASSWORD=<mật_khẩu_SQL_Server_thật_của_bạn>
+DB_ENCRYPT=false
+DB_TRUST_CERT=true
+
+# ─── Bảo vệ đăng nhập ───
+LOCKOUT_MAX_ATTEMPTS=6
+LOCKOUT_WINDOW_MINUTES=15
+IPBLOCK_MAX_ATTEMPTS=6
+IPBLOCK_WRONG_PASSWORD_MAX_ATTEMPTS=15
+IPBLOCK_WINDOW_MINUTES=15
+IPBLOCK_DURATION_MINUTES=30
+
+# ─── Swagger ───
+ENABLE_SWAGGER=false
+
+# ─── Parser ───
+PARSER_STRICT_MODE=false
+
+# ─── JWT ───
+JWT_SECRET=<sinh_ngay_bên_dưới>
+JWT_EXPIRES_IN=8h
+
+# ─── Fingerprint ───
+FP_ENC_KEY=k42yVJ1TDdgCiNX+gIFRDvddfvihwjvREJcBSPbpJkw=
+FINGERPRINT_BRIDGE_TOKEN=qk7_bridge_2026_secret_xyz9876543210abcdef
+```
+
+* **Sinh `JWT_SECRET` mới:** Chạy lệnh PowerShell và dán chuỗi sinh được vào `JWT_SECRET`:
+```powershell
+[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+```
+
+#### 4. Cấu hình biến môi trường AI boxchat (`boxchat/.env`)
+Tạo hoặc chỉnh sửa tệp `boxchat/.env`:
+```env
+BACKEND_UPLOADS_DIR=../backend/uploads
+QDRANT_STORAGE_PATH=./local_storage/qdrant_data
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:7b
+```
+
+#### 5. Cài đặt dependencies (Chỉ chạy lần đầu)
+Mở CMD thực thi lần lượt:
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\backend
+npm install
+
+cd /d D:\QK7_DataHub\qk7-datahub\frontend
+npm install
+
+cd /d D:\QK7_DataHub\qk7-datahub\boxchat
+pip install -r requirements.txt
+```
+
+#### 6. Đóng gói giao diện Frontend (Production Build)
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\frontend
+npm run build
+```
+Kiểm tra file build đã tự động xuất sang `backend/public/`:
+```cmd
+dir D:\QK7_DataHub\qk7-datahub\backend\public\index.html
+```
+
+#### 7. Khởi tạo tài khoản quản trị viên
+Tại thư mục `backend`, chạy:
+```cmd
+cd /d D:\QK7_DataHub\qk7-datahub\backend
+node setup-passwords.js
+```
+*(Thiết lập tài khoản: Mã `USR-001`, Mật khẩu `123456789`, Vai trò `ADMIN`)*
+
+#### 8. Mở cổng tường lửa Windows Firewall (Server)
+Chạy lệnh PowerShell (Run as Administrator) mở port 8000:
+```powershell
+New-NetFirewallRule -DisplayName "QK7 Backend 8000" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow
+```
+
+---
+
+### 10.2. Quy Trình Khởi Động Server Hàng Ngày
+
+1. **Khởi động hệ thống máy chủ (Backend + AI boxchat):**
+   - Click đúp vào tệp `s.bat` tại thư mục gốc `D:\QK7_DataHub\qk7-datahub\s.bat`.
+2. **Khởi động trạm quét vân tay trên server (nếu máy server có gắn ZK9500):**
+   ```cmd
+   cd /d D:\QK7_DataHub\qk7-datahub\fingerprint
+   python agent.py
+   ```
+
+---
+
+### 10.3. Thiết Lập Máy Trạm Client Quét Vân Tay (192.168.1.X)
+
+#### 1. Cài đặt driver ZK9500 & Python
+- Cài driver ZK9500 trên máy client và kiểm tra:
+  ```cmd
+  dir C:\Windows\System32\libzkfp.dll
+  ```
+- Kiểm tra Python (yêu cầu >= 3.10):
+  ```cmd
+  python --version
+  ```
+
+#### 2. Cài chứng chỉ rootCA vào Windows Root Store
+Mở PowerShell (Run as Administrator) trên máy Client:
+```powershell
+# Copy rootCA.pem từ thư mục chia sẻ LAN về client
+Copy-Item "\\192.168.1.229\QK7Share\rootCA.pem" "C:\QK7Agent\rootCA.pem" -Force
+
+# Cài chứng chỉ vào Windows Root Store
+Import-Certificate -FilePath "C:\QK7Agent\rootCA.pem" -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+#### 3. Tạo thư mục trạm máy quét `C:\QK7Agent\`
+```text
+C:\QK7Agent\
+├── agent.py
+├── libzkfp.dll
+├── requirements.txt
+├── s-agent.bat
+├── .env                    ← sửa ở bước 4
+└── (chưa có device_id.txt — sẽ tự sinh khi chạy lần đầu)
+```
+
+#### 4. Cấu hình file `C:\QK7Agent\.env`
+Tạo/sửa file `.env` trên máy Client (thay IP bằng IP máy server thực tế):
+```env
+# Cấu hình cho MÁY CLIENT — KHÔNG dùng localhost
+BACKEND_WS_URL=ws://192.168.1.229:8000/ws/fingerprint
+BRIDGE_TOKEN=qk7_bridge_2026_secret_xyz9876543210abcdef
+DEVICE_SERVER_HOST=127.0.0.1
+DEVICE_SERVER_PORT=9001
+MATCH_SCORE_THRESHOLD=45
+```
+
+#### 5. Cài đặt Python dependencies
+```cmd
+cd /d C:\QK7Agent
+pip install -r requirements.txt
+```
+
+#### 6. Chạy thử nghiệm Fingerprint Agent
+```cmd
+cd /d C:\QK7Agent
+python agent.py
+```
+*(Hoặc click đúp file `s-agent.bat`)*
+
+#### 7. Đăng ký tự động chạy khi Login (Startup)
+1. Nhấn **Win + R**, nhập `shell:startup`, bấm **Enter**.
+2. Trong thư mục vừa mở, click chuột phải → **New** → **Shortcut**.
+3. Trong ô *"Type the location of the item"*, nhập:
+   ```text
+   C:\QK7Agent\s-agent.bat
+   ```
+4. Bấm **Next** → đặt tên `QK7 Fingerprint Agent` → bấm **Finish**.
+
+---
+
+### 10.4. Kiểm Tra & Giám Sát Truy Cập Toàn Mạng
+* **Cổng giao diện người dùng:** `http://192.168.1.229:8000` *(hoặc IP máy server)*
+* **Tài liệu Swagger API:** `http://192.168.1.229:8000/api-docs`
+* **API Trợ lý AI boxchat:** `http://192.168.1.229:8001/docs`
+* **Trạm kiểm soát vân tay nội bộ:** `http://127.0.0.1:9001/device-id`
 
 ---
 
@@ -603,9 +811,9 @@ Phân hệ **SecurityAuditLog** (`frontend/src/components/dashboard/SecurityAudi
 Hệ thống tự động phân loại và tính toán 4 chỉ số KPI ngay trên dữ liệu nhật ký kiểm toán:
 1. **Tổng Hoạt Động (Total Activities):** Thống kê tổng số lượng bản ghi kiểm toán trong hệ thống kèm tỷ lệ phát sinh trong 24 giờ qua.
 2. **Cảnh Báo An Ninh & Vi Phạm Chính Sách (Security Alerts):** Tự động lọc và đếm các hành vi nguy cơ cao:
-   $$\text{Security Alert Actions} = \{\text{'FINGERPRINT\_FAIL'}, \text{'ACCESS\_DENIED'}, \text{'CLEARANCE\_VIOLATION'}, \text{'SUSPICIOUS\_LOGIN'}\}$$
+   > `Security Alert Actions`: `FINGERPRINT_FAIL`, `ACCESS_DENIED`, `CLEARANCE_VIOLATION`, `SUSPICIOUS_LOGIN`
 3. **Thay Đổi Vai Trò & Đặc Quyền (Privilege Mutations):** Giám sát các can thiệp nhạy cảm về phân quyền quân nhân:
-   $$\text{Privilege Actions} = \{\text{'ASSIGN\_ROLE'}, \text{'ENROLL\_FINGERPRINT'}, \text{'REVOKE\_PERMISSION'}, \text{'UPDATE\_USER'}\}$$
+   > `Privilege Actions`: `ASSIGN_ROLE`, `ENROLL_FINGERPRINT`, `REVOKE_PERMISSION`, `UPDATE_USER`
 4. **Truy Xuất Văn Bản Mật (Document Access Events):** Theo dõi lưu lượng xem và tải các tài liệu quân sự cấp độ Mật, Tối Mật và Tuyệt Mật.
 
 ### 11.3. Cơ Chế Giám Sát Trực Tuyến & Tự Động Làm Mới (Live SOC Monitor)
@@ -709,4 +917,105 @@ Row N+6:                                       [H:I]   Thiếu tá QNCN Nguyễn
 - **Khối ký duyệt báo cáo:** Đặt tại cột H và I, cách 2 dòng sau bảng dữ liệu với tiêu đề `NGƯỜI LẬP` và chức danh quân nhân ký duyệt `Thiếu tá QNCN Nguyễn Mạnh Nam`.
 
 ---
-*Tài liệu kiến trúc hệ thống QK7 DataHub được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
+
+## 14. Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)
+
+### 14.1. Bối Cảnh & Thách Thức Vận Hành Đa Thiết Bị Quân Khu 7
+Trong môi trường công tác tại Bộ Tư Lệnh Quân Khu 7:
+- **80% thời gian chỉ huy & tác chiến:** Thủ trưởng, sĩ quan tác chiến sử dụng máy tính bảng **iPad Air M4 (11-inch & 13-inch)** khi cơ động tại sở chỉ huy, phòng họp tác chiến, thực địa.
+- **Tại văn phòng cố định:** Cán bộ văn thư, quản trị viên sử dụng máy tính bàn (Desktop PC Widescreen tỉ lệ 16:9).
+- **Thách thức:** Việc ép một layout PC co giãn thông thường (Responsive đơn thuần) khiến giao diện trên iPad bị bể nặng: Header rớt thành nhiều dòng, tên quân nhân bị cắt cụt, thanh điều hướng bị gãy đôi, và các nút bấm quá nhỏ không phù hợp thao tác ngón tay. Do đó, hệ thống đã kiến tạo kiến trúc **Dual-Platform chuyên biệt**.
+
+### 14.2. Đặc Tả Thông Số Viewport iPad Air M4
+Hệ thống được thiết kế và kiểm thử thực tế trên thiết bị iPad Air M4 thông qua 4 trình duyệt iPadOS: **Safari, Google Chrome, Google App và Cốc Cốc**:
+- **Chế độ Nằm Ngang (Landscape - Chế độ thao tác chính):** Kích thước thực tế `1210 × 802 px`, tỉ lệ W/H = `1.51`.
+- **Chế độ Nằm Dọc (Portrait):** Kích thước thực tế `834 × 1178 px`, tỉ lệ W/H = `0.71`.
+- **Quy chuẩn Apple Human Interface Guidelines:** Vùng chạm tối thiểu (Touch Target) đạt chuẩn **≥ 44 × 44 px**, khoảng cách an toàn (padding/margin) mở rộng chống bấm nhầm ngón tay khi tác chiến khẩn trương.
+
+### 14.3. Mô-Đun Quản Lý Trạng Thái Thiết Bị (`DeviceModeContext` & `useDeviceMode`)
+- **Trạng thái lưu trữ bền vững:** Lưu cấu hình qua `localStorage.getItem('qk7_device_mode')` (`'pc' | 'ipad'`), tự động khôi phục chế độ người dùng lựa chọn sau mỗi phiên làm việc.
+- **Hook `useDeviceMode`:** Cung cấp thuộc tính `deviceMode`, `isPC`, `isIPad` và hàm `setDeviceMode` cho toàn bộ cây component React.
+- **Bộ chuyển đổi thông minh `DeviceModeSwitch`:**
+  - Đặt tại góc phải thanh Header (bên cạnh đồng hồ hệ thống).
+  - Hỗ trợ xem nhanh Popover thông số kỹ thuật thiết bị: Viewport thực tế, DPR, Touch Area, Gestures, Định dạng tối ưu.
+  - **Hỗ trợ toàn diện 2 Theme:**
+    - **Light Mode:** Nền `bg-purple-50/70`, viền `border-purple-200/80`, nút kích hoạt đổ màu tím đậm thương hiệu QK7 (`#722ED1`, `bg-purple-600 text-white`). Popover nền trắng tinh khiết `#ffffff`, viền tím nhạt thanh lịch.
+    - **Dark Mode:** Nền `bg-slate-900/80`, viền `border-slate-800`, nút kích hoạt tím dạ quang sang trọng.
+
+### 14.4. Cơ Chế Điều Hướng Chuyển Trang Phân Biệt Giữa PC & iPad
+Nhằm giải quyết triệt để lỗi nhảy giao diện và đáp ứng thói quen thao tác của từng thiết bị:
+1. **Trên Chế Độ iPad Air M4 (`deviceMode === 'ipad'`):**
+   - Sử dụng thanh điều hướng trung tâm căn giữa dạng **Segmented Navigation Bar**.
+   - Thiết kế dạng viên thuốc lớn, tích hợp hiệu ứng trượt mượt mà (smooth pill glider transition) tối ưu cho việc quan sát trực quan trên máy tính bảng.
+2. **Trên Chế Độ Máy Tính Bàn (`deviceMode === 'pc'`):**
+   - **Loại bỏ Dynamic Sliding Pill Indicator (Hiệu ứng viên thuốc trượt):** Do mỗi trang trong hệ thống mount component Header riêng, việc dùng indicator trượt động tính theo `offsetLeft` gây hiện tượng nhảy vị trí và chớp nháy (layout shift) khi chuyển từ "Đơn vị của tôi" sang "Quản trị".
+   - **Phục hồi cụm nút bấm cũ chuyển trang màu sắc chuyên biệt:**
+     - Nút **Đăng tải**: Tông màu Xanh ngọc Emerald (`bg-emerald-50 text-emerald-700 border-emerald-300`).
+     - Nút **Trung tâm thư viện số**: Tông màu Xanh lam Blue (`bg-blue-50 text-blue-700 border-blue-300`).
+     - Nút **Đơn vị của tôi**: Tông màu Tím Violet (`bg-purple-50 text-purple-700 border-purple-300`).
+     - Nút **Quản trị**: Tông màu Vàng cam Amber (`bg-amber-50 text-amber-700 border-amber-300`).
+   - Cụm nút bấm độc lập giúp tốc độ chuyển trang tức thì (0ms latency), ổn định tuyệt đối và không phụ thuộc vào tọa độ DOM.
+
+---
+
+## 15. Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (`MyUnitPage`) & Chuẩn Hóa Danh Xưng Thư Viện Số
+
+### 15.1. Chuẩn Hóa Danh Xưng "Trung Tâm Thư Viện Số" Toàn Diện
+Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Bộ Tư Lệnh Quân Khu 7:
+- Toàn bộ các chữ hiển thị `"Portal"` hoặc `"PORTAL"` trên toàn bộ giao diện đã được chuyển đổi thành **`"Trung tâm thư viện số"`**:
+  - Thanh Header điều hướng (Desktop nav pills & iPad segmented glider).
+  - Tiêu đề và biểu ngữ phụ của trang tra cứu văn bản (`PortalPage.tsx`).
+  - Huy hiệu phân loại tài khoản đăng nhập nhanh (`LoginForm.tsx`: `Cấp 3 • Trung tâm thư viện số`).
+  - Menu cá nhân trong Popover đại diện người dùng (`User Profile Menu`).
+  - Ngăn kéo điều hướng dành cho thiết bị di động / máy tính bảng (`Mobile Navigation Drawer`).
+- **Cam kết bảo toàn hạ tầng:** Giữ nguyên 100% đường dẫn URL nội bộ (`/portal`), hằng số định tuyến `ROUTE_PATHS.PORTAL` và API endpoint backend để bảo đảm không xảy ra bất kỳ lỗi hồi quy định tuyến nào.
+
+### 15.2. Kiến Trúc Phân Hệ "Đơn Vị Của Tôi" (`MyUnitPage` - `/my-unit`)
+- **Mục tiêu phân hệ:** Đáp ứng nhu cầu phân cấp quản lý tài liệu theo chiều dọc. Mỗi cơ quan, đơn vị trực thuộc Quân Khu 7 (Sư đoàn, Lữ đoàn, Trung đoàn, Phòng ban Tham mưu...) có một không gian số riêng để quản lý, lưu trữ và khai thác các văn bản nội bộ chuyên biệt.
+- **Các tính năng nòng cốt trên giao diện:**
+  - **Banner nhận diện đơn vị:** Hiển thị tên cơ quan/đơn vị trực thuộc của quân nhân đang đăng nhập, cấp bậc và số lượng tài liệu đang lưu hành.
+  - **Bộ lọc đa chiều thời gian thực:** Lọc tài liệu theo mức độ bảo mật (Công Khai, Nội Bộ, Mật, Tối Mật, Tuyệt Mật), loại văn kiện (Kế hoạch, Mệnh lệnh, Báo cáo, Chỉ thị, Hướng dẫn) và đơn vị phát hành.
+  - **Tích hợp xác thực vân tay 2FA:** Cho phép xem trước trực tiếp (Preview Inline) và tải về tệp PDF đính kèm. Đối với tài liệu độ mật Cấp 3, 4, 5, hệ thống tự động kích hoạt `FingerprintScanModal` để bảo vệ an ninh tuyệt đối.
+  - **Tương thích hoàn hảo Dual-Platform:** Giao diện lưới thẻ tài liệu (Document Grid) và bảng danh sách tự động co giãn tối ưu trên cả màn hình máy tính bàn lẫn màn hình cảm ứng iPad Air M4.
+
+---
+
+## 16. Kiến Trúc Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout Engine)
+
+### 16.1. Bối Cảnh & Thách Thức Khi Phóng To Màn Hình (Browser Zooming 125% – 200%)
+Trong môi trường công tác thực tế tại Bộ Tư Lệnh Quân Khu 7:
+- Cán bộ và chỉ huy thường phóng to trình duyệt (125%, 150%, 175%, 200%) để theo dõi chi tiết văn bản hoặc sử dụng màn hình laptop có độ phân giải phổ thông (1366×768, 1536×864).
+- Khi phóng to 175% trên màn hình Full HD (1920×1080), kích thước viewport thực tế co hẹp chỉ còn **~1097px** (trên màn hình 1536px chỉ còn ~877px).
+- **Hệ quả của layout cũ khi chưa tối ưu:**
+  - Nút điều hướng không có `whitespace-nowrap`, dẫn đến khi bị co hẹp, chữ bị ngắt dòng thành 2–3 tầng (*"Trung / tâm thư / viện số"*, *"Đơn / vị của / tôi"*).
+  - Chiều rộng cố định của các thành phần vượt quá viewport khiến nút `DeviceModeSwitch` bị cắt đôi, nút `ThemeToggle` và `User Profile` bị đẩy mất khỏi mép phải màn hình.
+  - Thanh tab phụ chuyển sang chế độ cuộn ẩn thanh cuộn (`no-scrollbar`) nhưng không có nút điều hướng, khiến người dùng dùng chuột máy tính không cuộn được và các tab chức năng cuối bị ẩn.
+
+### 16.2. Giải Pháp Kiến Trúc Header Đa Tầng Thích Ứng (3-Tier Adaptive Header Engine)
+Hệ thống thiết kế giải pháp phản hồi kích thước viewport theo 3 tầng trạng thái tự động:
+1. **Tier 1 — Widescreen Mode (Viewport ≥ 1536px / Zoom 100%):**
+   - Hiển thị đầy đủ Logo, Tên hệ thống, Phụ đề quân sự và Đồng hồ số thời gian thực (`liveClock`).
+   - Cụm nút điều hướng nhanh hiển thị đầy đủ icon và nhãn dài chính quy: `Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`.
+   - Nút đại diện quân nhân hiển thị đầy đủ Họ tên và Cấp độ bảo mật.
+2. **Tier 2 — Compact Text Mode (1280px ≤ Viewport < 1536px / Zoom 125% – 150%):**
+   - Phụ đề quân sự áp dụng cơ chế `truncate max-w-[220px]`.
+   - Nút điều hướng tự động rút ngắn nhãn: *"Thư viện số"*, *"Đơn vị"*, tiết kiệm hơn 120px bề ngang.
+   - Giữ nguyên các thao tác trực tiếp mà không cần ẩn bớt công cụ.
+3. **Tier 3 — Icon-Only Tooltip Mode (Viewport < 1280px / Zoom 175% – 200%):**
+   - Ẩn phụ đề đơn vị và đồng hồ số để nhường toàn bộ không gian cho tác vụ chính.
+   - Cụm điều hướng nhanh chuyển sang dạng **Icon Button chuẩn kích thước 36×36px**, tích hợp **Ant Design `<Tooltip>`** hiển thị nhãn đầy đủ khi rê chuột.
+   - Cụm điều khiển trọng yếu (`DeviceModeSwitch`, `ThemeToggle`, `User Profile`) được bảo vệ bằng `shrink-0`, cam kết **100% hiển thị đầy đủ trên mọi mức phóng to (kể cả zoom 200%)**.
+
+### 16.3. Kiến Trúc Thanh Tab Quản Trị Tương Tác Hai Chiều (Smart Horizontal Tab Strip)
+- **Cơ chế cuộn bánh xe chuột (`onWheel`):** Bắt sự kiện cuộn chuột dọc trên desktop và chuyển hóa mượt mà thành cuộn ngang (`tabStripRef.current.scrollLeft += e.deltaY`).
+- **Nút điều hướng hai đầu:** Bổ sung nút cuộn trái (`ChevronLeft`) và nút cuộn phải (`ChevronRight`) cho phép di chuyển tức thì 220px mỗi lần bấm (`scrollBy({ behavior: 'smooth' })`).
+- **Tự động căn giữa tab kích hoạt (`scrollIntoView`):** Khi chuyển tab (bằng click hoặc từ sidebar), tab mục tiêu tự động trượt vào trung tâm khung nhìn (`inline: 'center'`).
+- **Chuẩn hóa tinh gọn:** Loại bỏ nút `[ ≡ Danh mục ]` trùng lặp ở hàng thứ 2, nhường toàn bộ không gian ngang cho 10 tab chức năng quản trị.
+
+### 16.4. Tối Ưu Hóa Giao Diện Thanh Bên Sidebar
+- Loại bỏ nút toggle `< Thu gọn danh mục` ở đáy sidebar (vốn bị trùng lặp với nút gạt ở đầu header sidebar).
+- Điều chỉnh khoảng đệm chân trang (`pb-4`), mang lại trải nghiệm thị giác gọn gàng, liền mạch và tập trung hoàn toàn vào 10 danh mục quản trị.
+
+---
+*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
+

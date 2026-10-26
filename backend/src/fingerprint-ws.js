@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 
 const agentConnections = new Map();
 const pendingJobs = new Map();
+const deviceEnrollProgress = new Map();
 
 function setupFingerprintWS(httpServer, { BRIDGE_TOKEN }) {
   const wss = new WebSocket.Server({ server: httpServer, path: '/ws/fingerprint' });
@@ -38,11 +39,30 @@ function setupFingerprintWS(httpServer, { BRIDGE_TOKEN }) {
           if (pending && pending.deviceId === deviceId) {
             clearTimeout(pending.timeout);
             pendingJobs.delete(msg.job_id);
+
+            if (msg.type === 'enroll_result') {
+              deviceEnrollProgress.set(deviceId, {
+                enrolling: false,
+                step: msg.success ? 3 : (deviceEnrollProgress.get(deviceId)?.step || 0),
+                total: 3,
+                state: msg.success ? 'completed' : (msg.error || 'error'),
+                updatedAt: Date.now(),
+              });
+            }
+
             pending.resolve(msg);
           }
         } else if (msg.type === 'enroll_progress') {
           const pending = pendingJobs.get(msg.job_id);
           if (pending) pending.latestStep = msg.step;
+
+          deviceEnrollProgress.set(deviceId, {
+            enrolling: true,
+            step: Number(msg.step) || 0,
+            total: Number(msg.total) || 3,
+            state: Number(msg.step) >= 3 ? 'merging' : `captured_${msg.step}`,
+            updatedAt: Date.now(),
+          });
         }
       } catch (err) {
         console.error('[WS] msg parse:', err.message);
@@ -55,6 +75,13 @@ function setupFingerprintWS(httpServer, { BRIDGE_TOKEN }) {
         agentConnections.delete(deviceId);
         console.log(`[WS] Agent offline: ${deviceId} (remaining: ${agentConnections.size})`);
       }
+      deviceEnrollProgress.set(deviceId, {
+        enrolling: false,
+        step: 0,
+        total: 3,
+        state: 'offline',
+        updatedAt: Date.now(),
+      });
       for (const [jobId, pending] of pendingJobs.entries()) {
         if (pending.deviceId === deviceId) {
           clearTimeout(pending.timeout);
@@ -119,10 +146,27 @@ function requestEnroll(deviceId, { user_id, timeout_seconds = 60 }, timeoutMs = 
     const jobId = 'ENR-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
     const timeout = setTimeout(() => {
       pendingJobs.delete(jobId);
+      deviceEnrollProgress.set(deviceId, {
+        enrolling: false,
+        step: 0,
+        total: 3,
+        state: 'timeout',
+        updatedAt: Date.now(),
+      });
       reject(new Error('ENROLL_TIMEOUT'));
     }, timeoutMs);
 
-    pendingJobs.set(jobId, { resolve, reject, timeout, deviceId });
+    pendingJobs.set(jobId, { resolve, reject, timeout, deviceId, user_id });
+
+    // Đánh dấu bắt đầu tiến trình enroll cho deviceId
+    deviceEnrollProgress.set(deviceId, {
+      enrolling: true,
+      step: 0,
+      total: 3,
+      state: 'waiting_touch_1',
+      jobId,
+      updatedAt: Date.now(),
+    });
 
     try {
       conn.ws.send(JSON.stringify({
@@ -134,9 +178,32 @@ function requestEnroll(deviceId, { user_id, timeout_seconds = 60 }, timeoutMs = 
     } catch (err) {
       pendingJobs.delete(jobId);
       clearTimeout(timeout);
+      deviceEnrollProgress.set(deviceId, {
+        enrolling: false,
+        step: 0,
+        total: 3,
+        state: 'error',
+        updatedAt: Date.now(),
+      });
       reject(err);
     }
   });
+}
+
+function getEnrollProgress(deviceId) {
+  if (deviceId && deviceEnrollProgress.has(deviceId)) {
+    const p = deviceEnrollProgress.get(deviceId);
+    if (Date.now() - p.updatedAt <= 120000) {
+      return { enrolling: p.enrolling, step: p.step, total: p.total, state: p.state };
+    }
+  }
+  // Nếu deviceId không truyền hoặc không khớp, tìm bất kỳ agent nào đang active enroll
+  for (const [, p] of deviceEnrollProgress.entries()) {
+    if (p.enrolling && Date.now() - p.updatedAt <= 120000) {
+      return { enrolling: p.enrolling, step: p.step, total: p.total, state: p.state };
+    }
+  }
+  return { enrolling: false, step: 0, total: 3, state: 'idle' };
 }
 
 function isAgentOnline(deviceId) {
@@ -155,6 +222,7 @@ module.exports = {
   setupFingerprintWS,
   requestScan,
   requestEnroll,
+  getEnrollProgress,
   isAgentOnline,
   listAgents,
 };

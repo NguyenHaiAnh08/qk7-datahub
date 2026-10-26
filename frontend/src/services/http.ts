@@ -1,8 +1,14 @@
 /**
- * HTTP Client Wrapper dùng chung cho toàn bộ frontend
- * Đảm bảo 100% header xác thực theo chuẩn server.js:
- *   - X-User-Id
- *   - X-Clearance
+ * HTTP Client Wrapper dùng chung cho toàn bộ frontend.
+ *
+ * Cơ chế xác thực:
+ *   - FE gửi duy nhất: `Authorization: Bearer <JWT>` (qua getAuthHeaders())
+ *   - Backend Express (:8000) verify JWT và tự inject X-User-Id / X-Clearance
+ *     khi proxy sang AI microservice (:8001) — FE KHÔNG được tự set các header này
+ *     để tránh giả mạo quyền hạn.
+ *
+ * Response lỗi (401, 403, 5xx) sẽ phát sự kiện `qk7:http-error` để
+ * HttpErrorListener (mounted toàn cục) hiển thị notification + điều hướng.
  */
 
 export interface HttpOptions extends RequestInit {
@@ -35,12 +41,11 @@ export class HttpError extends Error {
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  const userId = sessionStorage.getItem('qk7_username') || 'GUEST';
-  const clearance = sessionStorage.getItem('qk7_level') || '1';
-  return {
-    'X-User-Id': userId,
-    'X-Clearance': String(clearance),
-  };
+  const token = sessionStorage.getItem('qk7_token');
+  if (token) {
+    return { 'Authorization': `Bearer ${token}` };
+  }
+  return {};
 }
 
 export async function http<T>(url: string, options: HttpOptions = {}): Promise<T> {
@@ -98,15 +103,24 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
 
     return data as T;
   } catch (err: any) {
-    // Nếu là lỗi mạng không phản hồi (fetch failed/offline)
+    // Nếu là lỗi mạng không phản hồi (fetch failed/offline/Safari Load failed)
     if (!(err instanceof HttpError)) {
-      const netError = new HttpError(503, err.message || 'Mất kết nối tới máy chủ', null, url);
+      const isLoadFailed =
+        err?.name === 'TypeError' ||
+        err?.message === 'Load failed' ||
+        (err?.message && (err.message.includes('fetch') || err.message.includes('Load failed')));
+
+      const friendlyMsg = isLoadFailed
+        ? 'Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend đang chạy!'
+        : (err.message || 'Mất kết nối tới máy chủ');
+
+      const netError = new HttpError(503, friendlyMsg, null, url);
       if (typeof window !== 'undefined' && !options.skipErrorNotification) {
         window.dispatchEvent(
           new CustomEvent<HttpErrorDetail>('qk7:http-error', {
             detail: {
               status: 503,
-              message: 'Không thể kết nối đến máy chủ Backend (Port 8000)',
+              message: friendlyMsg,
               url,
               autoRedirect: options.autoRedirectOnError ?? false,
             },

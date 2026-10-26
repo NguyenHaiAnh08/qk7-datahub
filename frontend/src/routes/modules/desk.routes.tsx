@@ -12,7 +12,9 @@ const deskRoutes: RouteModuleExport = {
     {
       path: ROUTE_PATHS.DESK,
       element: (
-        <ProtectedRoute staffOnly>
+        <ProtectedRoute
+          requiredAnyOf={['DOC_UPLOAD', 'DOC_EDIT', 'DOC_DELETE', 'DOC_PARSE']}
+        >
           <DocumentDeskPage />
         </ProtectedRoute>
       ),

@@ -81,7 +81,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [theme, applyThemeToDOM]);
 
-  // Toggle with animated transitions
+  // <!-- Lucian UX/UI Prompt #219 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#219 -->
+  // Toggle with Circular-reveal animated transition
   const toggleTheme = useCallback(
     (event?: React.MouseEvent) => {
       const nextTheme: Theme = theme === 'dark' ? 'light' : 'dark';
@@ -94,12 +95,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       if (hasViewTransitions) {
-        const x = event?.clientX ?? window.innerWidth - 80;
-        const y = event?.clientY ?? 40;
-        const endRadius = Math.hypot(
-          Math.max(x, window.innerWidth - x),
-          Math.max(y, window.innerHeight - y)
-        );
+        const root = document.documentElement;
+        // Tọa độ tâm vòng tròn (--cx, --cy) tính toán chính xác từ getBoundingClientRect() của nút bấm
+        const cxVar = root.style.getPropertyValue('--cx');
+        const cyVar = root.style.getPropertyValue('--cy');
+        const x = cxVar ? parseFloat(cxVar) : (event?.clientX ?? window.innerWidth - 60);
+        const y = cyVar ? parseFloat(cyVar) : (event?.clientY ?? 32);
 
         try {
           const transition = (document as any).startViewTransition(() => {
@@ -109,21 +110,18 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (transition && transition.ready) {
             transition.ready
               .then(() => {
-                const clipPath = [
-                  `circle(0px at ${x}px ${y}px)`,
-                  `circle(${endRadius}px at ${x}px ${y}px)`
-                ];
+                // Hiệu ứng lan tỏa hình tròn (clip-path: circle) từ 0px ra 150vmax phủ kín toàn màn hình
                 document.documentElement.animate(
                   {
-                    clipPath: nextTheme === 'dark' ? clipPath : [...clipPath].reverse()
+                    clipPath: [
+                      `circle(0px at ${x}px ${y}px)`,
+                      `circle(150vmax at ${x}px ${y}px)`
+                    ]
                   },
                   {
-                    duration: 380,
-                    easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-                    pseudoElement:
-                      nextTheme === 'dark'
-                        ? '::view-transition-new(root)'
-                        : '::view-transition-old(root)'
+                    duration: 700,
+                    easing: 'cubic-bezier(.65, 0, .35, 1)',
+                    pseudoElement: '::view-transition-new(root)'
                   }
                 );
               })

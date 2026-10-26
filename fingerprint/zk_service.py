@@ -46,6 +46,8 @@ class ZK9500Service:
         self._lock = threading.RLock()
         self._scan_lock = threading.Lock()
 
+    # ─────────────────────────── SDK lifecycle ───────────────────────────
+
     def load_sdk(self) -> Tuple[bool, str]:
         if not _PYZKFP_OK:
             return False, f"pyzkfp không import được: {_IMPORT_ERR}"
@@ -67,8 +69,19 @@ class ZK9500Service:
             return False, f"Init SDK lỗi: {e}"
 
     def open_device(self) -> Tuple[bool, str]:
+        """Mở thiết bị (Lazy Open). Nếu lần đóng trước đã Terminate → Init lại."""
+        # ★ Lazy Init: sau full reset, cần Init lại SDK trước khi OpenDevice
+        if self.zk and not self.sdk_loaded:
+            try:
+                self.zk.Init()
+                self.sdk_loaded = True
+                print("[ZK] ✅ Lazy Init OK")
+            except Exception as e:
+                return False, f"Lazy Init lỗi: {e}"
+
         if not self.sdk_loaded:
             return False, "SDK chưa load"
+
         try:
             n = self.zk.GetDeviceCount()
             if n <= 0:
@@ -85,21 +98,50 @@ class ZK9500Service:
             self.device_connected = False
             return False, f"OpenDevice lỗi: {e}"
 
-    def close(self):
+    def close_device(self, full_reset: Optional[bool] = None):
+        """
+        Đóng thiết bị vật lý (tắt LED/sensor).
+        Mặc định full_reset=True → gọi Terminate() để giải phóng USB handle
+        (đảm bảo LED tắt hẳn). Có thể tắt bằng env DEVICE_FULL_RESET_ON_CLOSE=false.
+        """
         with self._lock:
+            # 1) CloseDevice — KHÔNG nuốt lỗi im lặng nữa
             if self.device_connected and self.zk:
                 try:
                     self.zk.CloseDevice()
-                except Exception:
-                    pass
+                    print("[ZK] ✅ CloseDevice")
+                except Exception as e:
+                    print(f"[ZK] ⚠️ CloseDevice lỗi: {e}")
+            self.device_connected = False
+
+            # 2) Full reset để nhả USB handle
+            if full_reset is None:
+                full_reset = os.getenv(
+                    "DEVICE_FULL_RESET_ON_CLOSE", "true"
+                ).lower() in ("1", "true", "yes")
+
+            if full_reset and self.zk and self.sdk_loaded:
+                try:
+                    self.zk.Terminate()
+                    print("[ZK] ✅ Terminate (giải phóng USB)")
+                except Exception as e:
+                    print(f"[ZK] ⚠️ Terminate lỗi: {e}")
+                # Đánh dấu cần Init lại — open_device() sẽ Init lazily
+                self.sdk_loaded = False
+
+    def close(self):
+        """Đóng hoàn toàn (dùng khi tắt Agent)."""
+        self.close_device()
+        with self._lock:
             if self.sdk_loaded and self.zk:
                 try:
                     self.zk.Terminate()
                 except Exception:
                     pass
-            self.device_connected = False
             self.sdk_loaded = False
             self.zk = None
+
+    # ─────────────────────────── Template store ───────────────────────────
 
     @staticmethod
     def _hash_user_id(user_id: str) -> int:
@@ -168,6 +210,8 @@ class ZK9500Service:
             self._sid_to_template.pop(sid, None)
         return True
 
+    # ─────────────────────────── Scan / Compare ───────────────────────────
+
     def _capture_once(self) -> Optional[bytes]:
         if not self.device_connected or not self.zk:
             return None
@@ -192,9 +236,9 @@ class ZK9500Service:
                     return None
                 t = self._capture_once()
                 if t is not None:
-                    time.sleep(0.05)
+                    time.sleep(0.01)  # wait for LED off
                     return t
-                time.sleep(0.06)
+                time.sleep(0.02)
             return None
         finally:
             self._scan_lock.release()

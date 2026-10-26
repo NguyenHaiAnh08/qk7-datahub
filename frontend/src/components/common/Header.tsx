@@ -15,10 +15,12 @@ import {
   Trash2,      // ⭐ MỚI
   Activity,    // ⭐ MỚI
   Shield,
+  Bot,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
+import { useAIChat } from '../../contexts/AIChatContext';
 import { ThemeToggle } from './ThemeToggle';
 import { DeviceModeSwitch } from './DeviceModeSwitch';
 import { ROUTE_PATHS } from '../../routes/routePaths';
@@ -53,8 +55,17 @@ const NavigationGlider: React.FC<{
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
 }> = ({ activeNav: explicitActiveNav }) => {
   const { user, isAdmin, isStaff, hasPermission } = useAuth();
-  const { deviceMode } = useDeviceMode();
+  const { deviceMode, isTouch } = useDeviceMode();
   const location = useLocation();
+
+  // Nhận diện thiết bị cảm ứng hoặc chế độ iPadOS để vô hiệu hóa Tooltip (tránh lỗi Safari iPad phải chạm 2 lần)
+  const isTouchOrIPad =
+    deviceMode === 'ipad' ||
+    isTouch ||
+    (typeof navigator !== 'undefined' &&
+      (navigator.maxTouchPoints > 0 ||
+        (/iPad|iPhone|iPod|Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1))) ||
+    (typeof window !== 'undefined' && 'ontouchstart' in window);
 
   // Tự động nhận diện tab đang mở nếu activeNav không được truyền từ page
   const getEffectiveActiveNav = () => {
@@ -192,7 +203,7 @@ const NavigationGlider: React.FC<{
     <nav
       ref={containerRef as any}
       aria-label="Điều hướng hệ thống"
-      className={`u058-nav relative flex items-center gap-1.5 sm:gap-2 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-2xl rounded-full px-2 sm:px-2.5 py-1.5 select-none w-fit max-w-full ${
+      className={`u058-nav relative flex items-center gap-1.5 sm:gap-2 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-2xl rounded-full px-2 sm:px-2.5 py-1.5 select-none w-fit max-w-full touch-manipulation ${
         isInitialMount.current ? 'no-transition' : ''
       }`}
       style={{
@@ -207,70 +218,87 @@ const NavigationGlider: React.FC<{
       {visibleTabs.map((tab, index) => {
         const isActive = activeNav === tab.key;
         const IconComponent = tab.icon;
+
+        const tabLink = (
+          <Link
+            id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
+            ref={(el) => {
+              tabRefs.current[tab.key] = el;
+            }}
+            to={tab.to}
+            onClick={(e) => {
+              if (isActive) {
+                e.preventDefault();
+                return;
+              }
+              const container = containerRef.current;
+              if (container) {
+                const labelEl = labelRefs.current[tab.key];
+                const textW = labelEl ? labelEl.scrollWidth : 60;
+                // targetW = icon (20) + gap (8) + textW + horizontal padding (32)
+                const targetW = Math.round(20 + 8 + textW + 32);
+                // targetX ước tính = container padding left (8px-10px) + index * (collapsed width 40px + gap 8px)
+                const targetX = Math.round(10 + index * (40 + 8));
+
+                if (targetW > 0) {
+                  lastKnownPillCoords = { left: targetX, width: targetW };
+                  container.style.setProperty('--x', `${targetX}px`);
+                  container.style.setProperty('--w', `${targetW}px`);
+                  container.style.setProperty('--pill-opacity', '1');
+                  setIndicatorStyle({ left: targetX, width: targetW });
+                }
+              }
+            }}
+            aria-current={isActive ? 'page' : undefined}
+            aria-label={tab.label}
+            data-active={isActive ? 'true' : 'false'}
+            className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 select-none h-10 touch-manipulation cursor-pointer ${
+              isActive
+                ? 'is-active !text-white font-bold px-4 py-2 shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0'
+            }`}
+            style={isActive ? { color: '#ffffff' } : undefined}
+          >
+            <IconComponent
+              className={`w-5 h-5 shrink-0 transition-transform duration-300 ${
+                isActive ? 'scale-105 !text-white stroke-white' : tab.inactiveColor
+              }`}
+              style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
+            />
+            <span
+              ref={(el) => {
+                labelRefs.current[tab.key] = el;
+              }}
+              className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-400 ease-[cubic-bezier(.34,1.45,.64,1)] ${
+                isActive
+                  ? 'max-w-[280px] opacity-100 ml-2 font-bold !text-white'
+                  : 'max-w-0 opacity-0 ml-0 pointer-events-none'
+              }`}
+              style={isActive ? { color: '#ffffff' } : undefined}
+            >
+              {tab.label}
+            </span>
+          </Link>
+        );
+
+        // Trên iPad hoặc thiết bị cảm ứng, không bọc Tooltip vì iOS Safari sẽ ưu tiên hiển thị hover tooltip ở lần chạm 1 và phải bấm lần 2 mới kích hoạt điều hướng
+        if (isTouchOrIPad || isActive) {
+          return (
+            <React.Fragment key={tab.key}>
+              {tabLink}
+            </React.Fragment>
+          );
+        }
+
         return (
           <Tooltip
             key={tab.key}
-            title={!isActive ? tab.label : ''}
+            title={tab.label}
             placement="bottom"
             mouseEnterDelay={0.25}
             arrow={{ pointAtCenter: true }}
           >
-            <Link
-              id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
-              ref={(el) => {
-                tabRefs.current[tab.key] = el;
-              }}
-              to={tab.to}
-              onClick={() => {
-                if (isActive) return;
-                const container = containerRef.current;
-                if (container) {
-                  const labelEl = labelRefs.current[tab.key];
-                  const textW = labelEl ? labelEl.scrollWidth : 60;
-                  // targetW = icon (20) + gap (8) + textW + horizontal padding (32)
-                  const targetW = Math.round(20 + 8 + textW + 32);
-                  // targetX ước tính = container padding left (8px-10px) + index * (collapsed width 40px + gap 8px)
-                  const targetX = Math.round(10 + index * (40 + 8));
-
-                  if (targetW > 0) {
-                    lastKnownPillCoords = { left: targetX, width: targetW };
-                    container.style.setProperty('--x', `${targetX}px`);
-                    container.style.setProperty('--w', `${targetW}px`);
-                    container.style.setProperty('--pill-opacity', '1');
-                    setIndicatorStyle({ left: targetX, width: targetW });
-                  }
-                }
-              }}
-              aria-current={isActive ? 'page' : undefined}
-              aria-label={tab.label}
-              data-active={isActive ? 'true' : 'false'}
-              className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 select-none h-10 ${
-                isActive
-                  ? 'is-active !text-white font-bold px-4 py-2 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0'
-              }`}
-              style={isActive ? { color: '#ffffff' } : undefined}
-            >
-              <IconComponent
-                className={`w-5 h-5 shrink-0 transition-transform duration-300 ${
-                  isActive ? 'scale-105 !text-white stroke-white' : tab.inactiveColor
-                }`}
-                style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
-              />
-              <span
-                ref={(el) => {
-                  labelRefs.current[tab.key] = el;
-                }}
-                className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-400 ease-[cubic-bezier(.34,1.45,.64,1)] ${
-                  isActive
-                    ? 'max-w-[280px] opacity-100 ml-2 font-bold !text-white'
-                    : 'max-w-0 opacity-0 ml-0 pointer-events-none'
-                }`}
-                style={isActive ? { color: '#ffffff' } : undefined}
-              >
-                {tab.label}
-              </span>
-            </Link>
+            {tabLink}
           </Tooltip>
         );
       })}
@@ -292,6 +320,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [liveClock, setLiveClock] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
+  const { isChatOpen, toggleChat, aiStatus } = useAIChat();
 
   useEffect(() => {
     if (!showClock) return;
@@ -503,7 +532,7 @@ export const Header: React.FC<HeaderProps> = ({
   // ══════════════════════════════════════════════════════════════════════
   if (deviceMode === 'ipad') {
     return (
-      <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-xs transition-colors duration-200 select-none">
+      <header className="sticky top-0 z-30 shrink-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 min-h-[3.75rem] sm:min-h-[4rem] h-[calc(3.75rem+env(safe-area-inset-top,0px))] sm:h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-xs transition-colors duration-200 select-none">
         {/* Cụm Trái (shrink-0 z-20 flex items-center gap-2): Logo + Tên trường */}
         <div className="shrink-0 z-20 flex items-center gap-2 sm:gap-2.5">
           {onToggleMobileMenu && isIPadPortrait && (
@@ -561,6 +590,33 @@ export const Header: React.FC<HeaderProps> = ({
           <DeviceModeSwitch compact />
           <ThemeToggle size="sm" />
 
+          {/* Nút Mở Trợ Lý AI (AI Chat Drawer Trigger) - iPad */}
+          <button
+            type="button"
+            onClick={() => toggleChat()}
+            className={`relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 cursor-pointer border select-none ${
+              isChatOpen
+                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 shadow-sm ring-2 ring-emerald-500/20'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-500/40'
+            }`}
+            title="Trợ lý AI - Dữ liệu Số Quân Khu 7"
+            aria-label="Mở Trợ lý AI Dữ liệu Số Quân Khu 7"
+          >
+            <Bot className="w-4 h-4 text-emerald-600 dark:text-emerald-400 transition-transform duration-200 hover:scale-110" />
+            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  aiStatus === 'online' ? 'bg-emerald-400' : 'bg-amber-400'
+                }`}
+              />
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  aiStatus === 'online' ? 'bg-emerald-500' : 'bg-amber-500'
+                }`}
+              />
+            </span>
+          </button>
+
           {/* User Profile Pill - Hiển thị đầy đủ họ tên quân nhân */}
           <Popover
             content={userPopoverContent}
@@ -610,7 +666,7 @@ export const Header: React.FC<HeaderProps> = ({
   // BRANCH 2: GIAO DIỆN MÁY TÍNH TIÊU CHUẨN (deviceMode === 'pc')
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
+    <header className="sticky top-0 z-30 shrink-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 min-h-[4rem] h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
       {/* Vùng Trái: Brand & Optional Drawer Hamburger Button */}
       <div className="shrink-0 z-20 flex items-center space-x-2 sm:space-x-3">
         {onToggleMobileMenu && (
@@ -677,6 +733,35 @@ export const Header: React.FC<HeaderProps> = ({
           <ThemeToggle />
         </div>
 
+        {/* Nút Mở Trợ Lý AI (AI Chat Drawer Trigger) - PC */}
+        <div className="shrink-0">
+          <button
+            type="button"
+            onClick={() => toggleChat()}
+            className={`relative flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 cursor-pointer border select-none ${
+              isChatOpen
+                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 shadow-sm ring-2 ring-emerald-500/20'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-500/40'
+            }`}
+            title="Trợ lý AI - Dữ liệu Số Quân Khu 7"
+            aria-label="Mở Trợ lý AI Dữ liệu Số Quân Khu 7"
+          >
+            <Bot className="w-4 h-4 text-emerald-600 dark:text-emerald-400 transition-transform duration-200 hover:scale-110" />
+            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  aiStatus === 'online' ? 'bg-emerald-400' : 'bg-amber-400'
+                }`}
+              />
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  aiStatus === 'online' ? 'bg-emerald-500' : 'bg-amber-500'
+                }`}
+              />
+            </span>
+          </button>
+        </div>
+
         {/* User profile menu Desktop */}
         <div className="shrink-0 z-20">
           <Popover
@@ -689,7 +774,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <button
               type="button"
-              className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
+              className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
             >
               <div
                 className="relative w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"

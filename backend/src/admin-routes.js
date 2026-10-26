@@ -808,6 +808,49 @@ module.exports = (app, deps) => {
         }
     });
 
+    app.put('/api/admin/permissions/reorder', async (req, res) => {
+        try {
+            const { items } = req.body;
+            if (!Array.isArray(items)) {
+                return res.status(400).json({ error: 'items phải là một mảng danh sách quyền và sort_order' });
+            }
+            const pool = await getPool();
+            const transaction = new sql.Transaction(pool);
+            await transaction.begin();
+            try {
+                for (const it of items) {
+                    if (it.permission_id && typeof it.sort_order === 'number') {
+                        await new sql.Request(transaction)
+                            .input('id', sql.VarChar(50), it.permission_id)
+                            .input('so', sql.Int, it.sort_order)
+                            .query(`UPDATE [PERMISSION] SET sort_order = @so WHERE permission_id = @id`);
+                    }
+                }
+                await transaction.commit();
+                _invalidateAll();
+
+                if (typeof writeAccessLog === 'function') {
+                    writeAccessLog({
+                        user_id: req.user?.user_id,
+                        action: 'PERMISSION_REORDER',
+                        resource: 'PERMISSION',
+                        details: `Sắp xếp lại thứ tự cho ${items.length} quyền`,
+                        severity: 'Info',
+                        ip: req.ip,
+                    }).catch(() => {});
+                }
+
+                res.json({ success: true, updated: items.length });
+            } catch (err) {
+                await transaction.rollback();
+                throw err;
+            }
+        } catch (e) {
+            console.error('[PUT /api/admin/permissions/reorder]', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     app.put('/api/admin/permissions/:id', async (req, res) => {
         try {
             const { description, group_code, sort_order, subgroup_key, subgroup_label, subgroup_order, subgroup_tone } = req.body;

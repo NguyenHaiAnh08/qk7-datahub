@@ -327,25 +327,25 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
       {/* 2. Bảng Dữ Liệu High-craft Grid */}
       <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors duration-200">
         <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <table className="w-full text-xs text-left min-w-[1020px] table-fixed">
+          <table className="w-full text-xs text-left min-w-[1280px]">
             <colgroup>
-              <col style={{ width: '20%' }} />
-              <col style={{ width: '11%' }} />
-              <col style={{ width: '23%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
+              <col style={{ width: '230px' }} />
+              <col style={{ width: '130px' }} />
+              <col style={{ width: '250px' }} />
+              <col style={{ width: '180px' }} />
+              <col style={{ width: '180px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '200px' }} />
             </colgroup>
             <thead className="bg-slate-50 dark:bg-slate-800/60 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800/80">
               <tr>
-                <th className="py-3 px-4">Quân nhân</th>
-                <th className="py-3 px-4">IP</th>
-                <th className="py-3 px-4">Thiết bị</th>
-                <th className="py-3 px-4">Đăng nhập</th>
-                <th className="py-3 px-4">Hoạt động cuối</th>
-                <th className="py-3 px-4">Idle</th>
-                <th className="py-3 px-4 text-right">Thao tác</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Quân nhân</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">IP</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Thiết bị</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Đăng nhập</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Hoạt động cuối</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Idle</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -385,9 +385,9 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
                         isKilling ? 'opacity-0 transition-opacity duration-200' : ''
                       }`}
                     >
-                      {/* 1. Cột Quân nhân */}
-                      <td className="py-3.5 px-4 overflow-hidden">
-                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
+                      {/* 1. Cột Quân nhân: Căn giữa */}
+                      <td className="py-3.5 px-4 text-center overflow-hidden">
+                        <div className="font-bold text-slate-900 dark:text-white flex items-center justify-center gap-1.5 truncate">
                           <span className="truncate">{s.full_name}</span>
                           {isCurrentUser && (
                             <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
@@ -408,14 +408,14 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
                         )}
                       </td>
 
-                      {/* 2. Cột IP: font-mono tabular-nums text-sm chuẩn quân sự */}
-                      <td className="py-3.5 px-4 font-mono tabular-nums text-sm font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {/* 2. Cột IP: font-mono tabular-nums text-sm căn giữa */}
+                      <td className="py-3.5 px-4 font-mono tabular-nums text-sm font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap text-center">
                         {s.ip || '127.0.0.1'}
                       </td>
 
-                      {/* 3. Cột Thiết bị: Đã qua hàm parse User-Agent gọn gàng */}
-                      <td className="py-3.5 px-4 overflow-hidden" title={s.user_agent}>
-                        <div className="flex items-center gap-2.5 min-w-0">
+                      {/* 3. Cột Thiết bị: Đã qua hàm parse User-Agent gọn gàng, căn giữa */}
+                      <td className="py-3.5 px-4 overflow-hidden text-center" title={s.user_agent}>
+                        <div className="flex items-center justify-center gap-2.5 min-w-0">
                           <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 flex items-center justify-center shrink-0">
                             {parsed.deviceType === 'tablet' ? (
                               <Tablet className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
@@ -425,7 +425,7 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
                               <Laptop className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                             )}
                           </div>
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 text-left">
                             <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5 truncate">
                               <span>{parsed.os}</span>
                               <span className="text-slate-400 text-[10px]">•</span>
@@ -444,21 +444,21 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
                         </div>
                       </td>
 
-                      {/* 4. Cột Đăng nhập: font-mono tabular-nums text-sm */}
-                      <td className="py-3.5 px-4 font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {/* 4. Cột Đăng nhập: font-mono tabular-nums text-sm căn giữa */}
+                      <td className="py-3.5 px-4 font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap text-center">
                         {s.created_at ? new Date(s.created_at).toLocaleString('vi-VN') : '—'}
                       </td>
 
-                      {/* 5. Cột Hoạt động cuối: font-mono tabular-nums text-sm */}
-                      <td className="py-3.5 px-4 font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {/* 5. Cột Hoạt động cuối: font-mono tabular-nums text-sm căn giữa */}
+                      <td className="py-3.5 px-4 font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap text-center">
                         {s.last_seen_at ? new Date(s.last_seen_at).toLocaleString('vi-VN') : '—'}
                       </td>
 
-                      {/* 6. Cột Idle: Pill bo tròn đèn tín hiệu pulsing */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">{renderIdlePill(s)}</td>
+                      {/* 6. Cột Idle: Pill bo tròn đèn tín hiệu pulsing căn giữa */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">{renderIdlePill(s)}</td>
 
-                      {/* 7. Cột Thao tác: Ngắt phiên & Ngắt toàn bộ */}
-                      <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                      {/* 7. Cột Thao tác: Ngắt phiên & Ngắt toàn bộ căn giữa */}
+                      <td className="py-3.5 px-4 text-center space-x-1.5 whitespace-nowrap">
                         {hasPermission('SESSION_KILL') && (
                           <>
                             {isCurrentUser ? (

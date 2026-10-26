@@ -9,6 +9,7 @@ module.exports = (app, deps) => {
         listActiveSessions,
         killSessionById,
         revokeAllUserSessions,
+        sessionIdleTimeoutMinutes = 30,
     } = deps;
 
     // ═══ Cache invalidation helpers ═══
@@ -1327,8 +1328,12 @@ module.exports = (app, deps) => {
                 return res.status(500).json({ error: 'Session module chưa được wire vào admin-routes', code: 'SESSION_MODULE_NOT_WIRED' });
             }
             const userId = req.query.user_id || null;
-            const items = await listActiveSessions(userId);
-            res.json({ items, total: items.length });
+            const items = await listActiveSessions(userId, sessionIdleTimeoutMinutes);
+            res.json({
+                items,
+                total: items.length,
+                idle_timeout_minutes: sessionIdleTimeoutMinutes,
+            });
         } catch (e) {
             console.error('[GET /api/admin/sessions]', e);
             res.status(500).json({ error: e.message });

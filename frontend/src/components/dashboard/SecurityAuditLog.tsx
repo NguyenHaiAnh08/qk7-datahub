@@ -24,10 +24,15 @@ import {
   Copy,
   X,
   SlidersHorizontal,
+  Archive,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 import { AccessLog } from '../../types/user';
 import { dashboardApi } from '../../services/dashboardApi';
-import { exportAuditReportExcel } from '../../utils/exportAuditReportExcel';
+import { exportAuditReportExcel, prepareAuditReportExcel } from '../../utils/exportAuditReportExcel';
+import { CompactDownloadButton } from '../common/CompactDownloadButton';
+import { toast } from '../common/Toast';
 
 export type SeverityGroup = 'ALL' | 'ALERT' | 'SYSTEM' | 'ACCESS';
 
@@ -38,6 +43,7 @@ export function getActionCategory(action: string = '', note: string = ''): 'ALER
   if (
     act.includes('FAIL') ||
     act.includes('DENIED') ||
+    act.includes('BLOCK') ||   
     act.includes('ERROR') ||
     lowerNote.includes('sai mật khẩu') ||
     lowerNote.includes('thất bại') ||
@@ -167,6 +173,10 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
   const [severityFilter, setSeverityFilter] = useState<SeverityGroup>('ALL');
   const [actionFilter, setActionFilter] = useState('');
 
+  // Bộ lọc phạm vi chu kỳ (Tháng hiện tại không giới hạn / Kho lưu trữ tháng cũ / Tất cả)
+  const [scopeFilter, setScopeFilter] = useState<'active' | 'archive' | 'all'>('active');
+  const [cycleInfo, setCycleInfo] = useState<{ current_month?: string; reset_policy?: string } | null>(null);
+
   // Tự động làm mới (Auto-Refresh)
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(30); // 10s, 30s, 0 (tắt)
   const [isPaused, setIsPaused] = useState(false);
@@ -175,21 +185,21 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [isExporting, setIsExporting] = useState(false);
 
   // Xem chi tiết (Modal / Drawer)
   const [selectedLog, setSelectedLog] = useState<AccessLog | null>(null);
   const [copiedJson, setCopiedJson] = useState(false);
 
-  // Load logs từ API
+  // Load logs từ API (không giới hạn 200 sự kiện, nạp theo chu kỳ tháng hiện tại hoặc kho lưu trữ)
   const fetchLogs = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
       else setIsRefreshing(true);
 
-      const res = await dashboardApi.getAccessLogs();
+      const res = await dashboardApi.getAccessLogs({ scope: scopeFilter });
       const items = res.items || [];
       setLogs(items);
+      setCycleInfo(res.cycle || null);
       setCountdown(autoRefreshInterval);
     } catch (err: any) {
       if (showToast) {
@@ -201,10 +211,10 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
     }
   };
 
-  // Khởi tạo load logs
+  // Khởi tạo và nạp lại khi chuyển đổi phạm vi chu kỳ
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [scopeFilter]);
 
   // Tự động làm mới theo chu kỳ
   useEffect(() => {
@@ -293,25 +303,43 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
   }, [filteredLogs, currentPage, pageSize]);
 
   // Xuất file Báo cáo Excel chuẩn định dạng Quân đội (Xuất báo cáo mẫu.xlsx)
-  const handleExportExcel = async () => {
+  // Cơ chế Hold & Release: Giữ file trong suốt quá trình chạy thanh tiến trình và chỉ thả file về máy khi UI đạt 'done'
+  const handleExportExcel = async (signal?: AbortSignal): Promise<() => void> => {
     if (filteredLogs.length === 0) {
       if (showToast) showToast('Không có dữ liệu nhật ký để xuất!', 'info');
-      return;
+      else toast.info('Không có dữ liệu nhật ký để xuất!');
+      throw new Error('Không có dữ liệu nhật ký để xuất');
     }
 
-    try {
-      setIsExporting(true);
-      await exportAuditReportExcel(filteredLogs);
+    toast.info(`Đang truyền phát và chuẩn bị kết xuất ${filteredLogs.length} sự kiện an ninh...`, {
+      title: 'ĐANG XỬ LÝ DỮ LIỆU',
+      badge: 'EXCEL-EXPORT',
+      duration: 3200,
+    });
+
+    const release = await prepareAuditReportExcel(filteredLogs);
+
+    return () => {
+      release();
+      const msg = `Đã xuất thành công ${filteredLogs.length} sự kiện an ninh sang file Excel (.xlsx)!`;
       if (showToast) {
-        showToast(`Đã xuất thành công ${filteredLogs.length} sự kiện an ninh sang file Excel (.xlsx)!`, 'success');
+        showToast(msg, 'success');
       }
-    } catch (err: any) {
-      if (showToast) {
-        showToast('Lỗi khi xuất file Excel: ' + err.message, 'error');
-      }
-    } finally {
-      setIsExporting(false);
-    }
+      toast.success(msg, {
+        title: 'XUẤT BÁO CÁO HOÀN TẤT',
+        badge: 'EXCEL-READY',
+      });
+    };
+  };
+
+  const handleCancelExportExcel = () => {
+    const msg = 'Đã hủy thao tác xuất báo cáo Excel.';
+    if (showToast) showToast(msg, 'info');
+    toast.info(msg, {
+      title: 'ĐÃ HỦY THAO TÁC',
+      badge: 'CANCELLED',
+      duration: 2000,
+    });
   };
 
   // Copy JSON trong Modal
@@ -418,10 +446,10 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
             return (
               <span
                 key={idx}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20 whitespace-nowrap"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20 whitespace-nowrap"
                 title={`Thiết bị ID: ${tgt.id}`}
               >
-                <HardDrive className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0" />
+                <HardDrive className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
                 {tgt.shortId || tgt.id}
               </span>
             );
@@ -467,7 +495,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
           }
           if (/^DEV-[a-f0-9-]+$/i.test(p)) {
             return (
-              <span key={i} className="font-mono text-purple-700 dark:text-purple-300 font-semibold px-1 py-0.5 rounded bg-purple-100/80 dark:bg-purple-500/10 mx-0.5 border border-purple-200/80 dark:border-purple-500/20" title={p}>
+              <span key={i} className="font-mono text-amber-700 dark:text-amber-300 font-semibold px-1 py-0.5 rounded bg-amber-100/80 dark:bg-amber-500/10 mx-0.5 border border-amber-200/80 dark:border-amber-500/20" title={p}>
                 {p.length > 18 ? `${p.slice(0, 14)}...` : p}
               </span>
             );
@@ -491,7 +519,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 dark:bg-purple-500/10 dark:border-purple-500/20 dark:text-purple-400">
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400">
               <Activity className="w-5 h-5 animate-pulse" />
             </div>
             <div>
@@ -506,7 +534,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
         </div>
 
         {/* Live Indicator, Auto-refresh & Quick Actions */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Live Indicator Badge */}
           <button
             onClick={() => setIsPaused(!isPaused)}
@@ -542,7 +570,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
               }}
               className={`px-2 py-1 rounded-lg transition cursor-pointer ${
                 autoRefreshInterval === 10 && !isPaused
-                  ? 'bg-purple-600 text-white font-semibold shadow-xs'
+                  ? 'bg-[#166534] dark:bg-emerald-600 text-white font-semibold shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
               }`}
             >
@@ -555,7 +583,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
               }}
               className={`px-2 py-1 rounded-lg transition cursor-pointer ${
                 autoRefreshInterval === 30 && !isPaused
-                  ? 'bg-purple-600 text-white font-semibold shadow-xs'
+                  ? 'bg-[#166534] dark:bg-emerald-600 text-white font-semibold shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
               }`}
             >
@@ -580,22 +608,27 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
               if (showToast) showToast('Đã làm mới dữ liệu nhật ký an ninh!', 'success');
             }}
             disabled={loading || isRefreshing}
-            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:border-slate-800 dark:text-slate-300 rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
+            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:border-slate-800 dark:text-slate-300 rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50 btn-tactile active:scale-95"
             title="Làm mới ngay"
           >
-            <RotateCw className={`w-4 h-4 ${isRefreshing || loading ? 'animate-spin text-purple-600 dark:text-purple-400' : ''}`} />
+            <RotateCw className={`w-4 h-4 ${isRefreshing || loading ? 'animate-spin text-emerald-600 dark:text-emerald-400' : ''}`} />
           </button>
 
-          {/* Nút Xuất Excel */}
-          <button
-            onClick={handleExportExcel}
-            disabled={isExporting}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-60 text-white text-xs font-semibold rounded-xl transition shadow-xs cursor-pointer border border-purple-500/40"
-            title="Xuất file báo cáo Excel (.xlsx) chuẩn Quân đội"
-          >
-            <Download className={`w-3.5 h-3.5 ${isExporting ? 'animate-bounce' : ''}`} />
-            <span>{isExporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
-          </button>
+          {/* Nút Xuất Excel với hiệu ứng tiến trình Lucian UX/UI Prompt #004 giống Trung tâm văn bản */}
+          <CompactDownloadButton
+            onDownload={handleExportExcel}
+            onCancel={handleCancelExportExcel}
+            size="compact"
+            idleLabel="Xuất Excel"
+            doneLabel="Đã xuất Excel"
+            disabled={filteredLogs.length === 0}
+            disabledTitle={
+              filteredLogs.length === 0
+                ? 'Không có dữ liệu nhật ký để xuất'
+                : 'Xuất file báo cáo Excel (.xlsx) chuẩn Quân đội'
+            }
+            className="shadow-xs"
+          />
         </div>
       </div>
 
@@ -606,7 +639,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
           onClick={() => setSeverityFilter('ALL')}
           className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
             severityFilter === 'ALL'
-              ? 'bg-purple-50/70 border-purple-300 ring-2 ring-purple-500/30 shadow-md dark:bg-slate-800/90 dark:border-purple-500/70 dark:ring-purple-500/50 dark:shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+              ? 'bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-500/30 shadow-md dark:bg-slate-800/90 dark:border-emerald-500/70 dark:ring-emerald-500/50 dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]'
               : 'bg-white hover:bg-slate-50/80 border-slate-200/80 shadow-xs dark:bg-[#111827]/80 dark:hover:bg-slate-900 dark:border-slate-800/80'
           }`}
         >
@@ -621,7 +654,14 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
             <span className="text-[11px] text-slate-500 dark:text-slate-400">sự kiện</span>
           </div>
           <div className="mt-1 text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
-            <span>Bản ghi giám sát 24/7</span>
+            {scopeFilter === 'active' && (
+              <>
+                <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}</span>
+                <span>• Tự làm sạch ngày 01</span>
+              </>
+            )}
+            {scopeFilter === 'archive' && <span className="text-purple-700 dark:text-purple-400 font-semibold">Kho lưu trữ tháng trước</span>}
+            {scopeFilter === 'all' && <span>Toàn bộ sự kiện lịch sử</span>}
           </div>
         </div>
 
@@ -701,10 +741,95 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
         </div>
       </div>
 
-      {/* 3. TOOLBAR: SEVERITY PILLS & SEARCH & ACTIONS */}
-      <div className="p-3 bg-white border border-slate-200/80 text-slate-700 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs dark:bg-[#111827]/80 dark:backdrop-blur-md dark:border-slate-800 dark:text-slate-200">
-        {/* Severity Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1.5">
+      {/* 3. TOOLBAR: SCOPE & SEVERITY PILLS & SEARCH & ACTIONS */}
+      <div className="p-3 bg-white border border-slate-200/80 text-slate-700 rounded-2xl flex flex-col gap-2.5 shadow-xs dark:bg-[#111827]/80 dark:backdrop-blur-md dark:border-slate-800 dark:text-slate-200">
+        {/* Dòng 1: Bộ chọn Chu kỳ Scope + Bộ lọc hành động & Tìm kiếm */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          {/* Scope Toggle: Tháng hiện tại (Hoạt động) / Kho lưu trữ / Tất cả */}
+          <div className="flex items-center bg-slate-100 border border-slate-200 dark:bg-slate-900/90 dark:border-slate-800 rounded-xl p-0.5 text-xs shadow-xs shrink-0 self-start sm:self-auto">
+            <button
+              onClick={() => setScopeFilter('active')}
+              className={`px-2.5 py-1 rounded-lg transition cursor-pointer font-medium ${
+                scopeFilter === 'active'
+                  ? 'bg-white text-emerald-800 font-bold shadow-xs dark:bg-emerald-600 dark:text-white'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+              title="Sự kiện của tháng hiện tại (không giới hạn, tự động làm sạch vào ngày 01 đầu tháng)"
+            >
+              Tháng {new Date().getMonth() + 1} (Hiện tại)
+            </button>
+            <button
+              onClick={() => setScopeFilter('archive')}
+              className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 font-medium ${
+                scopeFilter === 'archive'
+                  ? 'bg-white text-purple-800 font-bold shadow-xs dark:bg-purple-700 dark:text-white'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+              title="Kho lưu trữ các tháng trước đã được dọn dẹp"
+            >
+              <Archive className="w-3 h-3" />
+              Lưu trữ
+            </button>
+            <button
+              onClick={() => setScopeFilter('all')}
+              className={`px-2.5 py-1 rounded-lg transition cursor-pointer font-medium ${
+                scopeFilter === 'all'
+                  ? 'bg-white text-emerald-800 font-bold shadow-xs dark:bg-emerald-600 dark:text-white'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+              title="Toàn bộ lịch sử (hiện tại và kho lưu trữ)"
+            >
+              Tất cả
+            </button>
+          </div>
+
+          {/* Action Dropdown & Search Input */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Dropdown hành động chi tiết */}
+            <select
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-emerald-600 dark:focus:border-emerald-500 shadow-xs dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200"
+            >
+              <option value="">Tất cả hành động</option>
+              <option value="LOGIN">LOGIN (Đăng nhập)</option>
+              <option value="LOGIN_FAIL">LOGIN_FAIL (Đăng nhập thất bại)</option>
+              <option value="VIEW">VIEW (Xem tài liệu)</option>
+              <option value="DOWNLOAD">DOWNLOAD (Tải tệp)</option>
+              <option value="UPLOAD">UPLOAD (Tải lên)</option>
+              <option value="CREATE_USER">CREATE_USER (Tạo quân nhân)</option>
+              <option value="UPDATE_USER">UPDATE_USER (Sửa quân nhân)</option>
+              <option value="DELETE_USER">DELETE_USER (Xóa quân nhân)</option>
+              <option value="ASSIGN_ROLE">ASSIGN_ROLE (Gán vai trò)</option>
+              <option value="REVOKE_ROLE">REVOKE_ROLE (Thu hồi vai trò)</option>
+              <option value="FINGERPRINT_ENROLL">FINGERPRINT_ENROLL (Đăng ký vân tay)</option>
+              <option value="FINGERPRINT_FAIL">FINGERPRINT_FAIL (Lỗi vân tay)</option>
+            </select>
+
+            {/* Ô tìm kiếm tổng hợp */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm IP, User, Tiêu đề, Ghi chú..."
+                className="w-full sm:w-60 pl-9 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-600 dark:focus:border-emerald-500 shadow-xs dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:placeholder-slate-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Dòng 2: Mức độ (Xuống dòng riêng biệt, giữ liền mạch cả 4 nút phân loại) */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/60">
           <span className="text-xs font-medium text-slate-500 dark:text-slate-400 mr-1 flex items-center gap-1">
             <SlidersHorizontal className="w-3.5 h-3.5" /> Mức độ:
           </span>
@@ -712,7 +837,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
             onClick={() => setSeverityFilter('ALL')}
             className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition cursor-pointer border ${
               severityFilter === 'ALL'
-                ? 'bg-purple-600 text-white border-purple-500 shadow-xs'
+                ? 'bg-[#166534] dark:bg-emerald-600 text-white border-emerald-500 shadow-xs'
                 : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200/70 hover:text-slate-900 dark:bg-slate-900/60 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200'
             }`}
           >
@@ -752,56 +877,12 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
             Truy cập ({kpiStats.documentAccess})
           </button>
         </div>
-
-        {/* Action Dropdown & Search Input */}
-        <div className="flex items-center gap-2">
-          {/* Dropdown hành động chi tiết */}
-          <select
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-purple-500 shadow-xs dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:focus:border-purple-500"
-          >
-            <option value="">Tất cả hành động</option>
-            <option value="LOGIN">LOGIN (Đăng nhập)</option>
-            <option value="LOGIN_FAIL">LOGIN_FAIL (Đăng nhập thất bại)</option>
-            <option value="VIEW">VIEW (Xem tài liệu)</option>
-            <option value="DOWNLOAD">DOWNLOAD (Tải tệp)</option>
-            <option value="UPLOAD">UPLOAD (Tải lên)</option>
-            <option value="CREATE_USER">CREATE_USER (Tạo quân nhân)</option>
-            <option value="UPDATE_USER">UPDATE_USER (Sửa quân nhân)</option>
-            <option value="DELETE_USER">DELETE_USER (Xóa quân nhân)</option>
-            <option value="ASSIGN_ROLE">ASSIGN_ROLE (Gán vai trò)</option>
-            <option value="REVOKE_ROLE">REVOKE_ROLE (Thu hồi vai trò)</option>
-            <option value="FINGERPRINT_ENROLL">FINGERPRINT_ENROLL (Đăng ký vân tay)</option>
-            <option value="FINGERPRINT_FAIL">FINGERPRINT_FAIL (Lỗi vân tay)</option>
-          </select>
-
-          {/* Ô tìm kiếm tổng hợp */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm IP, User, Tiêu đề, Ghi chú..."
-              className="w-full sm:w-64 pl-9 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-purple-500 shadow-xs dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:placeholder-slate-500 dark:focus:border-purple-500"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* 4. TABLE SECTION (CHUẨN CẢ LIGHT & DARK NIGHT MODE) */}
       <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm dark:bg-[#111827]/80 dark:backdrop-blur-md dark:border-slate-800 dark:shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left text-xs min-w-[980px]">
             <thead className="bg-slate-50 text-slate-600 uppercase text-[11px] border-b border-slate-200 font-semibold tracking-wider dark:bg-slate-900/90 dark:text-slate-400 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4 whitespace-nowrap">Thời Gian</th>
@@ -818,7 +899,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-slate-500 dark:text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <RotateCw className="w-6 h-6 animate-spin text-purple-600 dark:text-purple-400" />
+                      <RotateCw className="w-6 h-6 animate-spin text-emerald-600 dark:text-emerald-400" />
                       <span>Đang tải nhật ký kiểm toán an ninh...</span>
                     </div>
                   </td>
@@ -865,7 +946,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                       }`}
                     >
                       {/* Cột THỜI GIAN */}
-                      <td className="py-3 px-4 whitespace-nowrap font-mono">
+                      <td className="py-3 px-4 whitespace-nowrap font-mono tabular-nums">
                         <div className={`font-bold text-xs ${isAlert ? 'text-rose-700 dark:text-red-300' : 'text-slate-800 dark:text-slate-200'}`}>
                           {timeFormatted}
                         </div>
@@ -882,7 +963,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                             className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                               isAlert
                                 ? 'bg-rose-100 text-rose-700 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-500/40'
-                                : 'bg-purple-100 text-purple-700 border border-purple-200 dark:bg-gradient-to-tr dark:from-indigo-950 dark:to-purple-900 dark:border-purple-500/30 dark:text-purple-200'
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-gradient-to-tr dark:from-emerald-950 dark:to-emerald-900 dark:border-emerald-500/30 dark:text-emerald-200'
                             }`}
                           >
                             {getInitials(l.full_name)}
@@ -894,10 +975,10 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                           {/* User ID Badge */}
                           {l.user_id && (
                             <span
-                              className={`font-mono text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap shadow-2xs font-semibold ${
+                              className={`font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap shadow-2xs font-semibold ${
                                 isAlert
                                   ? 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-red-900/40 dark:text-rose-300 dark:border-red-500/30'
-                                  : 'bg-slate-100 text-slate-700 border border-slate-300/80 dark:bg-slate-800/90 dark:text-slate-300 dark:border-slate-700/60'
+                                  : 'text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25'
                               }`}
                             >
                               {l.user_id}
@@ -917,7 +998,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                       </td>
 
                       {/* Cột ĐỊA CHỈ IP */}
-                      <td className="py-3 px-4 whitespace-nowrap font-mono text-xs">
+                      <td className="py-3 px-4 whitespace-nowrap font-mono tabular-nums text-xs">
                         {isLocalhost ? (
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] ${
@@ -951,7 +1032,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                             e.stopPropagation();
                             setSelectedLog(l);
                           }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:text-slate-400 dark:hover:text-purple-300 dark:hover:bg-purple-500/10 transition cursor-pointer"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 dark:text-slate-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-500/10 transition cursor-pointer"
                           title="Xem chi tiết sự kiện"
                         >
                           <Eye className="w-4 h-4" />
@@ -985,7 +1066,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
             <select
               value={pageSize}
               onChange={(e) => setPageSize(Number(e.target.value))}
-              className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-purple-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200"
+              className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-emerald-600 dark:focus:border-emerald-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200"
             >
               <option value={10}>10 dòng</option>
               <option value={20}>20 dòng</option>
@@ -1029,7 +1110,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                       onClick={() => setCurrentPage(p)}
                       className={`min-w-[28px] h-7 px-2 rounded-lg transition text-xs font-mono font-medium ${
                         currentPage === p
-                          ? 'bg-purple-600 text-white font-bold shadow-xs'
+                          ? 'bg-[#166534] dark:bg-emerald-600 text-white font-bold shadow-xs'
                           : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:border-transparent dark:hover:bg-slate-700 dark:text-slate-300'
                       }`}
                     >
@@ -1080,12 +1161,12 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[90vh]"
+              className="relative w-full max-w-xl mx-auto w-[calc(100vw-32px)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[90vh]"
             >
               {/* Modal Header */}
               <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20">
+                  <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
                     <ShieldCheck className="w-5 h-5" />
                   </div>
                   <div>
@@ -1096,7 +1177,13 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                       <span className="font-mono text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/20">
                         Mã: {selectedLog.log_id || 'N/A'}
                       </span>
-                      <span className="text-xs text-slate-500">Chuẩn SOC Record</span>
+                      {selectedLog.is_archived ? (
+                        <span className="font-mono text-xs text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded dark:text-purple-300 dark:bg-purple-950/40 dark:border-purple-800/40 flex items-center gap-1">
+                          <Archive className="w-3 h-3" /> Bản ghi lưu trữ
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500">Chuẩn SOC Record (Hoạt động)</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1137,7 +1224,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-950/50 dark:border-slate-800/80">
                     <span className="text-slate-500 text-[11px] block">Quân nhân thực hiện</span>
                     <div className="flex items-center gap-2 mt-1">
-                      <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900/80 dark:border-purple-500/30 dark:text-purple-200 flex items-center justify-center text-[10px] font-bold">
+                      <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/80 dark:border-emerald-500/30 dark:text-emerald-200 flex items-center justify-center text-[10px] font-bold">
                         {getInitials(selectedLog.full_name)}
                       </div>
                       <span className="font-semibold text-slate-900 dark:text-slate-200">{selectedLog.full_name || 'Hệ thống'}</span>
@@ -1193,7 +1280,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                     </span>
                     <button
                       onClick={() => handleCopyJson(selectedLog)}
-                      className="flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-semibold cursor-pointer"
+                      className="flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 font-semibold cursor-pointer"
                     >
                       {copiedJson ? (
                         <>

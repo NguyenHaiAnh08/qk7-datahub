@@ -3,12 +3,14 @@ import { FileText, Eye, Download, Lock, Calendar, Building, HardDrive } from 'lu
 import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
+import { CompactDownloadButton } from '../common/CompactDownloadButton';
 
 export interface DocumentCardProps {
   document: DocumentItem;
   userClearanceLevel: number;
   onPreview: (doc: DocumentItem) => void;
-  onDownload: (doc: DocumentItem) => void;
+  onDownload: (doc: DocumentItem, signal?: AbortSignal) => Promise<(() => void) | void> | (() => void) | void;
+  onCancelDownload?: (doc: DocumentItem) => void;
 }
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -16,13 +18,14 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   userClearanceLevel,
   onPreview,
   onDownload,
+  onCancelDownload,
 }) => {
   const isRestricted = (document.security_level_id || 1) > userClearanceLevel;
 
   const getLevelBadgeClass = (lv: number) => {
     switch (lv) {
       case 5:
-        return 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30';
+        return 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30';
       case 4:
         return 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
       case 3:
@@ -40,11 +43,11 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   const isSecretLevel = docLevel >= 3;
 
   return (
-    <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all duration-200 group">
+    <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col justify-between hover:border-emerald-600/40 dark:hover:border-emerald-500/40 transition-colors duration-150 group">
       <div>
         {/* Top Badges */}
         <div className="flex items-center justify-between gap-2 mb-2.5">
-          <span className="font-mono text-purple-600 dark:text-purple-400 font-semibold text-xs tracking-wide truncate">
+          <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 tracking-wide truncate">
             {document.document_code}
           </span>
           <span
@@ -57,7 +60,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         </div>
 
         {/* Title */}
-        <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors line-clamp-2 mb-2">
+        <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors line-clamp-2 mb-2">
           {document.title}
         </h4>
 
@@ -106,7 +109,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
       {/* Action Footer */}
       <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
         {isRestricted ? (
-          <div className="w-full py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5">
+          <div className="w-full min-h-[40px] py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5">
             <Lock className="w-3.5 h-3.5" />
             <span>Giới hạn quyền truy cập</span>
           </div>
@@ -114,32 +117,23 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           <>
             <button
               onClick={() => onPreview(document)}
-              className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              className="flex-1 min-h-[40px] py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>Xem trước</span>
+              <span>Xem văn bản PDF</span>
             </button>
-            {canDownload ? (
-              <button
-                onClick={() => onDownload(document)}
-                className="py-1.5 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                title="Tải về máy"
-              >
-                <Download className="w-3.5 h-3.5" />
-              </button>
-            ) : (
-              <button
-                disabled
-                className="py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed opacity-60"
-                title={
-                  isSecretLevel
-                    ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
-                    : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
-                }
-              >
-                <Download className="w-3.5 h-3.5" />
-              </button>
-            )}
+            <CompactDownloadButton
+              onDownload={(signal) => onDownload(document, signal)}
+              onCancel={() => onCancelDownload?.(document)}
+              disabled={!canDownload}
+              disabledTitle={
+                isSecretLevel
+                  ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
+                  : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
+              }
+              fileSize={formatFileSize(document.file_size ?? document.file_size_bytes)}
+              size="normal"
+            />
           </>
         )}
       </div>

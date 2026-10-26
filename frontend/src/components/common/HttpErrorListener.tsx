@@ -1,24 +1,18 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { App as AntApp } from 'antd';
-import {
-  WarningOutlined,
-  StopOutlined,
-  ApiOutlined,
-  ExclamationCircleOutlined,
-} from '@ant-design/icons';
 import { HttpErrorDetail } from '../../services/http';
+import { authService } from '../../services/authService';
 import { ROUTE_PATHS } from '../../routes/routePaths';
+import { toast } from './Toast';
 
 /**
  * Global HTTP Error Listener
- * Bắt các mã trạng thái HTTP từ các cuộc gọi API Backend (http.ts)
- * và tự động thông báo qua Ant Design Notification / điều hướng trang mã trạng thái.
+ * - 401 (không phải login) → Xóa session + dispatch 'qk7:session-expired' để AuthContext reset
+ * - Các mã khác → JolyUI Animated Toast với âm hưởng chỉ huy tác chiến quân sự
  */
 export const HttpErrorListener: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { notification } = AntApp.useApp();
 
   useEffect(() => {
     const handleHttpError = (event: Event) => {
@@ -26,11 +20,36 @@ export const HttpErrorListener: React.FC = () => {
       const detail = customEvent.detail;
       if (!detail) return;
 
+      // Endpoint fingerprint tự xử lý lỗi riêng (agent offline, timeout...)
       if (detail.url?.includes('/fingerprint/')) return;
 
       const { status, message, url, autoRedirect } = detail;
 
-      // Không hiển thị popup nếu đang ở sẵn trang lỗi tương ứng
+      // 401 trên chính request login = sai mật khẩu — KHÔNG redirect để user nhập lại
+      const isLoginRequest = url?.includes('/auth/login');
+
+      // Nếu đang là khách (Guest), không cần redirect khi 401 (do API yêu cầu auth)
+      const currentUser = authService.getCurrentSession();
+      const isGuest = currentUser?.user_id === 'GUEST';
+
+      // === 401: session hết hạn — clear + redirect ===
+      if (status === 401 && !isLoginRequest && !isGuest) {
+        try {
+          authService.clearSession();
+        } catch {
+          /* ignore */
+        }
+        // Báo cho AuthProvider biết để reset state + navigate
+        window.dispatchEvent(new CustomEvent('qk7:session-expired'));
+
+        toast.warning(
+          message || 'Vui lòng đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
+          { title: 'Phiên Làm Việc Hết Hạn', badge: 'AUTH-401' }
+        );
+        return;
+      }
+
+      // Không hiển thị popup nếu đang ở trang lỗi tương ứng
       const isAlreadyOnErrorPage =
         location.pathname === `/error/${status}` ||
         location.pathname === `/${status}` ||
@@ -43,54 +62,35 @@ export const HttpErrorListener: React.FC = () => {
 
       if (isAlreadyOnErrorPage) return;
 
-      // frontend/src/components/common/HttpErrorListener.tsx
-// (khoảng dòng 60-110)
-
       switch (status) {
-        case 401:
-          notification.warning({
-            title: 'Phiên Làm Việc Hết Hạn',        // ⚠️ message → title
-            description: message || 'Bạn cần đăng nhập lại để tiếp tục thao tác trên cổng dữ liệu.',
-            icon: <WarningOutlined className="text-amber-500" />,
-            duration: 4.5,
-          });
-          break;
-
         case 403:
-          notification.error({
-            title: 'Truy Cập Bị Từ Chối',          
-            description: message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
-            icon: <StopOutlined className="text-red-500" />,
-            duration: 4.5,
-          });
+          toast.securityAlert(
+            message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
+            { title: 'Truy Cập Bị Từ Chối', badge: 'CLEARANCE-403' }
+          );
           break;
 
         case 404:
-          notification.info({
-            title: 'Không Tìm Thấy Tài Nguyên',     
-            description: message || `Không tìm thấy endpoint hoặc tài liệu yêu cầu: ${url}`,
-            duration: 4.5,
-          });
+          toast.info(
+            message || `Không tìm thấy endpoint hoặc tài liệu yêu cầu: ${url}`,
+            { title: 'Không Tìm Thấy Tài Nguyên', badge: '404' }
+          );
           break;
 
         case 500:
         case 502:
         case 503:
         case 504:
-          notification.error({
-            title: 'Sự Cố Máy Chủ',           
-            description: message || 'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
-            icon: <ApiOutlined className="text-red-500" />,
-            duration: 5,
-          });
+          toast.error(
+            message || 'Máy chủ cổng dữ liệu hoặc SQL Server gặp sự cố khi xử lý truy vấn.',
+            { title: 'Sự Cố Máy Chủ', badge: `ERR-${status}` }
+          );
           break;
 
         default:
-          notification.warning({
-            title: 'Lỗi Phản Hồi Hệ Thống',   
-            description: message,
-            icon: <ExclamationCircleOutlined className="text-amber-500" />,
-            duration: 4.5,
+          toast.warning(message || 'Đã xảy ra sự cố không xác định', {
+            title: 'Lỗi Phản Hồi Hệ Thống',
+            badge: `HTTP-${status}`,
           });
           break;
       }
@@ -100,7 +100,7 @@ export const HttpErrorListener: React.FC = () => {
     return () => {
       window.removeEventListener('qk7:http-error', handleHttpError);
     };
-  }, [navigate, location.pathname, notification]);
+  }, [navigate, location.pathname]);
 
   return null;
 };

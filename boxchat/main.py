@@ -22,8 +22,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-# Nạp biến môi trường từ .env
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+# Load root .env (single source of truth)
+_ROOT_ENV = os.path.join(os.path.dirname(__file__), "..", ".env")
+load_dotenv(_ROOT_ENV, override=False)
+
+# Optional: boxchat/.env (nếu có, override)
+_LOCAL_ENV = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(_LOCAL_ENV):
+    load_dotenv(_LOCAL_ENV, override=True)
 
 # Import core modules
 from core.pdf_processor import PDFProcessor

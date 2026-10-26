@@ -42,23 +42,51 @@ const ENROLL_STATUS_URL = `${AGENT_BASE}/enroll-status`;
 
 export const fingerprintService = {
   /**
-   * Lấy device_id của máy quét vân tay đang chạy trên máy trạm.
-   * Ném Error('AGENT_NOT_RUNNING') nếu agent chưa bật hoặc timeout.
+   * Lấy device_id của máy quét vân tay ZK9500.
+   * - Trên Máy tính: Ưu tiên gọi Local Agent http://127.0.0.1:9001/device-id (timeout 1.2s).
+   * - Trên iPad Air M4 (hoặc khi Local Agent chưa bật): Tự động fallback sang Express Gateway (:8000)
+   *   gọi /api/admin/fingerprint/agents để lấy máy quét ZK9500 đang trực tuyến tại Server/bàn thuyết trình.
    */
-  async getLocalDeviceId(timeoutMs: number = 2000): Promise<string> {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetch(DEVICE_ID_URL, { signal: ctrl.signal });
-      if (!res.ok) throw new Error('Agent lỗi');
-      const data = await res.json();
-      if (!data.device_id) throw new Error('Agent thiếu device_id');
-      return data.device_id;
-    } catch {
-      throw new Error('AGENT_NOT_RUNNING');
-    } finally {
-      clearTimeout(timer);
+    async getLocalDeviceId(timeoutMs: number = 1200): Promise<string> {
+    const isIPad =
+      typeof document !== 'undefined' &&
+      (document.documentElement.getAttribute('data-device-mode') === 'ipad' ||
+        (typeof navigator !== 'undefined' &&
+          (navigator.maxTouchPoints >= 2 ||
+            /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+            (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1))));
+
+    // 1. Nếu không phải iPad, thử gọi Local Agent trước
+    if (!isIPad) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);   // ← Honor full timeout (F6)
+      try {
+        const res = await fetch(DEVICE_ID_URL, { signal: ctrl.signal });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.device_id) return data.device_id;
+        }
+      } catch {
+        // Local agent không có trên máy này -> fallback sang Server (silent)
+      } finally {
+        clearTimeout(timer);
+      }
     }
+
+    // 2. Fallback cho iPad Air M4 hoặc Server Presentation Station
+    try {
+      const serverAgents = await http<{ items: Array<{ device_id: string }> }>(
+        '/api/admin/fingerprint/agents',
+        { method: 'GET', skipErrorNotification: true }
+      );
+      if (serverAgents?.items?.length > 0 && serverAgents.items[0].device_id) {
+        return serverAgents.items[0].device_id;
+      }
+    } catch {
+      // Bỏ qua lỗi fallback
+    }
+
+    throw new Error('AGENT_NOT_RUNNING');
   },
 
   /**
@@ -76,7 +104,7 @@ export const fingerprintService = {
         'Content-Type': 'application/json',
         'X-Device-FP': deviceId,
       },
-      body: JSON.stringify({ file_id: fileId }),
+      body: JSON.stringify({ file_id: fileId, device_id: deviceId }),
       skipErrorNotification: true,
       signal,
     });
@@ -120,21 +148,28 @@ export const fingerprintService = {
   },
 
   /**
-   * Poll trạng thái enroll 3 bước từ Local Agent (127.0.0.1:9001).
-   * Trả null nếu agent chưa bật hoặc timeout 1s.
+   * Poll trạng thái enroll 3 bước qua Express Gateway (/api/admin/fingerprint/enroll-status?deviceId=...).
+   * Express Gateway nhận sự kiện WebSocket thời gian thực từ ZK9500 Agent.
+   * Dùng silent: true & skipErrorNotification: true để tuyệt đối không log lỗi vào console.
    */
-  async getEnrollStatus(): Promise<EnrollStatusResponse | null> {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 1000);
+  async getEnrollStatus(deviceId?: string): Promise<EnrollStatusResponse | null> {
     try {
-      const res = await fetch(ENROLL_STATUS_URL, { signal: ctrl.signal });
-      if (!res.ok) return null;
-      return await res.json();
+      const query = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
+      const res = await http<EnrollStatusResponse>(
+        `/api/admin/fingerprint/enroll-status${query}`,
+        {
+          method: 'GET',
+          skipErrorNotification: true,
+          silent: true,
+        }
+      );
+      if (res && typeof res.step === 'number') {
+        return res;
+      }
     } catch {
-      return null;
-    } finally {
-      clearTimeout(timer);
+      // Bỏ qua lỗi polling im lặng
     }
+    return null;
   },
 };
 

@@ -24,6 +24,7 @@ export interface AIChatResponse {
   answer: string;
   citations: AICitation[];
   reasoning?: AIReasoning;
+  think?: string; 
 }
 
 export interface AIQuizQuestion {

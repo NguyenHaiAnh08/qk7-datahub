@@ -35,6 +35,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { aiService, AIChatResponse, AICitation, AIStudyBookResponse, AIQuizQuestion } from '../../services/aiService';
 import { fileService } from '../../services/fileService';
+import { toast } from '../common/Toast';
 
 const { Text, Paragraph, Title } = Typography;
 
@@ -87,22 +88,24 @@ export const AIChatWidget: React.FC = () => {
 
   const getPopupStyle = (): React.CSSProperties => {
     if (typeof window === 'undefined') {
-      return { position: 'fixed', bottom: 92, left: 24, zIndex: 99999 };
+      return { position: 'fixed', bottom: 84, right: 20, zIndex: 35 };
     }
 
     const screenW = window.innerWidth;
     const screenH = window.innerHeight;
 
     const actualW = Math.min(popupWidth, screenW - 32);
-    const actualH = Math.min(popupHeight, screenH - 110);
+    const actualH = Math.min(popupHeight, screenH - 100);
 
     return {
       position: 'fixed',
-      left: '24px',
-      bottom: '92px',
+      right: '20px',
+      bottom: '84px',
       width: `${actualW}px`,
       height: `${actualH}px`,
-      zIndex: 99999,
+      maxHeight: 'calc(100dvh - 5.5rem)',
+      maxWidth: 'calc(100vw - 32px)',
+      zIndex: 35,
       boxShadow: isDark
         ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(114, 46, 209, 0.25)'
         : '0 25px 50px -12px rgba(114, 46, 209, 0.2), 0 0 20px rgba(0,0,0,0.06)'
@@ -203,7 +206,7 @@ export const AIChatWidget: React.FC = () => {
       const targetUrl = `${url}#page=${page}`;
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } catch (err: any) {
-      message.error(`Không thể mở tệp: ${err.message}`);
+      toast.error(`Không thể mở tệp: ${err.message}`, { title: 'TRUY CẬP TỆP THẤT BẠI' });
     }
   };
 
@@ -217,7 +220,7 @@ export const AIChatWidget: React.FC = () => {
       setSubmittedQuiz(false);
       return data;
     } catch (err: any) {
-      message.error(`Lỗi tải dữ liệu cuốn sách: ${err.message}`);
+      toast.error(`Lỗi tải dữ liệu cuốn sách: ${err.message}`, { title: 'LỖI STUDY BOOK' });
       return null;
     } finally {
       setLoadingStudyBook(false);
@@ -246,7 +249,10 @@ export const AIChatWidget: React.FC = () => {
     if (!studyBookData?.tab_quiz) return;
     const answeredCount = Object.keys(selectedAnswers).length;
     if (answeredCount < studyBookData.tab_quiz.length) {
-      message.warning(`Đồng chí vui lòng hoàn thành tất cả ${studyBookData.tab_quiz.length} câu hỏi trước khi nộp bài.`);
+      toast.warning(`Đồng chí vui lòng hoàn thành tất cả ${studyBookData.tab_quiz.length} câu hỏi trước khi nộp bài.`, {
+        title: 'CHƯA HOÀN THÀNH BÀI THI',
+        badge: 'QUIZ',
+      });
       return;
     }
     setSubmittedQuiz(true);
@@ -267,21 +273,21 @@ export const AIChatWidget: React.FC = () => {
   return (
     <>
       {/* ─────────────────────────────────────────────────────────────
-          1. NÚT TRÒN MỞ CHAT CỐ ĐỊNH Ở GÓC DƯỚI BÊN TRÁI (THEO SIDEBAR)
+          1. NÚT TRÒN MỞ CHAT CỐ ĐỊNH Ở GÓC DƯỚI BÊN PHẢI (fixed bottom-5 right-5, z-30)
       ───────────────────────────────────────────────────────────── */}
       <div
         style={{
           position: 'fixed',
-          left: '24px',
-          bottom: '24px',
-          zIndex: 99999,
+          right: '20px',
+          bottom: '20px',
+          zIndex: 30,
           userSelect: 'none',
         }}
         className="transition-transform duration-200"
       >
         <Tooltip
           title={isOpen ? 'Đóng hộp thoại AI' : 'Trợ lý AI Tác chiến & Dữ liệu QK7'}
-          placement="right"
+          placement="left"
           open={isOpen ? false : undefined}
         >
           <button
@@ -290,14 +296,14 @@ export const AIChatWidget: React.FC = () => {
             className="
               relative w-14 h-14 rounded-full flex items-center justify-center text-white
               shadow-xl transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer
-              bg-gradient-to-tr from-[#531dab] via-[#722ED1] to-[#9254de]
-              border-2 border-white/20
-              focus:outline-none focus:ring-4 focus:ring-purple-500/30
+              bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d]
+              border-2 border-amber-500/35
+              focus:outline-none focus:ring-4 focus:ring-emerald-500/30
             "
             style={{
               boxShadow: isDark
-                ? '0 10px 25px -5px rgba(114, 46, 209, 0.6), 0 0 15px rgba(146, 84, 222, 0.4)'
-                : '0 10px 25px -5px rgba(114, 46, 209, 0.4)'
+                ? '0 10px 25px -5px rgba(16, 185, 129, 0.4), 0 0 15px rgba(245, 158, 11, 0.25)'
+                : '0 10px 25px -5px rgba(22, 101, 52, 0.35)'
             }}
           >
             {isOpen ? (
@@ -322,8 +328,8 @@ export const AIChatWidget: React.FC = () => {
         <div
           className={`
             flex flex-col overflow-hidden transition-all duration-300
-            rounded-[26px] shadow-2xl
-            ${isDark ? 'bg-[#0b0c10] border border-purple-800/40 text-slate-100' : 'bg-[#fcfaff] border border-purple-200 text-slate-900'}
+            rounded-[26px] shadow-2xl max-h-[calc(100dvh-5rem)]
+            ${isDark ? 'bg-[#090e17] border border-emerald-900/40 text-slate-100' : 'bg-[#ffffff] border border-emerald-200 text-slate-900'}
           `}
           style={getPopupStyle()}
         >
@@ -331,11 +337,11 @@ export const AIChatWidget: React.FC = () => {
           <div
             className={`
               px-4 py-3.5 flex items-center justify-between border-b
-              ${isDark ? 'bg-gradient-to-r from-[#1a102f] to-[#0b0c10] border-purple-900/30' : 'bg-gradient-to-r from-[#f5eeff] to-[#ffffff] border-purple-100'}
+              ${isDark ? 'bg-gradient-to-r from-[#0d1f16] to-[#090e17] border-emerald-900/30' : 'bg-gradient-to-r from-[#f0fdf4] to-[#ffffff] border-emerald-100'}
             `}
           >
             <div className="flex items-center space-x-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#531dab] to-[#9254de] flex items-center justify-center text-white shadow-sm flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-500/30 flex items-center justify-center text-white shadow-sm flex-shrink-0">
                 <RobotOutlined className="text-base" />
               </div>
               <div className="min-w-0">
@@ -347,9 +353,9 @@ export const AIChatWidget: React.FC = () => {
                   />
                 </div>
                 <div className="text-[11px] opacity-75 truncate flex items-center space-x-1">
-                  <span>QK7 DataHub</span>
+                  <span>Trường Quân Sự QK7</span>
                   <span>•</span>
-                  <span className="text-purple-400 font-medium">
+                  <span className="text-amber-600 dark:text-amber-400 font-medium">
                     {user?.clearance_name || `Cấp ${user?.clearance_level_id || 1}`}
                   </span>
                 </div>
@@ -361,9 +367,9 @@ export const AIChatWidget: React.FC = () => {
                 <button
                   onClick={() => {
                     setMessages([]);
-                    message.success('Đã làm mới phiên hội thoại.');
+                    toast.success('Đã làm mới phiên hội thoại với Trợ lý AI.', { title: 'PHIÊN MỚI', badge: 'AI-RESET' });
                   }}
-                  className="p-1.5 rounded-lg hover:bg-purple-500/10 hover:text-purple-400 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors btn-tactile active:scale-95 cursor-pointer"
                 >
                   <ReloadOutlined className="text-xs" />
                 </button>
@@ -372,7 +378,7 @@ export const AIChatWidget: React.FC = () => {
               <Tooltip title={isExpanded ? 'Thu nhỏ' : 'Mở rộng'}>
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="p-1.5 rounded-lg hover:bg-purple-500/10 hover:text-purple-400 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors"
                 >
                   {isExpanded ? (
                     <FullscreenExitOutlined className="text-xs" />
@@ -405,11 +411,11 @@ export const AIChatWidget: React.FC = () => {
                     ${
                       msg.sender === 'user'
                         ? isDark
-                          ? 'bg-[#531dab] text-white rounded-br-none'
-                          : 'bg-[#722ED1] text-white rounded-br-none'
+                          ? 'bg-[#14532d] text-white rounded-br-none border border-emerald-600/30'
+                          : 'bg-[#166534] text-white rounded-br-none shadow-sm'
                         : isDark
-                          ? 'bg-[#722ED1] text-white rounded-bl-none'
-                          : 'bg-[#f3e8ff] text-[#2e1065] border border-[#d8b4fe] rounded-bl-none'
+                          ? 'bg-[#111827] text-slate-100 border border-emerald-800/40 rounded-bl-none'
+                          : 'bg-[#f0fdf4] text-[#14532d] border border-[#86efac] rounded-bl-none'
                     }
                   `}
                 >
@@ -440,7 +446,7 @@ export const AIChatWidget: React.FC = () => {
                               ${
                                 isDark
                                   ? 'bg-white/15 hover:bg-white/25 text-white'
-                                  : 'bg-white hover:bg-purple-50 text-[#6b21a8] border border-[#d8b4fe] shadow-xs'
+                                  : 'bg-white hover:bg-emerald-50 text-[#166534] border border-[#86efac] shadow-xs'
                               }
                             `}
                           >
@@ -465,7 +471,7 @@ export const AIChatWidget: React.FC = () => {
                                 ${
                                   isDark
                                     ? 'bg-white/15 hover:bg-white/25 text-white'
-                                    : 'bg-white hover:bg-purple-50 text-[#6b21a8] border border-[#d8b4fe]'
+                                    : 'bg-white hover:bg-emerald-50 text-[#166534] border border-[#86efac]'
                                 }
                               `}
                             >
@@ -481,7 +487,7 @@ export const AIChatWidget: React.FC = () => {
                                 ${
                                   isDark
                                     ? 'bg-white/15 hover:bg-white/25 text-white'
-                                    : 'bg-white hover:bg-purple-50 text-[#6b21a8] border border-[#d8b4fe]'
+                                    : 'bg-white hover:bg-emerald-50 text-[#166534] border border-[#86efac]'
                                 }
                               `}
                             >
@@ -504,19 +510,19 @@ export const AIChatWidget: React.FC = () => {
                         <div className="mt-1.5 space-y-1 pl-2 border-l border-white/30 text-[10.5px]">
                           {msg.reasoning.mem && (
                             <div>
-                              <strong className="text-purple-200">&lt;mem&gt;:</strong>{' '}
+                              <strong className="text-emerald-300 dark:text-emerald-400">&lt;mem&gt;:</strong>{' '}
                               {msg.reasoning.mem}
                             </div>
                           )}
                           {msg.reasoning.think && (
                             <div>
-                              <strong className="text-purple-200">&lt;think&gt;:</strong>{' '}
+                              <strong className="text-emerald-300 dark:text-emerald-400">&lt;think&gt;:</strong>{' '}
                               {msg.reasoning.think}
                             </div>
                           )}
                           {msg.reasoning.tool_call && (
                             <div>
-                              <strong className="text-purple-200">&lt;tool_call&gt;:</strong>{' '}
+                              <strong className="text-emerald-300 dark:text-emerald-400">&lt;tool_call&gt;:</strong>{' '}
                               {msg.reasoning.tool_call}
                             </div>
                           )}
@@ -532,7 +538,7 @@ export const AIChatWidget: React.FC = () => {
 
             {/* Trạng thái đang tải */}
             {loading && (
-              <div className="flex items-center space-x-2 text-xs text-purple-400 p-2">
+              <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 p-2">
                 <Spin size="small" />
                 <span>Trợ lý đang đối chiếu văn kiện và số trang [p.X]...</span>
               </div>
@@ -543,7 +549,7 @@ export const AIChatWidget: React.FC = () => {
 
           {/* GỢI Ý CÂU HỎI NHANH */}
           {messages.length <= 2 && (
-            <div className="px-3 py-1.5 flex flex-wrap gap-1.5 border-t border-purple-500/15">
+            <div className="px-3 py-1.5 flex flex-wrap gap-1.5 border-t border-emerald-500/15">
               {QUICK_PROMPTS.map((prompt, pIdx) => (
                 <button
                   key={pIdx}
@@ -553,8 +559,8 @@ export const AIChatWidget: React.FC = () => {
                     text-[11px] px-2.5 py-1 rounded-full transition-colors truncate max-w-full
                     ${
                       isDark
-                        ? 'bg-purple-950/40 text-purple-300 hover:bg-purple-900/60 border border-purple-800/40'
-                        : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
+                        ? 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-800/40'
+                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
                     }
                   `}
                 >
@@ -568,7 +574,7 @@ export const AIChatWidget: React.FC = () => {
           <div
             className={`
               p-3 border-t
-              ${isDark ? 'bg-[#0b0c10] border-purple-900/30' : 'bg-[#ffffff] border-purple-100'}
+              ${isDark ? 'bg-[#090e17] border-emerald-900/30' : 'bg-[#ffffff] border-emerald-100'}
             `}
           >
             <div
@@ -576,8 +582,8 @@ export const AIChatWidget: React.FC = () => {
                 flex items-center rounded-full px-3 py-1.5 border transition-all duration-200
                 ${
                   isDark
-                    ? 'bg-[#161922] border-purple-700/60 focus-within:border-[#722ED1] focus-within:ring-2 focus-within:ring-purple-600/30'
-                    : 'bg-[#ffffff] border-purple-300 focus-within:border-[#722ED1] focus-within:ring-2 focus-within:ring-purple-400/30'
+                    ? 'bg-[#111827] border-emerald-700/60 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-600/30'
+                    : 'bg-[#ffffff] border-emerald-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/30'
                 }
               `}
             >
@@ -603,7 +609,7 @@ export const AIChatWidget: React.FC = () => {
                   w-8 h-8 rounded-full flex items-center justify-center text-white transition-all
                   ${
                     inputText.trim() && !loading
-                      ? 'bg-[#722ED1] hover:bg-[#854eca] active:scale-95 shadow-sm'
+                      ? 'bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] active:scale-95 shadow-sm border border-amber-500/30'
                       : 'bg-slate-400/40 cursor-not-allowed text-slate-300'
                   }
                 `}
@@ -620,7 +626,7 @@ export const AIChatWidget: React.FC = () => {
       ───────────────────────────────────────────────────────────── */}
       <Modal
         title={
-          <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400">
+          <div className="flex items-center space-x-2 text-emerald-700 dark:text-emerald-400">
             <ApartmentOutlined className="text-lg" />
             <span>02 Sơ Đồ Tổ Chức & Luồng Chỉ Đạo</span>
           </div>
@@ -655,10 +661,10 @@ export const AIChatWidget: React.FC = () => {
 
             {/* Khối trực quan hóa sơ đồ */}
             <div
-              className={`p-4 rounded-xl border ${isDark ? 'bg-slate-950 border-purple-900/40' : 'bg-slate-50 border-purple-200'}`}
+              className={`p-4 rounded-xl border ${isDark ? 'bg-slate-950 border-emerald-900/40' : 'bg-slate-50 border-emerald-200'}`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-purple-500">
+                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                   Mã Sơ Đồ Mermaid (Flowchart)
                 </span>
                 <Button
@@ -666,7 +672,7 @@ export const AIChatWidget: React.FC = () => {
                   icon={<CopyOutlined />}
                   onClick={() => {
                     navigator.clipboard.writeText(studyBookData.tab_diagram.mermaid_code);
-                    message.success('Đã sao chép mã Mermaid.js vào clipboard.');
+                    toast.success('Đã sao chép mã Mermaid.js vào clipboard.', { title: 'ĐÃ SAO CHÉP', badge: 'MERMAID' });
                   }}
                 >
                   Sao chép mã
@@ -690,7 +696,7 @@ export const AIChatWidget: React.FC = () => {
                       key={sIdx}
                       className={`p-2.5 rounded-lg border text-xs ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}
                     >
-                      <div className="font-semibold text-purple-600 dark:text-purple-400 mb-1">
+                      <div className="font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
                         {sec.title}
                       </div>
                       <p className="text-slate-600 dark:text-slate-300 mb-1">{sec.summary}</p>
@@ -718,7 +724,7 @@ export const AIChatWidget: React.FC = () => {
       ───────────────────────────────────────────────────────────── */}
       <Modal
         title={
-          <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400">
+          <div className="flex items-center space-x-2 text-emerald-700 dark:text-emerald-400">
             <FormOutlined className="text-lg" />
             <span>03 Kiểm Tra Nhận Thức Văn Bản (Trắc Nghiệm 4 Đáp Án)</span>
           </div>
@@ -740,7 +746,7 @@ export const AIChatWidget: React.FC = () => {
             <Button
               key="submit"
               type="primary"
-              className="!bg-[#722ED1]"
+              className="!bg-[#166534] hover:!bg-[#14532d] !border-amber-500/30"
               onClick={handleSubmitQuiz}
               disabled={loadingStudyBook || !studyBookData?.tab_quiz}
             >
@@ -842,10 +848,10 @@ export const AIChatWidget: React.FC = () => {
                                   : isChosen && !isCorrect && submittedQuiz
                                     ? 'bg-rose-500/20 border-rose-500 text-rose-400 line-through'
                                     : isChosen
-                                      ? 'bg-purple-600/20 border-purple-500 text-purple-400 font-medium'
+                                      ? 'bg-emerald-600/20 border-emerald-500 text-emerald-700 dark:text-emerald-400 font-medium'
                                       : isDark
-                                        ? 'bg-slate-950/50 border-slate-800 hover:border-purple-600/50'
-                                        : 'bg-slate-50 border-slate-200 hover:border-purple-400'
+                                        ? 'bg-slate-950/50 border-slate-800 hover:border-emerald-600/50'
+                                        : 'bg-slate-50 border-slate-200 hover:border-emerald-400'
                               }
                             `}
                           >
@@ -862,24 +868,24 @@ export const AIChatWidget: React.FC = () => {
                     {submittedQuiz && (
                       <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
                         <div className="flex items-center space-x-2">
-                          <Tag color="purple">Đáp án đúng: {q.correct_answer}</Tag>
+                          <Tag color="green">Đáp án đúng: {q.correct_answer}</Tag>
                           <Tag color="blue">{q.citation}</Tag>
                         </div>
 
                         <p className="text-slate-600 dark:text-slate-300">{q.explanation}</p>
 
                         {q.agentic_steps && (
-                          <div className="p-2 rounded bg-purple-950/20 dark:bg-purple-950/40 border border-purple-800/30 text-[11px] space-y-1">
+                          <div className="p-2 rounded bg-emerald-950/20 dark:bg-emerald-950/40 border border-emerald-800/30 text-[11px] space-y-1">
                             <div>
-                              <strong className="text-purple-400">&lt;mem&gt;:</strong>{' '}
+                              <strong className="text-emerald-400">&lt;mem&gt;:</strong>{' '}
                               {q.agentic_steps.mem}
                             </div>
                             <div>
-                              <strong className="text-purple-400">&lt;think&gt;:</strong>{' '}
+                              <strong className="text-emerald-400">&lt;think&gt;:</strong>{' '}
                               {q.agentic_steps.think}
                             </div>
                             <div>
-                              <strong className="text-purple-400">&lt;tool_call&gt;:</strong>{' '}
+                              <strong className="text-emerald-400">&lt;tool_call&gt;:</strong>{' '}
                               {q.agentic_steps.tool_call}
                             </div>
                           </div>
@@ -908,7 +914,7 @@ function renderFormattedText(text: string): React.ReactNode {
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return (
-        <strong key={index} className="font-semibold text-purple-300 dark:text-purple-200">
+        <strong key={index} className="font-semibold text-emerald-800 dark:text-emerald-300">
           {part.slice(2, -2)}
         </strong>
       );
@@ -917,7 +923,7 @@ function renderFormattedText(text: string): React.ReactNode {
       return (
         <span
           key={index}
-          className="inline-block px-1.5 py-0.2 mx-0.5 rounded bg-purple-900/40 text-purple-300 font-mono text-[11px] border border-purple-500/30"
+          className="inline-block px-1.5 py-0.5 mx-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-mono text-[11px]"
         >
           {part}
         </span>

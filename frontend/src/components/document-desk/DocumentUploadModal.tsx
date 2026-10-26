@@ -115,14 +115,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   setDuplicateInfo(null);
   setAllowOverride(false);
 
-  Promise.all([
-    documentService.parseDocument(selectedFile).catch((err) => {
-      console.warn('[parse PDF]', err);
-      return { success: false, error: err.message } as ParseDocumentResult;
-    }),
-    documentService.checkDuplicate(selectedFile).catch(() => null),
-  ])
-    .then(([parseRes, dupRes]) => {
+  // ✅ CHỈ 1 API call — parse đã trả về cả duplicate_check (SHA256 + code)
+  documentService.parseDocument(selectedFile)
+    .then((parseRes) => {
       if (parseRes.success && parseRes.parsed) {
         const p = parseRes.parsed;
         if (p.document_code) setCode(p.document_code);
@@ -141,7 +136,15 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       } else if (parseRes.error) {
         setParseError(parseRes.error);
       }
-      if (dupRes) setDuplicateInfo(dupRes);
+
+      // ✅ Map duplicate_check từ parse response → state duplicateInfo
+      if (parseRes.duplicate_check) {
+        setDuplicateInfo(parseRes.duplicate_check);
+      }
+    })
+    .catch((err) => {
+      console.warn('[parse PDF]', err);
+      setParseError(err?.message || 'Không thể đọc PDF. Vui lòng nhập tay.');
     })
     .finally(() => setParsing(false));
   // eslint-disable-next-line
@@ -193,15 +196,15 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const getSecurityBadgeClass = (name: string) => {
     const lower = (name || '').toLowerCase();
     if (lower.includes('tuyệt mật')) {
-      return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30';
+      return 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30';
     }
     if (lower.includes('tối mật')) {
-      return 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30';
+      return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25';
     }
     if (lower.includes('mật')) {
-      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30';
     }
-    return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+    return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
   };
 
   // ── Mở modal xác nhận ──
@@ -405,7 +408,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="Ví dụ: 125/QĐ-QK7"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
                 />
               </div>
 
@@ -418,7 +421,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   value={signer}
                   onChange={(e) => setSigner(e.target.value)}
                   placeholder="Họ tên, chức danh người ký..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
                 />
               </div>
             </div>
@@ -432,7 +435,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Về việc chỉ đạo triển khai kế hoạch bảo đảm an toàn..."
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
               />
             </div>
 
@@ -444,7 +447,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <select
                   value={typeId}
                   onChange={(e) => setTypeId(e.target.value)}
-                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors ${
+                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-colors ${
                     typeId ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
                   }`}
                 >
@@ -531,7 +534,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <select
                   value={securityLevel}
                   onChange={(e) => setSecurityLevel(e.target.value ? Number(e.target.value) : '')}
-                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors ${
+                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-colors ${
                     securityLevel !== '' ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
                   }`}
                 >
@@ -556,7 +559,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   type="date"
                   value={issueDate}
                   onChange={(e) => setIssueDate(e.target.value)}
-                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors ${
+                  className={`w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-colors ${
                     issueDate ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
                   }`}
                 />
@@ -598,7 +601,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   disabled={!isFormValid || submitting || (duplicateInfo?.sha_duplicate && !allowOverride)}
                   className={`px-4 py-2 font-bold rounded-xl flex items-center gap-1.5 transition ${
                     isFormValid
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-md shadow-emerald-600/30'
+                      ? 'bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white cursor-pointer shadow-md shadow-emerald-950/20 border border-amber-500/25'
                       : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700/60 cursor-not-allowed shadow-none'
                   }`}
                   title={!isFormValid ? 'Vui lòng điền đầy đủ các thông tin bắt buộc (*)' : undefined}
@@ -750,7 +753,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 type="button"
                 onClick={executeSave}
                 disabled={submitting}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-emerald-600/30 disabled:opacity-50"
+                className="px-4 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-emerald-950/20 border border-amber-500/25 disabled:opacity-50"
               >
                 {submitting ? (
                   <>

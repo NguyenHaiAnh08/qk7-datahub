@@ -12,11 +12,15 @@ const swaggerSpec = {
     title: 'QK7 DataHub API',
     version: '1.0.0',
     description:
-      'API Gateway nội bộ QK7 — Quản lý tài liệu PDF phân cấp bảo mật 5 mức.\n\n' +
-      '**Xác thực:** gửi `X-User-Id` và `X-Clearance` (trừ các endpoint công khai).\n\n' +
-      '**Tài khoản test:** `USR-001/123456789` (Admin, Cấp 5) · `USR-002/123456789` (Văn thư, Cấp 3) · `USR-003/123456789` (Thủ trưởng, Cấp 4)\n\n' +
-      '**Quy tắc tải file:** Tài liệu Cấp ≥ 3 chỉ được **xem** (`download=0`), không được tải về.\n\n' +
-      '**Quyền admin:** mọi endpoint `/api/admin/*` yêu cầu `X-Clearance >= 4`.',
+  'API Gateway nội bộ QK7 — Quản lý tài liệu PDF phân cấp bảo mật 5 mức.\n\n' +
+  '**Xác thực:** JWT Bearer Token (trừ các endpoint công khai: `/api/auth/login`, `/api/health`, `/api/meta`).\n\n' +
+  '**Quy trình đăng nhập:**\n' +
+  '1. Gọi `POST /api/auth/login` với `{ user_id, password }`\n' +
+  '2. Nhận về `token` (JWT, hết hạn 8h) + `user`\n' +
+  '3. Gửi kèm header `Authorization: Bearer <token>` cho mọi request tiếp theo\n\n' +
+  '**Tài khoản test:** `USR-001/123456789` (Admin, Cấp 5) · `USR-002/123456789` (Văn thư, Cấp 3) · `USR-003/123456789` (Thủ trưởng, Cấp 4)\n\n' +
+  '**Quy tắc tải file:** Tài liệu Cấp ≥ 3 chỉ được **xem** (`download=0`), không được tải về.\n\n' +
+  '**Quyền admin:** mọi endpoint `/api/admin/*` yêu cầu JWT có `clearance_level_id >= 4`.',
     contact: { name: 'Phòng CNTT QK7' },
   },
   servers: [{ url: '/', description: 'Cùng origin Swagger UI' }],
@@ -31,7 +35,7 @@ const swaggerSpec = {
     { name: 'AI Assistant', description: 'Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded Agentic RAG)' },
   ],
 
-  security: [{ UserHeader: [], ClearanceHeader: [] }],
+  security: [{ BearerAuth: [] }],
 
   paths: {
     // ==========================================================
@@ -61,18 +65,22 @@ const swaggerSpec = {
           200: {
             description: 'Thành công — trả JWT + thông tin user',
             content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success:    { type: 'boolean', example: true },
-                    token:      { type: 'string', description: 'JWT token dùng cho header Authorization: Bearer <token>', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
-                    expires_in: { type: 'string', example: '8h' },
-                    user:       { $ref: '#/components/schemas/UserFull' },
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success:    { type: 'boolean', example: true },
+                  token:      {
+                    type: 'string',
+                    description: 'JWT token. Payload chứa `{ user_id, clearance_level_id, roles, iat, exp }`. Gửi trong header `Authorization: Bearer <token>` cho mọi request tiếp theo.',
+                    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiVVNSLTAwMSIsImNsZWFyYW5jZV9sZXZlbF9pZCI6NSwicm9sZXMiOlsiUk9MLTAxIl0sImlhdCI6MTczMDAwMDAwMCwiZXhwIjoxNzMwMDI4ODAwfQ.xxx',
                   },
+                  expires_in: { type: 'string', example: '8h', description: 'Thời gian hết hạn (JWT_EXPIRES_IN)' },
+                  user:       { $ref: '#/components/schemas/UserFull' },
                 },
               },
             },
+          },
           },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
@@ -106,9 +114,9 @@ const swaggerSpec = {
     '/api/auth/fingerprint/verify': {
       post: {
         tags: ['Auth'],
-        summary: 'Xác thực vân tay → cấp token tạm xem file cấp 4-5',
+        summary: 'Xác thực vân tay → cấp token tạm xem file cấp 3-5 (Mật, Tối Mật, Tuyệt Mật)',
         description:
-          'Endpoint xác thực vân tay cho tài liệu cấp Tối mật (4) / Tuyệt mật (5).\n\n' +
+          'Endpoint xác thực vân tay cho tài liệu cấp Mật (3) / Tối mật (4) / Tuyệt mật (5).\n\n' +
           '**Cách hoạt động:**\n' +
           '1. Browser lấy `device_id` từ Fingerprint Agent local (`http://127.0.0.1:9001/device-id`)\n' +
           '2. Browser gọi endpoint này kèm header `X-Device-FP: <device_id>`\n' +
@@ -116,7 +124,7 @@ const swaggerSpec = {
           '4. Agent quét ZK9500, so khớp template, gửi kết quả về BE\n' +
           '5. Nếu khớp → BE cấp `fingerprint_token` (JWT 5 phút, gắn file_id + user_id)\n\n' +
           '**Frontend dùng token này** để gọi `GET /api/files/{fileId}/view` qua header `X-Fingerprint-Token`.',
-        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             in: 'header',
@@ -212,7 +220,7 @@ const swaggerSpec = {
           '4. Agent chờ user đặt tay 3 lần (cùng ngón), merge template, gửi về BE\n' +
           '5. BE mã hóa template (AES-256-GCM) → lưu vào `USER_FINGERPRINT.template_enc`\n\n' +
           '**Lưu ý:** Người đặt tay PHẢI là user đích — nếu admin đặt tay của mình thì sau này user đích sẽ không quét được.',
-        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             in: 'path',
@@ -279,7 +287,7 @@ const swaggerSpec = {
         description:
           'Trả về danh sách các Agent (máy trạm có đầu đọc ZK9500) đang kết nối WebSocket tới BE.\n\n' +
           'Dùng để debug hoặc kiểm tra máy nào đang sẵn sàng quét vân tay.',
-        security: [{ BearerAuth: [] }, { UserHeader: [], ClearanceHeader: [] }],
+        security: [{ BearerAuth: [] }],
         responses: {
           200: {
             description: 'Danh sách agent',
@@ -305,6 +313,43 @@ const swaggerSpec = {
             },
           },
           403: { description: 'Cần quyền admin (clearance ≥ 4)' },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    '/api/admin/fingerprint/enroll-status': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Trạng thái tiến trình đăng ký vân tay 3 bước thời gian thực',
+        description: 'Trả về tiến trình enroll 3 bước (0/3, 1/3, 2/3, 3/3) cho máy quét chỉ định qua query deviceId hoặc header X-Device-FP.',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'deviceId',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Mã thiết bị ZK9500 (tùy chọn)',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Tiến trình enroll',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    enrolling: { type: 'boolean', example: true },
+                    step: { type: 'integer', example: 1 },
+                    total: { type: 'integer', example: 3 },
+                    state: { type: 'string', example: 'captured_1' },
+                  },
+                },
+              },
+            },
+          },
           500: { $ref: '#/components/responses/ServerError' },
         },
       },
@@ -648,7 +693,7 @@ const swaggerSpec = {
           name: 'X-Fingerprint-Token',
           required: false,
           schema: { type: 'string' },
-          description: 'BẮT BUỘC nếu file có security_level_id ≥ 4. Lấy từ POST /api/auth/fingerprint/verify. Token có hạn 5 phút, gắn với user_id + file_id.',
+          description: 'BẮT BUỘC nếu file có security_level_id ≥ 3 (Cấp 3 - Mật, Cấp 4 - Tối Mật, Cấp 5 - Tuyệt Mật). Lấy từ POST /api/auth/fingerprint/verify. Token có hạn 5 phút, gắn với user_id + file_id.',
           example: 'eyJhbGciOiJIUzI1NiIs...',
         },
       ],
@@ -667,15 +712,25 @@ const swaggerSpec = {
     '/api/access-logs': {
       get: {
         tags: ['Logs'],
-        summary: 'Nhật ký truy cập (200 bản ghi gần nhất)',
+        summary: 'Nhật ký truy cập & kiểm toán an ninh (Không giới hạn, tự động làm sạch đầu tháng)',
         parameters: [
-          { in: 'query', name: 'user',   schema: { type: 'string' } },
+          { in: 'query', name: 'user',   schema: { type: 'string' }, description: 'Lọc theo mã quân nhân (user_id)' },
           {
             in: 'query', name: 'action',
             schema: {
               type: 'string',
               enum: ['LOGIN', 'LOGIN_FAIL', 'VIEW', 'DOWNLOAD', 'UPLOAD', 'UPDATE', 'DELETE', 'DENIED', 'ERROR'],
             },
+            description: 'Lọc theo loại hành động',
+          },
+          {
+            in: 'query', name: 'scope',
+            schema: {
+              type: 'string',
+              enum: ['active', 'archive', 'all'],
+              default: 'active',
+            },
+            description: 'Phạm vi: active (tháng hiện tại), archive (kho lưu trữ các tháng cũ), all (tất cả)',
           },
         ],
         responses: {
@@ -688,6 +743,66 @@ const swaggerSpec = {
                   properties: {
                     total: { type: 'integer' },
                     items: { type: 'array', items: { $ref: '#/components/schemas/AccessLog' } },
+                    cycle: {
+                      type: 'object',
+                      properties: {
+                        scope: { type: 'string' },
+                        current_month: { type: 'string' },
+                        reset_policy: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    '/api/access-logs/stats': {
+      get: {
+        tags: ['Logs'],
+        summary: 'Thống kê trạng thái chu kỳ nhật ký và kho lưu trữ',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    current_month: { type: 'string' },
+                    active_month_count: { type: 'integer' },
+                    total_active_table_count: { type: 'integer' },
+                    archive_count: { type: 'integer' },
+                    last_archived_at: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    '/api/access-logs/archive-run': {
+      post: {
+        tags: ['Logs'],
+        summary: 'Kích hoạt lưu trữ và làm sạch nhật ký tháng cũ thủ công',
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string' },
+                    archivedCount: { type: 'integer' },
+                    cutoffDate: { type: 'string', format: 'date-time' },
                   },
                 },
               },
@@ -1895,35 +2010,23 @@ const swaggerSpec = {
   // ============================================================
   components: {
     securitySchemes: {
-  UserHeader: {
-    type: 'apiKey',
-    in: 'header',
-    name: 'X-User-Id',
-    description: 'Mã user (VD: USR-001) — legacy auth (khi ALLOW_LEGACY_AUTH=true)',
-  },
-  ClearanceHeader: {
-    type: 'apiKey',
-    in: 'header',
-    name: 'X-Clearance',
-    description: 'Mức bảo mật 1-5 — legacy auth',
-  },
   BearerAuth: {
     type: 'http',
     scheme: 'bearer',
     bearerFormat: 'JWT',
-    description: 'JWT token lấy từ POST /api/auth/login (khuyến nghị dùng thay legacy)',
+    description: 'JWT token lấy từ `POST /api/auth/login`. Header: `Authorization: Bearer <token>`. Hết hạn sau 8 giờ.',
   },
   DeviceFPHeader: {
     type: 'apiKey',
     in: 'header',
     name: 'X-Device-FP',
-    description: 'Device ID của Fingerprint Agent trên máy user — lấy từ http://127.0.0.1:9001/device-id. Bắt buộc cho các endpoint fingerprint.',
+    description: 'Device ID của Fingerprint Agent trên máy user — lấy từ `http://127.0.0.1:9001/device-id`. Bắt buộc cho các endpoint fingerprint.',
   },
   FingerprintTokenHeader: {
     type: 'apiKey',
     in: 'header',
     name: 'X-Fingerprint-Token',
-    description: 'Token tạm 5 phút cấp sau khi xác thực vân tay — BẮT BUỘC để xem file cấp 4-5.',
+    description: 'Token tạm 5 phút cấp sau khi xác thực vân tay — BẮT BUỘC để xem file cấp 3-5 (Mật, Tối Mật, Tuyệt Mật).',
   },
 },
 

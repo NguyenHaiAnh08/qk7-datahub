@@ -10,12 +10,16 @@ import { extractTargets, getActionCategory } from '../components/dashboard/Secur
  * - A1:D1: PHÒNG THAM MƯU HÀNH CHÍNH | E1:I1: CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
  * - A2:D2: TỔ CÔNG NGHỆ THÔNG TIN   | E2:I2: Độc lập - Tự do - Hạnh phúc
  * - A3:D3: Số: ……/BC-CNTT           | E3:I3: Thành phố Hồ Chí Minh, ngày ... tháng ... năm ...
- * - A5:I5: NHẬT KÝ HOẠT ĐỘNG - THƯ VIỆN SỐ (Tiêu đề lớn)
+ * - A5:I5: NHẬT KÝ HOẠT ĐỘNG - DỮ LIỆU SỐ (Tiêu đề lớn)
  * - Row 6: Tiêu đề các cột (Nền cam vàng #FFC000, viền mảnh, căn giữa)
  * - Row 7+: Dữ liệu nhật ký
  * - Footer: NGƯỜI LẬP -> Thiếu tá QNCN Nguyễn Mạnh Nam
+/**
+ * Chuẩn bị file báo cáo Nhật ký kiểm toán an ninh dạng Excel (.xlsx)
+ * Chuẩn định dạng Quân đội theo mẫu: "Xuất báo cáo mẫu.xlsx"
+ * Trả về hàm release() để chỉ thả file về máy khi UI/UX hoàn tất.
  */
-export async function exportAuditReportExcel(logs: AccessLog[]): Promise<void> {
+export async function prepareAuditReportExcel(logs: AccessLog[]): Promise<() => void> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'QK7 DataHub';
   workbook.lastModifiedBy = 'Thiếu tá QNCN Nguyễn Mạnh Nam';
@@ -96,7 +100,7 @@ export async function exportAuditReportExcel(logs: AccessLog[]): Promise<void> {
   // ─── ROW 5: TIÊU ĐỀ BÁO CÁO ───
   worksheet.mergeCells('A5:I5');
   const cellA5 = worksheet.getCell('A5');
-  cellA5.value = 'NHẬT KÝ HOẠT ĐỘNG - THƯ VIỆN SỐ';
+  cellA5.value = 'NHẬT KÝ HOẠT ĐỘNG - DỮ LIỆU SỐ';
   cellA5.font = { name: 'Times New Roman', size: 14, bold: true };
   cellA5.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(5).height = 28;
@@ -227,18 +231,32 @@ export async function exportAuditReportExcel(logs: AccessLog[]): Promise<void> {
   cellSignerName.font = { name: 'Times New Roman', size: 13, bold: true };
   cellSignerName.alignment = { horizontal: 'center', vertical: 'middle' };
 
-  // Ghi buffer và tải file về máy
+  // Ghi buffer và chuẩn bị hàm release tệp Excel
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const fileDateStr = `${year}${month}${day}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-  a.download = `Nhat_Ky_Hoat_Dong_Thu_Vien_So_${fileDateStr}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+
+  return () => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const fileDateStr = `${year}${month}${day}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    a.download = `Nhat_Ky_Hoat_Dong_Thu_Vien_So_${fileDateStr}.xlsx`;
+    document.body.appendChild(a);
+    try {
+      a.click();
+    } finally {
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+  };
+}
+
+/**
+ * Xuất file báo cáo Nhật ký kiểm toán an ninh dạng Excel (.xlsx) trực tiếp
+ */
+export async function exportAuditReportExcel(logs: AccessLog[]): Promise<void> {
+  const release = await prepareAuditReportExcel(logs);
+  release();
 }

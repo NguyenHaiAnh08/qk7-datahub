@@ -57,6 +57,7 @@ export interface AccessLog {
   created_at?: string;
   ip?: string;
   note?: string;
+  is_archived?: number | boolean;
 }
 
 export interface AdminStats {

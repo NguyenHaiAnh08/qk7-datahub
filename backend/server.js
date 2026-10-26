@@ -120,8 +120,16 @@ const loginLimiter = rateLimit({
   message: { error: 'Quá nhiều lần đăng nhập thất bại.', code: 'LOGIN_RATE_LIMITED' },
 });
 
+const fingerprintLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 30,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Thao tác cảm biến vân tay quá dồn dập. Vui lòng thử lại sau giây lát.', code: 'FP_RATE_LIMITED' },
+});
+
 app.use('/api', globalLimiter);
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/fingerprint/scan', fingerprintLimiter);
+app.use('/api/fingerprint/enroll', fingerprintLimiter);
 
 // ═══════════════════════════════════════════════════════════════
 // STATIC & SWAGGER
@@ -1643,19 +1651,27 @@ require('./src/admin-routes')(app, {
   sessionIdleTimeoutMinutes: SESSION_IDLE_TIMEOUT_MINUTES,
 });
 
-app.use('/api/ai', requireAuth, require('./src/ai-routes')({ requirePermission }));
+app.use('/api/ai', requireAuth, require('./src/ai-routes')({
+  requirePermission,
+  writeAccessLog,
+  getClientIp,
+}));
 
 // ═══════════════════════════════════════════════════════════════
 // ERROR HANDLER & SPA FALLBACK
 // ═══════════════════════════════════════════════════════════════
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File vượt quá 50MB' });
-    return res.status(400).json({ error: err.message });
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File vượt quá 50MB', code: 'LIMIT_FILE_SIZE' });
+    return res.status(400).json({ error: err.message, code: 'MULTER_ERROR' });
   }
   if (err) {
     console.error('[Global error]', err);
-    return res.status(500).json({ error: err.message });
+    const status = err.status || err.statusCode || 500;
+    return res.status(status).json({
+      error: err.message || 'Lỗi máy chủ nội bộ',
+      code: err.code || (status === 500 ? 'INTERNAL_SERVER_ERROR' : 'REQUEST_ERROR'),
+    });
   }
   next();
 });

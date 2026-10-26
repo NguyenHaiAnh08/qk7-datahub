@@ -20,6 +20,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { FingerprintScanModal } from '../users/FingerprintScanModal';
 import { CompactDownloadButton } from '../common/CompactDownloadButton';
 import { AccessDeniedCard } from '../common/AccessDeniedCard';
+import { toast } from '../common/Toast';
 
 export interface DocumentPreviewModalProps {
   open: boolean;
@@ -105,26 +106,53 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   if (!open || !document) return null;
 
-  const handleDownload = async () => {
-    if (!canDownload) return;
+  const handleDownload = async (signal?: AbortSignal): Promise<() => void> => {
+    if (!canDownload || !document) throw new Error('Không có quyền tải về');
     try {
       setDownloading(true);
+      toast.info(`Đang truyền phát và chuẩn bị văn bản ${document.document_code}...`, {
+        title: 'ĐANG XỬ LÝ TỆP',
+        badge: 'STREAMING',
+        duration: 3200,
+      });
+
       if (blobUrl) {
-        const a = window.document.createElement('a');
-        a.href = blobUrl;
-        a.download = document.original_name || `${document.document_code}.pdf`;
-        window.document.body.appendChild(a);
-        a.click();
-        window.document.body.removeChild(a);
-      } else {
-        await fileService.downloadFile(
-          document.file_id,
-          document.original_name || `${document.document_code}.pdf`,
-          fingerprintToken || undefined
-        );
+        return () => {
+          const a = window.document.createElement('a');
+          a.href = blobUrl;
+          a.download = document.original_name || `${document.document_code}.pdf`;
+          window.document.body.appendChild(a);
+          try {
+            a.click();
+          } finally {
+            a.remove();
+          }
+          toast.success(`Đã tải xuống thành công văn bản ${document.document_code}`, {
+            title: 'TẢI TỆP HOÀN TẤT',
+            badge: 'PDF-READY',
+          });
+        };
       }
+
+      const release = await fileService.prepareDownload(
+        document.file_id,
+        document.original_name || `${document.document_code}.pdf`,
+        fingerprintToken || undefined,
+        signal
+      );
+
+      return () => {
+        release();
+        toast.success(`Đã tải xuống thành công văn bản ${document.document_code}`, {
+          title: 'TẢI TỆP HOÀN TẤT',
+          badge: 'PDF-READY',
+        });
+      };
     } catch (err: any) {
-      setError(err.message || 'Lỗi khi tải tệp');
+      if (err?.name !== 'AbortError') {
+        setError(err.message || 'Lỗi khi tải tệp');
+      }
+      throw err;
     } finally {
       setDownloading(false);
     }
@@ -201,6 +229,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               </button>
               <CompactDownloadButton
                 onDownload={handleDownload}
+                onCancel={() =>
+                  toast.info(`Đã hủy tải văn bản ${document.document_code}`, {
+                    title: 'ĐÃ HỦY TẢI',
+                    badge: 'CANCELLED',
+                    duration: 2000,
+                  })
+                }
                 disabled={!canDownload}
                 disabledTitle={
                   isSecretLevel

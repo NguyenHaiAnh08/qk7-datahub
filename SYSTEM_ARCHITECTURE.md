@@ -483,13 +483,24 @@ erDiagram
     }
 
     ACCESS_LOG {
-        bigint log_id PK "Mã định danh nhật ký tự tăng"
+        string log_id PK "Mã định danh nhật ký"
         string user_id FK "Quân nhân thực hiện hành vi"
         string file_id FK "Tệp tài liệu chịu tác động (nếu có)"
-        string action "LOGIN, VIEW, DOWNLOAD, UPLOAD, FINGERPRINT_OK, FINGERPRINT_FAIL..."
+        string action "LOGIN, VIEW, DOWNLOAD, UPLOAD, FINGERPRINT_OK..."
         string ip "Địa chỉ IP trạm làm việc"
         string note "Chi tiết ghi chú bổ sung"
-        datetime created_at "Dấu thời gian kiểm toán chính xác"
+        datetime timestamp "Dấu thời gian kiểm toán chính xác"
+    }
+
+    ACCESS_LOG_ARCHIVE {
+        string log_id PK "Mã định danh nhật ký đã lưu trữ"
+        string user_id FK "Quân nhân thực hiện hành vi"
+        string file_id FK "Tệp tài liệu chịu tác động"
+        string action "Loại hành vi kiểm toán"
+        string ip "Địa chỉ IP trạm làm việc"
+        string note "Chi tiết ghi chú"
+        datetime timestamp "Thời gian ghi nhận ban đầu"
+        datetime archived_at "Thời gian chuyển vào kho lưu trữ định kỳ đầu tháng"
     }
 
     ROLE {

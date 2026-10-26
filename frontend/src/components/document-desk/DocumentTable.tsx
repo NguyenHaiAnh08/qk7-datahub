@@ -14,6 +14,7 @@ import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
+import { CompactDownloadButton } from '../common/CompactDownloadButton';
 
 export interface DocumentTableProps {
   documents: DocumentItem[];
@@ -26,7 +27,8 @@ export interface DocumentTableProps {
   onClearFilters?: () => void;
   onPageChange: (page: number) => void;
   onPreview: (doc: DocumentItem) => void;
-  onDownload: (doc: DocumentItem) => void;
+  onDownload: (doc: DocumentItem, signal?: AbortSignal) => Promise<(() => void) | void> | (() => void) | void;
+  onCancelDownload?: (doc: DocumentItem) => void;
   onEdit?: (doc: DocumentItem) => void;
   onDelete?: (doc: DocumentItem) => void;
 }
@@ -43,6 +45,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   onPageChange,
   onPreview,
   onDownload,
+  onCancelDownload,
   onEdit,
   onDelete,
 }) => {
@@ -169,30 +172,18 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                             const canDownload = docLevel <= 2 && docLevel <= userClearanceLevel;
                             const isSecretLevel = docLevel >= 3;
 
-                            if (canDownload) {
-                              return (
-                                <button
-                                  onClick={() => onDownload(doc)}
-                                  className="p-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800/60 rounded-lg transition cursor-pointer"
-                                  title="Tải về tệp gốc"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                </button>
-                              );
-                            }
-
                             return (
-                              <button
-                                disabled
-                                className="p-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 rounded-lg cursor-not-allowed opacity-60"
-                                title={
+                              <CompactDownloadButton
+                                onDownload={(signal) => onDownload(doc, signal)}
+                                onCancel={() => onCancelDownload?.(doc)}
+                                size="icon"
+                                disabled={!canDownload}
+                                disabledTitle={
                                   isSecretLevel
                                     ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
                                     : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
                                 }
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
+                              />
                             );
                           })()}
                           {onEdit && (

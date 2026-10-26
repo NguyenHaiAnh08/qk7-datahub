@@ -277,6 +277,8 @@ const {
   requireAnyPermission,
 } = perms;
 
+const SESSION_IDLE_TIMEOUT_MINUTES = parseInt(process.env.SESSION_IDLE_TIMEOUT_MINUTES || '30', 10);
+
 const createSessionModule = require('./src/sessions');
 const createConfigModule = require('./src/system-config');
 
@@ -287,10 +289,22 @@ const {
   revokeAllUserSessions,
   killSessionById,
   listActiveSessions,
+  revokeIdleSessions,
   invalidateTokenCache,
 } = createSessionModule({ sql, getPool, writeAccessLog, getClientIp });
 
 const config = createConfigModule({ sql, getPool });
+
+// Tự động revoke session không hoạt động > SESSION_IDLE_TIMEOUT_MINUTES
+setInterval(async () => {
+  try {
+    await revokeIdleSessions(SESSION_IDLE_TIMEOUT_MINUTES, 'IDLE_TIMEOUT');
+  } catch (err) {
+    console.error('[Idle cleanup]', err.message);
+  }
+}, 60 * 1000);
+
+console.log(`[Session] ⏰ Idle timeout: ${SESSION_IDLE_TIMEOUT_MINUTES} phút (tự động logout)`);
 
 // ═══════════════════════════════════════════════════════════════
 // AUTH MIDDLEWARE — JWT + Session validation
@@ -1545,6 +1559,7 @@ require('./src/admin-routes')(app, {
   getUserPermissions: perms.getUserPermissions,
   invalidateCache: perms.invalidateCache,
   revokeAllUserSessions, killSessionById, listActiveSessions,
+  sessionIdleTimeoutMinutes: SESSION_IDLE_TIMEOUT_MINUTES,
 });
 
 app.use('/api/ai', requireAuth, require('./src/ai-routes')({ requirePermission }));

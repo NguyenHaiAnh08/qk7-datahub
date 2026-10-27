@@ -60,6 +60,13 @@ async def lifespan(app: FastAPI):
             print(f"[boxchat] Đã nạp tự động {indexed} tài liệu vào kho vector.")
         except Exception as e:
             print(f"[boxchat] Auto-index cảnh báo: {e}")
+
+    # Warm-up mô hình LLM Ollama
+    try:
+        agent_tutor.warm_up()
+    except Exception as e:
+        print(f"[boxchat] Warm-up Ollama cảnh báo: {e}")
+
     yield
     print("[boxchat] Dừng microservice.")
 
@@ -81,12 +88,13 @@ app.add_middleware(
 )
 
 
-# ─── Pydantic Models ───
 class ChatRequest(BaseModel):
     query: str = Field(..., description="Nội dung câu hỏi của quân nhân")
     user_id: Optional[str] = Field("USR-GUEST", description="Mã quân nhân")
     user_clearance: int = Field(1, description="Cấp độ bảo mật (1-5)", ge=1, le=5)
     file_id: Optional[str] = Field(None, description="Mã tệp cụ thể nếu đang mở tài liệu")
+    history: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Lịch sử trao đổi đa lượt")
+    biometric_verified: Optional[bool] = Field(False, description="Cờ xác nhận đã quét vân tay ZK9500 hợp lệ")
 
 
 class IngestRequest(BaseModel):
@@ -112,6 +120,7 @@ class SyncAllRequest(BaseModel):
 # ─── Endpoints ───
 
 @app.get("/ai/health")
+@app.get("/api/ai/health")
 async def health_check():
     """
     Kiểm tra trạng thái sẵn sàng của boxchat và số lượng chunks đã nạp.
@@ -194,25 +203,31 @@ async def chat_with_tutor(req: ChatRequest):
     Tra cứu thông minh và hội thoại với Trợ lý Tác chiến:
     Pre-filtering cứng: security_level_id <= user_clearance
     Trích dẫn số trang [p.X] và suy luận <mem>, <think>, <tool_call>.
+    Bảo vệ Sinh trắc học Vân tay ZK9500 cho văn kiện Cấp 3-5.
     """
     if not req.query or not req.query.strip():
         raise HTTPException(status_code=400, detail="Thiếu nội dung câu hỏi")
 
+    # Tối ưu truy vấn đa lượt (Query Rewriting với ngữ cảnh history)
+    rewritten_query = agent_tutor._rewrite_query_with_history(req.query, req.history or [])
+
     # 1. Tìm kiếm chunks phù hợp với cấp quyền của quân nhân
     retrieved_chunks = vector_store.search(
-        query=req.query,
+        query=rewritten_query,
         max_security_level=req.user_clearance,
         file_id=req.file_id,
         top_k=5
     )
 
-    # 2. Sinh câu trả lời Grounded RAG qua AgentTutor
+    # 2. Sinh câu trả lời Grounded RAG qua AgentTutor (có áp Biometric Guard)
     result = agent_tutor.answer_query(
         query=req.query,
         user_id=req.user_id or "USR-GUEST",
         user_clearance=req.user_clearance,
         retrieved_chunks=retrieved_chunks,
-        file_id=req.file_id
+        file_id=req.file_id,
+        history=req.history,
+        biometric_verified=bool(req.biometric_verified)
     )
 
     return result
@@ -282,4 +297,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8001))
     host = os.getenv("HOST", "0.0.0.0")
-    uvicorn.run("main:app", host=host, port=port, reload=True)
+    uvicorn.run(app, host=host, port=port, reload=False)

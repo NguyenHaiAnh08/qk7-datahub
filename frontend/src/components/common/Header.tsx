@@ -353,7 +353,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Nội dung Popover User Profile cho iPad và Desktop
   const userPopoverContent = (
-    <div className="w-72 p-1 text-slate-800 dark:text-slate-200 text-xs">
+    <div className="w-[340px] sm:w-[360px] p-1 text-slate-800 dark:text-slate-200 text-xs">
       <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -394,12 +394,12 @@ export const Header: React.FC<HeaderProps> = ({
           {user?.full_name || 'Khách tra cứu'}
         </div>
         {(user?.rank_name || user?.position) && (
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
             {[user.rank_name, user.position].filter(Boolean).join(' - ')}
           </div>
         )}
         {user?.unit_name && (
-          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 font-medium">
+          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 font-medium whitespace-nowrap">
             {user.unit_name}
           </div>
         )}

@@ -154,7 +154,10 @@ class AgentTutor:
         retrieved_chunks: List[Dict[str, Any]],
         file_id: Optional[str] = None,
         history: Optional[List[Dict[str, Any]]] = None,
-        biometric_verified: bool = False
+        biometric_verified: bool = False,
+        user_name: Optional[str] = None,
+        user_position: Optional[str] = None,
+        user_rank: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Thực thi quy trình Agentic RAG có bảo vệ Sinh trắc học Vân tay ZK9500:
@@ -167,10 +170,24 @@ class AgentTutor:
         has_vector = any("vector_score" in c for c in retrieved_chunks)
         retrieval_mode = "hybrid" if has_vector else "bm25_only"
 
+        # Chuẩn hóa chức danh quân sự xưng hô cá nhân hóa
+        # Ví dụ: "Báo cáo Đồng chí Nguyễn Mạnh Nam - Tổ trưởng Công Nghệ Thông Tin,"
+        pos_display = (user_position or "").strip()
+        if pos_display.upper() == "CNTT" or "tổ trưởng cntt" in pos_display.lower():
+            pos_display = "Tổ trưởng Công Nghệ Thông Tin"
+
+        if user_name and pos_display:
+            salutation = f"Báo cáo Đồng chí {user_name} - {pos_display},"
+        elif user_name:
+            salutation = f"Báo cáo Đồng chí {user_name},"
+        else:
+            salutation = "Báo cáo đồng chí,"
+
         # Bước 1: <mem>
         bio_status_str = "Đã xác thực vân tay ZK9500" if biometric_verified else "Chưa xác thực vân tay"
         mem_trace = (
-            f"[Agent Memory] Quân nhân ID: {user_id} | Cấp độ bảo mật: Cấp {user_clearance} ({clearance_name}). "
+            f"[Agent Memory] Quân nhân ID: {user_id} | Họ tên: {user_name or 'N/A'} | Chức vụ: {pos_display or 'N/A'}. "
+            f"Cấp độ bảo mật: Cấp {user_clearance} ({clearance_name}). "
             f"Sinh trắc học: {bio_status_str}. "
             f"Tài liệu mục tiêu: {file_id or 'Toàn bộ kho dữ liệu hợp lệ'}. "
             f"Tổng số đoạn trích hợp lệ thu nhận: {len(retrieved_chunks)}."
@@ -179,7 +196,7 @@ class AgentTutor:
         # Kiểm tra ngưỡng bằng chứng
         if not retrieved_chunks:
             return {
-                "answer": NO_DATA_FALLBACK_MESSAGE,
+                "answer": f"{salutation} không tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.",
                 "citations": [],
                 "reasoning": {
                     "mem": mem_trace,
@@ -196,7 +213,53 @@ class AgentTutor:
             }
 
         # Bước 2: <think>
-        valid_chunks = [c for c in retrieved_chunks if c.get("score", 0) >= 0.1] or retrieved_chunks[:3]
+        raw_valid = [c for c in retrieved_chunks if c.get("score", 0) > 0.001] or retrieved_chunks
+
+        # --- SINGLE-DOCUMENT FOCUS & DOMINANT DOCUMENT FILTERING ---
+        # Đảm bảo chỉ gợi ý đúng 1 file phù hợp nhất khi người dùng tra cứu thông tin văn bản
+        query_lower = query.lower()
+        code_matches = re.findall(r'(\d+[\/\-][A-Za-z0-9\/\-]+|\b\d{2,4}\b)', query)
+        target_file_id = None
+
+        if code_matches and raw_valid:
+            for chunk in raw_valid:
+                chunk_code = (chunk.get("document_code") or "").lower()
+                chunk_title = (chunk.get("title") or "").lower()
+                chunk_fid = (chunk.get("file_id") or "").lower()
+                for cm in code_matches:
+                    cm_lower = cm.lower()
+                    if cm_lower in chunk_code or cm_lower in chunk_title or cm_lower in chunk_fid:
+                        target_file_id = chunk.get("file_id")
+                        break
+                if target_file_id:
+                    break
+
+        single_doc_keywords = [
+            "ai ban hành", "đơn vị nào ban hành", "cơ quan nào ban hành", "người ký", "ai ký",
+            "ngày phát hành", "ngày ban hành", "ngày tháng năm", "thời gian ban hành",
+            "số hiệu", "ký hiệu", "kí hiệu", "số văn bản", "số quyết định", "số kế hoạch",
+            "trích yếu", "nội dung là gì", "có nội dung gì", "loại văn bản", "văn bản gì"
+        ]
+        is_single_doc_query = any(kw in query_lower for kw in single_doc_keywords)
+
+        if target_file_id:
+            # Ưu tiên tuyệt đối văn bản có số hiệu khớp với câu hỏi
+            valid_chunks = [c for c in raw_valid if c.get("file_id") == target_file_id] or raw_valid
+        elif is_single_doc_query and raw_valid:
+            # Câu hỏi tra cứu thuộc tính văn bản: Giữ duy nhất file đứng đầu (top 1)
+            top_file_id = raw_valid[0].get("file_id")
+            valid_chunks = [c for c in raw_valid if c.get("file_id") == top_file_id]
+        elif raw_valid:
+            # Câu hỏi tổng hợp đa tài liệu hoặc kiểm tra đa cấp mật:
+            # Chỉ giữ các tài liệu có độ liên quan cao sát với top 1 (>= 0.75 * top_score)
+            top_score = raw_valid[0].get("score", 0)
+            if top_score > 0:
+                valid_chunks = [c for c in raw_valid if c.get("score", 0) >= 0.75 * top_score]
+            else:
+                valid_chunks = raw_valid
+        else:
+            valid_chunks = raw_valid
+
         if not valid_chunks:
             return {
                 "answer": NO_DATA_FALLBACK_MESSAGE,
@@ -217,10 +280,10 @@ class AgentTutor:
 
         # Trường hợp 1: Có tài liệu Cấp 3+ nhưng CHƯA xác thực vân tay ZK9500
         if classified_chunks and not biometric_verified:
-            # 1A. Toàn bộ tài liệu đều thuộc Cấp 3+
+            # 1A. Toàn bộ tài liệu đều thuộc Cấp 3+ (100% Cấp 3+) -> Khóa TOÀN BỘ câu trả lời
             if not unclassified_chunks:
                 biometric_warning_msg = (
-                    "Báo cáo đồng chí, tài liệu liên quan đến nội dung này thuộc danh mục văn bản bảo mật (Cấp 3 trở lên). "
+                    f"{salutation} tài liệu liên quan đến nội dung này thuộc danh mục văn bản bảo mật (Cấp 3 trở lên). "
                     "Yêu cầu cán bộ xác thực vân tay trên máy quét ZKTeco ZK9500 "
                     "(hoặc bấm vào thẻ trích dẫn văn bản bên dưới để quét vân tay) trước khi Trợ lý AI trích xuất nội dung mật."
                 )
@@ -253,7 +316,7 @@ class AgentTutor:
                     "requires_biometric": True
                 }
 
-            # 1B. Kết hợp cả Cấp 1-2 và Cấp 3+: Chỉ tổng hợp từ Cấp 1-2
+            # 1B. Kết hợp cả Cấp 1-2 và Cấp 3+: Vẫn sinh câu trả lời dựa trên Cấp 1-2 (unclassified_chunks)
             prompt_chunks = unclassified_chunks
         else:
             # Trường hợp 2: Đã xác thực vân tay HOẶC chỉ có tài liệu Cấp 1-2
@@ -265,7 +328,7 @@ class AgentTutor:
             f"Tìm thấy các điều khoản và nội dung trích yếu tương thích."
         )
 
-        # Chuẩn bị danh sách citations đính kèm
+        # Chuẩn bị danh sách citations đính kèm:
         citations = []
         seen_citations = set()
         for c in valid_chunks:
@@ -275,7 +338,7 @@ class AgentTutor:
                 sec_id = int(c.get("security_level_id", 1))
                 is_classified = sec_id >= 3
 
-                # Nếu là cấp 3+ và chưa quét vân tay -> che snippet
+                # Nếu là cấp 3+ và chưa quét vân tay -> che snippet và gắn cờ requires_biometric
                 if is_classified and not biometric_verified:
                     snippet = "[Nội dung Mật - Yêu cầu xác thực vân tay ZK9500 để xem chi tiết]"
                     requires_bio = True
@@ -294,13 +357,14 @@ class AgentTutor:
                 })
 
         # Bước 3: <tool_call> sinh câu trả lời
-        answer_text, synthesis_mode = self._generate_grounded_answer(query, prompt_chunks, user_clearance, history)
+        answer_text, synthesis_mode = self._generate_grounded_answer(
+            query, prompt_chunks, user_clearance, history, salutation=salutation, pos_display=pos_display
+        )
 
-        # Nếu có tài liệu cấp 3+ bị che trong trường hợp hỗn hợp
+        # Nếu có tài liệu cấp 3+ bị che trong trường hợp hỗn hợp: Chèn thông báo cảnh báo ở cuối câu trả lời
         if classified_chunks and not biometric_verified and unclassified_chunks:
             answer_text += (
-                "\n\n*(Lưu ý: Hệ thống phát hiện thêm các tài liệu liên quan thuộc Cấp Mật 3 trở lên. "
-                "Vui lòng xác thực vân tay ZK9500 để Trợ lý AI giải phóng toàn bộ nội dung mật)*"
+                "\n\nLưu ý: Có các tài liệu Cấp 3+ liên quan đã bị ẩn. Vui lòng quét vân tay để xem chi tiết."
             )
 
         # Hậu kiểm trích dẫn số trang trong câu trả lời
@@ -314,7 +378,8 @@ class AgentTutor:
         page_tags = [f"[p.{c.get('page', 1)}]" for c in prompt_chunks]
         tool_call_trace = f"[Tool Citation Grounding] Đã gán trích dẫn cụ thể các trang: {', '.join(page_tags)}."
 
-        requires_bio_flag = bool(classified_chunks and not biometric_verified)
+        # Chỉ khóa toàn bộ câu trả lời (requires_biometric=True) nếu 100% chunks tìm được đều thuộc Cấp 3+
+        requires_bio_flag = bool(classified_chunks and not unclassified_chunks and not biometric_verified)
 
         return {
             "answer": verified_answer,
@@ -380,7 +445,9 @@ class AgentTutor:
         query: str,
         chunks: List[Dict[str, Any]],
         user_clearance: int,
-        history: Optional[List[Dict[str, Any]]] = None
+        history: Optional[List[Dict[str, Any]]] = None,
+        salutation: str = "Báo cáo đồng chí,",
+        pos_display: str = ""
     ) -> Tuple[str, str]:
         """
         Sinh câu trả lời trích dẫn grounded:
@@ -389,18 +456,20 @@ class AgentTutor:
         Trả về tuple (answer_text, synthesis_mode).
         """
         # Thử qua Ollama nếu online
-        ollama_response = self._call_ollama(query, chunks, history)
+        ollama_response = self._call_ollama(query, chunks, history, salutation=salutation, pos_display=pos_display)
         if ollama_response:
             return ollama_response, "llm"
 
         # Fallback Extractive Synthesizer
-        return self._extractive_synthesize(query, chunks), "extractive"
+        return self._extractive_synthesize(query, chunks, salutation=salutation), "extractive"
 
     def _call_ollama(
         self,
         query: str,
         chunks: List[Dict[str, Any]],
-        history: Optional[List[Dict[str, Any]]] = None
+        history: Optional[List[Dict[str, Any]]] = None,
+        salutation: str = "Báo cáo đồng chí,",
+        pos_display: str = ""
     ) -> Optional[str]:
         """
         Kết nối Ollama local API (http://127.0.0.1:11434/api/generate).
@@ -434,11 +503,17 @@ class AgentTutor:
             system_prompt = (
                 "Bạn là Trợ Lý Tác Chiến & Văn Thư AI của Bộ Tư Lệnh Quân Khu 7 (QK7 DataHub).\n"
                 "NGUYÊN TẮC THI HÀNH NHIỆM VỤ:\n"
-                "1. Tập trung 100% vào việc phân tích, trích xuất và trả lời trực tiếp, chính xác, trung thực dựa trên DANH SÁCH BẰNG CHỨNG được cung cấp.\n"
-                "2. TUYỆT ĐỐI KHÔNG tự bịa đặt, suy đoán ngoài văn bản, không sinh nội dung lan man hay tạo các trường dữ liệu thừa.\n"
-                "3. Tác phong xưng hô chuẩn mực điều lệnh Quân đội nhân dân Việt Nam: Mở đầu bằng 'Báo cáo đồng chí, ...'.\n"
-                "4. Mọi luận điểm, số liệu, điều khoản, chỉ thị bắt buộc phải kèm theo trích dẫn số trang chính xác dạng [p.X] ngay sau nội dung được trích xuất.\n"
-                "5. Nếu trong danh sách bằng chứng không có hoặc không đủ dữ liệu để trả lời, phải trả lời nguyên văn: "
+                "1. Tập trung 100% vào việc phân tích, trích xuất và trả lời trực tiếp, chính xác, trung thực dựa trên DANH SÁCH BẰNG CHỨNG được cung cấp. Ưu tiên bám sát văn bản có số hiệu hoặc tiêu đề được hỏi.\n"
+                "2. Quy tắc trích xuất thể thức văn bản hành chính - quân sự:\n"
+                "   - Loại văn bản: Xác định chuẩn xác theo tên loại văn bản in hoa giữa trang (ví dụ: KẾ HOẠCH, BÁO CÁO, CHỈ THỊ, QUYẾT ĐỊNH, THÔNG BÁO, CÔNG VĂN).\n"
+                "   - Đơn vị ban hành: Căn cứ vào cơ quan ban hành ở góc trên bên trái (ví dụ: QUÂN KHU 7 / TRƯỜNG QUÂN SỰ).\n"
+                "   - Người ký / Chức vụ: Căn cứ vào chức vụ và họ tên người ký ở góc dưới bên phải (ví dụ: CHÍNH ỦY - Đại tá Bùi Đình Thành).\n"
+                "   - Nội dung văn bản: Trích xuất trung thực nội dung thể hiện trong thân văn bản (kể cả khi văn bản ghi nội dung thử nghiệm như 'NỘI DUNG DEMO').\n"
+                "   - Số hiệu, ngày tháng năm, trích yếu: Nêu chính xác theo thông tin ghi trên văn bản.\n"
+                "3. TUYỆT ĐỐI KHÔNG tự bịa đặt, suy đoán ngoài văn bản, không nhầm lẫn thể loại văn bản khác.\n"
+                f"4. Tác phong xưng hô chuẩn mực điều lệnh Quân đội nhân dân Việt Nam: Bắt buộc mở đầu câu trả lời bằng '{salutation}'.\n"
+                "5. Mọi luận điểm, số liệu, trích dẫn bắt buộc phải kèm theo số trang chính xác dạng [p.X] ngay sau nội dung được trích xuất.\n"
+                "6. Nếu trong danh sách bằng chứng không có hoặc không đủ dữ liệu để trả lời, phải trả lời nguyên văn: "
                 f"'{NO_DATA_FALLBACK_MESSAGE}'."
             )
 
@@ -472,13 +547,35 @@ class AgentTutor:
                 result = resp.json()
                 answer = result.get("response", "").strip()
                 if answer and len(answer) > 20:
+                    # Chuẩn hóa phần mở đầu câu trả lời luôn khớp với salutation yêu cầu mà KHÔNG bị lặp từ
+                    salut_core = salutation.rstrip(",. ").strip()
+                    if answer.lower().startswith(salut_core.lower()):
+                        rest = answer[len(salut_core):].lstrip(",.:- \t\n")
+                        if pos_display and rest.lower().startswith(pos_display.lower()):
+                            rest = rest[len(pos_display):].lstrip(",.:- \t\n")
+                        answer = f"{salutation}\n\n{rest}"
+                    else:
+                        cleaned = re.sub(
+                            r'^(?:báo cáo|kính gửi|thưa)\s+[^,\n.]*[,.:-]*\s*',
+                            '',
+                            answer,
+                            flags=re.IGNORECASE
+                        ).strip()
+                        if pos_display and cleaned.lower().startswith(pos_display.lower()):
+                            cleaned = cleaned[len(pos_display):].lstrip(",.:- \t\n")
+                        answer = f"{salutation}\n\n{cleaned}"
                     return answer
         except Exception:
             pass
 
         return None
 
-    def _extractive_synthesize(self, query: str, chunks: List[Dict[str, Any]]) -> str:
+    def _extractive_synthesize(
+        self,
+        query: str,
+        chunks: List[Dict[str, Any]],
+        salutation: str = "Báo cáo đồng chí,"
+    ) -> str:
         """
         Extractive Grounding Synthesizer:
         Tổng hợp câu trả lời mạch lạc từ các đoạn văn bản tin cậy nhất kèm trích dẫn [p.X].
@@ -494,7 +591,7 @@ class AgentTutor:
         highlight_text = ". ".join(sentences[:3]) + "." if sentences else raw_text[:300] + "..."
 
         answer_parts = [
-            f"Báo cáo đồng chí, căn cứ theo **{doc_code}** (*{title}*), tại **Trang {page} [p.{page}]**, nội dung quy định như sau:",
+            f"{salutation} căn cứ theo **{doc_code}** (*{title}*), tại **Trang {page} [p.{page}]**, nội dung quy định như sau:",
             f"\n> \"{highlight_text}\" [p.{page}]"
         ]
 

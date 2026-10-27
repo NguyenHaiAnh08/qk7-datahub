@@ -6,6 +6,7 @@ thuật toán kết hợp Reciprocal Rank Fusion (RRF k=60) và khử trùng l�
 """
 
 import os
+import sys
 import json
 import math
 import re
@@ -13,6 +14,14 @@ import uuid
 import hashlib
 from typing import List, Dict, Any, Optional, Set
 from collections import Counter
+
+# Đảm bảo in tiếng Việt trên console Windows không bị lỗi charmap
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 import requests
 
@@ -55,23 +64,57 @@ class HybridVectorStore:
 
         self.last_search_mode = "bm25_only"
         self.qdrant_client = None
+        self.stale_lock_cleaned = False
         if HAS_QDRANT:
+            lock_path = os.path.join(self.storage_path, ".lock")
+            if os.path.exists(lock_path):
+                import subprocess
+                try:
+                    current_pid = os.getpid()
+                    check = subprocess.run(
+                        ['powershell', '-NoProfile', '-Command',
+                         f"Get-CimInstance Win32_Process -Filter \"Name LIKE 'python%'\" | "
+                         f"Where-Object {{ $_.ProcessId -ne {current_pid} -and ($_.CommandLine -like '*main.py*' -or $_.CommandLine -like '*uvicorn*') }} | "
+                         f"Select-Object -First 1 -ExpandProperty ProcessId"],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    other_pids = check.stdout.strip()
+                    if other_pids:
+                        print(f"[VectorStore] Qdrant đang được process khác sử dụng (PID: {other_pids}). KHÔNG xóa .lock.")
+                        self.qdrant_client = None
+                        return
+                except subprocess.TimeoutExpired:
+                    print("[VectorStore] Không check được process khác, KHÔNG xóa lock để an toàn")
+                    self.qdrant_client = None
+                    return
+                except Exception as check_err:
+                    print(f"[VectorStore] Lỗi kiểm tra process khác ({check_err}), KHÔNG xóa lock để an toàn")
+                    self.qdrant_client = None
+                    return
+
+                # Nếu không có process khác, xóa lock tồn dư
+                print(f"[VectorStore] Xóa lock tồn dư (đã xác nhận không có process khác): {lock_path}")
+                try:
+                    os.remove(lock_path)
+                    self.stale_lock_cleaned = True
+                except Exception as re:
+                    print(f"[VectorStore] Không xóa được lock: {re}")
+                    self.qdrant_client = None
+                    return
+
             try:
                 # Qdrant chế độ local file path
                 self.qdrant_client = QdrantClient(path=self.storage_path)
             except Exception as e:
-                lock_file = os.path.join(self.storage_path, ".lock")
-                if os.path.exists(lock_file):
-                    try:
-                        print(f"[VectorStore] Phát hiện file khóa Qdrant tồn dư ({e}). Đang giải phóng và thử kết nối lại...")
-                        os.remove(lock_file)
-                        self.qdrant_client = QdrantClient(path=self.storage_path)
-                    except Exception as retry_err:
-                        print(f"[VectorStore] Qdrant retry thất bại: {retry_err}")
-                        self.qdrant_client = None
-                else:
-                    print(f"[VectorStore] Qdrant local init notice (using fallback engine): {e}")
+                error_msg = str(e).lower()
+                # BẮT BUỘC: chỉ xử lý nếu là lock error
+                if "lock" not in error_msg and "already" not in error_msg:
+                    print(f"[VectorStore] Qdrant init failed (không phải lock): {e}")
                     self.qdrant_client = None
+                    return
+
+                print(f"[VectorStore] Qdrant local init thất bại ({e}).")
+                self.qdrant_client = None
 
             if self.qdrant_client:
                 try:

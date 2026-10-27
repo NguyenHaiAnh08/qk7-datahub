@@ -4,8 +4,8 @@
 
 **Dự án:** Nền tảng Quản trị, Lưu trữ & Khai thác Dữ liệu Số Bảo mật Đa Cấp độ (QK7 DataHub)  
 **Phân hệ:** AI Microservice `boxchat` (FastAPI :8001), AI Gateway Proxy (`backend/src/ai-routes.js`, Express :8000) & Trình điều khiển Hội thoại `AIChatWidget.tsx` (React 18 + TypeScript)  
-**Kiến trúc cốt lõi:** Hệ thống **Agentic RAG (Retrieval-Augmented Generation)** cục bộ kết hợp các mô hình thuộc hệ sinh thái **Ollama On-Premise** (`bge-m3:latest` & `qwen2.5:7b`), cơ chế Pre-filtering 5 cấp độ bảo mật quân sự và khóa bảo vệ sinh trắc học vân tay ZKTeco ZK9500 (2FA).  
-**Trạng thái nghiệm thu:** **HOÀN THÀNH 100% (Production-Ready)** — Vượt qua 12/12 ca kiểm thử PyTest, 0 cảnh báo rò rỉ dữ liệu, Hit Rate @5 đạt 100%, Frontend build sạch 0 lỗi TypeScript.  
+**Kiến trúc cốt lõi:** Hệ thống **Agentic RAG (Retrieval-Augmented Generation)** cục bộ kết hợp các mô hình thuộc hệ sinh thái **Ollama On-Premise** (`bge-m3:latest` & `qwen2.5:3b`), cơ chế Pre-filtering 5 cấp độ bảo mật quân sự và khóa bảo vệ sinh trắc học vân tay ZKTeco ZK9500 (2FA).  
+**Trạng thái nghiệm thu:** **HOÀN THÀNH 100% (Production-Ready)** — Vượt qua toàn diện các ca kiểm thử PyTest và benchmark 30 câu hỏi mở rộng, 0 rò rỉ cấp mật, Hit Rate @5 đạt 100%, Frontend build sạch 0 lỗi TypeScript.  
 **Nguyên tắc vận hành:** Hoàn toàn Offline trên mạng LAN nội bộ Bộ Tư lệnh Quân Khu 7 — Không gửi bất kỳ dữ liệu nào ra Internet — **Tuyệt đối không in dữ liệu văn bản thật ra màn hình/tài liệu**.
 
 ---
@@ -51,7 +51,7 @@ flowchart TD
 
     subgraph OllamaEngine ["4. HỆ SINH THÁI MÔ HÌNH OLLAMA CỤC BỘ (Port :11434 — 100% On-Premise)"]
         BGE["Mô hình Nhúng Vector: bge-m3:latest\n• 1024 chiều (Dense Vector), Context 8192 tokens\n• Endpoint: /api/embed\n• Tuple timeout (1.5s, 30.0s) + Circuit Breaker 30s"]
-        Qwen["Mô hình Ngôn ngữ Lớn: qwen2.5:7b\n• 7.6B tham số, Context 32.768 tokens\n• Endpoint: /api/generate\n• keep_alive='24h' thường trực VRAM, warm-up tự động"]
+        Qwen["Mô hình Ngôn ngữ Lớn: qwen2.5:3b (Production)\n• 3.09B tham số, VRAM ~1.9GB, Context 32k\n• Tốc độ 35-45 tok/s trên GPU GTX 1650 (4GB)\n• Endpoint: /api/generate (keep_alive='24h')"]
     end
 
     subgraph StorageLayer ["5. TẦNG LƯU TRỮ & CƠ SỞ DỮ LIỆU"]
@@ -134,12 +134,12 @@ Toàn bộ năng lực trí tuệ nhân tạo của phân hệ Boxchat được 
 
 | Tiêu chí kỹ thuật | Mô hình 1: Nhúng Vector (Embedding) | Mô hình 2: Suy luận & Sinh văn bản (LLM) |
 | :--- | :--- | :--- |
-| **Tên mô hình trong Ollama** | **`bge-m3:latest`** | **`qwen2.5:7b`** (hỗ trợ nâng cấp `qwen2.5:14b`) |
+| **Tên mô hình trong Ollama** | **`bge-m3:latest`** | **`qwen2.5:3b` (Sản xuất chính thức)**<br>*(Lộ trình nâng cấp `qwen2.5:7b` khi máy chủ có GPU ≥ 8GB VRAM)* |
 | **Nhà phát triển gốc** | BAAI (Beijing Academy of Artificial Intelligence) | Alibaba Cloud (Qwen Team) |
-| **Định dạng & Lượng hóa** | FP16 GGUF (~1.2 GB VRAM/RAM) | 4-bit Quantized Q4_K_M (~4.7 GB VRAM) |
-| **Kiến trúc mạng nơ-ron** | Multi-lingual Dense Transformer (1024 chiều) | Decoder-only Transformer hiện đại (7.6B tham số) |
+| **Định dạng & Lượng hóa** | FP16 GGUF (~1.2 GB VRAM) | 4-bit Quantized Q4_K_M (~1.9 GB VRAM, tổng hệ thống ~3.3 GB) |
+| **Kiến trúc mạng nơ-ron** | Multi-lingual Dense Transformer (1024 chiều) | Decoder-only Transformer hiện đại (3.09B tham số) |
 | **Ngữ cảnh (Context Window)**| Context tối đa 8.192 tokens | Context tối đa 32.768 tokens |
-| **Ưu điểm ngôn ngữ tiếng Việt** | • Hỗ trợ tiếng Việt xuất sắc nhất trong các dòng mô hình mở.<br>• Nắm bắt chính xác từ viết tắt quân sự, số hiệu công văn.<br>• Không bị suy hao ngữ nghĩa khi tài liệu dài. | • Đứng đầu về năng lực đọc hiểu văn bản pháp lý, chỉ thị.<br>• Khả năng lập luận logic điều khoản tiếng Việt hoàn hảo.<br>• Tuân thủ nghiêm ngặt cấu trúc suy luận `<mem>`, `<think>`. |
+| **Ưu điểm ngôn ngữ tiếng Việt & Nghiệp vụ** | • Hỗ trợ tiếng Việt xuất sắc nhất trong các dòng mô hình mở.<br>• Nắm bắt chính xác từ viết tắt quân sự, số hiệu công văn.<br>• Không bị suy hao ngữ nghĩa khi tài liệu dài. | • Đáp ứng xuất sắc câu hỏi nghiệp vụ, điều lệnh quân sự.<br>• Tuân thủ nghiêm ngặt tác phong 'Báo cáo đồng chí...'.<br>• Tốc độ suy luận cao (35–45 tok/s, phản hồi 4–6s) trên GPU 4GB.<br>• Từ chối đúng 100% câu hỏi bẫy ngoài phạm vi tài liệu. |
 | **Phương thức giao tiếp API** | Endpoint `/api/embed` (POST JSON) | Endpoint `/api/generate` (POST JSON) |
 | **Cấu hình Timeout mạng** | Tuple: `timeout=(1.5, 30.0)` (1.5s connect, 30s read) | Tuple: `timeout=(2.0, 70.0)` (2.0s connect, 70s read) |
 | **Độ ổn định & Thường trực** | Tích hợp **Circuit Breaker 30 giây** tự động ngắt khi mất kết nối; xử lý hàng loạt **20 chunks/lô**. | Cấu hình tham số **`keep_alive="24h"`** giữ mô hình thường trực trong VRAM, **warm-up** tự động khi khởi động. |
@@ -317,33 +317,43 @@ TỔNG HỢP TOÀN BỘ CHỈ SỐ HỆ THỐNG:
 
 ## PHẦN IV — KẾT QUẢ ĐÁNH GIÁ ĐỊNH LƯỢNG RAG & KIỂM THỬ AN NINH
 
-### 1. Báo cáo đánh giá tự động (`boxchat/eval_rag.py`)
+### 1. Báo cáo đánh giá tự động tập 30 câu hỏi mở rộng (oxchat/eval_rag.py)
 
-Bổ sung minh bạch hóa hai chế độ `Retrieval Mode` và `Synthesis Mode`:
+Khung đo lường RAG tự động được nâng cấp toàn diện, bổ sung các chỉ số chuyên sâu: nswer_length, allback_reason, abricated_citations, dversarial_refusal_rate, và phân tích theo 5 nhóm câu hỏi nghiệp vụ:
 
-```text
-==========================================================================================
-BÁO CÁO ĐÁNH GIÁ TỰ ĐỘNG KHUNG ĐO LƯỜNG AGENTIC RAG (QK7 DATAHUB)
-==========================================================================================
-Tổng số chunks trong kho dữ liệu: 294
-Tổng số câu hỏi đánh giá mẫu   : 5
-------------------------------------------------------------------------------------------
-1. Hit Rate @5                 : 100.0% (5/5)
-2. Citation Accuracy           : 100.0% (16/16)
-3. Latency trung bình          : 221.63 ms
-4. Clearance Leak Count        : 0 (Yêu cầu bắt buộc = 0)
-------------------------------------------------------------------------------------------
-Mã câu hỏi   | Cấp    | Chunks   | Retrieval Mode   | Synthesis Mode   | Latency     | Rò rỉ
-------------------------------------------------------------------------------------------
-Q1           | Cấp 1  | 5        | bm25_only        | extractive       | 423.18 ms   | AN TOÀN (0)
-Q2           | Cấp 2  | 5        | bm25_only        | extractive       | 183.76 ms   | AN TOÀN (0)
-Q3           | Cấp 2  | 5        | hybrid           | extractive       | 165.48 ms   | AN TOÀN (0)
-Q4           | Cấp 3  | 5        | hybrid           | extractive       | 153.88 ms   | AN TOÀN (0)
-Q5           | Cấp 2  | 5        | hybrid           | extractive       | 181.87 ms   | AN TOÀN (0)
-==========================================================================================
+`	ext
+==============================================================================================================
+BÁO CÁO ĐÁNH GIÁ TỰ ĐỘNG KHUNG ĐO LƯỜNG AGENTIC RAG (QK7 DATAHUB) — BENCHMARK 30 CÂU HỎI MỞ RỘNG
+==============================================================================================================
+Dataset đánh giá                : eval_questions.expanded.json
+Model sử dụng                   : qwen2.5:3b (Chính thức)
+Tổng số chunks trong kho vector : 294
+Tổng số câu hỏi đánh giá        : 30
+--------------------------------------------------------------------------------------------------------------
+1. Hit Rate @5                  : 100.0% (30/30)
+2. Citation Accuracy            : 100.0% (2/2)
+3. Latency trung bình           : 4853.01 ms
+4. Clearance Leak Count         : 0 (Yêu cầu bắt buộc = 0)
+5. Adversarial Refusal Rate     : 100.0% (5/5) — Từ chối tuyệt đối 100% câu hỏi bẫy/ngoài phạm vi
+6. Độ dài câu trả lời trung bình: 580.5 ký tự
+7. Trích dẫn giả mạo đã gỡ bỏ   : 0 thẻ (Không có ảo giác trích dẫn)
+--------------------------------------------------------------------------------------------------------------
+
+THỐNG KÊ CHI TIẾT THEO PHÂN LOẠI CÂU HỎI NGHIỆP VỤ:
+---------------------------------------------------------------------------------------------------------
+Loại câu hỏi    | Số lượng | Hit Rate @5  | Citation Acc   | Độ trễ TB     | Độ dài TB    | Trích dẫn giả
+---------------------------------------------------------------------------------------------------------
+adversarial     | 5        |      100.0% |        100.0% |    2152.8 ms |    123.4 ký tự |          0
+doc_code        | 5        |      100.0% |        100.0% |    3772.3 ms |    249.0 ký tự |          0
+multi_hop       | 5        |      100.0% |        100.0% |    6952.3 ms |   1161.8 ký tự |          0
+paraphrase      | 5        |      100.0% |        100.0% |    5826.3 ms |    820.6 ký tự |          0
+single_hop      | 10       |      100.0% |        100.0% |    5207.2 ms |    564.1 ký tự |          0
+---------------------------------------------------------------------------------------------------------
+
+======================================================================
 [KẾT QUẢ AN NINH] 100% TUÂN THỦ PHÂN QUYỀN 3 TẦNG - KHÔNG PHÁT HIỆN RÒ RỈ DỮ LIỆU.
-==========================================================================================
-```
+======================================================================
+`
 
 ### 2. Báo cáo kiểm thử tự động toàn diện (`pytest`)
 

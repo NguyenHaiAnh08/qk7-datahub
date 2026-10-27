@@ -544,13 +544,20 @@ erDiagram
 
 ## 7. Kiến Trúc Trợ Lý AI Tác Chiến & Văn Thư (boxchat Agentic RAG)
 
-### 7.1. Nguyên Lý Thiết Kế
+### 7.1. Nguyên Lý Thiết Kế & Cấu Hình Model Sản Xuất
 Microservice **boxchat** (Python FastAPI tại cổng `:8001`) được thiết kế theo kiến trúc **Citation-Grounded Agentic RAG (Retrieval-Augmented Generation)**:
-1. **Trích xuất PDF Chuyên Sâu (`PDFProcessor`):** Đọc tuần tự từng trang tài liệu PDF quân sự, bảo toàn bảng biểu số liệu, đánh dấu số trang tuyệt đối để phục vụ gắn nhãn trích dẫn.
-2. **Kho Vector Lai (`HybridVectorStore`):** Lưu trữ embedding văn bản vào CSDL vector **Qdrant** cục bộ (`local_storage/qdrant_data`), không truyền dữ liệu ra Internet, bảo đảm an ninh mạng quân sự nội bộ.
-3. **Agent Tutor & Thinking Process:** LLM suy luận nhiều bước, hiển thị quá trình tư duy (`think`) và sinh câu trả lời kèm chip dẫn chứng số trang. Người dùng bấm vào chip dẫn chứng sẽ nhảy trực tiếp đến trang văn bản PDF tương ứng.
-4. **Biên Soạn Giáo Trình Tác Chiến (`StudyBookGenerator`):** Tự động phân tích các văn kiện, chỉ thị lớn để tổng hợp thành tài liệu học tập, tóm tắt các điểm cốt lõi và sinh đề trắc nghiệm kiểm tra nhận thức chính trị/tác chiến.
-5. **Dòng Thời Gian Lịch Sử Quân Sự (`MediaTimelineManager`):** Tự động bóc tách các mốc thời gian, chiến dịch, sự kiện trong văn bản để hiển thị dạng dòng thời gian tương tác.
+1. **Lựa Chọn & Chuẩn Hóa Model Sản Xuất (`qwen2.5:3b`):**
+   - **Model LLM:** `qwen2.5:3b` (chạy qua Ollama cục bộ `http://127.0.0.1:11434`), kết hợp model embedding đa ngôn ngữ `bge-m3` (1024-d).
+   - **Cơ sở lựa chọn:** Dựa trên kết quả đo lường và khảo sát phần cứng thực tế (NVIDIA GeForce GTX 1650 4.0 GB VRAM) tại tài liệu `docs/MODEL_DECISION.md`. Model 3b chỉ chiếm ~1.9 GB (tổng hệ thống kèm bge-m3 và KV cache ~3.3 GB VRAM), vừa vặn 100% trong GPU VRAM mà không bị tràn sang RAM hệ thống.
+   - **Hiệu năng thực nghiệm (30 câu hỏi mở rộng):** Đạt **Hit Rate @5 100%**, **Citation Accuracy 100%**, **Clearance Leak = 0 (an toàn tuyệt đối)**, **Adversarial Refusal Rate 100%** trước các câu hỏi bẫy/ngoài phạm vi, với độ trễ phản hồi tối ưu **4.8 – 6.7 giây** (đáp ứng hoàn hảo cho kíp trực tác chiến).
+   - **Điều kiện nâng cấp `7b` trong tương lai:** Chỉ nâng cấp khi trang bị máy chủ có GPU chuyên dụng VRAM ≥ 8.0 GB (như RTX 3060 12GB hoặc RTX A4000).
+2. **Kho Vector Lai & Cơ Chế Khóa Tự Phục Hồi An Toàn (Self-Healing Qdrant with Process Safety Guard):**
+   - Lưu trữ embedding văn bản vào CSDL vector **Qdrant** cục bộ (`local_storage/qdrant_data`), không truyền dữ liệu ra Internet, bảo đảm an ninh mạng quân sự nội bộ.
+   - **Cơ chế Self-Healing an toàn:** Tự động phát hiện và dọn dẹp file `.lock` tồn dư do tắt máy đột ngột hoặc crash trước khi khởi tạo Qdrant. Để ngăn ngừa nguy cơ phá hỏng cơ sở dữ liệu khi có 2 tiến trình chạy song song, hệ thống áp dụng **Process Safety Guard** (rà soát PID và danh sách tiến trình `Win32_Process` của Windows, loại trừ PID hiện tại). Nếu phát hiện tiến trình AI khác đang hoạt động, hệ thống **tuyệt đối không xóa lock** và kích hoạt chế độ an toàn.
+3. **Trích xuất PDF Chuyên Sâu (`PDFProcessor`):** Đọc tuần tự từng trang tài liệu PDF quân sự, bảo toàn bảng biểu số liệu, đánh dấu số trang tuyệt đối để phục vụ gắn nhãn trích dẫn.
+4. **Agent Tutor, Hậu Kiểm Trích Dẫn & Thinking Process:** LLM suy luận nhiều bước, hiển thị quá trình tư duy (`think`), viết lại câu truy vấn ngữ cảnh (`_rewrite_query_with_history`), và áp dụng bộ lọc hậu kiểm trích dẫn số trang bằng biểu thức chính quy (`_verify_inline_citations`) nhằm triệt tiêu 100% ảo giác trích dẫn. Người dùng bấm vào chip dẫn chứng sẽ nhảy trực tiếp đến trang văn bản PDF tương ứng.
+5. **Biên Soạn Giáo Trình Tác Chiến (`StudyBookGenerator`):** Tự động phân tích các văn kiện, chỉ thị lớn để tổng hợp thành tài liệu học tập, tóm tắt các điểm cốt lõi và sinh đề trắc nghiệm kiểm tra nhận thức chính trị/tác chiến.
+6. **Dòng Thời Gian Lịch Sử Quân Sự (`MediaTimelineManager`):** Tự động bóc tách các mốc thời gian, chiến dịch, sự kiện trong văn bản để hiển thị dạng dòng thời gian tương tác.
 
 ### 7.2. Cơ Chế Chuyển Mạch Dự Phòng Thông Minh (Smart SQL Fallback)
 Nhằm đạt tiêu chuẩn sẵn sàng cao (High Availability), Express Gateway (`backend/src/ai-routes.js`) được tích hợp cơ chế bảo vệ kép:

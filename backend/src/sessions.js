@@ -157,16 +157,23 @@ module.exports = function createSessionModule({
     return r.rowsAffected[0] || 0;
   }
 
-  async function listActiveSessions(userId = null) {
+    async function listActiveSessions(userId = null, idleTimeoutMinutes = 15) {
     const pool = await getPool();
     const req = pool.request();
+    
+    // Mặc định coi là "offline" nếu không hoạt động trong 30 phút
+    const timeout = parseInt(idleTimeoutMinutes, 10) || 30;
+    req.input('idleTimeout', sql.Int, timeout);
+
     let q = `
       SELECT s.session_id, s.user_id, u.full_name, u.[rank], u.[position],
              s.ip, s.user_agent, s.created_at, s.last_seen_at, s.expires_at,
              DATEDIFF(MINUTE, s.last_seen_at, GETDATE()) AS minutes_idle
       FROM USER_SESSION s
       JOIN [USER] u ON u.user_id = s.user_id
-      WHERE s.revoked = 0 AND s.expires_at > GETDATE()
+      WHERE s.revoked = 0 
+        AND s.expires_at > GETDATE()
+        AND s.last_seen_at > DATEADD(MINUTE, -@idleTimeout, GETDATE())
     `;
     if (userId) {
       q += ` AND s.user_id = @uid`;
@@ -175,6 +182,32 @@ module.exports = function createSessionModule({
     q += ` ORDER BY s.last_seen_at DESC`;
     return (await req.query(q)).recordset;
   }
+
+
+    // ⏰ Tự động revoke các session idle quá lâu
+  async function revokeIdleSessions(idleTimeoutMinutes = 30, reason = 'IDLE_TIMEOUT') {
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('timeout', sql.Int, idleTimeoutMinutes)
+      .input('reason', sql.NVarChar(200), reason)
+      .query(`
+        UPDATE USER_SESSION
+        SET revoked = 1,
+            revoked_at = GETDATE(),
+            revoked_reason = @reason
+        WHERE revoked = 0
+          AND expires_at > GETDATE()
+          AND last_seen_at < DATEADD(MINUTE, -@timeout, GETDATE());
+        SELECT @@ROWCOUNT AS n;
+      `);
+    const count = r.recordset[0]?.n || 0;
+    if (count > 0) {
+      console.log(`[Session] 🔒 Auto-revoked ${count} session(s) idle > ${idleTimeoutMinutes} phút`);
+      cache.clear();
+    }
+    return count;
+  }
+
 
   function invalidateTokenCache(token) {
     cache.delete(hashToken(token));
@@ -188,6 +221,7 @@ module.exports = function createSessionModule({
     revokeAllUserSessions,
     killSessionById,
     listActiveSessions,
+    revokeIdleSessions,
     invalidateTokenCache,
   };
 };

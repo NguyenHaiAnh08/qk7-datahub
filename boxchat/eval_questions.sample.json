@@ -1,0 +1,32 @@
+[
+  {
+    "id": "Q1",
+    "query": "Quy định về thể thức và kỹ thuật trình bày văn bản hành chính quân sự?",
+    "expected_keywords": ["thể thức", "văn bản", "hành chính"],
+    "user_clearance": 1
+  },
+  {
+    "id": "Q2",
+    "query": "Nhiệm vụ, quyền hạn và trách nhiệm của kíp trực chỉ huy trong ca trực tác chiến?",
+    "expected_keywords": ["trực chỉ huy", "tác chiến", "nhiệm vụ"],
+    "user_clearance": 2
+  },
+  {
+    "id": "Q3",
+    "query": "Thời hạn bảo quản và quy trình lưu trữ hồ sơ tài liệu quân sự theo quy định hiện hành?",
+    "expected_keywords": ["bảo quản", "lưu trữ", "hồ sơ"],
+    "user_clearance": 2
+  },
+  {
+    "id": "Q4",
+    "query": "Trách nhiệm của cán bộ, chiến sĩ trong công tác bảo vệ bí mật quân sự và bí mật nhà nước?",
+    "expected_keywords": ["bảo vệ", "bí mật", "trách nhiệm"],
+    "user_clearance": 3
+  },
+  {
+    "id": "Q5",
+    "query": "Quy trình tiếp nhận, chuyển giao và bàn giao tài liệu văn thư bảo mật trong đơn vị?",
+    "expected_keywords": ["tiếp nhận", "bàn giao", "văn thư"],
+    "user_clearance": 2
+  }
+]

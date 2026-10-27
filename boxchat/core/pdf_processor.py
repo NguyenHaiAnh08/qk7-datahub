@@ -5,8 +5,17 @@ Gắn cứng metadata bảo mật (security_level_id 1-5) vào từng chunk văn
 """
 
 import os
+import sys
 import re
 from typing import List, Dict, Any, Optional
+
+# Đảm bảo in tiếng Việt trên console Windows không bị lỗi charmap
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 try:
     import pymupdf as fitz

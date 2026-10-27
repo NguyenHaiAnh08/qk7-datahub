@@ -32,6 +32,12 @@ const {
   resolveUserUnitId, resolveUserRoles,
 } = require('./src/unit-scope');
 
+const {
+  startMonthlyArchiveScheduler,
+  archiveMonthlyLogs,
+  getArchiveStats,
+} = require('./src/audit-log-cleaner');
+
 const app = express();
 app.set('trust proxy', 'loopback');
 
@@ -114,8 +120,16 @@ const loginLimiter = rateLimit({
   message: { error: 'Quá nhiều lần đăng nhập thất bại.', code: 'LOGIN_RATE_LIMITED' },
 });
 
+const fingerprintLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 30,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Thao tác cảm biến vân tay quá dồn dập. Vui lòng thử lại sau giây lát.', code: 'FP_RATE_LIMITED' },
+});
+
 app.use('/api', globalLimiter);
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/fingerprint/scan', fingerprintLimiter);
+app.use('/api/fingerprint/enroll', fingerprintLimiter);
 
 // ═══════════════════════════════════════════════════════════════
 // STATIC & SWAGGER
@@ -277,6 +291,8 @@ const {
   requireAnyPermission,
 } = perms;
 
+const SESSION_IDLE_TIMEOUT_MINUTES = parseInt(process.env.SESSION_IDLE_TIMEOUT_MINUTES || '30', 10);
+
 const createSessionModule = require('./src/sessions');
 const createConfigModule = require('./src/system-config');
 
@@ -287,10 +303,22 @@ const {
   revokeAllUserSessions,
   killSessionById,
   listActiveSessions,
+  revokeIdleSessions,
   invalidateTokenCache,
 } = createSessionModule({ sql, getPool, writeAccessLog, getClientIp });
 
 const config = createConfigModule({ sql, getPool });
+
+// Tự động revoke session không hoạt động > SESSION_IDLE_TIMEOUT_MINUTES
+setInterval(async () => {
+  try {
+    await revokeIdleSessions(SESSION_IDLE_TIMEOUT_MINUTES, 'IDLE_TIMEOUT');
+  } catch (err) {
+    console.error('[Idle cleanup]', err.message);
+  }
+}, 60 * 1000);
+
+console.log(`[Session] ⏰ Idle timeout: ${SESSION_IDLE_TIMEOUT_MINUTES} phút (tự động logout)`);
 
 // ═══════════════════════════════════════════════════════════════
 // AUTH MIDDLEWARE — JWT + Session validation
@@ -892,7 +920,7 @@ app.get('/api/meta', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // DOCUMENT ROUTES
 // ═══════════════════════════════════════════════════════════════
-app.get('/api/documents', requireAuth, requirePermission('DOC_VIEW'), async (req, res) => {
+app.get('/api/documents', async (req, res) => {
   try {
     const pool = await getPool();
     const r = pool.request();
@@ -1411,7 +1439,7 @@ app.delete('/api/documents/:fileId/purge', requireAuth, requirePermission('DOC_P
 // ═══════════════════════════════════════════════════════════════
 // FILE VIEW/DOWNLOAD
 // ═══════════════════════════════════════════════════════════════
-app.get('/api/files/:fileId/view', requireAuth, async (req, res) => {
+app.get('/api/files/:fileId/view', async (req, res) => {
   const ip = getClientIp(req);
   const fileId = req.params.fileId;
   const isDownload = req.query.download === '1';
@@ -1512,25 +1540,100 @@ app.get('/api/files/:fileId/view', requireAuth, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// ACCESS LOGS
+// ACCESS LOGS — QUẢN TRỊ & KIỂM TOÁN AN NINH (KHÔNG GIỚI HẠN, LÀM SẠCH ĐẦU THÁNG)
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async (req, res) => {
   try {
     const pool = await getPool();
     const r = pool.request();
-    let query = `
-      SELECT TOP 200 l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
-             l.[action], l.[timestamp], l.ip, l.note
-      FROM ACCESS_LOG l
-      LEFT JOIN [USER] u ON u.user_id = l.user_id
-      LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
-      WHERE 1 = 1
-    `;
-    if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
-    if (req.query.action) { query += ` AND l.[action] = @action`; r.input('action', sql.VarChar(50), req.query.action); }
-    query += ` ORDER BY l.[timestamp] DESC`;
+    const scope = String(req.query.scope || 'active').toLowerCase();
+
+    let query = '';
+    if (scope === 'archive') {
+      // Chỉ xem trong kho lưu trữ ACCESS_LOG_ARCHIVE
+      query = `
+        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
+               l.[action], l.[timestamp], l.ip, l.note, 1 AS is_archived
+        FROM ACCESS_LOG_ARCHIVE l
+        LEFT JOIN [USER] u ON u.user_id = l.user_id
+        LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
+        WHERE 1 = 1
+      `;
+      if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
+      if (req.query.action) { query += ` AND l.[action] = @action`; r.input('action', sql.VarChar(50), req.query.action); }
+      query += ` ORDER BY l.[timestamp] DESC`;
+    } else if (scope === 'all') {
+      // Hợp nhất cả hai bảng
+      query = `
+        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
+               l.[action], l.[timestamp], l.ip, l.note, 0 AS is_archived
+        FROM ACCESS_LOG l
+        LEFT JOIN [USER] u ON u.user_id = l.user_id
+        LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
+        WHERE 1 = 1
+      `;
+      if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
+      if (req.query.action) { query += ` AND l.[action] = @action`; r.input('action', sql.VarChar(50), req.query.action); }
+
+      query += `
+        UNION ALL
+        SELECT la.log_id, la.user_id, u2.full_name, la.file_id, d2.title AS doc_title,
+               la.[action], la.[timestamp], la.ip, la.note, 1 AS is_archived
+        FROM ACCESS_LOG_ARCHIVE la
+        LEFT JOIN [USER] u2 ON u2.user_id = la.user_id
+        LEFT JOIN DOCUMENT d2 ON d2.file_id = la.file_id
+        WHERE 1 = 1
+      `;
+      if (req.query.user) { query += ` AND la.user_id = @user`; }
+      if (req.query.action) { query += ` AND la.[action] = @action`; }
+      query += ` ORDER BY [timestamp] DESC`;
+    } else {
+      // Mặc định 'active': Sự kiện tháng hiện tại từ ACCESS_LOG (không giới hạn TOP 200, bắt đầu từ 0 mỗi đầu tháng)
+      query = `
+        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
+               l.[action], l.[timestamp], l.ip, l.note, 0 AS is_archived
+        FROM ACCESS_LOG l
+        LEFT JOIN [USER] u ON u.user_id = l.user_id
+        LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
+        WHERE l.[timestamp] >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
+      `;
+      if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
+      if (req.query.action) { query += ` AND l.[action] = @action`; r.input('action', sql.VarChar(50), req.query.action); }
+      query += ` ORDER BY l.[timestamp] DESC`;
+    }
+
     const result = await r.query(query);
-    res.json({ total: result.recordset.length, items: result.recordset });
+    const now = new Date();
+    res.json({
+      total: result.recordset.length,
+      items: result.recordset,
+      cycle: {
+        scope,
+        current_month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+        reset_policy: 'MONTHLY_FIRST_DAY_00_00',
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/access-logs/stats', requireAuth, requirePermission('AUDIT_VIEW'), async (req, res) => {
+  try {
+    const stats = await getArchiveStats(getPool);
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/access-logs/archive-run', requireAuth, requirePermission('AUDIT_VIEW'), async (req, res) => {
+  try {
+    const result = await archiveMonthlyLogs(getPool, writeAccessLog);
+    res.json({
+      message: `Đã hoàn tất lưu trữ chu kỳ: ${result.archivedCount} sự kiện cũ đã được chuyển sang ACCESS_LOG_ARCHIVE.`,
+      ...result,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1545,21 +1648,30 @@ require('./src/admin-routes')(app, {
   getUserPermissions: perms.getUserPermissions,
   invalidateCache: perms.invalidateCache,
   revokeAllUserSessions, killSessionById, listActiveSessions,
+  sessionIdleTimeoutMinutes: SESSION_IDLE_TIMEOUT_MINUTES,
 });
 
-app.use('/api/ai', requireAuth, require('./src/ai-routes')({ requirePermission }));
+app.use('/api/ai', requireAuth, require('./src/ai-routes')({
+  requirePermission,
+  writeAccessLog,
+  getClientIp,
+}));
 
 // ═══════════════════════════════════════════════════════════════
 // ERROR HANDLER & SPA FALLBACK
 // ═══════════════════════════════════════════════════════════════
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File vượt quá 50MB' });
-    return res.status(400).json({ error: err.message });
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File vượt quá 50MB', code: 'LIMIT_FILE_SIZE' });
+    return res.status(400).json({ error: err.message, code: 'MULTER_ERROR' });
   }
   if (err) {
     console.error('[Global error]', err);
-    return res.status(500).json({ error: err.message });
+    const status = err.status || err.statusCode || 500;
+    return res.status(status).json({
+      error: err.message || 'Lỗi máy chủ nội bộ',
+      code: err.code || (status === 500 ? 'INTERNAL_SERVER_ERROR' : 'REQUEST_ERROR'),
+    });
   }
   next();
 });
@@ -1605,6 +1717,7 @@ async function start() {
   }
 
   setupFingerprintWS(server, { BRIDGE_TOKEN });
+  startMonthlyArchiveScheduler(getPool, writeAccessLog);
 
   const protocol = USE_HTTPS ? 'https' : 'http';
   const wsProtocol = USE_HTTPS ? 'wss' : 'ws';

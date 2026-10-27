@@ -1,4 +1,4 @@
-# QK7 DATAHUB — Cổng Quản Lý Dữ Liệu Tập Trung Quân Khu 7
+# TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB — Cổng Quản Lý Dữ Liệu Tập Trung Quân Khu 7
 
 Hệ thống quản lý, lưu trữ số hóa, phân quyền khai thác tài liệu quân sự bảo mật đa cấp độ, tích hợp Trợ lý Trí Tuệ Nhân Tạo (AI RAG) và Xác Thực Sinh Trắc Học Vân Tay (ZKTeco ZK9500) của Bộ Tư Lệnh Quân Khu 7.
 
@@ -158,6 +158,33 @@ qk7-datahub/
 - **Tinh giản cấu trúc giao diện & loại bỏ nút trùng lặp:**
   - Loại bỏ nút `[ ≡ Danh mục ]` ở hàng thứ 2 vì Header đã có sẵn nút Menu Hamburger `[ ≡ ]`.
   - Loại bỏ nút `< Thu gọn danh mục` ở đáy sidebar (trùng lặp với nút gạt ở đầu sidebar), tối ưu khoảng đệm `pb-4` giúp sidebar thoáng và liền mạch.
+
+### 11. Giám Sát Phiên Đang Trực Tuyến Thời Gian Thực (Active Online Sessions)
+- **Bảng điều khiển trung tâm tác chiến mạng (Command Center Telemetry):** Theo dõi toàn bộ các phiên làm việc đang kết nối tới hệ thống từ Desktop PC và iPad Air M4 với chu kỳ làm mới tự động **15 giây (`LIVE 15s`)** có hiệu ứng phát quang nhịp đập (`animate-ping`).
+- **Phân loại trạng thái nhịp đập:** 🟢 Đang trực (`idle <= 2m`), 🟡 Chờ thao tác (`idle <= 120m`), 🔴 Cảnh báo treo (`idle > 120m`), tự động thu hồi phiên sau 180 phút.
+- **Bộ bóc tách User-Agent thông minh:** Tự động nhận diện hệ điều hành và trình duyệt (Ví dụ: `Windows • Chrome`, `iPadOS • Safari`) kèm icon phân loại thiết bị trực quan (Desktop, Tablet, Mobile).
+- **Typography quân sự chuẩn xác:** Cột IP và dấu thời gian ép kiểu `font-mono tabular-nums text-sm`, toàn bộ các cột được căn giữa (`text-center`) tuyệt đối cân xứng.
+- **Ngắt phiên an toàn (Kill Sessions Guard):** Hỗ trợ ngắt phiên đơn lẻ hoặc cưỡng bức hủy toàn bộ phiên của quân nhân trên mọi thiết bị. Tích hợp cơ chế tự bảo vệ an toàn (`is_current` guard) ngăn Quản trị viên vô tình tự ngắt phiên của chính mình.
+
+### 12. Thùng Rác Tài Liệu Tác Chiến & Khôi Phục Dữ Liệu An Toàn 2 Bước (Tactical Trash Bin & Data Recovery)
+- **Vòng đời Xóa Mềm (Soft Delete):** Khi xóa tài liệu, hệ thống đánh dấu `deleted_at`, `deleted_by`, `deleted_reason`, bảo toàn tuyệt đối file PDF vật lý và mã băm SHA-256 trên đĩa lưu trữ.
+- **Khôi phục đơn lẻ & Hàng loạt (Batch Actions):** Khôi phục 1 tài liệu hoặc chọn checkbox khôi phục nhiều tài liệu cùng lúc chỉ trong một cú click chuột.
+- **Cơ chế Xóa Vĩnh Viễn An Toàn 2 Bước (Double-Safety Purge):**
+  - Hộp thoại cảnh báo rủi ro quân sự màu Đỏ Quân Kỳ (`#b91c1c` / red-600).
+  - Bắt buộc xác nhận mã tệp tin `confirm === fileId` (hoặc nhập từ khóa bảo vệ `XAC NHAN XOA` khi dọn sạch thùng rác) mới tiến hành xóa vật lý trên ổ đĩa và CSDL.
+  - Tự động ghi vết vào `ACCESS_LOG` với mức độ Critical phục vụ thanh tra an ninh.
+- **Bản sắc thiết kế Quân đội:** Xóa bỏ hoàn toàn màu tím AI mặc định ở sidebar, đồng bộ hệ màu Xanh Lục Quân - Vàng Kim - Đỏ Quân Kỳ, bảng dữ liệu rộng rãi `min-w-[1150px]` không ép chữ.
+
+### 13. Quản Trị Phân Quyền Kéo-Thả Trực Quan & Phân Quyền Trực Tiếp Quân Nhân (Permissions Drag-and-Drop)
+- **Sắp xếp thứ tự Kéo - Thả (Drag & Drop):** Xóa bỏ trường nhập thủ công `Sort order tổng` gây bối rối; thay bằng tay cầm kéo thả trực quan (`GripVertical`) chuẩn HTML5, cập nhật giao diện tức thì (Optimistic Update) và đồng bộ nguyên tử qua SQL Transaction.
+- **Phân quyền trực tiếp cá nhân (`USER_PERMISSION`):** Cho phép gán quyền đặc thù cho cá nhân quân nhân có thời hạn (`expires_at`) hoặc theo nhiệm vụ đặc biệt (`note`), kết hợp linh hoạt với phân quyền theo vai trò (`ROLE_PERMISSION`).
+- **Tối ưu Form Modal:** Lưới 2 cột trực quan, đóng khung phân vùng Phân loại con (Subgroup) bằng khối Fieldset viền hổ phách sắc nét.
+- **Bảng mã màu 4 cấp độ rủi ro:** Phân loại rõ ràng 🟢 Read (Chỉ đọc), 🟡 Write (Ghi), 🟣 Security (Bảo mật), 🔴 Delete (Xóa/Nguy hiểm) kết hợp hệ thống huy hiệu nhóm quyền động (`DOCUMENT`, `SYSTEM`, `USER`, `ROLE`, `FINGERPRINT`, `AUDIT`).
+
+### 14. Trợ Lý AI Trượt Đỉnh & Cơ Chế Khám Phá Hệ Thống Tự Động (Header AI Drawer & Guided Tour)
+- **Ngăn kéo Trợ lý AI trượt đỉnh (Header AI Slide-Over Drawer):** Ngăn kéo 380px trượt mượt mà bằng lò xo vật lý (`--ux-spring`), kính mờ `backdrop-blur-md`, tra cứu điều lệnh và phương án tác chiến tức thì kèm trích dẫn số trang.
+- **Chuỗi khám phá hệ thống tự động (Guided Tour Engine):** Tự động hướng dẫn từng bước (Step-by-step Spotlight Tour) cho tài khoản Khách vãng lai (Guest) khi lần đầu truy cập.
+- **Nút khám phá La bàn (`Compass` button):** Tích hợp trên biểu ngữ an ninh `SecurityBanner`, cho phép kích hoạt lại tour khám phá bất cứ lúc nào mà không làm rối mắt thanh Header.
 
 ---
 
@@ -372,9 +399,11 @@ Hệ thống tích hợp cổng tài liệu API tương tác trực tiếp:
 1. **`Auth`**: Đăng nhập (`POST /api/auth/login`), hồ sơ cá nhân (`GET /api/auth/me`), xác thực vân tay (`POST /api/auth/fingerprint/verify`).
 2. **`AI`**: Hỏi đáp RAG tác chiến (`POST /api/ai/query`), biên soạn giáo trình học tập (`POST /api/ai/study-book`), kiểm tra trạng thái AI (`GET /api/ai/health`), nạp văn kiện vào vector store (`POST /api/ai/ingest`).
 3. **`Fingerprint` (Admin)**: Đăng ký mẫu vân tay quân nhân (`POST /api/admin/fingerprint/enroll/{userId}`), danh sách máy quét online (`GET /api/admin/fingerprint/agents`), xóa vân tay (`DELETE /api/admin/fingerprint/users/{userId}`).
-4. **`Documents`**: Quản lý tài liệu PDF — Tìm kiếm có kiểm soát độ mật (`GET /api/documents`), Tải lên hash SHA-256 (`POST /api/documents/upload`), Xem chi tiết, Sửa, Xóa.
+4. **`Documents & Trash`**: Quản lý tài liệu PDF — Tìm kiếm có kiểm soát độ mật (`GET /api/documents`), Tải lên hash SHA-256 (`POST /api/documents/upload`), Xem chi tiết, Sửa, Xóa mềm (`DELETE /api/documents/{fileId}`), Danh sách thùng rác (`GET /api/documents/trash`), Khôi phục tài liệu (`POST /api/documents/{fileId}/restore`), Xóa vĩnh viễn an toàn 2 bước (`DELETE /api/documents/{fileId}/purge`).
 5. **`Files`**: Stream xem inline hoặc tải về tệp PDF đính kèm (`GET /api/files/{fileId}/view`, yêu cầu `X-Fingerprint-Token` nếu độ mật ≥ 3: Cấp 3 - Mật, Cấp 4 - Tối Mật, Cấp 5 - Tuyệt Mật).
-6. **`Admin` (Cần Clearance ≥ 4)**: KPI thống kê (`/api/admin/stats`), CRUD Quân nhân, Phân quyền vai trò, CRUD Đơn vị, Loại văn bản, Mức bảo mật và Dọn dẹp Audit Log.
+6. **`Active Sessions`**: Giám sát phiên trực tuyến (`GET /api/admin/sessions`), ngắt phiên làm việc cưỡng bức (`POST /api/admin/sessions/{id}/kill`), hủy toàn bộ phiên của quân nhân (`POST /api/admin/sessions/user/{userId}/revoke-all`).
+7. **`Permissions & RBAC`**: Quản lý danh mục quyền (`GET/POST/PUT/DELETE /api/admin/permissions`), sắp xếp thứ tự kéo-thả (`PUT /api/admin/permissions/reorder`), phân quyền vai trò (`POST /api/admin/roles/{id}/permissions`), cấp quyền trực tiếp cá nhân (`GET/POST/DELETE /api/admin/users/{id}/permissions`).
+8. **`Admin` (Cần Clearance ≥ 4)**: KPI thống kê (`/api/admin/stats`), CRUD Quân nhân, CRUD Đơn vị, Loại văn bản, Mức bảo mật và Dọn dẹp Audit Log.
 
 ---
 
@@ -385,4 +414,4 @@ Hệ thống tích hợp cổng tài liệu API tương tác trực tiếp:
 * **Cán bộ / Sĩ quan (Cấp 3 - Mật):** `USR-002` (Thiếu tá - Thư ký)
 
 ---
-*Bản quyền tài liệu thuộc Bộ Tư Lệnh Quân Khu 7 — QK7 DataHub.*
+*Bản quyền tài liệu thuộc Bộ Tư Lệnh Quân Khu 7 — TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB.*

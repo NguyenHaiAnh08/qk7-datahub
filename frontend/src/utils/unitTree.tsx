@@ -39,10 +39,39 @@ export function buildUnitTree(units: Unit[]): UnitTreeNode[] {
     }
   }
 
-  // Bước 2: Sort theo tiếng Việt
-  rootUnits.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  // Helper ưu tiên phân cấp: QK7 (cao nhất) -> Trường Quân sự QK7 (đơn vị chủ quản hệ thống) -> Sư đoàn & các đơn vị khác
+  const isRootQK7 = (u: Unit) =>
+    u.unit_id === 'QK7' ||
+    u.name.toLowerCase().includes('bộ tư lệnh') ||
+    u.name.toLowerCase().trim() === 'quân khu 7';
+
+  const isSchoolUnit = (u: Unit) =>
+    u.unit_id === 'TQS' ||
+    u.name.toLowerCase().includes('trường quân sự');
+
+  const sortUnitsWithPriority = (list: Unit[]) => {
+    list.sort((a, b) => {
+      // 1. Quân khu 7 (cấp cao nhất) luôn lên trước
+      const aIsQK7 = isRootQK7(a);
+      const bIsQK7 = isRootQK7(b);
+      if (aIsQK7 && !bIsQK7) return -1;
+      if (!aIsQK7 && bIsQK7) return 1;
+
+      // 2. Trường Quân sự Quân khu 7 luôn ưu tiên xếp trên các sư đoàn / đơn vị khác
+      const aIsSchool = isSchoolUnit(a);
+      const bIsSchool = isSchoolUnit(b);
+      if (aIsSchool && !bIsSchool) return -1;
+      if (!aIsSchool && bIsSchool) return 1;
+
+      // 3. Các đơn vị còn lại sắp xếp theo bảng chữ cái tiếng Việt
+      return a.name.localeCompare(b.name, 'vi');
+    });
+  };
+
+  // Bước 2: Sort theo thứ tự ưu tiên & tiếng Việt
+  sortUnitsWithPriority(rootUnits);
   for (const item of map.values()) {
-    item.children.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    sortUnitsWithPriority(item.children);
   }
 
   // Bước 3: Tạo node với UI cha - con trực quan theo cấp độ (depth)
@@ -118,4 +147,54 @@ export function getUnitFullPath(units: Unit[], unitId: string): string {
     guard++;
   }
   return parts.join(' — ');
+}
+
+/**
+ * Lọc danh sách đơn vị cho phạm vi Trường Quân sự Quân khu 7:
+ * - Giữ lại "Quân khu 7" (cha)
+ * - "Trường Quân sự Quân khu 7" (con)
+ * - Toàn bộ các phòng ban / đơn vị trực thuộc Trường Quân sự Quân khu 7
+ * - Ẩn các đơn vị khác (Sư đoàn 309, Sư đoàn 5, các trung đoàn/tiểu đoàn khác...)
+ */
+export function filterSchoolUnits(units: Unit[], currentUnitId?: string): Unit[] {
+  if (!units || units.length === 0) return [];
+
+  // 1. Tìm đơn vị Trường Quân sự Quân khu 7 (TQS)
+  const tqsUnit = units.find(
+    (u) =>
+      u.unit_id === 'TQS' ||
+      u.name.toLowerCase().includes('trường quân sự')
+  );
+
+  if (!tqsUnit) return units;
+
+  // 2. Thu thập toàn bộ ID các đơn vị con cháu trực thuộc TQS
+  const allowedUnitIds = new Set<string>();
+  allowedUnitIds.add(tqsUnit.unit_id);
+
+  let addedMore = true;
+  while (addedMore) {
+    addedMore = false;
+    for (const u of units) {
+      if (u.parent_id && allowedUnitIds.has(u.parent_id) && !allowedUnitIds.has(u.unit_id)) {
+        allowedUnitIds.add(u.unit_id);
+        addedMore = true;
+      }
+    }
+  }
+
+  // 3. Thu thập các cấp cha của TQS (Quân khu 7)
+  let currParentId = tqsUnit.parent_id;
+  while (currParentId) {
+    allowedUnitIds.add(currParentId);
+    const parentUnit = units.find((u) => u.unit_id === currParentId);
+    currParentId = parentUnit?.parent_id;
+  }
+
+  // 4. Giữ lại currentUnitId nếu có để tránh mất lựa chọn khi edit user cũ
+  if (currentUnitId) {
+    allowedUnitIds.add(currentUnitId);
+  }
+
+  return units.filter((u) => allowedUnitIds.has(u.unit_id));
 }

@@ -19,6 +19,8 @@ export const dashboardApi = {
 
   // Logs
   getAccessLogs: logService.getAccessLogs,
+  getAccessLogStats: logService.getStats,
+  triggerArchiveRun: logService.triggerArchiveRun,
 
   // Roles
   getRoles: roleService.getRoles,
@@ -28,6 +30,9 @@ export const dashboardApi = {
 
   // Permissions
   getPermissions: permissionService.getPermissions,
+  createPermission: permissionService.createPermission,
+  updatePermission: permissionService.updatePermission,
+  reorderPermissions: permissionService.reorderPermissions,
   deletePermission: permissionService.deletePermission,
 
   // Units

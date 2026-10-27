@@ -1446,26 +1446,65 @@ app.get('/api/files/:fileId/view', async (req, res) => {
 
   try {
     const pool = await getPool();
-    const result = await pool.request()
-      .input('file_id', sql.VarChar(50), fileId)
-      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at FROM DOCUMENT WHERE file_id = @file_id`);
+    let result = await pool.request()
+      .input('file_id', sql.VarChar(100), fileId)
+      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE file_id = @file_id`);
+
+    // Smart Document Resolver Fallback: Nếu không tìm thấy theo file_id
+    if (result.recordset.length === 0) {
+      // 1. Thử tìm theo document_code
+      result = await pool.request()
+        .input('file_id', sql.NVarChar(100), fileId)
+        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE document_code = @file_id`);
+    }
+
+    if (result.recordset.length === 0) {
+      // 2. Thử tìm theo stored_path hoặc original_name chứa fileId
+      result = await pool.request()
+        .input('file_id_pattern', sql.NVarChar(200), `%${fileId}%`)
+        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE stored_path LIKE @file_id_pattern OR original_name LIKE @file_id_pattern`);
+    }
+
+    if (result.recordset.length === 0 && fileId.startsWith('PDF-')) {
+      // 3. Fallback cho synthetic ID dạng PDF-xxx: Lọc ký tự và so khớp với stored_path/document_code
+      const cleanStem = fileId.replace(/^PDF-/, '').replace(/[^a-zA-Z0-9]/g, '');
+      if (cleanStem.length >= 6) {
+        const allDocs = await pool.request().query(`
+          SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code 
+          FROM DOCUMENT WHERE deleted_at IS NULL
+        `);
+        const matched = allDocs.recordset.find((d) => {
+          const p = (d.stored_path || '').replace(/[^a-zA-Z0-9]/g, '');
+          const o = (d.original_name || '').replace(/[^a-zA-Z0-9]/g, '');
+          const c = (d.document_code || '').replace(/[^a-zA-Z0-9]/g, '');
+          return (p && (p.includes(cleanStem.slice(0, 16)) || cleanStem.includes(p.slice(-16)))) ||
+                 (o && (o.includes(cleanStem.slice(0, 16)) || cleanStem.includes(o.slice(-16)))) ||
+                 (c && cleanStem.includes(c));
+        });
+        if (matched) {
+          result = { recordset: [matched] };
+        }
+      }
+    }
+
     if (result.recordset.length === 0) {
       await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Không tìm thấy' });
       return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
     }
     const doc = result.recordset[0];
+    const canonicalFileId = doc.file_id || fileId;
 
     if (doc.deleted_at) {
       const canViewTrash = (req.user.permissions || []).includes('DOC_TRASH_VIEW')
                           || (req.user.roles || []).includes('ROL-01');
       if (!canViewTrash) {
-        await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa' });
+        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa' });
         return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
       }
     }
 
     if (doc.security_level_id > req.user.clearance_level_id) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Không đủ cấp' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Không đủ cấp' });
       return res.status(403).json({ error: 'Không có quyền truy cập' });
     }
 
@@ -1480,7 +1519,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       try {
         const decoded = jwt.verify(fpToken, JWT_SECRET);
         if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
-        if (decoded.file_id !== fileId) throw new Error('Token không khớp file');
+        if (decoded.file_id !== fileId && decoded.file_id !== canonicalFileId) throw new Error('Token không khớp file');
         if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
       } catch {
         return res.status(403).json({
@@ -1490,13 +1529,13 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       }
 
       if (isDownload) {
-        await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Cấp 3+ không được tải' });
+        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Cấp 3+ không được tải' });
         return res.status(403).json({ error: 'Tài liệu Cấp 3+ chỉ xem trực tiếp, không tải về.' });
       }
     }
 
     if (!validateStoredPath(doc.stored_path)) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Path không hợp lệ' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Path không hợp lệ' });
       return res.status(400).json({ error: 'Đường dẫn tệp không hợp lệ' });
     }
 
@@ -1511,22 +1550,22 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     }
 
     if (!filePath || !fs.existsSync(filePath)) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'ERROR', ip, note: 'File không tồn tại' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'ERROR', ip, note: 'File không tồn tại' });
       return res.status(404).json({ error: 'File không tồn tại trên hệ thống lưu trữ' });
     }
 
     const lst = fs.lstatSync(filePath);
     if (lst.isSymbolicLink()) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Symlink bị chặn' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Symlink bị chặn' });
       return res.status(403).json({ error: 'Không thể truy cập tệp' });
     }
     if (!filePath.toLowerCase().endsWith('.pdf')) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Extension không phải PDF' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Extension không phải PDF' });
       return res.status(403).json({ error: 'Chỉ chấp nhận tệp PDF' });
     }
 
     await writeAccessLog({
-      userId: req.user.user_id, fileId,
+      userId: req.user.user_id, fileId: canonicalFileId,
       action: isDownload ? 'DOWNLOAD' : 'VIEW', ip,
     });
 

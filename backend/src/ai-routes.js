@@ -42,8 +42,8 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
         FROM ACCESS_LOG
         WHERE user_id = @userId
           AND action IN ('FINGERPRINT_OK', 'FINGERPRINT_VERIFY_OK')
-          AND created_at >= DATEADD(minute, -5, GETDATE())
-        ORDER BY created_at DESC
+          AND [timestamp] >= DATEADD(minute, -5, GETDATE())
+        ORDER BY [timestamp] DESC
       `;
       const result = await pool.request()
         .input('userId', sql.VarChar(50), userId)
@@ -124,6 +124,25 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       const user_clearance = req.user.clearance_level_id || 1;
       const history = Array.isArray(req.body.history) ? req.body.history.slice(-6) : [];
 
+      // Lấy thông tin họ tên, chức vụ, cấp bậc của người dùng đang đăng nhập
+      let user_name = req.user.full_name || '';
+      let user_position = req.user.position || '';
+      let user_rank = req.user.rank || '';
+
+      try {
+        const pool = await getPool();
+        const uRes = await pool.request()
+          .input('uid', sql.VarChar(50), req.user.user_id)
+          .query('SELECT full_name, [rank] AS rank_name, [position] FROM [USER] WHERE user_id = @uid');
+        if (uRes.recordset && uRes.recordset.length > 0) {
+          user_name = uRes.recordset[0].full_name || user_name;
+          user_position = uRes.recordset[0].position || user_position;
+          user_rank = uRes.recordset[0].rank_name || user_rank;
+        }
+      } catch (uErr) {
+        console.warn('[AI user info lookup error]:', uErr.message);
+      }
+
       // Kiểm tra xác thực sinh trắc học vân tay ZK9500
       const biometric_verified = await checkBiometricVerified(req);
 
@@ -153,6 +172,9 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
           const aiRes = await callAI('/ai/chat', 'POST', {
             query: query.trim(),
             user_id: req.user.user_id,
+            user_name,
+            user_position,
+            user_rank,
             user_clearance,
             file_id: file_id || null,
             history,
@@ -211,22 +233,29 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       const unclassifiedItems = items.filter((d) => (d.security_level_id || 1) <= 2);
       const classifiedItems = items.filter((d) => (d.security_level_id || 1) >= 3);
 
+      let salutation = 'Báo cáo đồng chí,';
+      if (user_name && user_position) {
+        salutation = `Báo cáo Đồng chí ${user_name} - ${user_position},`;
+      } else if (user_name) {
+        salutation = `Báo cáo Đồng chí ${user_name},`;
+      }
+
       let answer = '';
       let requiresBiometric = false;
 
       if (items.length === 0) {
-        answer = 'Báo cáo đồng chí, không tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.';
+        answer = `${salutation} không tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.`;
       } else if (!biometric_verified && classifiedItems.length > 0) {
         requiresBiometric = true;
         if (unclassifiedItems.length === 0) {
-          answer = 'Yêu cầu cán bộ xác thực vân tay trên máy quét ZKTeco ZK9500 (hoặc bấm vào thẻ trích dẫn văn bản bên dưới để quét vân tay) trước khi Trợ lý AI trích xuất nội dung mật.';
+          answer = `${salutation} tài liệu liên quan thuộc danh mục văn bản bảo mật (Cấp 3 trở lên). Yêu cầu cán bộ xác thực vân tay trên máy quét ZKTeco ZK9500 (hoặc bấm vào thẻ trích dẫn văn bản bên dưới để quét vân tay) trước khi Trợ lý AI trích xuất nội dung mật.`;
         } else {
-          answer = `Báo cáo đồng chí, tìm thấy ${items.length} văn bản liên quan. Phần công khai/nội bộ:\n` +
+          answer = `${salutation} tìm thấy ${items.length} văn bản liên quan. Phần công khai/nội bộ:\n` +
             unclassifiedItems.map((d, i) => `${i + 1}. ${d.document_code || d.file_id} — ${d.title}`).join('\n') +
             `\n\n*(Lưu ý: Có ${classifiedItems.length} văn bản Cấp 3+ Mật/Tối mật/Tuyệt mật yêu cầu xác thực vân tay ZK9500 để xem nội dung chi tiết)*`;
         }
       } else {
-        answer = `Báo cáo đồng chí, tìm thấy ${items.length} văn bản liên quan:\n` +
+        answer = `${salutation} tìm thấy ${items.length} văn bản liên quan:\n` +
           items.map((d, i) => `${i + 1}. ${d.document_code || d.file_id} — ${d.title}`).join('\n');
       }
 

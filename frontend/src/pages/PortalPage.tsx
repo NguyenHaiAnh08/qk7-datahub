@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   X,
   FileCheck,
-  Compass,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
 import { toast } from '../components/common/Toast';
@@ -55,7 +54,7 @@ export const PortalPage: React.FC = () => {
   const [showSecurityPolicy, setShowSecurityPolicy] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
 
-  // Auto-launch spotlight tour for first-time guest visitors
+  // Tự động kích hoạt tour hướng dẫn cho khách vãng lai lần đầu truy cập (First-time Guest)
   useEffect(() => {
     const isGuest = !user || user.user_id === 'GUEST';
     if (isGuest) {
@@ -421,15 +420,6 @@ export const PortalPage: React.FC = () => {
                   <RotateCw className="w-3.5 h-3.5" />
                   <span>Làm mới</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsTourOpen(true)}
-                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 dark:bg-amber-400/15 hover:bg-amber-500/20 dark:hover:bg-amber-400/25 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center gap-1 transition cursor-pointer shrink-0 whitespace-nowrap select-none"
-                  title="Xem hướng dẫn nhanh hệ thống (Spotlight Tour)"
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>Hướng dẫn nhanh</span>
-                </button>
               </div>
             </div>
           </div>
@@ -573,10 +563,13 @@ export const PortalPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Spotlight Tour for Guests */}
+      {/* Spotlight Tour tự động kích hoạt cho khách vãng lai */}
       <SpotlightTour
         isOpen={isTourOpen}
-        onClose={() => setIsTourOpen(false)}
+        onClose={() => {
+          setIsTourOpen(false);
+          localStorage.setItem('qk7_guest_tour_seen', 'true');
+        }}
       />
     </div>
   );

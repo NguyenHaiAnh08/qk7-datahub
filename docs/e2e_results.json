@@ -1,0 +1,114 @@
+{
+  "timestamp": "2026-10-27 18:03:43",
+  "total_scenarios": 15,
+  "passed": 15,
+  "failed": 0,
+  "avg_latency_ms": 3316.91,
+  "results": [
+    {
+      "scenario": 1,
+      "name": "Health check microservice (:8001)",
+      "status": "PASS",
+      "latency_ms": 38.94,
+      "details": "status=online, port=8001, chunks=295, ollama=True"
+    },
+    {
+      "scenario": 2,
+      "name": "Swagger OpenAPI Docs (:8001/docs)",
+      "status": "PASS",
+      "latency_ms": 4.01,
+      "details": "HTTP 200, length=1023"
+    },
+    {
+      "scenario": 3,
+      "name": "Chat query Cấp 1 (Công khai)",
+      "status": "PASS",
+      "latency_ms": 3966.86,
+      "details": "Clearance=1, requires_biometric=False, citations=3, answer_len=665"
+    },
+    {
+      "scenario": 4,
+      "name": "Chat query Cấp 2 (Nội bộ)",
+      "status": "PASS",
+      "latency_ms": 741.03,
+      "details": "Clearance=2, requires_biometric=False, citations=3"
+    },
+    {
+      "scenario": 5,
+      "name": "Chat query Cấp 3 KHÔNG vân tay (Khóa 2FA)",
+      "status": "PASS",
+      "latency_ms": 630.62,
+      "details": "requires_biometric=True, snippet_masked=True, citations=3"
+    },
+    {
+      "scenario": 6,
+      "name": "Chat query Cấp 3 CÓ vân tay (Mở khóa)",
+      "status": "PASS",
+      "latency_ms": 12317.56,
+      "details": "biometric_verified=True, unmasked=True, citations=3, answer_len=1658"
+    },
+    {
+      "scenario": 7,
+      "name": "Chat query Cấp 4 CÓ vân tay (Tối Mật)",
+      "status": "PASS",
+      "latency_ms": 3605.63,
+      "details": "Clearance=4, citations=1, answer_len=648"
+    },
+    {
+      "scenario": 8,
+      "name": "Chat query Cấp 5 (Tuyệt Mật)",
+      "status": "PASS",
+      "latency_ms": 689.65,
+      "details": "Clearance=5, citations=3, answer_len=91"
+    },
+    {
+      "scenario": 9,
+      "name": "Multi-turn chat (Contextual Rewriting)",
+      "status": "PASS",
+      "latency_ms": 6630.16,
+      "details": "Turn 2 completed, citations=3, answer_len=408"
+    },
+    {
+      "scenario": 10,
+      "name": "Adversarial Refusal (Không hallucinate)",
+      "status": "PASS",
+      "latency_ms": 766.57,
+      "details": "Refusal verified: is_refusal=True, citations=2"
+    },
+    {
+      "scenario": 11,
+      "name": "Citation Verification (file_id, page, doc_code)",
+      "status": "PASS",
+      "latency_ms": 7930.19,
+      "details": "3/3 citations hợp lệ 100% (file_id, page>=1, doc_code, sec_name)"
+    },
+    {
+      "scenario": 12,
+      "name": "Ingest tài liệu mới (:8001/ai/ingest)",
+      "status": "PASS",
+      "latency_ms": 165.41,
+      "details": "success=True, chunks_created=1, chunks_stored=1"
+    },
+    {
+      "scenario": 13,
+      "name": "Tra cứu văn kiện vừa nạp (Search After Ingest)",
+      "status": "PASS",
+      "latency_ms": 987.82,
+      "details": "Retrieved citations=1, found_target=True"
+    },
+    {
+      "scenario": 14,
+      "name": "Gateway Defense-in-depth & Proxy to AI (:8000 -> :8001)",
+      "status": "PASS",
+      "latency_ms": 2019.64,
+      "details": "Gateway mode=active_microservice, AI status=online, port=8001"
+    },
+    {
+      "scenario": 15,
+      "name": "Gateway /api/ai/chat E2E Routing & Auto-Recovery",
+      "status": "PASS",
+      "latency_ms": 9259.63,
+      "details": "Gateway /api/ai/chat routed successfully to :8001. citations=3, answer_len=797"
+    }
+  ]
+}

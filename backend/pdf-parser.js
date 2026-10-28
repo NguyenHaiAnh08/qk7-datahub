@@ -7,12 +7,44 @@ const path = require('path');
 // LOAD CONFIG — regex cấu trúc (JSON)
 // ═══════════════════════════════════════════════════════════════
 const CONFIG_PATH = path.join(__dirname, 'config', 'parser-patterns.json');
+
+// [PATCH 3 — 4.1]
+// ═══════════════════════════════════════════════════════════════
+// [v4.3] CONFIG MẶC ĐỊNH — Chỉ là fallback an toàn khi thiếu file JSON.
+// Giá trị thực tế được đọc từ config/parser-patterns.json + env vars.
+// ═══════════════════════════════════════════════════════════════
 let PARSER_CONFIG = {
-    document_code: 'S[ốo]\\s*:\\s*(\\d+)?[ \\t]*([\\/\\-]?)[ \\t]*([A-ZĐ][A-ZĐ0-9\\/\\-]*(?:[ \\t]+[A-ZĐ0-9][A-ZĐ0-9\\/\\-]+)*)',
+    document_code: 'S\\s*[ốo]\\s*[:.]?\\s*(\\d{1,5})?\\s*([\\/\\-])?\\s*([A-ZĐ][A-ZĐ0-9\\-]*(?:[\\/\\-][A-ZĐ0-9]+)*)',
     issued_date: 'ng[àa]y\\s*(\\d+)?\\s*th[áa]ng\\s*(\\d+)\\s*n[ăa]m\\s*(\\d{4})',
     title_stop: '^(Căn cứ|Kính gửi|Thực hiện|Căn cứ vào|HIỆU TRƯỞNG|CHỦ TỊCH|KT\\.|TM\\.|T\\/M|Nơi nhận)',
     roman_heading: '^\\s*(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)[\\-\\s\\.]',
     signer_name: '^[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,4}$',
+
+    suspicious_code_patterns: ['^\\d{1,3}/\\d{1,3}$', '^/[^A-ZĐ]', '^-', '^\\d+$'],
+    code_rematch_strict: 'S[ốo]\\s*[:.]?\\s*(\\d{1,5})\\s*[\\/\\-]\\s*([A-ZĐ][A-ZĐ0-9\\/\\-]*(?:\\s+[A-ZĐ0-9][A-ZĐ0-9\\/\\-]+)*)',
+    fallback_command: '^(Đ[ẢA]NG\\s*B[ỘO]|QU[ÂA]N\\s*KHU|B[ỘO]\\s*T[ƯU]\\s*L[ỆE]NH|S[ƯU]\\s*ĐO[ÀA]N|TRUNG\\s*ĐO[ÀA]N|L[ỮU]\\s*ĐO[ÀA]N|TI[ỂE]U\\s*ĐO[ÀA]N|Đ[ẠA]I\\s*Đ[ỘO]I)',
+    fallback_unit: '(Đ[ẢA]NG\\s*[ỦU]Y|TR[ƯU][ỜO]NG|S[ƯU]\\s*ĐO[ÀA]N|TRUNG\\s*ĐO[ÀA]N|L[ỮU]\\s*ĐO[ÀA]N|TI[ỂE]U\\s*ĐO[ÀA]N|PH[ÒO]NG|BAN|KHOA|VI[ỆE]N|TRUNG\\s*T[ÂA]M|Đ[ỘO]I)',
+    rank_prefix: '\\b(Đại|Thượng|Trung|Thiếu|Chuẩn|Dai|Thuong|Thieu|Chuan)\\s+[A-ZÀ-Ỹa-zà-ỹ]{1,5}',
+
+    extract_text: {
+        same_line_tolerance_px: 5,
+        mid_column_tolerance_ratio: 0.08,
+    },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// [v4.3] ĐỌC NGƯỠNG TỪ ENV (không hard-code nữa)
+// ═══════════════════════════════════════════════════════════════
+const PARSER_THRESHOLDS = {
+    garbageTcvnRatio: parseFloat(process.env.PARSER_GARBAGE_TCVN_RATIO || '0.03'),
+    garbageMeaningfulRatio: parseFloat(process.env.PARSER_GARBAGE_MEANINGFUL_RATIO || '0.3'),
+    ocrConfidenceMin: parseFloat(process.env.PARSER_OCR_CONFIDENCE_MIN || '70'),
+    headerOcrDarkRatioMin: parseFloat(process.env.PARSER_HEADER_OCR_DARK_RATIO_MIN || '0.005'),
+    headerOcrThreshold: parseInt(process.env.PARSER_HEADER_OCR_THRESHOLD || '140', 10),
+    renderScale: parseInt(process.env.PARSER_RENDER_SCALE || '3', 10),
+    headerRenderScale: parseInt(process.env.PARSER_HEADER_RENDER_SCALE || '4', 10),
+    signerTailPages: parseInt(process.env.PARSER_SIGNER_TAIL_PAGES || '3', 10),
+    earlyOcrPages: parseInt(process.env.PARSER_EARLY_OCR_PAGES || '1', 10),
 };
 
 try {
@@ -27,34 +59,70 @@ try {
     console.error('[parser] Lỗi đọc config:', err.message);
 }
 
+// [PATCH 3 — 4.2]
+// ═══════════════════════════════════════════════════════════════
+// [v4.3] Compile 1 lần — tái sử dụng cho mọi lần parse
+// ═══════════════════════════════════════════════════════════════
+const COMPILED = {
+    suspiciousCodePatterns: [],
+    codeRematchStrict: null,
+    fallbackCommand: null,
+    fallbackUnit: null,
+    rankPrefix: null,
+    signerName: null,
+    titleStop: null,
+    romanHeading: null,
+    codeStandard: null,
+    issuedDate: null,
+};
+
+function compileParserRegexes() {
+    try {
+        COMPILED.suspiciousCodePatterns = (PARSER_CONFIG.suspicious_code_patterns || []).map((p) => new RegExp(p, 'i'));
+        COMPILED.codeRematchStrict = new RegExp(PARSER_CONFIG.code_rematch_strict, 'i');
+        COMPILED.fallbackCommand = new RegExp(PARSER_CONFIG.fallback_command);
+        COMPILED.fallbackUnit = new RegExp(PARSER_CONFIG.fallback_unit);
+        COMPILED.rankPrefix = new RegExp(PARSER_CONFIG.rank_prefix, 'gi');
+        COMPILED.signerName = new RegExp(PARSER_CONFIG.signer_name, 'i');
+        COMPILED.titleStop = new RegExp(PARSER_CONFIG.title_stop, 'i');
+        COMPILED.romanHeading = new RegExp(PARSER_CONFIG.roman_heading);
+        COMPILED.codeStandard = new RegExp(PARSER_CONFIG.document_code, 'i');
+        COMPILED.issuedDate = new RegExp(PARSER_CONFIG.issued_date, 'i');
+        console.log('[parser] ✅ Compiled all regexes from config');
+    } catch (err) {
+        console.error('[parser] ❌ Lỗi compile regex:', err.message);
+        throw err;
+    }
+}
+compileParserRegexes();
+
+// [PATCH 3 — NEW] Helper làm sạch ký tự ẩn (zero-width, control, nbsp)
+function sanitizeHiddenChars(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
 const STRICT_MODE = (process.env.PARSER_STRICT_MODE || 'false').toLowerCase() === 'true';
 
-// ═══════════════════════════════════════════════════════════════
-// [FIX] PHÁT HIỆN GARBAGE TEXT (PDF lỗi font nhúng)
-// ═══════════════════════════════════════════════════════════════
-/**
- * Trả về true nếu text là "rác" — hiện tượng PDF không nhúng font
- * khiến pdfjs đọc ra các ký tự Unicode vô nghĩa (VD:      ...).
- * Cách kiểm tra: đếm tỷ lệ ký tự thực sự (chữ cái + số) trên tổng độ dài.
- */
+// [PATCH 3 — 4.3] isGarbageText đọc ngưỡng từ PARSER_THRESHOLDS
 function isGarbageText(text) {
     if (!text) return false;
     const trimmed = text.trim();
     if (trimmed.length < 50) return false;
 
-    // [FIX] TCVN3 typo: ký tự nằm trong dải U+00A0 - U+00BF (§¹¸ª¬­®¯°±²³...)
-    // Đây là dấu hiệu của PDF dùng font TCVN3/VNI không nhúng Unicode map
     const tcvn3TypoCount = (trimmed.match(/[\u00A0-\u00BF]/g) || []).length;
-    if (tcvn3TypoCount / trimmed.length > 0.03) {
-        // > 3% là đã bất thường — văn bản VN đúng chuẩn gần như không có ký tự này
-        return true;
-    }
+    if (tcvn3TypoCount / trimmed.length > PARSER_THRESHOLDS.garbageTcvnRatio) return true;
 
-    // Heuristic cũ: đếm token có nghĩa
     const tokens = trimmed.split(/\s+/).filter(t => t.length >= 2);
     const meaningfulTokens = tokens.filter(t => /^[a-zA-Z0-9À-ỹ]{2,}$/.test(t));
     const meaningfulChars = meaningfulTokens.reduce((sum, t) => sum + t.length, 0);
-    return meaningfulChars / trimmed.length < 0.3;
+    return meaningfulChars / trimmed.length < PARSER_THRESHOLDS.garbageMeaningfulRatio;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -65,12 +133,9 @@ let catalogCache = { data: null, loadedAt: 0 };
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-
 // ═══════════════════════════════════════════════════════════════
-// FUZZY MATCHING — So khớp mờ, không cần bảng alias 
+// FUZZY MATCHING
 // ═══════════════════════════════════════════════════════════════
-
-/** Bỏ dấu tiếng Việt: "Đại tá" → "dai ta" */
 function removeDiacritics(str) {
     if (!str) return '';
     return str
@@ -82,7 +147,6 @@ function removeDiacritics(str) {
         .toLowerCase();
 }
 
-/** Khoảng cách Levenshtein — số phép sửa tối thiểu để biến a thành b */
 function levenshtein(a, b) {
     if (a === b) return 0;
     if (!a.length) return b.length;
@@ -101,12 +165,6 @@ function levenshtein(a, b) {
     return dp[a.length][b.length];
 }
 
-/**
- * So khớp mờ: tìm tên chuẩn trong DB gần nhất với chuỗi OCR đọc được.
- * @param {string} input - "Đại td", "Thượng ta"...
- * @param {Array<string|{name:string}>} candidates - catalog.ranks / catalog.positions
- * @param {number} threshold - Số ký tự sai tối đa (default 2)
- */
 function fuzzyMatch(input, candidates, threshold = 2) {
     if (!input || !candidates || candidates.length === 0) return null;
     const inputNorm = removeDiacritics(input);
@@ -134,7 +192,6 @@ async function loadCatalogs(getPool, sql) {
 
     const pool = await getPool();
 
-    // 1. Doc Types
     let docTypes = [];
     try {
         const typesRes = await pool.request().query(`SELECT type_id, name FROM DOCUMENT_TYPE`);
@@ -143,7 +200,6 @@ async function loadCatalogs(getPool, sql) {
         console.warn('[parser] Lỗi đọc DOCUMENT_TYPE:', err.message);
     }
 
-    // 2. Ranks & Positions
     let ranks = [];
     try {
         const ranksRes = await pool.request().query(`SELECT name FROM MILITARY_RANK WHERE active = 1 ORDER BY sort_order`);
@@ -160,7 +216,6 @@ async function loadCatalogs(getPool, sql) {
         console.warn('[parser] Lỗi đọc MILITARY_POSITION:', err.message);
     }
 
-    // 3. Units with alias fallback
     let units = [];
     try {
         const unitsRes = await pool.request().query(`
@@ -182,7 +237,6 @@ async function loadCatalogs(getPool, sql) {
         }
     }
 
-    // 4. Patterns with automatic fallback
     let patterns = [];
     try {
         const patternsRes = await pool.request().query(`
@@ -196,7 +250,6 @@ async function loadCatalogs(getPool, sql) {
         console.warn('[parser] Không đọc được DOCUMENT_TYPE_PATTERN từ DB, dùng pattern mặc định:', err.message);
     }
 
-    // Fallback: nếu patterns từ DB rỗng hoặc lỗi, tự động sinh pattern từ docTypes
     if (!patterns || patterns.length === 0) {
         patterns = docTypes.map((dt, idx) => ({
             pattern_id: idx + 1,
@@ -221,8 +274,6 @@ async function loadCatalogs(getPool, sql) {
     const rootUnits = units.filter(u => !u.parent_id).map(u => u.name.toUpperCase());
     const childUnits = units.filter(u => u.parent_id).map(u => u.name.toUpperCase());
 
-
-        // Build position signer pattern (cả có dấu và không dấu để bắt lỗi OCR)
     const posPatternStr = positions
         .map(p => {
             const withD = escapeRegex(p);
@@ -231,7 +282,6 @@ async function loadCatalogs(getPool, sql) {
         })
         .sort((a, b) => b.length - a.length)
         .join('|');
-
 
     const compiledPatterns = patterns.map(p => {
         try {
@@ -274,16 +324,22 @@ async function matchUnitByName(getPool, sql, name) {
     return { unit_id: matches[0].unit_id, matched_by: 'name/alias' };
 }
 
+// [PATCH 3 — 4.4] extractTextItems đọc tolerance từ config
 async function extractTextItems(buffer) {
     const pdfjsLib = await pdfjsLibPromise;
     const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
     const pages = [];
+
+    const sameLineTol = PARSER_CONFIG.extract_text?.same_line_tolerance_px ?? 5;
+    const midColRatio = PARSER_CONFIG.extract_text?.mid_column_tolerance_ratio ?? 0.08;
+
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const viewport = page.getViewport({ scale: 1 });
         const textContent = await page.getTextContent();
-        const items = textContent.items
-            .filter(it => typeof it.str === 'string')
+
+        const rawItems = textContent.items
+            .filter(it => typeof it.str === 'string' && it.str.length > 0)
             .map(it => ({
                 str: it.str,
                 x: it.transform?.[4] ?? 0,
@@ -291,18 +347,66 @@ async function extractTextItems(buffer) {
                 width: it.width || 0,
                 height: it.height || 0,
             }));
+
+        rawItems.sort((a, b) => {
+            const yDiff = b.y - a.y;
+            if (Math.abs(yDiff) < sameLineTol) return a.x - b.x;
+            return yDiff;
+        });
+
+        const lines = [];
+        for (const it of rawItems) {
+            const lastLine = lines[lines.length - 1];
+            if (lastLine && Math.abs(lastLine.y - it.y) < sameLineTol) {
+                lastLine.items.push(it);
+                lastLine.maxX = Math.max(lastLine.maxX || 0, it.x + it.width);
+            } else {
+                lines.push({ y: it.y, items: [it], maxX: it.x + it.width });
+            }
+        }
+
+        const midX = viewport.width / 2;
+        const tolerance = viewport.width * midColRatio;
+
+        const pageLines = lines.map(line => {
+            const sortedItems = line.items.sort((a, b) => a.x - b.x);
+
+            const leftItems = sortedItems.filter(it => it.x < midX - tolerance);
+            const rightItems = sortedItems.filter(it => it.x > midX + tolerance);
+            const crossItems = sortedItems.filter(it =>
+                it.x >= midX - tolerance && it.x <= midX + tolerance
+            );
+
+            if (leftItems.length === 0 || rightItems.length === 0) {
+                return sortedItems.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+            }
+
+            const leftText = leftItems.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+            const rightText = rightItems.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+            const crossText = crossItems.map(it => it.str).join(' ').trim();
+
+            const parts = [leftText, crossText, rightText].filter(Boolean);
+            return parts.join(' | ');
+        }).filter(Boolean);
+
+        const pageText = pageLines.join('\n');
+
         pages.push({
             pageNum: i,
-            items,
+            items: rawItems,
+            lines: pageLines,
+            text: pageText,
             height: viewport.height,
             width: viewport.width,
         });
     }
-    const fullText = pages.map(p => p.items.map(it => it.str).join('\n')).join('\n\n');
+
+    const fullText = pages.map(p => p.text).join('\n\n');
     return { pages, fullText };
 }
 
-async function renderPdfToImages(buffer, scale = 3) {
+// [PATCH 3 — 4.5] renderPdfToImages đọc scale mặc định từ PARSER_THRESHOLDS
+async function renderPdfToImages(buffer, scale = PARSER_THRESHOLDS.renderScale) {
     try {
         const { pdf: pdfToImg } = await import('pdf-to-img');
         const images = [];
@@ -325,9 +429,7 @@ async function ocrImage(imageBuffer) {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// OCR CHỈ VÙNG HEADER (sau "Số:") — đọc số hiệu bị ẩn dạng ảnh
-// ═══════════════════════════════════════════════════════════════
+// [PATCH 3 — 4.6] ocrNumberFromHeader dùng PARSER_THRESHOLDS
 async function ocrNumberFromHeader(buffer, pages) {
     if (!pages || pages.length === 0) return null;
 
@@ -336,12 +438,7 @@ async function ocrNumberFromHeader(buffer, pages) {
     const pageHeight = page1.height || 842;
 
     const soItem = items.find(it => /^S[ốo]\s*:?\s*$/.test(it.str.trim()));
-    if (!soItem) {
-        console.log('[header-ocr] Không tìm thấy "Số:"');
-        return null;
-    }
-
-    console.log(`[header-ocr] "Số:" tại x=${soItem.x.toFixed(1)}, y=${soItem.y.toFixed(1)}`);
+    if (!soItem) return null;
 
     const sameLine = items
         .filter(it => Math.abs(it.y - soItem.y) < 5 && it.x > soItem.x - 2)
@@ -352,30 +449,19 @@ async function ocrNumberFromHeader(buffer, pages) {
 
     for (const it of sameLine) {
         if (it.x <= soItem.x + 5) continue;
-        if (!it.str.trim()) {
-            xEnd = it.x + (it.width || 40);
-            break;
-        }
-        if (it.str.includes('/')) {
-            xEnd = it.x;
-            break;
-        }
+        if (!it.str.trim()) { xEnd = it.x + (it.width || 40); break; }
+        if (it.str.includes('/')) { xEnd = it.x; break; }
     }
 
     if (xEnd <= xStart + 10) xEnd = xStart + 80;
     const cropWidthPDF = xEnd - xStart;
-    if (cropWidthPDF < 20) {
-        console.log('[header-ocr] Vùng crop quá nhỏ:', cropWidthPDF);
-        return null;
-    }
+    if (cropWidthPDF < 20) return null;
 
-    console.log(`[header-ocr] Crop: x=${xStart.toFixed(1)}-${xEnd.toFixed(1)}, y=${soItem.y.toFixed(1)}, w=${cropWidthPDF.toFixed(1)}`);
-
-    const images = await renderPdfToImages(buffer, 4);
+    const images = await renderPdfToImages(buffer, PARSER_THRESHOLDS.headerRenderScale);
     if (images.length === 0) return null;
     const pageImage = images[0];
 
-    const scale = 4;
+    const scale = PARSER_THRESHOLDS.headerRenderScale;
     const yTopPDF = pageHeight - soItem.y - 12;
     const yBottomPDF = pageHeight - soItem.y + 18;
 
@@ -386,26 +472,40 @@ async function ocrNumberFromHeader(buffer, pages) {
 
     try {
         const sharp = require('sharp');
-        const cropped = await sharp(pageImage)
+        const croppedBuffer = await sharp(pageImage)
             .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
             .grayscale()
             .normalize()
             .resize({ width: cropW * 3, kernel: 'lanczos3' })
             .sharpen()
-            .threshold(140)
+            .threshold(PARSER_THRESHOLDS.headerOcrThreshold)
             .png()
             .toBuffer();
 
-        const { data: { text } } = await Tesseract.recognize(cropped, 'eng', {
+        const { data: rawPixels, info } = await sharp(croppedBuffer).raw().toBuffer({ resolveWithObject: true });
+
+        let darkPixels = 0;
+        const totalPixels = info.width * info.height;
+        for (let i = 0; i < rawPixels.length; i += info.channels) {
+            if (rawPixels[i] < 128) darkPixels++;
+        }
+        const darkRatio = darkPixels / totalPixels;
+
+        if (darkRatio < PARSER_THRESHOLDS.headerOcrDarkRatioMin) return null;
+
+        const { data } = await Tesseract.recognize(croppedBuffer, 'eng', {
             tessedit_char_whitelist: '0123456789',
             logger: () => {},
         });
 
-        const cleaned = text.replace(/\D/g, '').trim();
-        console.log(`[header-ocr] Đọc: "${text.trim()}" → "${cleaned}"`);
+        const cleaned = data.text.replace(/\D/g, '').trim();
+        const confidence = data.confidence || 0;
 
-        if (cleaned && cleaned.length >= 1 && cleaned.length <= 6) {
-            return cleaned;
+        if (confidence < PARSER_THRESHOLDS.ocrConfidenceMin) return null;
+
+        if (cleaned && cleaned.length >= 1 && cleaned.length <= 4) {
+            const numVal = parseInt(cleaned, 10);
+            if (numVal > 0 && numVal <= 9999) return cleaned;
         }
         return null;
     } catch (err) {
@@ -520,10 +620,10 @@ function findUnitsInText(text, catalog, opts = {}) {
     return { parent: shorter, unit: longer, candidates: nonOverlapping };
 }
 
-// ═══════════════════════════════════════════════════════════════
-// EXTRACT METADATA
-// ═══════════════════════════════════════════════════════════════
-function extractMetadata(text, catalog) {
+// [PATCH 3 — 4.8] extractMetadata — dùng COMPILED thay toàn bộ regex hard-code
+function extractMetadata(rawText, catalog) {
+    const text = sanitizeHiddenChars(rawText);
+
     const result = {
         document_code: null,
         document_number: null,
@@ -539,37 +639,62 @@ function extractMetadata(text, catalog) {
 
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // ── Số hiệu ──
-    const codeRegex = new RegExp(PARSER_CONFIG.document_code, 'i');
-    const codeMatch = text.match(codeRegex);
+    // ═══════════════════════════════════════════════════════════════
+    // Số hiệu — Dùng COMPILED.codeStandard
+    // ═══════════════════════════════════════════════════════════════
+    const codeMatch = text.match(COMPILED.codeStandard);
     if (codeMatch) {
-        const num = codeMatch[1] || null;
-        const sep = codeMatch[2] || '';
-        const rawSuffix = codeMatch[3].replace(/\s*([\/\-])\s*/g, '$1').trim();
+        const num = (codeMatch[1] || '').trim();
+        const sep = codeMatch[2] || '/';
+        const rawSuffix = (codeMatch[3] || '').replace(/\s*([\/\-])\s*/g, '$1').trim().toUpperCase();
 
-        result.document_number = num;
-        result.document_code = num
-            ? `${num}${sep || '/'}${rawSuffix}`
-            : (sep ? `${sep}${rawSuffix}` : rawSuffix);
-
-        const guessType = rawSuffix.split(/[-\/]/)[0];
-        const catalogType = catalog.docTypes.find(
-            t => t.type_id.toUpperCase() === guessType.toUpperCase()
-        );
-        if (catalogType) {
-            result.doc_type_code = catalogType.type_id;
-            result.doc_type_name = catalogType.name.toUpperCase();
+        if (num) {
+            result.document_number = num;
+            result.document_code = `${num}${sep}${rawSuffix}`;
+            const guessType = rawSuffix.split(/[\/\-]/)[0];
+            const catalogType = catalog.docTypes.find(t => t.type_id.toUpperCase() === guessType.toUpperCase());
+            if (catalogType) {
+                result.doc_type_code = catalogType.type_id;
+                result.doc_type_name = catalogType.name.toUpperCase();
+            }
         }
     }
 
-    // ── Loại VB + Title ──
-    const TITLE_STOP = new RegExp(PARSER_CONFIG.title_stop, 'i');
-    const ROMAN_HEADING = new RegExp(PARSER_CONFIG.roman_heading);
+    // ═══════════════════════════════════════════════════════════════
+    // [v4.3] Re-match suspicious code — đọc từ COMPILED
+    // ═══════════════════════════════════════════════════════════════
+    if (result.document_code) {
+        const isSuspicious = COMPILED.suspiciousCodePatterns.some(p => p.test(result.document_code));
+        if (isSuspicious) {
+            const strictMatch = text.match(COMPILED.codeRematchStrict);
+            if (strictMatch) {
+                const fixedCode = `${strictMatch[1]}/${strictMatch[2]}`.replace(/\s+/g, '');
+                if (fixedCode.length > result.document_code.length) {
+                    result.document_number = strictMatch[1];
+                    result.document_code = fixedCode;
+                }
+            }
+        }
+    }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Ngày ban hành — COMPILED.issuedDate
+    // ═══════════════════════════════════════════════════════════════
+    const dateMatch = text.match(COMPILED.issuedDate);
+    if (dateMatch) {
+        const day = (dateMatch[1] || '').trim();
+        const month = (dateMatch[2] || '').padStart(2, '0');
+        const year = dateMatch[3];
+        if (!day) result.issued_date = null;
+        else result.issued_date = `${year}-${month}-${day.padStart(2, '0')}`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Loại VB + Tiêu đề — COMPILED.titleStop / COMPILED.romanHeading
+    // ═══════════════════════════════════════════════════════════════
     for (const pattern of catalog.patterns) {
         const match = text.match(pattern.compiled);
         if (!match) continue;
-
         result.doc_type_code = pattern.type_id;
         const catalogType = catalog.docTypes.find(t => t.type_id === pattern.type_id);
         if (catalogType) result.doc_type_name = catalogType.name.toUpperCase();
@@ -578,17 +703,15 @@ function extractMetadata(text, catalog) {
         if (inlineTitle) {
             let mergedTitle = inlineTitle;
             const matchedLineIdx = lines.findIndex(l => l.includes(inlineTitle) || l === inlineTitle);
-
             if (matchedLineIdx >= 0) {
                 for (let k = matchedLineIdx + 1; k < Math.min(matchedLineIdx + 4, lines.length); k++) {
                     const next = lines[k];
                     if (!next) break;
-                    if (TITLE_STOP.test(next)) break;
-                    if (ROMAN_HEADING.test(next)) break;
+                    if (COMPILED.titleStop.test(next)) break;
+                    if (COMPILED.romanHeading.test(next)) break;
                     if (/^-\s/.test(next)) break;
                     if (/^#/.test(next)) break;
                     if (/^[A-ZÀ-Ỹ0-9\s\.\-]+$/.test(next) && next.length > 10) break;
-
                     if (/^[a-zà-ỹ]/.test(next) || /^(và|của|về|nhằm|để)\s/i.test(next)) {
                         mergedTitle += ' ' + next;
                     } else {
@@ -598,15 +721,13 @@ function extractMetadata(text, catalog) {
             }
             result.title = mergedTitle;
         } else {
-            const idx = lines.findIndex(l => {
-                try { return pattern.compiled.test(l); } catch { return false; }
-            });
+            const idx = lines.findIndex(l => { try { return pattern.compiled.test(l); } catch { return false; } });
             if (idx >= 0) {
                 const parts = [];
                 for (let j = idx + 1; j < Math.min(idx + 6, lines.length); j++) {
                     const line = lines[j];
-                    if (TITLE_STOP.test(line)) break;
-                    if (ROMAN_HEADING.test(line)) break;
+                    if (COMPILED.titleStop.test(line)) break;
+                    if (COMPILED.romanHeading.test(line)) break;
                     if (/^-\s/.test(line)) break;
                     if (/^#/.test(line)) break;
                     if (line.length < 5 && !/^\d+$/.test(line)) break;
@@ -618,33 +739,19 @@ function extractMetadata(text, catalog) {
         break;
     }
 
-    // ── Ngày ban hành ──
-    const dateRegex = new RegExp(PARSER_CONFIG.issued_date, 'i');
-    const dateMatch = text.match(dateRegex);
-    if (dateMatch) {
-        const day = dateMatch[1] || '01';
-        const month = dateMatch[2].padStart(2, '0');
-        const year = dateMatch[3];
-        result.issued_date = `${year}-${month}-${day.padStart(2, '0')}`;
-    }
-
-        // ── Người ký ──
-    // 1. Exact match: Cấp bậc + Tên (dùng catalog.rankPattern)
+    // ═══════════════════════════════════════════════════════════════
+    // Người ký — COMPILED.rankPrefix / COMPILED.signerName
+    // ═══════════════════════════════════════════════════════════════
     if (catalog.rankPattern) {
-        const signerRegex = new RegExp(
-            `(${catalog.rankPattern})\\s+([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+)+)`
-        );
+        const signerRegex = new RegExp(`(${catalog.rankPattern})\\s+(?:QNCN\\s+)?([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,4})`);
         const signerMatch = text.match(signerRegex);
-        if (signerMatch) {
-            result.signer = `${signerMatch[1]} ${signerMatch[2]}`.trim();
-        }
+        if (signerMatch) result.signer = `${signerMatch[1]} ${signerMatch[2]}`.trim();
     }
 
-    // 2. FUZZY match: Cấp bậc + Tên (xử lý OCR sai như "Đại td", "Thuong ta")
     if (!result.signer && catalog.ranks && catalog.ranks.length > 0) {
-        const rankPrefixRegex = /\b(Đại|Thượng|Trung|Thiếu|Chuẩn|Dai|Thuong|Thieu|Chuan)\s+[A-ZÀ-Ỹa-zà-ỹ]{1,5}/gi;
+        COMPILED.rankPrefix.lastIndex = 0;   // reset state (global regex)
         let rankMatch;
-        while ((rankMatch = rankPrefixRegex.exec(text)) !== null) {
+        while ((rankMatch = COMPILED.rankPrefix.exec(text)) !== null) {
             const matchedRank = fuzzyMatch(rankMatch[0], catalog.ranks);
             if (matchedRank) {
                 const after = text.slice(rankMatch.index + rankMatch[0].length);
@@ -657,41 +764,32 @@ function extractMetadata(text, catalog) {
         }
     }
 
-    // 3. Quét ngược từ dưới lên: Chức danh (từ DB) + Tên
     if (!result.signer && catalog.posPatternStr) {
         const POSITION_SIGNER = new RegExp(`(?:${catalog.posPatternStr})`, 'i');
-        const NAME_REGEX = /^(?=.*[A-ZÀ-Ỹa-zà-ỹ])[A-ZÀ-Ỹa-zà-ỹ]+(?:\s+[A-ZÀ-Ỹa-zà-ỹ]+){1,4}$/i;
-
         for (let i = lines.length - 1; i >= 0; i--) {
             if (POSITION_SIGNER.test(lines[i])) {
                 for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
-                    if (POSITION_SIGNER.test(lines[j])) continue;  // Bỏ qua chức danh khác
-                    if (NAME_REGEX.test(lines[j])) {
-                        result.signer = lines[j];
-                        break;
-                    }
+                    if (POSITION_SIGNER.test(lines[j])) continue;
+                    if (COMPILED.signerName.test(lines[j])) { result.signer = lines[j]; break; }
                 }
                 if (result.signer) break;
             }
         }
     }
 
-    // 4. Fallback cuối: quét ngược tên thuần Việt (bỏ qua dòng toàn số/rác)
     if (!result.signer) {
-        const NAME_REGEX = /^(?=.*[A-ZÀ-Ỹa-zà-ỹ])[A-ZÀ-Ỹa-zà-ỹ]+(?:\s+[A-ZÀ-Ỹa-zà-ỹ]+){1,4}$/i;
         for (let i = lines.length - 1; i >= 0; i--) {
             const line = lines[i];
             if (line.length < 8) continue;
             if (/^[0-9\s\.\,\-\/]+$/.test(line)) continue;
             if (!/[À-Ỹà-ỹ]/.test(line) && !/Đ|đ/.test(line)) continue;
-            if (NAME_REGEX.test(line)) {
-                result.signer = line;
-                break;
-            }
+            if (COMPILED.signerName.test(line)) { result.signer = line; break; }
         }
     }
 
-    // ── Chức danh ──
+    // ═══════════════════════════════════════════════════════════════
+    // Chức danh — từ catalog (DB)
+    // ═══════════════════════════════════════════════════════════════
     if (catalog.positionPattern) {
         const posMatches = [...text.matchAll(new RegExp(catalog.positionPattern, 'g'))];
         if (posMatches.length > 0) {
@@ -700,50 +798,34 @@ function extractMetadata(text, catalog) {
         }
     }
 
-    // ── ĐƠN VỊ BAN HÀNH — DB-first scan ──
-    const unitScan = findUnitsInText(text, catalog, {
-        maxLinesToScan: 12,
-        minLength: 5,
-        allowSingleLevel: true,
-    });
+    // ═══════════════════════════════════════════════════════════════
+    // Đơn vị — DB-first (giữ nguyên logic cũ)
+    // ═══════════════════════════════════════════════════════════════
+    const unitScan = findUnitsInText(text, catalog, { maxLinesToScan: 12, minLength: 5, allowSingleLevel: true });
+    if (unitScan.parent) result.issuer_parent_unit_name = unitScan.parent.name;
+    if (unitScan.unit) result.issuer_unit_name = unitScan.unit.name;
 
-    if (unitScan.parent) {
-        result.issuer_parent_unit_name = unitScan.parent.name;
-    }
-    if (unitScan.unit) {
-        result.issuer_unit_name = unitScan.unit.name;
-    }
-
-    // Fallback regex đơn giản — CHỈ khi LENIENT mode và DB không match
+    // Fallback — dùng COMPILED.fallbackCommand / COMPILED.fallbackUnit
     if (!STRICT_MODE && !result.issuer_unit_name) {
-        const FALLBACK_COMMAND = /^(Đ[ẢA]NG\s*B[ỘO]|QU[ÂA]N\s*KHU|B[ỘO]\s*T[ƯU]\s*L[ỆE]NH|S[ƯU]\s*ĐO[ÀA]N|TRUNG\s*ĐO[ÀA]N|L[ỮU]\s*ĐO[ÀA]N|TI[ỂE]U\s*ĐO[ÀA]N|Đ[ẠA]I\s*Đ[ỘO]I)/;
-        const FALLBACK_UNIT = /(Đ[ẢA]NG\s*[ỦU]Y|TR[ƯU][ỜO]NG|S[ƯU]\s*ĐO[ÀA]N|TRUNG\s*ĐO[ÀA]N|L[ỮU]\s*ĐO[ÀA]N|TI[ỂE]U\s*ĐO[ÀA]N|PH[ÒO]NG|BAN|KHOA|VI[ỆE]N|TRUNG\s*T[ÂA]M|Đ[ỘO]I)/;
-
         for (let i = 0; i < Math.min(lines.length - 1, 8); i++) {
-            const l1 = lines[i];
-            const l2 = lines[i + 1];
+            const l1 = lines[i], l2 = lines[i + 1];
             const isUpper1 = /^[A-ZÀ-Ỹ0-9\s\.\-]+$/.test(l1) && l1.length >= 4;
             const isUpper2 = /^[A-ZÀ-Ỹ0-9\s\.\-]+$/.test(l2) && l2.length >= 4;
             if (!isUpper1 || !isUpper2) continue;
             if (/C[ỘO]NG\s*HO[ÀA]/i.test(l1)) continue;
             if (/^S[ốo]\s*:/i.test(l2)) continue;
-
-            if (FALLBACK_COMMAND.test(l1) || FALLBACK_UNIT.test(l2)) {
+            if (COMPILED.fallbackCommand.test(l1) || COMPILED.fallbackUnit.test(l2)) {
                 result.issuer_parent_unit_name = l1;
                 result.issuer_unit_name = l2;
                 break;
             }
         }
-
         if (!result.issuer_unit_name) {
             for (const line of lines.slice(0, 15)) {
                 if (!/^[A-ZÀ-Ỹ0-9\s\.\-]+$/.test(line)) continue;
                 if (line.length < 5) continue;
                 if (/C[ỘO]NG\s*HO[ÀA]/i.test(line)) continue;
-                if (FALLBACK_UNIT.test(line)) {
-                    result.issuer_unit_name = line;
-                    break;
-                }
+                if (COMPILED.fallbackUnit.test(line)) { result.issuer_unit_name = line; break; }
             }
         }
     }
@@ -807,12 +889,10 @@ function mergeMissingFields(primary, fallback, missingFields) {
     return { merged, sources };
 }
 
-// ═══════════════════════════════════════════════════════════════
-// [FIX] OCR các trang cuối để tìm người ký
-// ═══════════════════════════════════════════════════════════════
-async function ocrSignerFromTail(buffer, catalog, nLastPages = 3) {
+// [PATCH 3 — 4.7] ocrSignerFromTail default nLastPages từ env
+async function ocrSignerFromTail(buffer, catalog, nLastPages = PARSER_THRESHOLDS.signerTailPages) {
     console.log(`[signer-ocr] OCR ${nLastPages} trang cuối để tìm người ký...`);
-    const images = await renderPdfToImages(buffer, 3);
+    const images = await renderPdfToImages(buffer, PARSER_THRESHOLDS.renderScale);
     if (images.length === 0) {
         console.log('[signer-ocr] Không render được PDF');
         return null;
@@ -827,14 +907,12 @@ async function ocrSignerFromTail(buffer, catalog, nLastPages = 3) {
             continue;
         }
 
-        // Bước 1: extract theo catalog (rank + name)
         const parsed = extractMetadata(ocrText, catalog);
         if (parsed.signer) {
             console.log(`[signer-ocr] ✅ Page ${pageIdx} (catalog): "${parsed.signer}"`);
             return { signer: parsed.signer, signer_position: parsed.signer_position, page: pageIdx };
         }
 
-        // [FUZZY] Bước 2: Fuzzy match Cấp bậc từ DB (thay RANK_HARDCODED hard-code)
         if (catalog.ranks && catalog.ranks.length > 0) {
             const rankPrefixRegex = /\b(Đại|Thượng|Trung|Thiếu|Chuẩn|Dai|Thuong|Thieu|Chuan)\s+[A-ZÀ-Ỹa-zà-ỹ]{1,5}/gi;
             let rankMatch;
@@ -852,19 +930,15 @@ async function ocrSignerFromTail(buffer, catalog, nLastPages = 3) {
             }
         }
 
-        // [FIX] Bước 3: fallback tên thuần Việt — lấy dòng cuối cùng có dạng tên người
         const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
-        // Regex mới: linh hoạt hơn, chấp nhận chữ thường
         const nameRegex = /^[A-ZÀ-Ỹa-zà-ỹ]+(?:\s+[A-ZÀ-Ỹa-zà-ỹ]+){1,4}$/i;
-        
+
         for (let k = lines.length - 1; k >= Math.max(0, lines.length - 20); k--) {
             const line = lines[k];
             if (line.length < 8) continue;
-            // Bỏ qua dòng toàn số hoặc ký tự rác (như trang 8)
-            if (/^[0-9\s\.\,\-\/]+$/.test(line)) continue; 
-            // Yêu cầu có ít nhất 1 ký tự tiếng Việt có dấu hoặc chữ Đ để tránh bắt nhầm từ tiếng Anh
+            if (/^[0-9\s\.\,\-\/]+$/.test(line)) continue;
             if (!/[À-Ỹà-ỹ]/.test(line) && !/Đ|đ/.test(line)) continue;
-            
+
             if (nameRegex.test(line)) {
                 console.log(`[signer-ocr] ⚠️ Page ${pageIdx} (name-only, không rõ rank): "${line}"`);
                 return { signer: line, signer_position: null, page: pageIdx, warning: 'no_rank' };
@@ -878,12 +952,9 @@ async function ocrSignerFromTail(buffer, catalog, nLastPages = 3) {
     return null;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// [FIX] OCR toàn bộ document khi phát hiện garbage text
-// ═══════════════════════════════════════════════════════════════
 async function ocrWholeDocument(buffer) {
     console.log('[full-ocr] OCR toàn bộ document (phát hiện garbage text)...');
-    const images = await renderPdfToImages(buffer, 3);
+    const images = await renderPdfToImages(buffer, PARSER_THRESHOLDS.renderScale);
     if (images.length === 0) return '';
     let fullText = '';
     for (let i = 0; i < images.length; i++) {
@@ -893,15 +964,10 @@ async function ocrWholeDocument(buffer) {
     return fullText;
 }
 
-
-// ═══════════════════════════════════════════════════════════════
-// [FUZZY] Chuẩn hóa Cấp bậc người ký bằng DB
-// ═══════════════════════════════════════════════════════════════
 function normalizeRankName(signer, catalog) {
     if (!signer || !catalog || !catalog.ranks || catalog.ranks.length === 0) return signer;
 
     const parts = signer.trim().split(/\s+/);
-    // Thử prefix 3 từ → 2 từ (VD: "Đại td Lê" fail → "Đại td" match "Đại tá")
     for (let n = Math.min(3, parts.length - 1); n >= 2; n--) {
         const rankPart = parts.slice(0, n).join(' ');
         const matched = fuzzyMatch(rankPart, catalog.ranks);
@@ -912,7 +978,6 @@ function normalizeRankName(signer, catalog) {
     }
     return signer;
 }
-
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN
@@ -933,7 +998,6 @@ async function parseDocumentPdf(buffer, deps = {}) {
 
     const { pages, fullText } = await extractTextItems(buffer);
 
-    // [FIX] Phát hiện garbage text theo từng trang
     const pageTexts = pages.map(p => p.items.map(it => it.str).join(' '));
     const garbageFlags = pageTexts.map(t => isGarbageText(t));
     const garbageCount = garbageFlags.filter(Boolean).length;
@@ -952,7 +1016,6 @@ async function parseDocumentPdf(buffer, deps = {}) {
             console.log(`[parse] ⚠️ Có ${garbageCount} trang bị garbage (sẽ OCR bổ sung nếu thiếu trường)`);
         }
     } else {
-        // [FIX] OCR toàn bộ khi đa số trang là garbage
         console.log('[parse] Phát hiện scan/garbage → OCR toàn bộ document');
         const ocrFullText = await ocrWholeDocument(buffer);
         if (ocrFullText && ocrFullText.trim().length > 20) {
@@ -969,21 +1032,18 @@ async function parseDocumentPdf(buffer, deps = {}) {
         }
     }
 
-    // ── [FIX] Xử lý theo nhóm trường thiếu ──
     const missing = getMissingFields(parsed);
 
-    // Nhóm 1: trường ở đầu văn bản → OCR page 1
     const earlyMissing = missing.filter(f =>
         ['document_code', 'doc_type_code', 'title', 'issued_date'].includes(f)
     );
-    // Nhóm 2: trường ở cuối văn bản → OCR các trang cuối
     const lateMissing = missing.filter(f =>
         ['signer', 'signer_position'].includes(f)
     );
 
     if (earlyMissing.length > 0) {
         console.log(`[parse] Thiếu (đầu VB): ${earlyMissing.join(', ')} → OCR page 1`);
-        const images = await renderPdfToImages(buffer, 3);
+        const images = await renderPdfToImages(buffer, PARSER_THRESHOLDS.renderScale);
         if (images.length > 0) {
             const ocrText = await ocrImage(images[0]);
             if (ocrText && ocrText.trim().length > 20) {
@@ -997,7 +1057,8 @@ async function parseDocumentPdf(buffer, deps = {}) {
 
     if (lateMissing.includes('signer')) {
         console.log(`[parse] Thiếu (cuối VB): signer → OCR các trang cuối`);
-        const signerResult = await ocrSignerFromTail(buffer, catalog, 3);
+        // [PATCH 3 — 4.7] không truyền cứng 3 → dùng PARSER_THRESHOLDS.signerTailPages
+        const signerResult = await ocrSignerFromTail(buffer, catalog);
         if (signerResult) {
             parsed.signer = signerResult.signer;
             if (!parsed.signer_position && signerResult.signer_position) {
@@ -1008,7 +1069,6 @@ async function parseDocumentPdf(buffer, deps = {}) {
         }
     }
 
-    // ── Số hiệu bị ẩn → OCR vùng header ──
     if (
         parsed.document_code &&
         !parsed.document_number &&
@@ -1028,14 +1088,12 @@ async function parseDocumentPdf(buffer, deps = {}) {
         }
     }
 
-    // Gán source mặc định cho các field đã có
     for (const key of Object.keys(parsed)) {
         if (parsed[key] !== null && !sources[key]) {
             sources[key] = isDigital ? 'text' : 'ocr';
         }
     }
 
-    // ── Match đơn vị với DB ──
     let issuer_parent_unit_id = null, issuer_unit_id = null;
     let parent_matched = false, unit_matched = false;
 
@@ -1059,12 +1117,10 @@ async function parseDocumentPdf(buffer, deps = {}) {
         issuer_display = parsed.issuer_parent_unit_name;
     }
 
-    // [FUZZY] Chuẩn hóa cấp bậc người ký (Đại td → Đại tá)
     if (parsed.signer && catalog) {
         parsed.signer = normalizeRankName(parsed.signer, catalog);
     }
 
-    // ── [FIX] Cập nhật lại missingFields sau khi OCR ──
     const finalMissing = getMissingFields(parsed);
 
     return {
@@ -1090,4 +1146,11 @@ async function parseDocumentPdf(buffer, deps = {}) {
     };
 }
 
-module.exports = { parseDocumentPdf, invalidateCatalogCache };
+// [PATCH 3 — 4.9] Export thêm để test/script bên ngoài dùng
+module.exports = {
+    parseDocumentPdf,
+    invalidateCatalogCache,
+    sanitizeHiddenChars,
+    PARSER_THRESHOLDS,
+    compileParserRegexes,
+};

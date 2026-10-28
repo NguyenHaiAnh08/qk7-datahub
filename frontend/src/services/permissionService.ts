@@ -3,12 +3,22 @@ import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { Permission, UserPermissionResponse } from '../types/user';
 
 export const permissionService = {
-  // Catalog
+  // ─── CATALOG ───
   getPermissions: async (): Promise<{ total: number; items: Permission[] }> => {
     return http<{ total: number; items: Permission[] }>(API_ENDPOINTS.ADMIN.PERMISSIONS);
   },
 
-  createPermission: async (data: any): Promise<{ success: boolean }> => {
+  createPermission: async (data: {
+    permission_id: string;
+    code: string;
+    description?: string | null;
+    group_code: string;
+    subgroup_key?: string | null;
+    subgroup_label?: string | null;
+    subgroup_order?: number;
+    subgroup_tone?: string;
+    sort_order?: number;
+  }): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.PERMISSIONS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -16,7 +26,18 @@ export const permissionService = {
     });
   },
 
-  updatePermission: async (permId: string, data: any): Promise<{ success: boolean }> => {
+  updatePermission: async (
+    permId: string,
+    data: {
+      description?: string | null;
+      group_code?: string;
+      subgroup_key?: string | null;
+      subgroup_label?: string | null;
+      subgroup_order?: number;
+      subgroup_tone?: string;
+      sort_order?: number;
+    }
+  ): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.PERMISSION_DETAIL(permId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -41,7 +62,7 @@ export const permissionService = {
     return http<UserPermissionResponse>(API_ENDPOINTS.ADMIN.USER_PERMISSIONS(userId));
   },
 
-    grantUserPermission: async (
+  grantUserPermission: async (
     userId: string,
     permission_id: string,
     opts?: { expires_at?: string | null; note?: string }

@@ -8,6 +8,7 @@ import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
 import { usersApi } from '../services/usersApi';
 import { dashboardApi } from '../services/dashboardApi';
+import { isApprovalRequired } from '../utils/approvalUtils';
 import {
   User,
   Unit,
@@ -106,11 +107,17 @@ export const UsersPage: React.FC = () => {
   const handleDeleteUser = async () => {
     if (!deleteConfirm.user) return;
     try {
-      await usersApi.deleteUser(deleteConfirm.user.user_id);
+      const res: any = await usersApi.deleteUser(deleteConfirm.user.user_id);
       const deletedName = deleteConfirm.user.full_name;
       const deletedId = deleteConfirm.user.user_id;
       setDeleteConfirm({ open: false, user: null });
       await loadData();
+
+      if (isApprovalRequired(res)) {
+       // ApprovalListener đã toast — không show success sai
+      return;
+     }
+
       toast.success(`Đã xóa quân nhân ${deletedName} khỏi danh bạ đơn vị.`, {
         title: 'XÓA QUÂN NHÂN',
         badge: deletedId,

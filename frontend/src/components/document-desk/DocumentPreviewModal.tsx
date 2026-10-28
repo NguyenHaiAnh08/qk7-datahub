@@ -26,6 +26,8 @@ export interface DocumentPreviewModalProps {
   open: boolean;
   document: DocumentItem | null;
   userClearanceLevel?: number;
+  initialToken?: string | null;
+  page?: number;
   onClose: () => void;
 }
 
@@ -33,6 +35,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   open,
   document,
   userClearanceLevel: propClearanceLevel,
+  initialToken: propInitialToken,
+  page = 1,
   onClose,
 }) => {
   const { user } = useAuth();
@@ -58,7 +62,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       return;
     }
 
-    if (docLevel >= 3 && !fpToken) {
+    const storedToken = typeof window !== 'undefined'
+      ? (sessionStorage.getItem(`qk7_fp_token_${docId}`) || sessionStorage.getItem('qk7_fp_token'))
+      : null;
+    const effectiveToken = fpToken || fingerprintToken || storedToken;
+
+    if (docLevel >= 3 && !effectiveToken) {
       setShowScanModal(true);
       setLoading(false);
       return;
@@ -67,14 +76,21 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const blob = await fileService.fetchFileBlob(docId, '0', fpToken || undefined);
+      const blob = await fileService.fetchFileBlob(docId, '0', effectiveToken || undefined);
       const url = URL.createObjectURL(blob);
       setBlobUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return url;
       });
+      if (effectiveToken && effectiveToken !== fingerprintToken) {
+        setFingerprintToken(effectiveToken);
+      }
     } catch (err: any) {
-      setError(err.message || 'Không thể tải tệp văn bản. Vui lòng kiểm tra quyền truy cập.');
+      if ((err.status === 403 || err.require_fingerprint) && docLevel >= 3) {
+        setShowScanModal(true);
+      } else {
+        setError(err.message || 'Không thể tải tệp văn bản. Vui lòng kiểm tra quyền truy cập.');
+      }
     } finally {
       setLoading(false);
     }
@@ -82,8 +98,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   useEffect(() => {
     if (open && document) {
-      setFingerprintToken(null);
-      loadPdfBlob(document.file_id, null);
+      const storedToken = typeof window !== 'undefined'
+        ? (sessionStorage.getItem(`qk7_fp_token_${document.file_id}`) || sessionStorage.getItem('qk7_fp_token'))
+        : null;
+      const tokenToUse = propInitialToken || storedToken;
+      setFingerprintToken(tokenToUse);
+      loadPdfBlob(document.file_id, tokenToUse);
     } else {
       setBlobUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -160,9 +180,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const handleOpenNewTab = () => {
     if (blobUrl) {
-      window.open(`${blobUrl}#toolbar=0&navpanes=0`, '_blank');
+      window.open(`${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0`, '_blank');
     } else {
-      window.open(`${fileService.getViewUrl(document.file_id, '0')}#toolbar=0&navpanes=0`, '_blank');
+      window.open(`${fileService.getViewUrl(document.file_id, '0')}#page=${page || 1}&toolbar=0&navpanes=0`, '_blank');
     }
   };
 
@@ -296,9 +316,10 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             )}
 
             {!loading && !error && blobUrl && (
-              <iframe
-                src={`${blobUrl}#toolbar=0&navpanes=0`}
+              <embed
+                src={`${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0`}
                 title={document.title}
+                type="application/pdf"
                 className="w-full h-full border-none"
               />
             )}
@@ -312,14 +333,23 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         fileId={document?.file_id || ''}
         onSuccess={(token) => {
           setShowScanModal(false);
-          setFingerprintToken(token || null);
+          const validToken = token || '';
+          if (validToken && typeof window !== 'undefined') {
+            sessionStorage.setItem('qk7_fp_token', validToken);
+            if (document?.file_id) {
+              sessionStorage.setItem(`qk7_fp_token_${document.file_id}`, validToken);
+            }
+          }
+          setFingerprintToken(validToken || null);
           if (document) {
-            loadPdfBlob(document.file_id, token || null);
+            loadPdfBlob(document.file_id, validToken || null);
           }
         }}
         onCancel={() => {
           setShowScanModal(false);
-          onClose();
+          if (!blobUrl) {
+            onClose();
+          }
         }}
       />
     </AnimatePresence>

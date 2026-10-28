@@ -18,7 +18,7 @@ const swaggerSpec = {
   '1. Gọi `POST /api/auth/login` với `{ user_id, password }`\n' +
   '2. Nhận về `token` (JWT, hết hạn 8h) + `user`\n' +
   '3. Gửi kèm header `Authorization: Bearer <token>` cho mọi request tiếp theo\n\n' +
-  '**Tài khoản test:** `USR-001/123456789` (Admin, Cấp 5) · `USR-002/123456789` (Văn thư, Cấp 3) · `USR-003/123456789` (Thủ trưởng, Cấp 4)\n\n' +
+  '**Tài khoản test:** `USR-001/123456789` (Admin, Cấp 5) · `USR-002/123456789` (Chỉ huy, Cấp 5) · `USR-003/123456789` (Cơ yếu, Cấp 5) · `USR-004/123456789` (Trợ lý, Cấp 2) · `USR-005/123456789` (Văn thư, Cấp 3) · `USR-006/123456789` (Nhân viên IT, Cấp 1)\n\n' +
   '**Quy tắc tải file:** Tài liệu Cấp ≥ 3 chỉ được **xem** (`download=0`), không được tải về.\n\n' +
   '**Quyền admin:** mọi endpoint `/api/admin/*` yêu cầu JWT có `clearance_level_id >= 4`.',
     contact: { name: 'Phòng CNTT QK7' },

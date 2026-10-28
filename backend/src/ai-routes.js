@@ -9,7 +9,8 @@ const { sql, getPool } = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'qk7-secret-key-change-in-production-2026';
 
-module.exports = function createAIRoutes({ requirePermission, writeAccessLog, getClientIp }) {
+module.exports = function createAIRoutes({ requirePermission, writeAccessLog, getClientIp, JWT_SECRET: passedSecret }) {
+  const effectiveJwtSecret = passedSecret || JWT_SECRET;
   const router = express.Router();
 
   const AI_BASE = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8001';
@@ -17,21 +18,25 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
   const AI_CHAT_TIMEOUT_MS = parseInt(process.env.AI_CHAT_TIMEOUT_MS || '75000', 10); // Chờ LLM sinh câu trả lời 60–90s (mặc định 75s)
 
   // Kiểm tra xác thực sinh trắc học vân tay ZK9500 (Header Token hoặc ACCESS_LOG trong 5 phút)
-  async function checkBiometricVerified(req) {
+  async function checkBiometricVerified(req, allowLogFallback = false) {
     const userId = req.user?.user_id;
     if (!userId) return false;
 
     // 1. Kiểm tra header X-Fingerprint-Token
-    const fpToken = req.headers['x-fingerprint-token'] || req.headers['X-Fingerprint-Token'];
+    const fpToken = req.headers['x-fingerprint-token'] || req.headers['X-Fingerprint-Token'] || req.body?.fingerprint_token;
     if (fpToken) {
       try {
-        const decoded = jwt.verify(fpToken, JWT_SECRET);
+        const decoded = jwt.verify(fpToken, effectiveJwtSecret);
         if (decoded && decoded.user_id === userId) {
           return true;
         }
       } catch (tokenErr) {
-        // Token không hợp lệ hoặc hết hạn, tiếp tục kiểm tra nhật ký ACCESS_LOG
+        // Token không hợp lệ hoặc hết hạn
       }
+    }
+
+    if (!allowLogFallback) {
+      return false;
     }
 
     // 2. Tra cứu ACCESS_LOG trong vòng 5 phút gần nhất
@@ -144,7 +149,7 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       }
 
       // Kiểm tra xác thực sinh trắc học vân tay ZK9500
-      const biometric_verified = await checkBiometricVerified(req);
+      const biometric_verified = await checkBiometricVerified(req, false);
 
       // Ghi nhật ký kiểm toán hành động hỏi AI
       await logAudit(
@@ -291,10 +296,31 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
     }
   });
 
-  // ─── 3. STUDY BOOK (with Audit Trail) ───
+  // ─── 3. STUDY BOOK (with Clearance Enforcement & Biometric & Audit Trail) ───
   router.get('/study-book/:fileId', requirePermission('AI_STUDY_BOOK'), async (req, res) => {
     try {
       const fileId = req.params.fileId;
+      const pool = await getPool();
+      const docRes = await pool.request()
+        .input('fid', sql.VarChar(100), fileId)
+        .query('SELECT security_level_id FROM DOCUMENT WHERE file_id = @fid AND deleted_at IS NULL');
+
+      if (docRes.recordset && docRes.recordset.length > 0) {
+        const secLvl = docRes.recordset[0].security_level_id || 1;
+        const userClearance = req.user.clearance_level_id || 1;
+        if (secLvl > userClearance) {
+          await logAudit(req, 'AI_STUDY_BOOK_DENIED', `Từ chối tạo tài liệu ${fileId}: Không đủ cấp mật`, fileId);
+          return res.status(403).json({ error: 'Không có quyền truy cập văn bản này' });
+        }
+        if (secLvl >= 3) {
+          const bioOk = await checkBiometricVerified(req);
+          if (!bioOk) {
+            await logAudit(req, 'AI_STUDY_BOOK_DENIED', `Từ chối tạo tài liệu ${fileId}: Chưa quét vân tay`, fileId);
+            return res.status(403).json({ error: 'Tài liệu Cấp 3+ yêu cầu xác thực vân tay', require_fingerprint: true });
+          }
+        }
+      }
+
       await logAudit(req, 'AI_STUDY_BOOK', `Tạo tài liệu học tập văn bản ${fileId}`, fileId);
 
       const r = await callAI(

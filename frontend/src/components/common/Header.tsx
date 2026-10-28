@@ -37,8 +37,10 @@ interface HeaderProps {
 // HELPER: Lấy chữ cái đầu của tên cuối (tên chính) theo quy chuẩn tiếng Việt
 // Ví dụ: "Lương Nhật Thăng" -> "T", "Nguyễn Mạnh Nam" -> "N"
 // ══════════════════════════════════════════════════════════════════════
-export function getAvatarInitial(name?: string, fallback = 'K'): string {
+export function getAvatarInitial(name?: string, fallback = 'ĐB'): string {
   if (!name || !name.trim()) return fallback;
+  const clean = name.trim();
+  if (clean.toLowerCase() === 'đại biểu' || clean.toLowerCase() === 'khách') return 'ĐB';
   const parts = name.trim().split(/\s+/);
   const lastName = parts[parts.length - 1];
   return lastName ? lastName.charAt(0).toUpperCase() : fallback;
@@ -351,15 +353,24 @@ export const Header: React.FC<HeaderProps> = ({
   const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
   const canAccessSessions = hasPermission('SESSION_VIEW');
 
+  const isGuestUser = !user || user.user_id === 'GUEST';
+  const avatarInitial = getAvatarInitial(user?.full_name);
+
   // Nội dung Popover User Profile cho iPad và Desktop
   const userPopoverContent = (
-    <div className="w-[340px] sm:w-[360px] p-1 text-slate-800 dark:text-slate-200 text-xs">
-      <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
+    <div className="w-[380px] max-w-[92vw] p-1 text-slate-800 dark:text-slate-200 text-xs">
+      <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider shrink-0">
-              {user?.user_id || 'Tài khoản'}
-            </span>
+            {isGuestUser ? (
+              <span className="font-bold text-slate-900 dark:text-white text-sm shrink-0">
+                Đại biểu
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider shrink-0">
+                {user?.user_id || 'Tài khoản'}
+              </span>
+            )}
             {isOnline ? (
               <span
                 className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 select-none shrink-0"
@@ -390,11 +401,16 @@ export const Header: React.FC<HeaderProps> = ({
             {user?.clearance_name || 'Công khai'}
           </span>
         </div>
-        <div className="font-bold text-slate-900 dark:text-white mt-1.5 text-sm">
-          {user?.full_name || 'Khách tra cứu'}
-        </div>
+        {!isGuestUser && (
+          <>
+            <div className="font-bold text-slate-900 dark:text-white mt-1.5 text-sm">
+              {user?.full_name || 'Cán bộ'}
+            </div>
         {(user?.rank_name || user?.position) && (
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
+          <div
+            className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis"
+            title={[user.rank_name, user.position].filter(Boolean).join(' - ')}
+          >
             {[user.rank_name, user.position].filter(Boolean).join(' - ')}
           </div>
         )}
@@ -422,6 +438,8 @@ export const Header: React.FC<HeaderProps> = ({
               );
             })}
           </div>
+        )}
+          </>
         )}
       </div>
 
@@ -625,6 +643,8 @@ export const Header: React.FC<HeaderProps> = ({
             onOpenChange={setUserPopoverOpen}
             placement="bottomRight"
             arrow={{ pointAtCenter: true }}
+            overlayStyle={{ maxWidth: 'none' }}
+            overlayInnerStyle={{ padding: 0 }}
           >
             <button
               type="button"
@@ -634,10 +654,12 @@ export const Header: React.FC<HeaderProps> = ({
                 className="relative w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
               >
                 <span
-                  className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
+                  className={`!text-white font-black leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] ${
+                    avatarInitial.length > 1 ? 'text-[9.5px] tracking-tight' : 'text-xs'
+                  }`}
                   style={{ color: '#ffffff' }}
                 >
-                  {getAvatarInitial(user?.full_name)}
+                  {avatarInitial}
                 </span>
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-white dark:ring-slate-800 ${
@@ -647,7 +669,7 @@ export const Header: React.FC<HeaderProps> = ({
                 />
               </div>
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap leading-none">
-                {user?.full_name || 'Khách'}
+                {user?.full_name || (isGuestUser ? 'Đại biểu' : 'Khách')}
               </span>
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
@@ -771,6 +793,8 @@ export const Header: React.FC<HeaderProps> = ({
             onOpenChange={setDropdownOpen}
             placement="bottomRight"
             arrow={{ pointAtCenter: true }}
+            overlayStyle={{ maxWidth: 'none' }}
+            overlayInnerStyle={{ padding: 0 }}
           >
             <button
               type="button"
@@ -780,10 +804,12 @@ export const Header: React.FC<HeaderProps> = ({
                 className="relative w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
               >
                 <span
-                  className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
+                  className={`!text-white font-black leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] ${
+                    avatarInitial.length > 1 ? 'text-[10px] tracking-tight' : 'text-xs'
+                  }`}
                   style={{ color: '#ffffff' }}
                 >
-                  {getAvatarInitial(user?.full_name)}
+                  {avatarInitial}
                 </span>
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-800 ${
@@ -794,7 +820,7 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <div className="text-left hidden md:block whitespace-nowrap">
                 <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
-                  {user?.full_name || 'Khách'}
+                  {user?.full_name || (isGuestUser ? 'Đại biểu' : 'Khách')}
                 </span>
                 <span className="block text-[10px] text-amber-600 dark:text-amber-400 leading-tight font-medium">
                   {user?.clearance_name || `Mức ${user?.clearance_level_id || 1}`}

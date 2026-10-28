@@ -6,7 +6,7 @@ TUYỆT ĐỐI KHÔNG in nội dung văn bản thật ra màn hình.
 """
 
 import pytest
-from core.agent_tutor import AgentTutor
+from core.agent_tutor import AgentTutor, NO_DATA_FALLBACK_MESSAGE
 
 
 @pytest.fixture
@@ -314,3 +314,49 @@ def test_personalized_military_salutation(agent_tutor):
     )
     assert res3["answer"].startswith("Báo cáo Đồng chí Nguyễn Mạnh Nam - Tổ trưởng Công Nghệ Thông Tin,")
 
+
+
+def test_clearance_leak_user_clearance_2_asking_level_5(agent_tutor):
+    """
+    7. KIỂM THỬ CHỐNG RÒ RỈ METADATA (CLEARANCE LEAK - FAIL CLOSED):
+    Quân nhân Cấp 2 hỏi về tài liệu Tuyệt Mật Cấp 5.
+    Yêu cầu tuyệt đối:
+    - citations BẮT BUỘC là mảng rỗng [] (không để lộ file_id, tiêu đề, số trang).
+    - Câu trả lời BẮT BUỘC chứa NO_DATA_FALLBACK_MESSAGE.
+    - Cờ requires_biometric BẮT BUỘC là False (không kích hoạt nhắc vân tay vì user không đủ cấp phép).
+    """
+    secret_level_5_chunks = [
+        {
+            "chunk_id": "CHK-TOPSECRET-01",
+            "file_id": "PDF-TOPSECRET-999",
+            "document_code": "999/TM-BTL",
+            "title": "Kế hoạch tác chiến Tuyệt mật Biên giới Hải đảo",
+            "page": 5,
+            "security_level_id": 5,
+            "text": "Nội dung tuyệt mật về bố trí trận địa tên lửa và phòng thủ không gian.",
+            "score": 0.98
+        }
+    ]
+
+    result = agent_tutor.answer_query(
+        query="Kế hoạch tác chiến Tuyệt mật Biên giới Hải đảo số 999/TM-BTL?",
+        user_id="USR-CLEARANCE-2",
+        user_name="Nguyễn Văn B",
+        user_position="Nhân viên cơ yếu",
+        user_clearance=2,
+        retrieved_chunks=secret_level_5_chunks,
+        biometric_verified=False
+    )
+
+    # 1. BẮT BUỘC citations là mảng rỗng []
+    assert result["citations"] == [], f"Clearance leak detected: citations={result['citations']}"
+
+    # 2. BẮT BUỘC câu trả lời chứa NO_DATA_FALLBACK_MESSAGE
+    assert NO_DATA_FALLBACK_MESSAGE in result["answer"]
+
+    # 3. Tuyệt đối không để lộ file_id hoặc document_code trong câu trả lời
+    assert "PDF-TOPSECRET-999" not in result["answer"]
+    assert "999/TM-BTL" not in result["answer"]
+
+    # 4. Cờ requires_biometric phải là False (không gợi ý quét vân tay cho tài liệu vượt cấp)
+    assert result.get("requires_biometric") is False

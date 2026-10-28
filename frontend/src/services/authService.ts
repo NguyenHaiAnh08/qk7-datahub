@@ -279,7 +279,7 @@ export const authService = {
     if (!userId || userId === 'GUEST') {
       return {
         user_id: 'GUEST',
-        full_name: 'Khách',
+        full_name: 'Đại biểu',
         clearance_level_id: 1,
         clearance_name: 'Công khai',
       };

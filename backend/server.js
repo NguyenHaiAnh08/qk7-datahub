@@ -19,7 +19,7 @@ const swaggerSpec = require('./swagger');
 const { parseDocumentPdf } = require('./pdf-parser');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 require('dotenv').config({
-  path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env')],
+  path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')],
 });
 
 const {
@@ -1694,6 +1694,7 @@ app.use('/api/ai', requireAuth, require('./src/ai-routes')({
   requirePermission,
   writeAccessLog,
   getClientIp,
+  JWT_SECRET,
 }));
 
 // ═══════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 # KIẾN TRÚC TOÀN BỘ HỆ THỐNG — TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB
 
-> **Bảo mật:** Cấp Bộ Tư Lệnh Quân Khu 7  
+> **Bảo mật:** Cấp Trường Quân sự Quân khu 7  
 > **Phiên bản kiến trúc:** v3.8-ENTERPRISE (Dual-Platform Desktop & iPadOS, React 18 + TS SPA, Express 5 Gateway, AI RAG & ZKTeco Biometric Engine)  
 > **Ngày cập nhật:** 21/10/2026  
 
@@ -985,7 +985,7 @@ Row N+6:                                       [H:I]   Thiếu tá QNCN Nguyễn
 ## 14. Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)
 
 ### 14.1. Bối Cảnh & Thách Thức Vận Hành Đa Thiết Bị Quân Khu 7
-Trong môi trường công tác tại Bộ Tư Lệnh Quân Khu 7:
+Trong môi trường công tác tại Trường Quân sự Quân khu 7:
 - **80% thời gian chỉ huy & tác chiến:** Thủ trưởng, sĩ quan tác chiến sử dụng máy tính bảng **iPad Air M4 (11-inch & 13-inch)** khi cơ động tại sở chỉ huy, phòng họp tác chiến, thực địa.
 - **Tại văn phòng cố định:** Cán bộ văn thư, quản trị viên sử dụng máy tính bàn (Desktop PC Widescreen tỉ lệ 16:9).
 - **Thách thức:** Việc ép một layout PC co giãn thông thường (Responsive đơn thuần) khiến giao diện trên iPad bị bể nặng: Header rớt thành nhiều dòng, tên quân nhân bị cắt cụt, thanh điều hướng bị gãy đôi, và các nút bấm quá nhỏ không phù hợp thao tác ngón tay. Do đó, hệ thống đã kiến tạo kiến trúc **Dual-Platform chuyên biệt**.
@@ -1025,7 +1025,7 @@ Nhằm giải quyết triệt để lỗi nhảy giao diện và đáp ứng th�
 ## 15. Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (`MyUnitPage`) & Chuẩn Hóa Danh Xưng Thư Viện Số
 
 ### 15.1. Chuẩn Hóa Danh Xưng "Trung Tâm Thư Viện Số" Toàn Diện
-Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Bộ Tư Lệnh Quân Khu 7:
+Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Trường Quân sự Quân khu 7:
 - Toàn bộ các chữ hiển thị `"Portal"` hoặc `"PORTAL"` trên toàn bộ giao diện đã được chuyển đổi thành **`"Trung tâm thư viện số"`**:
   - Thanh Header điều hướng (Desktop nav pills & iPad segmented glider).
   - Tiêu đề và biểu ngữ phụ của trang tra cứu văn bản (`PortalPage.tsx`).
@@ -1047,7 +1047,7 @@ Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Bộ Tư Lệnh 
 ## 16. Kiến Trúc Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout Engine)
 
 ### 16.1. Bối Cảnh & Thách Thức Khi Phóng To Màn Hình (Browser Zooming 125% – 200%)
-Trong môi trường công tác thực tế tại Bộ Tư Lệnh Quân Khu 7:
+Trong môi trường công tác thực tế tại Trường Quân sự Quân khu 7:
 - Cán bộ và chỉ huy thường phóng to trình duyệt (125%, 150%, 175%, 200%) để theo dõi chi tiết văn bản hoặc sử dụng màn hình laptop có độ phân giải phổ thông (1366×768, 1536×864).
 - Khi phóng to 175% trên màn hình Full HD (1920×1080), kích thước viewport thực tế co hẹp chỉ còn **~1097px** (trên màn hình 1536px chỉ còn ~877px).
 - **Hệ quả của layout cũ khi chưa tối ưu:**
@@ -1085,7 +1085,7 @@ Hệ thống thiết kế giải pháp phản hồi kích thước viewport theo
 ## 17. Kiến Trúc Phân Hệ Giám Sát Phiên Đang Trực Tuyến (Active Online Sessions Real-time Monitoring Engine)
 
 ### 17.1. Bối Cảnh Tác Chiến & Yêu Cầu An Ninh Mạng Quân Khu
-Trong môi trường mạng quân sự nội bộ của Bộ Tư Lệnh Quân Khu 7:
+Trong môi trường mạng quân sự nội bộ của Trường Quân sự Quân khu 7:
 - Các cán bộ, sĩ quan và nhân viên tác chiến đồng thời kết nối vào hệ thống từ nhiều loại thiết bị: máy tính bàn văn phòng (Desktop PC Widescreen), máy tính bảng tác chiến di động (**iPad Air M4**) và thiết bị đầu cuối chuyên dụng.
 - Nhằm phòng chống rủi ro chiếm đoạt phiên làm việc (Session Hijacking), tài khoản bị chia sẻ trái phép hoặc cán bộ rời vị trí quên đăng xuất, hệ thống triển khai phân hệ **Giám Sát Phiên Đang Trực Tuyến (`SessionsPage.tsx` - `/sessions`)** cung cấp bảng điều khiển trung tâm (Command Center Telemetry) cho kíp trực tác chiến mạng.
 
@@ -1200,6 +1200,6 @@ Nhằm hỗ trợ thủ trưởng và cán bộ tác chiến tra cứu nhanh đi
 - **Tinh giản giao diện Header:** Loại bỏ nút hướng dẫn nhanh thừa thãi trên Header bar để nhường không gian cho các công cụ điều khiển trọng yếu (`DeviceModeSwitch`, `ThemeToggle`, `User Profile`), chuyển toàn bộ điểm nhấn khám phá về đúng ngữ cảnh của Banner tác chiến.
 
 ---
-*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
+*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*
 
 

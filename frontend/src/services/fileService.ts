@@ -15,8 +15,13 @@ export const fileService = {
     const url = fileService.getViewUrl(fileId, download);
 
     const headers: Record<string, string> = { ...getAuthHeaders() };
-    if (fingerprintToken) {
-      headers['X-Fingerprint-Token'] = fingerprintToken;
+    const effectiveToken =
+      fingerprintToken ||
+      (typeof window !== 'undefined'
+        ? sessionStorage.getItem(`qk7_fp_token_`) || sessionStorage.getItem('qk7_fp_token')
+        : undefined);
+    if (effectiveToken) {
+      headers['X-Fingerprint-Token'] = effectiveToken;
     }
 
     const response = await fetch(url, { headers, signal });

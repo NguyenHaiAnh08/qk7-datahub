@@ -68,26 +68,6 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
       data = await response.text();
     }
 
-
-    // ═══════════════════════════════════════════════════════════════
-    // [v4.3.2] 202 APPROVAL_REQUIRED — không phải lỗi, chỉ "chờ duyệt"
-    // Dispatch event để ApprovalListener toast toàn cục.
-    // Caller PHẢI check isApprovalRequired() để tránh show success sai.
-    // ═══════════════════════════════════════════════════════════════
-    if (
-      response.status === 202 &&
-      typeof data === 'object' &&
-      (data as any)?.code === 'APPROVAL_REQUIRED'
-    ) {
-      if (typeof window !== 'undefined' && !options.skipErrorNotification) {
-        window.dispatchEvent(
-          new CustomEvent('qk7:approval-required', { detail: data })
-        );
-      }
-      return data as T;
-    }
-
-
     if (!response.ok) {
       let errorMsg = `Lỗi HTTP ${response.status}`;
       if (typeof data === 'object' && data?.error) {

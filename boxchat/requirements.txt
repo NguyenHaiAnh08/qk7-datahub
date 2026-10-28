@@ -5,4 +5,3 @@ python-dotenv>=1.0.1
 pymupdf>=1.24.0
 qdrant-client>=1.8.0
 requests>=2.31.0
-prometheus-client>=0.20.0

@@ -32,12 +32,6 @@ const {
   resolveUserUnitId, resolveUserRoles,
 } = require('./src/unit-scope');
 
-const {
-  startMonthlyArchiveScheduler,
-  archiveMonthlyLogs,
-  getArchiveStats,
-} = require('./src/audit-log-cleaner');
-
 const app = express();
 app.set('trust proxy', 'loopback');
 
@@ -120,16 +114,8 @@ const loginLimiter = rateLimit({
   message: { error: 'Quá nhiều lần đăng nhập thất bại.', code: 'LOGIN_RATE_LIMITED' },
 });
 
-const fingerprintLimiter = rateLimit({
-  windowMs: 60 * 1000, max: 30,
-  standardHeaders: true, legacyHeaders: false,
-  message: { error: 'Thao tác cảm biến vân tay quá dồn dập. Vui lòng thử lại sau giây lát.', code: 'FP_RATE_LIMITED' },
-});
-
 app.use('/api', globalLimiter);
 app.use('/api/auth/login', loginLimiter);
-app.use('/api/fingerprint/scan', fingerprintLimiter);
-app.use('/api/fingerprint/enroll', fingerprintLimiter);
 
 // ═══════════════════════════════════════════════════════════════
 // STATIC & SWAGGER
@@ -1446,65 +1432,26 @@ app.get('/api/files/:fileId/view', async (req, res) => {
 
   try {
     const pool = await getPool();
-    let result = await pool.request()
-      .input('file_id', sql.VarChar(100), fileId)
-      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE file_id = @file_id`);
-
-    // Smart Document Resolver Fallback: Nếu không tìm thấy theo file_id
-    if (result.recordset.length === 0) {
-      // 1. Thử tìm theo document_code
-      result = await pool.request()
-        .input('file_id', sql.NVarChar(100), fileId)
-        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE document_code = @file_id`);
-    }
-
-    if (result.recordset.length === 0) {
-      // 2. Thử tìm theo stored_path hoặc original_name chứa fileId
-      result = await pool.request()
-        .input('file_id_pattern', sql.NVarChar(200), `%${fileId}%`)
-        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE stored_path LIKE @file_id_pattern OR original_name LIKE @file_id_pattern`);
-    }
-
-    if (result.recordset.length === 0 && fileId.startsWith('PDF-')) {
-      // 3. Fallback cho synthetic ID dạng PDF-xxx: Lọc ký tự và so khớp với stored_path/document_code
-      const cleanStem = fileId.replace(/^PDF-/, '').replace(/[^a-zA-Z0-9]/g, '');
-      if (cleanStem.length >= 6) {
-        const allDocs = await pool.request().query(`
-          SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code 
-          FROM DOCUMENT WHERE deleted_at IS NULL
-        `);
-        const matched = allDocs.recordset.find((d) => {
-          const p = (d.stored_path || '').replace(/[^a-zA-Z0-9]/g, '');
-          const o = (d.original_name || '').replace(/[^a-zA-Z0-9]/g, '');
-          const c = (d.document_code || '').replace(/[^a-zA-Z0-9]/g, '');
-          return (p && (p.includes(cleanStem.slice(0, 16)) || cleanStem.includes(p.slice(-16)))) ||
-                 (o && (o.includes(cleanStem.slice(0, 16)) || cleanStem.includes(o.slice(-16)))) ||
-                 (c && cleanStem.includes(c));
-        });
-        if (matched) {
-          result = { recordset: [matched] };
-        }
-      }
-    }
-
+    const result = await pool.request()
+      .input('file_id', sql.VarChar(50), fileId)
+      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at FROM DOCUMENT WHERE file_id = @file_id`);
     if (result.recordset.length === 0) {
       await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Không tìm thấy' });
       return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
     }
     const doc = result.recordset[0];
-    const canonicalFileId = doc.file_id || fileId;
 
     if (doc.deleted_at) {
       const canViewTrash = (req.user.permissions || []).includes('DOC_TRASH_VIEW')
                           || (req.user.roles || []).includes('ROL-01');
       if (!canViewTrash) {
-        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa' });
+        await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa' });
         return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
       }
     }
 
     if (doc.security_level_id > req.user.clearance_level_id) {
-      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Không đủ cấp' });
+      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Không đủ cấp' });
       return res.status(403).json({ error: 'Không có quyền truy cập' });
     }
 
@@ -1519,7 +1466,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       try {
         const decoded = jwt.verify(fpToken, JWT_SECRET);
         if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
-        if (decoded.file_id !== fileId && decoded.file_id !== canonicalFileId) throw new Error('Token không khớp file');
+        if (decoded.file_id !== fileId) throw new Error('Token không khớp file');
         if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
       } catch {
         return res.status(403).json({
@@ -1529,13 +1476,13 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       }
 
       if (isDownload) {
-        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Cấp 3+ không được tải' });
+        await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Cấp 3+ không được tải' });
         return res.status(403).json({ error: 'Tài liệu Cấp 3+ chỉ xem trực tiếp, không tải về.' });
       }
     }
 
     if (!validateStoredPath(doc.stored_path)) {
-      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Path không hợp lệ' });
+      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Path không hợp lệ' });
       return res.status(400).json({ error: 'Đường dẫn tệp không hợp lệ' });
     }
 
@@ -1550,22 +1497,22 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     }
 
     if (!filePath || !fs.existsSync(filePath)) {
-      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'ERROR', ip, note: 'File không tồn tại' });
+      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'ERROR', ip, note: 'File không tồn tại' });
       return res.status(404).json({ error: 'File không tồn tại trên hệ thống lưu trữ' });
     }
 
     const lst = fs.lstatSync(filePath);
     if (lst.isSymbolicLink()) {
-      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Symlink bị chặn' });
+      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Symlink bị chặn' });
       return res.status(403).json({ error: 'Không thể truy cập tệp' });
     }
     if (!filePath.toLowerCase().endsWith('.pdf')) {
-      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Extension không phải PDF' });
+      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Extension không phải PDF' });
       return res.status(403).json({ error: 'Chỉ chấp nhận tệp PDF' });
     }
 
     await writeAccessLog({
-      userId: req.user.user_id, fileId: canonicalFileId,
+      userId: req.user.user_id, fileId,
       action: isDownload ? 'DOWNLOAD' : 'VIEW', ip,
     });
 
@@ -1579,100 +1526,25 @@ app.get('/api/files/:fileId/view', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// ACCESS LOGS — QUẢN TRỊ & KIỂM TOÁN AN NINH (KHÔNG GIỚI HẠN, LÀM SẠCH ĐẦU THÁNG)
+// ACCESS LOGS
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async (req, res) => {
   try {
     const pool = await getPool();
     const r = pool.request();
-    const scope = String(req.query.scope || 'active').toLowerCase();
-
-    let query = '';
-    if (scope === 'archive') {
-      // Chỉ xem trong kho lưu trữ ACCESS_LOG_ARCHIVE
-      query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
-               l.[action], l.[timestamp], l.ip, l.note, 1 AS is_archived
-        FROM ACCESS_LOG_ARCHIVE l
-        LEFT JOIN [USER] u ON u.user_id = l.user_id
-        LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
-        WHERE 1 = 1
-      `;
-      if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
-      if (req.query.action) { query += ` AND l.[action] = @action`; r.input('action', sql.VarChar(50), req.query.action); }
-      query += ` ORDER BY l.[timestamp] DESC`;
-    } else if (scope === 'all') {
-      // Hợp nhất cả hai bảng
-      query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
-               l.[action], l.[timestamp], l.ip, l.note, 0 AS is_archived
-        FROM ACCESS_LOG l
-        LEFT JOIN [USER] u ON u.user_id = l.user_id
-        LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
-        WHERE 1 = 1
-      `;
-      if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
-      if (req.query.action) { query += ` AND l.[action] = @action`; r.input('action', sql.VarChar(50), req.query.action); }
-
-      query += `
-        UNION ALL
-        SELECT la.log_id, la.user_id, u2.full_name, la.file_id, d2.title AS doc_title,
-               la.[action], la.[timestamp], la.ip, la.note, 1 AS is_archived
-        FROM ACCESS_LOG_ARCHIVE la
-        LEFT JOIN [USER] u2 ON u2.user_id = la.user_id
-        LEFT JOIN DOCUMENT d2 ON d2.file_id = la.file_id
-        WHERE 1 = 1
-      `;
-      if (req.query.user) { query += ` AND la.user_id = @user`; }
-      if (req.query.action) { query += ` AND la.[action] = @action`; }
-      query += ` ORDER BY [timestamp] DESC`;
-    } else {
-      // Mặc định 'active': Sự kiện tháng hiện tại từ ACCESS_LOG (không giới hạn TOP 200, bắt đầu từ 0 mỗi đầu tháng)
-      query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
-               l.[action], l.[timestamp], l.ip, l.note, 0 AS is_archived
-        FROM ACCESS_LOG l
-        LEFT JOIN [USER] u ON u.user_id = l.user_id
-        LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
-        WHERE l.[timestamp] >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
-      `;
-      if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
-      if (req.query.action) { query += ` AND l.[action] = @action`; r.input('action', sql.VarChar(50), req.query.action); }
-      query += ` ORDER BY l.[timestamp] DESC`;
-    }
-
+    let query = `
+      SELECT TOP 200 l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
+             l.[action], l.[timestamp], l.ip, l.note
+      FROM ACCESS_LOG l
+      LEFT JOIN [USER] u ON u.user_id = l.user_id
+      LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
+      WHERE 1 = 1
+    `;
+    if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
+    if (req.query.action) { query += ` AND l.[action] = @action`; r.input('action', sql.VarChar(50), req.query.action); }
+    query += ` ORDER BY l.[timestamp] DESC`;
     const result = await r.query(query);
-    const now = new Date();
-    res.json({
-      total: result.recordset.length,
-      items: result.recordset,
-      cycle: {
-        scope,
-        current_month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-        reset_policy: 'MONTHLY_FIRST_DAY_00_00',
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/access-logs/stats', requireAuth, requirePermission('AUDIT_VIEW'), async (req, res) => {
-  try {
-    const stats = await getArchiveStats(getPool);
-    res.json(stats);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/access-logs/archive-run', requireAuth, requirePermission('AUDIT_VIEW'), async (req, res) => {
-  try {
-    const result = await archiveMonthlyLogs(getPool, writeAccessLog);
-    res.json({
-      message: `Đã hoàn tất lưu trữ chu kỳ: ${result.archivedCount} sự kiện cũ đã được chuyển sang ACCESS_LOG_ARCHIVE.`,
-      ...result,
-    });
+    res.json({ total: result.recordset.length, items: result.recordset });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1690,27 +1562,19 @@ require('./src/admin-routes')(app, {
   sessionIdleTimeoutMinutes: SESSION_IDLE_TIMEOUT_MINUTES,
 });
 
-app.use('/api/ai', requireAuth, require('./src/ai-routes')({
-  requirePermission,
-  writeAccessLog,
-  getClientIp,
-}));
+app.use('/api/ai', requireAuth, require('./src/ai-routes')({ requirePermission }));
 
 // ═══════════════════════════════════════════════════════════════
 // ERROR HANDLER & SPA FALLBACK
 // ═══════════════════════════════════════════════════════════════
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File vượt quá 50MB', code: 'LIMIT_FILE_SIZE' });
-    return res.status(400).json({ error: err.message, code: 'MULTER_ERROR' });
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File vượt quá 50MB' });
+    return res.status(400).json({ error: err.message });
   }
   if (err) {
     console.error('[Global error]', err);
-    const status = err.status || err.statusCode || 500;
-    return res.status(status).json({
-      error: err.message || 'Lỗi máy chủ nội bộ',
-      code: err.code || (status === 500 ? 'INTERNAL_SERVER_ERROR' : 'REQUEST_ERROR'),
-    });
+    return res.status(500).json({ error: err.message });
   }
   next();
 });
@@ -1756,7 +1620,6 @@ async function start() {
   }
 
   setupFingerprintWS(server, { BRIDGE_TOKEN });
-  startMonthlyArchiveScheduler(getPool, writeAccessLog);
 
   const protocol = USE_HTTPS ? 'https' : 'http';
   const wsProtocol = USE_HTTPS ? 'wss' : 'ws';

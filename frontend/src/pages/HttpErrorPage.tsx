@@ -127,9 +127,9 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
   const displaySubTitle = propSubTitle || propMessage || stateMessage || config.subTitle;
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between transition-colors duration-200">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between transition-colors duration-200">
       {/* Header Bar */}
-      <header className="px-6 py-3 sm:py-4 pt-[max(env(safe-area-inset-top),0.75rem)] flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-20">
+      <header className="px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-20">
         <div
           className="flex items-center space-x-3 cursor-pointer select-none"
           onClick={() => navigate(ROUTE_PATHS.PORTAL)}
@@ -210,7 +210,7 @@ export const HttpErrorPage: React.FC<HttpErrorPageProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="py-3 sm:py-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
+      <footer className="py-4 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
         Hệ Thống Dữ Liệu Số Hóa Văn Bản — Quân Khu 7 © {new Date().getFullYear()}
       </footer>
     </div>

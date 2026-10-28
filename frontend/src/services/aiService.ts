@@ -12,8 +12,6 @@ export interface AICitation {
   page: number;
   security_level_name: string;
   snippet: string;
-  requires_biometric?: boolean;
-  security_level_id?: number;
 }
 
 export interface AIReasoning {
@@ -26,8 +24,7 @@ export interface AIChatResponse {
   answer: string;
   citations: AICitation[];
   reasoning?: AIReasoning;
-  think?: string;
-  requires_biometric?: boolean;
+  think?: string; 
 }
 
 export interface AIQuizQuestion {
@@ -88,28 +85,15 @@ export interface AIHealthStatus {
 
 export const aiService = {
   /**
-   * Gửi câu hỏi tác chiến tới Trợ lý AI (Pre-filtering bảo mật theo X-Clearance & Khóa Biometric Cấp 3-5)
+   * Gửi câu hỏi tác chiến tới Trợ lý AI (Pre-filtering bảo mật theo X-Clearance)
    */
-  async chat(params: {
-    query: string;
-    file_id?: string;
-    history?: Array<{ role: string; content: string }>;
-    fingerprint_token?: string;
-  }): Promise<AIChatResponse> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (params.fingerprint_token) {
-      headers['X-Fingerprint-Token'] = params.fingerprint_token;
-    }
+  async chat(params: { query: string; file_id?: string }): Promise<AIChatResponse> {
     return http<AIChatResponse>('/api/ai/chat', {
       method: 'POST',
-      headers,
-      body: JSON.stringify({
-        query: params.query,
-        file_id: params.file_id,
-        history: params.history,
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
       skipErrorNotification: false,
     });
   },

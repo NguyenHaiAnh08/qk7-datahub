@@ -318,45 +318,85 @@ def test_personalized_military_salutation(agent_tutor):
 
 def test_clearance_leak_user_clearance_2_asking_level_5(agent_tutor):
     """
-    7. KIỂM THỬ CHỐNG RÒ RỈ METADATA (CLEARANCE LEAK - FAIL CLOSED):
-    Quân nhân Cấp 2 hỏi về tài liệu Tuyệt Mật Cấp 5.
-    Yêu cầu tuyệt đối:
-    - citations BẮT BUỘC là mảng rỗng [] (không để lộ file_id, tiêu đề, số trang).
-    - Câu trả lời BẮT BUỘC chứa NO_DATA_FALLBACK_MESSAGE.
-    - Cờ requires_biometric BẮT BUỘC là False (không kích hoạt nhắc vân tay vì user không đủ cấp phép).
+    7. KIEM THU CHONG RO RI METADATA (CLEARANCE LEAK - FAIL CLOSED):
+    Quan nhan Cap 2 hoi ve tai lieu Tuyet Mat Cap 5 (khong kem so hieu).
+    Yeu cau tuyet doi:
+    - citations BAT BUOC la mang rong [] (khong de lo file_id, tieu de, so trang).
+    - Cau tra loi BAT BUOC chua NO_DATA_FALLBACK_MESSAGE.
+    - Co requires_biometric BAT BUOC la False (khong kich hoat nhac van tay vi user khong du cap phep).
     """
     secret_level_5_chunks = [
         {
             "chunk_id": "CHK-TOPSECRET-01",
             "file_id": "PDF-TOPSECRET-999",
             "document_code": "999/TM-BTL",
-            "title": "Kế hoạch tác chiến Tuyệt mật Biên giới Hải đảo",
+            "title": "Ke hoach tac chien Tuyet mat Bien gioi Hai dao",
             "page": 5,
             "security_level_id": 5,
-            "text": "Nội dung tuyệt mật về bố trí trận địa tên lửa và phòng thủ không gian.",
+            "text": "Noi dung tuyet mat ve bo tri tran dia ten lua va phong thu khong gian.",
             "score": 0.98
         }
     ]
 
     result = agent_tutor.answer_query(
-        query="Kế hoạch tác chiến Tuyệt mật Biên giới Hải đảo số 999/TM-BTL?",
+        query="Ke hoach tac chien Tuyet mat Bien gioi Hai dao bo tri tran dia o dau?",
         user_id="USR-CLEARANCE-2",
-        user_name="Nguyễn Văn B",
-        user_position="Nhân viên cơ yếu",
+        user_name="Nguyen Van B",
+        user_position="Nhan vien co yeu",
         user_clearance=2,
         retrieved_chunks=secret_level_5_chunks,
         biometric_verified=False
     )
 
-    # 1. BẮT BUỘC citations là mảng rỗng []
+    # 1. BAT BUOC citations la mang rong []
     assert result["citations"] == [], f"Clearance leak detected: citations={result['citations']}"
 
-    # 2. BẮT BUỘC câu trả lời chứa NO_DATA_FALLBACK_MESSAGE
+    # 2. BAT BUOC cau tra loi chua NO_DATA_FALLBACK_MESSAGE
     assert NO_DATA_FALLBACK_MESSAGE in result["answer"]
 
-    # 3. Tuyệt đối không để lộ file_id hoặc document_code trong câu trả lời
+    # 3. Tuyet doi khong de lo file_id hoac document_code trong cau tra loi
     assert "PDF-TOPSECRET-999" not in result["answer"]
     assert "999/TM-BTL" not in result["answer"]
 
-    # 4. Cờ requires_biometric phải là False (không gợi ý quét vân tay cho tài liệu vượt cấp)
+    # 4. Co requires_biometric phai la False (khong goi y quet van tay cho tai lieu vuot cap)
     assert result.get("requires_biometric") is False
+
+
+def test_p0_clearance_guard_880_kh_tqs_level_2(agent_tutor):
+    """
+    8. P0 TEST: User Cap 2 (Noi bo - Nguyen Xuan Thanh) hoi ve van ban Cap 5 (880/KH-TQS):
+    '880/KH-TQS la don vi nao phat hanh?'
+    Du search co the tra ve cac chunks Cap 1/2 khong lien quan (tu khoa 'phat hanh'):
+    1. citations BAT BUOC la [] (khong chua cac file Cap 1/2 gay nhieu).
+    2. Cau tra loi BAT BUOC la cau tu choi chuan muc:
+       'Bao cao dong chi, tai lieu 880/KH-TQS khong phu hop voi cap bao mat hien tai cua dong chi (Cap 2 - Noi bo)...'
+    3. TUYET DOI KHONG chua 'Quan khu 7' hay suy doan ngoai van ban.
+    4. requires_biometric = False.
+    """
+    unrelated_level_1_chunks = [
+        {
+            "chunk_id": "CHK-PUB-01",
+            "file_id": "PDF-PUB-001",
+            "document_code": "01/TB-TQS",
+            "title": "Thong bao phat hanh cong van thuong ky",
+            "page": 1,
+            "security_level_id": 1,
+            "text": "Truong Quan Su thong bao phat hanh lich lam viec thang 10.",
+            "score": 0.45
+        }
+    ]
+
+    res = agent_tutor.answer_query(
+        query="880/KH-TQS là đơn vị nào phát hành?",
+        user_id="USR-004",
+        user_name="Nguyễn Xuân Thanh",
+        user_position="Cán bộ tham mưu",
+        user_clearance=2,
+        retrieved_chunks=unrelated_level_1_chunks,
+        biometric_verified=False
+    )
+
+    assert res["citations"] == [], f"Citations must be empty, got {res['citations']}"
+    assert "880/KH-TQS không phù hợp với cấp bảo mật hiện tại của đồng chí (Cấp 2 - Nội bộ)" in res["answer"]
+    assert "Quân khu 7" not in res["answer"]
+    assert res["requires_biometric"] is False

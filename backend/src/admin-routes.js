@@ -42,7 +42,7 @@ module.exports = (app, deps) => {
     const { approvalInterceptor, loadProtectedPermissions, isProtectedAdmin } = approvalModule;
 
 
-        // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
     // [v4.3.2] Route xem yêu cầu của chính mình — dành cho IT
     // KHÔNG nằm dưới /api/admin → không cần permission đặc biệt,
     // chỉ cần authenticated (đã được middleware chung xử lý).

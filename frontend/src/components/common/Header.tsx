@@ -1,7 +1,7 @@
 /* <!-- Lucian UX/UI Prompt #058 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#058 --> */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // (giữ nguyên import, dùng cho tương lai)
 import { Popover, Tooltip } from 'antd';
 import {
   Building,
@@ -15,11 +15,8 @@ import {
   Trash2,
   Activity,
   Shield,
-<<<<<<< HEAD
   Bell,
-=======
   Bot,
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
@@ -56,13 +53,11 @@ let lastKnownPillCoords: { left: number; width: number } | null = null;
 const NavigationGlider: React.FC<{
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
 }> = ({ activeNav: explicitActiveNav }) => {
-  const { user, isAdmin, isStaff, hasPermission } = useAuth();
+  const { user, isAdmin, hasPermission } = useAuth();
   const { deviceMode, isTouch } = useDeviceMode();
   const location = useLocation();
 
-<<<<<<< HEAD
-=======
-  // Nhận diện thiết bị cảm ứng hoặc chế độ iPadOS để vô hiệu hóa Tooltip (tránh lỗi Safari iPad phải chạm 2 lần)
+  // Nhận diện thiết bị cảm ứng hoặc chế độ iPadOS để vô hiệu hóa Tooltip
   const isTouchOrIPad =
     deviceMode === 'ipad' ||
     isTouch ||
@@ -71,8 +66,6 @@ const NavigationGlider: React.FC<{
         (/iPad|iPhone|iPod|Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1))) ||
     (typeof window !== 'undefined' && 'ontouchstart' in window);
 
-  // Tự động nhận diện tab đang mở nếu activeNav không được truyền từ page
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
   const getEffectiveActiveNav = () => {
     if (explicitActiveNav) return explicitActiveNav;
     const path = location.pathname;
@@ -215,6 +208,7 @@ const NavigationGlider: React.FC<{
         const isActive = activeNav === tab.key;
         const IconComponent = tab.icon;
 
+        // ✅ FIX: Tạo 1 element duy nhất (tabLink), tái sử dụng ở cả 2 nhánh
         const tabLink = (
           <Link
             id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
@@ -231,9 +225,7 @@ const NavigationGlider: React.FC<{
               if (container) {
                 const labelEl = labelRefs.current[tab.key];
                 const textW = labelEl ? labelEl.scrollWidth : 60;
-                // targetW = icon (20) + gap (8) + textW + horizontal padding (32)
                 const targetW = Math.round(20 + 8 + textW + 32);
-                // targetX ước tính = container padding left (8px-10px) + index * (collapsed width 40px + gap 8px)
                 const targetX = Math.round(10 + index * (40 + 8));
 
                 if (targetW > 0) {
@@ -277,15 +269,14 @@ const NavigationGlider: React.FC<{
           </Link>
         );
 
-        // Trên iPad hoặc thiết bị cảm ứng, không bọc Tooltip vì iOS Safari sẽ ưu tiên hiển thị hover tooltip ở lần chạm 1 và phải bấm lần 2 mới kích hoạt điều hướng
+        // Trên iPad / cảm ứng hoặc tab đang active: KHÔNG bọc Tooltip
         if (isTouchOrIPad || isActive) {
           return (
-            <React.Fragment key={tab.key}>
-              {tabLink}
-            </React.Fragment>
+            <React.Fragment key={tab.key}>{tabLink}</React.Fragment>
           );
         }
 
+        // ✅ FIX: Tooltip chỉ chứa DUY NHẤT 1 child (tabLink). Trước đây code render 2 Link → bug.
         return (
           <Tooltip
             key={tab.key}
@@ -294,64 +285,7 @@ const NavigationGlider: React.FC<{
             mouseEnterDelay={0.25}
             arrow={{ pointAtCenter: true }}
           >
-<<<<<<< HEAD
-            <Link
-              id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
-              ref={(el) => {
-                tabRefs.current[tab.key] = el;
-              }}
-              to={tab.to}
-              onClick={() => {
-                if (isActive) return;
-                const container = containerRef.current;
-                if (container) {
-                  const labelEl = labelRefs.current[tab.key];
-                  const textW = labelEl ? labelEl.scrollWidth : 60;
-                  const targetW = Math.round(20 + 8 + textW + 32);
-                  const targetX = Math.round(10 + index * (40 + 8));
-
-                  if (targetW > 0) {
-                    lastKnownPillCoords = { left: targetX, width: targetW };
-                    container.style.setProperty('--x', `${targetX}px`);
-                    container.style.setProperty('--w', `${targetW}px`);
-                    container.style.setProperty('--pill-opacity', '1');
-                    setIndicatorStyle({ left: targetX, width: targetW });
-                  }
-                }
-              }}
-              aria-current={isActive ? 'page' : undefined}
-              aria-label={tab.label}
-              data-active={isActive ? 'true' : 'false'}
-              className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 select-none h-10 ${
-                isActive
-                  ? 'is-active !text-white font-bold px-4 py-2 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0'
-              }`}
-              style={isActive ? { color: '#ffffff' } : undefined}
-            >
-              <IconComponent
-                className={`w-5 h-5 shrink-0 transition-transform duration-300 ${
-                  isActive ? 'scale-105 !text-white stroke-white' : tab.inactiveColor
-                }`}
-                style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
-              />
-              <span
-                ref={(el) => {
-                  labelRefs.current[tab.key] = el;
-                }}
-                className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-400 ease-[cubic-bezier(.34,1.45,.64,1)] ${
-                  isActive
-                    ? 'max-w-[280px] opacity-100 ml-2 font-bold !text-white'
-                    : 'max-w-0 opacity-0 ml-0 pointer-events-none'
-                }`}
-                style={isActive ? { color: '#ffffff' } : undefined}
-              >
-                {tab.label}
-              </span>
-            </Link>
-=======
             {tabLink}
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
           </Tooltip>
         );
       })}
@@ -371,7 +305,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { isOnline, checkConnection } = useNetworkStatus();
   const navigate = useNavigate();
   const { count: approvalCount } = useApprovalContext();
-  const showApprovalBadge = hasPermission('AUDIT_VIEW') && approvalCount > 0;
+  const showApprovalBadge = hasPermission('APPROVAL_VALIDATE') && approvalCount > 0;
   const [liveClock, setLiveClock] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
@@ -400,6 +334,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
   const canAccessSessions = hasPermission('SESSION_VIEW');
+
+  // (liveClock hiện không render – giữ state để tương thích nếu sau này cần hiển thị)
+  void liveClock;
 
   const userPopoverContent = (
     <div className="w-[340px] sm:w-[360px] p-1 text-slate-800 dark:text-slate-200 text-xs">
@@ -529,7 +466,6 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
 
-        {/* ⭐ KHỐI ĐÃ ĐƯỢC SỬA LỖI HOÀN TOÀN */}
         {canAccessAdmin && (
           <>
             <Link
@@ -615,12 +551,9 @@ export const Header: React.FC<HeaderProps> = ({
   // ══════════════════════════════════════════════════════════════════════
   if (deviceMode === 'ipad') {
     return (
-<<<<<<< HEAD
-      <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-xs transition-colors duration-200 select-none">
-=======
-      <header className="sticky top-0 z-30 shrink-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 min-h-[3.75rem] sm:min-h-[4rem] h-[calc(3.75rem+env(safe-area-inset-top,0px))] sm:h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-xs transition-colors duration-200 select-none">
-        {/* Cụm Trái (shrink-0 z-20 flex items-center gap-2): Logo + Tên trường */}
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
+      // ✅ FIX: Gộp 2 thẻ <header> bị trùng thành 1, kết hợp class của cả hai
+      <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 min-h-[3.75rem] sm:min-h-[4rem] h-[calc(3.75rem+env(safe-area-inset-top,0px))] sm:h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-xs transition-colors duration-200 select-none">
+        {/* Cụm Trái: Hamburger (nếu có) + Logo + Tên trường */}
         <div className="shrink-0 z-20 flex items-center gap-2 sm:gap-2.5">
           {onToggleMobileMenu && isIPadPortrait && (
             <button
@@ -674,9 +607,7 @@ export const Header: React.FC<HeaderProps> = ({
           <DeviceModeSwitch compact />
           <ThemeToggle size="sm" />
 
-<<<<<<< HEAD
-=======
-          {/* Nút Mở Trợ Lý AI (AI Chat Drawer Trigger) - iPad */}
+          {/* Nút Mở Trợ Lý AI - iPad */}
           <button
             type="button"
             onClick={() => toggleChat()}
@@ -703,8 +634,7 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </button>
 
-          {/* User Profile Pill - Hiển thị đầy đủ họ tên quân nhân */}
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
+          {/* User Profile Pill - iPad */}
           <Popover
             content={userPopoverContent}
             trigger="click"
@@ -775,12 +705,9 @@ export const Header: React.FC<HeaderProps> = ({
   // BRANCH 2: GIAO DIỆN MÁY TÍNH TIÊU CHUẨN (deviceMode === 'pc')
   // ══════════════════════════════════════════════════════════════════════
   return (
-<<<<<<< HEAD
-    <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
-=======
-    <header className="sticky top-0 z-30 shrink-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 min-h-[4rem] h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
+    // ✅ FIX: Gộp 2 thẻ <header> bị trùng thành 1
+    <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 min-h-[4rem] h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
       {/* Vùng Trái: Brand & Optional Drawer Hamburger Button */}
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
       <div className="shrink-0 z-20 flex items-center space-x-2 sm:space-x-3">
         {onToggleMobileMenu && (
           <button
@@ -841,9 +768,7 @@ export const Header: React.FC<HeaderProps> = ({
           <ThemeToggle />
         </div>
 
-<<<<<<< HEAD
-=======
-        {/* Nút Mở Trợ Lý AI (AI Chat Drawer Trigger) - PC */}
+        {/* Nút Mở Trợ Lý AI - PC */}
         <div className="shrink-0">
           <button
             type="button"
@@ -873,7 +798,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* User profile menu Desktop */}
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
         <div className="shrink-0 z-20">
           <Popover
             content={userPopoverContent}

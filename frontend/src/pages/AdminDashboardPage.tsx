@@ -29,6 +29,7 @@ import {
   Monitor,
   ShieldCheck,
   GripVertical,
+  Bell,
 } from 'lucide-react';
 
 import { TrashPage } from './TrashPage';
@@ -55,6 +56,7 @@ import { ProtectedPermissionsConfigPage } from './ProtectedPermissionsConfigPage
 import { isApprovalRequired } from '../utils/approvalUtils';
 import { useApprovalContext } from '../contexts/ApprovalContext';
 import { useSearchParams } from 'react-router-dom';
+import { Tooltip } from 'antd';
 
 import { dashboardApi } from '../services/dashboardApi';
 import { permissionService } from '../services/permissionService';
@@ -127,7 +129,7 @@ const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any; permission?:
   { id: 'logs',        label: 'Nhật ký',       icon: Activity,        permission: 'AUDIT_VIEW' },
   { id: 'sessions',    label: 'Phiên online',  icon: Monitor,         permission: 'SESSION_VIEW' },
   { id: 'trash',       label: 'Thùng rác',     icon: Trash2,          permission: 'DOC_TRASH_VIEW' },
-  { id: 'approvals',   label: 'Phê duyệt',     icon: ShieldCheck,     permission: 'AUDIT_VIEW' },
+  { id: 'approvals',   label: 'Phê duyệt yêu cầu', icon: Bell,        permission: 'APPROVAL_VALIDATE' },
 ];
 
 const PERMISSION_GROUPS = [
@@ -150,9 +152,6 @@ const PERMISSION_TONES = [
   { value: 'danger',   label: '🔴 Delete / Danger — Xóa / nguy hiểm (Đỏ Quân Kỳ)' },
 ];
 
-<<<<<<< HEAD
-const buildPermissionFormData = (item?: Permission | null) => {
-=======
 // Helper ánh xạ màu sắc chuẩn quân đội cho Group Badge
 const getPermissionGroupBadge = (groupCode?: string) => {
   const g = (groupCode || '').toUpperCase();
@@ -176,7 +175,6 @@ const getPermissionGroupBadge = (groupCode?: string) => {
 
 // Helper khởi tạo form data cho permission (new hoặc edit)
 const buildPermissionFormData = (item?: Permission | null, defaultOrder = 0) => {
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
   if (!item) {
     return {
       permission_id: '',
@@ -987,13 +985,34 @@ export const AdminDashboardPage: React.FC = () => {
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
-                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                                title="Xóa vai trò"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {(() => {
+                                const needsApproval = !isAdmin;
+                                return (
+                                  <Tooltip
+                                    title={
+                                      needsApproval
+                                        ? '⚠️ Yêu cầu quyền Admin để xóa vai trò — bấm để gửi yêu cầu phê duyệt'
+                                        : 'Xóa vai trò'
+                                    }
+                                    placement="top"
+                                    arrow
+                                  >
+                                    <button
+                                      onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
+                                      className={`
+                                        p-1.5 rounded-lg transition cursor-pointer
+                                        ${
+                                          needsApproval
+                                            ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 hover:text-amber-600 dark:hover:text-amber-400'
+                                            : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent'
+                                        }
+                                      `}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </Tooltip>
+                                );
+                              })()}
                             </td>
                           </tr>
                         ))
@@ -1065,42 +1084,6 @@ export const AdminDashboardPage: React.FC = () => {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {permsList.length === 0 ? (
                         <tr>
-<<<<<<< HEAD
-                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">Chưa có quyền nào</td>
-                        </tr>
-                      ) : (
-                        permsList.map((p) => (
-                          <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold whitespace-nowrap">{p.permission_id}</td>
-                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold whitespace-nowrap">{p.name || p.code || p.permission_id}</td>
-                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">
-                                {(p as any).group_code || '—'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-right whitespace-nowrap">
-                              <button
-                                onClick={() => {
-                                  setGenericFormData(buildPermissionFormData(p));
-                                  setGenericModal({ open: true, type: 'permissions', item: p });
-                                }}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                                title="Sửa quyền"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
-                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                                title="Xóa quyền"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-=======
                           <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500">
                             Chưa có quyền nào
                           </td>
@@ -1152,12 +1135,12 @@ export const AdminDashboardPage: React.FC = () => {
                                 </div>
                               </td>
 
-                              {/* 1. Mã Quyền: font-mono tabular-nums text-sm font-semibold text-amber-500 */}
+                              {/* 1. Mã Quyền */}
                               <td className="py-3 px-4 font-mono tabular-nums text-sm text-amber-600 dark:text-amber-400 font-semibold whitespace-nowrap">
                                 {p.permission_id}
                               </td>
 
-                              {/* 2. Tên quyền (Mã code UPPER_SNAKE): font-mono text-sm text-amber-400 font-medium */}
+                              {/* 2. Tên quyền (Mã code UPPER_SNAKE) */}
                               <td className="py-3 px-4 font-mono text-sm text-slate-800 dark:text-amber-400 font-medium whitespace-nowrap">
                                 {p.code || p.name || p.permission_id}
                               </td>
@@ -1167,7 +1150,7 @@ export const AdminDashboardPage: React.FC = () => {
                                 {p.description || '—'}
                               </td>
 
-                              {/* 4. Nhóm (Group Badge với màu sắc động chuẩn quân đội) */}
+                              {/* 4. Nhóm (Group Badge) */}
                               <td className="py-3 px-4 whitespace-nowrap">
                                 <span
                                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-xs ${getPermissionGroupBadge(
@@ -1205,7 +1188,6 @@ export const AdminDashboardPage: React.FC = () => {
                             </tr>
                           );
                         })
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
                       )}
                     </tbody>
                   </table>
@@ -1818,28 +1800,17 @@ export const AdminDashboardPage: React.FC = () => {
                         </select>
                       </div>
 
-<<<<<<< HEAD
-                      <fieldset className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2.5">
-                        <legend className="px-2 text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Phân loại con (Subgroup)</legend>
-=======
-                      {/* ─── 2. Phân loại con (Subgroup) ─── */}
                       <fieldset className="border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 rounded-xl p-3.5 space-y-3">
                         <legend className="px-2 text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
                           Phân loại con (Subgroup)
                         </legend>
 
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
                         <div>
                           <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Subgroup key</label>
                           <input type="text" value={genericFormData.subgroup_key || ''}
                             onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_key: e.target.value })}
                             placeholder="doc-view, doc-edit, doc-danger..."
-<<<<<<< HEAD
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
-=======
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
-                          />
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
                           <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
                             Dùng chung với quyền khác trong cùng nhóm. VD: <code className="font-mono text-amber-500">doc-view</code>
                           </p>
@@ -1849,51 +1820,23 @@ export const AdminDashboardPage: React.FC = () => {
                           <input type="text" value={genericFormData.subgroup_label || ''}
                             onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_label: e.target.value })}
                             placeholder="Xem & Tra cứu"
-<<<<<<< HEAD
                             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          <div>
-                            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Thứ tự trong nhóm</label>
-                            <input type="number" min={0} max={999} value={genericFormData.subgroup_order ?? 50}
-                              onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_order: Number(e.target.value) })}
-                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">10 = đầu, 99 = cuối</p>
-=======
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
-                          />
-                        </div>
-
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                               Thứ tự trong nhóm
                             </label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={999}
-                              value={genericFormData.subgroup_order ?? 50}
-                              onChange={(e) =>
-                                setGenericFormData({ ...genericFormData, subgroup_order: Number(e.target.value) })
-                              }
-                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
-                            />
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                              10 = đầu, 99 = cuối
-                            </p>
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
+                            <input type="number" min={0} max={999} value={genericFormData.subgroup_order ?? 50}
+                              onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_order: Number(e.target.value) })}
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">10 = đầu, 99 = cuối</p>
                           </div>
                           <div>
                             <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mức độ nguy hiểm (tone)</label>
                             <select value={genericFormData.subgroup_tone || 'read'}
                               onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_tone: e.target.value })}
-<<<<<<< HEAD
-                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20">
-=======
-                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
-                            >
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20">
                               {PERMISSION_TONES.map((t) => (
                                 <option key={t.value} value={t.value}>{t.label}</option>
                               ))}
@@ -1901,7 +1844,6 @@ export const AdminDashboardPage: React.FC = () => {
                           </div>
                         </div>
                       </fieldset>
-<<<<<<< HEAD
 
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Sort order tổng (thanh tab)</label>
@@ -1909,8 +1851,6 @@ export const AdminDashboardPage: React.FC = () => {
                           onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
                           className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
                       </div>
-=======
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
                     </>
                   )}
                 </div>

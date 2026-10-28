@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Trash2,
   Monitor,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -68,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems: Array<{ id: string; label: string; icon: any; permission?: string }> = [
     { id: 'overview',    label: 'Tổng quan',    icon: LayoutDashboard, permission: 'SYSTEM_STATS_VIEW' },
+    { id: 'approvals',   label: 'Phê duyệt yêu cầu', icon: Bell, permission: 'APPROVAL_VALIDATE' },
     { id: 'users',       label: 'Người dùng',   icon: Users,           permission: 'USER_VIEW' },
     { id: 'roles',       label: 'Vai trò',      icon: KeyRound,        permission: 'ROLE_VIEW' },
     { id: 'permissions', label: 'Quyền',        icon: ShieldAlert,     permission: 'PERMISSION_VIEW' },

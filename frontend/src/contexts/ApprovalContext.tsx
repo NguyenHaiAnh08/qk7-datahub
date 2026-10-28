@@ -55,7 +55,7 @@ export const ApprovalProvider: React.FC<ApprovalProviderProps> = ({
 
   // ─── Điều kiện bật poll ───
   const isAuthenticated = !!user && user.user_id !== 'GUEST';
-  const canApprove = hasPermission('AUDIT_VIEW');
+  const canApprove = hasPermission('APPROVAL_VALIDATE');
   const enabled = isAuthenticated && canApprove;
 
   const [count, setCount] = useState<number>(0);

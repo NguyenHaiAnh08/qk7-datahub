@@ -4,21 +4,16 @@ import { ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { DeviceModeProvider } from './contexts/DeviceModeContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext'; // ✅ bỏ useAuth (không dùng)
 import { RouterProvider } from './routes/RouterProvider';
 import { HttpErrorListener } from './components/common/HttpErrorListener';
 import { ApprovalListener } from './components/common/ApprovalListener';
 import { ToastProvider } from './components/common/Toast';
 import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
-<<<<<<< HEAD
-import AIChatWidget from './components/ai-chat/AIChatWidget';
+import AIChatWidget from './components/ai-chat/AIChatWidget'; // ✅ dùng cái này
 import { ApprovalProvider } from './contexts/ApprovalContext';
-=======
-import { AIChatProvider } from './contexts/AIChatContext';
-import AIChatDrawer from './components/ai-chat/AIChatDrawer';
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
+import { AIChatProvider } from './contexts/AIChatContext'
 import './index.css';
-
 
 /**
  * Wrapper đồng bộ Theme (Dark/Light) và Cấu hình Token Ant Design toàn diện
@@ -138,7 +133,8 @@ const AIChatWrapper: React.FC = () => {
     return null;
   }
 
-  return <AIChatDrawer />;
+  // ✅ FIX: render AIChatWidget (đã import) thay vì AIChatDrawer (không tồn tại)
+  return <AIChatWidget />;
 };
 
 /**
@@ -155,17 +151,12 @@ export const App: React.FC = () => {
             <ToastProvider>
               <NetworkStatusProvider>
                 <AuthProvider>
-<<<<<<< HEAD
-                  <ApprovalProvider pollMs={30000}>
-                    <RouterProvider />
-                    <AIChatWrapper />
-                  </ApprovalProvider>
-=======
                   <AIChatProvider>
-                    <RouterProvider />
-                    <AIChatWrapper />
+                    <ApprovalProvider pollMs={30000}>
+                      <RouterProvider />
+                      <AIChatWrapper />
+                    </ApprovalProvider>
                   </AIChatProvider>
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
                 </AuthProvider>
               </NetworkStatusProvider>
             </ToastProvider>
@@ -177,4 +168,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

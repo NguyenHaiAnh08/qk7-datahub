@@ -374,7 +374,7 @@ export const AIChatDrawer: React.FC = () => {
                       </div>
 
                       {/* NÚT QUÉT VÂN TAY NẾU CÓ CỜ requires_biometric (chỉ hiện khi chưa có token) */}
-                      {msg.requires_biometric && !fpToken && !(typeof window !== 'undefined' && sessionStorage.getItem('qk7_fp_token')) && (
+                      {msg.requires_biometric && (
                         <div className="mt-2.5">
                           <button
                             type="button"
@@ -389,7 +389,7 @@ export const AIChatDrawer: React.FC = () => {
                             className="w-full min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all duration-200 bg-gradient-to-r from-[#991b1b] via-[#b91c1c] to-[#d97706] hover:from-[#b91c1c] hover:to-[#f59e0b] text-white shadow-md active:scale-[0.98] border border-amber-400/40 cursor-pointer"
                           >
                             <Fingerprint className="w-4 h-4 text-amber-300 animate-pulse flex-shrink-0" />
-                            <span>Quét vân tay để xem</span>
+                            <span>Quét vân tay để nhận câu trả lời</span>
                           </button>
                         </div>
                       )}
@@ -430,6 +430,7 @@ export const AIChatDrawer: React.FC = () => {
                     </span>
                   </div>
                 ))}
+
 
                 {/* Trạng thái đang tải câu trả lời */}
                 {loading && (

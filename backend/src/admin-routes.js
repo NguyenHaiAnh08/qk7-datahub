@@ -111,9 +111,12 @@ module.exports = (app, deps) => {
     
 
     const requireAdminPanelAccess = async (req, res, next) => {
+        if (!req.user || !req.user.is_authenticated) {
+            return res.status(401).json({ error: 'Cần đăng nhập để truy cập trang quản trị', code: 'UNAUTHORIZED' });
+        }
         if ((req.user?.roles || []).includes('ROL-01')) return next();
 
-        const fullPath = (req.originalUrl || '').split('?')[0];
+        const fullPath = (req.originalUrl || '').split('?')[0].replace(/\/+$/, '') || '/';
 
         const rules = AUTO_PERMISSIONS[req.method] || [];
         const matched = rules.find(([regex]) => regex.test(fullPath));
@@ -1536,17 +1539,20 @@ module.exports = (app, deps) => {
         try {
             const status = (req.query.status || 'PENDING').toUpperCase();
             const pool = await getPool();
-            const r = await pool.request()
-                .input('s', sql.VarChar(20), status)
-                .query(`
-                    SELECT ar.*, u.full_name AS requester_name, u.[rank] AS requester_rank,
-                           rv.full_name AS reviewer_name
-                    FROM APPROVAL_REQUEST ar
-                    LEFT JOIN [USER] u ON u.user_id = ar.requester_id
-                    LEFT JOIN [USER] rv ON rv.user_id = ar.reviewed_by
-                    WHERE ar.status = @s
-                    ORDER BY ar.created_at DESC
-                `);
+            const request = pool.request();
+            let query = `
+                SELECT ar.*, u.full_name AS requester_name, u.[rank] AS requester_rank,
+                       rv.full_name AS reviewer_name
+                FROM APPROVAL_REQUEST ar
+                LEFT JOIN [USER] u ON u.user_id = ar.requester_id
+                LEFT JOIN [USER] rv ON rv.user_id = ar.reviewed_by
+            `;
+            if (status !== 'ALL') {
+                request.input('s', sql.VarChar(20), status);
+                query += ` WHERE ar.status = @s`;
+            }
+            query += ` ORDER BY ar.created_at DESC`;
+            const r = await request.query(query);
             res.json({ total: r.recordset.length, items: r.recordset });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });

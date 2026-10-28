@@ -93,7 +93,14 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
       if (typeof data === 'object' && data?.error) {
         errorMsg = data.error;
       } else if (typeof data === 'string' && data.trim()) {
-        errorMsg = data.trim();
+        const preMatch = data.match(/<pre>(.*?)<\/pre>/is);
+        if (preMatch) {
+          errorMsg = preMatch[1].trim();
+        } else if (data.includes('<!DOCTYPE') || data.includes('<html')) {
+          errorMsg = `Lỗi máy chủ (${response.status})`;
+        } else {
+          errorMsg = data.trim();
+        }
       } else if (response.status === 500 || response.status === 502 || response.status === 504) {
         errorMsg = 'Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend đang chạy!';
       }

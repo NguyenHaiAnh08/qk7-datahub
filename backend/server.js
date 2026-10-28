@@ -1724,6 +1724,14 @@ app.use((req, res, next) => {
   else res.status(404).send('Không tìm thấy public/index.html');
 });
 
+// 404 Handler cho các API endpoint không tồn tại (trả về JSON thay vì HTML Express mặc định)
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: `API endpoint không tồn tại: ${req.method} ${req.originalUrl}`,
+    code: 'NOT_FOUND',
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════
 // START
 // ═══════════════════════════════════════════════════════════════

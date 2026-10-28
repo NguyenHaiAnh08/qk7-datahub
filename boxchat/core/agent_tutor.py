@@ -200,6 +200,48 @@ class AgentTutor:
             f"Tổng số đoạn trích hợp lệ thu nhận: {len(authorized_chunks)}."
         )
 
+        # NHẬN DIỆN SỐ HIỆU VĂN BẢN TRONG CÂU HỎI (Vd: 880/KH-TQS, 333/KH-TQS, 145/KH-TQS)
+        # Nếu câu hỏi có chứa số hiệu văn bản cụ thể NHƯNG authorized_chunks không chứa bất kỳ chunk nào thuộc văn bản đó
+        # (nghĩa là đã bị Pre-filtering bảo mật chặn lại hoặc không tồn tại trong kho cấp quyền) -> TỪ CHỐI NGAY LẬP TỨC
+        doc_code_matches = re.findall(r'(\d+[\/\-_][\w\/\-_]+)', query)
+        if doc_code_matches:
+            target_doc_code = doc_code_matches[0]
+            doc_chunk_found = False
+            for c in authorized_chunks:
+                c_code = (c.get("document_code") or "").lower()
+                c_title = (c.get("title") or "").lower()
+                c_fid = (c.get("file_id") or "").lower()
+                c_text = (c.get("text") or "").lower()
+                for cm in doc_code_matches:
+                    cm_lower = cm.lower()
+                    if cm_lower in c_code or cm_lower in c_title or cm_lower in c_fid or cm_lower in c_text:
+                        doc_chunk_found = True
+                        break
+                if doc_chunk_found:
+                    break
+
+            if not doc_chunk_found:
+                refusal_answer = (
+                    f"Báo cáo đồng chí, tài liệu {target_doc_code} không phù hợp với cấp bảo mật hiện tại của đồng chí "
+                    f"(Cấp {user_clearance} - {'Nội bộ' if user_clearance == 2 else clearance_name}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật."
+                )
+                return {
+                    "answer": refusal_answer,
+                    "citations": [],
+                    "reasoning": {
+                        "mem": mem_trace,
+                        "think": (
+                            f"[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản {target_doc_code}. "
+                            f"Văn bản này không thuộc phạm vi cấp quyền Cấp {user_clearance} ({clearance_name}). "
+                            f"Áp dụng nguyên tắc Fail Closed: Từ chối trích dẫn và không suy đoán bừa."
+                        ),
+                        "tool_call": f"[Security Refusal] Chặn trích dẫn văn bản {target_doc_code} do vượt cấp bảo mật."
+                    },
+                    "retrieval_mode": retrieval_mode,
+                    "synthesis_mode": "clearance_blocked",
+                    "requires_biometric": False
+                }
+
         # Kiểm tra ngưỡng bằng chứng & Cấp quyền
         if not authorized_chunks:
             fallback_answer = (
@@ -545,6 +587,7 @@ class AgentTutor:
                 f"4. Tác phong xưng hô chuẩn mực điều lệnh Quân đội nhân dân Việt Nam: Mở đầu câu trả lời đúng 1 lần duy nhất bằng '{salutation}'. TUYỆT ĐỐI KHÔNG lặp lại họ tên, cấp bậc hoặc chức vụ sau lời chào này.\n"
                 "5. Mọi luận điểm, số liệu, trích dẫn bắt buộc phải kèm theo số trang chính xác dạng [p.X] ngay sau nội dung được trích xuất.\n"
                 f"6. Chỉ khi 100% danh sách bằng chứng hoàn toàn không có thông tin liên quan đến câu hỏi, mới trả lời duy nhất câu: '{NO_DATA_FALLBACK_MESSAGE}'. Nếu đã trích xuất được thông tin, TUYỆT ĐỐI KHÔNG chèn thêm câu từ chối này vào cuối câu trả lời.\n"
+                f"7. Nếu câu hỏi đề cập đến một số hiệu văn bản cụ thể mà số hiệu đó KHÔNG CÓ trong DANH SÁCH BẰNG CHỨNG, TUYỆT ĐỐI KHÔNG được suy đoán bừa (như tự nhận là Quân khu 7 hay bất kỳ cơ quan nào). Phải trả lời đúng mẫu từ chối quy định.\n"
             )
 
             prompt = (

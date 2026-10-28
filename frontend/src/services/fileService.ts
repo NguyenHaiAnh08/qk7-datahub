@@ -10,6 +10,7 @@ export const fileService = {
     fileId: string,
     download: '0' | '1' = '0',
     fingerprintToken?: string,
+    signal?: AbortSignal,
   ): Promise<Blob> => {
     const url = fileService.getViewUrl(fileId, download);
 
@@ -18,7 +19,7 @@ export const fileService = {
       headers['X-Fingerprint-Token'] = fingerprintToken;
     }
 
-    const response = await fetch(url, { headers });
+    const response = await fetch(url, { headers, signal });
 
     if (!response.ok) {
       const contentType = response.headers.get('content-type') || '';
@@ -45,17 +46,12 @@ export const fileService = {
     return await response.blob();
   },
 
-  downloadFile: async (
-    fileId: string,
-    filename?: string,
-    fingerprintToken?: string,
-  ): Promise<void> => {
-    const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken);
+  saveBlobToFile: (blob: Blob, filename?: string): void => {
     const blobUrl = URL.createObjectURL(blob);
     const a = window.document.createElement('a');
 
     a.href = blobUrl;
-    a.download = filename || `${fileId}.pdf`;
+    a.download = filename || 'document.pdf';
 
     window.document.body.appendChild(a);
     try {
@@ -64,6 +60,27 @@ export const fileService = {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
     }
+  },
+
+  downloadFile: async (
+    fileId: string,
+    filename?: string,
+    fingerprintToken?: string,
+  ): Promise<void> => {
+    const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken);
+    fileService.saveBlobToFile(blob, filename || `${fileId}.pdf`);
+  },
+
+  prepareDownload: async (
+    fileId: string,
+    filename?: string,
+    fingerprintToken?: string,
+    signal?: AbortSignal,
+  ): Promise<() => void> => {
+    const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken, signal);
+    return () => {
+      fileService.saveBlobToFile(blob, filename || `${fileId}.pdf`);
+    };
   },
 };
 

@@ -1,43 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Button,
-  Input,
   Tooltip,
-  Badge,
-  Modal,
-  Tabs,
-  Radio,
-  Tag,
-  Spin,
-  Alert,
-  Collapse,
-  Space,
-  Typography,
-  message
+  Spin
 } from 'antd';
 import {
   MessageOutlined,
   CloseOutlined,
   SendOutlined,
   FilePdfOutlined,
-  ApartmentOutlined,
-  FormOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
   RobotOutlined,
   ReloadOutlined,
   FullscreenOutlined,
   FullscreenExitOutlined,
-  CopyOutlined,
-  InfoCircleOutlined
+  LockOutlined
 } from '@ant-design/icons';
+import { Fingerprint } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { aiService, AIChatResponse, AICitation, AIStudyBookResponse, AIQuizQuestion } from '../../services/aiService';
+import { aiService, AICitation } from '../../services/aiService';
 import { fileService } from '../../services/fileService';
 import { toast } from '../common/Toast';
-
-const { Text, Paragraph, Title } = Typography;
+import { FingerprintScanModal } from '../users/FingerprintScanModal';
 
 interface ChatMessage {
   id: string;
@@ -70,15 +53,18 @@ export const AIChatWidget: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [aiStatus, setAiStatus] = useState<'online' | 'fallback' | 'checking'>('checking');
 
-  // State cho Modal "02 Sơ đồ"
-  const [diagramModalVisible, setDiagramModalVisible] = useState<boolean>(false);
-  const [studyBookData, setStudyBookData] = useState<AIStudyBookResponse | null>(null);
-  const [loadingStudyBook, setLoadingStudyBook] = useState<boolean>(false);
 
-  // State cho Modal "03 Kiểm tra"
-  const [quizModalVisible, setQuizModalVisible] = useState<boolean>(false);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
-  const [submittedQuiz, setSubmittedQuiz] = useState<boolean>(false);
+  // State cho Khóa Bảo Vệ Sinh Trắc Học Vân Tay ZK9500 (Biometric AI Guard)
+  const [scanModalOpen, setScanModalOpen] = useState<boolean>(false);
+  const [targetScanFileId, setTargetScanFileId] = useState<string>('');
+  const [targetScanDocCode, setTargetScanDocCode] = useState<string>('');
+  const [fingerprintToken, setFingerprintToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('qk7_fp_token');
+    }
+    return null;
+  });
+  const lastUserQueryRef = useRef<string>('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -159,24 +145,48 @@ export const AIChatWidget: React.FC = () => {
     }
   }, [user]);
 
-  // Gửi tin nhắn
-  const handleSend = async (queryText?: string) => {
+  // Gửi tin nhắn (hỗ trợ Auto-retry khi quét vân tay ZK9500 thành công)
+  const handleSend = async (queryText?: string, fpToken?: string, isRetry: boolean = false) => {
     const textToSend = (queryText || inputText).trim();
     if (!textToSend || loading) return;
 
-    const userMsg: ChatMessage = {
-      id: `usr_${Date.now()}`,
-      sender: 'user',
-      text: textToSend,
-      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-    };
+    lastUserQueryRef.current = textToSend;
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText('');
+    if (!isRetry) {
+      const userMsg: ChatMessage = {
+        id: `usr_${Date.now()}`,
+        sender: 'user',
+        text: textToSend,
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      setInputText('');
+    }
+
     setLoading(true);
 
+    // Lấy 6 lượt lịch sử trao đổi gần nhất
+    const history = messages
+      .filter((m) => m.id !== 'welcome')
+      .slice(-6)
+      .map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      }));
+
+    const activeToken =
+      fpToken ||
+      fingerprintToken ||
+      (typeof window !== 'undefined' ? sessionStorage.getItem('qk7_fp_token') : null) ||
+      undefined;
+
     try {
-      const res = await aiService.chat({ query: textToSend });
+      const res = await aiService.chat({
+        query: textToSend,
+        history,
+        fingerprint_token: activeToken,
+      });
+
       const aiMsg: ChatMessage = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
@@ -185,7 +195,21 @@ export const AIChatWidget: React.FC = () => {
         reasoning: res.reasoning,
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
       };
-      setMessages((prev) => [...prev, aiMsg]);
+
+      if (isRetry) {
+        // Cập nhật mượt mà tin nhắn AI gần nhất đã được giải mã
+        setMessages((prev) => {
+          const lastAiIdx = prev.map((m) => m.sender).lastIndexOf('ai');
+          if (lastAiIdx !== -1) {
+            const next = [...prev];
+            next[lastAiIdx] = aiMsg;
+            return next;
+          }
+          return [...prev, aiMsg];
+        });
+      } else {
+        setMessages((prev) => [...prev, aiMsg]);
+      }
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
@@ -196,6 +220,36 @@ export const AIChatWidget: React.FC = () => {
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Mở hộp thoại quét vân tay ZK9500 cho thẻ trích dẫn Cấp 3-5
+  const handleOpenFingerprintScan = (fileId: string, docCode: string) => {
+    setTargetScanFileId(fileId);
+    setTargetScanDocCode(docCode || 'Văn kiện Mật');
+    setScanModalOpen(true);
+  };
+
+  // Callback khi Local Agent :9001 và Gateway xác thực vân tay thành công
+  const handleFingerprintSuccess = (token: string) => {
+    setScanModalOpen(false);
+    const validToken = token || '';
+    if (validToken) {
+      sessionStorage.setItem('qk7_fp_token', validToken);
+      setFingerprintToken(validToken);
+    }
+
+    toast.success(
+      `Xác thực vân tay ZK9500 thành công! Đang tự động giải mã nội dung mật...`,
+      { title: 'SINH TRẮC HỌC HỢP LỆ', badge: 'ZK9500', duration: 3200 }
+    );
+
+    // Tự động kích hoạt lại câu hỏi gần nhất kèm token vừa xác thực
+    const queryToRetry = lastUserQueryRef.current || inputText.trim();
+    if (queryToRetry) {
+      setTimeout(() => {
+        handleSend(queryToRetry, validToken, true);
+      }, 350);
     }
   };
 
@@ -210,65 +264,6 @@ export const AIChatWidget: React.FC = () => {
     }
   };
 
-  // Nạp dữ liệu Study Book
-  const fetchStudyBook = async (fileId: string) => {
-    setLoadingStudyBook(true);
-    try {
-      const data = await aiService.getStudyBook(fileId);
-      setStudyBookData(data);
-      setSelectedAnswers({});
-      setSubmittedQuiz(false);
-      return data;
-    } catch (err: any) {
-      toast.error(`Lỗi tải dữ liệu cuốn sách: ${err.message}`, { title: 'LỖI STUDY BOOK' });
-      return null;
-    } finally {
-      setLoadingStudyBook(false);
-    }
-  };
-
-  // Nút 2: Mở Modal 02 Sơ đồ
-  const handleOpenDiagram = async (fileId: string) => {
-    setDiagramModalVisible(true);
-    await fetchStudyBook(fileId);
-  };
-
-  // Nút 3: Mở Modal 03 Kiểm tra
-  const handleOpenQuiz = async (fileId: string) => {
-    setQuizModalVisible(true);
-    await fetchStudyBook(fileId);
-  };
-
-  // Nộp bài kiểm tra
-  const handleSelectAnswer = (qId: number, answerKey: string) => {
-    if (submittedQuiz) return;
-    setSelectedAnswers((prev) => ({ ...prev, [qId]: answerKey }));
-  };
-
-  const handleSubmitQuiz = () => {
-    if (!studyBookData?.tab_quiz) return;
-    const answeredCount = Object.keys(selectedAnswers).length;
-    if (answeredCount < studyBookData.tab_quiz.length) {
-      toast.warning(`Đồng chí vui lòng hoàn thành tất cả ${studyBookData.tab_quiz.length} câu hỏi trước khi nộp bài.`, {
-        title: 'CHƯA HOÀN THÀNH BÀI THI',
-        badge: 'QUIZ',
-      });
-      return;
-    }
-    setSubmittedQuiz(true);
-  };
-
-  // Tính điểm
-  const calculateScore = () => {
-    if (!studyBookData?.tab_quiz) return { correct: 0, total: 0 };
-    let correct = 0;
-    studyBookData.tab_quiz.forEach((q) => {
-      if (selectedAnswers[q.id] === q.correct_answer) {
-        correct += 1;
-      }
-    });
-    return { correct, total: studyBookData.tab_quiz.length };
-  };
 
   return (
     <>
@@ -428,75 +423,138 @@ export const AIChatWidget: React.FC = () => {
                     ))}
                   </div>
 
-                  {/* CÁC NÚT BẤM HÀNH ĐỘNG BÊN TRONG BONG BÓNG AI */}
+                  {/* CĂN CỨ VĂN BẢN TRÍCH DẪN & HÀNH ĐỘNG TINH GỌN */}
                   {msg.citations && msg.citations.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-white/20 dark:border-white/15 space-y-2">
-                      <div className="text-[11px] font-semibold tracking-wide uppercase opacity-90">
-                        📑 Căn cứ văn bản & Hành động:
+                      <div className="text-[11px] font-semibold tracking-wide uppercase opacity-90 flex items-center justify-between">
+                        <span>📑 Căn cứ văn bản trích dẫn ({msg.citations.length}):</span>
                       </div>
 
-                      {msg.citations.map((c, cIdx) => (
-                        <div key={cIdx} className="space-y-1.5">
-                          {/* Nút 1: Mở PDF tại đúng trang */}
-                          <button
-                            onClick={() => handleOpenPdf(c.file_id, c.page)}
+                      {msg.citations.map((c, cIdx) => {
+                        const isBiometricLocked =
+                          Boolean(c.requires_biometric) ||
+                          (c.snippet && c.snippet.includes('[Nội dung Mật')) ||
+                          (c.security_level_name &&
+                            (c.security_level_name.includes('Cấp 3') ||
+                              c.security_level_name.includes('Cấp 4') ||
+                              c.security_level_name.includes('Cấp 5') ||
+                              c.security_level_name.toLowerCase().includes('mật')));
+
+                        if (isBiometricLocked) {
+                          return (
+                            <div
+                              key={cIdx}
+                              className={`
+                                p-3 rounded-xl border transition-all duration-200 space-y-2
+                                ${
+                                  isDark
+                                    ? 'bg-gradient-to-br from-red-950/50 via-[#1a0f0f] to-slate-900 border-red-700/60 shadow-md'
+                                    : 'bg-gradient-to-br from-red-50/90 via-amber-50/40 to-white border-red-300 shadow-sm'
+                                }
+                              `}
+                            >
+                              {/* Hàng 1: Tiêu đề / Số hiệu văn bản & Số trang + Mức độ bảo mật */}
+                              <div className="flex items-center justify-between gap-1.5">
+                                <div className="flex items-center space-x-1.5 truncate">
+                                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-red-600/20 text-red-500 dark:text-red-400 flex-shrink-0">
+                                    <LockOutlined className="text-xs" />
+                                  </span>
+                                  <span className="text-xs font-bold text-red-700 dark:text-red-400 truncate">
+                                    Trang {c.page} • [{c.document_code || c.file_id}]
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-300 border border-red-500/30 flex-shrink-0">
+                                  {c.security_level_name || 'Cấp 3 - Mật'}
+                                </span>
+                              </div>
+
+                              {/* Hàng 2: Trạng thái khóa sinh trắc học */}
+                              <div className="text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-300 italic px-1 line-clamp-2">
+                                "{c.snippet || '🔒 [Tài liệu Mật] - Yêu cầu xác thực vân tay ZK9500 để xem chi tiết'}"
+                              </div>
+
+                              {/* Hàng 3: Nút bấm kích hoạt hộp thoại quét vân tay (Touch Target >= 44x44px Apple HIG) */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenFingerprintScan(c.file_id, c.document_code)}
+                                className={`
+                                  w-full min-h-[44px] px-3 py-2 rounded-lg text-xs font-semibold
+                                  flex items-center justify-center space-x-2 transition-all duration-200
+                                  bg-gradient-to-r from-[#991b1b] via-[#b91c1c] to-[#d97706] hover:from-[#b91c1c] hover:to-[#f59e0b]
+                                  text-white shadow-md active:scale-[0.98] border border-amber-400/40 cursor-pointer
+                                `}
+                              >
+                                <Fingerprint className="w-4 h-4 text-amber-300 animate-pulse flex-shrink-0" />
+                                <span className="truncate">Nhấn để quét vân tay ZK9500 mở khóa nội dung</span>
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={cIdx}
                             className={`
-                              w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between
-                              transition-all duration-200
+                              p-3 rounded-xl border transition-all duration-200 space-y-2
                               ${
                                 isDark
-                                  ? 'bg-white/15 hover:bg-white/25 text-white'
-                                  : 'bg-white hover:bg-emerald-50 text-[#166534] border border-[#86efac] shadow-xs'
+                                  ? 'bg-slate-900/80 border-emerald-800/40 hover:border-emerald-600/60'
+                                  : 'bg-white border-emerald-200 hover:border-emerald-400 shadow-xs'
                               }
                             `}
                           >
-                            <span className="flex items-center space-x-1.5 truncate mr-2">
-                              <FilePdfOutlined className="text-red-400 flex-shrink-0" />
-                              <span className="truncate">
-                                📄 Mở {c.document_code} — Trang {c.page} (p.{c.page})
+                            {/* Hàng 1: Tiêu đề / Số hiệu văn bản & Số trang + Mức độ bảo mật */}
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="flex items-center space-x-1.5 truncate">
+                                <FilePdfOutlined className="text-red-500 flex-shrink-0 text-sm" />
+                                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 truncate">
+                                  Trang {c.page} • [{c.document_code || c.file_id}]
+                                </span>
+                                <span className="text-[10px] opacity-75 font-mono text-slate-500 dark:text-slate-400">
+                                  [p.{c.page}]
+                                </span>
+                              </div>
+                              <span
+                                className={`
+                                  text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full flex-shrink-0 border
+                                  ${
+                                    isDark
+                                      ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                  }
+                                `}
+                              >
+                                {c.security_level_name || 'Cấp 1 - Công khai'}
                               </span>
-                            </span>
-                            <span className="text-[10px] opacity-75 flex-shrink-0 font-mono">
-                              [p.{c.page}]
-                            </span>
-                          </button>
+                            </div>
 
-                          {/* Nhóm 2 Nút: 02 Sơ đồ & 03 Kiểm tra */}
-                          <div className="grid grid-cols-2 gap-1.5">
+                            {/* Hàng 2: Nội dung tóm tắt trích dẫn (snippet) */}
+                            {c.snippet && (
+                              <div className="text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-300 px-1 line-clamp-2">
+                                "{c.snippet}"
+                              </div>
+                            )}
+
+                            {/* Hàng 3: Nút bấm mở xem file PDF tại đúng trang (Touch target >= 40px) */}
                             <button
-                              onClick={() => handleOpenDiagram(c.file_id)}
+                              type="button"
+                              onClick={() => handleOpenPdf(c.file_id, c.page)}
                               className={`
-                                px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center space-x-1
-                                transition-all duration-200
+                                w-full min-h-[40px] px-3 py-2 rounded-lg text-xs font-semibold
+                                flex items-center justify-center space-x-1.5 transition-all duration-200 cursor-pointer active:scale-[0.98]
                                 ${
                                   isDark
-                                    ? 'bg-white/15 hover:bg-white/25 text-white'
-                                    : 'bg-white hover:bg-emerald-50 text-[#166534] border border-[#86efac]'
+                                    ? 'bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-200 border border-emerald-700/40'
+                                    : 'bg-emerald-50 hover:bg-emerald-100 text-[#166534] border border-emerald-300 shadow-xs'
                                 }
                               `}
                             >
-                              <ApartmentOutlined />
-                              <span>🗺️ 02 Sơ đồ</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleOpenQuiz(c.file_id)}
-                              className={`
-                                px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center space-x-1
-                                transition-all duration-200
-                                ${
-                                  isDark
-                                    ? 'bg-white/15 hover:bg-white/25 text-white'
-                                    : 'bg-white hover:bg-emerald-50 text-[#166534] border border-[#86efac]'
-                                }
-                              `}
-                            >
-                              <FormOutlined />
-                              <span>📝 03 Kiểm tra</span>
+                              <FilePdfOutlined className="text-red-500 flex-shrink-0" />
+                              <span className="truncate">Mở văn kiện tại Trang {c.page} [p.{c.page}]</span>
                             </button>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -621,286 +679,17 @@ export const AIChatWidget: React.FC = () => {
         </div>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────
-          3. MODAL "02 SƠ ĐỒ" (Mermaid.js / Cấu trúc tổ chức)
-      ───────────────────────────────────────────────────────────── */}
-      <Modal
-        title={
-          <div className="flex items-center space-x-2 text-emerald-700 dark:text-emerald-400">
-            <ApartmentOutlined className="text-lg" />
-            <span>02 Sơ Đồ Tổ Chức & Luồng Chỉ Đạo</span>
-          </div>
-        }
-        open={diagramModalVisible}
-        onCancel={() => setDiagramModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setDiagramModalVisible(false)}>
-            Đóng
-          </Button>
-        ]}
-        width={700}
-        destroyOnHidden
-      >
-        {loadingStudyBook ? (
-          <div className="py-12 text-center space-y-3">
-            <Spin size="large" />
-            <div className="text-sm text-slate-500">Đang khởi tạo sơ đồ tổ chức tác chiến...</div>
-          </div>
-        ) : studyBookData ? (
-          <div className="space-y-4 py-2">
-            <Alert
-              type="info"
-              showIcon
-              message={
-                <div>
-                  <strong>{studyBookData.document_code}</strong> — {studyBookData.title}
-                </div>
-              }
-              description={studyBookData.tab_diagram.description}
-            />
 
-            {/* Khối trực quan hóa sơ đồ */}
-            <div
-              className={`p-4 rounded-xl border ${isDark ? 'bg-slate-950 border-emerald-900/40' : 'bg-slate-50 border-emerald-200'}`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                  Mã Sơ Đồ Mermaid (Flowchart)
-                </span>
-                <Button
-                  size="small"
-                  icon={<CopyOutlined />}
-                  onClick={() => {
-                    navigator.clipboard.writeText(studyBookData.tab_diagram.mermaid_code);
-                    toast.success('Đã sao chép mã Mermaid.js vào clipboard.', { title: 'ĐÃ SAO CHÉP', badge: 'MERMAID' });
-                  }}
-                >
-                  Sao chép mã
-                </Button>
-              </div>
-
-              <pre className="p-3 rounded-lg bg-black/80 text-emerald-400 text-xs font-mono overflow-x-auto leading-relaxed">
-                {studyBookData.tab_diagram.mermaid_code}
-              </pre>
-            </div>
-
-            {/* Tóm tắt các phân đoạn chính */}
-            {studyBookData.tab_document?.sections && (
-              <div>
-                <Title level={5} className="!text-sm !mb-2">
-                  Chương mục & Trích dẫn số trang:
-                </Title>
-                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                  {studyBookData.tab_document.sections.map((sec, sIdx) => (
-                    <div
-                      key={sIdx}
-                      className={`p-2.5 rounded-lg border text-xs ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}
-                    >
-                      <div className="font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
-                        {sec.title}
-                      </div>
-                      <p className="text-slate-600 dark:text-slate-300 mb-1">{sec.summary}</p>
-                      <Button
-                        size="small"
-                        type="link"
-                        className="!p-0 !h-auto text-xs"
-                        onClick={() => handleOpenPdf(studyBookData.file_id, sec.page)}
-                      >
-                        📄 Mở tài liệu tại Trang {sec.page}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="py-8 text-center text-slate-400">Không có dữ liệu sơ đồ.</div>
-        )}
-      </Modal>
 
       {/* ─────────────────────────────────────────────────────────────
-          4. MODAL "03 KIỂM TRA" (5 câu hỏi trắc nghiệm A/B/C/D)
+          3. MODAL QUÉT VÂN TAY QUANG HỌC ZK9500 (BIOMETRIC AI GUARD)
       ───────────────────────────────────────────────────────────── */}
-      <Modal
-        title={
-          <div className="flex items-center space-x-2 text-emerald-700 dark:text-emerald-400">
-            <FormOutlined className="text-lg" />
-            <span>03 Kiểm Tra Nhận Thức Văn Bản (Trắc Nghiệm 4 Đáp Án)</span>
-          </div>
-        }
-        open={quizModalVisible}
-        onCancel={() => setQuizModalVisible(false)}
-        footer={[
-          submittedQuiz ? (
-            <Button
-              key="retry"
-              onClick={() => {
-                setSubmittedQuiz(false);
-                setSelectedAnswers({});
-              }}
-            >
-              Làm Lại
-            </Button>
-          ) : (
-            <Button
-              key="submit"
-              type="primary"
-              className="!bg-[#166534] hover:!bg-[#14532d] !border-amber-500/30"
-              onClick={handleSubmitQuiz}
-              disabled={loadingStudyBook || !studyBookData?.tab_quiz}
-            >
-              Nộp Bài Kiểm Tra
-            </Button>
-          ),
-          <Button key="close" onClick={() => setQuizModalVisible(false)}>
-            Đóng
-          </Button>
-        ]}
-        width={760}
-        destroyOnHidden
-      >
-        {loadingStudyBook ? (
-          <div className="py-12 text-center space-y-3">
-            <Spin size="large" />
-            <div className="text-sm text-slate-500">Đang biên soạn bộ câu hỏi trắc nghiệm...</div>
-          </div>
-        ) : studyBookData?.tab_quiz ? (
-          <div className="space-y-5 py-2">
-            {/* Banner tổng kết điểm khi đã nộp bài */}
-            {submittedQuiz && (
-              <Alert
-                type={calculateScore().correct >= 4 ? 'success' : 'warning'}
-                showIcon
-                message={
-                  <span className="font-semibold text-base">
-                    Kết Quả: {calculateScore().correct} / {calculateScore().total} Câu Đúng
-                  </span>
-                }
-                description={
-                  calculateScore().correct >= 4
-                    ? 'Xuất sắc! Đồng chí đã nắm vững các nội dung trọng tâm và quy định bảo mật của văn bản.'
-                    : 'Đồng chí cần đối chiếu lại các trang trích dẫn được giải thích bên dưới để củng cố nhận thức.'
-                }
-              />
-            )}
-
-            {/* Danh sách 5 câu hỏi */}
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-              {studyBookData.tab_quiz.map((q, idx) => {
-                const userChoice = selectedAnswers[q.id];
-                const isCorrect = userChoice === q.correct_answer;
-
-                return (
-                  <div
-                    key={q.id}
-                    className={`
-                      p-4 rounded-xl border transition-colors
-                      ${
-                        submittedQuiz
-                          ? isCorrect
-                            ? isDark
-                              ? 'bg-emerald-950/30 border-emerald-800/50'
-                              : 'bg-emerald-50/50 border-emerald-300'
-                            : isDark
-                              ? 'bg-rose-950/30 border-rose-800/50'
-                              : 'bg-rose-50/50 border-rose-300'
-                          : isDark
-                            ? 'bg-slate-900/60 border-slate-800'
-                            : 'bg-white border-slate-200'
-                      }
-                    `}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <span className="font-semibold text-sm">
-                        Câu {idx + 1}: {q.question}
-                      </span>
-                      {submittedQuiz && (
-                        <span>
-                          {isCorrect ? (
-                            <Tag color="success" icon={<CheckCircleOutlined />}>
-                              Đúng
-                            </Tag>
-                          ) : (
-                            <Tag color="error" icon={<CloseCircleOutlined />}>
-                              Chưa đúng
-                            </Tag>
-                          )}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 4 Lựa chọn A, B, C, D */}
-                    <div className="space-y-2">
-                      {(['A', 'B', 'C', 'D'] as const).map((key) => {
-                        const isChosen = userChoice === key;
-                        const isTheCorrectOne = submittedQuiz && q.correct_answer === key;
-
-                        return (
-                          <div
-                            key={key}
-                            onClick={() => handleSelectAnswer(q.id, key)}
-                            className={`
-                              p-2.5 rounded-lg border text-xs cursor-pointer flex items-center space-x-2 transition-all
-                              ${
-                                isTheCorrectOne
-                                  ? 'bg-emerald-500/20 border-emerald-500 font-medium text-emerald-400'
-                                  : isChosen && !isCorrect && submittedQuiz
-                                    ? 'bg-rose-500/20 border-rose-500 text-rose-400 line-through'
-                                    : isChosen
-                                      ? 'bg-emerald-600/20 border-emerald-500 text-emerald-700 dark:text-emerald-400 font-medium'
-                                      : isDark
-                                        ? 'bg-slate-950/50 border-slate-800 hover:border-emerald-600/50'
-                                        : 'bg-slate-50 border-slate-200 hover:border-emerald-400'
-                              }
-                            `}
-                          >
-                            <span className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[11px] border border-current flex-shrink-0">
-                              {key}
-                            </span>
-                            <span className="flex-1">{q.options[key]}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Giải thích chi tiết & Trích dẫn số trang */}
-                    {submittedQuiz && (
-                      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
-                        <div className="flex items-center space-x-2">
-                          <Tag color="green">Đáp án đúng: {q.correct_answer}</Tag>
-                          <Tag color="blue">{q.citation}</Tag>
-                        </div>
-
-                        <p className="text-slate-600 dark:text-slate-300">{q.explanation}</p>
-
-                        {q.agentic_steps && (
-                          <div className="p-2 rounded bg-emerald-950/20 dark:bg-emerald-950/40 border border-emerald-800/30 text-[11px] space-y-1">
-                            <div>
-                              <strong className="text-emerald-400">&lt;mem&gt;:</strong>{' '}
-                              {q.agentic_steps.mem}
-                            </div>
-                            <div>
-                              <strong className="text-emerald-400">&lt;think&gt;:</strong>{' '}
-                              {q.agentic_steps.think}
-                            </div>
-                            <div>
-                              <strong className="text-emerald-400">&lt;tool_call&gt;:</strong>{' '}
-                              {q.agentic_steps.tool_call}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="py-8 text-center text-slate-400">Không thể tải đề kiểm tra.</div>
-        )}
-      </Modal>
+      <FingerprintScanModal
+        open={scanModalOpen}
+        fileId={targetScanFileId}
+        onSuccess={handleFingerprintSuccess}
+        onCancel={() => setScanModalOpen(false)}
+      />
     </>
   );
 };

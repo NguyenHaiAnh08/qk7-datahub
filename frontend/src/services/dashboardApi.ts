@@ -34,6 +34,10 @@ export const dashboardApi = {
   getPermissions: permissionService.getPermissions,
   createPermission: permissionService.createPermission,
   updatePermission: permissionService.updatePermission,
+<<<<<<< HEAD
+=======
+  reorderPermissions: permissionService.reorderPermissions,
+>>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
   deletePermission: permissionService.deletePermission,
 
   // Units

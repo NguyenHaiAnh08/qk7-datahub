@@ -8,6 +8,7 @@ export const permissionService = {
     return http<{ total: number; items: Permission[] }>(API_ENDPOINTS.ADMIN.PERMISSIONS);
   },
 
+<<<<<<< HEAD
   createPermission: async (data: {
     permission_id: string;
     code: string;
@@ -19,6 +20,9 @@ export const permissionService = {
     subgroup_tone?: string;
     sort_order?: number;
   }): Promise<{ success: boolean }> => {
+=======
+  createPermission: async (data: any): Promise<{ success: boolean }> => {
+>>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
     return http(API_ENDPOINTS.ADMIN.PERMISSIONS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -26,6 +30,7 @@ export const permissionService = {
     });
   },
 
+<<<<<<< HEAD
   updatePermission: async (
     permId: string,
     data: {
@@ -38,6 +43,9 @@ export const permissionService = {
       sort_order?: number;
     }
   ): Promise<{ success: boolean }> => {
+=======
+  updatePermission: async (permId: string, data: any): Promise<{ success: boolean }> => {
+>>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
     return http(API_ENDPOINTS.ADMIN.PERMISSION_DETAIL(permId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -45,6 +53,17 @@ export const permissionService = {
     });
   },
 
+<<<<<<< HEAD
+=======
+  reorderPermissions: async (items: Array<{ permission_id: string; sort_order: number }>): Promise<{ success: boolean; updated: number }> => {
+    return http(API_ENDPOINTS.ADMIN.PERMISSION_REORDER, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+  },
+
+>>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
   deletePermission: async (permId: string): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.PERMISSION_DETAIL(permId), { method: 'DELETE' });
   },

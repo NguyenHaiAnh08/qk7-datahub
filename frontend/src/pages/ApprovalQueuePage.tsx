@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Clock, X, Check, Eye, Lock } from 'lucide-react';
+import { ShieldCheck, Clock, X, Check, Eye, Lock, Loader2 } from 'lucide-react';
 import { approvalService, ApprovalRequest } from '../services/approvalService';
 import { http } from '../services/http';
 import { toast } from '../components/common/Toast';
-
-
+import { useApprovalContext } from '../contexts/ApprovalContext';
+import { useAuth } from '../hooks/useAuth';
 
 // Helper: Dịch API thành câu tiếng Việt
 const formatRequestAction = (method: string, path: string): string => {
@@ -72,9 +72,11 @@ const formatPermissionName = (code: string): string => {
   return viName ? `${code} (${viName})` : code;
 };
 
-
-
 export const ApprovalQueuePage: React.FC = () => {
+  const { user } = useAuth();
+  // 🔥 Lấy hàm refresh từ Context để cập nhật Badge trên Header/Sidebar lập tức
+  const { refresh: refreshApprovalCount } = useApprovalContext();
+
   const [items, setItems] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ApprovalRequest | null>(null);
@@ -88,10 +90,14 @@ export const ApprovalQueuePage: React.FC = () => {
       setItems(r.items || []);
     } catch (err: any) {
       toast.error('Lỗi tải danh sách: ' + err.message);
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    load(); 
+  }, []);
 
   const handleApprove = async () => {
     if (!selected) return;
@@ -117,11 +123,18 @@ export const ApprovalQueuePage: React.FC = () => {
       } catch (execErr: any) {
         toast.error(`Đã duyệt nhưng thực thi thất bại: ${execErr.message}`);
       }
+      
       setSelected(null);
-      await load();
+      await load(); // Load lại danh sách hàng đợi hiện tại
+      
+      // 🔥 Cập nhật lại Badge đỏ trên Header lập tức
+      await refreshApprovalCount(); 
+      
     } catch (err: any) {
       toast.error('Lỗi duyệt: ' + err.message);
-    } finally { setProcessing(false); }
+    } finally { 
+      setProcessing(false); 
+    }
   };
 
   const handleReject = async () => {
@@ -135,13 +148,23 @@ export const ApprovalQueuePage: React.FC = () => {
       toast.info(`Đã từ chối yêu cầu ${selected.request_id}`, {
         title: 'ĐÃ TỪ CHỐI', badge: 'REJECTED'
       });
+      
       setSelected(null);
       setRejectNote('');
       await load();
+      
+      // 🔥 Cập nhật lại Badge đỏ trên Header lập tức
+      await refreshApprovalCount(); 
+      
     } catch (err: any) {
       toast.error('Lỗi: ' + err.message);
-    } finally { setProcessing(false); }
+    } finally { 
+      setProcessing(false); 
+    }
   };
+
+  // Kiểm tra xem có phải Admin đang tự duyệt yêu cầu của chính mình không
+  const isSelfRequest = selected?.requester_id === user?.user_id;
 
   return (
     <div className="space-y-4">
@@ -154,13 +177,14 @@ export const ApprovalQueuePage: React.FC = () => {
             {items.length} chờ
           </span>
         </h2>
-        <button onClick={load} className="px-3 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 cursor-pointer">
+        <button onClick={load} disabled={loading} className="px-3 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 cursor-pointer disabled:opacity-50 flex items-center gap-1.5">
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
           Làm mới
         </button>
       </div>
 
       {/* Danh sách */}
-      {items.length === 0 ? (
+      {items.length === 0 && !loading ? (
         <div className="p-12 text-center bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800">
           <Clock className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-700 mb-3" />
           <p className="text-sm text-slate-500 font-medium">Không có yêu cầu nào đang chờ duyệt</p>
@@ -204,13 +228,21 @@ export const ApprovalQueuePage: React.FC = () => {
 
       {/* Modal chi tiết */}
       {selected && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => !processing && setSelected(null)}>
           <div className="bg-white dark:bg-slate-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-auto border border-slate-200 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <h3 className="font-bold text-sm">Chi tiết yêu cầu {selected.request_id}</h3>
-              <button onClick={() => setSelected(null)} className="cursor-pointer"><X className="w-5 h-5" /></button>
+              <button onClick={() => setSelected(null)} disabled={processing} className="cursor-pointer disabled:opacity-50"><X className="w-5 h-5" /></button>
             </div>
+            
             <div className="p-4 space-y-3 text-xs">
+              {isSelfRequest && (
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-2">
+                  <Lock className="w-4 h-4 shrink-0" />
+                  Cảnh báo: Đây là yêu cầu do chính bạn tạo ra. Bạn không thể tự phê duyệt.
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-500 mb-1 font-semibold">Người yêu cầu</label>
@@ -218,44 +250,56 @@ export const ApprovalQueuePage: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1 font-semibold">Quyền bị khóa</label>
-                  <div className="font-mono font-semibold text-amber-600">{selected.required_permission}</div>
+                  <div className="font-mono font-semibold text-amber-600">{formatPermissionName(selected.required_permission)}</div>
                 </div>
                 <div>
-                  <label className="block text-slate-500 mb-1 font-semibold">Phương thức</label>
-                  <div className="font-mono">{selected.http_method}</div>
+                  <label className="block text-slate-500 mb-1 font-semibold">Hành động</label>
+                  <div className="font-semibold text-emerald-600">{formatRequestAction(selected.http_method, selected.http_path)}</div>
                 </div>
                 <div>
-                  <label className="block text-slate-500 mb-1 font-semibold">Đường dẫn</label>
-                  <div className="font-mono text-[11px] break-all">{selected.http_path}</div>
+                  <label className="block text-slate-500 mb-1 font-semibold">Đường dẫn API</label>
+                  <div className="font-mono text-[11px] break-all">{selected.http_method} {selected.http_path}</div>
                 </div>
               </div>
+
+              {/* Hiển thị lý do nếu có (request_reason) */}
+              {(selected as any).request_reason && (
+                <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-lg">
+                  <label className="block text-amber-700 dark:text-amber-400 mb-1 font-bold">Lý do từ người yêu cầu:</label>
+                  <div className="text-slate-700 dark:text-slate-300 italic">"{(selected as any).request_reason}"</div>
+                </div>
+              )}
+
               {selected.http_body && (
                 <div>
-                  <label className="block text-slate-500 mb-1 font-semibold">Nội dung yêu cầu</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Nội dung gửi kèm (Payload)</label>
                   <pre className="bg-slate-100 dark:bg-slate-950 p-2 rounded text-[11px] overflow-auto max-h-40">
                     {(() => { try { return JSON.stringify(JSON.parse(selected.http_body!), null, 2); } catch { return selected.http_body; } })()}
                   </pre>
                 </div>
               )}
+              
               <div>
-                <label className="block text-slate-500 mb-1 font-semibold">Lý do từ chối (nếu từ chối)</label>
+                <label className="block text-slate-500 mb-1 font-semibold text-rose-500">Lý do từ chối (Bắt buộc nếu Từ chối)</label>
                 <textarea
                   value={rejectNote}
                   onChange={(e) => setRejectNote(e.target.value)}
-                  placeholder="Nhập lý do nếu từ chối..."
-                  className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 text-sm"
+                  placeholder="Nhập lý do từ chối để người yêu cầu biết..."
+                  className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 text-sm focus:outline-none focus:border-rose-500"
                   rows={2}
+                  disabled={processing}
                 />
               </div>
             </div>
+
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
-              <button onClick={handleReject} disabled={processing}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-50">
-                <X className="w-3.5 h-3.5" /> Từ chối
+              <button onClick={handleReject} disabled={processing || isSelfRequest || !rejectNote.trim()}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                {processing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />} Từ chối
               </button>
-              <button onClick={handleApprove} disabled={processing}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-50">
-                <Check className="w-3.5 h-3.5" /> Duyệt & Thực thi
+              <button onClick={handleApprove} disabled={processing || isSelfRequest}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                {processing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Duyệt & Thực thi
               </button>
             </div>
           </div>

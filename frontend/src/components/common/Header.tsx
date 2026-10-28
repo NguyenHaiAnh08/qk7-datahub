@@ -12,9 +12,10 @@ import {
   LogOut,
   ChevronDown,
   Menu,
-  Trash2,      // ⭐ MỚI
-  Activity,    // ⭐ MỚI
+  Trash2,
+  Activity,
   Shield,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
@@ -22,6 +23,7 @@ import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { ThemeToggle } from './ThemeToggle';
 import { DeviceModeSwitch } from './DeviceModeSwitch';
 import { ROUTE_PATHS } from '../../routes/routePaths';
+import { useApprovalContext } from '../../contexts/ApprovalContext';
 
 interface HeaderProps {
   title?: string;
@@ -33,7 +35,6 @@ interface HeaderProps {
 
 // ══════════════════════════════════════════════════════════════════════
 // HELPER: Lấy chữ cái đầu của tên cuối (tên chính) theo quy chuẩn tiếng Việt
-// Ví dụ: "Lương Nhật Thăng" -> "T", "Nguyễn Mạnh Nam" -> "N"
 // ══════════════════════════════════════════════════════════════════════
 export function getAvatarInitial(name?: string, fallback = 'K'): string {
   if (!name || !name.trim()) return fallback;
@@ -43,10 +44,8 @@ export function getAvatarInitial(name?: string, fallback = 'K'): string {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058)
-// Đăng tải • Dữ liệu số • Đơn vị của tôi • Quản trị
+// COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt
 // ══════════════════════════════════════════════════════════════════════
-// Lưu trữ vị trí Pill gần nhất giữa các lần chuyển trang để duy trì chuyển động 2 chiều liên tục (Bidirectional motion)
 let lastKnownPillCoords: { left: number; width: number } | null = null;
 
 const NavigationGlider: React.FC<{
@@ -56,7 +55,6 @@ const NavigationGlider: React.FC<{
   const { deviceMode } = useDeviceMode();
   const location = useLocation();
 
-  // Tự động nhận diện tab đang mở nếu activeNav không được truyền từ page
   const getEffectiveActiveNav = () => {
     if (explicitActiveNav) return explicitActiveNav;
     const path = location.pathname;
@@ -68,7 +66,6 @@ const NavigationGlider: React.FC<{
   };
 
   const activeNav = getEffectiveActiveNav();
-
   const userUnitName = user?.unit_name?.trim() || 'Đơn vị của tôi';
 
   const allNavTabs = [
@@ -80,10 +77,7 @@ const NavigationGlider: React.FC<{
       icon: UploadCloud,
       activeColor: 'text-white',
       inactiveColor: 'text-amber-700 dark:text-amber-400',
-      visible:
-        hasPermission('DOC_UPLOAD') ||
-        hasPermission('DOC_EDIT') ||
-        hasPermission('DOC_PARSE'),
+      visible: hasPermission('DOC_UPLOAD') || hasPermission('DOC_EDIT') || hasPermission('DOC_PARSE'),
     },
     {
       key: 'portal',
@@ -127,7 +121,6 @@ const NavigationGlider: React.FC<{
   });
   const isInitialMount = useRef(!lastKnownPillCoords);
 
-  // Chuẩn hóa tính toán tọa độ offset thực tế chính xác tuyệt đối từ container cha
   const updateIndicator = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -141,7 +134,6 @@ const NavigationGlider: React.FC<{
 
       if (w > 0) {
         lastKnownPillCoords = { left: x, width: w };
-        // Gán trực tiếp vào CSS variable của DOM node để loại bỏ độ trễ và giật khung hình
         container.style.setProperty('--x', `${x}px`);
         container.style.setProperty('--w', `${w}px`);
         container.style.setProperty('--pill-opacity', '1');
@@ -161,12 +153,10 @@ const NavigationGlider: React.FC<{
       isInitialMount.current = false;
     });
 
-    // Sau khi CSS transition của morphing pill hoàn tất (400-450ms), tinh chỉnh lại vị trí chuẩn xác 100%
     const settleTimer = setTimeout(() => {
       updateIndicator();
     }, 450);
 
-    // ResizeObserver đảm bảo Pill cập nhật chuẩn xác khi font chữ, zoom, hoặc container thay đổi
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       ro = new ResizeObserver(() => {
@@ -201,7 +191,6 @@ const NavigationGlider: React.FC<{
         '--pill-opacity': indicatorStyle.width > 0 ? 1 : 0,
       } as React.CSSProperties}
     >
-      {/* Sliding Pill Highlight Indicator (#058 Morphing Dock) */}
       <span className="u058-pill" aria-hidden="true" />
 
       {visibleTabs.map((tab, index) => {
@@ -227,9 +216,7 @@ const NavigationGlider: React.FC<{
                 if (container) {
                   const labelEl = labelRefs.current[tab.key];
                   const textW = labelEl ? labelEl.scrollWidth : 60;
-                  // targetW = icon (20) + gap (8) + textW + horizontal padding (32)
                   const targetW = Math.round(20 + 8 + textW + 32);
-                  // targetX ước tính = container padding left (8px-10px) + index * (collapsed width 40px + gap 8px)
                   const targetX = Math.round(10 + index * (40 + 8));
 
                   if (targetW > 0) {
@@ -289,6 +276,8 @@ export const Header: React.FC<HeaderProps> = ({
   const { deviceMode, orientation } = useDeviceMode();
   const { isOnline, checkConnection } = useNetworkStatus();
   const navigate = useNavigate();
+  const { count: approvalCount } = useApprovalContext();
+  const showApprovalBadge = hasPermission('AUDIT_VIEW') && approvalCount > 0;
   const [liveClock, setLiveClock] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
@@ -303,13 +292,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   const isIPadPortrait = deviceMode === 'ipad' && orientation === 'portrait';
 
-  // ══════════════════════════════════════════════════════════════════════
-  // PERMISSION GATES — dùng chung cho Popover, Desktop quick nav và logo click
-  // ══════════════════════════════════════════════════════════════════════
   const canAccessDesk =
-    hasPermission('DOC_UPLOAD') ||
-    hasPermission('DOC_EDIT') ||
-    hasPermission('DOC_PARSE');
+    hasPermission('DOC_UPLOAD') || hasPermission('DOC_EDIT') || hasPermission('DOC_PARSE');
 
   const canAccessAdmin =
     hasPermission('SYSTEM_STATS_VIEW') ||
@@ -322,7 +306,6 @@ export const Header: React.FC<HeaderProps> = ({
   const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
   const canAccessSessions = hasPermission('SESSION_VIEW');
 
-  // Nội dung Popover User Profile cho iPad và Desktop
   const userPopoverContent = (
     <div className="w-72 p-1 text-slate-800 dark:text-slate-200 text-xs">
       <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
@@ -437,7 +420,6 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
 
-        {/* ⭐ MỚI — Thùng rác tài liệu */}
         {canAccessTrash && (
           <Link
             to={ROUTE_PATHS.ADMIN_TRASH}
@@ -452,21 +434,42 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
 
+        {/* ⭐ KHỐI ĐÃ ĐƯỢC SỬA LỖI HOÀN TOÀN */}
         {canAccessAdmin && (
-          <Link
-            to={ROUTE_PATHS.ADMIN}
-            onClick={() => {
-              setUserPopoverOpen(false);
-              setDropdownOpen(false);
-            }}
-            className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
-          >
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-500 mr-2" />
-            <span>Trung tâm quản trị hệ thống</span>
-          </Link>
+          <>
+            <Link
+              to={ROUTE_PATHS.ADMIN}
+              onClick={() => {
+                setUserPopoverOpen(false);
+                setDropdownOpen(false);
+              }}
+              className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-500 mr-2" />
+              <span>Trung tâm quản trị hệ thống</span>
+            </Link>
+
+            {showApprovalBadge && (
+              <Link
+                to={`${ROUTE_PATHS.ADMIN}?tab=approvals`}
+                onClick={() => {
+                  setUserPopoverOpen(false);
+                  setDropdownOpen(false);
+                }}
+                className="flex items-center justify-between px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition"
+              >
+                <span className="flex items-center">
+                  <Bell className="w-3.5 h-3.5 text-amber-500 mr-2" />
+                  <span>Yêu cầu chờ duyệt</span>
+                </span>
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                  {approvalCount}
+                </span>
+              </Link>
+            )}
+          </>
         )}
 
-        {/* ⭐ MỚI — Phiên đang hoạt động */}
         {canAccessSessions && (
           <Link
             to={ROUTE_PATHS.ADMIN_SESSIONS}
@@ -478,6 +481,20 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Activity className="w-3.5 h-3.5 text-cyan-500 mr-2" />
             <span>Phiên đang hoạt động</span>
+          </Link>
+        )}
+
+        {user && user.user_id !== 'GUEST' && (
+          <Link
+            to={ROUTE_PATHS.MY_APPROVALS}
+            onClick={() => {
+              setUserPopoverOpen(false);
+              setDropdownOpen(false);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+          >
+            <Clock className="w-3.5 h-3.5 text-amber-500 mr-2" />
+            <span>Yêu cầu của tôi</span>
           </Link>
         )}
       </div>
@@ -499,12 +516,11 @@ export const Header: React.FC<HeaderProps> = ({
   );
 
   // ══════════════════════════════════════════════════════════════════════
-  // BRANCH 1: GIAO DIỆN HEADER CHUYÊN BIỆT CHO IPAD AIR M4 (deviceMode === 'ipad')
+  // BRANCH 1: GIAO DIỆN HEADER CHUYÊN BIỆT CHO IPAD AIR M4
   // ══════════════════════════════════════════════════════════════════════
   if (deviceMode === 'ipad') {
     return (
       <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-xs transition-colors duration-200 select-none">
-        {/* Cụm Trái (shrink-0 z-20 flex items-center gap-2): Logo + Tên trường */}
         <div className="shrink-0 z-20 flex items-center gap-2 sm:gap-2.5">
           {onToggleMobileMenu && isIPadPortrait && (
             <button
@@ -538,14 +554,11 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Cụm Giữa (flex-1 min-w-0 overflow-hidden flex justify-center px-1 sm:px-2 lg:px-4) */}
         <div className="flex-1 flex justify-center px-1 sm:px-2 lg:px-4 min-w-0 overflow-hidden">
           <NavigationGlider activeNav={activeNav} />
         </div>
 
-        {/* Cụm Phải (shrink-0 z-20 flex items-center gap-1.5 sm:gap-2): Switch + Theme + User Profile Pill */}
         <div id="tour-header-controls-ipad" className="shrink-0 z-20 flex items-center gap-1.5 sm:gap-2">
-          {/* Live Indicator Trạng Thái Kết Nối - Chỉ cảnh báo khi mất kết nối máy chủ */}
           {!isOnline && (
             <button
               type="button"
@@ -561,7 +574,6 @@ export const Header: React.FC<HeaderProps> = ({
           <DeviceModeSwitch compact />
           <ThemeToggle size="sm" />
 
-          {/* User Profile Pill - Hiển thị đầy đủ họ tên quân nhân */}
           <Popover
             content={userPopoverContent}
             trigger="click"
@@ -574,13 +586,8 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
             >
-              <div
-                className="relative w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
-              >
-                <span
-                  className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
-                  style={{ color: '#ffffff' }}
-                >
+              <div className="relative w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs">
+                <span className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]" style={{ color: '#ffffff' }}>
                   {getAvatarInitial(user?.full_name)}
                 </span>
                 <span
@@ -593,6 +600,33 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap leading-none">
                 {user?.full_name || 'Khách'}
               </span>
+
+              {showApprovalBadge && (
+                <Tooltip
+                  title={`${approvalCount} yêu cầu đang chờ Quản trị viên tối cao phê duyệt`}
+                  placement="bottom"
+                  arrow
+                >
+                  <span
+                    role="status"
+                    aria-label={`${approvalCount} yêu cầu chờ duyệt`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUserPopoverOpen(false);
+                      navigate(ROUTE_PATHS.ADMIN);
+                    }}
+                    className={`inline-flex items-center justify-center gap-0.5 min-w-[22px] h-5 px-1 rounded-md text-[10px] font-mono font-bold border transition-all duration-200 ease-[cubic-bezier(.34,1.45,.64,1)] cursor-pointer select-none shrink-0 hover:scale-110 ${
+                      approvalCount >= 10
+                        ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40'
+                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40'
+                    }`}
+                  >
+                    <Bell className="w-2.5 h-2.5" />
+                    <span className="tabular-nums">{approvalCount > 99 ? '99+' : approvalCount}</span>
+                  </span>
+                </Tooltip>
+              )}
+
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
                   (user?.clearance_level_id || 1) >= 4 ? 'bg-amber-400' : 'bg-emerald-400'
@@ -611,7 +645,6 @@ export const Header: React.FC<HeaderProps> = ({
   // ══════════════════════════════════════════════════════════════════════
   return (
     <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
-      {/* Vùng Trái: Brand & Optional Drawer Hamburger Button */}
       <div className="shrink-0 z-20 flex items-center space-x-2 sm:space-x-3">
         {onToggleMobileMenu && (
           <button
@@ -647,14 +680,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Vùng Giữa: Thanh Điều Hướng Morphing Pill Dock (Ở Giữa Màn Hình) */}
       <div className="hidden sm:flex flex-1 justify-center items-center px-2 sm:px-4 min-w-0 z-10">
         <NavigationGlider activeNav={activeNav} />
       </div>
 
-      {/* Vùng Phải: Controls & User Profile */}
       <div id="tour-header-controls" className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0 z-20">
-        {/* Live Network Indicator - Chỉ hiển thị nút cảnh báo nếu mất kết nối máy chủ (trạng thái bình thường chuyển vào bản thông tin user để tiết kiệm diện tích khung hình) */}
         {!isOnline && (
           <button
             type="button"
@@ -667,17 +697,14 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* Nút gạt chuyển đổi Máy tính / iPad Air M4 (Gọn trên Header) */}
         <div className="shrink-0">
           <DeviceModeSwitch compact />
         </div>
 
-        {/* Dark / Light Mode Animated Toggle */}
         <div className="shrink-0">
           <ThemeToggle />
         </div>
 
-        {/* User profile menu Desktop */}
         <div className="shrink-0 z-20">
           <Popover
             content={userPopoverContent}
@@ -691,13 +718,8 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
             >
-              <div
-                className="relative w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
-              >
-                <span
-                  className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
-                  style={{ color: '#ffffff' }}
-                >
+              <div className="relative w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs">
+                <span className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]" style={{ color: '#ffffff' }}>
                   {getAvatarInitial(user?.full_name)}
                 </span>
                 <span
@@ -715,6 +737,33 @@ export const Header: React.FC<HeaderProps> = ({
                   {user?.clearance_name || `Mức ${user?.clearance_level_id || 1}`}
                 </span>
               </div>
+
+              {showApprovalBadge && (
+                <Tooltip
+                  title={`${approvalCount} yêu cầu đang chờ duyệt`}
+                  placement="bottom"
+                  arrow
+                >
+                  <span
+                    role="status"
+                    aria-label={`${approvalCount} yêu cầu chờ duyệt`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDropdownOpen(false);
+                      navigate(ROUTE_PATHS.ADMIN);
+                    }}
+                    className={`inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-[11px] font-mono font-bold border transition-all duration-200 ease-[cubic-bezier(.34,1.45,.64,1)] cursor-pointer select-none shrink-0 hover:scale-105 ${
+                      approvalCount >= 10
+                        ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40'
+                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40'
+                    }`}
+                  >
+                    <Bell className="w-3 h-3" />
+                    <span className="tabular-nums">{approvalCount > 99 ? '99+' : approvalCount}</span>
+                  </span>
+                </Tooltip>
+              )}
+
               <ChevronDown
                 className={`w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0 transition-transform duration-200 ${
                   dropdownOpen ? 'rotate-180 text-emerald-600 dark:text-emerald-400' : ''

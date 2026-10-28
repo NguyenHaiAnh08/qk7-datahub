@@ -140,12 +140,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               {!collapsed && <span className="truncate">{item.label}</span>}
+              {counts?.[item.id] ? (
+      <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0">
+          {counts[item.id]! > 99 ? '99+' : counts[item.id]}
+      </span>
+   ) : null}
             </button>
           );
 
           if (collapsed) {
             return (
-              <Tooltip key={item.id} title={item.label} placement="right" mouseEnterDelay={0.15}>
+              <Tooltip key={item.id} title={
+     counts?.[item.id]
+       ? `${item.label} (${counts[item.id]} chờ duyệt)`
+       : item.label
+   } placement="right" mouseEnterDelay={0.15}>
                 {buttonElement}
               </Tooltip>
             );

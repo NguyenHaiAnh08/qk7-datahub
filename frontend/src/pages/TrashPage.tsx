@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Tooltip } from 'antd';
 import { Header } from '../components/common/Header';
 import { Toast, ToastState } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { documentsApi } from '../services/documentsApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem } from '../types';
+import { isApprovalRequired } from '../utils/approvalUtils';
 
 export interface TrashPageProps {
   /** Khi true: render inline trong AdminDashboardPage (không có Header riêng, không min-h-screen) */
@@ -13,7 +15,8 @@ export interface TrashPageProps {
 }
 
 export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const isAdminUser = (user?.roles || []).includes('ROL-01');
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState<{
@@ -49,21 +52,35 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   }, []);
 
   const handleAction = async () => {
-    if (!confirm.doc) return;
-    try {
-      if (confirm.mode === 'restore') {
-        await documentsApi.restoreDocument(confirm.doc.file_id);
-        showToast(`Đã khôi phục: ${confirm.doc.title}`, 'success');
-      } else {
-        await documentsApi.purgeDocument(confirm.doc.file_id);
-        showToast(`Đã xóa vĩnh viễn: ${confirm.doc.title}`, 'success');
-      }
+  if (!confirm.doc) return;
+  try {
+    let res: any;
+    if (confirm.mode === 'restore') {
+      res = await documentsApi.restoreDocument(confirm.doc.file_id);
+    } else {
+      res = await documentsApi.purgeDocument(confirm.doc.file_id);
+    }
+
+    // ✅ Nếu bị APPROVAL_REQUIRED → ApprovalListener đã toast "chờ duyệt" — không báo success
+    if (isApprovalRequired(res)) {
       setConfirm({ open: false, doc: null, mode: 'restore' });
       load();
-    } catch (err: any) {
-      showToast('Lỗi: ' + err.message, 'error');
+      return;
     }
-  };
+
+    // Chỉ báo success khi thao tác thực sự hoàn tất
+    showToast(
+      confirm.mode === 'restore'
+        ? `Đã khôi phục: ${confirm.doc.title}`
+        : `Đã xóa vĩnh viễn: ${confirm.doc.title}`,
+      'success'
+    );
+    setConfirm({ open: false, doc: null, mode: 'restore' });
+    load();
+  } catch (err: any) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+};
 
   // ═══════════════════════════════════════════════════════════
   // CONTENT (dùng chung cho cả 2 layout)
@@ -151,15 +168,29 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
                           <RotateCcw className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      {hasPermission('DOC_PURGE') && (
-                        <button
-                          onClick={() => setConfirm({ open: true, doc: d, mode: 'purge' })}
-                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-500/30 cursor-pointer"
-                          title="Xóa vĩnh viễn"
-                        >
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      {hasPermission('DOC_PURGE') && (() => {
+                        const needsApproval = !isAdminUser;
+                        const tooltip = needsApproval
+                          ? '⚠️ Yêu cầu quyền Admin để xóa vĩnh viễn — bấm để gửi yêu cầu phê duyệt'
+                          : 'Xóa vĩnh viễn khỏi hệ thống (không thể hoàn tác)';
+
+                        return (
+                          <Tooltip title={tooltip} placement="top" arrow>
+                            <button
+                              type="button"
+                              onClick={() => setConfirm({ open: true, doc: d, mode: 'purge' })}
+                              aria-label={needsApproval ? 'Yêu cầu phê duyệt xóa vĩnh viễn' : 'Xóa vĩnh viễn'}
+                              className={`p-1.5 rounded-lg transition-all duration-200 ease-[cubic-bezier(.34,1.45,.64,1)] cursor-pointer active:scale-95 ${
+                                needsApproval
+                                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 hover:text-amber-600 dark:hover:text-amber-400'
+                                  : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-500/30'
+                              }`}
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                            </button>
+                          </Tooltip>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))
@@ -175,21 +206,23 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   // Dialog (dùng chung + fix BUG #5: isDestructive chỉ khi purge)
   // ═══════════════════════════════════════════════════════════
   const confirmDialog = (
-    <ConfirmDialog
-      open={confirm.open}
-      title={confirm.mode === 'restore' ? 'Khôi phục tài liệu' : 'XÓA VĨNH VIỄN'}
-      message={
-        confirm.mode === 'restore'
-          ? `Khôi phục "${confirm.doc?.title}"?`
-          : `CẢNH BÁO: File PDF vật lý sẽ bị xóa vĩnh viễn khỏi ổ đĩa. Không thể hoàn tác. Xác nhận xóa "${confirm.doc?.title}"?`
-      }
-      confirmText={confirm.mode === 'restore' ? 'Khôi phục' : 'Xóa vĩnh viễn'}
-      confirmVariant={confirm.mode === 'restore' ? 'primary' : 'danger'}
-      isDestructive={confirm.mode !== 'restore'}
-      onConfirm={handleAction}
-      onCancel={() => setConfirm({ open: false, doc: null, mode: 'restore' })}
-    />
-  );
+  <ConfirmDialog
+    open={confirm.open}
+    title={confirm.mode === 'restore' ? 'Khôi phục tài liệu' : 'XÓA VĨNH VIỄN'}
+    message={
+      confirm.mode === 'restore'
+        ? `Khôi phục "${confirm.doc?.title}"?`
+        : isAdminUser
+          ? `CẢNH BÁO: File PDF vật lý sẽ bị xóa vĩnh viễn khỏi ổ đĩa. Không thể hoàn tác. Xác nhận xóa "${confirm.doc?.title}"?`
+          : `Hành động này cần Quản trị viên tối cao phê duyệt. Yêu cầu xóa vĩnh viễn "${confirm.doc?.title}" sẽ được gửi đi thay vì thực hiện ngay.`
+    }
+    confirmText={confirm.mode === 'restore' ? 'Khôi phục' : 'Xóa vĩnh viễn'}
+    confirmVariant={confirm.mode === 'restore' ? 'primary' : 'danger'}
+    isDestructive={confirm.mode !== 'restore'}
+    onConfirm={handleAction}
+    onCancel={() => setConfirm({ open: false, doc: null, mode: 'restore' })}
+  />
+);
 
   // ═══════════════════════════════════════════════════════════
   // EMBEDDED LAYOUT

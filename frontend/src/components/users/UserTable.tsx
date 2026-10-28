@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Pagination } from 'antd';
+import { Pagination, Tooltip } from 'antd';
 import { User } from '../../types/user';
+import { useAuth } from '../../hooks/useAuth';
 import { Pencil, KeyRound, Trash2, Fingerprint, Shield } from 'lucide-react';
 
 export interface UserTableProps {
@@ -26,6 +27,11 @@ export const UserTable: React.FC<UserTableProps> = ({
   loading = false,
   pageSize = 5,
 }) => {
+  // ⭐ Lấy trạng thái quyền của user đang đăng nhập
+  const { user, hasPermission } = useAuth();
+  const isAdminUser = (user?.roles || []).includes('ROL-01');
+  const canDeleteUser = hasPermission('USER_DELETE');
+
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Tự động reset trang về 1 khi số lượng users thay đổi (do search/filter)
@@ -216,13 +222,36 @@ export const UserTable: React.FC<UserTableProps> = ({
                     >
                       <KeyRound className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={() => onDelete(u)}
-                      className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
-                      title="Xóa người dùng"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                    {/* ⭐ Nút Xóa — chỉ hiển thị khi có quyền USER_DELETE,
+                        nếu không phải Admin sẽ hiện cảnh báo "cần phê duyệt" */}
+                    {canDeleteUser && (() => {
+                      const needsApproval = !isAdminUser;
+                      const tooltip = needsApproval
+                        ? '⚠️ Yêu cầu quyền Admin để xóa — bấm để gửi yêu cầu phê duyệt'
+                        : 'Xóa người dùng (đưa vào thùng rác)';
+
+                      return (
+                        <Tooltip title={tooltip} placement="top" arrow>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(u)}
+                            aria-label={needsApproval ? 'Yêu cầu duyệt xóa người dùng' : 'Xóa người dùng'}
+                            className={`
+                              p-1.5 rounded-lg transition-all duration-200 cursor-pointer
+                              btn-tactile active:scale-95
+                              ${
+                                needsApproval
+                                  ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 hover:text-amber-600 dark:hover:text-amber-400'
+                                  : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent'
+                              }
+                            `}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </Tooltip>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))

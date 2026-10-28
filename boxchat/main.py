@@ -14,7 +14,6 @@ if sys.platform.startswith('win'):
     except Exception:
         pass
 
-import time
 from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 
@@ -38,21 +37,6 @@ from core.vector_store import HybridVectorStore
 from core.agent_tutor import AgentTutor
 from core.study_book_gen import StudyBookGenerator
 from core.media_timeline import MediaTimelineManager
-from core.metrics import (
-    REQUEST_TOTAL,
-    REQUEST_DURATION,
-    LLM_FALLBACK_TOTAL,
-    LLM_SYNTHESIS_MODE,
-    ANSWER_LENGTH,
-    CITATIONS_EMITTED,
-    CITATIONS_FABRICATED,
-    CITATIONS_VALID,
-    BIOMETRIC_BLOCKS,
-    CLEARANCE_LEAKS,
-    ADVERSARIAL_REFUSALS,
-    update_system_gauges,
-    metrics_response
-)
 
 UPLOADS_DIR = os.getenv("BACKEND_UPLOADS_DIR", "../backend/uploads")
 STORAGE_PATH = os.getenv("QDRANT_STORAGE_PATH", "./local_storage/qdrant_data")
@@ -76,13 +60,6 @@ async def lifespan(app: FastAPI):
             print(f"[boxchat] Đã nạp tự động {indexed} tài liệu vào kho vector.")
         except Exception as e:
             print(f"[boxchat] Auto-index cảnh báo: {e}")
-
-    # Warm-up mô hình LLM Ollama
-    try:
-        agent_tutor.warm_up()
-    except Exception as e:
-        print(f"[boxchat] Warm-up Ollama cảnh báo: {e}")
-
     yield
     print("[boxchat] Dừng microservice.")
 
@@ -104,16 +81,12 @@ app.add_middleware(
 )
 
 
+# ─── Pydantic Models ───
 class ChatRequest(BaseModel):
     query: str = Field(..., description="Nội dung câu hỏi của quân nhân")
     user_id: Optional[str] = Field("USR-GUEST", description="Mã quân nhân")
-    user_name: Optional[str] = Field(None, description="Họ và tên quân nhân")
-    user_position: Optional[str] = Field(None, description="Chức vụ quân nhân")
-    user_rank: Optional[str] = Field(None, description="Cấp bậc quân nhân")
     user_clearance: int = Field(1, description="Cấp độ bảo mật (1-5)", ge=1, le=5)
     file_id: Optional[str] = Field(None, description="Mã tệp cụ thể nếu đang mở tài liệu")
-    history: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Lịch sử trao đổi đa lượt")
-    biometric_verified: Optional[bool] = Field(False, description="Cờ xác nhận đã quét vân tay ZK9500 hợp lệ")
 
 
 class IngestRequest(BaseModel):
@@ -139,7 +112,6 @@ class SyncAllRequest(BaseModel):
 # ─── Endpoints ───
 
 @app.get("/ai/health")
-@app.get("/api/ai/health")
 async def health_check():
     """
     Kiểm tra trạng thái sẵn sàng của boxchat và số lượng chunks đã nạp.
@@ -153,15 +125,6 @@ async def health_check():
         "ollama_connected": True,
         "security_enforcement": "Strict Pre-filtering (1-5)"
     }
-
-
-@app.get("/metrics")
-async def prometheus_metrics():
-    """
-    Prometheus metrics endpoint.
-    """
-    update_system_gauges(vector_store, agent_tutor)
-    return metrics_response()
 
 
 @app.post("/ai/ingest")
@@ -231,81 +194,28 @@ async def chat_with_tutor(req: ChatRequest):
     Tra cứu thông minh và hội thoại với Trợ lý Tác chiến:
     Pre-filtering cứng: security_level_id <= user_clearance
     Trích dẫn số trang [p.X] và suy luận <mem>, <think>, <tool_call>.
-    Bảo vệ Sinh trắc học Vân tay ZK9500 cho văn kiện Cấp 3-5.
     """
-    start_time = time.perf_counter()
-    status_code = "success"
-    retrieval_mode = "unknown"
-    try:
-        if not req.query or not req.query.strip():
-            raise HTTPException(status_code=400, detail="Thiếu nội dung câu hỏi")
+    if not req.query or not req.query.strip():
+        raise HTTPException(status_code=400, detail="Thiếu nội dung câu hỏi")
 
-        # Tối ưu truy vấn đa lượt (Query Rewriting với ngữ cảnh history)
-        rewritten_query = agent_tutor._rewrite_query_with_history(req.query, req.history or [])
+    # 1. Tìm kiếm chunks phù hợp với cấp quyền của quân nhân
+    retrieved_chunks = vector_store.search(
+        query=req.query,
+        max_security_level=req.user_clearance,
+        file_id=req.file_id,
+        top_k=5
+    )
 
-        # 1. Tìm kiếm chunks phù hợp với cấp quyền của quân nhân
-        retrieved_chunks = vector_store.search(
-            query=rewritten_query,
-            max_security_level=req.user_clearance,
-            file_id=req.file_id,
-            top_k=5
-        )
+    # 2. Sinh câu trả lời Grounded RAG qua AgentTutor
+    result = agent_tutor.answer_query(
+        query=req.query,
+        user_id=req.user_id or "USR-GUEST",
+        user_clearance=req.user_clearance,
+        retrieved_chunks=retrieved_chunks,
+        file_id=req.file_id
+    )
 
-        # Detect clearance leak (should never happen)
-        leaks = [c for c in retrieved_chunks if int(c.get("security_level_id", 1)) > req.user_clearance]
-        if leaks:
-            CLEARANCE_LEAKS.inc(len(leaks))
-            status_code = "critical_leak"
-
-        # 2. Sinh câu trả lời Grounded RAG qua AgentTutor (có áp Biometric Guard)
-        result = agent_tutor.answer_query(
-            query=req.query,
-            user_id=req.user_id or "USR-GUEST",
-            user_name=req.user_name,
-            user_position=req.user_position,
-            user_rank=req.user_rank,
-            user_clearance=req.user_clearance,
-            retrieved_chunks=retrieved_chunks,
-            file_id=req.file_id,
-            history=req.history,
-            biometric_verified=bool(req.biometric_verified)
-        )
-
-        # Track metrics
-        retrieval_mode = result.get("retrieval_mode", "unknown")
-        synthesis_mode = result.get("synthesis_mode", "extractive")
-        LLM_SYNTHESIS_MODE.labels(mode=synthesis_mode).inc()
-
-        answer_len = len(result.get("answer", ""))
-        ANSWER_LENGTH.observe(answer_len)
-
-        if result.get("requires_biometric"):
-            BIOMETRIC_BLOCKS.inc()
-
-        # Track citations
-        citations = result.get("citations", [])
-        CITATIONS_EMITTED.inc(len(citations))
-
-        # Track adversarial refusal (heuristic)
-        if any(kw in result.get("answer", "").lower() for kw in ["không có", "không thể", "từ chối", "không đủ cấp"]):
-            if not citations or all(c.get("requires_biometric") for c in citations):
-                ADVERSARIAL_REFUSALS.inc()
-
-        return result
-    except HTTPException:
-        status_code = "http_error"
-        raise
-    except Exception as e:
-        status_code = "internal_error"
-        raise
-    finally:
-        duration = time.perf_counter() - start_time
-        REQUEST_DURATION.labels(endpoint="/ai/chat").observe(duration)
-        REQUEST_TOTAL.labels(
-            endpoint="/ai/chat",
-            status=status_code,
-            retrieval_mode=retrieval_mode
-        ).inc()
+    return result
 
 
 @app.api_route("/ai/study-book/{file_id}", methods=["GET", "POST"])
@@ -372,4 +282,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8001))
     host = os.getenv("HOST", "0.0.0.0")
-    uvicorn.run(app, host=host, port=port, reload=False)
+    uvicorn.run("main:app", host=host, port=port, reload=True)

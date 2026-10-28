@@ -3,67 +3,11 @@ import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { Permission, UserPermissionResponse } from '../types/user';
 
 export const permissionService = {
-  // ─── CATALOG ───
+  // Catalog
   getPermissions: async (): Promise<{ total: number; items: Permission[] }> => {
     return http<{ total: number; items: Permission[] }>(API_ENDPOINTS.ADMIN.PERMISSIONS);
   },
 
-<<<<<<< HEAD
-  createPermission: async (data: {
-    permission_id: string;
-    code: string;
-    description?: string | null;
-    group_code: string;
-    subgroup_key?: string | null;
-    subgroup_label?: string | null;
-    subgroup_order?: number;
-    subgroup_tone?: string;
-    sort_order?: number;
-  }): Promise<{ success: boolean }> => {
-=======
-  createPermission: async (data: any): Promise<{ success: boolean }> => {
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
-    return http(API_ENDPOINTS.ADMIN.PERMISSIONS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-  },
-
-<<<<<<< HEAD
-  updatePermission: async (
-    permId: string,
-    data: {
-      description?: string | null;
-      group_code?: string;
-      subgroup_key?: string | null;
-      subgroup_label?: string | null;
-      subgroup_order?: number;
-      subgroup_tone?: string;
-      sort_order?: number;
-    }
-  ): Promise<{ success: boolean }> => {
-=======
-  updatePermission: async (permId: string, data: any): Promise<{ success: boolean }> => {
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
-    return http(API_ENDPOINTS.ADMIN.PERMISSION_DETAIL(permId), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-  },
-
-<<<<<<< HEAD
-=======
-  reorderPermissions: async (items: Array<{ permission_id: string; sort_order: number }>): Promise<{ success: boolean; updated: number }> => {
-    return http(API_ENDPOINTS.ADMIN.PERMISSION_REORDER, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
-    });
-  },
-
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
   deletePermission: async (permId: string): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.PERMISSION_DETAIL(permId), { method: 'DELETE' });
   },
@@ -73,7 +17,7 @@ export const permissionService = {
     return http<UserPermissionResponse>(API_ENDPOINTS.ADMIN.USER_PERMISSIONS(userId));
   },
 
-  grantUserPermission: async (
+    grantUserPermission: async (
     userId: string,
     permission_id: string,
     opts?: { expires_at?: string | null; note?: string }

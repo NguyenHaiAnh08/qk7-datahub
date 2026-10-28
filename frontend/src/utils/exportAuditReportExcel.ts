@@ -14,12 +14,8 @@ import { extractTargets, getActionCategory } from '../components/dashboard/Secur
  * - Row 6: Tiêu đề các cột (Nền cam vàng #FFC000, viền mảnh, căn giữa)
  * - Row 7+: Dữ liệu nhật ký
  * - Footer: NGƯỜI LẬP -> Thiếu tá QNCN Nguyễn Mạnh Nam
-/**
- * Chuẩn bị file báo cáo Nhật ký kiểm toán an ninh dạng Excel (.xlsx)
- * Chuẩn định dạng Quân đội theo mẫu: "Xuất báo cáo mẫu.xlsx"
- * Trả về hàm release() để chỉ thả file về máy khi UI/UX hoàn tất.
  */
-export async function prepareAuditReportExcel(logs: AccessLog[]): Promise<() => void> {
+export async function exportAuditReportExcel(logs: AccessLog[]): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'QK7 DataHub';
   workbook.lastModifiedBy = 'Thiếu tá QNCN Nguyễn Mạnh Nam';
@@ -231,32 +227,18 @@ export async function prepareAuditReportExcel(logs: AccessLog[]): Promise<() => 
   cellSignerName.font = { name: 'Times New Roman', size: 13, bold: true };
   cellSignerName.alignment = { horizontal: 'center', vertical: 'middle' };
 
-  // Ghi buffer và chuẩn bị hàm release tệp Excel
+  // Ghi buffer và tải file về máy
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
-
-  return () => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const fileDateStr = `${year}${month}${day}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-    a.download = `Nhat_Ky_Hoat_Dong_Thu_Vien_So_${fileDateStr}.xlsx`;
-    document.body.appendChild(a);
-    try {
-      a.click();
-    } finally {
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
-    }
-  };
-}
-
-/**
- * Xuất file báo cáo Nhật ký kiểm toán an ninh dạng Excel (.xlsx) trực tiếp
- */
-export async function exportAuditReportExcel(logs: AccessLog[]): Promise<void> {
-  const release = await prepareAuditReportExcel(logs);
-  release();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const fileDateStr = `${year}${month}${day}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+  a.download = `Nhat_Ky_Hoat_Dong_Thu_Vien_So_${fileDateStr}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

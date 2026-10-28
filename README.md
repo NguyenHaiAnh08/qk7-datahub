@@ -1,6 +1,6 @@
 # TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB — Cổng Quản Lý Dữ Liệu Tập Trung Quân Khu 7
 
-Hệ thống quản lý, lưu trữ số hóa, phân quyền khai thác tài liệu quân sự bảo mật đa cấp độ, tích hợp Trợ lý Trí Tuệ Nhân Tạo (AI RAG) và Xác Thực Sinh Trắc Học Vân Tay (ZKTeco ZK9500) của Bộ Tư Lệnh Quân Khu 7.
+Hệ thống quản lý, lưu trữ số hóa, phân quyền khai thác tài liệu quân sự bảo mật đa cấp độ, tích hợp Trợ lý Trí Tuệ Nhân Tạo (AI RAG) và Xác Thực Sinh Trắc Học Vân Tay (ZKTeco ZK9500) của Trường Quân sự Quân khu 7.
 
 ---
 
@@ -409,9 +409,12 @@ Hệ thống tích hợp cổng tài liệu API tương tác trực tiếp:
 
 ## 🔐 Tài Khoản Kiểm Thử Mẫu (Mật khẩu: `123456789`)
 
-* **Quản trị viên / Thủ trưởng (Cấp 5 - Tuyệt Mật):** `USR-004` (Đại tá - Chính ủy)
-* **Trưởng phòng / Chỉ huy (Cấp 4 - Tối Mật):** `USR-001` (Đại tá - Trưởng phòng Tham mưu)
-* **Cán bộ / Sĩ quan (Cấp 3 - Mật):** `USR-002` (Thiếu tá - Thư ký)
+* **Quản trị viên / Tổ trưởng CNTT (Cấp 5 - Tuyệt Mật):** `USR-001` (Thiếu tá QNCN Nguyễn Mạnh Nam)
+* **Chỉ huy / Trưởng phòng Tham mưu - Hành chính (Cấp 5 - Tuyệt Mật):** `USR-002` (Đại tá Lương Nhật Thăng)
+* **Cán bộ Cơ yếu (Cấp 5 - Tuyệt Mật):** `USR-003` (Trung tá QNCN Phạm Trường Sơn)
+* **Trợ lý tác chiến (Cấp 2 - Nội bộ):** `USR-004` (Trung tá Nguyễn Xuân Thanh)
+* **Cán bộ Văn thư (Cấp 3 - Mật):** `USR-005` (Trung tá QNCN Trần Thị Ánh Tuyết)
+* **Nhân viên IT / Kỹ thuật hệ thống (Cấp 1 - Công khai):** `USR-006` (Hạ sĩ Nguyễn Hải Anh)
 
 ---
-*Bản quyền tài liệu thuộc Bộ Tư Lệnh Quân Khu 7 — TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB.*
+*Bản quyền tài liệu thuộc TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB.*

@@ -132,7 +132,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     authService.clearSession();
     const guest: User = {
       user_id: 'GUEST',
-      full_name: 'Khách',
+      full_name: 'Đại biểu',
       clearance_level_id: 1,
       clearance_name: 'Công khai',
       permissions: [],

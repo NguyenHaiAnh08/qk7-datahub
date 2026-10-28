@@ -21,6 +21,8 @@ import { aiService, AICitation } from '../../services/aiService';
 import { fileService } from '../../services/fileService';
 import { toast } from '../common/Toast';
 import { FingerprintScanModal } from '../users/FingerprintScanModal';
+import { DocumentPreviewModal } from '../document-desk/DocumentPreviewModal';
+import { DocumentItem } from '../../types';
 
 interface ChatMessage {
   id: string;
@@ -28,6 +30,7 @@ interface ChatMessage {
   text: string;
   timestamp: string;
   citations?: AICitation[];
+  requires_biometric?: boolean;
   reasoning?: {
     mem?: string;
     think?: string;
@@ -58,12 +61,20 @@ export const AIChatWidget: React.FC = () => {
   const [scanModalOpen, setScanModalOpen] = useState<boolean>(false);
   const [targetScanFileId, setTargetScanFileId] = useState<string>('');
   const [targetScanDocCode, setTargetScanDocCode] = useState<string>('');
-  const [fingerprintToken, setFingerprintToken] = useState<string | null>(() => {
+
+  // State cho Modal Xem trước PDF an toàn (Blob URL qua fetch có kèm X-Fingerprint-Token)
+  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
+  const [previewPage, setPreviewPage] = useState<number>(1);
+  const [previewOpen, setPreviewOpen] = useState<boolean>(false);
+  // State lưu token vân tay đã xác thực trong phiên làm việc
+  const [fpToken, setFpToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return sessionStorage.getItem('qk7_fp_token');
     }
     return null;
   });
+  // Lưu câu hỏi gần nhất của user để auto-retry sau khi quét vân tay
+  const [lastQuery, setLastQuery] = useState<string>('');
   const lastUserQueryRef = useRef<string>('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -146,10 +157,11 @@ export const AIChatWidget: React.FC = () => {
   }, [user]);
 
   // Gửi tin nhắn (hỗ trợ Auto-retry khi quét vân tay ZK9500 thành công)
-  const handleSend = async (queryText?: string, fpToken?: string, isRetry: boolean = false) => {
+  const handleSend = async (queryText?: string, tokenOverride?: string, isRetry: boolean = false) => {
     const textToSend = (queryText || inputText).trim();
-    if (!textToSend || loading) return;
+    if (!textToSend || (loading && !isRetry)) return;
 
+    setLastQuery(textToSend);
     lastUserQueryRef.current = textToSend;
 
     if (!isRetry) {
@@ -174,11 +186,9 @@ export const AIChatWidget: React.FC = () => {
         content: m.text,
       }));
 
-    const activeToken =
-      fpToken ||
-      fingerprintToken ||
-      (typeof window !== 'undefined' ? sessionStorage.getItem('qk7_fp_token') : null) ||
-      undefined;
+    // P0 SECURITY: Câu hỏi mới (isRetry = false) TUYỆT ĐỐI KHÔNG tự động gửi kèm token cũ.
+    // Chỉ khi là retry sau khi quét vân tay (isRetry = true) thì mới dùng tokenOverride.
+    const activeToken = isRetry ? tokenOverride : undefined;
 
     try {
       const res = await aiService.chat({
@@ -192,12 +202,13 @@ export const AIChatWidget: React.FC = () => {
         sender: 'ai',
         text: res.answer,
         citations: res.citations,
+        requires_biometric: res.requires_biometric,
         reasoning: res.reasoning,
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
       };
 
       if (isRetry) {
-        // Cập nhật mượt mà tin nhắn AI gần nhất đã được giải mã
+        // Cập nhật đè lên bong bóng AI gần nhất đang chờ xác thực
         setMessages((prev) => {
           const lastAiIdx = prev.map((m) => m.sender).lastIndexOf('ai');
           if (lastAiIdx !== -1) {
@@ -214,7 +225,7 @@ export const AIChatWidget: React.FC = () => {
       const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
         sender: 'ai',
-        text: `Báo cáo đồng chí, hệ thống gặp gián đoạn tạm thời. Vui lòng thử lại sau giây lát.`,
+        text: `Báo cáo đồng chí, hệ thống gặp gián đoạn tạm thời: ${err.message || 'Lỗi kết nối'}. Vui lòng thử lại.`,
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -224,44 +235,73 @@ export const AIChatWidget: React.FC = () => {
   };
 
   // Mở hộp thoại quét vân tay ZK9500 cho thẻ trích dẫn Cấp 3-5
-  const handleOpenFingerprintScan = (fileId: string, docCode: string) => {
-    setTargetScanFileId(fileId);
+  const handleOpenFingerprintScan = (fileId?: string, docCode?: string) => {
+    setTargetScanFileId(fileId || '');
     setTargetScanDocCode(docCode || 'Văn kiện Mật');
     setScanModalOpen(true);
   };
 
   // Callback khi Local Agent :9001 và Gateway xác thực vân tay thành công
-  const handleFingerprintSuccess = (token: string) => {
+  const handleFingerprintSuccess = async (token: string) => {
     setScanModalOpen(false);
     const validToken = token || '';
     if (validToken) {
-      sessionStorage.setItem('qk7_fp_token', validToken);
-      setFingerprintToken(validToken);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('qk7_fp_token', validToken);
+        if (targetScanFileId) {
+          sessionStorage.setItem(`qk7_fp_token_${targetScanFileId}`, validToken);
+        }
+      }
+      setFpToken(validToken);
     }
 
     toast.success(
-      `Xác thực vân tay ZK9500 thành công! Đang tự động giải mã nội dung mật...`,
-      { title: 'SINH TRẮC HỌC HỢP LỆ', badge: 'ZK9500', duration: 3200 }
+      `Xác thực vân tay ZK9500 thành công! Đang lấy câu trả lời...`,
+      { title: 'SINH TRẮC HỌC HỢP LỆ', badge: 'ZK9500', duration: 3000 }
     );
 
-    // Tự động kích hoạt lại câu hỏi gần nhất kèm token vừa xác thực
-    const queryToRetry = lastUserQueryRef.current || inputText.trim();
+    // Tự động retry câu hỏi gần nhất
+    const queryToRetry = lastQuery || lastUserQueryRef.current || inputText.trim();
     if (queryToRetry) {
-      setTimeout(() => {
-        handleSend(queryToRetry, validToken, true);
-      }, 350);
+      setLoading(true);
+      await handleSend(queryToRetry, validToken, true);
+    } else if (targetScanFileId) {
+      handleOpenPdf(targetScanFileId, 1, targetScanDocCode, undefined, 'Cấp 3 - Mật');
     }
   };
 
-  // Nút 1: Mở PDF tại đúng trang
-  const handleOpenPdf = (fileId: string, page: number = 1) => {
-    try {
-      const url = fileService.getViewUrl(fileId, '0');
-      const targetUrl = `${url}#page=${page}`;
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
-    } catch (err: any) {
-      toast.error(`Không thể mở tệp: ${err.message}`, { title: 'TRUY CẬP TỆP THẤT BẠI' });
+  // Mở tài liệu PDF an toàn qua DocumentPreviewModal (không mở tab mới gây lỗi 403)
+  const handleOpenPdf = (
+    fileId: string,
+    page: number = 1,
+    docCode?: string,
+    title?: string,
+    secName?: string,
+    requiresBio: boolean = false
+  ) => {
+    let secLevel = 1;
+    if (requiresBio) {
+      secLevel = 3;
+    } else if (secName) {
+      const lower = secName.toLowerCase();
+      if (lower.includes('5') || lower.includes('tuyệt mật')) secLevel = 5;
+      else if (lower.includes('4') || lower.includes('tối mật')) secLevel = 4;
+      else if (lower.includes('3') || lower.includes('mật')) secLevel = 3;
+      else if (lower.includes('2') || lower.includes('nội bộ')) secLevel = 2;
     }
+
+    const docItem: DocumentItem = {
+      file_id: fileId,
+      document_code: docCode || fileId,
+      title: title || docCode || 'Văn kiện trích dẫn',
+      security_level_id: secLevel,
+      security_name: secName || `Cấp ${secLevel}`,
+      security_level_name: secName || `Cấp ${secLevel}`,
+    };
+
+    setPreviewDoc(docItem);
+    setPreviewPage(page);
+    setPreviewOpen(true);
   };
 
 
@@ -423,6 +463,25 @@ export const AIChatWidget: React.FC = () => {
                     ))}
                   </div>
 
+                  {/* NÚT QUÉT VÂN TAY ĐỂ XEM NẾU CÓ CỜ requires_biometric Ở CẤP ROOT (chỉ hiện khi chưa có token) */}
+                  {msg.requires_biometric && !fpToken && !(typeof window !== 'undefined' && sessionStorage.getItem('qk7_fp_token')) && (
+                    <div className="mt-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetCitation = msg.citations?.find((c) => c.requires_biometric);
+                          const fid = targetCitation?.file_id || targetScanFileId || '';
+                          const code = targetCitation?.document_code || 'Văn bản bảo mật';
+                          handleOpenFingerprintScan(fid, code);
+                        }}
+                        className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all duration-200 bg-gradient-to-r from-[#991b1b] via-[#b91c1c] to-[#d97706] hover:from-[#b91c1c] hover:to-[#f59e0b] text-white shadow-md active:scale-[0.98] border border-amber-400/40 cursor-pointer"
+                      >
+                        <Fingerprint className="w-4 h-4 text-amber-300 animate-pulse flex-shrink-0" />
+                        <span>Quét vân tay để xem</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* CĂN CỨ VĂN BẢN TRÍCH DẪN & HÀNH ĐỘNG TINH GỌN */}
                   {msg.citations && msg.citations.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-white/20 dark:border-white/15 space-y-2">
@@ -431,14 +490,12 @@ export const AIChatWidget: React.FC = () => {
                       </div>
 
                       {msg.citations.map((c, cIdx) => {
+                        const activeFpToken =
+                          fpToken || (typeof window !== 'undefined' ? sessionStorage.getItem('qk7_fp_token') : null);
                         const isBiometricLocked =
-                          Boolean(c.requires_biometric) ||
-                          (c.snippet && c.snippet.includes('[Nội dung Mật')) ||
-                          (c.security_level_name &&
-                            (c.security_level_name.includes('Cấp 3') ||
-                              c.security_level_name.includes('Cấp 4') ||
-                              c.security_level_name.includes('Cấp 5') ||
-                              c.security_level_name.toLowerCase().includes('mật')));
+                          !activeFpToken &&
+                          (Boolean(c.requires_biometric) ||
+                            (c.snippet && c.snippet.includes('[Nội dung Mật')));
 
                         if (isBiometricLocked) {
                           return (
@@ -538,7 +595,7 @@ export const AIChatWidget: React.FC = () => {
                             {/* Hàng 3: Nút bấm mở xem file PDF tại đúng trang (Touch target >= 40px) */}
                             <button
                               type="button"
-                              onClick={() => handleOpenPdf(c.file_id, c.page)}
+                              onClick={() => handleOpenPdf(c.file_id, c.page, c.document_code, c.title, c.security_level_name, false)}
                               className={`
                                 w-full min-h-[40px] px-3 py-2 rounded-lg text-xs font-semibold
                                 flex items-center justify-center space-x-1.5 transition-all duration-200 cursor-pointer active:scale-[0.98]
@@ -558,36 +615,7 @@ export const AIChatWidget: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Bước suy luận Agentic DeepTutor (Collapse) */}
-                  {msg.reasoning && (
-                    <div className="mt-2.5 pt-2 border-t border-white/15 text-[11px] opacity-80">
-                      <details className="cursor-pointer">
-                        <summary className="font-medium hover:underline select-none">
-                          🔍 Phân tích DeepTutor Agentic Grounding
-                        </summary>
-                        <div className="mt-1.5 space-y-1 pl-2 border-l border-white/30 text-[10.5px]">
-                          {msg.reasoning.mem && (
-                            <div>
-                              <strong className="text-emerald-300 dark:text-emerald-400">&lt;mem&gt;:</strong>{' '}
-                              {msg.reasoning.mem}
-                            </div>
-                          )}
-                          {msg.reasoning.think && (
-                            <div>
-                              <strong className="text-emerald-300 dark:text-emerald-400">&lt;think&gt;:</strong>{' '}
-                              {msg.reasoning.think}
-                            </div>
-                          )}
-                          {msg.reasoning.tool_call && (
-                            <div>
-                              <strong className="text-emerald-300 dark:text-emerald-400">&lt;tool_call&gt;:</strong>{' '}
-                              {msg.reasoning.tool_call}
-                            </div>
-                          )}
-                        </div>
-                      </details>
-                    </div>
-                  )}
+
                 </div>
 
                 <span className="text-[10px] text-slate-400 mt-1 px-1">{msg.timestamp}</span>
@@ -596,9 +624,11 @@ export const AIChatWidget: React.FC = () => {
 
             {/* Trạng thái đang tải */}
             {loading && (
-              <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 p-2">
+              <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/20 animate-pulse">
                 <Spin size="small" />
-                <span>Trợ lý đang đối chiếu văn kiện và số trang [p.X]...</span>
+                <span className="font-medium">
+                  {lastQuery ? 'Đang lấy câu trả lời...' : 'Trợ lý AI đang tra cứu kho dữ liệu số...'}
+                </span>
               </div>
             )}
 
@@ -689,6 +719,15 @@ export const AIChatWidget: React.FC = () => {
         fileId={targetScanFileId}
         onSuccess={handleFingerprintSuccess}
         onCancel={() => setScanModalOpen(false)}
+      />
+
+      {/* 4. MODAL XEM TRƯỚC VĂN BẢN PDF BẢO MẬT (BLOB URL + EMBED) */}
+      <DocumentPreviewModal
+        open={previewOpen}
+        document={previewDoc}
+        page={previewPage}
+        initialToken={fpToken || (typeof window !== 'undefined' ? sessionStorage.getItem('qk7_fp_token') : null)}
+        onClose={() => setPreviewOpen(false)}
       />
     </>
   );

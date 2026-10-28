@@ -183,6 +183,13 @@ class AgentTutor:
         else:
             salutation = "Báo cáo đồng chí,"
 
+        # NGUYÊN TẮC FAIL CLOSED: Lọc bỏ tuyệt đối 100% chunks có security_level_id > user_clearance
+        # Không bao giờ để tài liệu vượt cấp mật xuất hiện trong quá trình suy luận hoặc trả về citations
+        authorized_chunks = [
+            c for c in (retrieved_chunks or [])
+            if int(c.get("security_level_id", 1)) <= user_clearance
+        ]
+
         # Bước 1: <mem>
         bio_status_str = "Đã xác thực vân tay ZK9500" if biometric_verified else "Chưa xác thực vân tay"
         mem_trace = (
@@ -190,20 +197,25 @@ class AgentTutor:
             f"Cấp độ bảo mật: Cấp {user_clearance} ({clearance_name}). "
             f"Sinh trắc học: {bio_status_str}. "
             f"Tài liệu mục tiêu: {file_id or 'Toàn bộ kho dữ liệu hợp lệ'}. "
-            f"Tổng số đoạn trích hợp lệ thu nhận: {len(retrieved_chunks)}."
+            f"Tổng số đoạn trích hợp lệ thu nhận: {len(authorized_chunks)}."
         )
 
-        # Kiểm tra ngưỡng bằng chứng
-        if not retrieved_chunks:
+        # Kiểm tra ngưỡng bằng chứng & Cấp quyền
+        if not authorized_chunks:
+            fallback_answer = (
+                f"{salutation}\n\n{NO_DATA_FALLBACK_MESSAGE}"
+                if salutation != "Báo cáo đồng chí,"
+                else NO_DATA_FALLBACK_MESSAGE
+            )
             return {
-                "answer": f"{salutation} không tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.",
+                "answer": fallback_answer,
                 "citations": [],
                 "reasoning": {
                     "mem": mem_trace,
                     "think": (
                         f"[Agent Think] Không tìm thấy dữ liệu nào phù hợp với câu hỏi '{query}' "
                         f"trong phạm vi cấp quyền {clearance_name} (Cấp {user_clearance}). "
-                        f"Quyết định: Không suy đoán, trả lời từ chối theo quy định bảo mật."
+                        f"Quyết định: Không suy đoán, trả lời từ chối theo quy định bảo mật (Fail Closed)."
                     ),
                     "tool_call": "[Tool Grounding] Dừng trích dẫn do không có văn bản phù hợp."
                 },
@@ -213,7 +225,7 @@ class AgentTutor:
             }
 
         # Bước 2: <think>
-        raw_valid = [c for c in retrieved_chunks if c.get("score", 0) > 0.001] or retrieved_chunks
+        raw_valid = [c for c in authorized_chunks if c.get("score", 0) > 0.001] or authorized_chunks
 
         # --- SINGLE-DOCUMENT FOCUS & DOMINANT DOCUMENT FILTERING ---
         # Đảm bảo chỉ gợi ý đúng 1 file phù hợp nhất khi người dùng tra cứu thông tin văn bản
@@ -261,8 +273,13 @@ class AgentTutor:
             valid_chunks = raw_valid
 
         if not valid_chunks:
+            fallback_answer = (
+                f"{salutation}\n\n{NO_DATA_FALLBACK_MESSAGE}"
+                if salutation != "Báo cáo đồng chí,"
+                else NO_DATA_FALLBACK_MESSAGE
+            )
             return {
-                "answer": NO_DATA_FALLBACK_MESSAGE,
+                "answer": fallback_answer,
                 "citations": [],
                 "reasoning": {
                     "mem": mem_trace,
@@ -274,8 +291,9 @@ class AgentTutor:
                 "requires_biometric": False
             }
 
-        # --- KHÓA BẢO MẬT VÂN TAY CHO NỘI DUNG CẤP 3-5 ---
-        classified_chunks = [c for c in valid_chunks if int(c.get("security_level_id", 1)) >= 3]
+        # --- KHÓA BẢO MẬT VÂN TAY CHO NỘI DUNG CẤP 3-5 ĐƯỢC PHÉP TRUY CẬP ---
+        # Chỉ áp dụng cho tài liệu mà user CÓ CLEARANCE (security_level_id <= user_clearance) nhưng là Cấp 3+
+        classified_chunks = [c for c in valid_chunks if 3 <= int(c.get("security_level_id", 1)) <= user_clearance]
         unclassified_chunks = [c for c in valid_chunks if int(c.get("security_level_id", 1)) <= 2]
 
         # Trường hợp 1: Có tài liệu Cấp 3+ nhưng CHƯA xác thực vân tay ZK9500
@@ -358,7 +376,9 @@ class AgentTutor:
 
         # Bước 3: <tool_call> sinh câu trả lời
         answer_text, synthesis_mode = self._generate_grounded_answer(
-            query, prompt_chunks, user_clearance, history, salutation=salutation, pos_display=pos_display
+            query, prompt_chunks, user_clearance, history,
+            salutation=salutation, pos_display=pos_display,
+            user_position=user_position, user_name=user_name
         )
 
         # Nếu có tài liệu cấp 3+ bị che trong trường hợp hỗn hợp: Chèn thông báo cảnh báo ở cuối câu trả lời
@@ -377,6 +397,10 @@ class AgentTutor:
 
         page_tags = [f"[p.{c.get('page', 1)}]" for c in prompt_chunks]
         tool_call_trace = f"[Tool Citation Grounding] Đã gán trích dẫn cụ thể các trang: {', '.join(page_tags)}."
+
+        # Nếu câu trả lời chứa NO_DATA_FALLBACK_MESSAGE: BẮT BUỘC xóa sạch citations (Fail Closed)
+        if NO_DATA_FALLBACK_MESSAGE in verified_answer:
+            citations = []
 
         # Chỉ khóa toàn bộ câu trả lời (requires_biometric=True) nếu 100% chunks tìm được đều thuộc Cấp 3+
         requires_bio_flag = bool(classified_chunks and not unclassified_chunks and not biometric_verified)
@@ -447,7 +471,9 @@ class AgentTutor:
         user_clearance: int,
         history: Optional[List[Dict[str, Any]]] = None,
         salutation: str = "Báo cáo đồng chí,",
-        pos_display: str = ""
+        pos_display: str = "",
+        user_position: str = "",
+        user_name: str = ""
     ) -> Tuple[str, str]:
         """
         Sinh câu trả lời trích dẫn grounded:
@@ -456,11 +482,14 @@ class AgentTutor:
         Trả về tuple (answer_text, synthesis_mode).
         """
         # Thử qua Ollama nếu online
-        ollama_response = self._call_ollama(query, chunks, history, salutation=salutation, pos_display=pos_display)
-        if ollama_response:
+        ollama_response = self._call_ollama(
+            query, chunks, history, salutation=salutation,
+            pos_display=pos_display, user_position=user_position, user_name=user_name
+        )
+        if ollama_response and NO_DATA_FALLBACK_MESSAGE not in ollama_response:
             return ollama_response, "llm"
 
-        # Fallback Extractive Synthesizer
+        # Fallback Extractive Synthesizer nếu Ollama offline hoặc từ chối dù có bằng chứng hợp lệ
         return self._extractive_synthesize(query, chunks, salutation=salutation), "extractive"
 
     def _call_ollama(
@@ -469,7 +498,9 @@ class AgentTutor:
         chunks: List[Dict[str, Any]],
         history: Optional[List[Dict[str, Any]]] = None,
         salutation: str = "Báo cáo đồng chí,",
-        pos_display: str = ""
+        pos_display: str = "",
+        user_position: str = "",
+        user_name: str = ""
     ) -> Optional[str]:
         """
         Kết nối Ollama local API (http://127.0.0.1:11434/api/generate).
@@ -511,10 +542,9 @@ class AgentTutor:
                 "   - Nội dung văn bản: Trích xuất trung thực nội dung thể hiện trong thân văn bản (kể cả khi văn bản ghi nội dung thử nghiệm như 'NỘI DUNG DEMO').\n"
                 "   - Số hiệu, ngày tháng năm, trích yếu: Nêu chính xác theo thông tin ghi trên văn bản.\n"
                 "3. TUYỆT ĐỐI KHÔNG tự bịa đặt, suy đoán ngoài văn bản, không nhầm lẫn thể loại văn bản khác.\n"
-                f"4. Tác phong xưng hô chuẩn mực điều lệnh Quân đội nhân dân Việt Nam: Bắt buộc mở đầu câu trả lời bằng '{salutation}'.\n"
+                f"4. Tác phong xưng hô chuẩn mực điều lệnh Quân đội nhân dân Việt Nam: Mở đầu câu trả lời đúng 1 lần duy nhất bằng '{salutation}'. TUYỆT ĐỐI KHÔNG lặp lại họ tên, cấp bậc hoặc chức vụ sau lời chào này.\n"
                 "5. Mọi luận điểm, số liệu, trích dẫn bắt buộc phải kèm theo số trang chính xác dạng [p.X] ngay sau nội dung được trích xuất.\n"
-                "6. Nếu trong danh sách bằng chứng không có hoặc không đủ dữ liệu để trả lời, phải trả lời nguyên văn: "
-                f"'{NO_DATA_FALLBACK_MESSAGE}'."
+                f"6. Chỉ khi 100% danh sách bằng chứng hoàn toàn không có thông tin liên quan đến câu hỏi, mới trả lời duy nhất câu: '{NO_DATA_FALLBACK_MESSAGE}'. Nếu đã trích xuất được thông tin, TUYỆT ĐỐI KHÔNG chèn thêm câu từ chối này vào cuối câu trả lời.\n"
             )
 
             prompt = (
@@ -547,23 +577,58 @@ class AgentTutor:
                 result = resp.json()
                 answer = result.get("response", "").strip()
                 if answer and len(answer) > 20:
-                    # Chuẩn hóa phần mở đầu câu trả lời luôn khớp với salutation yêu cầu mà KHÔNG bị lặp từ
                     salut_core = salutation.rstrip(",. ").strip()
                     if answer.lower().startswith(salut_core.lower()):
-                        rest = answer[len(salut_core):].lstrip(",.:- \t\n")
-                        if pos_display and rest.lower().startswith(pos_display.lower()):
-                            rest = rest[len(pos_display):].lstrip(",.:- \t\n")
-                        answer = f"{salutation}\n\n{rest}"
+                        rest = answer[len(salut_core):]
                     else:
-                        cleaned = re.sub(
+                        rest = re.sub(
                             r'^(?:báo cáo|kính gửi|thưa)\s+[^,\n.]*[,.:-]*\s*',
                             '',
                             answer,
                             flags=re.IGNORECASE
                         ).strip()
-                        if pos_display and cleaned.lower().startswith(pos_display.lower()):
-                            cleaned = cleaned[len(pos_display):].lstrip(",.:- \t\n")
-                        answer = f"{salutation}\n\n{cleaned}"
+
+                    # Bóc tách triệt để mọi trường hợp lặp chức vụ, họ tên, hoặc xưng hô ở đầu nội dung
+                    while True:
+                        stripped = rest.lstrip(",.:- \t\n")
+                        if pos_display and stripped.lower().startswith(pos_display.lower()):
+                            rest = stripped[len(pos_display):]
+                            continue
+                        if user_position and stripped.lower().startswith(user_position.lower()):
+                            rest = stripped[len(user_position):]
+                            continue
+                        if user_name and stripped.lower().startswith(user_name.lower()):
+                            rest = stripped[len(user_name):]
+                            continue
+                        if stripped.lower().startswith("tổ trưởng công nghệ thông tin"):
+                            rest = stripped[len("tổ trưởng công nghệ thông tin"):]
+                            continue
+                        if stripped.lower().startswith("tổ trưởng cntt"):
+                            rest = stripped[len("tổ trưởng cntt"):]
+                            continue
+                        if stripped.lower().startswith("đồng chí"):
+                            rest = stripped[len("đồng chí"):]
+                            continue
+                        rest = stripped
+                        break
+
+                    if rest and rest[0].islower():
+                        rest = rest[0].upper() + rest[1:]
+                    answer = f"{salutation}\n\n{rest}"
+
+                    # Gỡ bỏ câu từ chối thừa ở cuối nếu mô hình đã trích xuất nội dung thực tế phía trước
+                    fallback_phrases = [
+                        NO_DATA_FALLBACK_MESSAGE.lower(),
+                        "nội dung này không có trong các văn bản thuộc phạm vi cấp quyền hiện tại",
+                        "nội dung này không có trong các văn bản thuộc phạm vi cấp quyền"
+                    ]
+                    for fb in fallback_phrases:
+                        if fb in answer.lower():
+                            fb_idx = answer.lower().rfind(fb)
+                            prefix_part = answer[:fb_idx].strip()
+                            if len(prefix_part) > len(salutation) + 25:
+                                answer = prefix_part
+
                     return answer
         except Exception:
             pass

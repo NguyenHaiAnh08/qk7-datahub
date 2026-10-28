@@ -30,7 +30,7 @@ export interface LoginFormProps {
   isSplitDeck?: boolean;
 }
 
-export type DemoRoleKey = 'canbo' | 'thuky' | 'vanthu' | 'coyeu' | 'it' | 'admin';
+export type DemoRoleKey = 'chihuy' | 'coyeu' | 'troly' | 'vanthu' | 'it' | 'admin';
 
 export const DEMO_ACCOUNTS: Record<
   DemoRoleKey,
@@ -42,39 +42,39 @@ export const DEMO_ACCOUNTS: Record<
     roleName: string;
   }
 > = {
-  canbo: {
-    id: 'USR-004',
+  chihuy: {
+    id: 'USR-002',
     title: 'Chỉ huy',
-    subtitle: 'Cấp 2 • Nội bộ',
-    label: 'Chỉ huy (USR-004 - Cấp 2)',
+    subtitle: 'Cấp 5 • Tuyệt Mật',
+    label: 'Chỉ huy - Lương Nhật Thăng (USR-002 - Cấp 5)',
     roleName: 'Chỉ huy',
   },
-  thuky: {
+  coyeu: {
     id: 'USR-003',
+    title: 'Cơ yếu',
+    subtitle: 'Cấp 5 • Tuyệt Mật',
+    label: 'Cơ yếu - Phạm Trường Sơn (USR-003 - Cấp 5)',
+    roleName: 'Cơ yếu',
+  },
+  troly: {
+    id: 'USR-004',
     title: 'Trợ lý',
-    subtitle: 'Cấp 4 • Tối Mật',
-    label: 'Trợ lý (USR-003 - Cấp 4)',
+    subtitle: 'Cấp 2 • Nội bộ',
+    label: 'Trợ lý - Nguyễn Xuân Thanh (USR-004 - Cấp 2)',
     roleName: 'Trợ lý',
   },
   vanthu: {
     id: 'USR-005',
     title: 'Văn thư',
     subtitle: 'Cấp 3 • Mật',
-    label: 'Cán bộ Văn thư (USR-005 - Cấp 3)',
+    label: 'Cán bộ Văn thư - Trần Thị Ánh Tuyết (USR-005 - Cấp 3)',
     roleName: 'Văn thư',
-  },
-  coyeu: {
-    id: 'USR-002',
-    title: 'Cơ yếu',
-    subtitle: 'Cấp 5 • Tuyệt Mật',
-    label: 'Cán bộ Cơ yếu (USR-002 - Cấp 5)',
-    roleName: 'Cơ yếu',
   },
   it: {
     id: 'USR-006',
     title: 'Nhân viên IT',
-    subtitle: 'Cấp 1 • Công khai',
-    label: 'Nhân viên IT (USR-006 - Cấp 1)',
+    subtitle: 'Cấp 1 • Công khai • Kỹ thuật hệ thống',
+    label: 'Nhân viên IT - Nguyễn Hải Anh (USR-006 - Cấp 1)',
     roleName: 'Nhân viên IT',
   },
   admin: {
@@ -108,9 +108,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
     if (passwordError) setPasswordError('');
     const upper = val.trim().toUpperCase();
     if (upper === 'USR-001') setSelectedRole('admin');
-    else if (upper === 'USR-002') setSelectedRole('coyeu');
-    else if (upper === 'USR-003') setSelectedRole('thuky');
-    else if (upper === 'USR-004') setSelectedRole('canbo');
+    else if (upper === 'USR-002') setSelectedRole('chihuy');
+    else if (upper === 'USR-003') setSelectedRole('coyeu');
+    else if (upper === 'USR-004') setSelectedRole('troly');
     else if (upper === 'USR-005') setSelectedRole('vanthu');
     else if (upper === 'USR-006') setSelectedRole('it');
     else setSelectedRole(null);
@@ -348,12 +348,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
               </div>
 
               <div className="space-y-1.5">
-                {/* 1. Chỉ huy (004) */}
+                {/* 1. Chỉ huy (002) */}
                 <button
                   type="button"
-                  onClick={() => quickFillRole('canbo')}
+                  onClick={() => quickFillRole('chihuy')}
+                  title="Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính (Cấp 5 - Tuyệt Mật)"
                   className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'canbo'
+                    selectedRole === 'chihuy'
                       ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500/60 text-blue-800 dark:text-blue-300 ring-1 ring-blue-500/40 shadow-xs'
                       : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
                   }`}
@@ -361,19 +362,41 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <div className="min-w-0 pr-1">
                     <div className="font-bold text-xs flex items-center gap-1">
                       <span>Chỉ huy</span>
-                      <span className="text-[10px] font-mono text-slate-400">004</span>
+                      <span className="text-[10px] font-mono text-slate-400">002</span>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
                   </div>
                   <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
                 </button>
 
-                {/* 2. Trợ lý (003) */}
+                {/* 2. Cơ yếu (003) */}
                 <button
                   type="button"
-                  onClick={() => quickFillRole('thuky')}
+                  onClick={() => quickFillRole('coyeu')}
+                  title="Phạm Trường Sơn - Cơ yếu (Cấp 5 - Tuyệt Mật)"
                   className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'thuky'
+                    selectedRole === 'coyeu'
+                      ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-xs'
+                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                  }`}
+                >
+                  <div className="min-w-0 pr-1">
+                    <div className="font-bold text-xs flex items-center gap-1">
+                      <span>Cơ yếu</span>
+                      <span className="text-[10px] font-mono text-slate-400">003</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
+                  </div>
+                  <KeyRound className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
+                </button>
+
+                {/* 3. Trợ lý (004) */}
+                <button
+                  type="button"
+                  onClick={() => quickFillRole('troly')}
+                  title="Nguyễn Xuân Thanh - Trợ lý tác chiến (Cấp 2 - Nội bộ)"
+                  className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                    selectedRole === 'troly'
                       ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500/60 text-teal-800 dark:text-teal-300 ring-1 ring-teal-500/40 shadow-xs'
                       : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
                   }`}
@@ -381,17 +404,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <div className="min-w-0 pr-1">
                     <div className="font-bold text-xs flex items-center gap-1">
                       <span>Trợ lý</span>
-                      <span className="text-[10px] font-mono text-slate-400">003</span>
+                      <span className="text-[10px] font-mono text-slate-400">004</span>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 4 • Tối Mật</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
                   </div>
                   <FileEdit className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
                 </button>
 
-                {/* 3. Văn thư (005) */}
+                {/* 4. Văn thư (005) */}
                 <button
                   type="button"
                   onClick={() => quickFillRole('vanthu')}
+                  title="Trần Thị Ánh Tuyết - Cán bộ Văn thư (Cấp 3 - Mật)"
                   className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                     selectedRole === 'vanthu'
                       ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/60 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/40 shadow-xs'
@@ -408,30 +432,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <FileText className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
                 </button>
 
-                {/* 4. Cơ yếu (002) */}
-                <button
-                  type="button"
-                  onClick={() => quickFillRole('coyeu')}
-                  className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'coyeu'
-                      ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="min-w-0 pr-1">
-                    <div className="font-bold text-xs flex items-center gap-1">
-                      <span>Cơ yếu</span>
-                      <span className="text-[10px] font-mono text-slate-400">002</span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
-                  </div>
-                  <KeyRound className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
-                </button>
-
                 {/* 5. Nhân viên IT (006) */}
                 <button
                   type="button"
                   onClick={() => quickFillRole('it')}
+                  title="Nguyễn Hải Anh - Nhân viên IT (Cấp 1 - Công khai)"
                   className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                     selectedRole === 'it'
                       ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-500/60 text-cyan-800 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-xs'
@@ -524,12 +529,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
 
         {/* 4 Roles in 2x2 Grid + Nhân viên IT */}
         <div className="grid grid-cols-2 gap-2">
-          {/* 1. Chỉ huy (004) */}
+          {/* 1. Chỉ huy (002) */}
           <button
             type="button"
-            onClick={() => quickFillRole('canbo')}
+            onClick={() => quickFillRole('chihuy')}
+            title="Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính (Cấp 5 - Tuyệt Mật)"
             className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedRole === 'canbo'
+              selectedRole === 'chihuy'
                 ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500/60 text-blue-800 dark:text-blue-300 ring-1 ring-blue-500/40 shadow-sm'
                 : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
             }`}
@@ -537,19 +543,41 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <div className="min-w-0 pr-1">
               <div className="font-bold text-xs flex items-center gap-1">
                 <span>Chỉ huy</span>
-                <span className="text-[10px] font-mono text-slate-400">004</span>
+                <span className="text-[10px] font-mono text-slate-400">002</span>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
             </div>
             <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
           </button>
 
-          {/* 2. Trợ lý (003) */}
+          {/* 2. Cơ yếu (003) */}
           <button
             type="button"
-            onClick={() => quickFillRole('thuky')}
+            onClick={() => quickFillRole('coyeu')}
+            title="Phạm Trường Sơn - Cơ yếu (Cấp 5 - Tuyệt Mật)"
             className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedRole === 'thuky'
+              selectedRole === 'coyeu'
+                ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-sm'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+            }`}
+          >
+            <div className="min-w-0 pr-1">
+              <div className="font-bold text-xs flex items-center gap-1">
+                <span>Cơ yếu</span>
+                <span className="text-[10px] font-mono text-slate-400">003</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
+            </div>
+            <KeyRound className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
+          </button>
+
+          {/* 3. Trợ lý (004) */}
+          <button
+            type="button"
+            onClick={() => quickFillRole('troly')}
+            title="Nguyễn Xuân Thanh - Trợ lý tác chiến (Cấp 2 - Nội bộ)"
+            className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+              selectedRole === 'troly'
                 ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500/60 text-teal-800 dark:text-teal-300 ring-1 ring-teal-500/40 shadow-sm'
                 : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
             }`}
@@ -557,17 +585,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <div className="min-w-0 pr-1">
               <div className="font-bold text-xs flex items-center gap-1">
                 <span>Trợ lý</span>
-                <span className="text-[10px] font-mono text-slate-400">003</span>
+                <span className="text-[10px] font-mono text-slate-400">004</span>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 4 • Tối Mật</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
             </div>
             <FileEdit className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
           </button>
 
-          {/* 3. Văn thư (005) */}
+          {/* 4. Văn thư (005) */}
           <button
             type="button"
             onClick={() => quickFillRole('vanthu')}
+            title="Trần Thị Ánh Tuyết - Cán bộ Văn thư (Cấp 3 - Mật)"
             className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
               selectedRole === 'vanthu'
                 ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/60 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/40 shadow-sm'
@@ -584,30 +613,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <FileText className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
           </button>
 
-          {/* 4. Cơ yếu (002) */}
-          <button
-            type="button"
-            onClick={() => quickFillRole('coyeu')}
-            className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedRole === 'coyeu'
-                ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-sm'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-            }`}
-          >
-            <div className="min-w-0 pr-1">
-              <div className="font-bold text-xs flex items-center gap-1">
-                <span>Cơ yếu</span>
-                <span className="text-[10px] font-mono text-slate-400">002</span>
-              </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
-            </div>
-            <KeyRound className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
-          </button>
-
           {/* 5. Nhân viên IT (006) - Col-span-2 */}
           <button
             type="button"
             onClick={() => quickFillRole('it')}
+            title="Nguyễn Hải Anh - Nhân viên IT (Cấp 1 - Công khai)"
             className={`col-span-2 p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
               selectedRole === 'it'
                 ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-500/60 text-cyan-800 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-sm'

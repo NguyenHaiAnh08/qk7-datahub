@@ -256,6 +256,8 @@ async def chat_with_tutor(req: ChatRequest):
         if leaks:
             CLEARANCE_LEAKS.inc(len(leaks))
             status_code = "critical_leak"
+            # CẮT BỎ TOÀN BỘ CHUNKS RÒ RỈ NGAY LẬP TỨC!
+            retrieved_chunks = [c for c in retrieved_chunks if int(c.get("security_level_id", 1)) <= req.user_clearance]
 
         # 2. Sinh câu trả lời Grounded RAG qua AgentTutor (có áp Biometric Guard)
         result = agent_tutor.answer_query(

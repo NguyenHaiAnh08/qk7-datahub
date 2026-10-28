@@ -16,9 +16,8 @@ import { isApprovalRequired } from '../utils/approvalUtils';
 const ITEMS_PER_PAGE = 8;
 
 export const DocumentDeskPage: React.FC = () => {
-  const { user } = useAuth();
-  const canUpload = (user?.roles || []).includes('ROL-01') || (user?.roles || []).includes('ROL-04');
-
+const { user, hasPermission } = useAuth(); 
+const canUpload = hasPermission('DOC_UPLOAD');
   // Metadata
   const [meta, setMeta] = useState<MetaData>({ types: [], units: [], levels: [] });
 

@@ -322,6 +322,8 @@ export const Header: React.FC<HeaderProps> = ({
   }, [showClock]);
 
   const isIPadPortrait = deviceMode === 'ipad' && orientation === 'portrait';
+  const isGuestUser = !user || user.user_id === 'GUEST';
+  const avatarInitial = getAvatarInitial(user?.full_name);
 
   const canAccessDesk =
     hasPermission('DOC_UPLOAD') || hasPermission('DOC_EDIT') || hasPermission('DOC_PARSE');

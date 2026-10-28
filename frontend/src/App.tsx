@@ -7,18 +7,10 @@ import { DeviceModeProvider } from './contexts/DeviceModeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { RouterProvider } from './routes/RouterProvider';
 import { HttpErrorListener } from './components/common/HttpErrorListener';
-import { ApprovalListener } from './components/common/ApprovalListener';
 import { ToastProvider } from './components/common/Toast';
 import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
-<<<<<<< HEAD
 import AIChatWidget from './components/ai-chat/AIChatWidget';
-import { ApprovalProvider } from './contexts/ApprovalContext';
-=======
-import { AIChatProvider } from './contexts/AIChatContext';
-import AIChatDrawer from './components/ai-chat/AIChatDrawer';
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
 import './index.css';
-
 
 /**
  * Wrapper đồng bộ Theme (Dark/Light) và Cấu hình Token Ant Design toàn diện
@@ -118,7 +110,6 @@ const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
     >
       <AntApp>
         <HttpErrorListener />
-        <ApprovalListener />
         {children}
       </AntApp>
     </ConfigProvider>
@@ -138,12 +129,12 @@ const AIChatWrapper: React.FC = () => {
     return null;
   }
 
-  return <AIChatDrawer />;
+  return <AIChatWidget />;
 };
 
 /**
  * Root Application Component
- * Sets up global context providers (Theme, DeviceMode, Ant Design, Auth, AIChat) and BrowserRouter.
+ * Sets up global context providers (Theme, DeviceMode, Ant Design, Auth) and BrowserRouter.
  * Route definitions are fully delegated to RouterProvider (auto-discovered routes).
  */
 export const App: React.FC = () => {
@@ -155,17 +146,8 @@ export const App: React.FC = () => {
             <ToastProvider>
               <NetworkStatusProvider>
                 <AuthProvider>
-<<<<<<< HEAD
-                  <ApprovalProvider pollMs={30000}>
-                    <RouterProvider />
-                    <AIChatWrapper />
-                  </ApprovalProvider>
-=======
-                  <AIChatProvider>
-                    <RouterProvider />
-                    <AIChatWrapper />
-                  </AIChatProvider>
->>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
+                  <RouterProvider />
+                  <AIChatWrapper />
                 </AuthProvider>
               </NetworkStatusProvider>
             </ToastProvider>

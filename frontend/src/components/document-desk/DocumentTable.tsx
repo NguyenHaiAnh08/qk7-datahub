@@ -10,13 +10,10 @@ import {
   ChevronRight,
   HardDrive
 } from 'lucide-react';
-import { Tooltip } from 'antd';
 import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
-import { CompactDownloadButton } from '../common/CompactDownloadButton';
-import { useAuth } from '../../hooks/useAuth';
 
 export interface DocumentTableProps {
   documents: DocumentItem[];
@@ -29,8 +26,7 @@ export interface DocumentTableProps {
   onClearFilters?: () => void;
   onPageChange: (page: number) => void;
   onPreview: (doc: DocumentItem) => void;
-  onDownload: (doc: DocumentItem, signal?: AbortSignal) => Promise<(() => void) | void> | (() => void) | void;
-  onCancelDownload?: (doc: DocumentItem) => void;
+  onDownload: (doc: DocumentItem) => void;
   onEdit?: (doc: DocumentItem) => void;
   onDelete?: (doc: DocumentItem) => void;
 }
@@ -47,12 +43,9 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   onPageChange,
   onPreview,
   onDownload,
-  onCancelDownload,
   onEdit,
   onDelete,
 }) => {
-  const { user, hasPermission } = useAuth();
-  const isAdminUser = (user?.roles || []).includes('ROL-01');
   const getLevelBadgeClass = (lv: number) => {
     switch (lv) {
       case 5:
@@ -176,18 +169,30 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                             const canDownload = docLevel <= 2 && docLevel <= userClearanceLevel;
                             const isSecretLevel = docLevel >= 3;
 
+                            if (canDownload) {
+                              return (
+                                <button
+                                  onClick={() => onDownload(doc)}
+                                  className="p-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800/60 rounded-lg transition cursor-pointer"
+                                  title="Tải về tệp gốc"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              );
+                            }
+
                             return (
-                              <CompactDownloadButton
-                                onDownload={(signal) => onDownload(doc, signal)}
-                                onCancel={() => onCancelDownload?.(doc)}
-                                size="icon"
-                                disabled={!canDownload}
-                                disabledTitle={
+                              <button
+                                disabled
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 rounded-lg cursor-not-allowed opacity-60"
+                                title={
                                   isSecretLevel
                                     ? 'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp, không được phép tải về máy'
                                     : `Cấp độ bảo mật (Cấp ${userClearanceLevel}) không đủ để tải văn bản Cấp ${docLevel}`
                                 }
-                              />
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
                             );
                           })()}
                           {onEdit && (
@@ -199,35 +204,15 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          {onDelete && (() => {
-                            const canDelete = hasPermission('DOC_DELETE');
-                            // Nếu user hoàn toàn không có quyền xóa → không hiện nút
-                            if (!canDelete) return null;
-
-                            // Non-admin (IT/Văn thư): icon xám + tooltip yêu cầu duyệt
-                            // Admin tối cao: icon đỏ + tooltip xóa bình thường
-                            const needsApproval = !isAdminUser;
-                            const tooltip = needsApproval
-                              ? '⚠️ Yêu cầu quyền Admin để xóa vĩnh viễn — bấm để gửi yêu cầu phê duyệt'
-                              : 'Xóa văn bản (đưa vào thùng rác)';
-
-                            return (
-                              <Tooltip title={tooltip} placement="top" arrow>
-                                <button
-                                  type="button"
-                                  onClick={() => onDelete(doc)}
-                                  aria-label={needsApproval ? 'Yêu cầu phê duyệt xóa văn bản' : 'Xóa văn bản'}
-                                  className={`p-1.5 rounded-lg transition-all duration-200 ease-[cubic-bezier(.34,1.45,.64,1)] cursor-pointer active:scale-95 btn-tactile ${
-                                    needsApproval
-                                      ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 hover:text-amber-600 dark:hover:text-amber-400'
-                                      : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 dark:text-rose-400 dark:border-transparent'
-                                  }`}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </Tooltip>
-                            );
-                          })()}
+                          {onDelete && (
+                            <button
+                              onClick={() => onDelete(doc)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                              title="Xóa văn bản"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>

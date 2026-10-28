@@ -1,4 +1,4 @@
-import { http } from './http';
+import { http } from '../services/http';
 import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { User } from '../types/user';
 
@@ -22,6 +22,7 @@ const STORAGE_KEYS = {
   STATUS: 'qk7_status',
   ROLES: 'qk7_roles',
   ROLE_NAMES: 'qk7_role_names',
+  PERMISSIONS: 'qk7_permissions',
 } as const;
 
 // ══════════════════════════════════════════════════════════════
@@ -48,8 +49,7 @@ export interface JwtPayload {
 
 /**
  * Parse JWT payload mà không cần verify chữ ký.
- * Dùng để đọc thông tin user_id/clearance từ token (server đã verify rồi).
- * KHÔNG dùng để quyết định phân quyền — chỉ dùng để hiển thị/optimistic UI.
+ * KHÔNG dùng để quyết định phân quyền — chỉ để hiển thị / optimistic UI.
  */
 function decodeJwtPayload(token: string): JwtPayload | null {
   try {
@@ -57,13 +57,12 @@ function decodeJwtPayload(token: string): JwtPayload | null {
     if (parts.length !== 3) return null;
     const base64Url = parts[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    // Padding base64
     const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
     const json = decodeURIComponent(
       atob(padded)
         .split('')
         .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
+        .join(''),
     );
     return JSON.parse(json) as JwtPayload;
   } catch {
@@ -89,6 +88,45 @@ function parseExpiresIn(value: string | undefined): number {
   return n * (multipliers[unit] || 0);
 }
 
+/**
+ * Ghi nếu có giá trị, xoá nếu undefined/rỗng — tránh stale data từ user cũ.
+ */
+function writeOrClear(key: string, value: string | undefined | null): void {
+  if (value != null && value !== '') {
+    sessionStorage.setItem(key, value);
+  } else {
+    sessionStorage.removeItem(key);
+  }
+}
+
+/**
+ * Ghi mảng string dạng JSON nếu hợp lệ, xoá key nếu undefined.
+ * Phân biệt: `undefined` (chưa biết) ≠ `[]` (đã biết rỗng).
+ */
+function writeJsonArray(key: string, value: string[] | undefined): void {
+  if (Array.isArray(value)) {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } else {
+    sessionStorage.removeItem(key);
+  }
+}
+
+/**
+ * Đọc mảng string dạng JSON. Trả undefined nếu không có hoặc hỏng.
+ */
+function readJsonArray(key: string): string[] | undefined {
+  const raw = sessionStorage.getItem(key);
+  if (!raw) return undefined;
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) && v.every((x) => typeof x === 'string')
+      ? (v as string[])
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ══════════════════════════════════════════════════════════════
 // Auth Service
 // ══════════════════════════════════════════════════════════════
@@ -96,10 +134,9 @@ export const authService = {
   /**
    * Đăng nhập — lưu JWT token + user info vào sessionStorage.
    *
-   * ⚠️ FAIL-FAST: Nếu backend không trả token, HOẶC sessionStorage không
-   * lưu được (VD: chế độ Ẩn danh), hàm sẽ THROW để AuthContext biết
-   * login thực sự THẤT BẠI — tránh trạng thái "login ảo" (có user nhưng
-   * không có token → mọi request sau đều 401).
+   * ⚠️ FAIL-FAST: nếu backend không trả token, hoặc sessionStorage không
+   * ghi được (Ẩn danh / storage bị chặn) → THROW để AuthContext biết
+   * login THẤT BẠI — tránh trạng thái "login ảo".
    */
   login: async (user_id: string, password: string): Promise<LoginResponse> => {
     const res = await http<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, {
@@ -108,48 +145,41 @@ export const authService = {
       body: JSON.stringify({ user_id: user_id.trim(), password }),
     });
 
-    // ─── 1. Kiểm tra backend có trả token không ───
+    // ─── 1. Backend phải trả token ───
     if (!res?.token) {
-      // Xóa sạch session cũ (nếu có) để tránh trạng thái nửa vời
       authService.clearSession();
       throw new Error(
-        'Máy chủ không trả về token xác thực. Vui lòng liên hệ quản trị viên hệ thống.'
+        'Máy chủ không trả về token xác thực. Vui lòng liên hệ quản trị viên hệ thống.',
       );
     }
 
-    // ─── 2. Lưu token vào sessionStorage — THROW nếu thất bại ───
+    // ─── 2. Lưu token — THROW nếu thất bại ───
     try {
       sessionStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
 
-      // Ghi nhận thời điểm hết hạn (fallback nếu JWT không có exp)
       const ttlMs = parseExpiresIn(res.expires_in);
       if (ttlMs > 0) {
         sessionStorage.setItem(
           STORAGE_KEYS.EXPIRES_IN,
-          String(Date.now() + ttlMs)
+          String(Date.now() + ttlMs),
         );
       }
 
-      // ─── 3. Verify token thực sự đã lưu được (belt-and-suspenders) ───
+      // Verify round-trip (belt-and-suspenders)
       const verifyToken = sessionStorage.getItem(STORAGE_KEYS.TOKEN);
       if (!verifyToken || verifyToken !== res.token) {
         throw new Error('TOKEN_NOT_PERSISTED');
       }
     } catch (e: any) {
-      // Dọn dẹp sạch để không có trạng thái "nửa đăng nhập"
       authService.clearSession();
-
       if (e?.message === 'TOKEN_NOT_PERSISTED') {
         throw new Error(
-          'Phiên đăng nhập không được lưu trữ. Trình duyệt có thể đang chặn sessionStorage.'
+          'Phiên đăng nhập không được lưu trữ. Trình duyệt có thể đang chặn sessionStorage.',
         );
       }
-
-      // Nguyên nhân phổ biến: chế độ Ẩn danh (Private Browsing), extension chặn storage,
-      // hoặc trình duyệt hết dung lượng sessionStorage
       throw new Error(
         'Trình duyệt không cho phép lưu phiên đăng nhập (có thể do chế độ Ẩn danh). ' +
-        'Vui lòng tắt chế độ Ẩn danh hoặc cho phép lưu trữ trang web này rồi đăng nhập lại.'
+          'Vui lòng tắt chế độ Ẩn danh hoặc cho phép lưu trữ trang này rồi đăng nhập lại.',
       );
     }
 
@@ -158,18 +188,21 @@ export const authService = {
 
   /**
    * Lấy thông tin user hiện tại từ server (dùng JWT trong header).
+   * Luôn chuẩn hoá về `User` với `roles/role_names/permissions` là mảng
+   * (không undefined) — vì đây là nguồn chân lý.
    */
   getMe: async (): Promise<User> => {
     const res = await http<any>(API_ENDPOINTS.AUTH.ME);
-    if (res && res.user) {
-      return res.user as User;
-    }
-    return res as User;
+    const raw: any = res && res.user ? res.user : res;
+    return {
+      ...raw,
+      roles: Array.isArray(raw?.roles) ? raw.roles : [],
+      role_names: Array.isArray(raw?.role_names) ? raw.role_names : [],
+      permissions: Array.isArray(raw?.permissions) ? raw.permissions : [],
+    } as User;
   },
 
-  /**
-   * 🔑 Lấy JWT token hiện tại (dùng cho http.ts và fileService).
-   */
+  /** Lấy JWT token hiện tại. */
   getToken: (): string | null => {
     try {
       return sessionStorage.getItem(STORAGE_KEYS.TOKEN);
@@ -178,20 +211,14 @@ export const authService = {
     }
   },
 
-  /**
-   * 🔑 Kiểm tra nhanh đã có token và token còn hạn không.
-   * Dùng để guard trước khi render ProtectedRoute hoặc gọi API quan trọng.
-   */
+  /** Đã có token và còn hạn không. */
   hasValidToken: (): boolean => {
     const token = authService.getToken();
     if (!token) return false;
     return !authService.isTokenExpired(0);
   },
 
-  /**
-   * 🔑 Decode JWT payload để lấy user_id, clearance, roles.
-   * Dùng cho optimistic UI (KHÔNG dùng để quyết định auth).
-   */
+  /** Decode JWT payload — chỉ dùng cho optimistic UI. */
   getTokenPayload: (): JwtPayload | null => {
     const token = authService.getToken();
     if (!token) return null;
@@ -199,20 +226,17 @@ export const authService = {
   },
 
   /**
-   * 🔑 Kiểm tra token đã hết hạn chưa (dựa trên exp hoặc fallback expires_in).
+   * Token hết hạn chưa (dựa trên `exp` hoặc fallback `expires_at`).
    */
   isTokenExpired: (bufferSeconds = 30): boolean => {
     const token = authService.getToken();
     if (!token) return true;
 
-    // Ưu tiên đọc `exp` trong payload
     const payload = decodeJwtPayload(token);
     if (payload && typeof payload.exp === 'number') {
-      // Buffer 30s để tránh race khi request gửi đúng lúc exp
       return Date.now() + bufferSeconds * 1000 >= payload.exp * 1000;
     }
 
-    // Fallback: dùng thời điểm expires tính từ lúc login
     const expiresAt = sessionStorage.getItem(STORAGE_KEYS.EXPIRES_IN);
     if (expiresAt) {
       const ts = parseInt(expiresAt, 10);
@@ -223,34 +247,40 @@ export const authService = {
   },
 
   /**
-   * Lưu user info vào sessionStorage (gọi sau login hoặc refreshProfile).
+   * Lưu user info vào sessionStorage.
+   *
+   * Ghi cả JSON blob (`qk7_user`) — dùng làm nguồn chính khi F5 — VÀ
+   * các key riêng lẻ để tương thích code cũ. Key nào `undefined` sẽ bị
+   * XOÁ để tránh stale data.
    */
   saveSession: (user: User) => {
+    // ─── Primary: full user JSON ───
     try {
       sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
     } catch (e) {
       console.warn('[authService] Failed to serialize user to sessionStorage', e);
     }
 
-    // Legacy keys — giữ tương thích ngược với code cũ đọc trực tiếp
-    sessionStorage.setItem(STORAGE_KEYS.USERNAME, user.user_id);
-    sessionStorage.setItem(STORAGE_KEYS.NAME, user.full_name);
-    sessionStorage.setItem(STORAGE_KEYS.LEVEL, String(user.clearance_level_id));
-    if (user.username) sessionStorage.setItem(STORAGE_KEYS.USER_LOGIN, user.username);
-    if (user.unit_id) sessionStorage.setItem(STORAGE_KEYS.UNIT, user.unit_id);
-    if (user.unit_name) sessionStorage.setItem(STORAGE_KEYS.UNIT_NAME, user.unit_name);
-    if (user.position) sessionStorage.setItem(STORAGE_KEYS.POSITION, user.position);
-    if (user.rank_name) sessionStorage.setItem(STORAGE_KEYS.RANK, user.rank_name);
-    if (user.clearance_name) sessionStorage.setItem(STORAGE_KEYS.CLEARANCE_NAME, user.clearance_name);
-    if (user.clearance_code) sessionStorage.setItem(STORAGE_KEYS.CLEARANCE_CODE, user.clearance_code);
-    if (user.status) sessionStorage.setItem(STORAGE_KEYS.STATUS, user.status);
-    if (user.roles) sessionStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(user.roles));
-    if (user.role_names) sessionStorage.setItem(STORAGE_KEYS.ROLE_NAMES, JSON.stringify(user.role_names));
+    // ─── Legacy / explicit keys ───
+    writeOrClear(STORAGE_KEYS.USERNAME, user.user_id);
+    writeOrClear(STORAGE_KEYS.USER_LOGIN, user.username ?? user.user_id?.toLowerCase());
+    writeOrClear(STORAGE_KEYS.NAME, user.full_name);
+    writeOrClear(STORAGE_KEYS.LEVEL, String(user.clearance_level_id ?? ''));
+    writeOrClear(STORAGE_KEYS.UNIT, user.unit_id);
+    writeOrClear(STORAGE_KEYS.UNIT_NAME, user.unit_name);
+    writeOrClear(STORAGE_KEYS.POSITION, user.position);
+    writeOrClear(STORAGE_KEYS.RANK, user.rank_name);
+    writeOrClear(STORAGE_KEYS.CLEARANCE_NAME, user.clearance_name);
+    writeOrClear(STORAGE_KEYS.CLEARANCE_CODE, user.clearance_code);
+    writeOrClear(STORAGE_KEYS.STATUS, user.status);
+
+    // ⭐ Array fields: phân biệt undefined vs [] đúng chuẩn
+    writeJsonArray(STORAGE_KEYS.ROLES, user.roles);
+    writeJsonArray(STORAGE_KEYS.ROLE_NAMES, user.role_names);
+    writeJsonArray(STORAGE_KEYS.PERMISSIONS, user.permissions);
   },
 
-  /**
-   * Xóa toàn bộ session (đăng xuất / logout / token hết hạn).
-   */
+  /** Xoá toàn bộ session — logout / token hết hạn. */
   clearSession: () => {
     Object.values(STORAGE_KEYS).forEach((key) => {
       sessionStorage.removeItem(key);
@@ -260,21 +290,35 @@ export const authService = {
   /**
    * Lấy user hiện tại từ sessionStorage (không gọi API).
    * Trả GUEST nếu chưa đăng nhập.
+   *
+   * ⚠️ Trả về permissions đúng trạng thái:
+   *   - Có mảng: dùng luôn (fast path).
+   *   - Undefined: AuthContext sẽ tự gọi `getMe()` để bù (slow path).
+   *   - GUEST: `permissions: []` — không có quyền gì.
    */
   getCurrentSession: (): User => {
-    // Ưu tiên đọc từ session JSON đầy đủ
+    // ─── 1. Primary: JSON blob ───
     const rawUser = sessionStorage.getItem(STORAGE_KEYS.USER);
     if (rawUser) {
       try {
         const parsed = JSON.parse(rawUser);
         if (parsed && parsed.user_id) {
-          return parsed;
+          // Chuẩn hoá: JSON.stringify đã bỏ key undefined → có thể thiếu.
+          // Không set mặc định ở đây để AuthContext phân biệt được
+          // "undefined" (chưa biết) vs "[]" (đã biết rỗng).
+          return {
+            ...parsed,
+            roles: parsed.roles,
+            role_names: parsed.role_names,
+            permissions: parsed.permissions,
+          } as User;
         }
       } catch {
-        // Fallback đọc từng key
+        // rơi xuống fallback
       }
     }
 
+    // ─── 2. Fallback: GUEST ───
     const userId = sessionStorage.getItem(STORAGE_KEYS.USERNAME);
     if (!userId || userId === 'GUEST') {
       return {
@@ -282,41 +326,40 @@ export const authService = {
         full_name: 'Đại biểu',
         clearance_level_id: 1,
         clearance_name: 'Công khai',
+        roles: [],
+        role_names: [],
+        permissions: [],
       };
     }
 
-    let roles: string[] | undefined;
-    let roleNames: string[] | undefined;
-    try {
-      const rawRoles = sessionStorage.getItem(STORAGE_KEYS.ROLES);
-      if (rawRoles) roles = JSON.parse(rawRoles);
-      const rawRoleNames = sessionStorage.getItem(STORAGE_KEYS.ROLE_NAMES);
-      if (rawRoleNames) roleNames = JSON.parse(rawRoleNames);
-    } catch {
-      // ignore
-    }
-
+    // ─── 3. Fallback: đọc từng key (JSON blob hỏng) ───
     return {
       user_id: userId,
-      username: sessionStorage.getItem(STORAGE_KEYS.USER_LOGIN) || userId.toLowerCase(),
+      username:
+        sessionStorage.getItem(STORAGE_KEYS.USER_LOGIN) || userId.toLowerCase(),
       full_name: sessionStorage.getItem(STORAGE_KEYS.NAME) || userId,
-      clearance_level_id: parseInt(sessionStorage.getItem(STORAGE_KEYS.LEVEL) || '1', 10),
+      clearance_level_id: parseInt(
+        sessionStorage.getItem(STORAGE_KEYS.LEVEL) || '1',
+        10,
+      ),
       unit_id: sessionStorage.getItem(STORAGE_KEYS.UNIT) || undefined,
       unit_name: sessionStorage.getItem(STORAGE_KEYS.UNIT_NAME) || undefined,
       position: sessionStorage.getItem(STORAGE_KEYS.POSITION) || undefined,
       rank_name: sessionStorage.getItem(STORAGE_KEYS.RANK) || undefined,
-      clearance_name: sessionStorage.getItem(STORAGE_KEYS.CLEARANCE_NAME) || undefined,
-      clearance_code: sessionStorage.getItem(STORAGE_KEYS.CLEARANCE_CODE) || undefined,
+      clearance_name:
+        sessionStorage.getItem(STORAGE_KEYS.CLEARANCE_NAME) || undefined,
+      clearance_code:
+        sessionStorage.getItem(STORAGE_KEYS.CLEARANCE_CODE) || undefined,
       status: sessionStorage.getItem(STORAGE_KEYS.STATUS) || 'active',
-      roles,
-      role_names: roleNames,
+      roles: readJsonArray(STORAGE_KEYS.ROLES),
+      role_names: readJsonArray(STORAGE_KEYS.ROLE_NAMES),
+      permissions: readJsonArray(STORAGE_KEYS.PERMISSIONS), // ⭐ NEW
     };
   },
 
-
   /**
-   * Logout — gọi backend để revoke session, sau đó clear local.
-   * Nếu backend lỗi vẫn phải clear local để user không bị treo.
+   * Logout — gọi backend revoke session, sau đó clear local.
+   * Backend lỗi vẫn phải clear local để user không bị treo.
    */
   logout: async (): Promise<void> => {
     try {

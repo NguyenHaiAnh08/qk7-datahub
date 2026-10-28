@@ -33,6 +33,7 @@ const swaggerSpec = {
     { name: 'Logs',      description: 'Nhật ký truy cập' },
     { name: 'Admin',     description: 'Quản trị hệ thống' },
     { name: 'AI Assistant', description: 'Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded Agentic RAG)' },
+    { name: 'Approval',  description: 'Maker-Checker — Phê duyệt yêu cầu thao tác nguy hiểm' },
   ],
 
   security: [{ BearerAuth: [] }],
@@ -812,6 +813,220 @@ const swaggerSpec = {
         },
       },
     },
+
+
+    // ══════════════════════════════════════════════════════════════
+    // APPROVAL WORKFLOW (Maker-Checker 4 mắt)
+    // ══════════════════════════════════════════════════════════════
+    '/api/my-approval-requests': {
+      get: {
+        tags: ['Approval'],
+        summary: 'User xem các yêu cầu của chính mình',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'status',
+            schema: {
+              type: 'string',
+              enum: ['PENDING_REJECTED', 'PENDING', 'REJECTED', 'ALL'],
+              default: 'PENDING_REJECTED',
+            },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Danh sách yêu cầu',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    total: { type: 'integer' },
+                    items: { type: 'array', items: { $ref: '#/components/schemas/ApprovalRequest' } },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    '/api/admin/approval-requests': {
+      get: {
+        tags: ['Approval'],
+        summary: 'Admin xem hàng đợi yêu cầu chờ duyệt (AUDIT_VIEW)',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'status',
+            schema: {
+              type: 'string',
+              enum: ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTING', 'EXECUTED', 'FAILED'],
+              default: 'PENDING',
+            },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Danh sách yêu cầu',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    total: { type: 'integer' },
+                    items: { type: 'array', items: { $ref: '#/components/schemas/ApprovalRequest' } },
+                  },
+                },
+              },
+            },
+          },
+          403: { description: 'Cần quyền AUDIT_VIEW' },
+          500: { $ref: '#/components/responses/ServerError' },
+        },
+      },
+    },
+
+    '/api/admin/approval-requests/{id}': {
+      get: {
+        tags: ['Approval'],
+        summary: 'Chi tiết 1 yêu cầu',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' }, example: 'APV-1729999999999-A1B2' }],
+        responses: {
+          200: { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApprovalRequest' } } } },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    '/api/admin/approval-requests/{id}/approve': {
+      post: {
+        tags: ['Approval'],
+        summary: 'Admin tối cao duyệt yêu cầu (chỉ USR-001)',
+        description: 'Chỉ Quản trị viên tối cao (PROTECTED_ADMIN_USER_ID) được duyệt. Sau khi duyệt, gọi lại endpoint gốc với header `X-Approval-Override: <request_id>`.',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: { type: 'object', properties: { review_note: { type: 'string' } } },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Đã duyệt' },
+          400: { description: 'Yêu cầu không ở trạng thái PENDING' },
+          403: { description: 'Không phải Quản trị viên tối cao' },
+        },
+      },
+    },
+
+    '/api/admin/approval-requests/{id}/reject': {
+      post: {
+        tags: ['Approval'],
+        summary: 'Admin tối cao từ chối yêu cầu (bắt buộc nhập lý do)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['review_note'],
+                properties: { review_note: { type: 'string', example: 'Văn bản còn hiệu lực, không được xóa' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Đã từ chối' },
+          400: { description: 'Thiếu lý do hoặc yêu cầu không PENDING' },
+          403: { description: 'Không phải Quản trị viên tối cao' },
+        },
+      },
+    },
+
+    '/api/admin/approval-requests/{id}/mark-executed': {
+      post: {
+        tags: ['Approval'],
+        summary: 'Đánh dấu yêu cầu đã thực thi xong',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+
+    '/api/admin/protected-permissions': {
+      get: {
+        tags: ['Approval'],
+        summary: 'Danh sách permission đang được bảo vệ (phải duyệt)',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          permission_id: { type: 'string' },
+                          protected_by: { type: 'string' },
+                          protected_at: { type: 'string', format: 'date-time' },
+                          note: { type: 'string', nullable: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          403: { description: 'Cần quyền ROLE_VIEW' },
+        },
+      },
+    },
+
+    '/api/admin/protected-permissions/{permissionId}': {
+      post: {
+        tags: ['Approval'],
+        summary: 'Bật bảo vệ cho permission (chỉ Admin tối cao)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'permissionId', required: true, schema: { type: 'string' }, example: 'PERM-UNIT-DELETE' }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: { type: 'object', properties: { note: { type: 'string' } } },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Đã bật bảo vệ' },
+          403: { description: 'Không phải Quản trị viên tối cao' },
+        },
+      },
+      delete: {
+        tags: ['Approval'],
+        summary: 'Tắt bảo vệ cho permission (chỉ Admin tối cao)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'permissionId', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Đã tắt bảo vệ' },
+          403: { description: 'Không phải Quản trị viên tối cao' },
+        },
+      },
+    },
+
 
     // ==========================================================
     // ADMIN — STATS
@@ -2065,6 +2280,33 @@ const swaggerSpec = {
         type: 'object',
         properties: { error: { type: 'string', example: 'Không tìm thấy tài liệu' } },
       },
+
+
+            ApprovalRequest: {
+        type: 'object',
+        properties: {
+          request_id:          { type: 'string', example: 'APV-1729999999999-A1B2' },
+          requester_id:        { type: 'string', example: 'USR-005' },
+          requester_name:      { type: 'string', nullable: true },
+          required_permission: { type: 'string', example: 'DOC_PURGE' },
+          http_method:         { type: 'string', example: 'DELETE' },
+          http_path:           { type: 'string', example: '/api/admin/units/U-TQS' },
+          http_body:           { type: 'string', nullable: true },
+          target_summary:      { type: 'string', example: 'DELETE /api/admin/units/U-TQS' },
+          status: {
+            type: 'string',
+            enum: ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTING', 'EXECUTED', 'FAILED'],
+          },
+          reviewed_by:    { type: 'string', nullable: true },
+          reviewer_name:  { type: 'string', nullable: true },
+          reviewed_at:    { type: 'string', format: 'date-time', nullable: true },
+          review_note:    { type: 'string', nullable: true },
+          executed_at:    { type: 'string', format: 'date-time', nullable: true },
+          execution_error:{ type: 'string', nullable: true },
+          created_at:     { type: 'string', format: 'date-time' },
+        },
+      },
+
 
       User: {
         type: 'object',

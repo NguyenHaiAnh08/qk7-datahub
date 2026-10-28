@@ -1,3 +1,5 @@
+
+import { http } from './http';
 import { systemService } from './systemService';
 import { roleService } from './roleService';
 import { permissionService } from './permissionService';
@@ -5,7 +7,7 @@ import { unitService } from './unitService';
 import { documentTypeService } from './documentTypeService';
 import { securityLevelService } from './securityLevelService';
 import { logService } from './logService';
-import { militaryService } from './militaryService';       // ← THÊM
+import { militaryService } from './militaryService';
 
 /**
  * Dashboard API (Aggregator Service)
@@ -19,6 +21,8 @@ export const dashboardApi = {
 
   // Logs
   getAccessLogs: logService.getAccessLogs,
+  getAccessLogStats: logService.getStats,
+  triggerArchiveRun: logService.triggerArchiveRun,
 
   // Roles
   getRoles: roleService.getRoles,
@@ -28,6 +32,12 @@ export const dashboardApi = {
 
   // Permissions
   getPermissions: permissionService.getPermissions,
+  createPermission: permissionService.createPermission,
+  updatePermission: permissionService.updatePermission,
+<<<<<<< HEAD
+=======
+  reorderPermissions: permissionService.reorderPermissions,
+>>>>>>> cf233fdbc97b0a7292ffcaa92451fc02aabe6508
   deletePermission: permissionService.deletePermission,
 
   // Units
@@ -59,6 +69,10 @@ export const dashboardApi = {
   createPosition: militaryService.createPosition,
   updatePosition: militaryService.updatePosition,
   deletePosition: militaryService.deletePosition,
+
+  getCreatableRoles: async (): Promise<{ items: any[]; is_admin: boolean; note?: string }> => {
+    return http('/api/admin/creatable-roles', { method: 'GET' });
+  },
 };
 
 export default dashboardApi;

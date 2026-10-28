@@ -9,6 +9,7 @@ export const ROUTE_PATHS = {
   DESK: '/document-desk',
   ADMIN: '/admin-dashboard',
   USERS: '/users',
+  MY_APPROVALS: '/my-approvals',
   ADMIN_TRASH: '/admin/trash',
   ADMIN_SESSIONS: '/admin/sessions',
   ERROR_400: '/400',

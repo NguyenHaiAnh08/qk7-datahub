@@ -10,11 +10,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   UserX,
-  Radio,
-  Globe,
-  Clock,
   ShieldCheck,
-  X,
   Layers,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
@@ -22,6 +18,7 @@ import { toast } from '../components/common/Toast';
 import { sessionService } from '../services/sessionService';
 import { useAuth } from '../hooks/useAuth';
 import { ActiveSession } from '../types/user';
+import { isApprovalRequired } from '../utils/approvalUtils';
 
 export interface SessionsPageProps {
   /** Khi true: render inline trong AdminDashboardPage (không có Header riêng, không min-h-screen) */
@@ -162,7 +159,15 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
     setConfirmModal({ open: false, type: 'single' });
 
     try {
-      await sessionService.kill(targetSession.session_id);
+      const r: any = await sessionService.kill(targetSession.session_id);
+
+      // Nếu backend yêu cầu phê duyệt → không claim success, refresh lại
+      if (isApprovalRequired(r)) {
+        setAnimatingSessionId(null);
+        await load(true);
+        return;
+      }
+
       toast.success(
         `Đã ngắt phiên kết nối của đồng chí "${targetSession.full_name}" (IP: ${targetSession.ip || 'Local'})`,
         {
@@ -172,6 +177,7 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
         }
       );
 
+      // Fade-out row khỏi danh sách
       setTimeout(() => {
         setSessions((prev) => prev.filter((s) => s.session_id !== targetSession.session_id));
         setAnimatingSessionId(null);
@@ -194,9 +200,16 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
     setLoading(true);
 
     try {
-      const r = await sessionService.killAllForUser(targetUserId);
+      const r: any = await sessionService.killAllForUser(targetUserId);
+
+      // Nếu backend yêu cầu phê duyệt → refresh lại, không claim success
+      if (isApprovalRequired(r)) {
+        await load(true);
+        return;
+      }
+
       toast.success(
-        `Đã ngắt toàn bộ ${r.revoked_count} phiên kết nối của quân nhân "${targetUserName || targetUserId}"!`,
+        `Đã ngắt toàn bộ ${r.revoked_count ?? 0} phiên kết nối của quân nhân "${targetUserName || targetUserId}"!`,
         {
           title: 'THU HỒI TOÀN BỘ THÀNH CÔNG',
           badge: 'REVOKED-ALL',
@@ -326,7 +339,7 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
 
       {/* 2. Bảng Dữ Liệu High-craft Grid */}
       <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors duration-200">
-        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="overflow-x-auto">
           <table className="w-full text-xs text-left min-w-[1280px]">
             <colgroup>
               <col style={{ width: '230px' }} />
@@ -408,12 +421,12 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
                         )}
                       </td>
 
-                      {/* 2. Cột IP: font-mono tabular-nums text-sm căn giữa */}
+                      {/* 2. Cột IP */}
                       <td className="py-3.5 px-4 font-mono tabular-nums text-sm font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap text-center">
                         {s.ip || '127.0.0.1'}
                       </td>
 
-                      {/* 3. Cột Thiết bị: Đã qua hàm parse User-Agent gọn gàng, căn giữa */}
+                      {/* 3. Cột Thiết bị */}
                       <td className="py-3.5 px-4 overflow-hidden text-center" title={s.user_agent}>
                         <div className="flex items-center justify-center gap-2.5 min-w-0">
                           <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 flex items-center justify-center shrink-0">
@@ -444,25 +457,24 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
                         </div>
                       </td>
 
-                      {/* 4. Cột Đăng nhập: font-mono tabular-nums text-sm căn giữa */}
+                      {/* 4. Cột Đăng nhập */}
                       <td className="py-3.5 px-4 font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap text-center">
                         {s.created_at ? new Date(s.created_at).toLocaleString('vi-VN') : '—'}
                       </td>
 
-                      {/* 5. Cột Hoạt động cuối: font-mono tabular-nums text-sm căn giữa */}
+                      {/* 5. Cột Hoạt động cuối */}
                       <td className="py-3.5 px-4 font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap text-center">
                         {s.last_seen_at ? new Date(s.last_seen_at).toLocaleString('vi-VN') : '—'}
                       </td>
 
-                      {/* 6. Cột Idle: Pill bo tròn đèn tín hiệu pulsing căn giữa */}
+                      {/* 6. Cột Idle: Pill pulsing */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">{renderIdlePill(s)}</td>
 
-                      {/* 7. Cột Thao tác: Ngắt phiên & Ngắt toàn bộ căn giữa */}
+                      {/* 7. Cột Thao tác */}
                       <td className="py-3.5 px-4 text-center space-x-1.5 whitespace-nowrap">
                         {hasPermission('SESSION_KILL') && (
                           <>
                             {isCurrentUser ? (
-                              /* Bảo vệ Admin không tự ngắt phiên của chính mình */
                               <span
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 select-none shadow-xs"
                                 title="Phiên đang đăng nhập hiện tại của đồng chí. Hệ thống khóa chức năng ngắt phiên để đảm bảo liên tục quyền điều hành."
@@ -528,7 +540,6 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
 
   // ═══════════════════════════════════════════════════════════
   // 3. MODAL CẢNH BÁO NGUY HIỂM: NGẮT PHIÊN (PURGE / KILL CONFIRMATION)
-  // Màu Đỏ Quân Kỳ & Xác nhận an toàn tuyệt đối
   // ═══════════════════════════════════════════════════════════
   const dangerConfirmModal = (
     <AnimatePresence>

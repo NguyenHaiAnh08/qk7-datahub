@@ -11,13 +11,13 @@ import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
+import { isApprovalRequired } from '../utils/approvalUtils';
 
 const ITEMS_PER_PAGE = 8;
 
 export const DocumentDeskPage: React.FC = () => {
-  const { user } = useAuth();
-  const canUpload = (user?.roles || []).includes('ROL-01') || (user?.roles || []).includes('ROL-04');
-
+const { user, hasPermission } = useAuth(); 
+const canUpload = hasPermission('DOC_UPLOAD');
   // Metadata
   const [meta, setMeta] = useState<MetaData>({ types: [], units: [], levels: [] });
 
@@ -111,19 +111,15 @@ export const DocumentDeskPage: React.FC = () => {
   const handleDeleteConfirm = async () => {
     if (!deleteConfirmDoc) return;
     try {
-      await documentsApi.deleteDocument(deleteConfirmDoc.file_id);
+      const res: any = await documentsApi.deleteDocument(deleteConfirmDoc.file_id);
+      setDeleteConfirmDoc(null);
+      await loadDocuments();
+      if (isApprovalRequired(res)) return;
       toast.success(`Đã xóa văn bản ${deleteConfirmDoc.document_code} khỏi hệ thống văn thư.`, {
         title: 'XÓA TÀI LIỆU THÀNH CÔNG',
         badge: deleteConfirmDoc.document_code,
       });
-      setDeleteConfirmDoc(null);
-      await loadDocuments();
-    } catch (err: any) {
-      toast.error('Lỗi xóa văn bản: ' + err.message, {
-        title: 'LỖI THAO TÁC',
-        badge: 'DELETE-ERR',
-      });
-    }
+    } catch (err: any) { /* existing */ }
   };
 
   // Download Handler

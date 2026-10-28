@@ -99,8 +99,11 @@ export const aiService = {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    if (params.fingerprint_token) {
-      headers['X-Fingerprint-Token'] = params.fingerprint_token;
+    // P0 SECURITY: CHỈ gửi X-Fingerprint-Token khi được truyền tường minh (explicit auto-retry sau khi quét vân tay)
+    // TUYỆT ĐỐI KHÔNG tự động lấy từ sessionStorage gửi kèm câu hỏi mới
+    const effectiveToken = params.fingerprint_token;
+    if (effectiveToken) {
+      headers['X-Fingerprint-Token'] = effectiveToken;
     }
     return http<AIChatResponse>('/api/ai/chat', {
       method: 'POST',
@@ -109,6 +112,7 @@ export const aiService = {
         query: params.query,
         file_id: params.file_id,
         history: params.history,
+        fingerprint_token: effectiveToken,
       }),
       skipErrorNotification: false,
     });

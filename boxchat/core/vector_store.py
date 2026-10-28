@@ -454,7 +454,12 @@ class HybridVectorStore:
             if len(final_results) >= top_k:
                 break
 
-        return final_results
+        # Defense-in-depth: Đảm bảo 100% không có chunk nào vượt max_security_level lọt qua
+        safe_results = [
+            c for c in final_results
+            if int(c.get("security_level_id", 1)) <= max_security_level
+        ]
+        return safe_results
 
     def _rank_bm25(self, query: str, candidates: List[Dict[str, Any]], top_k: int = 5) -> List[Dict[str, Any]]:
         """

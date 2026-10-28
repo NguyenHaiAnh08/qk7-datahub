@@ -122,6 +122,12 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         throw new Error('Không nhận được token');
       }
 
+      if (typeof window !== 'undefined' && res.fingerprint_token) {
+        sessionStorage.setItem('qk7_fp_token', res.fingerprint_token);
+        if (fileId) {
+          sessionStorage.setItem(`qk7_fp_token_`, res.fingerprint_token);
+        }
+      }
       setScore(res.score ?? null);
       setProgress(100);
       setPhase('success');

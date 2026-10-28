@@ -23,7 +23,7 @@ export const DEFAULT_GUEST_STEPS: SpotlightTourStep[] = [
     target: '#tour-nav-portal',
     title: 'Không gian Dữ liệu số',
     badge: 'Bước 01 / 06 · Điều hướng chính',
-    description: 'Khu vực chuyển đổi và tra cứu kho tài nguyên dữ liệu số công khai của Trường Quân sự Quân khu 7 dành cho khách và cán bộ.',
+    description: 'Khu vực chuyển đổi và tra cứu kho tài nguyên dữ liệu số công khai của Trường Quân sự Quân khu 7 dành cho đại biểu và cán bộ.',
     placement: 'bottom',
   },
   {
@@ -58,7 +58,7 @@ export const DEFAULT_GUEST_STEPS: SpotlightTourStep[] = [
     target: '#tour-header-controls, #tour-header-controls-ipad',
     title: 'Cụm công cụ hệ thống',
     badge: 'Bước 06 / 06 · Tiện ích chỉ huy',
-    description: 'Kiểm tra trạng thái kết nối mạng LAN nội bộ, chuyển đổi tỉ lệ hiển thị (PC / iPad), bật tắt giao diện Sáng/Tối và quản lý menu phiên tài khoản Khách.',
+    description: 'Kiểm tra trạng thái kết nối mạng LAN nội bộ, chuyển đổi tỉ lệ hiển thị (PC / iPad), bật tắt giao diện Sáng/Tối và quản lý menu phiên tài khoản Đại biểu.',
     placement: 'bottom',
   },
 ];

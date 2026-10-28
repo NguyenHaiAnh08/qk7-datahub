@@ -7,10 +7,13 @@ import { DeviceModeProvider } from './contexts/DeviceModeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { RouterProvider } from './routes/RouterProvider';
 import { HttpErrorListener } from './components/common/HttpErrorListener';
+import { ApprovalListener } from './components/common/ApprovalListener';
 import { ToastProvider } from './components/common/Toast';
 import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
 import AIChatWidget from './components/ai-chat/AIChatWidget';
+import { ApprovalProvider } from './contexts/ApprovalContext';
 import './index.css';
+
 
 /**
  * Wrapper đồng bộ Theme (Dark/Light) và Cấu hình Token Ant Design toàn diện
@@ -110,6 +113,7 @@ const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
     >
       <AntApp>
         <HttpErrorListener />
+        <ApprovalListener />
         {children}
       </AntApp>
     </ConfigProvider>
@@ -146,8 +150,10 @@ export const App: React.FC = () => {
             <ToastProvider>
               <NetworkStatusProvider>
                 <AuthProvider>
-                  <RouterProvider />
-                  <AIChatWrapper />
+                  <ApprovalProvider pollMs={30000}>
+                    <RouterProvider />
+                    <AIChatWrapper />
+                  </ApprovalProvider>
                 </AuthProvider>
               </NetworkStatusProvider>
             </ToastProvider>

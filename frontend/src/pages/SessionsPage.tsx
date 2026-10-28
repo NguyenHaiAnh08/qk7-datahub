@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { sessionService } from '../services/sessionService';
 import { useAuth } from '../hooks/useAuth';
 import { ActiveSession } from '../types/user';
+import { isApprovalRequired } from '../utils/approvalUtils';
 
 export interface SessionsPageProps {
   /** Khi true: render inline trong AdminDashboardPage (không có Header riêng, không min-h-screen) */
@@ -54,8 +55,8 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
 
   const killOne = async (sessionId: string) => {
     try {
-      await sessionService.kill(sessionId);
-      showToast('Đã kill session', 'success');
+      const res: any = await sessionService.kill(sessionId);
+      if (!isApprovalRequired(res)) showToast('Đã kill session', 'success');
       setConfirm({ open: false });
       load(true);
     } catch (err: any) {
@@ -65,8 +66,10 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
 
   const killAllForUser = async (userId: string) => {
     try {
-      const r = await sessionService.killAllForUser(userId);
-      showToast(`Đã kill ${r.revoked_count} session của ${userId}`, 'success');
+      const r: any = await sessionService.killAllForUser(userId);
+      if (!isApprovalRequired(r)) {
+        showToast(`Đã kill ${r.revoked_count} session của ${userId}`, 'success');
+     }
       setConfirm({ open: false });
       load(true);
     } catch (err: any) {

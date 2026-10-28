@@ -10,7 +10,7 @@ import { HttpErrorListener } from './components/common/HttpErrorListener';
 import { ApprovalListener } from './components/common/ApprovalListener';
 import { ToastProvider } from './components/common/Toast';
 import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
-import AIChatWidget from './components/ai-chat/AIChatWidget'; // ✅ dùng cái này
+import AIChatDrawer from './components/ai-chat/AIChatDrawer';
 import { ApprovalProvider } from './contexts/ApprovalContext';
 import { AIChatProvider } from './contexts/AIChatContext'
 import './index.css';
@@ -133,8 +133,8 @@ const AIChatWrapper: React.FC = () => {
     return null;
   }
 
-  // ✅ FIX: render AIChatWidget (đã import) thay vì AIChatDrawer (không tồn tại)
-  return <AIChatWidget />;
+  // Render AIChatDrawer hiện đại (Slide-over Drawer) kích hoạt từ nút Bot trên Header
+  return <AIChatDrawer />;
 };
 
 /**

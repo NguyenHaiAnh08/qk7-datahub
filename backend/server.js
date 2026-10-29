@@ -81,6 +81,7 @@ app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
+  originAgentCluster: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   hsts: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
 }));

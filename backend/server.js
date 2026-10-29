@@ -81,7 +81,9 @@ app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
+  originAgentCluster: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  hsts: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
 }));
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
@@ -138,6 +140,14 @@ if (ENABLE_SWAGGER) {
   app.get('/api-docs.json', (req, res) => res.json(swaggerSpec));
   console.log('[SWAGGER] Enabled at /api-docs');
 }
+
+app.get('/favicon.ico', (req, res) => {
+  const icoPath = path.join(publicDir, 'favicon.ico');
+  const pngPath = path.join(publicDir, 'favicon.png');
+  if (fs.existsSync(icoPath)) return res.type('image/x-icon').sendFile(icoPath);
+  if (fs.existsSync(pngPath)) return res.type('image/png').sendFile(pngPath);
+  res.status(204).end();
+});
 
 app.get('/', (req, res) => {
   const p = path.join(publicDir, 'index.html');

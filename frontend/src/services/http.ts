@@ -86,8 +86,8 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
       }
 
       const httpError = new HttpError(response.status, errorMsg, data, url);
-      if (!options.silent) {
-        console.error(`[HTTP ${response.status}] ${options.method || 'GET'} ${url} ->`, errorMsg);
+      if (!options.silent && import.meta.env.DEV) {
+        console.error(`[HTTP ${response.status}] ${options.method || 'GET'} ${url.split('?')[0]}`);
       }
 
       // Kích hoạt custom event toàn cục để Router/App lắng nghe và điều hướng

@@ -88,8 +88,8 @@ export const ApprovalProvider: React.FC<ApprovalProviderProps> = ({
     refresh();
 
     // Poll định kỳ
-    const timer = setInterval(refresh, pollMs);
-    return () => clearInterval(timer);
+    const timer = pollMs > 0 ? setInterval(refresh, pollMs) : null;
+    return () => { if (timer) clearInterval(timer); };
   }, [enabled, pollMs, refresh]);
 
   return (

@@ -78,6 +78,8 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
           <input
+            id="doc-desk-search-input"
+            name="doc_desk_search"
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -89,6 +91,8 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         {/* Document Type Dropdown */}
         <div>
           <select
+            id="doc-desk-type-select"
+            name="doc_desk_type"
             value={selectedType}
             onChange={(e) => onTypeChange(e.target.value)}
             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"
@@ -105,6 +109,8 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         {/* Unit Dropdown */}
         <div>
           <select
+            id="doc-desk-unit-select"
+            name="doc_desk_unit"
             value={selectedUnit}
             onChange={(e) => onUnitChange(e.target.value)}
             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition cursor-pointer"
@@ -134,6 +140,8 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         {/* Security Level Dropdown */}
         <div>
           <select
+            id="doc-desk-level-select"
+            name="doc_desk_level"
             value={selectedLevel}
             onChange={(e) => onLevelChange(Number(e.target.value))}
             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition"

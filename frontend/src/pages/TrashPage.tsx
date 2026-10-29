@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-<<<<<<< HEAD
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Trash2,
@@ -11,14 +10,12 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { Tooltip } from 'antd';
-=======
-import { Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 import { Header } from '../components/common/Header';
 import { toast } from '../components/common/Toast';
 import { documentsApi } from '../services/documentsApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem } from '../types';
+import { isApprovalRequired } from '../utils/approvalUtils';
 
 export interface TrashPageProps {
   /** Khi true: render inline trong AdminDashboardPage (không có Header riêng, không min-h-screen) */
@@ -26,7 +23,6 @@ export interface TrashPageProps {
 }
 
 export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
-<<<<<<< HEAD
   const { hasPermission, user } = useAuth();
   const isAdminUser = (user?.roles || []).includes('ROL-01');
 
@@ -53,38 +49,13 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   const [confirmKeyword, setConfirmKeyword] = useState('');
 
   // Tải danh sách tài liệu trong thùng rác
-=======
-  const { hasPermission } = useAuth();
-  const [docs, setDocs] = useState<DocumentItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [confirm, setConfirm] = useState<{
-    open: boolean;
-    doc: DocumentItem | null;
-    mode: 'restore' | 'purge';
-  }>({
-    open: false,
-    doc: null,
-    mode: 'restore',
-  });
-  const [toast, setToast] = useState<ToastState>({ show: false, message: '', type: 'success' });
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast((p) => ({ ...p, show: false })), 2800);
-  };
-
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
   const load = async () => {
     setLoading(true);
     try {
       const r = await documentsApi.getTrash();
       setDocs(r.items || []);
     } catch (err: any) {
-<<<<<<< HEAD
       toast.error('Lỗi tải thùng rác: ' + (err.message || 'Lỗi không xác định'));
-=======
-      showToast('Lỗi tải thùng rác: ' + err.message, 'error');
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
     } finally {
       setLoading(false);
     }
@@ -94,7 +65,6 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
     load();
   }, []);
 
-<<<<<<< HEAD
   // ═══════════════════════════════════════════════════════════
   // 1. THAO TÁC KHÔI PHỤC ĐƠN LẺ (Kèm hiệu ứng mờ dần)
   // ═══════════════════════════════════════════════════════════
@@ -177,27 +147,10 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
       toast.error('Lỗi trong quá trình khôi phục: ' + err.message);
     } finally {
       setBatchLoading(false);
-=======
-  const handleAction = async () => {
-    if (!confirm.doc) return;
-    try {
-      if (confirm.mode === 'restore') {
-        await documentsApi.restoreDocument(confirm.doc.file_id);
-        showToast(`Đã khôi phục: ${confirm.doc.title}`, 'success');
-      } else {
-        await documentsApi.purgeDocument(confirm.doc.file_id);
-        showToast(`Đã xóa vĩnh viễn: ${confirm.doc.title}`, 'success');
-      }
-      setConfirm({ open: false, doc: null, mode: 'restore' });
-      load();
-    } catch (err: any) {
-      showToast('Lỗi: ' + err.message, 'error');
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
     }
   };
 
   // ═══════════════════════════════════════════════════════════
-<<<<<<< HEAD
   // 3. THAO TÁC XÓA VĨNH VIỄN (PURGE - ĐƠN LẺ & DỌN RỖNG)
   // ═══════════════════════════════════════════════════════════
   const handlePurgeConfirm = async () => {
@@ -422,54 +375,10 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
                       <RefreshCw className="w-6 h-6 animate-spin text-emerald-600" />
                       <span className="text-xs font-medium">Đang tải dữ liệu thùng rác...</span>
                     </div>
-=======
-  // CONTENT (dùng chung cho cả 2 layout)
-  // ═══════════════════════════════════════════════════════════
-  const pageContent = (
-    <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-            <Trash2 className="w-6 h-6 text-rose-500" />
-            Thùng Rác Tài Liệu
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {docs.length} tài liệu đã xóa mềm. Chỉ Admin được xóa vĩnh viễn.
-          </p>
-        </div>
-        <button
-          onClick={load}
-          className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold cursor-pointer"
-        >
-          Làm mới
-        </button>
-      </div>
-
-      <div className="bg-white dark:bg-slate-900/80 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left min-w-[720px]">
-            <thead className="bg-slate-50 dark:bg-slate-800/60 text-[11px] uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
-              <tr>
-                <th className="py-3 px-4">Số hiệu</th>
-                <th className="py-3 px-4">Trích yếu</th>
-                <th className="py-3 px-4">Độ mật</th>
-                <th className="py-3 px-4">Đơn vị</th>
-                <th className="py-3 px-4">Xóa lúc</th>
-                <th className="py-3 px-4">Người xóa</th>
-                <th className="py-3 px-4 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    Đang tải...
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                   </td>
                 </tr>
               ) : docs.length === 0 ? (
                 <tr>
-<<<<<<< HEAD
                   <td colSpan={7} className="py-16 text-center text-slate-400 dark:text-slate-500">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center text-slate-400">
@@ -564,60 +473,6 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
                     </tr>
                   );
                 })
-=======
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    Thùng rác trống
-                  </td>
-                </tr>
-              ) : (
-                docs.map((d: any) => (
-                  <tr
-                    key={d.file_id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                  >
-                    <td className="py-3 px-4 font-mono font-bold text-amber-600 dark:text-amber-400">
-                      {d.document_code || d.file_id}
-                    </td>
-                    <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">
-                      {d.title}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-[10px] px-2 py-0.5 rounded border bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-500/30">
-                        {d.security_name || `Cấp ${d.security_level_id}`}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
-                      {d.unit_name || '—'}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500">
-                      {d.deleted_at ? new Date(d.deleted_at).toLocaleString('vi-VN') : '—'}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
-                      {d.deleted_by_name || '—'}
-                    </td>
-                    <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
-                      {hasPermission('DOC_RESTORE') && (
-                        <button
-                          onClick={() => setConfirm({ open: true, doc: d, mode: 'restore' })}
-                          className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-500/30 cursor-pointer"
-                          title="Khôi phục"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      {hasPermission('DOC_PURGE') && (
-                        <button
-                          onClick={() => setConfirm({ open: true, doc: d, mode: 'purge' })}
-                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-500/30 cursor-pointer"
-                          title="Xóa vĩnh viễn"
-                        >
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
               )}
             </tbody>
           </table>
@@ -627,7 +482,6 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   );
 
   // ═══════════════════════════════════════════════════════════
-<<<<<<< HEAD
   // 3. MODAL CẢNH BÁO NGUY HIỂM: XÓA VĨNH VIỄN (PURGE CONFIRMATION)
   // ═══════════════════════════════════════════════════════════
   const dangerPurgeModal = (
@@ -776,71 +630,30 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
 
   // ═══════════════════════════════════════════════════════════
   // EMBEDDED LAYOUT (Khi nhúng trong AdminDashboardPage)
-=======
-  // Dialog (dùng chung + fix BUG #5: isDestructive chỉ khi purge)
-  // ═══════════════════════════════════════════════════════════
-  const confirmDialog = (
-    <ConfirmDialog
-      open={confirm.open}
-      title={confirm.mode === 'restore' ? 'Khôi phục tài liệu' : 'XÓA VĨNH VIỄN'}
-      message={
-        confirm.mode === 'restore'
-          ? `Khôi phục "${confirm.doc?.title}"?`
-          : `CẢNH BÁO: File PDF vật lý sẽ bị xóa vĩnh viễn khỏi ổ đĩa. Không thể hoàn tác. Xác nhận xóa "${confirm.doc?.title}"?`
-      }
-      confirmText={confirm.mode === 'restore' ? 'Khôi phục' : 'Xóa vĩnh viễn'}
-      confirmVariant={confirm.mode === 'restore' ? 'primary' : 'danger'}
-      isDestructive={confirm.mode !== 'restore'}
-      onConfirm={handleAction}
-      onCancel={() => setConfirm({ open: false, doc: null, mode: 'restore' })}
-    />
-  );
-
-  // ═══════════════════════════════════════════════════════════
-  // EMBEDDED LAYOUT
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
   // ═══════════════════════════════════════════════════════════
   if (embedded) {
     return (
       <div className="space-y-5">
         {pageContent}
-<<<<<<< HEAD
         {dangerPurgeModal}
         {restoreAllConfirmModal}
-=======
-        {confirmDialog}
-        <Toast toast={toast} onClose={() => setToast((p) => ({ ...p, show: false }))} />
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
       </div>
     );
   }
 
   // ═══════════════════════════════════════════════════════════
-<<<<<<< HEAD
   // STANDALONE LAYOUT (Khi truy cập trực tiếp /admin/trash)
   // ═══════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans transition-colors duration-200">
       <Header activeNav="admin" title="Trường Quân Sự Quân Khu 7" subtitle="Thùng rác tài liệu" />
-=======
-  // STANDALONE LAYOUT
-  // ═══════════════════════════════════════════════════════════
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
-      <Header activeNav="admin" title="QK7 DATAHUB" subtitle="Thùng rác tài liệu" />
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-5">
         {pageContent}
       </main>
 
-<<<<<<< HEAD
       {dangerPurgeModal}
       {restoreAllConfirmModal}
-=======
-      {confirmDialog}
-      <Toast toast={toast} onClose={() => setToast((p) => ({ ...p, show: false }))} />
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
     </div>
   );
 };

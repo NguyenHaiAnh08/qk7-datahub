@@ -322,65 +322,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                 </div>
               </div>
 
-            {/* Input Tài khoản quân nhân */}
-            <NotchedInput
-              id="username-split"
-              name="username"
-              autoComplete="username"
-              label="Tài khoản quân nhân"
-              value={username}
-              onChange={handleUsernameChange}
-              icon={<UserIcon className="w-4 h-4" />}
-              errorMessage={usernameError}
-              shakeKey={usernameShake}
-              compact={true}
-              required
-            />
-
-            {/* Input Mật khẩu */}
-            <NotchedInput
-              id="password-split"
-              name="password"
-              autoComplete="current-password"
-              label="Mật khẩu"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={handlePasswordChange}
-              icon={<Lock className="w-4 h-4" />}
-              rightElement={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-              }
-              errorMessage={passwordError}
-              shakeKey={passwordShake}
-              compact={true}
-              required
-            />
-
-            {/* Nút Đăng nhập */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-semibold text-xs shadow-md shadow-emerald-950/20 border border-amber-500/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang xác thực thông tin...</span>
-                </>
-              ) : (
-                <>
-                  <UserCheck className="w-4 h-4" />
-                  <span>Đăng Nhập Hệ Thống</span>
-                </>
-              )}
-            </button>
               {/* Input Tài khoản quân nhân */}
               <NotchedInput
                 id="username-split"
@@ -604,50 +545,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   // BRANCH B: BỐ CỤC ĐỨNG TRUYỀN THỐNG (PC HOẶC IPAD PORTRAIT 834 x 1178)
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <form onSubmit={handleLoginSubmit} className="space-y-4">
-      {/* Input Tài khoản quân nhân */}
-      <NotchedInput
-        id="username-vertical"
-        name="username"
-        autoComplete="username"
-        label="Tài khoản quân nhân"
-        value={username}
-        onChange={handleUsernameChange}
-        icon={<UserIcon className="w-4.5 h-4.5" />}
-        errorMessage={usernameError}
-        shakeKey={usernameShake}
-        required
-      />
-
-      {/* Input Mật khẩu */}
-      <NotchedInput
-        id="password-vertical"
-        name="password"
-        autoComplete="current-password"
-        label="Mật khẩu"
-        type={showPassword ? 'text' : 'password'}
-        value={password}
-        onChange={handlePasswordChange}
-        icon={<Lock className="w-4.5 h-4.5" />}
-        rightElement={
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-            title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-          >
-            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        }
-        errorMessage={passwordError}
-        shakeKey={passwordShake}
-        required
-      />
     <>
       <form onSubmit={handleLoginSubmit} className="space-y-4">
         {/* Input Tài khoản quân nhân */}
         <NotchedInput
           id="username-vertical"
+          name="username"
+          autoComplete="username"
           label="Tài khoản quân nhân"
           value={username}
           onChange={handleUsernameChange}
@@ -660,6 +564,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
         {/* Input Mật khẩu */}
         <NotchedInput
           id="password-vertical"
+          name="password"
+          autoComplete="current-password"
           label="Mật khẩu"
           type={showPassword ? 'text' : 'password'}
           value={password}

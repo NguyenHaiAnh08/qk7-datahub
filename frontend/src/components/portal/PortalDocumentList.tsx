@@ -15,7 +15,8 @@ export interface PortalDocumentListProps {
   onClearFilters?: () => void;
   onPageChange: (page: number) => void;
   onPreview: (doc: DocumentItem) => void;
-  onDownload: (doc: DocumentItem) => void;
+  onDownload: (doc: DocumentItem, signal?: AbortSignal) => Promise<(() => void) | void> | (() => void) | void;
+  onCancelDownload?: (doc: DocumentItem) => void;
 }
 
 export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
@@ -30,6 +31,7 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
   onPageChange,
   onPreview,
   onDownload,
+  onCancelDownload,
 }) => {
   if (loading) {
     return (
@@ -70,6 +72,7 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
               userClearanceLevel={userClearanceLevel}
               onPreview={onPreview}
               onDownload={onDownload}
+              onCancelDownload={onCancelDownload}
             />
           </div>
         ))}

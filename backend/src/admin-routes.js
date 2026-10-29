@@ -1,13 +1,9 @@
 // src/admin-routes.js
 const bcrypt = require('bcryptjs');
-const { AUTO_PERMISSIONS, getAutoRequiredPermission } = require('./route-permissions');
 
 module.exports = (app, deps) => {
     const {
         sql, getPool, writeAccessLog,
-        requireAuth,
-        requirePermission,
-        requireAnyPermission,
         getUserPermissions,
         invalidateCache,
         listActiveSessions,
@@ -16,6 +12,7 @@ module.exports = (app, deps) => {
         sessionIdleTimeoutMinutes = 30,
     } = deps;
 
+<<<<<<< HEAD
 
     const getClientIp = (req) => {
         const raw = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || '';
@@ -94,6 +91,8 @@ module.exports = (app, deps) => {
     });
 
 
+=======
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
     // ═══ Cache invalidation helpers ═══
     const _invalidateUser = (uid) => {
         if (typeof invalidateCache === 'function') {
@@ -108,7 +107,84 @@ module.exports = (app, deps) => {
         }
     };
 
-    
+    const getClientIp = (req) => {
+        const raw = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || '';
+        let ip = String(Array.isArray(raw) ? raw[0] : raw).split(',')[0].trim();
+        if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+        if (ip === '::1') ip = '127.0.0.1';
+        return ip;
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // RBAC GATE — Pure permission-based, KHÔNG dùng clearance_level_id
+    // Admin role (ROL-01) luôn bypass
+    // ═══════════════════════════════════════════════════════════════
+    const AUTO_PERMISSIONS = {
+        GET: [
+            [/^\/api\/admin\/stats$/,                     'SYSTEM_STATS_VIEW'],
+            [/^\/api\/admin\/users$/,                     'USER_VIEW'],
+            [/^\/api\/admin\/users\/[^/]+\/roles$/,       'USER_VIEW'],
+            [/^\/api\/admin\/users\/[^/]+\/permissions$/, 'USER_VIEW'],
+            [/^\/api\/admin\/roles$/,                     'ROLE_VIEW'],
+            [/^\/api\/admin\/roles\/[^/]+\/permissions$/, 'ROLE_VIEW'],
+            [/^\/api\/admin\/permissions$/,               'PERMISSION_VIEW'],
+            [/^\/api\/admin\/units$/,                     'UNIT_VIEW'],
+            [/^\/api\/admin\/document-types$/,            'DOCTYPE_VIEW'],
+            [/^\/api\/admin\/security-levels$/,           'SECLEVEL_VIEW'],
+            [/^\/api\/admin\/ranks$/,                     'RANK_VIEW'],
+            [/^\/api\/admin\/positions$/,                 'POSITION_VIEW'],
+            [/^\/api\/admin\/unit-aliases$/,              'UNIT_ALIAS_VIEW'],
+            [/^\/api\/admin\/ip-blocklist$/,              'AUDIT_VIEW'],
+            [/^\/api\/admin\/login-attempts$/,            'AUDIT_VIEW'],
+            [/^\/api\/admin\/sessions$/,                  'SESSION_VIEW'],
+            [/^\/api\/admin\/sessions\/[^/]+$/,           'SESSION_VIEW'],
+            [/^\/api\/admin\/sessions\/user\/[^/]+$/,     'SESSION_VIEW'],
+        ],
+        POST: [
+            [/^\/api\/admin\/users$/,                     'USER_CREATE'],
+            [/^\/api\/admin\/users\/[^/]+\/roles$/,       'USER_ROLE_ASSIGN'],
+            [/^\/api\/admin\/users\/[^/]+\/permissions$/, 'USER_PERMISSION_ASSIGN'],
+            [/^\/api\/admin\/users\/[^/]+\/unlock$/,      'USER_EDIT'],
+            [/^\/api\/admin\/roles$/,                     'ROLE_CREATE'],
+            [/^\/api\/admin\/roles\/[^/]+\/permissions$/, 'ROLE_PERMISSION_ASSIGN'],
+            [/^\/api\/admin\/permissions$/,               'PERMISSION_CREATE'],
+            [/^\/api\/admin\/units$/,                     'UNIT_MANAGE'],
+            [/^\/api\/admin\/document-types$/,            'DOCTYPE_MANAGE'],
+            [/^\/api\/admin\/security-levels$/,           'SECLEVEL_MANAGE'],
+            [/^\/api\/admin\/ranks$/,                     'RANK_MANAGE'],
+            [/^\/api\/admin\/positions$/,                 'POSITION_MANAGE'],
+            [/^\/api\/admin\/unit-aliases$/,              'UNIT_ALIAS_MANAGE'],
+        ],
+        PUT: [
+            [/^\/api\/admin\/users\/[^/]+$/,              'USER_EDIT'],
+            [/^\/api\/admin\/users\/[^/]+\/credentials$/, 'USER_CREDENTIALS'],
+            [/^\/api\/admin\/roles\/[^/]+$/,              'ROLE_EDIT'],
+            [/^\/api\/admin\/permissions\/[^/]+$/,        'PERMISSION_EDIT'],
+            [/^\/api\/admin\/units\/[^/]+$/,              'UNIT_MANAGE'],
+            [/^\/api\/admin\/document-types\/[^/]+$/,     'DOCTYPE_MANAGE'],
+            [/^\/api\/admin\/security-levels\/[^/]+$/,    'SECLEVEL_MANAGE'],
+            [/^\/api\/admin\/ranks\/[^/]+$/,              'RANK_MANAGE'],
+            [/^\/api\/admin\/positions\/[^/]+$/,          'POSITION_MANAGE'],
+            [/^\/api\/admin\/unit-aliases\/[^/]+$/,       'UNIT_ALIAS_MANAGE'],
+        ],
+        DELETE: [
+            [/^\/api\/admin\/users\/[^/]+$/,                     'USER_DELETE'],
+            [/^\/api\/admin\/users\/[^/]+\/roles\/[^/]+$/,       'USER_ROLE_ASSIGN'],
+            [/^\/api\/admin\/users\/[^/]+\/permissions\/[^/]+$/, 'USER_PERMISSION_ASSIGN'],
+            [/^\/api\/admin\/roles\/[^/]+$/,                     'ROLE_DELETE'],
+            [/^\/api\/admin\/roles\/[^/]+\/permissions\/[^/]+$/, 'ROLE_PERMISSION_ASSIGN'],
+            [/^\/api\/admin\/permissions\/[^/]+$/,               'PERMISSION_DELETE'],
+            [/^\/api\/admin\/units\/[^/]+$/,                     'UNIT_MANAGE'],
+            [/^\/api\/admin\/document-types\/[^/]+$/,            'DOCTYPE_MANAGE'],
+            [/^\/api\/admin\/security-levels\/[^/]+$/,           'SECLEVEL_MANAGE'],
+            [/^\/api\/admin\/ranks\/[^/]+$/,                     'RANK_MANAGE'],
+            [/^\/api\/admin\/positions\/[^/]+$/,                 'POSITION_MANAGE'],
+            [/^\/api\/admin\/unit-aliases\/[^/]+$/,              'UNIT_ALIAS_MANAGE'],
+            [/^\/api\/admin\/ip-blocklist\/[^/]+$/,              'AUDIT_VIEW'],
+            [/^\/api\/admin\/sessions\/user\/[^/]+$/,            'SESSION_KILL'],
+            [/^\/api\/admin\/sessions\/[^/]+$/,                  'SESSION_KILL'],
+        ],
+    };
 
     const requireAdminPanelAccess = async (req, res, next) => {
         if (!req.user || !req.user.is_authenticated) {
@@ -151,10 +227,6 @@ module.exports = (app, deps) => {
         userId: req.user.user_id, fileId: null,
         action, ip: req.ip || '', note,
     });
-
-
-
-
 
     // ═══════════════════════════════════════════════════════════
     // 0. THỐNG KÊ DASHBOARD
@@ -230,43 +302,22 @@ module.exports = (app, deps) => {
                 return res.status(400).json({ error: 'Thiếu mức bảo mật' });
             }
 
-            // ═══════════════════════════════════════════════════════════
-            // [NEW] PHÂN QUYỀN TẠO USER: Admin → toàn quyền | IT → giới hạn
-            // ═══════════════════════════════════════════════════════════
-            const { NON_ADMIN_CREATABLE_ROLES } = require('./user-roles');
-            
             const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
             const callerClearance = req.user?.clearance_level_id || 1;
             const targetClearance = parseInt(clearance_level_id, 10);
             const targetRoles = role_id ? [role_id] : (Array.isArray(roles) ? roles : []);
 
             if (!callerIsAdmin) {
-                // 1. Không được tạo user cấp bảo mật cao hơn mình
                 if (targetClearance > callerClearance) {
                     return res.status(403).json({
                         error: `Không thể tạo user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
                         code: 'PERMISSION_DENIED',
                     });
                 }
-
-                // 2. [NEW] Chỉ được gán role trong whitelist (Trợ lý + Chỉ huy)
-                const invalidRoles = targetRoles.filter(
-                    (r) => r && !NON_ADMIN_CREATABLE_ROLES.includes(r)
-                );
-                if (invalidRoles.length > 0) {
+                if (targetRoles.includes('ROL-01')) {
                     return res.status(403).json({
-                        error: `Bạn chỉ được tạo tài khoản với vai trò "Trợ lý" hoặc "Chỉ huy". Vai trò không hợp lệ: ${invalidRoles.join(', ')}`,
-                        code: 'ROLE_NOT_ALLOWED',
-                        allowed_roles: NON_ADMIN_CREATABLE_ROLES,
-                    });
-                }
-
-                // 3. [NEW] Bắt buộc phải chọn 1 role (không được để trống)
-                if (targetRoles.length === 0) {
-                    return res.status(400).json({
-                        error: 'Vui lòng chọn vai trò cho tài khoản mới (Trợ lý hoặc Chỉ huy).',
-                        code: 'ROLE_REQUIRED',
-                        allowed_roles: NON_ADMIN_CREATABLE_ROLES,
+                        error: 'Chỉ Admin mới có thể tạo user có vai trò Admin',
+                        code: 'PERMISSION_DENIED',
                     });
                 }
             }
@@ -323,98 +374,76 @@ module.exports = (app, deps) => {
     });
 
     app.put('/api/admin/users/:id', async (req, res) => {
-    try {
-        const userId = req.params.id;
-        // SECURITY: KHÔNG nhận role_id/roles — dùng POST /users/:id/roles
-        const { full_name, rank_name, position, unit_id, status, clearance_level_id } = req.body;
+        try {
+            const userId = req.params.id;
+            // SECURITY: KHÔNG nhận role_id/roles — dùng POST /users/:id/roles
+            const { full_name, rank_name, position, unit_id, status, clearance_level_id } = req.body;
 
-        const pool = await getPool();
+            const pool = await getPool();
 
-        const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
-        const callerPerms = callerIsAdmin ? [] : await getUserPermissions(req.user.user_id);
-        const canChangeClearance = callerIsAdmin || callerPerms.includes('USER_ROLE_ASSIGN');
+            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+            const callerPerms = callerIsAdmin ? [] : await getUserPermissions(req.user.user_id);
+            const canChangeClearance = callerIsAdmin || callerPerms.includes('USER_ROLE_ASSIGN');
 
-        const targetUserRes = await pool.request()
-            .input('u', sql.VarChar(50), userId)
-            .query(`SELECT clearance_level_id, status FROM [USER] WHERE user_id = @u`);
-        if (targetUserRes.recordset.length === 0) {
-            return res.status(404).json({ error: 'Không tìm thấy user' });
-        }
-        const targetUser = targetUserRes.recordset[0];
-
-        if (!canChangeClearance && clearance_level_id !== undefined &&
-            parseInt(clearance_level_id, 10) !== targetUser.clearance_level_id) {
-            return res.status(403).json({
-                error: 'Chỉ người có quyền USER_ROLE_ASSIGN mới được đổi cấp độ bảo mật',
-                code: 'PERMISSION_DENIED',
-                required_permission: 'USER_ROLE_ASSIGN',
-            });
-        }
-
-        const callerClearance = req.user?.clearance_level_id || 1;
-        if (!callerIsAdmin && targetUser.clearance_level_id > callerClearance) {
-            return res.status(403).json({
-                error: `Không thể sửa user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
-            });
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // [SECURITY FIX v4.3.1] Chặn leo thang đặc quyền qua PUT
-        // Kiểm tra GIÁ TRỊ MỚI của clearance_level_id không được vượt cấp
-        // của người thực hiện (trừ Admin).
-        // ═══════════════════════════════════════════════════════════════
-        const newClearance =
-            clearance_level_id !== undefined
-                ? parseInt(clearance_level_id, 10)
-                : targetUser.clearance_level_id;
-
-        if (!callerIsAdmin && newClearance > callerClearance) {
-            return res.status(403).json({
-                error: `Không thể gán cấp bảo mật (Cấp ${newClearance}) cao hơn cấp của bạn (Cấp ${callerClearance})`,
-                code: 'CLEARANCE_ESCALATION_DENIED',
-                caller_clearance: callerClearance,
-                requested_clearance: newClearance,
-            });
-        }
-
-        // [SECURITY FIX v4.3.1] Bổ sung: Admin chỉ được đổi clearance
-        // nếu có quyền USER_ROLE_ASSIGN — nếu Admin tối cao ROL-01 thì bypass.
-
-        if (!callerIsAdmin && status !== undefined && status !== targetUser.status) {
-            const targetIsAdmin = await pool.request()
+            const targetUserRes = await pool.request()
                 .input('u', sql.VarChar(50), userId)
-                .query(`SELECT 1 FROM USER_ROLE WHERE user_id = @u AND role_id = 'ROL-01'`);
-            if (targetIsAdmin.recordset.length > 0) {
+                .query(`SELECT clearance_level_id, status FROM [USER] WHERE user_id = @u`);
+            if (targetUserRes.recordset.length === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy user' });
+            }
+            const targetUser = targetUserRes.recordset[0];
+
+            if (!canChangeClearance && clearance_level_id !== undefined &&
+                parseInt(clearance_level_id, 10) !== targetUser.clearance_level_id) {
                 return res.status(403).json({
-                    error: 'Chỉ Admin mới có thể đổi trạng thái tài khoản Admin khác',
+                    error: 'Chỉ người có quyền USER_ROLE_ASSIGN mới được đổi cấp độ bảo mật',
+                    code: 'PERMISSION_DENIED',
+                    required_permission: 'USER_ROLE_ASSIGN',
                 });
             }
+
+            const callerClearance = req.user?.clearance_level_id || 1;
+            if (!callerIsAdmin && targetUser.clearance_level_id > callerClearance) {
+                return res.status(403).json({
+                    error: `Không thể sửa user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
+                });
+            }
+
+            if (!callerIsAdmin && status !== undefined && status !== targetUser.status) {
+                const targetIsAdmin = await pool.request()
+                    .input('u', sql.VarChar(50), userId)
+                    .query(`SELECT 1 FROM USER_ROLE WHERE user_id = @u AND role_id = 'ROL-01'`);
+                if (targetIsAdmin.recordset.length > 0) {
+                    return res.status(403).json({
+                        error: 'Chỉ Admin mới có thể đổi trạng thái tài khoản Admin khác',
+                    });
+                }
+            }
+
+            const r = await pool.request()
+                .input('user_id', sql.VarChar(50), userId)
+                .input('full_name', sql.NVarChar(100), full_name)
+                .input('rank', sql.NVarChar(50), rank_name || null)
+                .input('position', sql.NVarChar(100), position || null)
+                .input('unit_id', sql.VarChar(50), unit_id || null)
+                .input('status', sql.VarChar(20), status || targetUser.status || 'active')
+                .input('clearance_level_id', sql.Int,
+                    canChangeClearance && clearance_level_id !== undefined
+                        ? parseInt(clearance_level_id, 10)
+                        : targetUser.clearance_level_id)
+                .query(`UPDATE [USER] SET full_name=@full_name, [rank]=@rank, [position]=@position,
+                        unit_id=@unit_id, status=@status, clearance_level_id=@clearance_level_id
+                        WHERE user_id=@user_id`);
+            if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+            await log(req, 'UPDATE_USER', `Sửa user ${userId}`);
+            _invalidateUser(userId);
+            res.json({ success: true });
+        } catch (e) {
+            console.error('[PUT /api/admin/users/:id]', e);
+            res.status(500).json({ error: e.message });
         }
-
-        const r = await pool.request()
-            .input('user_id', sql.VarChar(50), userId)
-            .input('full_name', sql.NVarChar(100), full_name)
-            .input('rank', sql.NVarChar(50), rank_name || null)
-            .input('position', sql.NVarChar(100), position || null)
-            .input('unit_id', sql.VarChar(50), unit_id || null)
-            .input('status', sql.VarChar(20), status || targetUser.status || 'active')
-            .input('clearance_level_id', sql.Int,
-                canChangeClearance && clearance_level_id !== undefined
-                    ? parseInt(clearance_level_id, 10)
-                    : targetUser.clearance_level_id)
-            .query(`UPDATE [USER] SET full_name=@full_name, [rank]=@rank, [position]=@position,
-                    unit_id=@unit_id, status=@status, clearance_level_id=@clearance_level_id
-                    WHERE user_id=@user_id`);
-        if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
-
-        await log(req, 'UPDATE_USER', `Sửa user ${userId}`);
-        _invalidateUser(userId);
-        res.json({ success: true });
-    } catch (e) {
-        console.error('[PUT /api/admin/users/:id]', e);
-        res.status(500).json({ error: e.message });
-    }
-});
+    });
 
     app.delete('/api/admin/users/:id', async (req, res) => {
         try {
@@ -439,7 +468,6 @@ module.exports = (app, deps) => {
 
             await pool.request().input('u', sql.VarChar(50), uid).query(`DELETE FROM USER_FINGERPRINT WHERE user_id = @u`);
             await pool.request().input('u', sql.VarChar(50), uid).query(`DELETE FROM USER_ROLE WHERE user_id = @u`);
-            await pool.request().input('u', sql.VarChar(50), uid).query(`DELETE FROM USER_PERMISSION WHERE user_id = @u`);
             await pool.request().input('u', sql.VarChar(50), uid).query(`DELETE FROM USER_SESSION WHERE user_id = @u`);
             await pool.request().input('u', sql.VarChar(50), uid).query(`UPDATE ACCESS_LOG SET user_id = NULL WHERE user_id = @u`);
             await pool.request().input('u', sql.VarChar(50), uid).query(`UPDATE DOCUMENT SET uploaded_by = NULL WHERE uploaded_by = @u`);
@@ -452,63 +480,50 @@ module.exports = (app, deps) => {
     });
 
     app.put('/api/admin/users/:id/credentials', async (req, res) => {
-    try {
-        const userId = req.params.id;
-        const { username, password } = req.body;
-        const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
-        if (!callerIsAdmin) {
-            return res.status(403).json({
-                error: 'Chỉ Quản trị viên tối cao được đổi mật khẩu quân nhân. ' +
-                       'Cán bộ IT vui lòng liên hệ Admin để thực hiện.',
-                code: 'CREDENTIALS_ADMIN_ONLY',
-            });
+        try {
+            const userId = req.params.id;
+            const { username, password } = req.body;
+            if (!username || !username.trim()) return res.status(400).json({ error: 'Thiếu username' });
+
+            const pool = await getPool();
+            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+            const callerClearance = req.user?.clearance_level_id || 1;
+
+            const chk = await pool.request()
+                .input('u', sql.VarChar(50), userId)
+                .query(`SELECT user_id, clearance_level_id FROM [USER] WHERE user_id = @u`);
+            if (chk.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+            // SECURITY: Không đổi password user cấp cao hơn mình
+            if (!callerIsAdmin && chk.recordset[0].clearance_level_id > callerClearance) {
+                return res.status(403).json({
+                    error: `Không thể đổi tài khoản user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
+                    code: 'PERMISSION_DENIED',
+                });
+            }
+
+            const reqUpdate = pool.request()
+                .input('u', sql.VarChar(50), userId)
+                .input('un', sql.VarChar(50), username.trim().toLowerCase());
+            let query = `UPDATE [USER] SET username = @un`;
+
+            if (password && password.trim()) {
+                if (password.length < 8) return res.status(400).json({ error: 'Mật khẩu cần ít nhất 8 ký tự' });
+                const hash = await bcrypt.hash(password, 10);
+                reqUpdate.input('ph', sql.VarChar(255), hash);
+                query += `, password_hash = @ph`;
+            }
+            query += ` WHERE user_id = @u`;
+            await reqUpdate.query(query);
+
+            await log(req, 'UPDATE_CREDENTIALS', `Cập nhật tài khoản ${userId} (username: ${username})`);
+            res.json({ success: true, user_id: userId, username: username.trim().toLowerCase() });
+        } catch (e) {
+            if (e.message.includes('UQ_USER_USERNAME') || e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Username đã tồn tại' });
+            console.error('[PUT /api/admin/users/:id/credentials]', e);
+            res.status(500).json({ error: e.message });
         }
-
-        if (!username || !username.trim()) {
-            return res.status(400).json({ error: 'Thiếu username' });
-        }
-
-        const pool = await getPool();
-        // ⚠️ KHÔNG khai báo lại callerIsAdmin — đã có ở trên
-        const callerClearance = req.user?.clearance_level_id || 1;
-
-        const chk = await pool.request()
-            .input('u', sql.VarChar(50), userId)
-            .query(`SELECT user_id, clearance_level_id FROM [USER] WHERE user_id = @u`);
-        if (chk.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
-
-        // [defense-in-depth] Không đổi password user cấp cao hơn mình
-        // Sau guard trên, callerIsAdmin luôn === true → block này thực tế
-        // không trigger, nhưng giữ để phòng trường hợp logic ROL-01 thay đổi.
-        if (!callerIsAdmin && chk.recordset[0].clearance_level_id > callerClearance) {
-            return res.status(403).json({
-                error: `Không thể đổi tài khoản user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
-                code: 'PERMISSION_DENIED',
-            });
-        }
-
-        const reqUpdate = pool.request()
-            .input('u', sql.VarChar(50), userId)
-            .input('un', sql.VarChar(50), username.trim().toLowerCase());
-        let query = `UPDATE [USER] SET username = @un`;
-
-        if (password && password.trim()) {
-            if (password.length < 8) return res.status(400).json({ error: 'Mật khẩu cần ít nhất 8 ký tự' });
-            const hash = await bcrypt.hash(password, 10);
-            reqUpdate.input('ph', sql.VarChar(255), hash);
-            query += `, password_hash = @ph`;
-        }
-        query += ` WHERE user_id = @u`;
-        await reqUpdate.query(query);
-
-        await log(req, 'UPDATE_CREDENTIALS', `Cập nhật tài khoản ${userId} (username: ${username})`);
-        res.json({ success: true, user_id: userId, username: username.trim().toLowerCase() });
-    } catch (e) {
-        if (e.message.includes('UQ_USER_USERNAME') || e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Username đã tồn tại' });
-        console.error('[PUT /api/admin/users/:id/credentials]', e);
-        res.status(500).json({ error: e.message });
-    }
-});
+    });
 
     // ═══════════════════════════════════════════════════════════
     // 2. USER_ROLE — assign / revoke
@@ -788,47 +803,6 @@ module.exports = (app, deps) => {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // ═══════════════════════════════════════════════════════════
-    // [NEW] Trả về role mà user hiện tại ĐƯỢC PHÉP gán khi tạo user
-    // Admin (ROL-01): trả về TẤT CẢ roles
-    // IT (non-admin): chỉ trả về Trợ lý + Chỉ huy
-    // ═══════════════════════════════════════════════════════════
-    app.get('/api/admin/creatable-roles', async (req, res) => {
-        try {
-            const { NON_ADMIN_CREATABLE_ROLES } = require('./user-roles');
-            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
-            
-            const pool = await getPool();
-            const allRolesRes = await pool.request().query(
-                `SELECT role_id, name FROM [ROLE] ORDER BY role_id`
-            );
-            const allRoles = allRolesRes.recordset;
-
-            // Admin → tất cả roles
-            if (callerIsAdmin) {
-                return res.json({
-                    items: allRoles,
-                    is_admin: true,
-                    note: 'Toàn quyền chọn mọi vai trò',
-                });
-            }
-
-            // IT → chỉ Trợ lý + Chỉ huy
-            const filtered = allRoles.filter((r) =>
-                NON_ADMIN_CREATABLE_ROLES.includes(r.role_id)
-            );
-
-            return res.json({
-                items: filtered,
-                is_admin: false,
-                note: 'Chỉ được gán vai trò Trợ lý hoặc Chỉ huy',
-            });
-        } catch (e) {
-            console.error('[GET /api/admin/creatable-roles]', e);
-            res.status(500).json({ error: e.message });
-        }
-    });
-
     app.post('/api/admin/roles', async (req, res) => {
         try {
             let { role_id, name } = req.body;
@@ -927,49 +901,6 @@ module.exports = (app, deps) => {
             res.json({ success: true });
         } catch (e) {
             if (e.message.includes('PRIMARY KEY') || e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Trùng id hoặc code' });
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    app.put('/api/admin/permissions/reorder', async (req, res) => {
-        try {
-            const { items } = req.body;
-            if (!Array.isArray(items)) {
-                return res.status(400).json({ error: 'items phải là một mảng danh sách quyền và sort_order' });
-            }
-            const pool = await getPool();
-            const transaction = new sql.Transaction(pool);
-            await transaction.begin();
-            try {
-                for (const it of items) {
-                    if (it.permission_id && typeof it.sort_order === 'number') {
-                        await new sql.Request(transaction)
-                            .input('id', sql.VarChar(50), it.permission_id)
-                            .input('so', sql.Int, it.sort_order)
-                            .query(`UPDATE [PERMISSION] SET sort_order = @so WHERE permission_id = @id`);
-                    }
-                }
-                await transaction.commit();
-                _invalidateAll();
-
-                if (typeof writeAccessLog === 'function') {
-                    writeAccessLog({
-                        user_id: req.user?.user_id,
-                        action: 'PERMISSION_REORDER',
-                        resource: 'PERMISSION',
-                        details: `Sắp xếp lại thứ tự cho ${items.length} quyền`,
-                        severity: 'Info',
-                        ip: req.ip,
-                    }).catch(() => {});
-                }
-
-                res.json({ success: true, updated: items.length });
-            } catch (err) {
-                await transaction.rollback();
-                throw err;
-            }
-        } catch (e) {
-            console.error('[PUT /api/admin/permissions/reorder]', e);
             res.status(500).json({ error: e.message });
         }
     });
@@ -1534,6 +1465,7 @@ module.exports = (app, deps) => {
         }
     });
 
+<<<<<<< HEAD
         // ═══════════════════════════════════════════════════════════
     // APPROVAL WORKFLOW — Endpoints
     // ═══════════════════════════════════════════════════════════
@@ -1669,4 +1601,6 @@ module.exports = (app, deps) => {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+=======
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 };

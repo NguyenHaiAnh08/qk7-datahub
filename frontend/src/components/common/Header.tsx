@@ -9,19 +9,19 @@ import {
   ShieldAlert,
   UploadCloud,
   BookOpen,
+  MonitorPlay,
+  Layers,
+  Library,
   LogOut,
   ChevronDown,
   Menu,
-<<<<<<< HEAD
   Trash2,
   Activity,
   Shield,
   Bell,
   Bot,
-=======
   Trash2,      // ⭐ MỚI
   Activity,    // ⭐ MỚI
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
@@ -34,12 +34,11 @@ interface HeaderProps {
   title?: string;
   subtitle?: string;
   showClock?: boolean;
-  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
+  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'materials' | 'library' | 'data';
   onToggleMobileMenu?: () => void;
 }
 
 // ══════════════════════════════════════════════════════════════════════
-<<<<<<< HEAD
 // HELPER: Lấy chữ cái đầu của tên cuối (tên chính) theo quy chuẩn tiếng Việt
 // ══════════════════════════════════════════════════════════════════════
 export function getAvatarInitial(name?: string, fallback = 'ĐB'): string {
@@ -52,19 +51,23 @@ export function getAvatarInitial(name?: string, fallback = 'ĐB'): string {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+// COMPONENT: Cụm Nút Điều Hướng 5 Phân Hệ (Morphing Pill: Icon -> Chữ Đẩy Ra)
+// ══════════════════════════════════════════════════════════════════════
 // COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt
-=======
 // COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt (Sliding Highlight Pill Navigation #058)
 // Đăng tải • Dữ liệu số • Đơn vị của tôi • Quản trị
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 // ══════════════════════════════════════════════════════════════════════
 // Lưu trữ vị trí Pill gần nhất giữa các lần chuyển trang để duy trì chuyển động 2 chiều liên tục (Bidirectional motion)
 let lastKnownPillCoords: { left: number; width: number } | null = null;
 
+
+
+
+final-test
 const NavigationGlider: React.FC<{
-  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
+  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'materials' | 'library' | 'data';
 }> = ({ activeNav: explicitActiveNav }) => {
-<<<<<<< HEAD
+  const { isAdmin } = useAuth();
   const { user, isAdmin, hasPermission } = useAuth();
   const { deviceMode, isTouch } = useDeviceMode();
   const location = useLocation();
@@ -84,18 +87,38 @@ const NavigationGlider: React.FC<{
   const location = useLocation();
 
   // Tự động nhận diện tab đang mở nếu activeNav không được truyền từ page
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
+
   const getEffectiveActiveNav = () => {
-    if (explicitActiveNav) return explicitActiveNav;
+    if (explicitActiveNav) {
+      if (
+        explicitActiveNav === 'desk' ||
+        explicitActiveNav === 'myunit' ||
+        explicitActiveNav === 'portal' ||
+        explicitActiveNav === 'data'
+      ) {
+        return 'portal';
+      }
+      return explicitActiveNav;
+    }
     const path = location.pathname;
-    if (path.startsWith(ROUTE_PATHS.DESK)) return 'desk';
-    if (path.startsWith(ROUTE_PATHS.MY_UNIT)) return 'myunit';
+    if (
+      path.startsWith(ROUTE_PATHS.DESK) ||
+      path.startsWith(ROUTE_PATHS.MY_UNIT) ||
+      path.startsWith(ROUTE_PATHS.PORTAL)
+    ) {
+      return 'portal';
+    }
+    if (path.startsWith(ROUTE_PATHS.LECTURES)) return 'lectures';
+    if (path.startsWith(ROUTE_PATHS.MATERIALS)) return 'materials';
+    if (path.startsWith(ROUTE_PATHS.LIBRARY)) return 'library';
     if (path.startsWith(ROUTE_PATHS.ADMIN)) return 'admin';
-    if (path.startsWith(ROUTE_PATHS.PORTAL)) return 'portal';
     return undefined;
   };
 
   const activeNav = getEffectiveActiveNav();
+
+  const allNavTabs = [
+    {
 
   const userUnitName = user?.unit_name?.trim() || 'Đơn vị của tôi';
 
@@ -117,30 +140,36 @@ const NavigationGlider: React.FC<{
       key: 'portal',
       to: ROUTE_PATHS.PORTAL,
       label: 'Dữ liệu số',
-      shortLabel: 'Dữ liệu số',
       icon: BookOpen,
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-700 dark:text-amber-400',
+      tourId: 'tour-nav-portal',
       visible: true,
     },
     {
-      key: 'myunit',
-      to: ROUTE_PATHS.MY_UNIT,
-      label: userUnitName,
-      shortLabel: userUnitName,
-      icon: Building,
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-700 dark:text-amber-400',
-      visible: Boolean(user && user.user_id !== 'GUEST'),
+      key: 'lectures',
+      to: ROUTE_PATHS.LECTURES,
+      label: 'Bài giảng số',
+      icon: MonitorPlay,
+      visible: true,
+    },
+    {
+      key: 'materials',
+      to: ROUTE_PATHS.MATERIALS,
+      label: 'Học liệu số',
+      icon: Layers,
+      visible: true,
+    },
+    {
+      key: 'library',
+      to: ROUTE_PATHS.LIBRARY,
+      label: 'Thư viện số',
+      icon: Library,
+      visible: true,
     },
     {
       key: 'admin',
       to: ROUTE_PATHS.ADMIN,
       label: 'Quản trị',
-      shortLabel: 'Quản trị',
       icon: ShieldAlert,
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-700 dark:text-amber-400',
       visible: Boolean(isAdmin),
     },
   ];
@@ -218,8 +247,10 @@ const NavigationGlider: React.FC<{
 
   return (
     <nav
-      ref={containerRef as any}
       aria-label="Điều hướng hệ thống"
+      className="u058-nav relative flex items-center gap-1.5 sm:gap-2 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-2xl rounded-full px-2 sm:px-2.5 py-1.5 select-none w-fit max-w-full touch-manipulation"
+    >
+      {visibleTabs.map((tab) => {
       className={`u058-nav relative flex items-center gap-1.5 sm:gap-2 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-2xl rounded-full px-2 sm:px-2.5 py-1.5 select-none w-fit max-w-full ${
         isInitialMount.current ? 'no-transition' : ''
       }`}
@@ -235,58 +266,35 @@ const NavigationGlider: React.FC<{
       {visibleTabs.map((tab, index) => {
         const isActive = activeNav === tab.key;
         const IconComponent = tab.icon;
-<<<<<<< HEAD
 
-        // ✅ FIX: Tạo 1 element duy nhất (tabLink), tái sử dụng ở cả 2 nhánh
         const tabLink = (
           <Link
-            id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
-            ref={(el) => {
-              tabRefs.current[tab.key] = el;
-            }}
+            key={tab.key}
+            id={tab.tourId || (tab.key === 'portal' ? 'tour-nav-portal' : undefined)}
             to={tab.to}
             onClick={(e) => {
-              if (isActive) {
+              if (isActive && location.pathname === tab.to) {
                 e.preventDefault();
-                return;
-              }
-              const container = containerRef.current;
-              if (container) {
-                const labelEl = labelRefs.current[tab.key];
-                const textW = labelEl ? labelEl.scrollWidth : 60;
-                const targetW = Math.round(20 + 8 + textW + 32);
-                const targetX = Math.round(10 + index * (40 + 8));
-
-                if (targetW > 0) {
-                  lastKnownPillCoords = { left: targetX, width: targetW };
-                  container.style.setProperty('--x', `${targetX}px`);
-                  container.style.setProperty('--w', `${targetW}px`);
-                  container.style.setProperty('--pill-opacity', '1');
-                  setIndicatorStyle({ left: targetX, width: targetW });
-                }
               }
             }}
             aria-current={isActive ? 'page' : undefined}
             aria-label={tab.label}
             data-active={isActive ? 'true' : 'false'}
-            className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 select-none h-10 touch-manipulation cursor-pointer ${
+            className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 ease-out select-none h-10 touch-manipulation cursor-pointer ${
               isActive
-                ? 'is-active !text-white font-bold px-4 py-2 shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0'
+                ? 'is-active bg-[#166534] dark:bg-emerald-600 !text-white font-bold px-4 py-2 shadow-md border border-emerald-500/40'
+                : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0 border border-transparent'
             }`}
             style={isActive ? { color: '#ffffff' } : undefined}
           >
             <IconComponent
-              className={`w-5 h-5 shrink-0 transition-transform duration-300 ${
-                isActive ? 'scale-105 !text-white stroke-white' : tab.inactiveColor
+              className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
+                isActive ? 'scale-105 !text-white stroke-white' : 'text-slate-600 dark:text-slate-400'
               }`}
               style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
             />
             <span
-              ref={(el) => {
-                labelRefs.current[tab.key] = el;
-              }}
-              className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-400 ease-[cubic-bezier(.34,1.45,.64,1)] ${
+              className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-200 ease-out ${
                 isActive
                   ? 'max-w-[280px] opacity-100 ml-2 font-bold !text-white'
                   : 'max-w-0 opacity-0 ml-0 pointer-events-none'
@@ -297,17 +305,12 @@ const NavigationGlider: React.FC<{
             </span>
           </Link>
         );
-
-        // Trên iPad / cảm ứng hoặc tab đang active: KHÔNG bọc Tooltip
         if (isTouchOrIPad || isActive) {
-          return (
-            <React.Fragment key={tab.key}>{tabLink}</React.Fragment>
-          );
+          return <React.Fragment key={tab.key}>{tabLink}</React.Fragment>;
         }
 
         // ✅ FIX: Tooltip chỉ chứa DUY NHẤT 1 child (tabLink). Trước đây code render 2 Link → bug.
-=======
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
+
         return (
           <Tooltip
             key={tab.key}
@@ -316,9 +319,7 @@ const NavigationGlider: React.FC<{
             mouseEnterDelay={0.25}
             arrow={{ pointAtCenter: true }}
           >
-<<<<<<< HEAD
             {tabLink}
-=======
             <Link
               id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
               ref={(el) => {
@@ -375,7 +376,6 @@ const NavigationGlider: React.FC<{
                 {tab.label}
               </span>
             </Link>
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
           </Tooltip>
         );
       })}
@@ -394,11 +394,8 @@ export const Header: React.FC<HeaderProps> = ({
   const { deviceMode, orientation } = useDeviceMode();
   const { isOnline, checkConnection } = useNetworkStatus();
   const navigate = useNavigate();
-<<<<<<< HEAD
   const { count: approvalCount } = useApprovalContext();
   const showApprovalBadge = hasPermission('APPROVAL_VALIDATE') && approvalCount > 0;
-=======
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
   const [liveClock, setLiveClock] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
@@ -434,19 +431,16 @@ export const Header: React.FC<HeaderProps> = ({
   const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
   const canAccessSessions = hasPermission('SESSION_VIEW');
 
-<<<<<<< HEAD
   // (liveClock hiện không render – giữ state để tương thích nếu sau này cần hiển thị)
   void liveClock;
 
   const userPopoverContent = (
     <div className="w-[380px] max-w-[92vw] p-1 text-slate-800 dark:text-slate-200 text-xs">
       <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800">
-=======
   // Nội dung Popover User Profile cho iPad và Desktop
   const userPopoverContent = (
     <div className="w-72 p-1 text-slate-800 dark:text-slate-200 text-xs">
       <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             {isGuestUser ? (
@@ -494,14 +488,11 @@ export const Header: React.FC<HeaderProps> = ({
               {user?.full_name || 'Cán bộ'}
             </div>
         {(user?.rank_name || user?.position) && (
-<<<<<<< HEAD
           <div
             className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis"
             title={[user.rank_name, user.position].filter(Boolean).join(' - ')}
           >
-=======
           <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
             {[user.rank_name, user.position].filter(Boolean).join(' - ')}
           </div>
         )}
@@ -510,7 +501,6 @@ export const Header: React.FC<HeaderProps> = ({
             {user.unit_name}
           </div>
         )}
-<<<<<<< HEAD
         {((user?.role_names && user.role_names.length > 0) || (user?.roles && user.roles.length > 0)) && (
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/60">
             <span className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 shrink-0 font-medium">
@@ -533,8 +523,6 @@ export const Header: React.FC<HeaderProps> = ({
         )}
           </>
         )}
-=======
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
       </div>
 
       <div className="py-1">
@@ -577,6 +565,42 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Đăng tải văn bản</span>
           </Link>
         )}
+
+        <Link
+          to={ROUTE_PATHS.LECTURES}
+          onClick={() => {
+            setUserPopoverOpen(false);
+            setDropdownOpen(false);
+          }}
+          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+        >
+          <MonitorPlay className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+          <span>Bài giảng số</span>
+        </Link>
+
+        <Link
+          to={ROUTE_PATHS.MATERIALS}
+          onClick={() => {
+            setUserPopoverOpen(false);
+            setDropdownOpen(false);
+          }}
+          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+        >
+          <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+          <span>Học liệu số</span>
+        </Link>
+
+        <Link
+          to={ROUTE_PATHS.LIBRARY}
+          onClick={() => {
+            setUserPopoverOpen(false);
+            setDropdownOpen(false);
+          }}
+          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+        >
+          <Library className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+          <span>Thư viện số</span>
+        </Link>
 
         {/* ⭐ MỚI — Thùng rác tài liệu */}
         {canAccessTrash && (
@@ -644,14 +668,11 @@ export const Header: React.FC<HeaderProps> = ({
   // ══════════════════════════════════════════════════════════════════════
   if (deviceMode === 'ipad') {
     return (
-<<<<<<< HEAD
       // ✅ FIX: Gộp 2 thẻ <header> bị trùng thành 1, kết hợp class của cả hai
       <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 min-h-[3.75rem] sm:min-h-[4rem] h-[calc(3.75rem+env(safe-area-inset-top,0px))] sm:h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-xs transition-colors duration-200 select-none">
         {/* Cụm Trái: Hamburger (nếu có) + Logo + Tên trường */}
-=======
       <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-xs transition-colors duration-200 select-none">
         {/* Cụm Trái (shrink-0 z-20 flex items-center gap-2): Logo + Tên trường */}
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
         <div className="shrink-0 z-20 flex items-center gap-2 sm:gap-2.5">
           {onToggleMobileMenu && isIPadPortrait && (
             <button
@@ -708,7 +729,6 @@ export const Header: React.FC<HeaderProps> = ({
           <DeviceModeSwitch compact />
           <ThemeToggle size="sm" />
 
-<<<<<<< HEAD
           {/* Nút Mở Trợ Lý AI - iPad */}
           <button
             type="button"
@@ -737,9 +757,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* User Profile Pill - iPad */}
-=======
           {/* User Profile Pill - Hiển thị đầy đủ họ tên quân nhân */}
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
           <Popover
             content={userPopoverContent}
             trigger="click"
@@ -758,19 +776,16 @@ export const Header: React.FC<HeaderProps> = ({
                 className="relative w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
               >
                 <span
-<<<<<<< HEAD
                   className={`!text-white font-black leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] ${
                     avatarInitial.length > 1 ? 'text-[9.5px] tracking-tight' : 'text-xs'
                   }`}
                   style={{ color: '#ffffff' }}
                 >
                   {avatarInitial}
-=======
                   className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
                   style={{ color: '#ffffff' }}
                 >
                   {user?.full_name ? user.full_name[0].toUpperCase() : 'K'}
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                 </span>
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-white dark:ring-slate-800 ${
@@ -799,12 +814,9 @@ export const Header: React.FC<HeaderProps> = ({
   // BRANCH 2: GIAO DIỆN MÁY TÍNH TIÊU CHUẨN (deviceMode === 'pc')
   // ══════════════════════════════════════════════════════════════════════
   return (
-<<<<<<< HEAD
     // ✅ FIX: Gộp 2 thẻ <header> bị trùng thành 1
     <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 min-h-[4rem] h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
-=======
     <header className="sticky top-0 z-30 shrink-0 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 text-slate-900 dark:text-white shadow-sm transition-colors duration-200 select-none">
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
       {/* Vùng Trái: Brand & Optional Drawer Hamburger Button */}
       <div className="shrink-0 z-20 flex items-center space-x-2 sm:space-x-3">
         {onToggleMobileMenu && (
@@ -871,7 +883,6 @@ export const Header: React.FC<HeaderProps> = ({
           <ThemeToggle />
         </div>
 
-<<<<<<< HEAD
         {/* Nút Mở Trợ Lý AI - PC */}
         <div className="shrink-0">
           <button
@@ -901,8 +912,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-=======
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
         {/* User profile menu Desktop */}
         <div className="shrink-0 z-20">
           <Popover
@@ -923,19 +932,16 @@ export const Header: React.FC<HeaderProps> = ({
                 className="relative w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
               >
                 <span
-<<<<<<< HEAD
                   className={`!text-white font-black leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] ${
                     avatarInitial.length > 1 ? 'text-[10px] tracking-tight' : 'text-xs'
                   }`}
                   style={{ color: '#ffffff' }}
                 >
                   {avatarInitial}
-=======
                   className="!text-white font-black text-xs leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
                   style={{ color: '#ffffff' }}
                 >
                   {user?.full_name ? user.full_name[0].toUpperCase() : 'K'}
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                 </span>
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-800 ${

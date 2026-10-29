@@ -15,6 +15,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
+import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { toast } from '../components/common/Toast';
 import { SecurityBanner } from '../components/portal/SecurityBanner';
 import { PortalDocumentList } from '../components/portal/PortalDocumentList';
@@ -228,6 +229,8 @@ export const PortalPage: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
+        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
+        <DataHubSubNav activeTab="portal" />
         {/* Security Banner */}
         <SecurityBanner
           user={user}
@@ -245,6 +248,8 @@ export const PortalPage: React.FC = () => {
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
               <input
+                id="portal-search-input"
+                name="portal_search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -256,6 +261,8 @@ export const PortalPage: React.FC = () => {
             {/* Document Type Dropdown */}
             <div>
               <select
+                id="portal-doc-type-select"
+                name="portal_doc_type"
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
@@ -272,6 +279,8 @@ export const PortalPage: React.FC = () => {
             {/* Issuing Unit Dropdown */}
             <div>
               <select
+                id="portal-unit-select"
+                name="portal_unit"
                 value={selectedUnit}
                 onChange={(e) => {
                   setSelectedUnit(e.target.value);
@@ -291,6 +300,8 @@ export const PortalPage: React.FC = () => {
             {/* Security Level Dropdown */}
             <div>
               <select
+                id="portal-level-select"
+                name="portal_level"
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value ? Number(e.target.value) : '')}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"

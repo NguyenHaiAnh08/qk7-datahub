@@ -11,6 +11,9 @@ export const ROUTE_PATHS = {
   USERS: '/users',
   ADMIN_TRASH: '/admin/trash',
   ADMIN_SESSIONS: '/admin/sessions',
+  LECTURES: '/lectures',
+  MATERIALS: '/materials',
+  LIBRARY: '/library',
   ERROR_400: '/400',
   ERROR_401: '/401',
   ERROR_403: '/403',
@@ -24,4 +27,3 @@ export const ROUTE_PATHS = {
 
 export type RoutePathKey = keyof typeof ROUTE_PATHS;
 export type RoutePathValue = typeof ROUTE_PATHS[RoutePathKey];
-

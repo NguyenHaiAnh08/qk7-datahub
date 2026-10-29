@@ -159,7 +159,7 @@ export const App: React.FC = () => {
                 <AuthProvider>
 <<<<<<< HEAD
                   <AIChatProvider>
-                    <ApprovalProvider pollMs={30000}>
+                    <ApprovalProvider pollMs={0}>
                       <RouterProvider />
                       <AIChatWrapper />
                     </ApprovalProvider>

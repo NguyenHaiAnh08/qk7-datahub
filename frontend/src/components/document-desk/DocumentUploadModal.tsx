@@ -143,7 +143,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       }
     })
     .catch((err) => {
-      console.warn('[parse PDF]', err);
+      if (import.meta.env.DEV) console.warn('[parse PDF] Lỗi phân tích văn bản');
       setParseError(err?.message || 'Không thể đọc PDF. Vui lòng nhập tay.');
     })
     .finally(() => setParsing(false));
@@ -261,7 +261,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setShowConfirmModal(false);
       onClose();
     } catch (err: any) {
-      console.error('[DocumentUploadModal]', err);
+      if (import.meta.env.DEV) console.error('[DocumentUploadModal] Lỗi tiếp nhận văn bản');
       setError(err.message || 'Thao tác không thành công, vui lòng thử lại!');
       setShowConfirmModal(false);
     } finally {

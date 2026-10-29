@@ -26,13 +26,17 @@ export function generateWatermarkCanvasPng(
 
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-  const text = `${options.userDisplayName} - ${options.timeStr}`;
+  const toTitleCase = (s: string) =>
+    s ? s.toLowerCase().split(/\s+/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Sĩ Quan';
+  const displayName = toTitleCase(options.userDisplayName);
+  const text = `${displayName} - ${options.timeStr}`;
   const angle = -25 * (Math.PI / 180); // Nghiêng góc -25 độ chuẩn quân sự
 
   // 4 vị trí trải đều các khung từ trên xuống dưới
   const yPositions = [0.18, 0.38, 0.62, 0.82];
 
-  ctx.font = '900 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace';
+  // Font thường (không in đậm - normal), chuẩn sans-serif thanh thoát sắc nét
+  ctx.font = 'normal 26px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.fillStyle = '#b91c1c';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

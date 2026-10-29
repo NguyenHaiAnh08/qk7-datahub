@@ -83,10 +83,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'trash',       label: 'Thùng rác',    icon: Trash2,          permission: 'DOC_TRASH_VIEW' },
   ];
 
-  // Ẩn item nếu user không có quyền tương ứng (item không khai báo permission → luôn hiện)
+  // Lọc các item mà user có quyền xem
   const visibleItems = navItems.filter(
     (item) => !item.permission || hasPermission(item.permission)
   );
+
+  // ✅ FIX TẠI ĐÂY: Nếu không có bất kỳ mục nào được phép hiển thị, ẩn toàn bộ Sidebar
+  // Bao gồm cả tiêu đề "DANH MỤC QUẢN TRỊ" và nút thu gọn
+  if (visibleItems.length === 0) {
+    return null;
+  }
 
   return (
     <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 select-none overflow-x-hidden">
@@ -143,20 +149,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`} />
               {!collapsed && <span className="truncate">{item.label}</span>}
               {counts?.[item.id] ? (
-      <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0">
-          {counts[item.id]! > 99 ? '99+' : counts[item.id]}
-      </span>
-   ) : null}
+                <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0">
+                  {counts[item.id]! > 99 ? '99+' : counts[item.id]}
+                </span>
+              ) : null}
             </button>
           );
 
           if (collapsed) {
             return (
               <Tooltip key={item.id} title={
-     counts?.[item.id]
-       ? `${item.label} (${counts[item.id]} chờ duyệt)`
-       : item.label
-   } placement="right" mouseEnterDelay={0.15}>
+                counts?.[item.id]
+                  ? `${item.label} (${counts[item.id]} chờ duyệt)`
+                  : item.label
+              } placement="right" mouseEnterDelay={0.15}>
                 {buttonElement}
               </Tooltip>
             );

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { HttpErrorDetail } from '../../services/http';
 import { authService } from '../../services/authService';
@@ -13,6 +13,9 @@ import { toast } from './Toast';
 export const HttpErrorListener: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // ✅ FIX: Dùng Ref để chặn spam Toast 403 (giới hạn 1 lần / 2 giây)
+  const last403TimeRef = useRef<number>(0);
 
   useEffect(() => {
     const handleHttpError = (event: Event) => {
@@ -63,12 +66,20 @@ export const HttpErrorListener: React.FC = () => {
       if (isAlreadyOnErrorPage) return;
 
       switch (status) {
-        case 403:
+        case 403: {
+          // ✅ FIX: Chặn spam 403 (chỉ hiện 1 lần trong 2 giây)
+          const now = Date.now();
+          if (now - last403TimeRef.current < 2000) {
+            return;
+          }
+          last403TimeRef.current = now;
+
           toast.securityAlert(
             message || 'Cấp độ bảo mật hoặc quyền hạn của bạn không đủ để thực hiện thao tác này.',
             { title: 'Truy Cập Bị Từ Chối', badge: 'CLEARANCE-403' }
           );
           break;
+        }
 
         case 404:
           toast.info(

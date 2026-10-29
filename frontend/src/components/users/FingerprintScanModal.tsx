@@ -9,12 +9,15 @@ import {
   Fingerprint,
 } from 'lucide-react';
 import { fingerprintService } from '../../services/fingerprintService';
+import { http } from '../../services/http';
 import { TouchIDFingerprint } from '../common/TouchIDFingerprint';
 import { CircularSpinner } from './FingerprintEnrollModal';
 
 export interface FingerprintScanModalProps {
   open: boolean;
-  fileId: string;
+  fileId?: string;
+  purpose?: 'file_access' | 'admin_login';
+  tempTicket?: string;
   onSuccess: (fingerprintToken: string) => void;
   onCancel: () => void;
 }
@@ -25,7 +28,9 @@ const MAX_AUTO_RETRY = 2;
 
 export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   open,
-  fileId,
+  fileId = '',
+  purpose = 'file_access',
+  tempTicket,
   onSuccess,
   onCancel,
 }) => {
@@ -109,6 +114,37 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
 
       if (signal.aborted || !mountedRef.current) return;
 
+      // ✅ PHÂN NHÁNH 1: XÁC THỰC 2FA ADMIN LOGIN
+      if (purpose === 'admin_login') {
+        if (!tempTicket) {
+          setError('Thiếu vé xác thực tạm thời. Vui lòng đăng nhập lại.');
+          setPhase('error');
+          return;
+        }
+
+        const res: any = await http('/api/auth/login/admin-fp-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ temp_ticket: tempTicket, device_id: deviceId }),
+          signal,
+        });
+
+        if (signal.aborted || !mountedRef.current) return;
+
+        setScore(res.score || 100);
+        setProgress(100);
+        setPhase('success');
+        retryCountRef.current = 0;
+
+        setTimeout(() => {
+          if (mountedRef.current && !signal.aborted) {
+            onSuccess(res.token); // Trả JWT thật về cho LoginForm
+          }
+        }, 900);
+        return;
+      }
+
+      // ✅ PHÂN NHÁNH 2: XÁC THỰC VÂN TAY XEM FILE (Mặc định)
       const res = await fingerprintService.verify(fileId, deviceId, signal);
 
       if (signal.aborted || !mountedRef.current) return;
@@ -125,7 +161,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       if (typeof window !== 'undefined' && res.fingerprint_token) {
         sessionStorage.setItem('qk7_fp_token', res.fingerprint_token);
         if (fileId) {
-          sessionStorage.setItem(`qk7_fp_token_`, res.fingerprint_token);
+          sessionStorage.setItem(`qk7_fp_token_${fileId}`, res.fingerprint_token);
         }
       }
       setScore(res.score ?? null);
@@ -244,10 +280,12 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
               </div>
               <div>
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                  Xác Thực Vân Tay
+                  {purpose === 'admin_login' ? 'Xác Thực Quản Trị Viên' : 'Xác Thực Vân Tay'}
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Tài liệu Mật / Tối mật / Tuyệt mật
+                  {purpose === 'admin_login' 
+                    ? 'Yêu cầu xác thực 2 lớp (2FA) cho Admin' 
+                    : 'Tài liệu Mật / Tối mật / Tuyệt mật'}
                 </p>
               </div>
             </div>
@@ -273,7 +311,9 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                   Đặt ngón tay lên máy quét
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 max-w-xs">
-                  Vui lòng đặt ngón tay đã đăng ký lên đầu đọc ZK9500
+                  {purpose === 'admin_login' 
+                    ? 'Vui lòng đặt ngón tay của Quản trị viên tối cao lên đầu đọc ZK9500'
+                    : 'Vui lòng đặt ngón tay đã đăng ký lên đầu đọc ZK9500'}
                 </p>
                 <div className="inline-flex items-center gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-1.5 rounded-full font-medium">
                   <CircularSpinner
@@ -290,10 +330,10 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
               <>
                 <div className="flex items-center justify-center gap-1.5 mb-1 text-emerald-600 dark:text-emerald-400 font-bold text-base">
                   <CheckCircle2 className="w-5 h-5" />
-                  <span>Quét vân tay thành công</span>
+                  <span>Xác thực thành công</span>
                 </div>
                 <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                  Đang mở tài liệu...
+                  {purpose === 'admin_login' ? 'Đang vào hệ thống...' : 'Đang mở tài liệu...'}
                 </p>
               </>
             )}

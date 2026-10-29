@@ -142,34 +142,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 collapsed ? 'justify-center p-2.5' : 'justify-start space-x-3 px-3 py-2.5'
               } rounded-xl text-xs transition cursor-pointer ${
                 isActive
-                  ? 'bg-purple-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/30 font-semibold shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium'
+                  ? 'bg-emerald-500/15 border-l-4 border-emerald-500 text-emerald-700 dark:text-emerald-400 border-t border-b border-r border-emerald-500/25 font-semibold shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium border border-transparent'
               }`}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
+              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`} />
               {!collapsed && <span className="truncate">{item.label}</span>}
-<<<<<<< HEAD
               {counts?.[item.id] ? (
                 <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0">
                   {counts[item.id]! > 99 ? '99+' : counts[item.id]}
                 </span>
               ) : null}
-=======
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
             </button>
           );
 
           if (collapsed) {
             return (
-<<<<<<< HEAD
               <Tooltip key={item.id} title={
                 counts?.[item.id]
                   ? `${item.label} (${counts[item.id]} chờ duyệt)`
                   : item.label
               } placement="right" mouseEnterDelay={0.15}>
-=======
-              <Tooltip key={item.id} title={item.label} placement="right" mouseEnterDelay={0.15}>
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                 {buttonElement}
               </Tooltip>
             );

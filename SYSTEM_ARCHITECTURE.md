@@ -23,6 +23,10 @@
 14. [Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)](#14-kiến-trúc-giao-diện-kép-đa-nền-tảng-dual-platform-desktop--ipados-touch-ui-engine)
 15. [Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (MyUnitPage) & Chuẩn Hóa Danh Xưng Thư Viện Số](#15-phân-hệ-quản-lý-tài-liệu-đơn-vị-trực-thuộc-myunitpage--chuẩn-hóa-danh-xưng-thư-viện-số)
 16. [Kiến Trúc Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout Engine)](#16-kiến-trúc-giao-diện-tự-thích-ứng-chống-bể-layout-mọi-mức-phóng-to-adaptive-zoom-proof-layout-engine)
+17. [Kiến Trúc Phân Hệ Giám Sát Phiên Đang Trực Tuyến (Active Online Sessions Real-time Monitoring Engine)](#17-kiến-trúc-phân-hệ-giám-sát-phiên-đang-trực-tuyến-active-online-sessions-real-time-monitoring-engine)
+18. [Kiến Trúc Thùng Rác Tài Liệu Tác Chiến & Khôi Phục Dữ Liệu An Toàn 2 Bước (Tactical Trash Bin & Double-Safety Recovery Engine)](#18-kiến-trúc-thùng-rác-tài-liệu-tác-chiến--khôi-phục-dữ-liệu-an-toàn-2-bước-tactical-trash-bin--double-safety-recovery-engine)
+19. [Kiến Trúc Quản Lý Phân Quyền Nâng Cao & Kéo Thả Thứ Tự Trực Quan (Granular Permissions, Subgroups & Drag-and-Drop Order Engine)](#19-kiến-trúc-quản-lý-phân-quyền-nâng-cao--kéo-thả-thứ-tự-trực-quan-granular-permissions-subgroups--drag-and-drop-order-engine)
+20. [Kiến Trúc Header AI Slide-Over Drawer & Khám Phá Hệ Thống Tự Động (Header AI Drawer & Guided Tour Engine)](#20-kiến-trúc-header-ai-slide-over-drawer--khám-phá-hệ-thống-tự-động-header-ai-drawer--guided-tour-engine)
 
 ---
 
@@ -422,6 +426,8 @@ erDiagram
     USER ||--o{ USER_ROLE : "sở hữu vai trò"
     ROLE ||--o{ ROLE_PERMISSION : "chứa đựng"
     PERMISSION ||--o{ ROLE_PERMISSION : "thuộc về"
+    USER ||--o{ USER_PERMISSION : "nhận quyền trực tiếp"
+    PERMISSION ||--o{ USER_PERMISSION : "gán cho người dùng"
     USER ||--o| USER_FINGERPRINT : "sở hữu dữ liệu sinh trắc học"
 
     USER {
@@ -479,17 +485,31 @@ erDiagram
         string sha256 "Mã băm SHA-256 chống chỉnh sửa"
         string stored_path "Đường dẫn tệp vật lý trong uploads/"
         string summary "Tóm tắt nội dung chính"
+        int is_deleted "Cờ xóa mềm (0: hiệu lực, 1: thùng rác)"
+        datetime deleted_at "Thời điểm chuyển vào thùng rác"
+        string deleted_by "Quân nhân thực hiện xóa"
         datetime created_at "Dấu thời gian số hóa tệp"
     }
 
     ACCESS_LOG {
-        bigint log_id PK "Mã định danh nhật ký tự tăng"
+        string log_id PK "Mã định danh nhật ký"
         string user_id FK "Quân nhân thực hiện hành vi"
         string file_id FK "Tệp tài liệu chịu tác động (nếu có)"
-        string action "LOGIN, VIEW, DOWNLOAD, UPLOAD, FINGERPRINT_OK, FINGERPRINT_FAIL..."
+        string action "LOGIN, VIEW, DOWNLOAD, UPLOAD, FINGERPRINT_OK..."
         string ip "Địa chỉ IP trạm làm việc"
         string note "Chi tiết ghi chú bổ sung"
-        datetime created_at "Dấu thời gian kiểm toán chính xác"
+        datetime timestamp "Dấu thời gian kiểm toán chính xác"
+    }
+
+    ACCESS_LOG_ARCHIVE {
+        string log_id PK "Mã định danh nhật ký đã lưu trữ"
+        string user_id FK "Quân nhân thực hiện hành vi"
+        string file_id FK "Tệp tài liệu chịu tác động"
+        string action "Loại hành vi kiểm toán"
+        string ip "Địa chỉ IP trạm làm việc"
+        string note "Chi tiết ghi chú"
+        datetime timestamp "Thời gian ghi nhận ban đầu"
+        datetime archived_at "Thời gian chuyển vào kho lưu trữ định kỳ đầu tháng"
     }
 
     ROLE {
@@ -497,10 +517,26 @@ erDiagram
         string name "Tên gọi vai trò"
     }
 
+    USER_PERMISSION {
+        string user_id PK,FK "Mã quân nhân nhận quyền trực tiếp"
+        string permission_id PK,FK "Mã quyền hạn được cấp"
+        datetime granted_at "Thời điểm cấp phát quyền hạn"
+        string granted_by "Quân nhân cấp phát"
+        datetime expires_at "Thời hạn hiệu lực (null: vô thời hạn)"
+        string note "Ghi chú mục đích nghiệp vụ"
+    }
+
     PERMISSION {
-        string permission_id PK "Mã quyền thao tác"
-        string code "Mã ký hiệu quyền hạn"
+        string permission_id PK "Mã quyền thao tác (PERM-DOC-01...)"
+        string code "Mã ký hiệu quyền hạn (UPPER_SNAKE)"
         string description "Diễn giải chi tiết quyền hạn"
+        string group_code "Mã nhóm (DOCUMENT, SYSTEM, USER, ROLE...)"
+        int sort_order "Thứ tự sắp xếp (hỗ trợ kéo thả Drag & Drop)"
+        string subgroup_key "Khóa phân loại con (doc-view, doc-edit...)"
+        string subgroup_label "Nhãn phân loại con"
+        int subgroup_order "Thứ tự phân loại con"
+        string subgroup_tone "Mức độ nguy hiểm (read, write, security, danger)"
+        int is_system "Cờ bảo vệ quyền hệ thống (1: không thể xóa)"
     }
 ```
 
@@ -508,13 +544,20 @@ erDiagram
 
 ## 7. Kiến Trúc Trợ Lý AI Tác Chiến & Văn Thư (boxchat Agentic RAG)
 
-### 7.1. Nguyên Lý Thiết Kế
+### 7.1. Nguyên Lý Thiết Kế & Cấu Hình Model Sản Xuất
 Microservice **boxchat** (Python FastAPI tại cổng `:8001`) được thiết kế theo kiến trúc **Citation-Grounded Agentic RAG (Retrieval-Augmented Generation)**:
-1. **Trích xuất PDF Chuyên Sâu (`PDFProcessor`):** Đọc tuần tự từng trang tài liệu PDF quân sự, bảo toàn bảng biểu số liệu, đánh dấu số trang tuyệt đối để phục vụ gắn nhãn trích dẫn.
-2. **Kho Vector Lai (`HybridVectorStore`):** Lưu trữ embedding văn bản vào CSDL vector **Qdrant** cục bộ (`local_storage/qdrant_data`), không truyền dữ liệu ra Internet, bảo đảm an ninh mạng quân sự nội bộ.
-3. **Agent Tutor & Thinking Process:** LLM suy luận nhiều bước, hiển thị quá trình tư duy (`think`) và sinh câu trả lời kèm chip dẫn chứng số trang. Người dùng bấm vào chip dẫn chứng sẽ nhảy trực tiếp đến trang văn bản PDF tương ứng.
-4. **Biên Soạn Giáo Trình Tác Chiến (`StudyBookGenerator`):** Tự động phân tích các văn kiện, chỉ thị lớn để tổng hợp thành tài liệu học tập, tóm tắt các điểm cốt lõi và sinh đề trắc nghiệm kiểm tra nhận thức chính trị/tác chiến.
-5. **Dòng Thời Gian Lịch Sử Quân Sự (`MediaTimelineManager`):** Tự động bóc tách các mốc thời gian, chiến dịch, sự kiện trong văn bản để hiển thị dạng dòng thời gian tương tác.
+1. **Lựa Chọn & Chuẩn Hóa Model Sản Xuất (`qwen2.5:3b`):**
+   - **Model LLM:** `qwen2.5:3b` (chạy qua Ollama cục bộ `http://127.0.0.1:11434`), kết hợp model embedding đa ngôn ngữ `bge-m3` (1024-d).
+   - **Cơ sở lựa chọn:** Dựa trên kết quả đo lường và khảo sát phần cứng thực tế (NVIDIA GeForce GTX 1650 4.0 GB VRAM) tại tài liệu `docs/MODEL_DECISION.md`. Model 3b chỉ chiếm ~1.9 GB (tổng hệ thống kèm bge-m3 và KV cache ~3.3 GB VRAM), vừa vặn 100% trong GPU VRAM mà không bị tràn sang RAM hệ thống.
+   - **Hiệu năng thực nghiệm (30 câu hỏi mở rộng):** Đạt **Hit Rate @5 100%**, **Citation Accuracy 100%**, **Clearance Leak = 0 (an toàn tuyệt đối)**, **Adversarial Refusal Rate 100%** trước các câu hỏi bẫy/ngoài phạm vi, với độ trễ phản hồi tối ưu **4.8 – 6.7 giây** (đáp ứng hoàn hảo cho kíp trực tác chiến).
+   - **Điều kiện nâng cấp `7b` trong tương lai:** Chỉ nâng cấp khi trang bị máy chủ có GPU chuyên dụng VRAM ≥ 8.0 GB (như RTX 3060 12GB hoặc RTX A4000).
+2. **Kho Vector Lai & Cơ Chế Khóa Tự Phục Hồi An Toàn (Self-Healing Qdrant with Process Safety Guard):**
+   - Lưu trữ embedding văn bản vào CSDL vector **Qdrant** cục bộ (`local_storage/qdrant_data`), không truyền dữ liệu ra Internet, bảo đảm an ninh mạng quân sự nội bộ.
+   - **Cơ chế Self-Healing an toàn:** Tự động phát hiện và dọn dẹp file `.lock` tồn dư do tắt máy đột ngột hoặc crash trước khi khởi tạo Qdrant. Để ngăn ngừa nguy cơ phá hỏng cơ sở dữ liệu khi có 2 tiến trình chạy song song, hệ thống áp dụng **Process Safety Guard** (rà soát PID và danh sách tiến trình `Win32_Process` của Windows, loại trừ PID hiện tại). Nếu phát hiện tiến trình AI khác đang hoạt động, hệ thống **tuyệt đối không xóa lock** và kích hoạt chế độ an toàn.
+3. **Trích xuất PDF Chuyên Sâu (`PDFProcessor`):** Đọc tuần tự từng trang tài liệu PDF quân sự, bảo toàn bảng biểu số liệu, đánh dấu số trang tuyệt đối để phục vụ gắn nhãn trích dẫn.
+4. **Agent Tutor, Hậu Kiểm Trích Dẫn & Thinking Process:** LLM suy luận nhiều bước, hiển thị quá trình tư duy (`think`), viết lại câu truy vấn ngữ cảnh (`_rewrite_query_with_history`), và áp dụng bộ lọc hậu kiểm trích dẫn số trang bằng biểu thức chính quy (`_verify_inline_citations`) nhằm triệt tiêu 100% ảo giác trích dẫn. Người dùng bấm vào chip dẫn chứng sẽ nhảy trực tiếp đến trang văn bản PDF tương ứng.
+5. **Biên Soạn Giáo Trình Tác Chiến (`StudyBookGenerator`):** Tự động phân tích các văn kiện, chỉ thị lớn để tổng hợp thành tài liệu học tập, tóm tắt các điểm cốt lõi và sinh đề trắc nghiệm kiểm tra nhận thức chính trị/tác chiến.
+6. **Dòng Thời Gian Lịch Sử Quân Sự (`MediaTimelineManager`):** Tự động bóc tách các mốc thời gian, chiến dịch, sự kiện trong văn bản để hiển thị dạng dòng thời gian tương tác.
 
 ### 7.2. Cơ Chế Chuyển Mạch Dự Phòng Thông Minh (Smart SQL Fallback)
 Nhằm đạt tiêu chuẩn sẵn sàng cao (High Availability), Express Gateway (`backend/src/ai-routes.js`) được tích hợp cơ chế bảo vệ kép:
@@ -580,8 +623,40 @@ Toàn bộ API được đặc tả chi tiết tại Swagger UI: **[http://local
 | `GET` | `/api/admin/fingerprint/agents` | QTV (Cấp ≥ 4) | — | Giám sát danh sách các máy quét vân tay vật lý (Agents) đang trực tuyến trong toàn mạng quân khu. |
 | `WS` | `/ws/fingerprint` | Máy trạm nội bộ | Query: `device_id, bridge_token` | Kênh kết nối thời gian thực 2 chiều giữa Express Gateway và Local Fingerprint Agent. |
 
-### 9.3. Nhóm Nghiệp Vụ Cốt Lõi (Auth, Documents, Files, Logs, Admin)
-*(Chi tiết đặc tả các endpoint xem, tải văn bản, phân quyền và kiểm toán tương tự các mục tiêu chuẩn của hệ thống)*
+### 9.3. Nhóm Quản Trị Phân Quyền & Vai Trò (Permissions & Role Assignment)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/admin/permissions` | `PERMISSION_VIEW` | — | Lấy toàn bộ danh mục quyền hạn hệ thống, sắp xếp theo `sort_order` tăng dần. |
+| `POST` | `/api/admin/permissions` | `PERMISSION_CREATE` | `{ permission_id, name, description, group_code, subgroup_code, subgroup_name, subgroup_order, severity }` | Tạo quyền mới trong danh mục hệ thống với phân vùng nhóm, phân loại con và mức độ nghiêm trọng. |
+| `PUT` | `/api/admin/permissions/{id}` | `PERMISSION_EDIT` | Path: `id`<br/>Body: `{ name, description, group_code, subgroup_code, subgroup_name, subgroup_order, severity }` | Cập nhật thông tin chi tiết của một quyền. |
+| `DELETE`| `/api/admin/permissions/{id}` | `PERMISSION_DELETE` | Path: `id` | Xóa quyền khỏi hệ thống (nghiêm cấm xóa quyền hệ thống `is_system = 1`). |
+| `PUT` | `/api/admin/permissions/reorder` | `PERMISSION_EDIT` | `{ orders: [{ permission_id, sort_order }] }` | **Sắp xếp thứ tự hiển thị bằng Kéo - Thả (Drag & Drop):** Cập nhật hàng loạt `sort_order` trong một SQL Transaction nguyên tử, tự động ghi vết kiểm toán `writeAccessLog`. |
+| `GET` | `/api/admin/roles` | `ROLE_VIEW` | — | Danh sách các vai trò trong hệ thống (ROL-01 Quản trị, ROL-02 Chỉ huy, ROL-03 Văn thư...). |
+| `GET` | `/api/admin/roles/{id}/permissions` | `ROLE_VIEW` | Path: `id` | Danh sách mã quyền đã được gán cho vai trò. |
+| `POST` | `/api/admin/roles/{id}/permissions` | `ROLE_ASSIGN` | Path: `id`<br/>Body: `{ permission_ids: [...] }` | Cập nhật tập quyền được cấp cho vai trò (đồng bộ bảng `ROLE_PERMISSION`). |
+| `GET` | `/api/admin/users/{id}/permissions` | `USER_VIEW` | Path: `id` | Tra cứu danh sách quyền được cấp trực tiếp cho cá nhân quân nhân (bảng `USER_PERMISSION`). |
+| `POST` | `/api/admin/users/{id}/permissions` | `USER_EDIT` | Path: `id`<br/>Body: `{ permission_id, expires_at, note }` | Cấp quyền đặc thù trực tiếp cho cá nhân có thời hạn hoặc vĩnh viễn. |
+| `DELETE`| `/api/admin/users/{id}/permissions/{permId}` | `USER_EDIT` | Path: `id`, `permId` | Thu hồi quyền được gán trực tiếp của cá nhân quân nhân. |
+
+### 9.4. Nhóm Giám Sát Phiên Đang Trực Tuyến (Active Online Sessions)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/admin/sessions` | `SESSION_VIEW` | — | Lấy toàn bộ danh sách phiên làm việc đang trực tuyến kèm địa chỉ IP, User-Agent parsed (HĐH, trình duyệt, loại thiết bị), `login_time`, `last_activity`, tính toán `idle_seconds` và cờ cảnh báo phiên treo. |
+| `GET` | `/api/admin/sessions/{id}` | `SESSION_VIEW` | Path: `id` | Tra cứu chi tiết một phiên làm việc cụ thể. |
+| `GET` | `/api/admin/sessions/user/{userId}` | `SESSION_VIEW` | Path: `userId` | Tra cứu toàn bộ các phiên hoạt động trên mọi thiết bị của một quân nhân. |
+| `POST` | `/api/admin/sessions/{id}/kill` | `SESSION_KILL` | Path: `id` | **Ngắt phiên làm việc cưỡng bức:** Hủy session token và giải phóng tài nguyên. Có cơ chế bảo vệ phiên hiện hành của Quản trị viên (`is_current` guard). |
+| `POST` | `/api/admin/sessions/user/{userId}/revoke-all` | `SESSION_KILL` | Path: `userId` | **Thu hồi toàn bộ phiên đa thiết bị:** Cưỡng bức đăng xuất quân nhân khỏi mọi máy tính bàn, iPad và thiết bị di động trong toàn quân khu. |
+
+### 9.5. Nhóm Thùng Rác Tài Liệu Tác Chiến & Khôi Phục (Tactical Trash Bin & Data Recovery)
+| Phương Thức | Đường Dẫn API | Phân Quyền | Tham Số / Body | Mô Tả Chức Năng |
+| :---: | :--- | :---: | :--- | :--- |
+| `GET` | `/api/documents/trash` | `DOC_TRASH_VIEW` | — | Danh sách tài liệu quân sự đã bị xóa tạm thời (`deleted_at IS NOT NULL`), có lọc theo cấp độ mật người dùng `security_level_id <= clearance`. |
+| `DELETE`| `/api/documents/{fileId}` | `DOC_DELETE` | Path: `fileId`<br/>Body: `{ reason }` | **Xóa mềm (Soft Delete):** Đánh dấu `deleted_at = GETDATE()`, lưu `deleted_by`, `deleted_reason`, bảo toàn tệp vật lý trên ổ đĩa. |
+| `POST` | `/api/documents/{fileId}/restore` | `DOC_RESTORE` | Path: `fileId` | **Khôi phục tài liệu:** Chuyển tài liệu từ thùng rác trở lại kho lưu trữ hoạt động bình thường (`deleted_at = NULL`). |
+| `DELETE`| `/api/documents/{fileId}/purge` | `DOC_PURGE` | Path: `fileId`<br/>Body: `{ confirm: fileId }` | **Xóa vĩnh viễn (Double-Safety Purge):** Xóa tệp PDF vật lý khỏi ổ đĩa (`uploads/YYYY/MM/...`) và xóa triệt để bản ghi khỏi CSDL SQL Server. Yêu cầu mã xác nhận khớp chính xác `fileId`. |
+
+### 9.6. Nhóm Nghiệp Vụ Cốt Lõi (Auth, Documents, Files, Logs, Admin)
+*(Chi tiết đặc tả các endpoint xem, tải văn bản, phân loại đơn vị và kiểm toán an ninh tương tự các mục tiêu chuẩn của hệ thống)*
 
 ---
 
@@ -1006,7 +1081,6 @@ Hệ thống thiết kế giải pháp phản hồi kích thước viewport theo
 - Điều chỉnh khoảng đệm chân trang (`pb-4`), mang lại trải nghiệm thị giác gọn gàng, liền mạch và tập trung hoàn toàn vào 10 danh mục quản trị.
 
 ---
-<<<<<<< HEAD
 
 ## 17. Kiến Trúc Phân Hệ Giám Sát Phiên Đang Trực Tuyến (Active Online Sessions Real-time Monitoring Engine)
 
@@ -1127,7 +1201,5 @@ Nhằm hỗ trợ thủ trưởng và cán bộ tác chiến tra cứu nhanh đi
 
 ---
 *Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*
-=======
-*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
+
 

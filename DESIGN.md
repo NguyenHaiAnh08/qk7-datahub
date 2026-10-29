@@ -224,11 +224,6 @@ Mỗi khi thiết kế hoặc refactor bất kỳ trang/thành phần nào trong
 | **Security Audit Timeline** | GitHub Primer Design System | Cột mốc thời gian dọc, huy hiệu cấp độ bảo mật (Clearance Badges) | Đang áp dụng cho SOC Audit Log |
 | **Government Form & A11y** | U.S. Web Design System (USWDS) | Chuẩn trợ năng tương phản cao, focus ring chiến thuật, nhãn rõ ràng | Đang áp dụng cho các modal & form nhập liệu |
 | **Unit Organization Tree** | Atlassian Design System | Cây thư mục tổ chức đa cấp, phân nhánh mượt mà, quản lý đơn vị mồ côi | Đang áp dụng cho Bộ lọc Đơn vị & Cây tổ chức |
-| **Tactical Trash Bin** | IBM Carbon + Military Safety | Bảng dữ liệu xóa mềm, batch selection, khôi phục tức thì, modal xóa vĩnh viễn 2 bước màu Đỏ Quân Kỳ | Đã tích hợp (`TrashPage`, Thùng rác tài liệu) |
-| **Active Sessions Telemetry** | Command Center + Carbon | Thăm dò 15s (`LIVE 15s`), User-Agent parsed thông minh, cân giữa 100% cột, font mono tabular-nums | Đã tích hợp (`SessionsPage`, Phiên đang trực tuyến) |
-| **Permission Drag-and-Drop** | Atlassian DnD + 4-Tone Risk | Tay cầm `GripVertical`, cập nhật tức thì, lưới 2 cột, fieldset subgroup hổ phách, loại bỏ `Sort order tổng` | Đã tích hợp (`AdminDashboardPage` - Tab Quyền) |
-| **Header AI Slide-Over Drawer** | Lucian Prompt #058 + Spring | Ngăn kéo trượt đỉnh 380px, lò xo nảy vật lý, kính mờ `backdrop-blur-md`, câu hỏi gợi ý tác chiến | Đã tích hợp (`Header` & `AIChatWidget`) |
-| **System Discovery Guided Tour** | Tactical Spotlight + Compass | Tự động kích hoạt cho khách vãng lai, nút La bàn trên `SecurityBanner`, loại bỏ nút Header thừa | Đã tích hợp (`PortalPage`, Tour khám phá) |
 
 ---
 
@@ -241,10 +236,6 @@ Mỗi khi thiết kế hoặc refactor bất kỳ trang/thành phần nào trong
 | **Nút bấm** | Nút bấm phẳng lì, rê chuột không đổi sắc độ, bấm không có cảm giác cơ học. | Lực hút hover nhẹ, bấm lún `scale(0.97)`, bóng phản xạ ánh sáng kim loại. |
 | **Thông báo** | Dùng alert trình duyệt giật cục hoặc notification AntD mặc định che khuất nội dung. | `AnimatedToast` góc dưới bên phải, có thanh đếm ngược, nảy lò xo mượt mà, xếp tầng thông minh. |
 | **Thời gian & IP** | Hiển thị chữ thường co giãn khiến số nhảy lung tung khi cập nhật. | `font-mono tabular-nums` căn đều từng ký tự như máy đo radar quân sự. |
-| **Sắp xếp thứ tự danh mục** | Bắt người dùng nhập số thứ tự thủ công trong form (gây xung đột và nhầm lẫn). | Kéo - thả trực quan (HTML5 Drag & Drop với tay cầm `GripVertical`), cập nhật tức thì (Optimistic UI). |
-| **Hành động phá hủy (Purge)** | Dùng 1 cú click hoặc alert đơn giản của trình duyệt. | Hộp thoại an toàn màu Đỏ Quân Kỳ (`#b91c1c`), cảnh báo rủi ro tối cao và yêu cầu nhập mã xác nhận 2 bước. |
-| **Giám sát phiên làm việc** | Hiển thị chuỗi User-Agent thô dài dòng, cột bảng bị xô lệch bên trái bên phải. | Phân tích thành `HĐH • Trình duyệt` kèm icon thiết bị, cân giữa 100% cột (`text-center`), chỉ báo trực tuyến nhấp nháy. |
-| **Bản sắc màu sắc Quân đội** | Để sót màu tím AI mặc định ở tab sidebar hoặc nút tác chiến. | Đồng bộ 100% hệ màu Quân đội: Xanh Lục Quân (`#166534`), Vàng Kim (`#fbbf24`), Đỏ Quân Kỳ (`#b91c1c`). |
 
 ---
 *Ghi chú cho AI Coding Agent: Trước khi bắt tay vào viết bất kỳ component hay chỉnh sửa giao diện nào trong thư mục `frontend/`, hãy đọc lại tài liệu này để đảm bảo giữ trọn vẹn bản sắc thiết kế thủ công tinh xảo của Trung Tâm Dữ Liệu Số — Quân Khu 7.*

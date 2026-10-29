@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { TrashPage } from './TrashPage';
+import { SessionsPage } from './SessionsPage';
+import { useAuth } from '../hooks/useAuth';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Drawer } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -28,13 +31,12 @@ import {
   UserCheck,
   Monitor,
   ShieldCheck,
+<<<<<<< HEAD
   GripVertical,
   Bell,
+=======
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 } from 'lucide-react';
-
-import { TrashPage } from './TrashPage';
-import { SessionsPage } from './SessionsPage';
-import { useAuth } from '../hooks/useAuth';
 import { useDeviceMode } from '../contexts/DeviceModeContext';
 import { Header } from '../components/common/Header';
 import { Sidebar } from '../components/common/Sidebar';
@@ -51,15 +53,17 @@ import { AssignRoleModal } from '../components/users/AssignRoleModal';
 import { FingerprintEnrollModal } from '../components/users/FingerprintEnrollModal';
 import { GrantPermissionModal } from '../components/users/GrantPermissionModal';
 import { RolePermissionModal } from '../components/users/RolePermissionModal';
+<<<<<<< HEAD
 import { ApprovalQueuePage } from './ApprovalQueuePage';
 import { ProtectedPermissionsConfigPage } from './ProtectedPermissionsConfigPage';
 import { isApprovalRequired } from '../utils/approvalUtils';
 import { useApprovalContext } from '../contexts/ApprovalContext';
 import { useSearchParams } from 'react-router-dom';
 import { Tooltip } from 'antd';
+=======
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 
 import { dashboardApi } from '../services/dashboardApi';
-import { permissionService } from '../services/permissionService';
 import { usersApi } from '../services/usersApi';
 import { formatFileSize } from '../utils/formatFileSize';
 import {
@@ -129,9 +133,15 @@ const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any; permission?:
   { id: 'logs',        label: 'Nhật ký',       icon: Activity,        permission: 'AUDIT_VIEW' },
   { id: 'sessions',    label: 'Phiên online',  icon: Monitor,         permission: 'SESSION_VIEW' },
   { id: 'trash',       label: 'Thùng rác',     icon: Trash2,          permission: 'DOC_TRASH_VIEW' },
+<<<<<<< HEAD
   { id: 'approvals',   label: 'Phê duyệt yêu cầu', icon: Bell,        permission: 'APPROVAL_VALIDATE' },
+=======
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 ];
 
+// ═══════════════════════════════════════════════════════════
+// CONST: Group options + tone options cho form permission
+// ═══════════════════════════════════════════════════════════
 const PERMISSION_GROUPS = [
   { value: 'DOCUMENT',    label: '📄 Văn bản' },
   { value: 'USER',        label: '👤 Người dùng' },
@@ -147,11 +157,12 @@ const PERMISSION_GROUPS = [
 
 const PERMISSION_TONES = [
   { value: 'read',     label: '🟢 Read — Xem / tra cứu (an toàn)' },
-  { value: 'write',    label: '🟡 Write / Edit — Ghi / chỉnh sửa (cảnh báo)' },
+  { value: 'write',    label: '🟡 Write — Ghi / chỉnh sửa' },
   { value: 'security', label: '🟣 Security — Bảo mật / phân quyền' },
-  { value: 'danger',   label: '🔴 Delete / Danger — Xóa / nguy hiểm (Đỏ Quân Kỳ)' },
+  { value: 'danger',   label: '🔴 Danger — Nguy hiểm / xóa' },
 ];
 
+<<<<<<< HEAD
 // Helper ánh xạ màu sắc chuẩn quân đội cho Group Badge
 const getPermissionGroupBadge = (groupCode?: string) => {
   const g = (groupCode || '').toUpperCase();
@@ -175,6 +186,10 @@ const getPermissionGroupBadge = (groupCode?: string) => {
 
 // Helper khởi tạo form data cho permission (new hoặc edit)
 const buildPermissionFormData = (item?: Permission | null, defaultOrder = 0) => {
+=======
+// Helper khởi tạo form data cho permission (new hoặc edit)
+const buildPermissionFormData = (item?: Permission | null) => {
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
   if (!item) {
     return {
       permission_id: '',
@@ -185,12 +200,12 @@ const buildPermissionFormData = (item?: Permission | null, defaultOrder = 0) => 
       subgroup_label: '',
       subgroup_order: 50,
       subgroup_tone: 'read',
-      sort_order: defaultOrder,
+      sort_order: 0,
     };
   }
   return {
     ...item,
-    group_code:     (item as any).group_code     || 'DOCUMENT',
+    group_code:     (item as any).group_code     || 'SYSTEM',
     subgroup_key:   (item as any).subgroup_key   || '',
     subgroup_label: (item as any).subgroup_label || '',
     subgroup_order: (item as any).subgroup_order ?? 50,
@@ -199,55 +214,27 @@ const buildPermissionFormData = (item?: Permission | null, defaultOrder = 0) => 
   };
 };
 
-// ============================================================
-// COMPONENT — CHỈ KHAI BÁO 1 LẦN
-// ============================================================
 export const AdminDashboardPage: React.FC = () => {
   const { deviceMode, orientation, screenWidth } = useDeviceMode();
-  const { user, isAdmin, hasPermission } = useAuth();
-  const { count: approvalCount } = useApprovalContext();
+  const { hasPermission } = useAuth();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ⭐ URL ↔ activeTab sync
-  const [searchParams, setSearchParams] = useSearchParams();
-  const urlTab = searchParams.get('tab') || 'overview';
-
-  const [activeTab, setActiveTab] = useState(urlTab);
-  const [sidebarOpen, setSidebarOpen] = useState(false);  // ✅ chỉ khai báo 1 lần
-
-  // ⭐ handleTabChange memo hoá để dùng an toàn trong useEffect deps
-  const handleTabChange = useCallback(
-    (tabId: string) => {
-      setActiveTab(tabId);
-      if (tabId === 'overview') {
-        setSearchParams({}, { replace: true });
-      } else {
-        setSearchParams({ tab: tabId }, { replace: true });
-      }
-    },
-    [setSearchParams]
-  );
-
-  // Sync URL → state (khi user bấm Back/Forward hoặc vào từ Header)
-  useEffect(() => {
-    if (urlTab !== activeTab) {
-      setActiveTab(urlTab);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab]);
-
+  // Filter tabs theo quyền — ẩn tab user không có permission
   const visibleTabs = useMemo(
     () => ADMIN_NAV_TABS.filter((t) => !t.permission || hasPermission(t.permission)),
     [hasPermission]
   );
 
-  // Nếu tab hiện tại không được phép → nhảy sang tab hợp lệ đầu tiên
+  // Đảm bảo activeTab hợp lệ — nếu user đang ở tab không có quyền (VD: bị thu hồi),
+  // tự động chuyển về tab đầu tiên họ được phép truy cập.
   useEffect(() => {
     if (visibleTabs.length === 0) return;
     const ids = visibleTabs.map((t) => t.id);
     if (!ids.includes(activeTab)) {
-      handleTabChange(ids[0]);
+      setActiveTab(ids[0]);
     }
-  }, [visibleTabs, activeTab, handleTabChange]);
+  }, [visibleTabs, activeTab]);
 
   const isIPadLandscape = deviceMode === 'ipad' && orientation === 'landscape';
   const isIPadPortrait = deviceMode === 'ipad' && orientation === 'portrait';
@@ -292,31 +279,35 @@ export const AdminDashboardPage: React.FC = () => {
     }
   }, [activeTab]);
 
-  // === LISTS ===
+  // Entities Data
   const [usersList, setUsersList] = useState<User[]>([]);
   const [rolesList, setRolesList] = useState<Role[]>([]);
   const [permsList, setPermsList] = useState<Permission[]>([]);
-  const [draggedPermIndex, setDraggedPermIndex] = useState<number | null>(null);
-  const [dragOverPermIndex, setDragOverPermIndex] = useState<number | null>(null);
-  const [isReorderingPerms, setIsReorderingPerms] = useState<boolean>(false);
   const [unitsList, setUnitsList] = useState<Unit[]>([]);
   const [docTypesList, setDocTypesList] = useState<DocumentType[]>([]);
   const [levelsList, setLevelsList] = useState<SecurityLevel[]>([]);
   const [ranksList, setRanksList] = useState<MilitaryRank[]>([]);
   const [positionsList, setPositionsList] = useState<MilitaryPosition[]>([]);
 
+  // Search & Filters
   const [userSearch, setUserSearch] = useState('');
 
-  // === MODALS ===
+  // Modals
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const [credModal, setCredModal] = useState<{ open: boolean; userId: string; username: string }>({
-    open: false, userId: '', username: '',
+    open: false,
+    userId: '',
+    username: ''
   });
 
-  const [assignRoleModal, setAssignRoleModal] = useState<{ open: boolean; selectedRole: Role | null }>({
-    open: false, selectedRole: null,
+  const [assignRoleModal, setAssignRoleModal] = useState<{
+    open: boolean;
+    selectedRole: Role | null;
+  }>({
+    open: false,
+    selectedRole: null,
   });
 
   const [fpEnrollModal, setFpEnrollModal] = useState<{ open: boolean; user: User | null }>({
@@ -324,42 +315,53 @@ export const AdminDashboardPage: React.FC = () => {
   });
 
   const [grantPermModal, setGrantPermModal] = useState<{ open: boolean; user: User | null }>({
-    open: false, user: null,
+    open: false,
+    user: null,
   });
 
-  const [rolePermModal, setRolePermModal] = useState<{ open: boolean; role: Role | null }>({
-    open: false, role: null,
+    const [rolePermModal, setRolePermModal] = useState<{ open: boolean; role: Role | null }>({
+    open: false,
+    role: null,
   });
 
+  // Generic Edit Modal for Roles, Units, DocTypes, Levels, Ranks, Positions, Permissions
   const [genericModal, setGenericModal] = useState<{
     open: boolean;
     type: 'roles' | 'units' | 'doctypes' | 'levels' | 'ranks' | 'positions' | 'permissions' | null;
     item: any;
-  }>({ open: false, type: null, item: null });
-
+  }>({
+    open: false,
+    type: null,
+    item: null
+  });
   const [genericFormData, setGenericFormData] = useState<any>({});
 
+  // Delete Confirm Dialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
     title: string;
     message: string;
     onConfirm: () => Promise<void>;
-  }>({ open: false, title: '', message: '', onConfirm: async () => {} });
-
-  const [toast, setToast] = useState<ToastState>({
-    show: false, message: '', type: 'success',
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: async () => {}
   });
 
-  // ⭐ memo hoá showToast để dùng an toàn trong các useEffect
-  const showToast = useCallback(
-    (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-      setToast({ show: true, message, type });
-      setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2800);
-    },
-    []
-  );
+  // Toast
+  const [toast, setToast] = useState<ToastState>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
 
-  // === LOADERS ===
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2800);
+  };
+
+  // Load Data by Tab
   const loadStats = async () => {
     try {
       const data = await dashboardApi.getStats();
@@ -400,40 +402,6 @@ export const AdminDashboardPage: React.FC = () => {
       setPermsList(data.items || []);
     } catch (err: any) {
       showToast('Lỗi tải quyền: ' + err.message, 'error');
-    }
-  };
-
-  const handleReorderPerms = async (targetIndex: number) => {
-    if (draggedPermIndex === null || draggedPermIndex === targetIndex) {
-      setDraggedPermIndex(null);
-      setDragOverPermIndex(null);
-      return;
-    }
-
-    const fromIndex = draggedPermIndex;
-    setDraggedPermIndex(null);
-    setDragOverPermIndex(null);
-
-    const updatedList = [...permsList];
-    const [movedItem] = updatedList.splice(fromIndex, 1);
-    updatedList.splice(targetIndex, 0, movedItem);
-
-    // Optimistic UI update
-    setPermsList(updatedList);
-    setIsReorderingPerms(true);
-
-    try {
-      const payload = updatedList.map((item, idx) => ({
-        permission_id: item.permission_id,
-        sort_order: (idx + 1) * 10,
-      }));
-      await permissionService.reorderPermissions(payload);
-      showToast('Đã lưu thứ tự sắp xếp quyền thành công!', 'success');
-    } catch (err: any) {
-      showToast('Lỗi khi lưu thứ tự quyền: ' + (err.message || 'Thao tác thất bại'), 'error');
-      await loadPermissions();
-    } finally {
-      setIsReorderingPerms(false);
     }
   };
 
@@ -484,48 +452,121 @@ export const AdminDashboardPage: React.FC = () => {
 
   useEffect(() => {
     switch (activeTab) {
-      case 'overview':    loadStats(); break;
+<<<<<<< HEAD
+      case 'overview':    
+        loadStats(); 
+        break;
       case 'users':
         loadUsers();
-        if (!unitsList.length)     loadUnits();
-        if (!levelsList.length)    loadLevels();
-        if (!rolesList.length)     loadRoles();
-        if (!ranksList.length)     loadRanks();
+        
+        // ✅ FIX: Dùng API /api/meta (Public) thay vì 4 API Admin để tránh lỗi 403
+        dashboardApi.getMeta().then((meta) => {
+          setUnitsList(meta.units || []);
+          setLevelsList(meta.levels || []);
+          setRanksList((meta as any).ranks || []);
+          setPositionsList((meta as any).positions || []);
+        }).catch(() => {});
+
+        // Vẫn giữ loadRoles vì Meta không có Roles
+        if (!rolesList.length) {
+           dashboardApi.getCreatableRoles().then(res => setRolesList(res.items)).catch(() => {});
+        }
+=======
+      case 'overview':
+        loadStats();
+        break;
+      case 'users':
+        loadUsers();
+        if (!unitsList.length) loadUnits();
+        if (!levelsList.length) loadLevels();
+        if (!rolesList.length) loadRoles();
+        if (!ranksList.length) loadRanks();
         if (!positionsList.length) loadPositions();
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
         break;
       case 'roles':
         loadRoles();
         if (!usersList.length) loadUsers();
         break;
-      case 'permissions': loadPermissions(); break;
-      case 'units':       loadUnits();       break;
-      case 'doctypes':    loadDocTypes();    break;
-      case 'levels':      loadLevels();      break;
-      case 'ranks':       loadRanks();       break;
-      case 'positions':   loadPositions();   break;
+      case 'permissions':
+        loadPermissions();
+        break;
+      case 'units':
+        loadUnits();
+        break;
+      case 'doctypes':
+        loadDocTypes();
+        break;
+      case 'levels':
+        loadLevels();
+        break;
+      case 'ranks':
+        loadRanks();
+        break;
+      case 'positions':
+        loadPositions();
+        break;
       case 'logs':
+        break;
       case 'sessions':
+        break;
       case 'trash':
         break;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
+<<<<<<< HEAD
   // === USER CRUD ===
+       const handleSaveUser = async (userData: Partial<User> & { role_id?: string; roles?: string[] }) => {
+    try {
+      if (selectedUser?.user_id) {
+        // 1. Tách role_id ra khỏi object để không gửi nhầm lên API updateUser
+        const { role_id, roles, ...updateData } = userData;
+
+        // 2. Cập nhật thông tin cơ bản (Tên, chức vụ, đơn vị, độ mật...)
+        await usersApi.updateUser(selectedUser.user_id, updateData);
+
+        // 3. Xử lý Vai trò (Nếu có thay đổi)
+        // Kiểm tra xem Role được chọn trên form có khác Role hiện tại trong DB không
+        const currentRole = selectedUser.roles?.[0]; // Vì thiết kế 1 user 1 role nên lấy phần tử đầu tiên
+        if (role_id && role_id !== currentRole) {
+          
+          // BƯỚC 3.1: Gỡ toàn bộ role cũ (nếu có)
+          if (selectedUser.roles && selectedUser.roles.length > 0) {
+            for (const oldRoleId of selectedUser.roles) {
+              // Không cho phép gỡ role Admin tối cao (để bảo vệ hệ thống)
+              if (oldRoleId !== 'ROL-01') {
+                await usersApi.revokeRole(selectedUser.user_id, oldRoleId);
+              }
+            }
+          }
+
+          // BƯỚC 3.2: Gán role mới
+          await usersApi.assignRole(selectedUser.user_id, role_id);
+        }
+
+        await loadUsers();
+        showToast('Đã cập nhật thông tin quân nhân thành công');
+      } else {
+        // Tạo mới: Form đã gửi kèm role_id, Backend sẽ tự xử lý
+        await usersApi.createUser(userData as any);
+        await loadUsers();
+        showToast('Đã tạo quân nhân mới thành công');
+      }
+    } catch (err: any) {
+      showToast('Lỗi: ' + err.message, 'error');
+=======
+  // Save User
   const handleSaveUser = async (userData: Partial<User>) => {
     if (selectedUser?.user_id) {
       await usersApi.updateUser(selectedUser.user_id, userData);
     } else {
       await usersApi.createUser(userData as any);
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
     }
-    await loadUsers();
-    showToast(
-      selectedUser?.user_id
-        ? 'Đã cập nhật thông tin quân nhân'
-        : 'Đã tạo quân nhân mới thành công'
-    );
   };
 
+  // Delete User
   const handleDeleteUser = (u: User) => {
     setDeleteConfirm({
       open: true,
@@ -533,53 +574,73 @@ export const AdminDashboardPage: React.FC = () => {
       message: `Bạn có chắc chắn muốn xóa tài khoản ${u.full_name} (${u.user_id})?`,
       onConfirm: async () => {
         try {
-          const res: any = await usersApi.deleteUser(u.user_id);
+          await usersApi.deleteUser(u.user_id);
           await loadUsers();
-          if (isApprovalRequired(res)) return;
           showToast(`Đã xóa tài khoản ${u.user_id}`);
         } catch (err: any) {
           showToast('Lỗi: ' + err.message, 'error');
         } finally {
           setDeleteConfirm((prev) => ({ ...prev, open: false }));
         }
-      },
+      }
     });
   };
 
-  // === GENERIC SAVE (catalog CRUD) ===
+  // Generic Save Modal
   const handleGenericSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const { type, item } = genericModal;
     try {
       if (type === 'roles') {
-        if (item) await dashboardApi.updateRole(item.role_id, { name: genericFormData.name });
-        else      await dashboardApi.createRole({ role_id: genericFormData.role_id, name: genericFormData.name });
+        if (item) {
+          await dashboardApi.updateRole(item.role_id, { name: genericFormData.name });
+        } else {
+          await dashboardApi.createRole({ role_id: genericFormData.role_id, name: genericFormData.name });
+        }
         loadRoles();
       } else if (type === 'units') {
-        if (item) await dashboardApi.updateUnit(item.unit_id, genericFormData);
-        else      await dashboardApi.createUnit(genericFormData);
+        if (item) {
+          await dashboardApi.updateUnit(item.unit_id, genericFormData);
+        } else {
+          await dashboardApi.createUnit(genericFormData);
+        }
         loadUnits();
       } else if (type === 'doctypes') {
-        if (item) await dashboardApi.updateDocumentType(item.type_id, genericFormData);
-        else      await dashboardApi.createDocumentType(genericFormData);
+        if (item) {
+          await dashboardApi.updateDocumentType(item.type_id, genericFormData);
+        } else {
+          await dashboardApi.createDocumentType(genericFormData);
+        }
         loadDocTypes();
       } else if (type === 'levels') {
-        if (item) await dashboardApi.updateSecurityLevel(item.level_id, genericFormData);
-        else      await dashboardApi.createSecurityLevel({
-          level_id: Number(genericFormData.level_id),
-          code: genericFormData.code,
-          name: genericFormData.name,
-        });
+        if (item) {
+          await dashboardApi.updateSecurityLevel(item.level_id, genericFormData);
+        } else {
+          await dashboardApi.createSecurityLevel({
+            level_id: Number(genericFormData.level_id),
+            code: genericFormData.code,
+            name: genericFormData.name
+          });
+        }
         loadLevels();
       } else if (type === 'ranks') {
-        if (item) await dashboardApi.updateRank(item.rank_id, genericFormData);
-        else      await dashboardApi.createRank(genericFormData);
+        if (item) {
+          await dashboardApi.updateRank(item.rank_id, genericFormData);
+        } else {
+          await dashboardApi.createRank(genericFormData);
+        }
         loadRanks();
       } else if (type === 'positions') {
-        if (item) await dashboardApi.updatePosition(item.position_id, genericFormData);
-        else      await dashboardApi.createPosition(genericFormData);
+        if (item) {
+          await dashboardApi.updatePosition(item.position_id, genericFormData);
+        } else {
+          await dashboardApi.createPosition(genericFormData);
+        }
         loadPositions();
       } else if (type === 'permissions') {
+        // ══════════════════════════════════════════════════
+        // PERMISSION: gồm 4 cột subgroup_* + group_code
+        // ══════════════════════════════════════════════════
         const payload = {
           permission_id:  String(genericFormData.permission_id || '').trim(),
           code:           String(genericFormData.code || '').trim().toUpperCase(),
@@ -591,21 +652,35 @@ export const AdminDashboardPage: React.FC = () => {
           subgroup_tone:  genericFormData.subgroup_tone || 'read',
           sort_order:     Number(genericFormData.sort_order) || 0,
         };
+
         const api = dashboardApi as any;
         if (item) {
           if (typeof api.updatePermission !== 'function') {
-            showToast('Backend chưa hỗ trợ sửa quyền — cần thêm PUT /api/admin/permissions/:id', 'error');
+            showToast(
+              'Backend chưa hỗ trợ sửa quyền — cần thêm PUT /api/admin/permissions/:id',
+              'error'
+            );
             return;
           }
+          // Không cho sửa permission_id / code (đã disable ở form)
           const { permission_id, code, ...updateBody } = payload;
           await api.updatePermission(item.permission_id, updateBody);
         } else {
           if (typeof api.createPermission !== 'function') {
-            showToast('Thiếu dashboardApi.createPermission — kiểm tra services/dashboardApi.ts', 'error');
+            showToast(
+              'Thiếu dashboardApi.createPermission — kiểm tra services/dashboardApi.ts',
+              'error'
+            );
             return;
           }
-          if (!payload.permission_id) { showToast('Thiếu Permission ID', 'error'); return; }
-          if (!payload.code)          { showToast('Thiếu mã code', 'error'); return; }
+          if (!payload.permission_id) {
+            showToast('Thiếu Permission ID', 'error');
+            return;
+          }
+          if (!payload.code) {
+            showToast('Thiếu mã code', 'error');
+            return;
+          }
           await api.createPermission(payload);
         }
         loadPermissions();
@@ -617,38 +692,56 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  // Generic Delete
   const handleGenericDelete = (type: string, id: string | number, name: string) => {
     setDeleteConfirm({
       open: true,
       title: `Xóa ${type}`,
-      message: `Đồng chí có chắc chắn muốn xóa bản ghi "${name}" (${id})?`,
+      message: `Bạn có chắc chắn muốn xóa bản ghi "${name}" (${id})?`,
       onConfirm: async () => {
         try {
-          let res: any = null;
-          if (type === 'roles')            res = await dashboardApi.deleteRole(String(id));
-          else if (type === 'permissions') res = await dashboardApi.deletePermission(String(id));
-          else if (type === 'units')       res = await dashboardApi.deleteUnit(String(id));
-          else if (type === 'doctypes')    res = await dashboardApi.deleteDocumentType(String(id));
-          else if (type === 'levels')      res = await dashboardApi.deleteSecurityLevel(Number(id));
-          else if (type === 'ranks')       res = await dashboardApi.deleteRank(String(id));
-          else if (type === 'positions')   res = await dashboardApi.deletePosition(String(id));
-
-          if (type === 'roles')            loadRoles();
-          else if (type === 'permissions') loadPermissions();
-          else if (type === 'units')       loadUnits();
-          else if (type === 'doctypes')    loadDocTypes();
-          else if (type === 'levels')      loadLevels();
-          else if (type === 'ranks')       loadRanks();
-          else if (type === 'positions')   loadPositions();
-
-          if (isApprovalRequired(res)) return;
-
-          if (type === 'ranks' && res?.soft_deleted) {
-            showToast(`Đã ẩn cấp bậc "${name}" khỏi dropdown`, 'info');
-          } else if (type === 'positions' && res?.soft_deleted) {
-            showToast(`Đã ẩn chức vụ "${name}" khỏi dropdown`, 'info');
-          } else {
-            showToast(`Đã xóa ${type} ${id}`);
+          if (type === 'roles') {
+            await dashboardApi.deleteRole(String(id));
+            loadRoles();
+            showToast(`Đã xóa vai trò ${id}`);
+          } else if (type === 'permissions') {
+            await dashboardApi.deletePermission(String(id));
+            loadPermissions();
+            showToast(`Đã xóa quyền ${id}`);
+          } else if (type === 'units') {
+            await dashboardApi.deleteUnit(String(id));
+            loadUnits();
+            showToast(`Đã xóa đơn vị ${id}`);
+          } else if (type === 'doctypes') {
+            await dashboardApi.deleteDocumentType(String(id));
+            loadDocTypes();
+            showToast(`Đã xóa loại văn bản ${id}`);
+          } else if (type === 'levels') {
+            await dashboardApi.deleteSecurityLevel(Number(id));
+            loadLevels();
+            showToast(`Đã xóa mức bảo mật ${id}`);
+          } else if (type === 'ranks') {
+            const res: any = await dashboardApi.deleteRank(String(id));
+            loadRanks();
+            if (res?.soft_deleted) {
+              showToast(
+                `Đã ẩn cấp bậc "${name}" khỏi dropdown (${res.note || 'đang được quân nhân sử dụng'})`,
+                'info',
+              );
+            } else {
+              showToast(`Đã xóa cấp bậc ${id}`);
+            }
+          } else if (type === 'positions') {
+            const res: any = await dashboardApi.deletePosition(String(id));
+            loadPositions();
+            if (res?.soft_deleted) {
+              showToast(
+                `Đã ẩn chức vụ "${name}" khỏi dropdown (${res.note || 'đang được quân nhân sử dụng'})`,
+                'info',
+              );
+            } else {
+              showToast(`Đã xóa chức vụ ${id}`);
+            }
           }
         } catch (err: any) {
           showToast('Lỗi: ' + err.message, 'error');
@@ -659,6 +752,7 @@ export const AdminDashboardPage: React.FC = () => {
     });
   };
 
+  // Filtered lists
   const filteredUsers = useMemo(() => {
     if (!userSearch.trim()) return usersList;
     const q = userSearch.toLowerCase().trim();
@@ -673,11 +767,9 @@ export const AdminDashboardPage: React.FC = () => {
     );
   }, [usersList, userSearch]);
 
-  // ============================================================
-  // RENDER
-  // ============================================================
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+      {/* Header */}
       <Header
         activeNav="admin"
         title="Trường Quân Sự Quân Khu 7"
@@ -685,7 +777,9 @@ export const AdminDashboardPage: React.FC = () => {
         onToggleMobileMenu={() => setSidebarOpen(true)}
       />
 
+      {/* Main Container */}
       <div className="flex-1 flex overflow-hidden relative">
+        {/* Fixed Desktop Sidebar hoặc iPad Landscape Dock Sidebar (190px / 68px) */}
         {!isPortraitMode && (
           <aside
             className={`flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md overflow-x-hidden transition-all duration-300 ${sidebarWidthClass}`}
@@ -693,16 +787,16 @@ export const AdminDashboardPage: React.FC = () => {
             <Sidebar
               activeTab={activeTab as any}
               onTabChange={(id) => {
-                handleTabChange(id);   // ✅ sync URL
+                setActiveTab(id);
                 setSidebarOpen(false);
               }}
               collapsed={sidebarCollapsed}
               onToggleCollapse={toggleSidebarCollapsed}
-              counts={{ approvals: approvalCount }}
             />
           </aside>
         )}
 
+        {/* Drawer trượt khi ở chế độ Portrait hoặc màn hình nhỏ < 1024px */}
         {isPortraitMode && (
           <Drawer
             placement="left"
@@ -715,7 +809,7 @@ export const AdminDashboardPage: React.FC = () => {
             <Sidebar
               activeTab={activeTab as any}
               onTabChange={(id) => {
-                handleTabChange(id);   // ✅ sync URL
+                setActiveTab(id);
                 setSidebarOpen(false);
               }}
               onClose={() => setSidebarOpen(false)}
@@ -724,9 +818,13 @@ export const AdminDashboardPage: React.FC = () => {
           </Drawer>
         )}
 
+        {/* Content Area */}
         <main className="flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-5 lg:p-6 xl:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-5">
+          {/* Mobile / iPad Portrait Menu Bar & Swipeable Tab Strip — Chuyển tab 1 chạm, không che dữ liệu */}
           {isPortraitMode && (
             <div className="flex items-center gap-1.5 sm:gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800/80 select-none">
+
+              {/* Nút cuộn danh mục sang trái trên desktop */}
               <button
                 type="button"
                 onClick={() => scrollTabStrip('left')}
@@ -737,6 +835,7 @@ export const AdminDashboardPage: React.FC = () => {
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
 
+              {/* Thanh Tab Ngang Cuộn Cảm Ứng & Lăn Bánh Xe Chuột — dùng visibleTabs (đã filter theo quyền) */}
               <div
                 ref={tabStripRef}
                 onWheel={handleTabStripWheel}
@@ -749,7 +848,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <button
                       key={tab.id}
                       data-tab-id={tab.id}
-                      onClick={() => handleTabChange(tab.id)}   // ✅ sync URL
+                      onClick={() => setActiveTab(tab.id)}
                       className={`whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
                         isActive
                           ? 'bg-[#166534] text-white shadow-xs dark:bg-emerald-600/25 dark:text-emerald-300 dark:border dark:border-emerald-500/40'
@@ -758,16 +857,12 @@ export const AdminDashboardPage: React.FC = () => {
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0" />
                       <span>{tab.label}</span>
-                      {tab.id === 'approvals' && approvalCount > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold">
-                          {approvalCount > 99 ? '99+' : approvalCount}
-                        </span>
-                      )}
                     </button>
                   );
                 })}
               </div>
 
+              {/* Nút cuộn danh mục sang phải trên desktop */}
               <button
                 type="button"
                 onClick={() => scrollTabStrip('right')}
@@ -780,8 +875,7 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
-          {/* ============== TAB PANELS ============== */}
-
+          {/* TAB: OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -803,44 +897,90 @@ export const AdminDashboardPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className={
-                isIPadLandscape
-                  ? 'grid grid-cols-4 gap-3'
-                  : isIPadPortrait
+              {/* KPI Cards — iPad Landscape 4 cột, iPad Portrait 2x2, PC 4 cột */}
+              <div
+                className={
+                  isIPadLandscape
+                    ? 'grid grid-cols-4 gap-3'
+                    : isIPadPortrait
                     ? 'grid grid-cols-2 gap-3'
                     : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4'
-              }>
-                <StatCard label="Quân nhân & Người dùng" value={stats?.users ?? '—'}      icon={<Users className="w-6 h-6" />}      color="blue"    subtext="Đã kích hoạt trên hệ thống" refreshKey={overviewRefreshKey} />
-                <StatCard label="Văn bản & Tài liệu"     value={stats?.documents ?? '—'}  icon={<FileCheck className="w-6 h-6" />}  color="emerald" subtext="Lưu trữ trong kho số"       delay={0.05} refreshKey={overviewRefreshKey} />
-                <StatCard label="Tổng dung lượng tệp"    value={stats ? formatFileSize(stats.totalSize) : '—'} icon={<HardDrive className="w-6 h-6" />} color="amber" subtext="Ổ đĩa dữ liệu an toàn"      delay={0.1}  refreshKey={overviewRefreshKey} />
-                <StatCard label="Truy cập nhật ký 24h"   value={stats?.logs24h ?? '—'}    icon={<History className="w-6 h-6" />}    color="red"     subtext="Bản ghi kiểm toán an ninh" delay={0.15} refreshKey={overviewRefreshKey} />
+                }
+              >
+                <StatCard
+                  label="Quân nhân & Người dùng"
+                  value={stats?.users ?? '—'}
+                  icon={<Users className="w-6 h-6" />}
+                  color="blue"
+                  subtext="Đã kích hoạt trên hệ thống"
+                  refreshKey={overviewRefreshKey}
+                />
+                <StatCard
+                  label="Văn bản & Tài liệu"
+                  value={stats?.documents ?? '—'}
+                  icon={<FileCheck className="w-6 h-6" />}
+                  color="emerald"
+                  subtext="Lưu trữ trong kho số"
+                  delay={0.05}
+                  refreshKey={overviewRefreshKey}
+                />
+                <StatCard
+                  label="Tổng dung lượng tệp"
+                  value={stats ? formatFileSize(stats.totalSize) : '—'}
+                  icon={<HardDrive className="w-6 h-6" />}
+                  color="amber"
+                  subtext="Ổ đĩa dữ liệu an toàn"
+                  delay={0.1}
+                  refreshKey={overviewRefreshKey}
+                />
+                <StatCard
+                  label="Truy cập nhật ký 24h"
+                  value={stats?.logs24h ?? '—'}
+                  icon={<History className="w-6 h-6" />}
+                  color="red"
+                  subtext="Bản ghi kiểm toán an ninh"
+                  delay={0.15}
+                  refreshKey={overviewRefreshKey}
+                />
               </div>
 
-              <div className={
-                isIPadLandscape
-                  ? 'grid grid-cols-2 gap-4'
-                  : isIPadPortrait
+              {/* Distribution Charts — iPad Landscape 2 cột song song, iPad Portrait dọc */}
+              <div
+                className={
+                  isIPadLandscape
+                    ? 'grid grid-cols-2 gap-4'
+                    : isIPadPortrait
                     ? 'grid grid-cols-1 gap-4'
                     : 'grid grid-cols-1 xl:grid-cols-2 gap-4'
-              }>
+                }
+              >
                 <DistributionChart
                   title="Phân Bố Tài Liệu Theo Mức Bảo Mật"
                   icon={<Shield className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
                   barColor="amber"
-                  items={(stats?.byLevel || []).map((x) => ({ id: x.lv, label: x.lvName, count: x.n }))}
+                  items={(stats?.byLevel || []).map((x) => ({
+                    id: x.lv,
+                    label: x.lvName,
+                    count: x.n,
+                  }))}
                   refreshKey={overviewRefreshKey}
                 />
                 <DistributionChart
                   title="Phân Bố Tài Liệu Theo Thể Loại Văn Bản"
                   icon={<FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
                   barColor="emerald"
-                  items={(stats?.byType || []).map((t) => ({ id: t.id, label: t.name, count: t.n }))}
+                  items={(stats?.byType || []).map((t) => ({
+                    id: t.id,
+                    label: t.name,
+                    count: t.n,
+                  }))}
                   refreshKey={overviewRefreshKey}
                 />
               </div>
             </div>
           )}
 
+          {/* TAB: USERS */}
           {activeTab === 'users' && (
             <div className="space-y-4">
               <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 sm:gap-4">
@@ -886,12 +1026,17 @@ export const AdminDashboardPage: React.FC = () => {
 
               <UserTable
                 users={filteredUsers}
-                onEdit={(u) => { setSelectedUser(u); setUserModalOpen(true); }}
-                onUpdateCredentials={(u) => setCredModal({
-                  open: true,
-                  userId: u.user_id,
-                  username: u.username || u.user_id.toLowerCase(),
-                })}
+                onEdit={(u) => {
+                  setSelectedUser(u);
+                  setUserModalOpen(true);
+                }}
+                onUpdateCredentials={(u) => {
+                  setCredModal({
+                    open: true,
+                    userId: u.user_id,
+                    username: u.username || u.user_id.toLowerCase()
+                  });
+                }}
                 onDelete={handleDeleteUser}
                 onEnrollFingerprint={(u) => setFpEnrollModal({ open: true, user: u })}
                 onGrantPermission={(u) => setGrantPermModal({ open: true, user: u })}
@@ -900,13 +1045,14 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
+          {/* TAB: ROLES */}
           {activeTab === 'roles' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <KeyRound className="w-5 h-5 text-amber-500 dark:text-amber-400" />
-                    <span>Quản Lý Vai Trò</span>
+                    <span>Quản Lý Vai Trò (Roles)</span>
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     Phân quyền vai trò chức năng hệ thống • Tổng số:{' '}
@@ -945,6 +1091,7 @@ export const AdminDashboardPage: React.FC = () => {
                         <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
                     </thead>
+                    {/* ✅ FIX #3 — tbody Roles đã vá */}
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {rolesList.length === 0 ? (
                         <tr>
@@ -967,11 +1114,19 @@ export const AdminDashboardPage: React.FC = () => {
                             <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
                             <td className="py-3 px-4 text-right whitespace-nowrap">
                               {r.role_id === 'ROL-01' ? (
-                                <button disabled className="p-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 rounded-lg mr-1.5 cursor-not-allowed opacity-60" title="Role Admin bypass toàn quyền — không cần phân quyền">
+                                <button
+                                  disabled
+                                  className="p-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 rounded-lg mr-1.5 cursor-not-allowed opacity-60"
+                                  title="Role Admin bypass toàn quyền — không cần phân quyền"
+                                >
                                   <ShieldCheck className="w-3.5 h-3.5" />
                                 </button>
                               ) : (
-                                <button onClick={() => setRolePermModal({ open: true, role: r })} className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 dark:border-amber-500/30 rounded-lg mr-1.5 transition cursor-pointer" title="Phân quyền cho vai trò">
+                                <button
+                                  onClick={() => setRolePermModal({ open: true, role: r })}
+                                  className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 dark:border-amber-500/30 rounded-lg mr-1.5 transition cursor-pointer"
+                                  title="Phân quyền cho vai trò"
+                                >
                                   <ShieldCheck className="w-3.5 h-3.5" />
                                 </button>
                               )}
@@ -1024,21 +1179,17 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
+          {/* TAB: PERMISSIONS */}
           {activeTab === 'permissions' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Sách Quyền
+                    <ShieldAlert className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Sách Quyền (Permissions)
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     Các quyền hạn truy xuất trong hệ thống • Tổng số:{' '}
                     <span className="font-semibold text-slate-700 dark:text-slate-200">{permsList.length}</span> quyền
-                    {isReorderingPerms && (
-                      <span className="ml-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse">
-                        • Đang lưu thứ tự mới...
-                      </span>
-                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1047,48 +1198,50 @@ export const AdminDashboardPage: React.FC = () => {
                       await loadPermissions();
                       showToast('Đã làm mới danh sách quyền!', 'success');
                     }}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95"
-                    title="Làm mới danh sách quyền"
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                    title="Làm mới quyền"
                   >
                     <RotateCw className="w-3.5 h-3.5" /> Làm mới
                   </button>
                   <button
                     onClick={() => {
-                      const nextOrder = (permsList.length + 1) * 10;
-                      setGenericFormData(buildPermissionFormData(null, nextOrder));
+                      setGenericFormData(buildPermissionFormData(null));
                       setGenericModal({ open: true, type: 'permissions', item: null });
                     }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm active:scale-95"
-                    title="Thêm quyền mới vào hệ thống"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                    title="Thêm quyền mới"
                   >
                     <Plus className="w-4 h-4" /> Thêm quyền
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900/90 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[700px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/95 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[640px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
                       <tr>
-                        <th className="py-3 px-3 text-center w-12" title="Kéo thả để sắp xếp thứ tự">
-                          <GripVertical className="w-4 h-4 mx-auto text-slate-400" />
-                        </th>
-                        <th className="py-3 px-4 whitespace-nowrap">Mã Quyền</th>
-                        <th className="py-3 px-4 whitespace-nowrap">Tên quyền</th>
+                        <th className="py-3 px-4">Mã Quyền</th>
+                        <th className="py-3 px-4">Tên quyền</th>
                         <th className="py-3 px-4">Mô tả</th>
-                        <th className="py-3 px-4 whitespace-nowrap">Nhóm</th>
-                        <th className="py-3 px-4 text-right whitespace-nowrap">Thao tác</th>
+                        <th className="py-3 px-4">Nhóm</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
                     </thead>
+                    {/* ✅ FIX #4 — tbody Permissions đã vá */}
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {permsList.length === 0 ? (
                         <tr>
+<<<<<<< HEAD
                           <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500">
+=======
+                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                             Chưa có quyền nào
                           </td>
                         </tr>
                       ) : (
+<<<<<<< HEAD
                         permsList.map((p, index) => {
                           const isBeingDragged = draggedPermIndex === index;
                           const isOver = dragOverPermIndex === index;
@@ -1188,6 +1341,43 @@ export const AdminDashboardPage: React.FC = () => {
                             </tr>
                           );
                         })
+=======
+                        permsList.map((p) => (
+                          <tr key={p.permission_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 font-semibold whitespace-nowrap">
+                              {p.permission_id}
+                            </td>
+                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold whitespace-nowrap">
+                              {p.name || p.code || p.permission_id}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{p.description || '—'}</td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">
+                                {(p as any).group_code || '—'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => {
+                                  setGenericFormData(buildPermissionFormData(p));
+                                  setGenericModal({ open: true, type: 'permissions', item: p });
+                                }}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
+                                title="Sửa quyền"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                title="Xóa quyền"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                       )}
                     </tbody>
                   </table>
@@ -1196,6 +1386,7 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
+          {/* TAB: UNITS */}
           {activeTab === 'units' && (
             <UnitTreeTable
               units={unitsList}
@@ -1216,6 +1407,7 @@ export const AdminDashboardPage: React.FC = () => {
             />
           )}
 
+          {/* TAB: DOCTYPES */}
           {activeTab === 'doctypes' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1281,6 +1473,7 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
+          {/* TAB: LEVELS */}
           {activeTab === 'levels' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1346,6 +1539,7 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
+          {/* TAB: RANKS */}
           {activeTab === 'ranks' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1353,7 +1547,9 @@ export const AdminDashboardPage: React.FC = () => {
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Award className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Cấp Bậc Quân Hàm
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Số thứ tự nhỏ hiển thị trước trong dropdown</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Số thứ tự nhỏ hiển thị trước trong dropdown
+                  </p>
                 </div>
                 <button
                   onClick={() => {
@@ -1380,7 +1576,11 @@ export const AdminDashboardPage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {ranksList.length === 0 ? (
-                        <tr><td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">Chưa có cấp bậc nào</td></tr>
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            Chưa có cấp bậc nào
+                          </td>
+                        </tr>
                       ) : (
                         ranksList.map((r) => (
                           <tr key={r.rank_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
@@ -1388,11 +1588,13 @@ export const AdminDashboardPage: React.FC = () => {
                             <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
                             <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-mono tabular-nums">{r.sort_order ?? 0}</td>
                             <td className="py-3 px-4">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                r.active !== false
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
-                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
-                              }`}>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  r.active !== false
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
+                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
+                                }`}
+                              >
                                 {r.active !== false ? 'Đang dùng' : 'Đã ẩn'}
                               </span>
                             </td>
@@ -1425,6 +1627,7 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
+          {/* TAB: POSITIONS */}
           {activeTab === 'positions' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1432,7 +1635,9 @@ export const AdminDashboardPage: React.FC = () => {
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Briefcase className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Chức Vụ
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Số thứ tự nhỏ hiển thị trước trong dropdown</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Số thứ tự nhỏ hiển thị trước trong dropdown
+                  </p>
                 </div>
                 <button
                   onClick={() => {
@@ -1459,7 +1664,11 @@ export const AdminDashboardPage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                       {positionsList.length === 0 ? (
-                        <tr><td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">Chưa có chức vụ nào</td></tr>
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            Chưa có chức vụ nào
+                          </td>
+                        </tr>
                       ) : (
                         positionsList.map((p) => (
                           <tr key={p.position_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
@@ -1467,11 +1676,13 @@ export const AdminDashboardPage: React.FC = () => {
                             <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name}</td>
                             <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-mono tabular-nums">{p.sort_order ?? 0}</td>
                             <td className="py-3 px-4">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                p.active !== false
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
-                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
-                              }`}>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  p.active !== false
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
+                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
+                                }`}
+                              >
                                 {p.active !== false ? 'Đang dùng' : 'Đã ẩn'}
                               </span>
                             </td>
@@ -1504,27 +1715,21 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'logs' && (<SecurityAuditLog showToast={showToast} />)}
+          {/* TAB: LOGS */}
+          {activeTab === 'logs' && (
+            <SecurityAuditLog showToast={showToast} />
+          )}
           {activeTab === 'sessions' && <SessionsPage embedded />}
           {activeTab === 'trash' && <TrashPage embedded />}
-          {activeTab === 'approvals' && (
-            <div className="space-y-8">
-              <ApprovalQueuePage />
-              <ProtectedPermissionsConfigPage />
-            </div>
-          )}
         </main>
       </div>
 
-      {/* ============== MODALS ============== */}
-
+      {/* User Form Modal */}
       <UserFormModal
         open={userModalOpen}
         user={selectedUser}
         units={unitsList}
         securityLevels={levelsList}
-        currentUserClearance={user?.clearance_level_id || 1}
-        isAdminUser={isAdmin}
         roles={rolesList}
         ranks={ranksList}
         positions={positionsList}
@@ -1536,6 +1741,7 @@ export const AdminDashboardPage: React.FC = () => {
         onSave={handleSaveUser}
       />
 
+      {/* User Credentials Modal */}
       <UserCredentialsModal
         open={credModal.open}
         userId={credModal.userId}
@@ -1545,6 +1751,7 @@ export const AdminDashboardPage: React.FC = () => {
         onToast={showToast}
       />
 
+      {/* Assign Role Modal */}
       <AssignRoleModal
         open={assignRoleModal.open}
         roles={rolesList}
@@ -1571,28 +1778,36 @@ export const AdminDashboardPage: React.FC = () => {
         />
       )}
 
+      {/* Generic Modal (Roles, Units, DocTypes, Levels, Ranks, Positions, Permissions) */}
       <AnimatePresence>
         {genericModal.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`bg-white dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${
+              className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${
                 genericModal.type === 'permissions' ? 'max-w-2xl' : 'max-w-md'
               } p-6 shadow-2xl text-xs space-y-4`}
             >
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <h3 className="font-bold text-base text-slate-900 dark:text-white">
                   {genericModal.item ? 'Chỉnh Sửa' : 'Thêm Mới'}{' '}
-                  {genericModal.type === 'units' ? 'Đơn Vị'
-                    : genericModal.type === 'roles' ? 'Vai Trò'
-                      : genericModal.type === 'doctypes' ? 'Loại Văn Bản'
-                        : genericModal.type === 'levels' ? 'Mức Bảo Mật'
-                          : genericModal.type === 'ranks' ? 'Cấp Bậc'
-                            : genericModal.type === 'positions' ? 'Chức Vụ'
-                              : genericModal.type === 'permissions' ? 'Quyền (Permission)'
-                                : genericModal.type}
+                  {genericModal.type === 'units'
+                    ? 'Đơn Vị'
+                    : genericModal.type === 'roles'
+                    ? 'Vai Trò'
+                    : genericModal.type === 'doctypes'
+                    ? 'Loại Văn Bản'
+                    : genericModal.type === 'levels'
+                    ? 'Mức Bảo Mật'
+                    : genericModal.type === 'ranks'
+                    ? 'Cấp Bậc'
+                    : genericModal.type === 'positions'
+                    ? 'Chức Vụ'
+                    : genericModal.type === 'permissions'
+                    ? 'Quyền (Permission)'
+                    : genericModal.type}
                 </h3>
                 <button
                   onClick={() => setGenericModal({ open: false, type: null, item: null })}
@@ -1609,15 +1824,25 @@ export const AdminDashboardPage: React.FC = () => {
                     <>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Vai Trò (Tự động)</label>
-                        <input type="text" readOnly disabled value={genericFormData.role_id || ''} placeholder="VD: ROL-07"
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={genericFormData.role_id || ''}
+                          placeholder="VD: ROL-07"
                           className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80"
-                          title="Mã vai trò được hệ thống tự động sinh theo thứ tự" />
+                          title="Mã vai trò được hệ thống tự động sinh theo thứ tự"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Vai Trò *</label>
-                        <input type="text" value={genericFormData.name || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                     </>
                   )}
@@ -1626,27 +1851,40 @@ export const AdminDashboardPage: React.FC = () => {
                     <>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Mã Đơn Vị *</label>
-                        <input type="text" disabled={Boolean(genericModal.item)} value={genericFormData.unit_id || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, unit_id: e.target.value })} required
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 text-sm font-mono font-medium" />
+                        <input
+                          type="text"
+                          disabled={Boolean(genericModal.item)}
+                          value={genericFormData.unit_id || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, unit_id: e.target.value })}
+                          required
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 text-sm font-mono font-medium"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Tên Đơn Vị *</label>
-                        <input type="text" value={genericFormData.name || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })} required
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-medium" />
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          required
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-medium"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Đơn Vị Cấp Trên</label>
-                        <select value={genericFormData.parent_id || ''}
+                        <select
+                          value={genericFormData.parent_id || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, parent_id: e.target.value })}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-medium text-sm cursor-pointer">
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-medium text-sm cursor-pointer"
+                        >
                           <option value="">Cấp cao nhất</option>
                           {[...unitsList]
                             .filter((u) => !genericModal.item || u.unit_id !== genericModal.item.unit_id)
                             .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
                             .map((u) => (
-                              <option key={u.unit_id} value={u.unit_id}>{u.name}</option>
+                              <option key={u.unit_id} value={u.unit_id}>
+                                {u.name}
+                              </option>
                             ))}
                         </select>
                       </div>
@@ -1657,21 +1895,33 @@ export const AdminDashboardPage: React.FC = () => {
                     <>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Loại *</label>
-                        <input type="text" disabled={Boolean(genericModal.item)} value={genericFormData.type_id || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, type_id: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        <input
+                          type="text"
+                          disabled={Boolean(genericModal.item)}
+                          value={genericFormData.type_id || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, type_id: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Loại Văn Bản *</label>
-                        <input type="text" value={genericFormData.name || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mô Tả</label>
-                        <input type="text" value={genericFormData.description || ''}
+                        <input
+                          type="text"
+                          value={genericFormData.description || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, description: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                     </>
                   )}
@@ -1680,22 +1930,36 @@ export const AdminDashboardPage: React.FC = () => {
                     <>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Cấp Độ (1 - 5) *</label>
-                        <input type="number" min="1" max="5" disabled={Boolean(genericModal.item)}
+                        <input
+                          type="number"
+                          min="1"
+                          max="5"
+                          disabled={Boolean(genericModal.item)}
                           value={genericFormData.level_id || 1}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, level_id: Number(e.target.value) })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          onChange={(e) => setGenericFormData({ ...genericFormData, level_id: Number(e.target.value) })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Ký Hiệu *</label>
-                        <input type="text" value={genericFormData.code || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, code: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        <input
+                          type="text"
+                          value={genericFormData.code || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, code: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Mức Bảo Mật *</label>
-                        <input type="text" value={genericFormData.name || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                     </>
                   )}
@@ -1704,27 +1968,43 @@ export const AdminDashboardPage: React.FC = () => {
                     <>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Cấp Bậc (Tự động)</label>
-                        <input type="text" readOnly disabled value={genericFormData.rank_id || ''} placeholder="VD: R-21"
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={genericFormData.rank_id || ''}
+                          placeholder="VD: R-21"
                           className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80"
-                          title="Mã cấp bậc được hệ thống tự động sinh theo thứ tự" />
+                          title="Mã cấp bậc được hệ thống tự động sinh theo thứ tự"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Cấp Bậc *</label>
-                        <input type="text" value={genericFormData.name || ''}
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                          placeholder="VD: Trung sĩ QNCN" required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          placeholder="VD: Trung sĩ QNCN"
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Thứ tự</label>
-                        <input type="number" value={genericFormData.sort_order ?? 0}
+                        <input
+                          type="number"
+                          value={genericFormData.sort_order ?? 0}
                           onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       {genericModal.item && (
                         <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold">
-                          <input type="checkbox" checked={genericFormData.active !== false}
-                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })} />
+                          <input
+                            type="checkbox"
+                            checked={genericFormData.active !== false}
+                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                          />
                           <span>Đang kích hoạt</span>
                         </label>
                       )}
@@ -1735,27 +2015,43 @@ export const AdminDashboardPage: React.FC = () => {
                     <>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Chức Vụ (Tự động)</label>
-                        <input type="text" readOnly disabled value={genericFormData.position_id || ''} placeholder="VD: P-19"
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={genericFormData.position_id || ''}
+                          placeholder="VD: P-19"
                           className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80"
-                          title="Mã chức vụ được hệ thống tự động sinh theo thứ tự" />
+                          title="Mã chức vụ được hệ thống tự động sinh theo thứ tự"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Chức Vụ *</label>
-                        <input type="text" value={genericFormData.name || ''}
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                          placeholder="VD: Phó phòng Kỹ thuật" required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          placeholder="VD: Phó phòng Kỹ thuật"
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Thứ tự</label>
-                        <input type="number" value={genericFormData.sort_order ?? 0}
+                        <input
+                          type="number"
+                          value={genericFormData.sort_order ?? 0}
                           onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       {genericModal.item && (
                         <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold">
-                          <input type="checkbox" checked={genericFormData.active !== false}
-                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })} />
+                          <input
+                            type="checkbox"
+                            checked={genericFormData.active !== false}
+                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                          />
                           <span>Đang kích hoạt</span>
                         </label>
                       )}
@@ -1764,79 +2060,157 @@ export const AdminDashboardPage: React.FC = () => {
 
                   {genericModal.type === 'permissions' && (
                     <>
+                      {/* ─── 1. Cơ bản ─── */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Permission ID *</label>
-                          <input type="text" value={genericFormData.permission_id || ''}
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                            Mã Permission ID *
+                          </label>
+                          <input
+                            type="text"
+                            value={genericFormData.permission_id || ''}
                             onChange={(e) => setGenericFormData({ ...genericFormData, permission_id: e.target.value })}
-                            disabled={Boolean(genericModal.item)} placeholder="PERM-DOC-10" required
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                            disabled={Boolean(genericModal.item)}
+                            placeholder="PERM-DOC-10"
+                            required
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                          />
                         </div>
                         <div>
-                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã code (UPPER_SNAKE) *</label>
-                          <input type="text" value={genericFormData.code || ''}
-                            onChange={(e) => setGenericFormData({ ...genericFormData, code: e.target.value.toUpperCase() })}
-                            disabled={Boolean(genericModal.item)} placeholder="DOC_EXPORT" required
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                            Mã code (UPPER_SNAKE) *
+                          </label>
+                          <input
+                            type="text"
+                            value={genericFormData.code || ''}
+                            onChange={(e) =>
+                              setGenericFormData({ ...genericFormData, code: e.target.value.toUpperCase() })
+                            }
+                            disabled={Boolean(genericModal.item)}
+                            placeholder="DOC_EXPORT"
+                            required
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                          />
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mô tả</label>
-                        <input type="text" value={genericFormData.description || ''}
+                        <input
+                          type="text"
+                          value={genericFormData.description || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, description: e.target.value })}
                           placeholder="Xuất văn bản ra PDF..."
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
 
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Nhóm (group_code) *</label>
-                        <select value={genericFormData.group_code || 'DOCUMENT'}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, group_code: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20">
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                          Nhóm (group_code) *
+                        </label>
+                        <select
+                          value={genericFormData.group_code || 'DOCUMENT'}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, group_code: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        >
                           {PERMISSION_GROUPS.map((g) => (
                             <option key={g.value} value={g.value}>{g.label}</option>
                           ))}
                         </select>
                       </div>
 
+<<<<<<< HEAD
                       <fieldset className="border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 rounded-xl p-3.5 space-y-3">
                         <legend className="px-2 text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+=======
+                      {/* ─── 2. Phân loại con ─── */}
+                      <fieldset className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2.5">
+                        <legend className="px-2 text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                           Phân loại con (Subgroup)
                         </legend>
 
                         <div>
-                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Subgroup key</label>
-                          <input type="text" value={genericFormData.subgroup_key || ''}
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                            Subgroup key
+                          </label>
+                          <input
+                            type="text"
+                            value={genericFormData.subgroup_key || ''}
                             onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_key: e.target.value })}
                             placeholder="doc-view, doc-edit, doc-danger..."
+<<<<<<< HEAD
                             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
+=======
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                          />
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                           <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                            Dùng chung với quyền khác trong cùng nhóm. VD: <code className="font-mono text-amber-500">doc-view</code>
+                            Dùng chung với quyền khác trong cùng nhóm. VD: <code className="font-mono">doc-view</code>
                           </p>
                         </div>
+
                         <div>
-                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Nhãn hiển thị</label>
-                          <input type="text" value={genericFormData.subgroup_label || ''}
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                            Nhãn hiển thị
+                          </label>
+                          <input
+                            type="text"
+                            value={genericFormData.subgroup_label || ''}
                             onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_label: e.target.value })}
                             placeholder="Xem & Tra cứu"
+<<<<<<< HEAD
                             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+=======
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                           <div>
                             <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                               Thứ tự trong nhóm
                             </label>
+<<<<<<< HEAD
                             <input type="number" min={0} max={999} value={genericFormData.subgroup_order ?? 50}
                               onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_order: Number(e.target.value) })}
                               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">10 = đầu, 99 = cuối</p>
+=======
+                            <input
+                              type="number"
+                              min={0}
+                              max={999}
+                              value={genericFormData.subgroup_order ?? 50}
+                              onChange={(e) =>
+                                setGenericFormData({ ...genericFormData, subgroup_order: Number(e.target.value) })
+                              }
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                            />
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              10 = đầu, 99 = cuối
+                            </p>
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                           </div>
+
                           <div>
-                            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mức độ nguy hiểm (tone)</label>
-                            <select value={genericFormData.subgroup_tone || 'read'}
+                            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                              Mức độ nguy hiểm (tone)
+                            </label>
+                            <select
+                              value={genericFormData.subgroup_tone || 'read'}
                               onChange={(e) => setGenericFormData({ ...genericFormData, subgroup_tone: e.target.value })}
+<<<<<<< HEAD
                               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20">
+=======
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                            >
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
                               {PERMISSION_TONES.map((t) => (
                                 <option key={t.value} value={t.value}>{t.label}</option>
                               ))}
@@ -1845,23 +2219,37 @@ export const AdminDashboardPage: React.FC = () => {
                         </div>
                       </fieldset>
 
+                      {/* ─── 3. Sort order tổng ─── */}
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Sort order tổng (thanh tab)</label>
-                        <input type="number" value={genericFormData.sort_order ?? 0}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                          Sort order tổng (thanh tab)
+                        </label>
+                        <input
+                          type="number"
+                          value={genericFormData.sort_order ?? 0}
+                          onChange={(e) =>
+                            setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })
+                          }
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                     </>
                   )}
+
                 </div>
 
                 <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-2">
-                  <button type="button" onClick={() => setGenericModal({ open: false, type: null, item: null })}
-                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-xl transition font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setGenericModal({ open: false, type: null, item: null })}
+                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-xl transition font-medium"
+                  >
                     Hủy bỏ
                   </button>
-                  <button type="submit"
-                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm">
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm"
+                  >
                     <Save className="w-3.5 h-3.5" /> Lưu lại
                   </button>
                 </div>
@@ -1871,6 +2259,7 @@ export const AdminDashboardPage: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* Delete Confirm Dialog */}
       <ConfirmDialog
         open={deleteConfirm.open}
         title={deleteConfirm.title}
@@ -1897,6 +2286,7 @@ export const AdminDashboardPage: React.FC = () => {
         onToast={showToast}
       />
 
+      {/* Toast Notification */}
       <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
     </div>
   );

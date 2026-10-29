@@ -59,7 +59,6 @@ export const API_ENDPOINTS = {
     ROLE_PERMISSIONS: (roleId: string) => `/api/admin/roles/${encodeURIComponent(roleId)}/permissions`,     
     ROLE_PERMISSION_DETAIL: (roleId: string, permId: string) => `/api/admin/roles/${encodeURIComponent(roleId)}/permissions/${encodeURIComponent(permId)}`,  
     PERMISSIONS: '/api/admin/permissions',
-    PERMISSION_REORDER: '/api/admin/permissions/reorder',
     PERMISSION_DETAIL: (permId: string) => `/api/admin/permissions/${encodeURIComponent(permId)}`,
     UNITS: '/api/admin/units',
     UNIT_DETAIL: (unitId: string) => `/api/admin/units/${encodeURIComponent(unitId)}`,

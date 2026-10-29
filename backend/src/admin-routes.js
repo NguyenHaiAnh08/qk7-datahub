@@ -146,7 +146,6 @@ module.exports = (app, deps) => {
         }
     };
     app.use('/api/admin', requireAdminPanelAccess);
-    app.use('/api/admin', approvalInterceptor);
 
     const log = (req, action, note) => writeAccessLog({
         userId: req.user.user_id, fileId: null,
@@ -613,7 +612,7 @@ module.exports = (app, deps) => {
         }
     });
 
-    app.delete('/api/admin/users/:id/roles/:roleId', async (req, res) => {
+        app.delete('/api/admin/users/:id/roles/:roleId', async (req, res) => {
         try {
             const userId = req.params.id;
             const roleId = req.params.roleId;
@@ -628,10 +627,23 @@ module.exports = (app, deps) => {
             }
 
             const pool = await getPool();
-            await pool.request()
-                .input('u', sql.VarChar(50), userId)
-                .input('r', sql.VarChar(50), roleId)
-                .query(`DELETE FROM USER_ROLE WHERE user_id=@u AND role_id=@r`);
+            
+            // ✅ FIX: Bọc try/catch để bắt lỗi Trigger từ SQL Server
+            try {
+                await pool.request()
+                    .input('u', sql.VarChar(50), userId)
+                    .input('r', sql.VarChar(50), roleId)
+                    .query(`DELETE FROM USER_ROLE WHERE user_id=@u AND role_id=@r`);
+            } catch (dbErr) {
+                if (dbErr.message.includes('The transaction ended in the trigger') || dbErr.message.includes('Không thể gỡ vai trò Admin')) {
+                    return res.status(403).json({ 
+                        error: 'Hệ thống từ chối gỡ vai trò này. Tài khoản này đang giữ vai trò Quản trị viên cuối cùng hoặc bị khóa bởi quy tắc bảo vệ.', 
+                        code: 'TRIGGER_BLOCKED' 
+                    });
+                }
+                throw dbErr; // Nếu là lỗi DB khác thì ném ra ngoài
+            }
+
             await log(req, 'REVOKE_ROLE', `Bỏ role ${roleId} của user ${userId}`);
             _invalidateUser(userId);
             res.json({ success: true });

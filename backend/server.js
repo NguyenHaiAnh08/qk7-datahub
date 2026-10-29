@@ -18,6 +18,8 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf } = require('./pdf-parser');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
+const createApprovalWorkflow = require('./src/approval-workflow');
+const { getAutoRequiredPermission } = require('./src/route-permissions');
 require('dotenv').config({
   path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')],
 });
@@ -50,6 +52,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'QK7-DEV-SECRET-CHANGE-IN-PROD-' + 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const FINGERPRINT_TOKEN_EXPIRES_IN = '5m';
 const BRIDGE_TOKEN = process.env.FINGERPRINT_BRIDGE_TOKEN || '';
+
+// ✅ CẤU HÌNH BẢO MẬT ADMIN (2FA)
+const PROTECTED_ADMIN_USER_ID = process.env.PROTECTED_ADMIN_USER_ID || 'USR-001';
+const ADMIN_ALLOWED_IP = (process.env.ADMIN_ALLOWED_IP || '').split(',').map(ip => ip.trim()).filter(Boolean);
 
 const FP_ENC_KEY = process.env.FP_ENC_KEY
   ? crypto.scryptSync(process.env.FP_ENC_KEY, 'qk7-fp-salt', 32)
@@ -277,9 +283,6 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
 // ═══════════════════════════════════════════════════════════════
 // DEPENDENCY INJECTION — Permissions / Sessions / Config
 // ═══════════════════════════════════════════════════════════════
-// ✅ FIX 2 (phần 1/2): MỘT instance permissions duy nhất
-//    → cache đồng bộ giữa requirePermission middleware và invalidateCache
-//    → loại bỏ dead-code `perms` không dùng, tránh bug chờ phát sinh
 const createPermissionsModule = require('./src/permissions');
 const perms = createPermissionsModule({
   sql, getPool, writeAccessLog, getClientIp,
@@ -329,6 +332,7 @@ app.use('/api', async (req, res, next) => {
 
   const isPublic =
     req.path === '/auth/login' ||
+    req.path === '/auth/login/admin-fp-verify' || // ✅ Thêm route xác thực vân tay Admin
     req.path === '/health' ||
     req.path === '/meta' ||
     req.path.startsWith('/test-http-error');
@@ -375,6 +379,18 @@ app.use('/api', async (req, res, next) => {
   }
 });
 
+// ============================================================
+// 2. SETUP APPROVAL WORKFLOW — NGAY SAU MIDDLEWARE JWT
+// ============================================================
+const { approvalInterceptor } = createApprovalWorkflow({
+  sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission
+});
+
+app.use('/api', approvalInterceptor);
+
+// ============================================================
+// 3. HELPER AUTH (function declaration → hoisted, vị trí tự do)
+// ============================================================
 function requireAuth(req, res, next) {
   if (!req.user || !req.user.is_authenticated) {
     return res.status(401).json({ error: 'Cần đăng nhập để thực hiện thao tác này' });
@@ -516,6 +532,17 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = r.recordset[0];
+
+    // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
+    // C
+    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+      if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
+        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
+        return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
+      }
+    }
+
     if (user.status !== 'active') {
       await writeLoginAttempt({ ip, username, result: 'LOCKED' });
       await writeAccessLog({
@@ -574,6 +601,41 @@ app.post('/api/auth/login', async (req, res) => {
       .input('uid', sql.VarChar(50), user.user_id)
       .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL, last_failed_at = NULL, status = 'active' WHERE user_id = @uid`);
 
+    // ✅ BƯỚC 2: NẾU LÀ ADMIN -> YÊU CẦU QUÉT VÂN TAY (Không cấp JWT ngay)
+    // COMMENT TOÀN BỘ if (user.user_id === PROTECTED_ADMIN_USER_ID) 1 LẦN KHI ADMIN TẠO TÀI KHOẢN LẦN ĐẦU
+    
+    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+      const fpRes = await pool.request()
+        .input('uid', sql.VarChar(50), user.user_id)
+        .query(`SELECT template_enc FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
+      
+      if (fpRes.recordset.length === 0) {
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_FAIL_FP' });
+        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_FAIL_FP', ip, note: 'Admin chưa đăng ký vân tay' });
+        return res.status(403).json({ error: 'Tài khoản Admin chưa được đăng ký vân tay. Không thể đăng nhập.' });
+      }
+
+      await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
+
+      // Tạo vé tạm (Temp Ticket) có hạn 2 phút
+      const tempTicket = jwt.sign(
+        { user_id: user.user_id, purpose: 'admin_login_fp' },
+        JWT_SECRET,
+        { expiresIn: '2m' }
+      );
+
+      return res.status(202).json({
+        success: true,
+        require_admin_fp: true,
+        temp_ticket: tempTicket,
+        message: 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+      });
+    }
+
+    // COMMENT ĐẾN ĐÂY
+
+
+    // User thường -> Cấp JWT và cho vào luôn
     await writeLoginAttempt({ ip, username, result: 'SUCCESS' });
 
     delete user.password_hash;
@@ -629,6 +691,122 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (err) {
     console.error('[POST /api/auth/login]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ BƯỚC 3: API XÁC THỰC VÂN TAY ĐỂ HOÀN TẤT LOGIN ADMIN
+app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
+  const { temp_ticket, device_id } = req.body;
+  const ip = getClientIp(req);
+
+  try {
+    if (!temp_ticket || !device_id) return res.status(400).json({ error: 'Thiếu dữ liệu xác thực (temp_ticket hoặc device_id)' });
+    if (!isAgentOnline(device_id)) return res.status(503).json({ error: 'Máy quét vân tay chưa sẵn sàng.', agent_offline: true });
+
+    // 1. Verify vé tạm
+    let decoded;
+    try {
+      decoded = jwt.verify(temp_ticket, JWT_SECRET);
+      if (decoded.purpose !== 'admin_login_fp') throw new Error('Sai purpose');
+    } catch {
+      return res.status(401).json({ error: 'Phiên xác thực đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+
+    // 2. Lấy Template vân tay của Admin trong DB
+    const pool = await getPool();
+    const fpRes = await pool.request()
+      .input('uid', sql.VarChar(50), decoded.user_id)
+      .query(`SELECT template_enc FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
+    
+    if (fpRes.recordset.length === 0) {
+      return res.status(403).json({ error: 'Chưa đăng ký vân tay.' });
+    }
+
+    const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc);
+    if (!templateBuffer) return res.status(500).json({ error: 'Template vân tay bị hỏng.' });
+    const templateB64 = templateBuffer.toString('base64');
+
+    // 3. Gửi lệnh quét xuống Agent
+    let scanResult;
+    try {
+      scanResult = await requestScan(device_id, { template_b64: templateB64, file_id: 'ADMIN_LOGIN' });
+    } catch (err) {
+      if (err.message === 'AGENT_OFFLINE' || err.message === 'AGENT_DISCONNECTED') {
+        return res.status(503).json({ error: 'Máy quét vừa mất kết nối.', agent_offline: true });
+      }
+      if (err.message === 'SCAN_TIMEOUT') {
+        return res.status(408).json({ error: 'Hết thời gian chờ quét vân tay.' });
+      }
+      throw err;
+    }
+
+    if (!scanResult.match) {
+      await writeAccessLog({ userId: decoded.user_id, fileId: null, action: 'LOGIN_FAIL_FP', ip, note: `Vân tay sai (score=${scanResult.score})` });
+      return res.status(403).json({ error: `Vân tay không khớp (score=${scanResult.score}). Vui lòng thử lại.` });
+    }
+
+    // 4. Vân tay khớp -> Lấy lại thông tin User và Cấp JWT chính thức
+    const uRes = await pool.request()
+      .input('uid', sql.VarChar(50), decoded.user_id)
+      .query(`
+        SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name,
+               u.[position], u.unit_id, u.status, u.clearance_level_id,
+               un.name AS unit_name, sl.name AS clearance_name, sl.code AS clearance_code,
+               CASE WHEN EXISTS (SELECT 1 FROM USER_FINGERPRINT uf WHERE uf.user_id = u.user_id AND uf.active = 1) THEN 1 ELSE 0 END AS has_fingerprint
+        FROM [USER] u
+        LEFT JOIN UNIT un ON un.unit_id = u.unit_id
+        LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
+        WHERE u.user_id = @uid
+      `);
+
+    if (uRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
+    const user = uRes.recordset[0];
+    user.has_fingerprint = user.has_fingerprint === 1;
+
+    const rolesRes = await pool.request()
+      .input('uid', sql.VarChar(50), user.user_id)
+      .query(`SELECT r.role_id, r.name FROM USER_ROLE ur JOIN [ROLE] r ON r.role_id = ur.role_id
+              WHERE ur.user_id = @uid AND (ur.expires_at IS NULL OR ur.expires_at > GETDATE())`);
+    user.roles = rolesRes.recordset.map((x) => x.role_id);
+    user.role_names = rolesRes.recordset.map((x) => x.name);
+
+    const token = jwt.sign(
+      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles },
+      JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    const match = JWT_EXPIRES_IN.match(/^(\d+)\s*([smhd])$/i);
+    let ttlMs = 8 * 60 * 60 * 1000;
+    if (match) {
+      const n = parseInt(match[1], 10);
+      const mult = { s: 1000, m: 60000, h: 3600000, d: 86400000 }[match[2].toLowerCase()] || 3600000;
+      ttlMs = n * mult;
+    }
+
+    await createSession({
+      userId: user.user_id,
+      clearanceLevelId: user.clearance_level_id,
+      token,
+      ip,
+      userAgent: req.headers['user-agent'],
+      expiresInMs: ttlMs,
+    });
+
+    await writeAccessLog({
+      userId: user.user_id, fileId: null, action: 'LOGIN_ADMIN_2FA', ip,
+      note: `${user.full_name} (Đăng nhập Admin 2FA vân tay)`,
+    });
+
+    const permissions = await getUserPermissions(user.user_id);
+
+    res.json({
+      success: true, token, expires_in: JWT_EXPIRES_IN,
+      user: { ...user, permissions },
+    });
+
+  } catch (err) {
+    console.error('[POST /api/auth/login/admin-fp-verify]', err);
     res.status(500).json({ error: err.message });
   }
 });

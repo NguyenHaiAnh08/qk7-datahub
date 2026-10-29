@@ -1,31 +1,8 @@
 {
-  "_comment": "Cấu hình Regex cho PDF parser QK7 — Sửa file này thay vì sửa code (v4.3)",
-
-  "document_code": "S\\s*[ốo]\\s*[:.]?\\s*(\\d{1,5})?\\s*([\\/\\-])?\\s*([A-ZĐ][A-ZĐ0-9\\-]*(?:[\\/\\-][A-ZĐ0-9]+)*)",
+  "_comment": "Regex cấu trúc văn bản VN — đa dạng hóa cho nhiều format",
+  "document_code": "S[ốo]\\s*[:.]?\\s*(\\d+)?[ \\t]*([\\/\\-]?)[ \\t]*([A-ZÀ-Ỹa-zà-ỹ0-9]+(?:[ \\t]*[\\/\\-.][ \\t]*[A-ZÀ-Ỹa-zà-ỹ0-9]+)*)",
   "issued_date": "ng[àa]y\\s*(\\d+)?\\s*th[áa]ng\\s*(\\d+)\\s*n[ăa]m\\s*(\\d{4})",
   "title_stop": "^(Căn cứ|Kính gửi|Thực hiện|Căn cứ vào|HIỆU TRƯỞNG|CHỦ TỊCH|KT\\.|TM\\.|T\\/M|Nơi nhận)",
   "roman_heading": "^\\s*(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)[\\-\\s\\.]",
-  "signer_name": "^[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,4}$",
-
-  "suspicious_code_patterns": [
-    "^\\d{1,3}/\\d{1,3}$",
-    "^/[^A-ZĐ]",
-    "^-",
-    "^\\d+$"
-  ],
-
-  "code_rematch_strict": "S[ốo]\\s*[:\\.]?\\s*(\\d{1,5})\\s*[\\/\\-]\\s*([A-ZĐ][A-ZĐ0-9\\/\\-]*(?:\\s+[A-ZĐ0-9][A-ZĐ0-9\\/\\-]+)*)",
-
-  "fallback_command": "^(Đ[ẢA]NG\\s*B[ỘO]|QU[ÂA]N\\s*KHU|B[ỘO]\\s*T[ƯU]\\s*L[ỆE]NH|S[ƯU]\\s*ĐO[ÀA]N|TRUNG\\s*ĐO[ÀA]N|L[ỮU]\\s*ĐO[ÀA]N|TI[ỂE]U\\s*ĐO[ÀA]N|Đ[ẠA]I\\s*Đ[ỘO]I)",
-
-  "fallback_unit": "(Đ[ẢA]NG\\s*[ỦU]Y|TR[ƯU][ỜO]NG|S[ƯU]\\s*ĐO[ÀA]N|TRUNG\\s*ĐO[ÀA]N|L[ỮU]\\s*ĐO[ÀA]N|TI[ỂE]U\\s*ĐO[ÀA]N|PH[ÒO]NG|BAN|KHOA|VI[ỆE]N|TRUNG\\s*T[ÂA]M|Đ[ỘO]I)",
-
-  "rank_prefix": "\\b(Đại|Thượng|Trung|Thiếu|Chuẩn|Dai|Thuong|Thieu|Chuan)\\s+[A-ZÀ-Ỹa-zà-ỹ]{1,5}",
-
-  "title_stop_extra": "^(Căn cứ|Kính gửi|Thực hiện|Nơi nhận|HIỆU TRƯỞNG|CHỦ TỊCH|KT\\.|TM\\.|T\\/M)",
-
-  "extract_text": {
-    "same_line_tolerance_px": 5,
-    "mid_column_tolerance_ratio": 0.08
-  }
+  "signer_name": "^[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,4}$"
 }

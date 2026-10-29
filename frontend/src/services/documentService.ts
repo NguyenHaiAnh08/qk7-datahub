@@ -198,8 +198,6 @@ export const documentService = {
   getViewUrl: fileService.getViewUrl,
   fetchDocumentBlob: fileService.fetchFileBlob,
   downloadDocument: fileService.downloadFile,
-  saveBlobToFile: fileService.saveBlobToFile,
-  prepareDownload: fileService.prepareDownload,
 
   // ═══════════════════════════════════════════════════════════
   // SOFT DELETE / TRASH / RESTORE / PURGE

@@ -33,7 +33,6 @@ const swaggerSpec = {
     { name: 'Logs',      description: 'Nhật ký truy cập' },
     { name: 'Admin',     description: 'Quản trị hệ thống' },
     { name: 'AI Assistant', description: 'Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded Agentic RAG)' },
-    { name: 'Approval',  description: 'Maker-Checker — Phê duyệt yêu cầu thao tác nguy hiểm' },
   ],
 
   security: [{ BearerAuth: [] }],
@@ -713,25 +712,15 @@ const swaggerSpec = {
     '/api/access-logs': {
       get: {
         tags: ['Logs'],
-        summary: 'Nhật ký truy cập & kiểm toán an ninh (Không giới hạn, tự động làm sạch đầu tháng)',
+        summary: 'Nhật ký truy cập (200 bản ghi gần nhất)',
         parameters: [
-          { in: 'query', name: 'user',   schema: { type: 'string' }, description: 'Lọc theo mã quân nhân (user_id)' },
+          { in: 'query', name: 'user',   schema: { type: 'string' } },
           {
             in: 'query', name: 'action',
             schema: {
               type: 'string',
               enum: ['LOGIN', 'LOGIN_FAIL', 'VIEW', 'DOWNLOAD', 'UPLOAD', 'UPDATE', 'DELETE', 'DENIED', 'ERROR'],
             },
-            description: 'Lọc theo loại hành động',
-          },
-          {
-            in: 'query', name: 'scope',
-            schema: {
-              type: 'string',
-              enum: ['active', 'archive', 'all'],
-              default: 'active',
-            },
-            description: 'Phạm vi: active (tháng hiện tại), archive (kho lưu trữ các tháng cũ), all (tất cả)',
           },
         ],
         responses: {
@@ -744,14 +733,6 @@ const swaggerSpec = {
                   properties: {
                     total: { type: 'integer' },
                     items: { type: 'array', items: { $ref: '#/components/schemas/AccessLog' } },
-                    cycle: {
-                      type: 'object',
-                      properties: {
-                        scope: { type: 'string' },
-                        current_month: { type: 'string' },
-                        reset_policy: { type: 'string' },
-                      },
-                    },
                   },
                 },
               },
@@ -762,6 +743,7 @@ const swaggerSpec = {
       },
     },
 
+<<<<<<< HEAD
     '/api/access-logs/stats': {
       get: {
         tags: ['Logs'],
@@ -1028,6 +1010,8 @@ const swaggerSpec = {
     },
 
 
+=======
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
     // ==========================================================
     // ADMIN — STATS
     // ==========================================================
@@ -2280,33 +2264,6 @@ const swaggerSpec = {
         type: 'object',
         properties: { error: { type: 'string', example: 'Không tìm thấy tài liệu' } },
       },
-
-
-            ApprovalRequest: {
-        type: 'object',
-        properties: {
-          request_id:          { type: 'string', example: 'APV-1729999999999-A1B2' },
-          requester_id:        { type: 'string', example: 'USR-005' },
-          requester_name:      { type: 'string', nullable: true },
-          required_permission: { type: 'string', example: 'DOC_PURGE' },
-          http_method:         { type: 'string', example: 'DELETE' },
-          http_path:           { type: 'string', example: '/api/admin/units/U-TQS' },
-          http_body:           { type: 'string', nullable: true },
-          target_summary:      { type: 'string', example: 'DELETE /api/admin/units/U-TQS' },
-          status: {
-            type: 'string',
-            enum: ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTING', 'EXECUTED', 'FAILED'],
-          },
-          reviewed_by:    { type: 'string', nullable: true },
-          reviewer_name:  { type: 'string', nullable: true },
-          reviewed_at:    { type: 'string', format: 'date-time', nullable: true },
-          review_note:    { type: 'string', nullable: true },
-          executed_at:    { type: 'string', format: 'date-time', nullable: true },
-          execution_error:{ type: 'string', nullable: true },
-          created_at:     { type: 'string', format: 'date-time' },
-        },
-      },
-
 
       User: {
         type: 'object',

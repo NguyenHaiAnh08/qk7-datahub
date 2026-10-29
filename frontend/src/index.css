@@ -923,18 +923,12 @@ html:not(.dark) .qk7-unit-treeselect-popup .ant-select-tree-node-selected {
    ───────────────────────────────────────────────────────────── */
 :root {
   --app-height: 100dvh;
-  --sat: env(safe-area-inset-top, 0px);
-  --sab: env(safe-area-inset-bottom, 0px);
-  --sal: env(safe-area-inset-left, 0px);
-  --sar: env(safe-area-inset-right, 0px);
 }
 
 html, body, #root {
   min-height: 100%;
   min-height: -webkit-fill-available;
   min-height: 100dvh;
-  overscroll-behavior-y: none;
-  -webkit-text-size-adjust: 100%;
 }
 
 /* Khi html[data-device-mode="ipad"]:
@@ -1482,22 +1476,12 @@ html.dark select option:checked,
   position: relative;
   display: flex;
   align-items: center;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .u058-nav a,
 .u058-nav a:link,
 .u058-nav a:visited {
   text-decoration: none;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.u058-tab {
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  cursor: pointer;
 }
 
 /* Đảm bảo tab ĐANG CHỌN (Active) luôn hiển thị chữ TRẮNG TUYỆT ĐỐI trên nền xanh quân đội #166534 / emerald-600 */
@@ -2003,269 +1987,6 @@ html.dark .u058-pill {
     transition: none !important;
   }
 }
-
-/* ══════════════════════════════════════════════════════════════════════
-   Lucian UX/UI Prompt #032 · Drag-and-Drop File Upload Zone & Progress List
-   MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#032
-   ══════════════════════════════════════════════════════════════════════ */
-.u032-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-.u032-zone {
-  --u032-green: #10b981;
-  --u032-green-deep: #166534;
-  position: relative;
-  border-radius: 1.125rem;
-  isolation: isolate;
-  user-select: none;
-  cursor: pointer;
-  background-color: rgba(248, 250, 252, 0.85);
-  transition: transform 0.35s cubic-bezier(0.34, 1.45, 0.64, 1),
-              box-shadow 0.3s ease,
-              background-color 0.25s ease;
-}
-
-html.dark .u032-zone,
-.dark .u032-zone {
-  background-color: rgba(15, 23, 42, 0.6);
-}
-
-.u032-zone:hover,
-.u032-zone.is-dragging {
-  transform: scale(1.03);
-  background-color: rgba(16, 185, 129, 0.05);
-}
-
-html.dark .u032-zone:hover,
-html.dark .u032-zone.is-dragging,
-.dark .u032-zone:hover,
-.dark .u032-zone.is-dragging {
-  background-color: rgba(16, 185, 129, 0.08);
-}
-
-.u032-zone.is-dragging {
-  box-shadow: 0 12px 30px -8px rgba(16, 185, 129, 0.25);
-}
-
-/* SVG Marching Dashed Border */
-.u032-dash {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.u032-dash rect {
-  fill: none;
-  stroke: rgba(203, 213, 225, 0.95);
-  stroke-width: 2px;
-  stroke-dasharray: 8 7;
-  stroke-dashoffset: 0;
-  rx: 18px;
-  ry: 18px;
-  transition: stroke 0.25s ease;
-}
-
-html.dark .u032-dash rect,
-.dark .u032-dash rect {
-  stroke: rgba(51, 65, 85, 0.9);
-}
-
-.u032-zone:hover .u032-dash rect,
-.u032-zone.is-dragging .u032-dash rect {
-  stroke: #10b981;
-  animation: u032-march 1.2s linear infinite;
-}
-
-@keyframes u032-march {
-  to {
-    stroke-dashoffset: -30;
-  }
-}
-
-/* Biểu tượng Orb mây bay nổi bật */
-.u032-orb-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.u032-orb {
-  position: relative;
-  width: 50px;
-  height: 50px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(22, 101, 52, 0.25));
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #10b981;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.15);
-  animation: u032-float 3s ease-in-out infinite;
-  transition: transform 0.35s cubic-bezier(0.34, 1.45, 0.64, 1),
-              box-shadow 0.3s ease,
-              border-color 0.25s ease,
-              background 0.25s ease;
-}
-
-.u032-zone:hover .u032-orb,
-.u032-zone.is-dragging .u032-orb {
-  transform: scale(1.1) translateY(-3px);
-  border-color: #10b981;
-  box-shadow: 0 8px 22px rgba(16, 185, 129, 0.35);
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(22, 101, 52, 0.35));
-}
-
-.u032-glow {
-  position: absolute;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%);
-  filter: blur(10px);
-  pointer-events: none;
-  opacity: 0.6;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.u032-zone:hover .u032-glow,
-.u032-zone.is-dragging .u032-glow {
-  opacity: 1;
-  transform: scale(1.3);
-}
-
-@keyframes u032-float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
-}
-
-/* File Progress List */
-.u032-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.u032-item {
-  position: relative;
-  background-color: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 0.875rem;
-  padding: 0.875rem 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-html.dark .u032-item,
-.dark .u032-item {
-  background-color: rgba(15, 23, 42, 0.85);
-  border-color: rgba(51, 65, 85, 0.7);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.u032-item:hover {
-  border-color: rgba(16, 185, 129, 0.45);
-}
-
-.u032-progress-track {
-  position: relative;
-  width: 100%;
-  height: 6px;
-  background-color: rgba(226, 232, 240, 0.8);
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-top: 0.625rem;
-}
-
-html.dark .u032-progress-track,
-.dark .u032-progress-track {
-  background-color: rgba(30, 41, 59, 0.8);
-}
-
-.u032-progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #166534, #10b981, #34d399);
-  border-radius: 9999px;
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.u032-progress-bar.is-error {
-  background: #f43f5e;
-}
-
-/* Reduced Motion */
-@media (prefers-reduced-motion: reduce) {
-  .u032-zone,
-  .u032-zone:hover,
-  .u032-zone.is-dragging {
-    transform: none !important;
-    transition: none !important;
-  }
-  .u032-dash rect {
-    animation: none !important;
-    transition: none !important;
-  }
-  .u032-orb {
-    animation: none !important;
-    transition: none !important;
-    transform: none !important;
-  }
-  .u032-glow {
-    animation: none !important;
-    transition: none !important;
-  }
-  .u032-progress-bar {
-    transition: none !important;
-  }
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   AI Chat Drawer Component · Slide-Over Drawer & Backdrop
-   ══════════════════════════════════════════════════════════════════════ */
-.ai-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 50;
-  transition: opacity 0.3s ease;
-}
-
-.ai-drawer-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 380px;
-  max-width: 100vw;
-  z-index: 51;
-  display: flex;
-  flex-direction: column;
-  box-shadow: -10px 0 35px -5px rgba(0, 0, 0, 0.35);
-  transition: transform 0.45s cubic-bezier(0.34, 1.45, 0.64, 1);
-  will-change: transform;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ai-drawer-panel,
-  .ai-drawer-backdrop {
-    transition: none !important;
-  }
-}
-
-
 
 
 

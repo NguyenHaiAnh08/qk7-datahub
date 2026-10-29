@@ -8,7 +8,6 @@ import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
 import { usersApi } from '../services/usersApi';
 import { dashboardApi } from '../services/dashboardApi';
-import { isApprovalRequired } from '../utils/approvalUtils';
 import {
   User,
   Unit,
@@ -55,13 +54,13 @@ export const UsersPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [uRes, unitRes, lvlRes, roleRes, metaRes] = await Promise.all([
+      // ✅ FIX: Chỉ gọi API Public/Meta và API lấy Users. Tránh gọi các API Admin gây lỗi 403
+      const [uRes, metaRes, rolesRes] = await Promise.all([
         usersApi.getUsers(),
-        dashboardApi.getUnits(),
-        dashboardApi.getSecurityLevels(),
-        dashboardApi.getRoles(),
         dashboardApi.getMeta(),
+        dashboardApi.getCreatableRoles().catch(() => ({ items: [] })), // Fallback nếu không có quyền
       ]);
+      
       const sortedUsers = [...(uRes.items || [])].sort((a, b) => {
         const parseNum = (id?: string) => {
           const m = (id || '').match(/USR-(\d+)/i);
@@ -69,12 +68,17 @@ export const UsersPage: React.FC = () => {
         };
         return parseNum(a.user_id) - parseNum(b.user_id);
       });
+      
       setUsersList(sortedUsers);
-      setUnitsList(unitRes.items || []);
-      setLevelsList(lvlRes.items || []);
-      setRolesList(roleRes.items || []);
+      
+      // Lấy dữ liệu danh mục từ Meta
+      setUnitsList(metaRes.units || []);
+      setLevelsList(metaRes.levels || []);
       setRanksList((metaRes as any).ranks || []);
       setPositionsList((metaRes as any).positions || []);
+      
+      // Roles lấy từ getCreatableRoles
+      setRolesList(rolesRes.items || []);
     } catch (err: any) {
       showToast('Lỗi tải dữ liệu quân nhân: ' + err.message, 'error');
     } finally {
@@ -86,7 +90,7 @@ export const UsersPage: React.FC = () => {
     loadData();
   }, []);
 
-    const handleSaveUser = async (userData: Partial<User>) => {
+  const handleSaveUser = async (userData: Partial<User>) => {
     if (selectedUser?.user_id) {
       await usersApi.updateUser(selectedUser.user_id, userData);
       await loadData();
@@ -107,17 +111,11 @@ export const UsersPage: React.FC = () => {
   const handleDeleteUser = async () => {
     if (!deleteConfirm.user) return;
     try {
-      const res: any = await usersApi.deleteUser(deleteConfirm.user.user_id);
+      await usersApi.deleteUser(deleteConfirm.user.user_id);
       const deletedName = deleteConfirm.user.full_name;
       const deletedId = deleteConfirm.user.user_id;
       setDeleteConfirm({ open: false, user: null });
       await loadData();
-
-      if (isApprovalRequired(res)) {
-       // ApprovalListener đã toast — không show success sai
-      return;
-     }
-
       toast.success(`Đã xóa quân nhân ${deletedName} khỏi danh bạ đơn vị.`, {
         title: 'XÓA QUÂN NHÂN',
         badge: deletedId,

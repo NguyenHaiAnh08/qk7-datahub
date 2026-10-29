@@ -30,6 +30,8 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/approval-requests$/,         'AUDIT_VIEW'],
     [/^\/api\/admin\/approval-requests\/[^/]+$/,  'AUDIT_VIEW'],
     [/^\/api\/admin\/protected-permissions$/,     'ROLE_VIEW'],
+    [/^\/api\/documents\/trash$/,                 'DOC_TRASH_VIEW'],
+    [/^\/api\/documents\/my-unit$/,               'DOC_VIEW'],
   ],
 
   POST: [
@@ -44,6 +46,11 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/security-levels$/,                  'SECLEVEL_MANAGE'],       // Đổi mức mật → duyệt
     [/^\/api\/admin\/approval-requests\/[^/]+\/(approve|reject|mark-executed)$/, 'AUDIT_VIEW'],
     [/^\/api\/admin\/protected-permissions\/[^/]+$/,     'ROLE_EDIT'],
+    [/^\/api\/documents\/upload$/,                'DOC_UPLOAD'],
+    [/^\/api\/documents\/parse$/,                 'DOC_PARSE'],
+    [/^\/api\/documents\/[^/]+\/restore$/,        'DOC_RESTORE'],
+    [/^\/api\/ai\/sync-all$/,                     'AI_SYNC'],
+    [/^\/api\/ai\/chat$/,                         'AI_QUERY'],
 
     // ─── NHÓM 2 (quan trọng — CREATE thì OK, EDIT/DELETE phải duyệt) ───
     [/^\/api\/admin\/units$/,                            'UNIT_CREATE'],           // ← TÁCH riêng
@@ -65,6 +72,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/ranks\/[^/]+$/,                     'RANK_EDIT'],             // ← TÁCH
     [/^\/api\/admin\/positions\/[^/]+$/,                 'POSITION_EDIT'],         // ← TÁCH
     [/^\/api\/admin\/unit-aliases\/[^/]+$/,              'UNIT_ALIAS_EDIT'],       // ← TÁCH
+    [/^\/api\/documents\/[^/]+$/,                 'DOC_EDIT'],
   ],
 
   DELETE: [
@@ -85,6 +93,8 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/sessions\/user\/[^/]+$/,            'SESSION_KILL'],
     [/^\/api\/admin\/sessions\/[^/]+$/,                  'SESSION_KILL'],
     [/^\/api\/admin\/protected-permissions\/[^/]+$/,     'ROLE_EDIT'],
+    [/^\/api\/documents\/[^/]+\/purge$/,          'DOC_PURGE'],
+    [/^\/api\/documents\/[^/]+$/,                 'DOC_DELETE'],
   ],
 };
 

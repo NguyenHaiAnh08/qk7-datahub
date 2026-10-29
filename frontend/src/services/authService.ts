@@ -138,14 +138,19 @@ export const authService = {
    * ghi được (Ẩn danh / storage bị chặn) → THROW để AuthContext biết
    * login THẤT BẠI — tránh trạng thái "login ảo".
    */
-  login: async (user_id: string, password: string): Promise<LoginResponse> => {
-    const res = await http<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, {
+  login: async (user_id: string, password: string): Promise<any> => { // Đổi return type thành any để linh hoạt
+    const res = await http<any>(API_ENDPOINTS.AUTH.LOGIN, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: user_id.trim(), password }),
     });
 
-    // ─── 1. Backend phải trả token ───
+    // Trả về ngay để LoginForm mở Modal quét vân tay
+    if (res?.require_admin_fp) {
+      return res;
+    }
+
+    // ─── 1. Backend phải trả token (cho User thường) ───
     if (!res?.token) {
       authService.clearSession();
       throw new Error(

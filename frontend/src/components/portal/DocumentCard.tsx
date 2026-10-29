@@ -9,7 +9,8 @@ export interface DocumentCardProps {
   document: DocumentItem;
   userClearanceLevel: number;
   onPreview: (doc: DocumentItem) => void;
-  onDownload: (doc: DocumentItem) => void;
+  onDownload: (doc: DocumentItem, signal?: AbortSignal) => Promise<(() => void) | void> | (() => void) | void;
+  onCancelDownload?: (doc: DocumentItem) => void;
 }
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -17,6 +18,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   userClearanceLevel,
   onPreview,
   onDownload,
+  onCancelDownload,
 }) => {
   const isRestricted = (document.security_level_id || 1) > userClearanceLevel;
 
@@ -121,7 +123,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               <span>Xem văn bản PDF</span>
             </button>
             <CompactDownloadButton
-              onDownload={() => onDownload(document)}
+              onDownload={(signal) => onDownload(document, signal)}
+              onCancel={() => onCancelDownload?.(document)}
               disabled={!canDownload}
               disabledTitle={
                 isSecretLevel

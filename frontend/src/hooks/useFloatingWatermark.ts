@@ -151,14 +151,24 @@ export function pickRandomWatermarkPreset(): WatermarkPreset {
  * Định dạng tên hiển thị đầy đủ của người dùng (không bị mất chữ, hiển thị trọn vẹn họ và tên):
  * Ví dụ: "Nguyễn Mạnh Nam" -> "NGUYỄN MẠNH NAM", "Trần Văn A" -> "TRẦN VĂN A"
  */
+export function toTitleCase(str: string): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export function formatUserDisplayName(fullName?: string, username?: string): string {
   if (fullName && fullName.trim()) {
-    return fullName.trim().toUpperCase();
+    return toTitleCase(fullName.trim());
   }
   if (username && username.trim()) {
-    return username.trim().toUpperCase();
+    return toTitleCase(username.trim());
   }
-  return 'SĨ QUAN';
+  return 'Sĩ Quan';
 }
 
 /**
@@ -169,12 +179,12 @@ export function extractUserLastName(fullName?: string, username?: string): strin
   if (fullName && fullName.trim()) {
     const parts = fullName.trim().split(/\s+/);
     const last = parts[parts.length - 1];
-    if (last) return last.toUpperCase();
+    if (last) return toTitleCase(last);
   }
   if (username && username.trim()) {
-    return username.trim().toUpperCase();
+    return toTitleCase(username.trim());
   }
-  return 'SĨ QUAN';
+  return 'Sĩ Quan';
 }
 
 /**

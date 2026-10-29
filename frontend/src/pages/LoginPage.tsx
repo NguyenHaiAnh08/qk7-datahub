@@ -103,7 +103,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
       {/* ══════════════════════════════════════════════════════════════════
           LỚP z-0 (ĐÁY): THẺ VIDEO NỀN CÔNG NGHỆ CHẠY VÒNG LẶP (HTML5 VIDEO)
           ══════════════════════════════════════════════════════════════════ */}
@@ -115,10 +115,10 @@ export const LoginPage: React.FC = () => {
       <DongSonDrumBackground />
 
       {/* ══════════════════════════════════════════════════════════════════
-          LỚP z-30 (TRÊN CÙNG): CỐ ĐỊNH TOP BAR (HEADER) & FOOTER
+          LỚP z-20 (TRÊN CÙNG): TOP BAR, KHUNG ĐĂNG NHẬP (LOGIN CARD) & UI
           ══════════════════════════════════════════════════════════════════ */}
-      {/* Top Bar — Cố định 100% ở đỉnh màn hình (Fixed Top Bar, không hở viền, hỗ trợ Safe Area) */}
-      <header className="fixed top-0 left-0 right-0 z-30 px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md shadow-xs pt-[max(env(safe-area-inset-top),0.625rem)] transition-colors duration-200">
+      {/* Top Bar */}
+      <div className="relative z-20 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md">
         <div className="flex items-center space-x-2.5 select-none">
           <img
             src="/Logo_QSQK7.png"
@@ -147,15 +147,15 @@ export const LoginPage: React.FC = () => {
             <span>Hỗ Trợ Kỹ Thuật</span>
           </button>
         </div>
-      </header>
+      </div>
 
-      {/* Center Login Card — Chiếm trọn không gian giữa Header & Footer cố định, tự căn giữa hoàn hảo và cho phép cuộn nội dung độc lập */}
-      <div className="relative z-20 flex-1 w-full overflow-y-auto overflow-x-hidden no-scrollbar flex items-center justify-center px-4 pt-[calc(3.75rem+env(safe-area-inset-top,0px))] pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] min-h-0">
+      {/* Center Login Card — Hỗ trợ 2 Cột Ngang cho iPad Landscape (1210 x 802) */}
+      <div className="relative z-20 flex-1 flex items-center justify-center px-4 py-4 sm:py-6 min-h-0">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className={`w-full mx-auto my-auto bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-xl ${
+          className={`w-full mx-auto bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-xl ${
             isIPadLandscape ? 'max-w-4xl' : 'max-w-md'
           }`}
         >
@@ -186,8 +186,8 @@ export const LoginPage: React.FC = () => {
         </motion.div>
       </div>
 
-      {/* Footer — Cố định 100% ở đáy màn hình (Fixed Footer, không hở viền, hỗ trợ Safe Area) */}
-      <footer className="fixed bottom-0 left-0 right-0 z-30 px-6 py-2.5 sm:py-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex items-center justify-center text-[11px] text-slate-500 dark:text-slate-400 text-center pb-[max(env(safe-area-inset-bottom),0.625rem)] transition-colors duration-200">
+      {/* Footer */}
+      <footer className="relative z-20 px-6 py-4 border-t border-slate-200 dark:border-slate-900 bg-white/70 dark:bg-slate-950/60 backdrop-blur-md flex items-center justify-center text-[11px] text-slate-500 text-center">
         <div>Bản quyền © 2026 Trường Quân sự Quân khu 7.</div>
       </footer>
 

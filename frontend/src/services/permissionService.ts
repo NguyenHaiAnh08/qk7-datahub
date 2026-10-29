@@ -3,11 +3,12 @@ import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { Permission, UserPermissionResponse } from '../types/user';
 
 export const permissionService = {
-  // ─── CATALOG ───
+  // Catalog
   getPermissions: async (): Promise<{ total: number; items: Permission[] }> => {
     return http<{ total: number; items: Permission[] }>(API_ENDPOINTS.ADMIN.PERMISSIONS);
   },
 
+<<<<<<< HEAD
   createPermission: async (data: {
     permission_id: string;
     code: string;
@@ -53,6 +54,8 @@ export const permissionService = {
     });
   },
 
+=======
+>>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
   deletePermission: async (permId: string): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.PERMISSION_DETAIL(permId), { method: 'DELETE' });
   },
@@ -62,7 +65,7 @@ export const permissionService = {
     return http<UserPermissionResponse>(API_ENDPOINTS.ADMIN.USER_PERMISSIONS(userId));
   },
 
-  grantUserPermission: async (
+    grantUserPermission: async (
     userId: string,
     permission_id: string,
     opts?: { expires_at?: string | null; note?: string }

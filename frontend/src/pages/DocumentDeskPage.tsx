@@ -11,7 +11,6 @@ import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
-import { isApprovalRequired } from '../utils/approvalUtils';
 
 const ITEMS_PER_PAGE = 8;
 
@@ -111,19 +110,23 @@ const canUpload = hasPermission('DOC_UPLOAD');
   const handleDeleteConfirm = async () => {
     if (!deleteConfirmDoc) return;
     try {
-      const res: any = await documentsApi.deleteDocument(deleteConfirmDoc.file_id);
-      setDeleteConfirmDoc(null);
-      await loadDocuments();
-      if (isApprovalRequired(res)) return;
+      await documentsApi.deleteDocument(deleteConfirmDoc.file_id);
       toast.success(`Đã xóa văn bản ${deleteConfirmDoc.document_code} khỏi hệ thống văn thư.`, {
         title: 'XÓA TÀI LIỆU THÀNH CÔNG',
         badge: deleteConfirmDoc.document_code,
       });
-    } catch (err: any) { /* existing */ }
+      setDeleteConfirmDoc(null);
+      await loadDocuments();
+    } catch (err: any) {
+      toast.error('Lỗi xóa văn bản: ' + err.message, {
+        title: 'LỖI THAO TÁC',
+        badge: 'DELETE-ERR',
+      });
+    }
   };
 
   // Download Handler
-  const handleDownload = async (doc: DocumentItem, signal?: AbortSignal) => {
+  const handleDownload = async (doc: DocumentItem) => {
     const userClearance = user?.clearance_level_id || 1;
     const docLevel = doc.security_level_id || 1;
 
@@ -133,7 +136,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
         'Tài liệu từ Cấp 3 trở lên chỉ duy nhất cho phép xem trực tiếp có xác thực vân tay 2FA, tuyệt đối không được phép tải về máy.',
         { title: 'QUY ĐỊNH BẢO MẬT VĂN THƯ', badge: 'LEVEL-3+' }
       );
-      throw new Error('Tài liệu Cấp 3+ không được phép tải về');
+      return;
     }
 
     if (docLevel > userClearance) {
@@ -141,52 +144,24 @@ const canUpload = hasPermission('DOC_UPLOAD');
         `Cấp độ bảo mật hiện tại của đồng chí (Cấp ${userClearance}) không đủ để tải văn bản Cấp ${docLevel}.`,
         { title: 'TỪ CHỐI TRUY CẬP', badge: 'CLEARANCE-DENIED' }
       );
-      throw new Error('Không đủ cấp độ bảo mật');
+      return;
     }
-
-    toast.info(`Đang tải văn bản ${doc.document_code}...`, {
-      title: 'ĐANG XỬ LÝ TỆP',
-      badge: 'STREAMING',
-      duration: 3200,
-    });
-
-    const release = await documentsApi.prepareDownload(
-      doc.file_id,
-      doc.original_name || `${doc.document_code}.pdf`,
-      undefined,
-      signal
-    );
-
-    return () => {
-      release();
+    try {
+      toast.info(`Đang tải văn bản ${doc.document_code}...`, {
+        title: 'ĐANG XỬ LÝ TỆP',
+        badge: 'STREAMING',
+        duration: 2500,
+      });
+      await documentsApi.downloadDocument(doc.file_id, doc.original_name || `${doc.document_code}.pdf`);
       toast.success(`Đã tải xuống thành công văn bản ${doc.document_code}`, {
         title: 'TẢI TỆP HOÀN TẤT',
         badge: 'PDF-READY',
       });
-    };
-  };
-
-  const handleCancelDownload = (doc: DocumentItem) => {
-    toast.info(`Đã hủy tải văn bản ${doc.document_code}`, {
-      title: 'ĐÃ HỦY TẢI',
-      badge: 'CANCELLED',
-      duration: 2000,
-    });
-  };
-
-  const handleDirectDownload = async (doc: DocumentItem) => {
-    try {
-      const release = await handleDownload(doc);
-      if (typeof release === 'function') {
-        release();
-      }
     } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        toast.error('Lỗi tải văn bản: ' + (err.message || 'Không có quyền truy cập'), {
-          title: 'THẤT BẠI',
-          badge: 'DOWNLOAD-ERR',
-        });
-      }
+      toast.error('Lỗi tải văn bản: ' + (err.message || 'Không có quyền truy cập'), {
+        title: 'THẤT BẠI',
+        badge: 'DOWNLOAD-ERR',
+      });
     }
   };
 
@@ -266,7 +241,6 @@ const canUpload = hasPermission('DOC_UPLOAD');
           onPageChange={setCurrentPage}
           onPreview={(doc) => setPreviewDoc(doc)}
           onDownload={handleDownload}
-          onCancelDownload={handleCancelDownload}
           onEdit={(doc) => {
             setEditingDoc(doc);
             setUploadModalOpen(true);

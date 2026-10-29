@@ -55,13 +55,13 @@ export const UsersPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [uRes, unitRes, lvlRes, roleRes, metaRes] = await Promise.all([
+      // ✅ FIX: Chỉ gọi API Public/Meta và API lấy Users. Tránh gọi các API Admin gây lỗi 403
+      const [uRes, metaRes, rolesRes] = await Promise.all([
         usersApi.getUsers(),
-        dashboardApi.getUnits(),
-        dashboardApi.getSecurityLevels(),
-        dashboardApi.getRoles(),
         dashboardApi.getMeta(),
+        dashboardApi.getCreatableRoles().catch(() => ({ items: [] })), // Fallback nếu không có quyền
       ]);
+      
       const sortedUsers = [...(uRes.items || [])].sort((a, b) => {
         const parseNum = (id?: string) => {
           const m = (id || '').match(/USR-(\d+)/i);
@@ -69,12 +69,17 @@ export const UsersPage: React.FC = () => {
         };
         return parseNum(a.user_id) - parseNum(b.user_id);
       });
+      
       setUsersList(sortedUsers);
-      setUnitsList(unitRes.items || []);
-      setLevelsList(lvlRes.items || []);
-      setRolesList(roleRes.items || []);
+      
+      // Lấy dữ liệu danh mục từ Meta
+      setUnitsList(metaRes.units || []);
+      setLevelsList(metaRes.levels || []);
       setRanksList((metaRes as any).ranks || []);
       setPositionsList((metaRes as any).positions || []);
+      
+      // Roles lấy từ getCreatableRoles
+      setRolesList(rolesRes.items || []);
     } catch (err: any) {
       showToast('Lỗi tải dữ liệu quân nhân: ' + err.message, 'error');
     } finally {
@@ -86,7 +91,7 @@ export const UsersPage: React.FC = () => {
     loadData();
   }, []);
 
-    const handleSaveUser = async (userData: Partial<User>) => {
+  const handleSaveUser = async (userData: Partial<User>) => {
     if (selectedUser?.user_id) {
       await usersApi.updateUser(selectedUser.user_id, userData);
       await loadData();

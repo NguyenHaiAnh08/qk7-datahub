@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-<<<<<<< HEAD
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Monitor,
@@ -14,46 +13,125 @@ import {
   ShieldCheck,
   Layers,
 } from 'lucide-react';
-=======
-import { Monitor, RefreshCw } from 'lucide-react';
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 import { Header } from '../components/common/Header';
-import { Toast, ToastState } from '../components/common/Toast';
-import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { toast } from '../components/common/Toast';
 import { sessionService } from '../services/sessionService';
 import { useAuth } from '../hooks/useAuth';
 import { ActiveSession } from '../types/user';
+import { isApprovalRequired } from '../utils/approvalUtils';
 
 export interface SessionsPageProps {
   /** Khi true: render inline trong AdminDashboardPage (không có Header riêng, không min-h-screen) */
   embedded?: boolean;
 }
 
+// ══════════════════════════════════════════════════════════════
+// DATA PARSING HELPER: Parse User-Agent thô sang định dạng thiết bị dễ đọc
+// ══════════════════════════════════════════════════════════════
+export interface ParsedUA {
+  os: string;
+  browser: string;
+  deviceType: 'desktop' | 'tablet' | 'mobile';
+  displayString: string;
+}
+
+export function parseUserAgent(ua?: string): ParsedUA {
+  if (!ua || ua.trim() === '') {
+    return {
+      os: 'Thiết bị không rõ',
+      browser: 'Trình duyệt không rõ',
+      deviceType: 'desktop',
+      displayString: 'Thiết bị không xác định',
+    };
+  }
+
+  const uaLower = ua.toLowerCase();
+
+  // 1. Nhận diện Hệ điều hành & Phân loại thiết bị
+  let os = 'Hệ điều hành khác';
+  let deviceType: 'desktop' | 'tablet' | 'mobile' = 'desktop';
+
+  if (
+    uaLower.includes('ipad') ||
+    (uaLower.includes('macintosh') && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1)
+  ) {
+    os = 'iPadOS';
+    deviceType = 'tablet';
+  } else if (uaLower.includes('iphone')) {
+    os = 'iOS (iPhone)';
+    deviceType = 'mobile';
+  } else if (uaLower.includes('windows nt 10.0')) {
+    os = 'Windows 10/11';
+    deviceType = 'desktop';
+  } else if (uaLower.includes('windows nt 6.3')) {
+    os = 'Windows 8.1';
+    deviceType = 'desktop';
+  } else if (uaLower.includes('windows nt 6.1')) {
+    os = 'Windows 7';
+    deviceType = 'desktop';
+  } else if (uaLower.includes('windows')) {
+    os = 'Windows';
+    deviceType = 'desktop';
+  } else if (uaLower.includes('macintosh') || uaLower.includes('mac os x')) {
+    os = 'macOS';
+    deviceType = 'desktop';
+  } else if (uaLower.includes('android')) {
+    os = 'Android';
+    deviceType = uaLower.includes('tablet') ? 'tablet' : 'mobile';
+  } else if (uaLower.includes('linux')) {
+    os = 'Linux';
+    deviceType = 'desktop';
+  }
+
+  // 2. Nhận diện Trình duyệt
+  let browser = 'Trình duyệt khác';
+  if (uaLower.includes('edg/') || uaLower.includes('edge/')) {
+    browser = 'MS Edge';
+  } else if (uaLower.includes('opr/') || uaLower.includes('opera')) {
+    browser = 'Opera';
+  } else if (uaLower.includes('chrome') || uaLower.includes('crios')) {
+    browser = 'Chrome';
+  } else if (uaLower.includes('firefox') || uaLower.includes('fxios')) {
+    browser = 'Firefox';
+  } else if (uaLower.includes('safari') && !uaLower.includes('chrome')) {
+    browser = 'Safari';
+  }
+
+  return {
+    os,
+    browser,
+    deviceType,
+    displayString: `${os} • ${browser}`,
+  };
+}
+
 export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) => {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [confirm, setConfirm] = useState<{
+  const [animatingSessionId, setAnimatingSessionId] = useState<string | null>(null);
+
+  // Modal Cảnh Báo Nguy Hiểm: Ngắt phiên (Đỏ Quân Kỳ)
+  const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
+    type: 'single' | 'all';
+    session?: ActiveSession;
     userId?: string;
-    sessionId?: string;
-    name?: string;
-  }>({ open: false });
-  const [toast, setToast] = useState<ToastState>({ show: false, message: '', type: 'success' });
+    userName?: string;
+  }>({
+    open: false,
+    type: 'single',
+  });
 
-  const showToast = (m: string, t: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ show: true, message: m, type: t });
-    setTimeout(() => setToast((p) => ({ ...p, show: false })), 2800);
-  };
-
+  // Tải danh sách phiên
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const r = await sessionService.listActive();
       setSessions(r.items || []);
     } catch (err: any) {
-      showToast('Lỗi: ' + err.message, 'error');
+      toast.error('Lỗi tải danh sách phiên: ' + (err.message || 'Lỗi không xác định'));
     } finally {
       setLoading(false);
     }
@@ -63,13 +141,13 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
     load();
   }, []);
 
+  // Live Auto-Refresh (Mặc định 15 giây)
   useEffect(() => {
     if (!autoRefresh) return;
     const t = setInterval(() => load(true), 15000);
     return () => clearInterval(t);
   }, [autoRefresh]);
 
-<<<<<<< HEAD
   // ═══════════════════════════════════════════════════════════
   // 1. THAO TÁC NGẮT PHIÊN ĐƠN LẺ (KILL SINGLE SESSION)
   // ═══════════════════════════════════════════════════════════
@@ -79,22 +157,8 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
 
     setAnimatingSessionId(targetSession.session_id);
     setConfirmModal({ open: false, type: 'single' });
-=======
-  const killOne = async (sessionId: string) => {
-    try {
-      await sessionService.kill(sessionId);
-      showToast('Đã kill session', 'success');
-      setConfirm({ open: false });
-      load(true);
-    } catch (err: any) {
-      showToast('Lỗi: ' + err.message, 'error');
-    }
-  };
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
 
-  const killAllForUser = async (userId: string) => {
     try {
-<<<<<<< HEAD
       const r: any = await sessionService.kill(targetSession.session_id);
 
       // Nếu backend yêu cầu phê duyệt → không claim success, refresh lại
@@ -118,19 +182,13 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
         setSessions((prev) => prev.filter((s) => s.session_id !== targetSession.session_id));
         setAnimatingSessionId(null);
       }, 250);
-=======
-      const r = await sessionService.killAllForUser(userId);
-      showToast(`Đã kill ${r.revoked_count} session của ${userId}`, 'success');
-      setConfirm({ open: false });
-      load(true);
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
     } catch (err: any) {
-      showToast('Lỗi: ' + err.message, 'error');
+      setAnimatingSessionId(null);
+      toast.error('Lỗi khi ngắt phiên: ' + (err.message || 'Không thể thu hồi phiên'));
     }
   };
 
   // ═══════════════════════════════════════════════════════════
-<<<<<<< HEAD
   // 2. THAO TÁC NGẮT TOÀN BỘ PHIÊN CỦA 1 QUÂN NHÂN (KILL ALL SESSIONS FOR USER)
   // ═══════════════════════════════════════════════════════════
   const handleKillAllConfirm = async () => {
@@ -215,52 +273,70 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
 
   // ═══════════════════════════════════════════════════════════
   // GIAO DIỆN NỘI DUNG CHÍNH (CONTENT)
-=======
-  // CONTENT (dùng chung cho cả 2 layout: standalone và embedded)
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
   // ═══════════════════════════════════════════════════════════
   const pageContent = (
     <>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* 1. Header & Live Indicator Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-            <Monitor className="w-6 h-6 text-cyan-500" />
-            Phiên Đang Trực Tuyến
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
+              <Monitor className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <span>Phiên Đang Trực Tuyến</span>
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center flex-wrap gap-1.5">
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
               {sessions.length}
             </span>{' '}
-            phiên đang hoạt động
-            <span className="text-slate-400 ml-1">
-              (tương tác trong 3 giờ gần nhất)
-            </span>
-            {' • '}
-            <span className="text-rose-500 dark:text-rose-400">
+            <span>phiên đang hoạt động (tương tác trong 3 giờ gần nhất)</span>
+            <span className="text-slate-400">•</span>
+            <span className="text-rose-600 dark:text-rose-400 font-medium">
               Tự động thoát nếu treo máy 180 phút
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-            />
-            <span>Tự động</span>
-          </label>
+
+        {/* Cụm công tắc Live Auto-Refresh & Nút Làm mới */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Live Auto-Refresh Toggle Switch */}
           <button
-            onClick={() => load()}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+            type="button"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer select-none active:scale-95 ${
+              autoRefresh
+                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                : 'bg-slate-100 dark:bg-slate-800/80 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400'
+            }`}
+            title="Bật/Tắt chế độ tự động làm mới theo chu kỳ 15 giây"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Làm mới
+            <span className="relative flex h-2 w-2">
+              {autoRefresh && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              )}
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  autoRefresh ? 'bg-emerald-500' : 'bg-slate-400'
+                }`}
+              />
+            </span>
+            <span className="font-mono">{autoRefresh ? 'TỰ ĐỘNG: LIVE (15s)' : 'TỰ ĐỘNG: TẮT'}</span>
+          </button>
+
+          {/* Nút Làm mới chuẩn xám trung tính có viền */}
+          <button
+            type="button"
+            onClick={() => load()}
+            disabled={loading}
+            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/90 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer select-none active:scale-95"
+            title="Tải lại danh sách phiên"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
+            <span>Làm mới</span>
           </button>
         </div>
       </div>
 
-<<<<<<< HEAD
       {/* 2. Bảng Dữ Liệu High-craft Grid */}
       <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors duration-200">
         <div className="overflow-x-auto">
@@ -275,101 +351,71 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
               <col style={{ width: '200px' }} />
             </colgroup>
             <thead className="bg-slate-50 dark:bg-slate-800/60 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800/80">
-=======
-      <div className="bg-white dark:bg-slate-900/80 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left min-w-[860px]">
-            <thead className="bg-slate-50 dark:bg-slate-800/60 text-[11px] uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
               <tr>
-                <th className="py-3 px-4">Quân nhân</th>
-                <th className="py-3 px-4">IP</th>
-                <th className="py-3 px-4">Thiết bị</th>
-                <th className="py-3 px-4">Đăng nhập</th>
-                <th className="py-3 px-4">Hoạt động cuối</th>
-                <th className="py-3 px-4">Idle</th>
-                <th className="py-3 px-4 text-right">Thao tác</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Quân nhân</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">IP</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Thiết bị</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Đăng nhập</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Hoạt động cuối</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Idle</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {loading && sessions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    Đang tải...
+                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <RefreshCw className="w-6 h-6 animate-spin text-emerald-600" />
+                      <span className="text-xs font-medium">Đang tải danh sách phiên trực tuyến...</span>
+                    </div>
                   </td>
                 </tr>
               ) : sessions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    Không có phiên nào đang hoạt động
+                  <td colSpan={7} className="py-16 text-center text-slate-400 dark:text-slate-500">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center text-slate-400">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                      </div>
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Không có phiên hoạt động
+                      </span>
+                      <span className="text-xs text-slate-400">Hiện tại chưa có người dùng nào trực tuyến</span>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                sessions.map((s) => (
-                  <tr
-                    key={s.session_id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                  >
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900 dark:text-white">
-                        {s.full_name}
-                      </div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        {s.user_id}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">
-                      {s.ip || '—'}
-                    </td>
-                    <td
-                      className="py-3 px-4 text-slate-500 dark:text-slate-400 max-w-[220px] truncate"
-                      title={s.user_agent}
+                sessions.map((s) => {
+                  const parsed = parseUserAgent(s.user_agent);
+                  const isCurrentUser = s.user_id === user?.user_id;
+                  const isKilling = animatingSessionId === s.session_id;
+
+                  return (
+                    <tr
+                      key={s.session_id}
+                      className={`hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors duration-150 group ${
+                        isKilling ? 'opacity-0 transition-opacity duration-200' : ''
+                      }`}
                     >
-                      {s.user_agent?.split(')')[0] || '—'}
-                    </td>
-                    <td className="py-3 px-4 text-[11px] font-mono text-slate-500">
-                      {new Date(s.created_at).toLocaleString('vi-VN')}
-                    </td>
-                    <td className="py-3 px-4 text-[11px] font-mono text-slate-500">
-                      {new Date(s.last_seen_at).toLocaleString('vi-VN')}
-                    </td>
-                                        <td className="py-3 px-4">
-                      {s.minutes_idle <= 2 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          Đang trực
-                        </span>
-                      ) : s.minutes_idle <= 120 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          {Math.floor(s.minutes_idle / 60) > 0
-                            ? `${Math.floor(s.minutes_idle / 60)}h ${s.minutes_idle % 60}p`
-                            : `${s.minutes_idle} phút`}
-                        </span>
-                      ) : (
-                        <span
-                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30"
-                          title={`Sắp auto-logout trong ${Math.max(0, 180 - s.minutes_idle)} phút nữa`}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                          {Math.floor(s.minutes_idle / 60)}h {s.minutes_idle % 60}p · sắp hết
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
-                      {hasPermission('SESSION_KILL') && (
-                        <>
-                          <button
-                            onClick={() =>
-                              setConfirm({
-                                open: true,
-                                sessionId: s.session_id,
-                                name: s.full_name,
-                              })
-                            }
-                            className="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-500/30 text-[11px] font-semibold cursor-pointer"
+                      {/* 1. Cột Quân nhân: Căn giữa */}
+                      <td className="py-3.5 px-4 text-center overflow-hidden">
+                        <div className="font-bold text-slate-900 dark:text-white flex items-center justify-center gap-1.5 truncate">
+                          <span className="truncate">{s.full_name}</span>
+                          {isCurrentUser && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
+                              Bạn
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs font-mono tabular-nums font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                          {s.user_id}
+                        </div>
+                        {(s.rank || s.position) && (
+                          <div
+                            className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5"
+                            title={[s.rank, s.position].filter(Boolean).join(' • ')}
                           >
-<<<<<<< HEAD
                             {[s.rank, s.position].filter(Boolean).join(' • ')}
                           </div>
                         )}
@@ -484,27 +530,6 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
                     </tr>
                   );
                 })
-=======
-                            Kill
-                          </button>
-                          <button
-                            onClick={() =>
-                              setConfirm({
-                                open: true,
-                                userId: s.user_id,
-                                name: s.full_name,
-                              })
-                            }
-                            className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-500/30 text-[11px] font-semibold cursor-pointer"
-                          >
-                            Kill tất cả
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
               )}
             </tbody>
           </table>
@@ -514,7 +539,6 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
   );
 
   // ═══════════════════════════════════════════════════════════
-<<<<<<< HEAD
   // 3. MODAL CẢNH BÁO NGUY HIỂM: NGẮT PHIÊN (PURGE / KILL CONFIRMATION)
   // ═══════════════════════════════════════════════════════════
   const dangerConfirmModal = (
@@ -632,33 +656,13 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
   );
 
   // ═══════════════════════════════════════════════════════════
-=======
->>>>>>> 9cca8193b4de194f8f1694b8c69925ce22b91e94
   // EMBEDDED LAYOUT (dùng khi nhúng trong AdminDashboardPage)
   // ═══════════════════════════════════════════════════════════
   if (embedded) {
     return (
       <div className="space-y-5">
         {pageContent}
-
-        <ConfirmDialog
-          open={confirm.open}
-          title="Kill session"
-          message={
-            confirm.sessionId
-              ? `Kill session của ${confirm.name}? User sẽ bị đăng xuất ngay lập tức.`
-              : `Kill TẤT CẢ session của ${confirm.name}? User sẽ bị đăng xuất toàn bộ thiết bị.`
-          }
-          confirmText="Kill"
-          confirmVariant="danger"
-          onConfirm={() => {
-            if (confirm.sessionId) killOne(confirm.sessionId);
-            else if (confirm.userId) killAllForUser(confirm.userId);
-          }}
-          onCancel={() => setConfirm({ open: false })}
-        />
-
-        <Toast toast={toast} onClose={() => setToast((p) => ({ ...p, show: false }))} />
+        {dangerConfirmModal}
       </div>
     );
   }
@@ -667,31 +671,14 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
   // STANDALONE LAYOUT (truy cập /admin/sessions trực tiếp qua URL)
   // ═══════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans transition-colors duration-200">
       <Header activeNav="admin" title="QK7 DATAHUB" subtitle="Phiên đang hoạt động" />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-5">
         {pageContent}
       </main>
 
-      <ConfirmDialog
-        open={confirm.open}
-        title="Kill session"
-        message={
-          confirm.sessionId
-            ? `Kill session của ${confirm.name}? User sẽ bị đăng xuất ngay lập tức.`
-            : `Kill TẤT CẢ session của ${confirm.name}? User sẽ bị đăng xuất toàn bộ thiết bị.`
-        }
-        confirmText="Kill"
-        confirmVariant="danger"
-        onConfirm={() => {
-          if (confirm.sessionId) killOne(confirm.sessionId);
-          else if (confirm.userId) killAllForUser(confirm.userId);
-        }}
-        onCancel={() => setConfirm({ open: false })}
-      />
-
-      <Toast toast={toast} onClose={() => setToast((p) => ({ ...p, show: false }))} />
+      {dangerConfirmModal}
     </div>
   );
 };

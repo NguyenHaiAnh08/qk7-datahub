@@ -39,10 +39,39 @@ export function buildUnitTree(units: Unit[]): UnitTreeNode[] {
     }
   }
 
-  // Bước 2: Sort theo tiếng Việt
-  rootUnits.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  // Helper ưu tiên phân cấp: QK7 (cao nhất) -> Trường Quân sự QK7 (đơn vị chủ quản hệ thống) -> Sư đoàn & các đơn vị khác
+  const isRootQK7 = (u: Unit) =>
+    u.unit_id === 'QK7' ||
+    u.name.toLowerCase().includes('bộ tư lệnh') ||
+    u.name.toLowerCase().trim() === 'quân khu 7';
+
+  const isSchoolUnit = (u: Unit) =>
+    u.unit_id === 'TQS' ||
+    u.name.toLowerCase().includes('trường quân sự');
+
+  const sortUnitsWithPriority = (list: Unit[]) => {
+    list.sort((a, b) => {
+      // 1. Quân khu 7 (cấp cao nhất) luôn lên trước
+      const aIsQK7 = isRootQK7(a);
+      const bIsQK7 = isRootQK7(b);
+      if (aIsQK7 && !bIsQK7) return -1;
+      if (!aIsQK7 && bIsQK7) return 1;
+
+      // 2. Trường Quân sự Quân khu 7 luôn ưu tiên xếp trên các sư đoàn / đơn vị khác
+      const aIsSchool = isSchoolUnit(a);
+      const bIsSchool = isSchoolUnit(b);
+      if (aIsSchool && !bIsSchool) return -1;
+      if (!aIsSchool && bIsSchool) return 1;
+
+      // 3. Các đơn vị còn lại sắp xếp theo bảng chữ cái tiếng Việt
+      return a.name.localeCompare(b.name, 'vi');
+    });
+  };
+
+  // Bước 2: Sort theo thứ tự ưu tiên & tiếng Việt
+  sortUnitsWithPriority(rootUnits);
   for (const item of map.values()) {
-    item.children.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    sortUnitsWithPriority(item.children);
   }
 
   // Bước 3: Tạo node với UI cha - con trực quan theo cấp độ (depth)

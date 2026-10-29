@@ -118,7 +118,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
           if (isApprovalRequired(res)) pendingCount++;
           else successCount++;
         } catch (e) {
-          console.warn(`[RestoreAll] Failed for fileId ${d.file_id}`, e);
+          if (import.meta.env.DEV) console.warn('[RestoreAll] Lỗi khôi phục tài liệu:', e);
         }
       }
 
@@ -170,7 +170,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
             if (isApprovalRequired(res)) pendingCount++;
             else purgedCount++;
           } catch (e) {
-            console.warn(`[PurgeAll] Failed for fileId ${d.file_id}`, e);
+            if (import.meta.env.DEV) console.warn('[PurgeAll] Lỗi xóa vĩnh viễn tài liệu:', e);
           }
         }
 

@@ -5,6 +5,10 @@ import { resolve } from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  esbuild: {
+    pure: ['console.log', 'console.info', 'console.debug', 'console.warn'],
+    drop: process.env.NODE_ENV === 'production' ? ['debugger'] : [],
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,

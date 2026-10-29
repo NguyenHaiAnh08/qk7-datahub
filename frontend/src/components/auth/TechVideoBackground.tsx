@@ -16,7 +16,7 @@ export const TechVideoBackground: React.FC = () => {
     if (videoRef.current) {
       videoRef.current.play().catch((err) => {
         // Tự động retry hoặc fallback nếu trình duyệt yêu cầu tương tác
-        console.warn('Video background autoplay blocked or waiting for gesture:', err);
+        // Video autoplay silently catches browser gesture requirement
       });
     }
   }, []);

@@ -5,6 +5,7 @@ import {
   LayoutGrid, List, BarChart2, ChevronDown, Shield, FileText,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
+import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { toast } from '../components/common/Toast';
 import { UnitOverviewStrip } from '../components/portal/UnitOverviewStrip';
 import { DistributionChart } from '../components/dashboard/DistributionChart';
@@ -31,9 +32,14 @@ export const MyUnitPage: React.FC = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+  const [selectedUnitId, setSelectedUnitId] = useState<string>(() => user?.unit_id || '');
   const [canSelectUnit, setCanSelectUnit] = useState(false);
-  const [currentUnit, setCurrentUnit] = useState<{ unit_id: string; name: string } | null>(null);
+  const [currentUnit, setCurrentUnit] = useState<{ unit_id: string; name: string } | null>(() => {
+    if (user?.unit_id && user?.unit_name) {
+      return { unit_id: user.unit_id, name: user.unit_name };
+    }
+    return null;
+  });
 
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [allUnitDocuments, setAllUnitDocuments] = useState<DocumentItem[]>([]);
@@ -64,6 +70,16 @@ export const MyUnitPage: React.FC = () => {
     else toast.success(message);
   };
 
+  // Đồng bộ tức thời thông tin đơn vị từ user phiên đăng nhập để tránh hiện tượng giật hiển thị
+  useEffect(() => {
+    if (user?.unit_id && !selectedUnitId) {
+      setSelectedUnitId(user.unit_id);
+    }
+    if (user?.unit_name && (!currentUnit || currentUnit.name !== user.unit_name)) {
+      setCurrentUnit({ unit_id: user.unit_id || '', name: user.unit_name });
+    }
+  }, [user?.unit_id, user?.unit_name]);
+
   useEffect(() => {
     dashboardApi.getMeta().then(setMeta).catch((err) => console.error('[meta]', err));
   }, []);
@@ -72,8 +88,9 @@ export const MyUnitPage: React.FC = () => {
   const loadDocuments = async () => {
     setLoading(true);
     try {
+      const unitToQuery = selectedUnitId || user?.unit_id;
       const res: MyUnitDocumentResponse = await documentService.getMyUnitDocuments({
-        unit_id: selectedUnitId || undefined,
+        unit_id: unitToQuery || undefined,
         // code: searchQuery || undefined,
         q: searchQuery || undefined,
         type: selectedType || undefined,
@@ -284,6 +301,8 @@ export const MyUnitPage: React.FC = () => {
       />
 
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
+        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
+        <DataHubSubNav activeTab="myunit" />
         {/* Banner */}
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -297,7 +316,7 @@ export const MyUnitPage: React.FC = () => {
                 <span className="text-slate-600 dark:text-slate-300">Đơn vị trực thuộc</span>
               </div>
               <h1 className="text-lg font-bold text-slate-900 dark:text-white truncate mt-0.5">
-                {currentUnit?.name || 'Trường Quân sự Quân khu 7'}
+                {currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Hệ thống hiển thị theo đơn vị của bạn.
@@ -389,6 +408,8 @@ export const MyUnitPage: React.FC = () => {
                 Đơn vị
               </label>
               <input
+                id="myunit-unit-input"
+                name="myunit_unit"
                 type="text"
                 readOnly
                 value={currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
@@ -404,6 +425,8 @@ export const MyUnitPage: React.FC = () => {
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
+                  id="myunit-search-input"
+                  name="myunit_search"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -418,6 +441,8 @@ export const MyUnitPage: React.FC = () => {
                 Loại văn bản
               </label>
               <select
+                id="myunit-type-select"
+                name="myunit_type"
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
@@ -434,6 +459,8 @@ export const MyUnitPage: React.FC = () => {
                 Mức bảo mật
               </label>
               <select
+                id="myunit-level-select"
+                name="myunit_level"
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value ? Number(e.target.value) : '')}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"

@@ -9,6 +9,9 @@ import {
   ShieldAlert,
   UploadCloud,
   BookOpen,
+  MonitorPlay,
+  Layers,
+  Library,
   LogOut,
   ChevronDown,
   Menu,
@@ -31,7 +34,7 @@ interface HeaderProps {
   title?: string;
   subtitle?: string;
   showClock?: boolean;
-  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
+  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'materials' | 'library' | 'data';
   onToggleMobileMenu?: () => void;
 }
 
@@ -48,14 +51,12 @@ export function getAvatarInitial(name?: string, fallback = 'ĐB'): string {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// COMPONENT: Cụm 4 Nút Điều Hướng Trượt Mượt
+// COMPONENT: Cụm Nút Điều Hướng 5 Phân Hệ (Morphing Pill: Icon -> Chữ Đẩy Ra)
 // ══════════════════════════════════════════════════════════════════════
-let lastKnownPillCoords: { left: number; width: number } | null = null;
-
 const NavigationGlider: React.FC<{
-  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login';
+  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'materials' | 'library' | 'data';
 }> = ({ activeNav: explicitActiveNav }) => {
-  const { user, isAdmin, hasPermission } = useAuth();
+  const { isAdmin } = useAuth();
   const { deviceMode, isTouch } = useDeviceMode();
   const location = useLocation();
 
@@ -69,197 +70,112 @@ const NavigationGlider: React.FC<{
     (typeof window !== 'undefined' && 'ontouchstart' in window);
 
   const getEffectiveActiveNav = () => {
-    if (explicitActiveNav) return explicitActiveNav;
+    if (explicitActiveNav) {
+      if (
+        explicitActiveNav === 'desk' ||
+        explicitActiveNav === 'myunit' ||
+        explicitActiveNav === 'portal' ||
+        explicitActiveNav === 'data'
+      ) {
+        return 'portal';
+      }
+      return explicitActiveNav;
+    }
     const path = location.pathname;
-    if (path.startsWith(ROUTE_PATHS.DESK)) return 'desk';
-    if (path.startsWith(ROUTE_PATHS.MY_UNIT)) return 'myunit';
+    if (
+      path.startsWith(ROUTE_PATHS.DESK) ||
+      path.startsWith(ROUTE_PATHS.MY_UNIT) ||
+      path.startsWith(ROUTE_PATHS.PORTAL)
+    ) {
+      return 'portal';
+    }
+    if (path.startsWith(ROUTE_PATHS.LECTURES)) return 'lectures';
+    if (path.startsWith(ROUTE_PATHS.MATERIALS)) return 'materials';
+    if (path.startsWith(ROUTE_PATHS.LIBRARY)) return 'library';
     if (path.startsWith(ROUTE_PATHS.ADMIN)) return 'admin';
-    if (path.startsWith(ROUTE_PATHS.PORTAL)) return 'portal';
     return undefined;
   };
 
   const activeNav = getEffectiveActiveNav();
-  const userUnitName = user?.unit_name?.trim() || 'Đơn vị của tôi';
 
   const allNavTabs = [
-    {
-      key: 'desk',
-      to: ROUTE_PATHS.DESK,
-      label: 'Đăng tải',
-      shortLabel: 'Đăng tải',
-      icon: UploadCloud,
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-700 dark:text-amber-400',
-      visible: hasPermission('DOC_UPLOAD') || hasPermission('DOC_EDIT') || hasPermission('DOC_PARSE'),
-    },
     {
       key: 'portal',
       to: ROUTE_PATHS.PORTAL,
       label: 'Dữ liệu số',
-      shortLabel: 'Dữ liệu số',
       icon: BookOpen,
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-700 dark:text-amber-400',
+      tourId: 'tour-nav-portal',
       visible: true,
     },
     {
-      key: 'myunit',
-      to: ROUTE_PATHS.MY_UNIT,
-      label: userUnitName,
-      shortLabel: userUnitName,
-      icon: Building,
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-700 dark:text-amber-400',
-      visible: Boolean(user && user.user_id !== 'GUEST'),
+      key: 'lectures',
+      to: ROUTE_PATHS.LECTURES,
+      label: 'Bài giảng số',
+      icon: MonitorPlay,
+      visible: true,
+    },
+    {
+      key: 'materials',
+      to: ROUTE_PATHS.MATERIALS,
+      label: 'Học liệu số',
+      icon: Layers,
+      visible: true,
+    },
+    {
+      key: 'library',
+      to: ROUTE_PATHS.LIBRARY,
+      label: 'Thư viện số',
+      icon: Library,
+      visible: true,
     },
     {
       key: 'admin',
       to: ROUTE_PATHS.ADMIN,
       label: 'Quản trị',
-      shortLabel: 'Quản trị',
       icon: ShieldAlert,
-      activeColor: 'text-white',
-      inactiveColor: 'text-amber-700 dark:text-amber-400',
       visible: Boolean(isAdmin),
     },
   ];
 
   const visibleTabs = allNavTabs.filter((t) => t.visible);
 
-  const containerRef = useRef<HTMLElement>(null);
-  const tabRefs = useRef<Record<string, HTMLElement | null>>({});
-  const labelRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>(() => {
-    return lastKnownPillCoords || { left: 0, width: 0 };
-  });
-  const isInitialMount = useRef(!lastKnownPillCoords);
-
-  const updateIndicator = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const activeEl = tabRefs.current[activeNav || ''];
-
-    if (activeEl) {
-      const containerRect = container.getBoundingClientRect();
-      const activeRect = activeEl.getBoundingClientRect();
-      const x = Math.round(activeRect.left - containerRect.left);
-      const w = Math.round(activeRect.width);
-
-      if (w > 0) {
-        lastKnownPillCoords = { left: x, width: w };
-        container.style.setProperty('--x', `${x}px`);
-        container.style.setProperty('--w', `${w}px`);
-        container.style.setProperty('--pill-opacity', '1');
-
-        setIndicatorStyle({ left: x, width: w });
-      }
-    } else {
-      container.style.setProperty('--pill-opacity', '0');
-      setIndicatorStyle({ left: 0, width: 0 });
-    }
-  }, [activeNav, visibleTabs.length, userUnitName]);
-
-  useEffect(() => {
-    updateIndicator();
-    const raf = requestAnimationFrame(() => {
-      updateIndicator();
-      isInitialMount.current = false;
-    });
-
-    const settleTimer = setTimeout(() => {
-      updateIndicator();
-    }, 450);
-
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
-      ro = new ResizeObserver(() => {
-        updateIndicator();
-      });
-      ro.observe(containerRef.current);
-    }
-
-    if (typeof document !== 'undefined' && document.fonts) {
-      document.fonts.ready.then(updateIndicator);
-    }
-
-    window.addEventListener('resize', updateIndicator);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(settleTimer);
-      window.removeEventListener('resize', updateIndicator);
-      if (ro) ro.disconnect();
-    };
-  }, [updateIndicator, deviceMode, activeNav]);
-
   return (
     <nav
-      ref={containerRef as any}
       aria-label="Điều hướng hệ thống"
-      className={`u058-nav relative flex items-center gap-1.5 sm:gap-2 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-2xl rounded-full px-2 sm:px-2.5 py-1.5 select-none w-fit max-w-full touch-manipulation ${
-        isInitialMount.current ? 'no-transition' : ''
-      }`}
-      style={{
-        '--x': `${indicatorStyle.left}px`,
-        '--w': `${indicatorStyle.width}px`,
-        '--pill-opacity': indicatorStyle.width > 0 ? 1 : 0,
-      } as React.CSSProperties}
+      className="u058-nav relative flex items-center gap-1.5 sm:gap-2 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-2xl rounded-full px-2 sm:px-2.5 py-1.5 select-none w-fit max-w-full touch-manipulation"
     >
-      <span className="u058-pill" aria-hidden="true" />
-
-      {visibleTabs.map((tab, index) => {
+      {visibleTabs.map((tab) => {
         const isActive = activeNav === tab.key;
         const IconComponent = tab.icon;
 
-        // ✅ FIX: Tạo 1 element duy nhất (tabLink), tái sử dụng ở cả 2 nhánh
         const tabLink = (
           <Link
-            id={tab.key === 'portal' ? 'tour-nav-portal' : undefined}
-            ref={(el) => {
-              tabRefs.current[tab.key] = el;
-            }}
+            key={tab.key}
+            id={tab.tourId || (tab.key === 'portal' ? 'tour-nav-portal' : undefined)}
             to={tab.to}
             onClick={(e) => {
-              if (isActive) {
+              if (isActive && location.pathname === tab.to) {
                 e.preventDefault();
-                return;
-              }
-              const container = containerRef.current;
-              if (container) {
-                const labelEl = labelRefs.current[tab.key];
-                const textW = labelEl ? labelEl.scrollWidth : 60;
-                const targetW = Math.round(20 + 8 + textW + 32);
-                const targetX = Math.round(10 + index * (40 + 8));
-
-                if (targetW > 0) {
-                  lastKnownPillCoords = { left: targetX, width: targetW };
-                  container.style.setProperty('--x', `${targetX}px`);
-                  container.style.setProperty('--w', `${targetW}px`);
-                  container.style.setProperty('--pill-opacity', '1');
-                  setIndicatorStyle({ left: targetX, width: targetW });
-                }
               }
             }}
             aria-current={isActive ? 'page' : undefined}
             aria-label={tab.label}
             data-active={isActive ? 'true' : 'false'}
-            className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 select-none h-10 touch-manipulation cursor-pointer ${
+            className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 ease-out select-none h-10 touch-manipulation cursor-pointer ${
               isActive
-                ? 'is-active !text-white font-bold px-4 py-2 shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0'
+                ? 'is-active bg-[#166534] dark:bg-emerald-600 !text-white font-bold px-4 py-2 shadow-md border border-emerald-500/40'
+                : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0 border border-transparent'
             }`}
             style={isActive ? { color: '#ffffff' } : undefined}
           >
             <IconComponent
-              className={`w-5 h-5 shrink-0 transition-transform duration-300 ${
-                isActive ? 'scale-105 !text-white stroke-white' : tab.inactiveColor
+              className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
+                isActive ? 'scale-105 !text-white stroke-white' : 'text-slate-600 dark:text-slate-400'
               }`}
               style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
             />
             <span
-              ref={(el) => {
-                labelRefs.current[tab.key] = el;
-              }}
-              className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-400 ease-[cubic-bezier(.34,1.45,.64,1)] ${
+              className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-200 ease-out ${
                 isActive
                   ? 'max-w-[280px] opacity-100 ml-2 font-bold !text-white'
                   : 'max-w-0 opacity-0 ml-0 pointer-events-none'
@@ -271,14 +187,10 @@ const NavigationGlider: React.FC<{
           </Link>
         );
 
-        // Trên iPad / cảm ứng hoặc tab đang active: KHÔNG bọc Tooltip
         if (isTouchOrIPad || isActive) {
-          return (
-            <React.Fragment key={tab.key}>{tabLink}</React.Fragment>
-          );
+          return <React.Fragment key={tab.key}>{tabLink}</React.Fragment>;
         }
 
-        // ✅ FIX: Tooltip chỉ chứa DUY NHẤT 1 child (tabLink). Trước đây code render 2 Link → bug.
         return (
           <Tooltip
             key={tab.key}
@@ -468,6 +380,42 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Đăng tải văn bản</span>
           </Link>
         )}
+
+        <Link
+          to={ROUTE_PATHS.LECTURES}
+          onClick={() => {
+            setUserPopoverOpen(false);
+            setDropdownOpen(false);
+          }}
+          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+        >
+          <MonitorPlay className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+          <span>Bài giảng số</span>
+        </Link>
+
+        <Link
+          to={ROUTE_PATHS.MATERIALS}
+          onClick={() => {
+            setUserPopoverOpen(false);
+            setDropdownOpen(false);
+          }}
+          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+        >
+          <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+          <span>Học liệu số</span>
+        </Link>
+
+        <Link
+          to={ROUTE_PATHS.LIBRARY}
+          onClick={() => {
+            setUserPopoverOpen(false);
+            setDropdownOpen(false);
+          }}
+          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+        >
+          <Library className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+          <span>Thư viện số</span>
+        </Link>
 
         {canAccessTrash && (
           <Link

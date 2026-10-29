@@ -274,6 +274,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             {/* Input Tài khoản quân nhân */}
             <NotchedInput
               id="username-split"
+              name="username"
+              autoComplete="username"
               label="Tài khoản quân nhân"
               value={username}
               onChange={handleUsernameChange}
@@ -287,6 +289,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             {/* Input Mật khẩu */}
             <NotchedInput
               id="password-split"
+              name="password"
+              autoComplete="current-password"
               label="Mật khẩu"
               type={showPassword ? 'text' : 'password'}
               value={password}
@@ -488,6 +492,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       {/* Input Tài khoản quân nhân */}
       <NotchedInput
         id="username-vertical"
+        name="username"
+        autoComplete="username"
         label="Tài khoản quân nhân"
         value={username}
         onChange={handleUsernameChange}
@@ -500,6 +506,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       {/* Input Mật khẩu */}
       <NotchedInput
         id="password-vertical"
+        name="password"
+        autoComplete="current-password"
         label="Mật khẩu"
         type={showPassword ? 'text' : 'password'}
         value={password}

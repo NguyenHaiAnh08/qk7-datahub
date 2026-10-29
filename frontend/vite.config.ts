@@ -39,6 +39,7 @@ export default defineConfig({
           'vendor-excel': ['exceljs'],
           'vendor-motion': ['framer-motion'],
           'vendor-icons': ['lucide-react'],
+          'vendor-pdflib': ['pdf-lib'],
         },
       },
     },

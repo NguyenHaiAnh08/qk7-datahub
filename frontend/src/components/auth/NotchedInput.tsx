@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 
 export interface NotchedInputProps {
   id: string;
+  name?: string;
   label: string;
   type?: string;
   value: string;
@@ -20,6 +21,7 @@ export interface NotchedInputProps {
 
 export const NotchedInput: React.FC<NotchedInputProps> = ({
   id,
+  name,
   label,
   type = 'text',
   value,
@@ -64,6 +66,7 @@ export const NotchedInput: React.FC<NotchedInputProps> = ({
         {/* Ô Input chính */}
         <input
           id={id}
+          name={name || id}
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}

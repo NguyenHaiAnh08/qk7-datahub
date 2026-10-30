@@ -1203,3 +1203,142 @@ Nhằm hỗ trợ thủ trưởng và cán bộ tác chiến tra cứu nhanh đi
 *Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*
 
 
+
+
+---
+
+## 21. Kiến Trúc Watermark Động & Chống Rò Rỉ Tài Liệu Quân Sự (Dynamic Military Watermark Engine)
+
+### 21.1. Nguyên Tắc An Ninh Chống Chụp Màn Hình & Rò Rỉ Tài Liệu
+Nhằm ngăn chặn việc quay phim, chụp ảnh màn hình hoặc in ấn tài liệu nội bộ trái phép, hệ thống triển khai cơ chế **Watermark Động Đa Tầng (Dynamic Security Overlay)**:
+1. **Dữ liệu Watermark Nhúng Trực Tiếp:**
+   * Họ và tên quân nhân (`user.full_name`).
+   * Mã định danh tài khoản (`user.user_id` / `username`).
+   * Địa chỉ IP trạm máy khách (`client_ip`).
+   * Dấu thời gian thực (`YYYY-MM-DD HH:mm:ss`).
+2. **Kỹ Thuật Phủ Lưới Ma Trận SVG/Canvas:**
+   * Watermark được vẽ bằng lớp canvas/SVG trong suốt với góc nghiêng chuẩn **-45 độ**.
+   * Bố trí lặp tuần hoàn theo khoảng cách toán học cố định, đảm bảo mọi vị trí chụp trên màn hình đều dính ít nhất 1 dấu ấn định danh.
+   * Cưỡng chế CSS `pointer-events: none` và `user-select: none`, không cản trở thao tác đọc văn bản của quân nhân.
+
+### 21.2. Chuẩn Hóa Typography & Cưỡng Chế Kiểu Chữ Đồng Nhất
+* **Khắc phục lỗi chữ in nghiêng (Italic Bug Remediation):** Toàn bộ các lớp Watermark và vùng hiển thị văn bản PDF Markdown đều được cưỡng chế thuộc tính `font-style: normal !important`, kích thước font chuẩn hóa `13px - 14px`, loại bỏ hiện tượng chữ bị xiên vẹo hoặc lệch cỡ chữ giữa các hàng.
+* **Cơ chế Chống Xóa Phần Tử (Anti-Tamper DOM Mutation Observer):** Frontend giám sát liên tục lớp DOM Watermark. Nếu người dùng mở DevTools để sửa `display: none` hoặc xóa node watermark, `MutationObserver` lập tức phát hiện và tự động render lại ngay trong 16ms, đồng thời khóa màn hình xem văn bản.
+
+---
+
+## 22. Kiến Trúc Chốt Chặn Cứng 3 Lớp Khi Lệch Giờ Máy Trạm (Triple-Tier Hardened Clock Authority & Anti-Tampering Engine)
+
+### 22.1. Động Cơ Tấn Công Lệch Giờ & Rủi Ro An Ninh
+Trong môi trường văn thư bảo mật, kẻ tấn công hoặc quân nhân có ý định xem trộm tài liệu thường lùi đồng hồ máy trạm cục bộ (Client System Time) nhằm:
+* Gian lận thời hạn hiệu lực của `X-Fingerprint-Token` (vốn chỉ có hiệu lực 5 phút).
+* Gian lận thời gian phiên đăng nhập JWT (`exp` timestamp).
+* Giả mạo mốc thời gian ghi log trên hệ thống.
+
+### 22.2. Cơ Chế Chốt Chặn Cứng 3 Lớp (Triple-Tier Clock Enforcement)
+Để triệt tiêu hoàn toàn lỗ hổng trên, hệ thống thiết lập cơ chế kiểm soát thời gian chuẩn độc lập:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Máy Trạm Client
+    participant GW as Gateway Middleware (Express)
+    participant NTP as Clock Authority Server
+    participant DB as SQL Server & SOC
+
+    Note over Client,GW: Máy trạm gửi request kèm Client-Time-Header
+    GW->>NTP: Lấy mốc thời gian chuẩn đồng bộ (Google / NTP)
+    GW->>GW: Tính độ lệch Delta Drift = |Time_Client - Time_Server|
+    alt Delta Drift > Ngưỡng Cho Phép (60s)
+        GW-->>Client: ❌ 403 FORBIDDEN (TIME_DRIFT_EXCEEDED)
+        GW->>DB: Ghi ACCESS_LOG (Severity: CRITICAL)
+        Note over Client: UI kích hoạt Security Alert Modal & Khóa thao tác
+    else Thời gian hợp lệ
+        GW->>GW: Tiếp tục kiểm tra Clearance & Token vân tay
+        GW-->>Client: Cho phép truy xuất luồng tài liệu
+    end
+```
+
+1. **Lớp 1 — Gateway Clock Authority Middleware (`backend/server.js`):**
+   * Định kỳ mỗi 5 phút, Gateway tự động đồng bộ giờ chuẩn qua giao thức HTTP Date Header từ máy chủ thời gian tin cậy (`www.google.com` hoặc NTP nội bộ Quân đội).
+   * Mọi request yêu cầu mở tệp `/api/files/:fileId/view` đều được kiểm tra độ lệch thời gian $\Delta t = |t_{\text{client}} - t_{\text{authority}}|$.
+   * Nếu phát hiện lệch giờ vượt quá ngưỡng an toàn ($\pm 60$ giây) $\rightarrow$ Ngay lập tức từ chối `403 TIME_DRIFT_EXCEEDED`.
+2. **Lớp 2 — Giao Diện Client UI Security Guard:**
+   * Khi nhận mã lỗi `TIME_DRIFT_EXCEEDED`, giao diện hiển thị hộp thoại cảnh báo vi phạm an ninh nghiêm trọng.
+   * Tạm dừng toàn bộ tác vụ đọc văn bản, yêu cầu quân nhân chỉnh lại đồng hồ máy trạm về chế độ tự động đồng bộ (Automatic Time Sync).
+3. **Lớp 3 — Nhật Ký Kiểm Toán Tức Thì (SOC Incident Escalation):**
+   * Hệ thống tự động ghi bản ghi vào bảng `ACCESS_LOG` với hành động `TIME_DRIFT_SECURITY_ALERT`, mức độ nghiêm trọng `CRITICAL`, kèm địa chỉ IP và độ lệch thời gian thực tế để kíp trực an ninh xử lý.
+4. **Phạm Vi Bảo Vệ Toàn Diện:**
+   * Chốt chặn lệch giờ được kích hoạt trên **toàn bộ 5 cấp độ tài liệu (Cấp 1 Công khai, Cấp 2 Nội bộ, Cấp 3 Mật, Cấp 4 Tối Mật, Cấp 5 Tuyệt Mật)**, không có ngoại lệ.
+
+---
+
+## 23. Kiến Trúc Xác Thực 2FA Sinh Trắc Học Admin & Cơ Chế Fail-Safe Khi Khởi Tạo (Admin Biometric Guard & Fail-Safe Engine)
+
+### 23.1. Mô Hình Xác Thực Hai Lớp (2FA Biometric) Cho Quản Trị Viên
+* Tài khoản Quản trị viên tối cao (`USR-001`) nắm giữ toàn quyền kiểm soát hệ thống, do đó bắt buộc phải vượt qua 2 lớp bảo vệ vật lý:
+  * **Lớp 1:** Tên đăng nhập và Mật khẩu băm an toàn chuẩn bcrypt.
+  * **Lớp 2:** Xác thực sinh trắc học vân tay qua máy quét quang học chuyên dụng ZKTeco ZK9500 (500 DPI).
+* **Luồng Vé Tạm (Temp Ticket Protocol):**
+  * Sau khi kiểm tra đúng mật khẩu lớp 1, Gateway không cấp ngay JWT chính thức mà chỉ cấp một **Vé tạm thời (`temp_ticket`)** dạng JWT có thời hạn cực ngắn (2 phút), kèm trường `purpose: 'admin_login_fp'`.
+  * Vé tạm này chỉ có một quyền duy nhất: gọi endpoint `/api/auth/login/admin-fp-verify` kèm mã định danh máy quét `device_id`.
+  * Sau khi ngón tay đặt lên cảm biến ZK9500 và đối sánh đạt điểm số tin cậy (Score $\ge 45$), Gateway mới phát hành JWT chính thức với đầy đủ quyền hạn.
+
+### 23.2. Cơ Chế Khởi Tạo An Toàn Dự Phòng (Fail-Safe Initialization)
+* **Vấn Đề Kỹ Thuật (Chicken-and-Egg Dilemma):** Khi triển khai hệ thống mới tại đơn vị hoặc sau khi quản trị viên reset mẫu vân tay qua CLI, tài khoản Admin chưa có mẫu vân tay trong bảng `USER_FINGERPRINT` (`active = 0`). Nếu cưỡng chế 2FA ngay lập tức, Admin sẽ bị kẹt vĩnh viễn ở màn hình đăng nhập.
+* **Giải Pháp Fail-Safe:**
+  * Tại `backend/server.js`: Nếu kiểm tra thấy Admin chưa có mẫu vân tay `active = 1`, hệ thống tạm thời cho phép hoàn tất đăng nhập bằng mật khẩu lớp 1.
+  * Đồng thời ghi nhật ký cảnh báo an ninh: `LOGIN_NO_FP_WARNING: Admin đăng nhập không qua 2FA vân tay (chưa enroll) — Yêu cầu enroll ngay`.
+  * Trên giao diện Admin: Hiển thị thanh cảnh báo màu hổ phách nhắc nhở quản trị viên di chuyển ngay đến trang **Quản lý người dùng** để thực hiện thu thập mẫu vân tay 3 bước.
+
+---
+
+## 24. Kiến Trúc Whitelist IP Bảo Vệ Quản Trị & Chống Spam Cảnh Báo (Admin IP Whitelist & Toast Anti-Spam Engine)
+
+### 24.1. Danh Sách Trắng IP Dành Cho Quản Trị Viên (Admin IP Whitelist)
+* **Nguyên lý thu hẹp bề mặt tấn công (Attack Surface Reduction):** Chỉ cho phép đăng nhập tài khoản có clearance Cấp 5 / Quản trị viên từ các dải địa chỉ IP nội bộ đã đăng ký trước:
+  * Vòng lặp nội bộ (Loopback): `127.0.0.1`, `::1`.
+  * Dải mạng cố định của phòng máy chủ và phòng chỉ huy tham mưu.
+* **Cơ chế khóa IP tự động (Auto IP Blocklist):**
+  * Sử dụng bảng `IP_BLOCKLIST` theo dõi số lần đăng nhập thất bại.
+  * Nếu một địa chỉ IP nhập sai mật khẩu quá 5 lần hoặc cố tình dò quét tài khoản Admin, IP đó sẽ bị khóa truy cập tạm thời trong 15 phút.
+
+### 24.2. Bộ Đệm Chống Spam Thông Báo Lỗi 403 (Toast Debounce & Throttle)
+* **Vấn Đề Giao Diện:** Khi phiên làm việc hết hạn hoặc token bị thu hồi, các tác vụ nền định kỳ (Background Polling, Heartbeat, Notification check) liên tục gửi request đến Gateway và nhận về hàng loạt phản hồi `403 Forbidden`. Điều này khiến các hộp thông báo lỗi (`AnimatedToast`) nảy lên liên tục, làm giật lag trình duyệt và gây ức chế cho người dùng.
+* **Giải Pháp Kỹ Thuật:**
+  * Xây dựng bộ điều tốc (Throttle 2 giây) tại HTTP Client Interceptor (`frontend/src/services/http.ts`).
+  * Mọi lỗi `403` xảy ra trong khoảng thời gian $\le 2000$ ms chỉ được phép phát sinh duy nhất 1 thông báo Toast cảnh báo trên màn hình.
+
+---
+
+## 25. Kiến Trúc Kiểm Tra Trùng Lặp & Bóc Tách Văn Kiện PDF (PDF Deduplication SHA-256 & Smart Ingestion Engine)
+
+### 25.1. Chống Trùng Lặp Tài Liệu Bằng Mã Băm Mật Mã Học SHA-256
+* **Quy Trình Upload An Toàn:**
+  1. Khi quân nhân kéo-thả tệp PDF lên `DocumentDeskPage`, luồng dữ liệu binary được tính toán mã băm **SHA-256** ngay tại bộ đệm máy chủ.
+  2. Gateway thực hiện truy vấn đối chiếu: `SELECT file_id, title FROM DOCUMENT WHERE file_hash = @sha256`.
+  3. Nếu tìm thấy mã băm trùng khớp: Hệ thống lập tức từ chối lưu tệp mới, trả về thông báo văn bản đã tồn tại trong CSDL kèm số hiệu công văn cũ.
+  4. Giúp tiết kiệm tối đa tài nguyên lưu trữ và ngăn ngừa xung đột phiên bản văn kiện tác chiến.
+
+### 25.2. Pipeline Bóc Tách & Nạp Vector Ngữ Nghĩa Tự Động (AI Ingestion Pipeline)
+* Sau khi tệp PDF được lưu trữ thành công vào thư mục `uploads/YYYY/MM/`, Gateway tự động kích hoạt luồng xử lý AI không đồng bộ (Async Trigger) sang microservice Boxchat (`:8001`):
+  * `pdf_processor.py`: Trích xuất từng trang tài liệu kèm số trang gốc (`page_number`).
+  * `vector_store.py`: Phân mảnh thông minh (Chunking 900 ký tự, overlap 80 ký tự), chuyển đổi embedding qua model `bge-m3` và nạp vào Qdrant Local Engine.
+  * Tích hợp cờ bảo vệ độ mật: Gắn chặt metadata `security_level_id` vào từng vector chunk phục vụ lọc ngữ cảnh an toàn.
+
+---
+
+## 26. Quy Chuẩn Vận Hành AI Agent & Sổ Tay Khắc Phục Sự Cố (Agent Guidelines & Troubleshooting Engine)
+
+### 26.1. Quy Trình Phối Hợp Bắt Buộc Với AI Agent (Agent Workflow Guidelines)
+Toàn bộ đội ngũ kỹ sư và công cụ AI hỗ trợ lập trình (Antigravity Agent) bắt buộc phải tuân thủ nghiêm ngặt quy trình 3 bước đã được đặc tả tại [AGENT_WORKFLOW.md](./AGENT_WORKFLOW.md):
+1. **Bước 1 — Khởi động & Đọc tài liệu (Pre-task Context Loading):** Rà soát toàn bộ file Markdown, hiểu rõ kiến trúc 5 tầng và quy chuẩn an ninh 3 lớp trước khi gõ lệnh.
+2. **Bước 2 — Thực hiện tác vụ (Execution):** Triển khai thay đổi nhỏ, bảo toàn hợp đồng API Swagger, kiểm thử TypeScript và build sạch sẽ.
+3. **Bước 3 — Cập nhật tài liệu sau hoàn thành (Post-task Documentation Update):** Cập nhật đồng bộ các file tài liệu kiến trúc, nhật ký sự cố và changelog để đảm bảo tài liệu luôn là nguồn chân lý duy nhất.
+
+### 26.2. Sổ Tay Tổng Hợp Sự Cố & Giải Pháp (Troubleshooting Catalog)
+Toàn bộ danh mục 13 sự cố kỹ thuật điển hình đã từng gặp (từ lỗi DLL ZKTeco 32/64-bit, lỗi giải mã GCM Auth Tag, lỗi Stacking Context Modal, Stale lock Qdrant, xung đột cổng mạng đến lỗi Check Constraint SQL Server) được ghi chép đầy đủ kèm mã lỗi và hướng dẫn khắc phục chi tiết tại:
+👉 **[TROUBLESHOOTING_HISTORY.md](./TROUBLESHOOTING_HISTORY.md)**
+
+---
+*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*

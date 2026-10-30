@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -158,12 +159,6 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         throw new Error('Không nhận được token');
       }
 
-      if (typeof window !== 'undefined' && res.fingerprint_token) {
-        sessionStorage.setItem('qk7_fp_token', res.fingerprint_token);
-        if (fileId) {
-          sessionStorage.setItem(`qk7_fp_token_${fileId}`, res.fingerprint_token);
-        }
-      }
       setScore(res.score ?? null);
       setProgress(100);
       setPhase('success');
@@ -182,8 +177,19 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       const msg = err.message || 'Xác thực thất bại';
       const isAgentOffline = Boolean(err.data?.agent_offline);
       const isNeedsEnroll = Boolean(err.data?.needs_enroll);
+      const isTemplateCorrupted =
+        err.data?.code === 'TEMPLATE_DECRYPT_FAILED' ||
+        /Template vân tay bị hỏng/i.test(msg);
       const isCancelled =
         Boolean(err.data?.cancelled) || err.message === 'CANCELLED';
+
+      console.error('[FingerprintScanModal] ❌ Lỗi xác thực vân tay:', {
+        message: err.message,
+        code: err.data?.code,
+        details: err.data?.details,
+        purpose,
+        fileId,
+      });
 
       if (isCancelled) {
         if (retryCountRef.current < 1) {
@@ -211,6 +217,13 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         );
         setNeedsEnroll(true);
         setPhase('error');
+      } else if (isTemplateCorrupted) {
+        setError(
+          err.data?.details ||
+            'Template vân tay bị hỏng hoặc sai khóa mã hóa hệ thống. Cần đăng ký lại (re-enroll).'
+        );
+        setPhase('error');
+        setRetryExhausted(true);
       } else {
         const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
         setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
@@ -264,14 +277,19 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
 
   if (!open) return null;
 
-  return (
+  const modalNode = (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/30 dark:bg-black/50 backdrop-blur-md transition-all duration-300"
+        onClick={handleCancel}
+      >
         <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.94 }}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md mx-auto overflow-hidden shadow-2xl"
+          initial={{ opacity: 0, scale: 0.94, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 10 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+          className="bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-800/90 rounded-3xl w-full max-w-md mx-auto overflow-hidden shadow-2xl backdrop-blur-xl"
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -394,6 +412,10 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       </div>
     </AnimatePresence>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalNode, document.body)
+    : modalNode;
 };
 
 export default FingerprintScanModal;

@@ -87,16 +87,19 @@ def free_port(port: int):
         import subprocess
         res = subprocess.run(["netstat", "-ano"], capture_output=True, text=True)
         my_pid = str(os.getpid())
+        killed_any = False
         for line in res.stdout.splitlines():
             if f":{port}" in line and "LISTENING" in line:
                 parts = line.strip().split()
                 pid = parts[-1]
                 if pid != my_pid and pid != "0":
-                    print(f"[Agent] 🔄 Đóng tiến trình cũ (PID {pid}) đang chiếm cổng {port}...")
+                    print(f"[Agent] 🔄 Phát hiện PID {pid} đang chiếm cổng {port}. Đang kill để giải phóng...")
                     subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
-                    time.sleep(1)
-    except Exception:
-        pass
+                    killed_any = True
+        if killed_any:
+            time.sleep(1.2)
+    except Exception as e:
+        print(f"[Agent] ⚠️ Lỗi kiểm tra cổng {port}: {e}")
 
 
 def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None):
@@ -151,15 +154,23 @@ def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None)
         def log_message(self, *args):
             pass
 
-    try:
-        server = http.server.HTTPServer((host, port), Handler)
-        t = threading.Thread(target=server.serve_forever, daemon=True)
-        t.start()
-        print(f"[Agent] Device-id server: http://{host}:{port}/device-id")
-        return server
-    except OSError as e:
-        print(f"[Agent] ⚠️  Không mở được {host}:{port}: {e}.")
-        return None
+    server = None
+    for attempt in range(3):
+        try:
+            free_port(port)
+            server = http.server.HTTPServer((host, port), Handler)
+            t = threading.Thread(target=server.serve_forever, daemon=True)
+            t.start()
+            print(f"[Agent] Device-id server: http://{host}:{port}/device-id")
+            return server
+        except OSError as e:
+            if attempt < 2:
+                print(f"[Agent] ⚠️ Cổng {port} chưa sẵn sàng ({e}), đang thử kill và mở lại lần {attempt + 2}...")
+                free_port(port)
+                time.sleep(1.5)
+            else:
+                print(f"[Agent] ❌ Không mở được {host}:{port}: {e}.")
+                return None
 
 
 class FingerprintAgent:

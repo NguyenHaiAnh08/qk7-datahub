@@ -262,7 +262,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
     setAdminFpModalOpen(false);
     if (!finalToken) return;
     
-    // Lưu token thật vào sessionStorage
+    // Xóa sạch mọi token vân tay xem tài liệu còn sót lại từ các phiên trước
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('qk7_fp_token');
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('qk7_fp_token')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch (e) {}
+    }
+
+    // Lưu token đăng nhập thật vào sessionStorage
     sessionStorage.setItem('qk7_token', finalToken);
     
     try {

@@ -80,6 +80,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const canDownload = !document || (docLevel <= 2 && docLevel <= clearanceLevel);
   const isSecretLevel = docLevel >= 3;
 
+  const clearBiometricSession = () => {
+    setFingerprintToken(null);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('qk7_fp_token');
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('qk7_fp_token')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch (e) {}
+    }
+  };
+
   const loadPdfBlob = async (docId: string, fpToken?: string | null) => {
     if (!canView) {
       setError(`Cấp độ bảo mật của bạn (Cấp ${clearanceLevel}) không đủ điều kiện xem văn bản này.`);
@@ -87,10 +101,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       return;
     }
 
-    const storedToken = typeof window !== 'undefined'
-      ? (sessionStorage.getItem(`qk7_fp_token_${docId}`) || sessionStorage.getItem('qk7_fp_token'))
-      : null;
-    const effectiveToken = fpToken || fingerprintToken || storedToken;
+    // Biometric Guard: Chỉ dùng token vừa xác thực trong phiên modal hiện hành (in-memory)
+    // Tuyệt đối không đọc lại token cũ từ sessionStorage để chống vượt rào khi mở lại hoặc đổi file
+    const effectiveToken = fpToken || fingerprintToken;
 
     if (docLevel >= 3 && !effectiveToken) {
       setShowScanModal(true);
@@ -103,17 +116,17 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     try {
       const fileResult = await fileService.fetchFileBlobWithMeta(docId, '0', effectiveToken || undefined);
 
-      // Clock-Skew Guard: Kiểm tra chênh lệch thời gian máy trạm và máy chủ
-      const MAX_CLOCK_SKEW_MS = 3 * 60 * 1000; // 3 phút
-      if (fileResult.clockSkewMs > MAX_CLOCK_SKEW_MS) {
-        const skewMinutes = Math.round(fileResult.clockSkewMs / 60000);
-        if (docLevel >= 3) {
-          setError(
-            `CẢNH BÁO AN NINH: Đồng hồ máy trạm bị sai lệch ${skewMinutes} phút so với máy chủ chuẩn QK7. Hệ thống từ chối mở tài liệu Cấp ${docLevel} để ngăn ngừa hành vi làm sai lệch bằng chứng pháp lý. Vui lòng đồng bộ lại giờ máy trạm trước khi truy cập.`
-          );
-          setLoading(false);
-          return;
-        }
+      // Clock-Skew Guard: Kiểm tra chênh lệch thời gian máy trạm và máy chủ (Áp dụng cho TOÀN BỘ cấp độ tài liệu: Cấp 1 đến Cấp 5)
+      // Ngưỡng 60 giây (1 phút): Chặn đứng 100% mọi hành vi chỉnh lùi/tiến giờ có chủ đích mà không gây chặn nhầm do độ trễ mạng
+      const MAX_CLOCK_SKEW_MS = 60 * 1000; // 1 phút (60 giây)
+      if (fileResult.clockSkewMs > MAX_CLOCK_SKEW_MS || fileResult.isClockTampered) {
+        const skewSec = Math.max(1, Math.round(fileResult.clockSkewMs / 1000));
+        const skewStr = skewSec >= 60 ? `${Math.round(skewSec / 60)} phút` : `${skewSec} giây`;
+        setError(
+          `CẢNH BÁO AN NINH: Đồng hồ máy trạm bị sai lệch ${skewStr} so với máy chủ chuẩn QK7 (Phát hiện hành vi điều chỉnh lùi/tiến giờ hệ thống). Hệ thống từ chối mở tài liệu (${document.document_code} - Cấp ${docLevel}) để ngăn ngừa hành vi làm sai lệch bằng chứng pháp lý. Vui lòng đồng bộ lại giờ chuẩn trước khi truy cập.`
+        );
+        setLoading(false);
+        return;
       }
 
       const userDisplayName = formatUserDisplayName(user?.full_name, user?.username);
@@ -146,10 +159,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   useEffect(() => {
     if (open && document) {
-      const storedToken = typeof window !== 'undefined'
-        ? (sessionStorage.getItem(`qk7_fp_token_${document.file_id}`) || sessionStorage.getItem('qk7_fp_token'))
-        : null;
-      const tokenToUse = propInitialToken || storedToken;
+      // Khi mở modal, chỉ dùng propInitialToken nếu có, tuyệt đối không lấy token cũ từ sessionStorage.
+      // Đối với tài liệu Cấp 3+, fingerprintToken ban đầu là null nên sẽ kích hoạt quét vân tay ngay lập tức.
+      const tokenToUse = propInitialToken || null;
       setFingerprintToken(tokenToUse);
       loadPdfBlob(document.file_id, tokenToUse);
     } else {
@@ -160,7 +172,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       setError(null);
       setLoading(false);
       setShowScanModal(false);
-      setFingerprintToken(null);
+      clearBiometricSession();
     }
 
     return () => {
@@ -168,6 +180,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         if (prev) URL.revokeObjectURL(prev);
         return null;
       });
+      clearBiometricSession();
     };
     // eslint-disable-next-line
   }, [open, document?.file_id, clearanceLevel]);
@@ -246,6 +259,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   };
 
   const handleClose = () => {
+    clearBiometricSession();
     if (isFullscreen) {
       try {
         if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
@@ -418,43 +432,49 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           }`}
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
-            <div className="flex items-center space-x-3 overflow-hidden">
+            <div className="flex items-center space-x-3 overflow-hidden min-w-0 flex-1 mr-3">
               <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
                 <FileText className="w-5 h-5" />
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center space-x-2">
-                  <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                  <span
+                    className="font-mono text-xs font-semibold px-2 py-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 whitespace-nowrap shrink-0 inline-flex items-center"
+                    title={document.document_code}
+                  >
                     {document.document_code}
                   </span>
-                  <span className="text-slate-400 text-xs">•</span>
-                  <span className="text-xs text-slate-800 dark:text-slate-200 font-bold truncate">
+                  <span className="text-slate-400 text-xs shrink-0 select-none">•</span>
+                  <span
+                    className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-bold truncate min-w-0 flex-1"
+                    title={document.title}
+                  >
                     {document.title}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  <span className="flex items-center gap-1">
+                <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap sm:flex-nowrap">
+                  <span className="flex items-center gap-1 shrink-0">
                     <Building className="w-3 h-3 text-slate-400" />
                     {document.unit_name || '—'}
                   </span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 shrink-0">
                     <Calendar className="w-3 h-3 text-slate-400" />
                     {formatDate(document.issued_date || document.issue_date)}
                   </span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 shrink-0">
                     <Shield className="w-3 h-3 text-amber-500" />
                     {document.security_name || document.security_level_name || `Cấp ${document.security_level_id}`}
                   </span>
                   {isSecretLevel ? (
-                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap">
                       Chỉ xem trực tiếp (Mật)
                     </span>
                   ) : !canDownload ? (
-                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                      Chưa đủ quyền tải về
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap">
+                      Chỉ xem trực tiếp
                     </span>
                   ) : null}
-                  <span>{formatFileSize(document.file_size ?? document.file_size_bytes)}</span>
+                  <span className="shrink-0">{formatFileSize(document.file_size ?? document.file_size_bytes)}</span>
                 </div>
               </div>
             </div>
@@ -560,16 +580,10 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       <FingerprintScanModal
         key="fingerprint-scan-modal"
         open={showScanModal}
-        fileId={document?.file_id || ''}
+        fileId={document?.file_id || ""}
         onSuccess={(token) => {
           setShowScanModal(false);
-          const validToken = token || '';
-          if (validToken && typeof window !== 'undefined') {
-            sessionStorage.setItem('qk7_fp_token', validToken);
-            if (document?.file_id) {
-              sessionStorage.setItem(`qk7_fp_token_${document.file_id}`, validToken);
-            }
-          }
+          const validToken = token || "";
           setFingerprintToken(validToken || null);
           if (document) {
             loadPdfBlob(document.file_id, validToken || null);
@@ -577,6 +591,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         }}
         onCancel={() => {
           setShowScanModal(false);
+          clearBiometricSession();
           if (!blobUrl) {
             onClose();
           }

@@ -17,6 +17,7 @@ const rateLimit = require('express-rate-limit');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf } = require('./pdf-parser');
+const { getAuthoritativeServerTime, detectOsClockTamper } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 const createApprovalWorkflow = require('./src/approval-workflow');
 const { getAutoRequiredPermission } = require('./src/route-permissions');
@@ -144,7 +145,16 @@ app.use('/api/fingerprint/enroll', fingerprintLimiter);
 // ═══════════════════════════════════════════════════════════════
 // STATIC & SWAGGER
 // ═══════════════════════════════════════════════════════════════
-app.use(express.static(publicDir));
+app.use(express.static(publicDir, {
+  setHeaders: (res, filePath) => {
+    // Không cache file HTML để client luôn cập nhật phiên bản mới nhất ngay lập tức
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 const ENABLE_SWAGGER = (process.env.ENABLE_SWAGGER || 'true').toLowerCase() === 'true';
 if (ENABLE_SWAGGER) {
@@ -167,7 +177,10 @@ app.get('/favicon.ico', (req, res) => {
 
 app.get('/', (req, res) => {
   const p = path.join(publicDir, 'index.html');
-  if (fs.existsSync(p)) res.sendFile(p);
+  if (fs.existsSync(p)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(p);
+  }
   else res.status(404).send('Không tìm thấy public/index.html');
 });
 
@@ -422,11 +435,22 @@ function encryptTemplate(buffer) {
   const tag = cipher.getAuthTag();
   return 'enc:' + Buffer.concat([iv, tag, enc]).toString('base64');
 }
-function decryptTemplate(encoded) {
+function decryptTemplate(encoded, context = {}) {
   if (!encoded) return null;
-  if (!FP_ENC_KEY || !encoded.startsWith('enc:')) return Buffer.from(encoded, 'base64');
+  if (!FP_ENC_KEY || !encoded.startsWith('enc:')) {
+    try {
+      return Buffer.from(encoded, 'base64');
+    } catch (err) {
+      console.error(`[decryptTemplate] Lỗi parse base64 plain cho user=${context.userId || 'N/A'}:`, err.message);
+      return null;
+    }
+  }
   try {
     const buf = Buffer.from(encoded.slice(4), 'base64');
+    if (buf.length < 28) {
+      console.error(`[decryptTemplate] Dữ liệu mã hóa không đủ độ dài header (length=${buf.length} < 28)`, context);
+      return null;
+    }
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const enc = buf.subarray(28);
@@ -434,7 +458,11 @@ function decryptTemplate(encoded) {
     d.setAuthTag(tag);
     return Buffer.concat([d.update(enc), d.final()]);
   } catch (err) {
-    console.error('[decryptTemplate]', err.message);
+    console.error(`[decryptTemplate] ❌ Lỗi giải mã AES-256-GCM cho user=${context.userId || 'N/A'}:`, {
+      error: err.message,
+      reason: 'GCM Auth Tag thất bại — FP_ENC_KEY hiện tại trong .env không khớp với khóa đã mã hóa template này trong DB, hoặc dữ liệu đã bị biến đổi.',
+      action: context.action || 'VERIFY'
+    });
     return null;
   }
 }
@@ -456,12 +484,15 @@ async function checkIpBlocked(ip) {
 }
 
 async function writeLoginAttempt({ ip, username, result }) {
+  // DB check constraint CK_LA_RESULT: ([result]='LOCKED' OR [result]='USERNAME_NOT_FOUND' OR [result]='WRONG_PASSWORD' OR [result]='SUCCESS')
+  const allowed = ['LOCKED', 'USERNAME_NOT_FOUND', 'WRONG_PASSWORD', 'SUCCESS'];
+  const sanitizedResult = allowed.includes(result) ? result : (result.includes('FAIL') ? 'WRONG_PASSWORD' : 'SUCCESS');
   try {
     const pool = await getPool();
     await pool.request()
       .input('ip', sql.VarChar(50), ip)
       .input('username', sql.NVarChar(50), username || null)
-      .input('result', sql.VarChar(30), result)
+      .input('result', sql.VarChar(30), sanitizedResult)
       .query(`INSERT INTO LOGIN_ATTEMPT (ip, username, result) VALUES (@ip, @username, @result)`);
   } catch (err) { console.error('[writeLoginAttempt]', err.message); }
 }
@@ -548,13 +579,13 @@ app.post('/api/auth/login', async (req, res) => {
 
     // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
     // C
-    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
-      if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
-        await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
-        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
-        return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
-      }
-    }
+    // if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+    //   if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
+    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
+    //     await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
+    //     return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
+    //   }
+    // }
 
     if (user.status !== 'active') {
       await writeLoginAttempt({ ip, username, result: 'LOCKED' });
@@ -614,38 +645,40 @@ app.post('/api/auth/login', async (req, res) => {
       .input('uid', sql.VarChar(50), user.user_id)
       .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL, last_failed_at = NULL, status = 'active' WHERE user_id = @uid`);
 
-    // ✅ BƯỚC 2: NẾU LÀ ADMIN -> YÊU CẦU QUÉT VÂN TAY (Không cấp JWT ngay)
-    // COMMENT TOÀN BỘ if (user.user_id === PROTECTED_ADMIN_USER_ID) 1 LẦN KHI ADMIN TẠO TÀI KHOẢN LẦN ĐẦU
-    
+    // ✅ BƯỚC 2: NẾU LÀ ADMIN -> YÊU CẦU QUÉT VÂN TAY (2FA Biometric)
     if (user.user_id === PROTECTED_ADMIN_USER_ID) {
       const fpRes = await pool.request()
         .input('uid', sql.VarChar(50), user.user_id)
         .query(`SELECT template_enc FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
       
       if (fpRes.recordset.length === 0) {
-        await writeLoginAttempt({ ip, username, result: 'LOGIN_FAIL_FP' });
-        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_FAIL_FP', ip, note: 'Admin chưa đăng ký vân tay' });
-        return res.status(403).json({ error: 'Tài khoản Admin chưa được đăng ký vân tay. Không thể đăng nhập.' });
+        // Tài khoản Admin chưa đăng ký vân tay (hoặc vừa reset qua CLI): Cho phép login password để tiến hành enroll ngay
+        console.warn(`[SECURITY] ⚠️ Tài khoản Quản trị viên tối cao (${user.user_id}) chưa kích hoạt vân tay active. Cho phép đăng nhập mật khẩu để tiến hành enroll tại Quản lý Người dùng.`);
+        await writeAccessLog({
+          userId: user.user_id,
+          fileId: null,
+          action: 'LOGIN_NO_FP_WARNING',
+          ip,
+          note: 'Admin đăng nhập không qua 2FA vân tay (chưa enroll hoặc vừa reset) — Yêu cầu enroll ngay'
+        });
+      } else {
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
+
+        // Tạo vé tạm (Temp Ticket) có hạn 2 phút
+        const tempTicket = jwt.sign(
+          { user_id: user.user_id, purpose: 'admin_login_fp' },
+          JWT_SECRET,
+          { expiresIn: '2m' }
+        );
+
+        return res.status(202).json({
+          success: true,
+          require_admin_fp: true,
+          temp_ticket: tempTicket,
+          message: 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+        });
       }
-
-      await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
-
-      // Tạo vé tạm (Temp Ticket) có hạn 2 phút
-      const tempTicket = jwt.sign(
-        { user_id: user.user_id, purpose: 'admin_login_fp' },
-        JWT_SECRET,
-        { expiresIn: '2m' }
-      );
-
-      return res.status(202).json({
-        success: true,
-        require_admin_fp: true,
-        temp_ticket: tempTicket,
-        message: 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
-      });
     }
-
-    // COMMENT ĐẾN ĐÂY
 
 
     // User thường -> Cấp JWT và cho vào luôn
@@ -736,8 +769,25 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
       return res.status(403).json({ error: 'Chưa đăng ký vân tay.' });
     }
 
-    const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc);
-    if (!templateBuffer) return res.status(500).json({ error: 'Template vân tay bị hỏng.' });
+    const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc, {
+      userId: decoded.user_id,
+      action: 'ADMIN_LOGIN_2FA'
+    });
+    if (!templateBuffer) {
+      console.error(`[admin-fp-verify] ❌ Template vân tay của Admin (${decoded.user_id}) bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY.`);
+      await writeAccessLog({
+        userId: decoded.user_id,
+        fileId: null,
+        action: 'LOGIN_FAIL_FP',
+        ip,
+        note: 'Admin 2FA thất bại: Template vân tay bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY'
+      });
+      return res.status(500).json({
+        error: 'Template vân tay bị hỏng hoặc sai khóa mã hóa hệ thống.',
+        code: 'TEMPLATE_DECRYPT_FAILED',
+        details: 'Không thể giải mã template vân tay bằng khóa FP_ENC_KEY hiện tại. Vui lòng kiểm tra khóa bí mật hoặc enroll lại vân tay.'
+      });
+    }
     const templateB64 = templateBuffer.toString('base64');
 
     // 3. Gửi lệnh quét xuống Agent
@@ -914,9 +964,25 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
       return res.status(403).json({ error: 'Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên.', needs_enroll: true });
     }
 
-    const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc);
+    const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc, {
+      userId: req.user.user_id,
+      action: 'FILE_VERIFY',
+      fileId
+    });
     if (!templateBuffer || templateBuffer.length < 100) {
-      return res.status(500).json({ error: 'Template vân tay bị hỏng. Vui lòng enroll lại.' });
+      console.error(`[fingerprint/verify] ❌ Template vân tay của user (${req.user.user_id}) bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY.`);
+      await writeAccessLog({
+        userId: req.user.user_id,
+        fileId,
+        action: 'VERIFY_FAIL_FP',
+        ip: getClientIp(req),
+        note: 'Xác thực vân tay thất bại: Template vân tay bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY'
+      });
+      return res.status(500).json({
+        error: 'Template vân tay bị hỏng hoặc sai khóa mã hóa. Vui lòng enroll lại.',
+        code: 'TEMPLATE_DECRYPT_FAILED',
+        details: 'Không thể giải mã template vân tay bằng khóa FP_ENC_KEY hiện tại.'
+      });
     }
     const templateB64 = templateBuffer.toString('base64');
 
@@ -1760,12 +1826,24 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       action: isDownload ? 'DOWNLOAD' : 'VIEW', ip,
     });
 
-    const serverNow = new Date();
+    const serverNow = getAuthoritativeServerTime();
+    const tamper = detectOsClockTamper();
+    if (tamper.isTampered) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId: canonicalFileId,
+        action: 'CLOCK_TAMPER_ALERT', ip,
+        note: `CẢNH BÁO: Giờ hệ điều hành máy trạm bị sai lệch ${tamper.skewMinutes} phút so với giờ chuẩn máy chủ QK7.`,
+      });
+    }
+
     res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
     res.setHeader('Content-Disposition', `${isDownload ? 'attachment' : 'inline'}; filename="${encodeURIComponent(doc.original_name)}"`);
-    res.setHeader('Access-Control-Expose-Headers', 'X-Server-Time, X-Trace-Id, X-Clock-Timestamp, Content-Disposition');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Server-Time, X-Trace-Id, X-Clock-Timestamp, X-Clock-Tamper, Content-Disposition');
     res.setHeader('X-Server-Time', serverNow.toISOString());
     res.setHeader('X-Clock-Timestamp', serverNow.getTime().toString());
+    if (tamper.isTampered) {
+      res.setHeader('X-Clock-Tamper', '1');
+    }
     if (logId) {
       res.setHeader('X-Trace-Id', logId);
     }
@@ -1918,7 +1996,10 @@ app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs')) return next();
   const indexPath = path.join(publicDir, 'index.html');
-  if (fs.existsSync(indexPath)) res.sendFile(indexPath);
+  if (fs.existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(indexPath);
+  }
   else res.status(404).send('Không tìm thấy public/index.html');
 });
 

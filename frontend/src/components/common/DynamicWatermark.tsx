@@ -41,23 +41,21 @@ export const WATERMARK_4_POSITIONS = [
  * 
  * ĐẶC ĐIỂM:
  * 1. Tổng cộng 4 watermark được trải đều 4 khung dọc theo văn bản (18%, 38%, 62%, 82%).
- * 2. Định dạng chuẩn hóa: [Họ và tên] - [HH:mm - DD/MM/YYYY] [REF-MÃ_LOG].
- * 3. Chữ to bản, nghiêng -25 độ, nằm trọn vẹn trong khung A4, tuyệt đối không tràn ra ngoài nền đen.
+ * 2. Định dạng chuẩn hóa 1 hàng duy nhất: [Họ và tên] - [HH:mm - DD/MM/YYYY] (ví dụ: Lương Nhật Thắng - 11:04 - 30/10/2026).
+ * 3. Chữ thanh thoát, nằm trọn vẹn trong khung A4, tuyệt đối không tràn ra ngoài nền đen.
  * 4. Khóa chặt mọi vùng trang để chống chụp trộm hoặc cắt cúp tài liệu.
  */
 export const DynamicWatermark: React.FC<DynamicWatermarkProps> = ({
   customText,
   userName: propUserName,
   serverTime,
-  traceId,
   targetOpacity = 0.18,
   className = '',
 }) => {
   const { user } = useAuth();
   const timeStr = React.useMemo(() => formatWatermarkDateTime(serverTime || new Date()), [serverTime]);
   const displayName = formatUserDisplayName(propUserName || user?.full_name, user?.username);
-  const traceTag = traceId ? ` [${traceId}]` : '';
-  const watermarkText = customText || `${displayName} - ${timeStr}${traceTag}`;
+  const watermarkText = customText || `${displayName} - ${timeStr}`;
 
   return (
     <div

@@ -259,6 +259,18 @@ export const authService = {
    * XOÁ để tránh stale data.
    */
   saveSession: (user: User) => {
+    // Xóa sạch token vân tay cũ khi lưu phiên đăng nhập mới
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('qk7_fp_token');
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('qk7_fp_token')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch (e) {}
+    }
+
     // ─── Primary: full user JSON ───
     try {
       sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
@@ -290,6 +302,17 @@ export const authService = {
     Object.values(STORAGE_KEYS).forEach((key) => {
       sessionStorage.removeItem(key);
     });
+    // Xóa sạch toàn bộ token vân tay tài liệu còn lưu trong sessionStorage
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('qk7_fp_token');
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('qk7_fp_token')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch (e) {}
+    }
   },
 
   /**

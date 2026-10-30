@@ -1,6 +1,27 @@
 # Nhật Ký Thay Đổi Kỹ Thuật (CHANGELOG) — QK7 DataHub
 
-Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến và bản vá kỹ thuật cho phân hệ Trợ lý AI Boxchat (:8001) trong khuôn khổ nhiệm vụ hoàn thiện toàn diện hệ thống.
+Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá kỹ thuật và quy chuẩn vận hành của dự án QK7 DataHub.
+
+---
+
+## [v1.2.0-security-ecosystem-complete] — 2026-10-30
+
+### 1. Quy hoạch Hệ sinh thái 4 phân hệ số hóa cốt lõi
+- **Phân định rõ 4 trụ cột:** Dữ liệu số (đã hoàn thiện, đang vận hành), Bài giảng số (sắp phát triển), Thư viện số (sắp phát triển) và Học liệu số (sắp phát triển).
+- **Đồng bộ hóa tài liệu kiến trúc:** Cập nhật `README.md` và `SYSTEM_ARCHITECTURE.md` phản ánh đầy đủ mô hình hệ sinh thái số hóa quân sự.
+
+### 2. Tăng cường An ninh & Bảo mật Đa Tầng
+- **Dynamic Watermark chuẩn hóa:** Khắc phục lỗi chữ in nghiêng (*italic*), cố định font-style normal, căn chỉnh đồng đều các hàng, chống thao tác xóa watermark qua DevTools.
+- **Chốt chặn cứng 3 lớp khi lệch giờ máy trạm (Clock Authority Engine):** Đồng bộ giờ chuẩn tham chiếu máy chủ (Google / NTP); Gateway Middleware kiểm tra delta drift và từ chối `403 TIME_DRIFT_EXCEEDED` trên toàn bộ 5 cấp độ tài liệu (Cấp 1 - Công khai đến Cấp 5 - Tuyệt mật); phát sinh cảnh báo SOC mức `CRITICAL`.
+- **Xác thực 2FA Sinh trắc học Admin & Fail-Safe Initialization:** Bắt buộc quét vân tay ZK9500 với tài khoản Admin; Vé tạm JWT 2 phút; modal Frosted Glass render qua React Portal vào `document.body`; cơ chế fail-safe cho phép đăng nhập mật khẩu khi DB chưa có mẫu vân tay active để quản trị viên tiến hành khởi tạo mẫu mới.
+- **Admin IP Whitelist:** Giới hạn đăng nhập quyền Admin trong dải IP nội bộ và máy trạm kiểm soát; tự động khóa IP nếu dò quét mật khẩu.
+- **Chống spam Toast cảnh báo 403 (2s Throttle):** Tránh hiện tượng giật lag giao diện khi nhiều background polling request đồng thời bị từ chối quyền.
+- **Phân hệ Quản trị & Phiên làm việc:** Quản lý quân nhân phân trang 5 người/trang, tìm kiếm tiếng Việt không dấu; Cây đơn vị 6 tầng bảo vệ đơn vị mồ côi; Tự động ẩn Sidebar khi không có menu; Giám sát và ngắt phiên cưỡng bức (`/sessions`).
+- **Trích xuất PDF & Kiểm tra chống trùng lặp SHA-256:** Ngăn tải lên tài liệu trùng lặp, tự động đồng bộ vector Qdrant.
+
+### 3. Ban hành Quy chuẩn Phối hợp AI Agent & Sổ tay Sự cố
+- **Ban hành `AGENT_WORKFLOW.md`:** Quy định bắt buộc 3 bước (1. Khởi động & Đọc tài liệu $\rightarrow$ 2. Thực hiện tác vụ $\rightarrow$ 3. Cập nhật tài liệu sau hoàn thành).
+- **Biên soạn `TROUBLESHOOTING_HISTORY.md`:** Tổng hợp 13 sự cố kỹ thuật điển hình (ZKTeco DLL 32/64-bit, AES-GCM Auth tag, Check constraint SQL `CK_LA_RESULT`, Port conflict, Stacking context layout...) và phương án khắc phục dứt điểm.
 
 ---
 
@@ -74,20 +95,3 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến và bản v
 ### 9. Bàn Giao Vận Hành & Phát Hành Phiên Bản (Phase 6)
 - **Biên soạn Sổ tay Bàn giao:** Tạo `docs/HANDOVER_CHECKLIST.md` hướng dẫn toàn diện cho kíp trực SOC và quản trị viên hệ thống.
 - **Phát hành phiên bản chính thức:** Gắn thẻ tag git `v1.1.0-boxchat-complete`.
-
----
-
-## Technical Debt & Known Issues (Nợ Kỹ Thuật Cần Lưu Ý)
-
-### 1. Python Runtime từ WindowsApps
-- **Hiện trạng:** Hệ thống đang sử dụng Python từ Microsoft Store / WindowsApps:
-  ```
-  C:\Users\PC\AppData\Local\Microsoft\WindowsApps\python.exe
-  (Target thực tế: C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_..._x64__qbz5n2kfra8p0\python.exe)
-  ```
-- **Rủi ro kỹ thuật:**
-  - Python trong thư mục WindowsApps bị quản lý bởi cơ chế bảo vệ phân quyền UWP của Windows, có thể gây khó khăn khi tạo virtualenv độc lập hoặc cài đặt package C-extension cấp hệ thống.
-  - Mã hóa mặc định trên Windows PowerShell/CMD là `cp1252`, có thể gây lỗi `UnicodeEncodeError` khi in chuỗi tiếng Việt nếu không có cờ `reconfigure(encoding='utf-8')`.
-- **Khuyến nghị cho giai đoạn bảo trì dài hạn:**
-  - Trong môi trường bàn giao chính thức cho đơn vị, khuyến nghị cài đặt bộ Python 3.12 chuẩn từ `python.org` (ví dụ cài vào `C:\Python312`) và tạo virtual environment riêng (`.venv`) cho từng phân hệ backend / boxchat / local_agent.
-  - Hiện tại giữ nguyên để đảm bảo không gây gián đoạn hoặc breaking change cho các dịch vụ đang chạy.

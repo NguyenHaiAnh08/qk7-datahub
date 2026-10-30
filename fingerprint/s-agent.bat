@@ -80,11 +80,24 @@ if not exist "zk_service.py" (
     pause
     exit /b 1
 )
+REM ─── Tu dong dong bo thu vien DLL ZKTeco 64-bit ───
 if not exist "libzkfp.dll" (
-    echo [LOI] Khong tim thay libzkfp.dll
-    echo Copy tu: C:\Windows\System32\libzkfp.dll
-    pause
-    exit /b 1
+    if exist "C:\Windows\System32\libzkfp.dll" copy /y "C:\Windows\System32\libzkfp.dll" "libzkfp.dll" >nul 2>&1
+)
+if not exist "fpslib.dll" (
+    if exist "C:\Windows\System32\fpslib.dll" copy /y "C:\Windows\System32\fpslib.dll" "fpslib.dll" >nul 2>&1
+)
+if not exist "zkfinger10.dll" (
+    if exist "C:\Windows\System32\zkfinger10.dll" copy /y "C:\Windows\System32\zkfinger10.dll" "zkfinger10.dll" >nul 2>&1
+)
+if not exist "ZKFPCap.dll" (
+    if exist "C:\Windows\System32\ZKFPCap.dll" copy /y "C:\Windows\System32\ZKFPCap.dll" "ZKFPCap.dll" >nul 2>&1
+)
+if not exist "libzksensorcore.dll" (
+    if exist "C:\Windows\System32\libzksensorcore.dll" copy /y "C:\Windows\System32\libzksensorcore.dll" "libzksensorcore.dll" >nul 2>&1
+)
+if not exist "zkfpslibLow.dll" (
+    if exist "C:\Windows\System32\zkfpslibLow.dll" copy /y "C:\Windows\System32\zkfpslibLow.dll" "zkfpslibLow.dll" >nul 2>&1
 )
 
 REM ─── Sinh .env cho agent ───
@@ -142,6 +155,15 @@ echo   Bridge Token:  %T%...
 echo.
 echo   Tram kiem soat: http://127.0.0.1:%PORT_CLIENT_AGENT%/device-id
 echo.
+
+REM ─── Giai phong cong %PORT_CLIENT_AGENT% neu dang bi chiem ───
+for /f "tokens=5" %%p in ('netstat -a -n -o ^| findstr ":%PORT_CLIENT_AGENT% " ^| findstr "LISTENING"') do (
+    if not "%%p"=="0" (
+        echo [PORT %PORT_CLIENT_AGENT%] Phat hien PID %%p dang chiem cong %PORT_CLIENT_AGENT%. Dang kill de khoi dong sach se...
+        taskkill /F /PID %%p >nul 2>&1
+        timeout /t 1 >nul
+    )
+)
 
 echo ==========================================
 echo   Dang khoi dong Fingerprint Agent...

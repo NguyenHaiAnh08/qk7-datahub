@@ -6,6 +6,7 @@ export interface FileBlobResult {
   serverTime: Date;
   traceId?: string;
   clockSkewMs: number;
+  isClockTampered?: boolean;
 }
 
 export const fileService = {
@@ -28,13 +29,10 @@ export const fileService = {
     const url = fileService.getViewUrl(fileId, download);
 
     const headers: Record<string, string> = { ...getAuthHeaders() };
-    const effectiveToken =
-      fingerprintToken ||
-      (typeof window !== 'undefined'
-        ? sessionStorage.getItem(`qk7_fp_token_`) || sessionStorage.getItem('qk7_fp_token')
-        : undefined);
-    if (effectiveToken) {
-      headers['X-Fingerprint-Token'] = effectiveToken;
+    // Chỉ gửi X-Fingerprint-Token khi được truyền trực tiếp từ modal xác thực vân tay hiện hành
+    // Tuyệt đối không fallback sang sessionStorage để ngăn ngừa tái sử dụng token giữa các tài liệu
+    if (fingerprintToken) {
+      headers['X-Fingerprint-Token'] = fingerprintToken;
     }
 
     const response = await fetch(url, { headers, signal });
@@ -67,6 +65,7 @@ export const fileService = {
     const timestampStr = response.headers.get('x-clock-timestamp');
     const serverTimeStr = response.headers.get('x-server-time') || response.headers.get('date');
     const traceId = response.headers.get('x-trace-id') || undefined;
+    const isClockTampered = response.headers.get('x-clock-tamper') === '1';
 
     let serverTime: Date;
     if (timestampStr && !isNaN(Number(timestampStr))) {
@@ -85,6 +84,7 @@ export const fileService = {
       serverTime,
       traceId,
       clockSkewMs,
+      isClockTampered,
     };
   },
 

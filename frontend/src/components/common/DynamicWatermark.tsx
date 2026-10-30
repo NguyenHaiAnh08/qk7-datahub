@@ -12,6 +12,10 @@ export interface DynamicWatermarkProps {
   userName?: string;
   /** ID của tài liệu để làm mới kiểu dáng ngẫu nhiên khi chuyển văn bản */
   documentId?: string;
+  /** Thời gian chuẩn máy chủ NTP (chống giả mạo giờ máy trạm) */
+  serverTime?: Date;
+  /** Mã định danh truy vết duy nhất từ ACCESS_LOG (REF-...) */
+  traceId?: string;
   /** Mức độ mờ hiển thị (mặc định: 0.18, trong khoảng 0.15 - 0.22) */
   targetOpacity?: number;
   /** Tùy chọn class bổ sung */
@@ -37,18 +41,19 @@ export const WATERMARK_4_POSITIONS = [
  * 
  * ĐẶC ĐIỂM:
  * 1. Tổng cộng 4 watermark được trải đều 4 khung dọc theo văn bản (18%, 38%, 62%, 82%).
- * 2. Định dạng chuẩn hóa: [TÊN ĐẦY ĐỦ] - [HH:mm] - [DD/MM/YYYY] (Ví dụ: NGUYỄN MẠNH NAM - 09:10 - 29/10/2026).
- * 3. Chữ to bản, nghiêng -25 độ, nằm trọn vẹn trong khung A4, tuyệt đối không tràn ra ngoài nền đen.
+ * 2. Định dạng chuẩn hóa 1 hàng duy nhất: [Họ và tên] - [HH:mm - DD/MM/YYYY] (ví dụ: Lương Nhật Thắng - 11:04 - 30/10/2026).
+ * 3. Chữ thanh thoát, nằm trọn vẹn trong khung A4, tuyệt đối không tràn ra ngoài nền đen.
  * 4. Khóa chặt mọi vùng trang để chống chụp trộm hoặc cắt cúp tài liệu.
  */
 export const DynamicWatermark: React.FC<DynamicWatermarkProps> = ({
   customText,
   userName: propUserName,
+  serverTime,
   targetOpacity = 0.18,
   className = '',
 }) => {
   const { user } = useAuth();
-  const timeStr = React.useMemo(() => formatWatermarkDateTime(new Date()), []);
+  const timeStr = React.useMemo(() => formatWatermarkDateTime(serverTime || new Date()), [serverTime]);
   const displayName = formatUserDisplayName(propUserName || user?.full_name, user?.username);
   const watermarkText = customText || `${displayName} - ${timeStr}`;
 
@@ -71,7 +76,7 @@ export const DynamicWatermark: React.FC<DynamicWatermarkProps> = ({
               transform: 'translate(-50%, -50%) rotate(-25deg)',
               opacity: targetOpacity,
             }}
-            className={`absolute text-center whitespace-nowrap font-mono font-black select-none pointer-events-none drop-shadow-xs text-[#b91c1c] text-xs sm:text-sm md:text-base lg:text-[17px] tracking-wider ${className}`}
+            className={`absolute text-center whitespace-nowrap font-mono select-none pointer-events-none drop-shadow-xs text-[#b91c1c] text-xs sm:text-sm md:text-base lg:text-[17px] tracking-wider ${className}`}
           >
             {watermarkText}
           </div>

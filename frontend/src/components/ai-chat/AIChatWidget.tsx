@@ -67,12 +67,7 @@ export const AIChatWidget: React.FC = () => {
   const [previewPage, setPreviewPage] = useState<number>(1);
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
   // State lưu token vân tay đã xác thực trong phiên làm việc
-  const [fpToken, setFpToken] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('qk7_fp_token');
-    }
-    return null;
-  });
+  const [fpToken, setFpToken] = useState<string | null>(null);
   // Lưu câu hỏi gần nhất của user để auto-retry sau khi quét vân tay
   const [lastQuery, setLastQuery] = useState<string>('');
   const lastUserQueryRef = useRef<string>('');
@@ -246,12 +241,6 @@ export const AIChatWidget: React.FC = () => {
     setScanModalOpen(false);
     const validToken = token || '';
     if (validToken) {
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('qk7_fp_token', validToken);
-        if (targetScanFileId) {
-          sessionStorage.setItem(`qk7_fp_token_${targetScanFileId}`, validToken);
-        }
-      }
       setFpToken(validToken);
     }
 
@@ -723,8 +712,11 @@ export const AIChatWidget: React.FC = () => {
         open={previewOpen}
         document={previewDoc}
         page={previewPage}
-        initialToken={fpToken || (typeof window !== 'undefined' ? sessionStorage.getItem('qk7_fp_token') : null)}
-        onClose={() => setPreviewOpen(false)}
+        initialToken={fpToken}
+        onClose={() => {
+          setPreviewOpen(false);
+          setFpToken(null);
+        }}
       />
     </>
   );

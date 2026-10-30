@@ -101,12 +101,28 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const cleanBlob = await fileService.fetchFileBlob(docId, '0', effectiveToken || undefined);
+      const fileResult = await fileService.fetchFileBlobWithMeta(docId, '0', effectiveToken || undefined);
+
+      // Clock-Skew Guard: Kiểm tra chênh lệch thời gian máy trạm và máy chủ
+      const MAX_CLOCK_SKEW_MS = 3 * 60 * 1000; // 3 phút
+      if (fileResult.clockSkewMs > MAX_CLOCK_SKEW_MS) {
+        const skewMinutes = Math.round(fileResult.clockSkewMs / 60000);
+        if (docLevel >= 3) {
+          setError(
+            `CẢNH BÁO AN NINH: Đồng hồ máy trạm bị sai lệch ${skewMinutes} phút so với máy chủ chuẩn QK7. Hệ thống từ chối mở tài liệu Cấp ${docLevel} để ngăn ngừa hành vi làm sai lệch bằng chứng pháp lý. Vui lòng đồng bộ lại giờ máy trạm trước khi truy cập.`
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
       const userDisplayName = formatUserDisplayName(user?.full_name, user?.username);
-      const timeStr = formatWatermarkDateTime(new Date());
-      const blob = await stampWatermarkOnPdf(cleanBlob, {
+      // Sử dụng thời gian chuẩn từ máy chủ NTP (tuyệt đối không dùng new Date() của client)
+      const timeStr = formatWatermarkDateTime(fileResult.serverTime);
+      const blob = await stampWatermarkOnPdf(fileResult.blob, {
         userDisplayName,
         timeStr,
+        traceId: fileResult.traceId,
         opacity: 0.18,
       });
       const url = URL.createObjectURL(blob);

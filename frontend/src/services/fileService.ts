@@ -1,17 +1,30 @@
 import { getAuthHeaders, HttpError } from './http';
 import { API_ENDPOINTS } from '../constants/apiEndpoints';
 
+export interface FileBlobResult {
+  blob: Blob;
+  serverTime: Date;
+  traceId?: string;
+  clockSkewMs: number;
+}
+
 export const fileService = {
   getViewUrl: (fileId: string, download: '0' | '1' = '0'): string => {
-  return API_ENDPOINTS.FILES.VIEW(fileId, download);
+    return API_ENDPOINTS.FILES.VIEW(fileId, download);
   },
 
-  fetchFileBlob: async (
+  /**
+   * Tải blob tài liệu kèm siêu dữ liệu bảo mật từ Server:
+   * - serverTime: Giờ chuẩn từ máy chủ NTP (chống chỉnh lùi/tiến giờ Windows)
+   * - traceId: Mã vết truy xuất duy nhất (REF-...) gắn vào ACCESS_LOG
+   * - clockSkewMs: Độ lệch giữa giờ máy trạm và giờ máy chủ (dùng cho Clock-Skew Guard)
+   */
+  fetchFileBlobWithMeta: async (
     fileId: string,
     download: '0' | '1' = '0',
     fingerprintToken?: string,
     signal?: AbortSignal,
-  ): Promise<Blob> => {
+  ): Promise<FileBlobResult> => {
     const url = fileService.getViewUrl(fileId, download);
 
     const headers: Record<string, string> = { ...getAuthHeaders() };
@@ -48,7 +61,41 @@ export const fileService = {
       throw new HttpError(response.status, errorMsg as string, errorData, url);
     }
 
-    return await response.blob();
+    const blob = await response.blob();
+
+    // 1. Trích xuất thời gian máy chủ từ Header (chống giả mạo giờ hệ thống trên máy trạm)
+    const timestampStr = response.headers.get('x-clock-timestamp');
+    const serverTimeStr = response.headers.get('x-server-time') || response.headers.get('date');
+    const traceId = response.headers.get('x-trace-id') || undefined;
+
+    let serverTime: Date;
+    if (timestampStr && !isNaN(Number(timestampStr))) {
+      serverTime = new Date(Number(timestampStr));
+    } else if (serverTimeStr) {
+      serverTime = new Date(serverTimeStr);
+    } else {
+      serverTime = new Date();
+    }
+
+    // 2. Tính độ lệch giữa máy trạm và máy chủ
+    const clockSkewMs = Math.abs(Date.now() - serverTime.getTime());
+
+    return {
+      blob,
+      serverTime,
+      traceId,
+      clockSkewMs,
+    };
+  },
+
+  fetchFileBlob: async (
+    fileId: string,
+    download: '0' | '1' = '0',
+    fingerprintToken?: string,
+    signal?: AbortSignal,
+  ): Promise<Blob> => {
+    const res = await fileService.fetchFileBlobWithMeta(fileId, download, fingerprintToken, signal);
+    return res.blob;
   },
 
   saveBlobToFile: (blob: Blob, filename?: string): void => {

@@ -3,6 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 export interface WatermarkOptions {
   userDisplayName: string;
   timeStr: string;
+  traceId?: string;
   opacity?: number;
 }
 
@@ -29,14 +30,15 @@ export function generateWatermarkCanvasPng(
   const toTitleCase = (s: string) =>
     s ? s.toLowerCase().split(/\s+/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Sĩ Quan';
   const displayName = toTitleCase(options.userDisplayName);
-  const text = `${displayName} - ${options.timeStr}`;
+  const traceTag = options.traceId ? ` [${options.traceId}]` : '';
+  const text = `${displayName} - ${options.timeStr}${traceTag}`;
   const angle = -25 * (Math.PI / 180); // Nghiêng góc -25 độ chuẩn quân sự
 
   // 4 vị trí trải đều các khung từ trên xuống dưới
   const yPositions = [0.18, 0.38, 0.62, 0.82];
 
   // Font thường (không in đậm - normal), chuẩn sans-serif thanh thoát sắc nét
-  ctx.font = 'normal 26px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = 'normal 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.fillStyle = '#b91c1c';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

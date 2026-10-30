@@ -91,7 +91,9 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   hsts: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
 }));
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['X-Server-Time', 'X-Trace-Id', 'X-Clock-Timestamp', 'Content-Disposition'],
+}));
 app.use(express.json({ limit: '2mb' }));
 app.disable('x-powered-by');
 
@@ -274,7 +276,7 @@ function getClientIp(req) {
 async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
   try {
     const pool = await getPool();
-    const logId = 'LOG-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    const logId = 'REF-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const validUserId = (userId && userId !== 'GUEST' && userId !== 'UNKNOWN') ? userId : null;
     await pool.request()
       .input('log_id', sql.VarChar(50), logId)
@@ -285,6 +287,7 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
       .input('note', sql.NVarChar(255), note ? String(note).slice(0, 255) : null)
       .query(`INSERT INTO ACCESS_LOG (log_id, user_id, file_id, [action], ip, note)
               VALUES (@log_id, @user_id, @file_id, @action, @ip, @note)`);
+    return logId;
   } catch (err) {
     console.error('[writeAccessLog]', err.message);
   }
@@ -1752,13 +1755,20 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       return res.status(403).json({ error: 'Chỉ chấp nhận tệp PDF' });
     }
 
-    await writeAccessLog({
+    const logId = await writeAccessLog({
       userId: req.user.user_id, fileId: canonicalFileId,
       action: isDownload ? 'DOWNLOAD' : 'VIEW', ip,
     });
 
+    const serverNow = new Date();
     res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
     res.setHeader('Content-Disposition', `${isDownload ? 'attachment' : 'inline'}; filename="${encodeURIComponent(doc.original_name)}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'X-Server-Time, X-Trace-Id, X-Clock-Timestamp, Content-Disposition');
+    res.setHeader('X-Server-Time', serverNow.toISOString());
+    res.setHeader('X-Clock-Timestamp', serverNow.getTime().toString());
+    if (logId) {
+      res.setHeader('X-Trace-Id', logId);
+    }
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     console.error('[GET file view]', err);

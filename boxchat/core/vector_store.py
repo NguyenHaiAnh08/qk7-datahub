@@ -1,15 +1,29 @@
 """
-vector_store.py - Kho Vector & Bộ Tìm Kiếm Hybrid BM25 + Vector cho QK7 AI_BOXCHAT
+vector_store.py - Kho Vector & Bộ Tìm Kiếm Hybrid BM25 + Vector Qdrant cho QK7 AI_BOXCHAT
 Đảm bảo 100% Pre-filtering: security_level_id <= max_security_level.
-Hỗ trợ lưu trữ cục bộ tại local_storage/qdrant_data và chạy 100% Offline.
+Hỗ trợ embedding bge-m3 (1024-d) qua Ollama cục bộ, Qdrant collection qk7_documents_v2,
+thuật toán kết hợp Reciprocal Rank Fusion (RRF k=60) và khử trùng lặp nội dung.
 """
 
 import os
+import sys
 import json
 import math
 import re
-from typing import List, Dict, Any, Optional
+import uuid
+import hashlib
+from typing import List, Dict, Any, Optional, Set
 from collections import Counter
+
+# Đảm bảo in tiếng Việt trên console Windows không bị lỗi charmap
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
+import requests
 
 try:
     from qdrant_client import QdrantClient  # type: ignore
@@ -20,34 +34,99 @@ except (ImportError, ModuleNotFoundError):
 
 
 class HybridVectorStore:
-    COLLECTION_NAME = "qk7_documents"
+    COLLECTION_NAME = "qk7_documents_v2"
 
-    def __init__(self, storage_path: str = "./local_storage/qdrant_data"):
+    def __init__(
+        self,
+        storage_path: str = "./local_storage/qdrant_data",
+        ollama_url: str = "http://127.0.0.1:11434",
+        embed_model: str = "bge-m3"
+    ):
         self.storage_path = os.path.abspath(storage_path)
         os.makedirs(self.storage_path, exist_ok=True)
-        
+
         self.meta_store_file = os.path.join(self.storage_path, "metadata_chunks.json")
         self.chunks_cache: List[Dict[str, Any]] = []
-        
+
+        self.ollama_url = os.getenv("OLLAMA_BASE_URL", ollama_url).rstrip("/")
+        if "localhost" in self.ollama_url:
+            self.ollama_url = self.ollama_url.replace("localhost", "127.0.0.1")
+        self.embed_model = os.getenv("OLLAMA_EMBED_MODEL", embed_model)
+        # Tuple timeout (connect_timeout=1.5s, read_timeout=30.0s)
+        self.embed_timeout = (1.5, float(os.getenv("OLLAMA_EMBED_TIMEOUT", "30.0")))
+
+        # Cơ chế Circuit Breaker cho kết nối Ollama Embed
+        self.ollama_embed_available = True
+        self.last_circuit_break_time = 0.0
+
         # Nạp dữ liệu chunks hiện có
         self._load_meta_store()
 
+        self.last_search_mode = "bm25_only"
         self.qdrant_client = None
+        self.stale_lock_cleaned = False
         if HAS_QDRANT:
+            lock_path = os.path.join(self.storage_path, ".lock")
+            if os.path.exists(lock_path):
+                import subprocess
+                try:
+                    current_pid = os.getpid()
+                    check = subprocess.run(
+                        ['powershell', '-NoProfile', '-Command',
+                         f"Get-CimInstance Win32_Process -Filter \"Name LIKE 'python%'\" | "
+                         f"Where-Object {{ $_.ProcessId -ne {current_pid} -and ($_.CommandLine -like '*main.py*' -or $_.CommandLine -like '*uvicorn*') }} | "
+                         f"Select-Object -First 1 -ExpandProperty ProcessId"],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    other_pids = check.stdout.strip()
+                    if other_pids:
+                        print(f"[VectorStore] Qdrant đang được process khác sử dụng (PID: {other_pids}). KHÔNG xóa .lock.")
+                        self.qdrant_client = None
+                        return
+                except subprocess.TimeoutExpired:
+                    print("[VectorStore] Không check được process khác, KHÔNG xóa lock để an toàn")
+                    self.qdrant_client = None
+                    return
+                except Exception as check_err:
+                    print(f"[VectorStore] Lỗi kiểm tra process khác ({check_err}), KHÔNG xóa lock để an toàn")
+                    self.qdrant_client = None
+                    return
+
+                # Nếu không có process khác, xóa lock tồn dư
+                print(f"[VectorStore] Xóa lock tồn dư (đã xác nhận không có process khác): {lock_path}")
+                try:
+                    os.remove(lock_path)
+                    self.stale_lock_cleaned = True
+                except Exception as re:
+                    print(f"[VectorStore] Không xóa được lock: {re}")
+                    self.qdrant_client = None
+                    return
+
             try:
                 # Qdrant chế độ local file path
                 self.qdrant_client = QdrantClient(path=self.storage_path)
-                collections = self.qdrant_client.get_collections().collections
-                exists = any(c.name == self.COLLECTION_NAME for c in collections)
-                if not exists:
-                    # Dùng vector 128 chiều biểu diễn TF-IDF/Hash cho vector mode
-                    self.qdrant_client.create_collection(
-                        collection_name=self.COLLECTION_NAME,
-                        vectors_config=VectorParams(size=128, distance=Distance.COSINE)
-                    )
             except Exception as e:
-                print(f"[VectorStore] Qdrant local init notice (using fallback engine): {e}")
+                error_msg = str(e).lower()
+                # BẮT BUỘC: chỉ xử lý nếu là lock error
+                if "lock" not in error_msg and "already" not in error_msg:
+                    print(f"[VectorStore] Qdrant init failed (không phải lock): {e}")
+                    self.qdrant_client = None
+                    return
+
+                print(f"[VectorStore] Qdrant local init thất bại ({e}).")
                 self.qdrant_client = None
+
+            if self.qdrant_client:
+                try:
+                    collections = [c.name for c in self.qdrant_client.get_collections().collections]
+                    if self.COLLECTION_NAME not in collections:
+                        # Tạo collection mới qk7_documents_v2 với 1024 chiều (bge-m3)
+                        self.qdrant_client.create_collection(
+                            collection_name=self.COLLECTION_NAME,
+                            vectors_config=VectorParams(size=1024, distance=Distance.COSINE)
+                        )
+                except Exception as ce:
+                    print(f"[VectorStore] Qdrant collection check notice: {ce}")
 
     def _load_meta_store(self):
         if os.path.exists(self.meta_store_file):
@@ -65,28 +144,158 @@ class HybridVectorStore:
         except Exception as e:
             print(f"[VectorStore] Lỗi lưu {self.meta_store_file}: {e}")
 
+    def clear_all(self):
+        """
+        Làm sạch kho vector và metadata chunks để sẵn sàng re-index từ đầu.
+        """
+        self.chunks_cache = []
+        self._save_meta_store()
+        if self.qdrant_client and HAS_QDRANT:
+            try:
+                collections = [c.name for c in self.qdrant_client.get_collections().collections]
+                if self.COLLECTION_NAME in collections:
+                    self.qdrant_client.delete_collection(self.COLLECTION_NAME)
+                self.qdrant_client.create_collection(
+                    collection_name=self.COLLECTION_NAME,
+                    vectors_config=VectorParams(size=1024, distance=Distance.COSINE)
+                )
+                print(f"[VectorStore] Đã tạo mới collection Qdrant '{self.COLLECTION_NAME}' (1024-d).")
+            except Exception as e:
+                print(f"[VectorStore] clear_all notice: {e}")
+
+    def _get_embeddings(self, texts: List[str]) -> Optional[List[List[float]]]:
+        """
+        Gọi API Ollama /api/embed để trích xuất vector bge-m3 (1024 chiều).
+        Hỗ trợ fallback sang /api/embeddings nếu là phiên bản Ollama cũ.
+        Timeout (connect=1.5s, read=30.0s). Kèm Circuit Breaker 30 giây khi mất kết nối TCP.
+        Trả về None nếu không kết nối được để Graceful Degradation.
+        """
+        if not texts:
+            return []
+
+        # Circuit Breaker: nếu Ollama vừa mất kết nối, tạm ngừng gọi trong 30s
+        import time
+        now = time.time()
+        if not self.ollama_embed_available:
+            if now - self.last_circuit_break_time < 30.0:
+                return None
+            self.ollama_embed_available = True
+
+        try:
+            # 1. Thử Ollama /api/embed (chuẩn từ v0.1.34+)
+            payload = {
+                "model": self.embed_model,
+                "input": texts
+            }
+            resp = requests.post(
+                f"{self.ollama_url}/api/embed",
+                json=payload,
+                timeout=self.embed_timeout
+            )
+            if resp.status_code == 200:
+                self.ollama_embed_available = True
+                data = resp.json()
+                embeddings = data.get("embeddings")
+                if embeddings and len(embeddings) == len(texts):
+                    return embeddings
+
+            # 2. Fallback sang /api/embeddings (chạy từng đoạn nếu /api/embed trả 404)
+            if resp.status_code == 404:
+                embeddings = []
+                for t in texts:
+                    old_payload = {"model": self.embed_model, "prompt": t}
+                    r_old = requests.post(
+                        f"{self.ollama_url}/api/embeddings",
+                        json=old_payload,
+                        timeout=self.embed_timeout
+                    )
+                    if r_old.status_code == 200:
+                        embeddings.append(r_old.json().get("embedding", []))
+                    else:
+                        return None
+                if len(embeddings) == len(texts):
+                    self.ollama_embed_available = True
+                    return embeddings
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            # Kích hoạt Circuit Breaker trong 30s khi lỗi kết nối mạng
+            self.ollama_embed_available = False
+            self.last_circuit_break_time = time.time()
+        except Exception:
+            pass
+        return None
+
     def add_chunks(self, chunks: List[Dict[str, Any]]) -> int:
         """
         Nạp mảng chunks vào kho vector và metadata store.
-        Mỗi chunk bắt buộc có: file_id, document_code, title, security_level_id, page, text.
+        - Xóa toàn bộ các chunk cũ có cùng file_id trong chunks_cache và trong Qdrant qk7_documents_v2.
+        - Gọi Ollama /api/embed theo batch để lấy vector 1024 chiều và upsert vào Qdrant kèm payload.
+        - Nếu Ollama /api/embed không phản hồi, vẫn lưu chunks_cache (Graceful Degradation).
         """
         if not chunks:
             return 0
 
-        # Xóa các chunk cũ cùng file_id để tránh trùng lặp khi re-index
-        incoming_file_ids = set(c["file_id"] for c in chunks)
+        incoming_file_ids = set(c["file_id"] for c in chunks if "file_id" in c)
+
+        # 1. Xóa các chunk cũ cùng file_id trong Qdrant (qk7_documents_v2)
+        if self.qdrant_client and incoming_file_ids:
+            for fid in incoming_file_ids:
+                try:
+                    self.qdrant_client.delete(
+                        collection_name=self.COLLECTION_NAME,
+                        points_selector=Filter(
+                            must=[FieldCondition(key="file_id", match=MatchValue(value=fid))]
+                        )
+                    )
+                except Exception as e:
+                    print(f"[VectorStore] Qdrant delete notice cho file_id {fid}: {e}")
+
+        # 2. Xóa các chunk cũ cùng file_id trong chunks_cache
         self.chunks_cache = [c for c in self.chunks_cache if c.get("file_id") not in incoming_file_ids]
 
-        added_count = 0
-        for idx, chunk in enumerate(chunks):
+        # 3. Chuẩn bị chunks chuẩn hóa
+        normalized_chunks = []
+        for chunk in chunks:
             chunk_copy = dict(chunk)
             chunk_copy["security_level_id"] = int(chunk_copy.get("security_level_id", 1))
             chunk_copy["page"] = int(chunk_copy.get("page", 1))
-            self.chunks_cache.append(chunk_copy)
-            added_count += 1
+            chunk_copy["bbox"] = chunk_copy.get("bbox") or [0, 0, 0, 0]
+            chunk_copy["section_title"] = chunk_copy.get("section_title", "")
+            normalized_chunks.append(chunk_copy)
 
+        # 4. Upsert vào Qdrant theo batch
+        if self.qdrant_client:
+            batch_size = 16
+            for i in range(0, len(normalized_chunks), batch_size):
+                batch = normalized_chunks[i:i + batch_size]
+                batch_texts = [b.get("text", "") for b in batch]
+                embeddings = self._get_embeddings(batch_texts)
+
+                if embeddings and len(embeddings) == len(batch):
+                    points = []
+                    for c_item, vec in zip(batch, embeddings):
+                        # Sinh UUIDv5 xác định từ chunk_id để chống trùng lặp điểm
+                        pt_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(c_item["chunk_id"])))
+                        payload = {
+                            "chunk_id": c_item["chunk_id"],
+                            "file_id": c_item["file_id"],
+                            "document_code": c_item.get("document_code", ""),
+                            "title": c_item.get("title", ""),
+                            "security_level_id": int(c_item.get("security_level_id", 1)),
+                            "page": int(c_item.get("page", 1)),
+                            "bbox": c_item.get("bbox", [0, 0, 0, 0]),
+                            "section_title": c_item.get("section_title", ""),
+                            "text": c_item.get("text", "")
+                        }
+                        points.append(PointStruct(id=pt_id, vector=vec, payload=payload))
+                    try:
+                        self.qdrant_client.upsert(collection_name=self.COLLECTION_NAME, points=points)
+                    except Exception as e:
+                        print(f"[VectorStore] Qdrant upsert notice: {e}")
+
+        # 5. Lưu vào chunks_cache (đảm bảo BM25 hoạt động dù Ollama offline)
+        self.chunks_cache.extend(normalized_chunks)
         self._save_meta_store()
-        return added_count
+        return len(normalized_chunks)
 
     def get_total_chunks(self) -> int:
         return len(self.chunks_cache)
@@ -111,31 +320,146 @@ class HybridVectorStore:
         top_k: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        Tìm kiếm với PRE-FILTERING BẢO MẬT TUYỆT ĐỐI:
-        1. Lọc cứng: security_level_id <= max_security_level
-        2. Nếu có file_id: lọc thêm file_id == file_id
-        3. Tính điểm Hybrid BM25 + Từ khóa trọng yếu + n-gram
+        Tìm kiếm Hybrid (Vector Qdrant 1024-d + BM25 + RRF) với BẢO MẬT TUYỆT ĐỐI:
+        1. Pre-filtering cả 2 nhánh: security_level_id <= max_security_level.
+        2. Nhánh Vector: top 15 qua Qdrant với query_filter Range(lte=max_security_level).
+        3. Nhánh BM25: top 15 từ chunks_cache đã lọc cấp độ mật.
+        4. Reciprocal Rank Fusion (RRF, k=60).
+        5. Khử trùng lặp nội dung (Content Deduplication qua SHA-256 text đã normalize).
         """
         if not query or not query.strip():
             return []
 
-        # PRE-FILTERING: Chỉ lấy chunks nằm trong giới hạn cấp phép
-        allowed_chunks = []
+        max_security_level = int(max_security_level)
+        self.last_search_mode = "bm25_only"
+
+        # --- NHÁNH 1: BM25 SEARCH (TOP 15) ---
+        bm25_candidates = []
         for c in self.chunks_cache:
             sec_lvl = int(c.get("security_level_id", 1))
-            if sec_lvl <= int(max_security_level):
+            if sec_lvl <= max_security_level:
                 if file_id:
                     if c.get("file_id") == file_id:
-                        allowed_chunks.append(c)
+                        bm25_candidates.append(c)
                 else:
-                    allowed_chunks.append(c)
+                    bm25_candidates.append(c)
 
-        if not allowed_chunks:
+        bm25_top15 = []
+        if bm25_candidates:
+            bm25_top15 = self._rank_bm25(query, bm25_candidates, top_k=15)
+
+        # --- NHÁNH 2: QDRANT VECTOR SEARCH (TOP 15) ---
+        vector_top15 = []
+        if self.qdrant_client:
+            try:
+                query_vecs = self._get_embeddings([query.strip()])
+                if query_vecs and len(query_vecs) == 1 and query_vecs[0]:
+                    # Pre-filtering nghiêm ngặt tại tầng vector
+                    must_conds = [
+                        FieldCondition(
+                            key="security_level_id",
+                            range=Range(lte=max_security_level)
+                        )
+                    ]
+                    if file_id:
+                        must_conds.append(
+                            FieldCondition(key="file_id", match=MatchValue(value=file_id))
+                        )
+                    q_filter = Filter(must=must_conds)
+
+                    # Truy vấn điểm vector
+                    if hasattr(self.qdrant_client, "query_points"):
+                        res = self.qdrant_client.query_points(
+                            collection_name=self.COLLECTION_NAME,
+                            query=query_vecs[0],
+                            query_filter=q_filter,
+                            limit=15
+                        )
+                        pts = res.points if hasattr(res, "points") else res
+                    elif hasattr(self.qdrant_client, "search"):
+                        pts = self.qdrant_client.search(
+                            collection_name=self.COLLECTION_NAME,
+                            query_vector=query_vecs[0],
+                            query_filter=q_filter,
+                            limit=15
+                        )
+                    else:
+                        pts = []
+
+                    for pt in pts:
+                        payload = dict(pt.payload or {})
+                        # Đảm bảo phòng thủ chiều sâu (Defense-in-depth)
+                        if int(payload.get("security_level_id", 1)) <= max_security_level:
+                            payload["vector_score"] = float(pt.score) if hasattr(pt, "score") else 0.0
+                            vector_top15.append(payload)
+
+                    if vector_top15:
+                        self.last_search_mode = "hybrid"
+            except Exception:
+                # Nếu vector search lỗi, giữ nguyên bm25_only
+                pass
+
+        # --- RRF FUSION (k=60) ---
+        rrf_k = 60
+        scores: Dict[str, float] = {}
+        chunk_map: Dict[str, Dict[str, Any]] = {}
+
+        # Chấm điểm từ BM25
+        for rank_idx, item in enumerate(bm25_top15):
+            cid = str(item.get("chunk_id", f"{item.get('file_id')}_{rank_idx}"))
+            rrf_score = 1.0 / (rrf_k + rank_idx + 1)
+            scores[cid] = scores.get(cid, 0.0) + rrf_score
+            if cid not in chunk_map:
+                chunk_map[cid] = dict(item)
+
+        # Chấm điểm từ Vector
+        for rank_idx, item in enumerate(vector_top15):
+            cid = str(item.get("chunk_id", f"{item.get('file_id')}_{rank_idx}"))
+            rrf_score = 1.0 / (rrf_k + rank_idx + 1)
+            scores[cid] = scores.get(cid, 0.0) + rrf_score
+            if cid not in chunk_map:
+                chunk_map[cid] = dict(item)
+
+        if not scores:
             return []
 
-        # Chấm điểm Hybrid BM25 + Token Re-ranking
-        ranked_results = self._rank_bm25(query, allowed_chunks, top_k=top_k)
-        return ranked_results
+        # Sắp xếp theo điểm RRF giảm dần
+        sorted_chunk_ids = sorted(scores.keys(), key=lambda cid: scores[cid], reverse=True)
+
+        # --- KHỬ TRÙNG LẶP NỘI DUNG (Content Deduplication) ---
+        # Nếu 2 chunk từ 2 file copy khác nhau có nội dung chuẩn hóa giống hệt nhau (trùng SHA-256),
+        # chỉ giữ lại 1 chunk có điểm cao nhất
+        seen_content_hashes: Set[str] = set()
+        final_results = []
+
+        for cid in sorted_chunk_ids:
+            chunk_data = chunk_map[cid]
+            # Defense-in-depth: Lọc cấp mật lần 3
+            if int(chunk_data.get("security_level_id", 1)) > max_security_level:
+                continue
+
+            text = chunk_data.get("text", "")
+            norm_text = re.sub(r'\s+', ' ', text.strip().lower())
+            content_hash = hashlib.sha256(norm_text.encode('utf-8')).hexdigest()
+
+            if content_hash in seen_content_hashes:
+                continue
+
+            seen_content_hashes.add(content_hash)
+            chunk_out = dict(chunk_data)
+            chunk_out["score"] = round(scores[cid], 5)
+            chunk_out["rrf_score"] = round(scores[cid], 5)
+            final_results.append(chunk_out)
+
+            if len(final_results) >= top_k:
+                break
+
+        # Defense-in-depth: Đảm bảo 100% không có chunk nào vượt max_security_level lọt qua
+        safe_results = [
+            c for c in final_results
+            if int(c.get("security_level_id", 1)) <= max_security_level
+        ]
+        return safe_results
 
     def _rank_bm25(self, query: str, candidates: List[Dict[str, Any]], top_k: int = 5) -> List[Dict[str, Any]]:
         """

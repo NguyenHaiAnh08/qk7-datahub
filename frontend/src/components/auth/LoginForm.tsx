@@ -23,6 +23,7 @@ import { User } from '../../types/user';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../routes/routePaths';
 import { NotchedInput } from './NotchedInput';
+import { FingerprintScanModal } from '../users/FingerprintScanModal';
 
 export interface LoginFormProps {
   onSuccess?: (user: User) => void;
@@ -30,7 +31,7 @@ export interface LoginFormProps {
   isSplitDeck?: boolean;
 }
 
-export type DemoRoleKey = 'canbo' | 'thuky' | 'vanthu' | 'coyeu' | 'it' | 'admin';
+export type DemoRoleKey = 'chihuy' | 'coyeu' | 'troly' | 'vanthu' | 'it' | 'admin';
 
 export const DEMO_ACCOUNTS: Record<
   DemoRoleKey,
@@ -42,39 +43,39 @@ export const DEMO_ACCOUNTS: Record<
     roleName: string;
   }
 > = {
-  canbo: {
-    id: 'USR-004',
+  chihuy: {
+    id: 'USR-002',
     title: 'Chỉ huy',
-    subtitle: 'Cấp 2 • Nội bộ',
-    label: 'Chỉ huy (USR-004 - Cấp 2)',
+    subtitle: 'Cấp 5 • Tuyệt Mật',
+    label: 'Chỉ huy - Lương Nhật Thăng (USR-002 - Cấp 5)',
     roleName: 'Chỉ huy',
   },
-  thuky: {
+  coyeu: {
     id: 'USR-003',
+    title: 'Cơ yếu',
+    subtitle: 'Cấp 5 • Tuyệt Mật',
+    label: 'Cơ yếu - Phạm Trường Sơn (USR-003 - Cấp 5)',
+    roleName: 'Cơ yếu',
+  },
+  troly: {
+    id: 'USR-004',
     title: 'Trợ lý',
-    subtitle: 'Cấp 4 • Tối Mật',
-    label: 'Trợ lý (USR-003 - Cấp 4)',
+    subtitle: 'Cấp 2 • Nội bộ',
+    label: 'Trợ lý - Nguyễn Xuân Thanh (USR-004 - Cấp 2)',
     roleName: 'Trợ lý',
   },
   vanthu: {
     id: 'USR-005',
     title: 'Văn thư',
     subtitle: 'Cấp 3 • Mật',
-    label: 'Cán bộ Văn thư (USR-005 - Cấp 3)',
+    label: 'Cán bộ Văn thư - Trần Thị Ánh Tuyết (USR-005 - Cấp 3)',
     roleName: 'Văn thư',
-  },
-  coyeu: {
-    id: 'USR-002',
-    title: 'Cơ yếu',
-    subtitle: 'Cấp 5 • Tuyệt Mật',
-    label: 'Cán bộ Cơ yếu (USR-002 - Cấp 5)',
-    roleName: 'Cơ yếu',
   },
   it: {
     id: 'USR-006',
     title: 'Nhân viên IT',
-    subtitle: 'Cấp 1 • Công khai',
-    label: 'Nhân viên IT (USR-006 - Cấp 1)',
+    subtitle: 'Cấp 1 • Công khai • Kỹ thuật hệ thống',
+    label: 'Nhân viên IT - Nguyễn Hải Anh (USR-006 - Cấp 1)',
     roleName: 'Nhân viên IT',
   },
   admin: {
@@ -88,13 +89,17 @@ export const DEMO_ACCOUNTS: Record<
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSplitDeck = false }) => {
   const navigate = useNavigate();
-  const { login, continueAsGuest: authContinueAsGuest } = useAuth();
+  const { continueAsGuest: authContinueAsGuest, saveUserSession } = useAuth(); 
   const isDev = import.meta.env.DEV;
   const [username, setUsername] = useState(isDev ? 'USR-001' : '');
   const [password, setPassword] = useState(isDev ? '123456789' : '');
   const [selectedRole, setSelectedRole] = useState<DemoRoleKey | null>(isDev ? 'admin' : null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // ✅ States phục vụ luồng xác thực vân tay Admin (2FA)
+  const [adminFpModalOpen, setAdminFpModalOpen] = useState(false);
+  const [tempTicket, setTempTicket] = useState('');
 
   // States quản lý lỗi và rung lắc (Shake UX #025) cho từng ô
   const [usernameError, setUsernameError] = useState('');
@@ -108,9 +113,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
     if (passwordError) setPasswordError('');
     const upper = val.trim().toUpperCase();
     if (upper === 'USR-001') setSelectedRole('admin');
-    else if (upper === 'USR-002') setSelectedRole('coyeu');
-    else if (upper === 'USR-003') setSelectedRole('thuky');
-    else if (upper === 'USR-004') setSelectedRole('canbo');
+    else if (upper === 'USR-002') setSelectedRole('chihuy');
+    else if (upper === 'USR-003') setSelectedRole('coyeu');
+    else if (upper === 'USR-004') setSelectedRole('troly');
     else if (upper === 'USR-005') setSelectedRole('vanthu');
     else if (upper === 'USR-006') setSelectedRole('it');
     else setSelectedRole(null);
@@ -160,7 +165,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
     setLoading(true);
 
     try {
-      const loggedInUser = await login(username, password);
+      // ✅ SỬ DỤNG authService.login TRỰC TIẾP ĐỂ BẮT ĐƯỢC RESPONSE 202
+      const res: any = await authService.login(username, password);
+
+      // ✅ NẾU BACKEND YÊU CẦU VÂN TAY (Mã 202)
+      if (res && res.require_admin_fp) {
+        setTempTicket(res.temp_ticket);
+        setAdminFpModalOpen(true); // Mở Modal quét vân tay
+        setLoading(false);
+        return;
+      }
+
+      // Nếu login bình thường, lấy thông tin user
+      const loggedInUser = await authService.getMe();
+
+      saveUserSession(loggedInUser); 
 
       if (onToast) {
         onToast(`Xin chào ${loggedInUser.full_name} (${loggedInUser.clearance_name || 'Đã xác thực'})`, 'success');
@@ -238,7 +257,50 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
     }
   };
 
-    const handleContinueAsGuest = () => {
+  // ✅ HÀM XỬ LÝ KHI QUÉT VÂN TAY ADMIN THÀNH CÔNG
+  const handleAdminFpSuccess = async (finalToken: string) => {
+    setAdminFpModalOpen(false);
+    if (!finalToken) return;
+    
+    // Xóa sạch mọi token vân tay xem tài liệu còn sót lại từ các phiên trước
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('qk7_fp_token');
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('qk7_fp_token')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch (e) {}
+    }
+
+    // Lưu token đăng nhập thật vào sessionStorage
+    sessionStorage.setItem('qk7_token', finalToken);
+    
+    try {
+      const me = await authService.getMe();
+      
+      saveUserSession(me);
+
+      if (onToast) onToast('Xác thực vân tay Quản trị viên thành công!', 'success');
+      
+      if (onSuccess) {
+        onSuccess(me);
+      } else {
+        setTimeout(() => {
+          if (isUserAdmin(me)) {
+            navigate(ROUTE_PATHS.ADMIN, { replace: true });
+          } else {
+            navigate(getDestinationByRole(me), { replace: true });
+          }
+        }, 500);
+      }
+    } catch (err: any) {
+      if (onToast) onToast('Lỗi khi lấy thông tin người dùng sau khi xác thực: ' + err.message, 'error');
+    }
+  };
+
+  const handleContinueAsGuest = () => {
     if (onToast) onToast('Đang chuyển hướng chế độ Đại biểu (Dữ liệu công khai)...', 'info');
     authContinueAsGuest();
   };
@@ -249,229 +311,245 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   // ══════════════════════════════════════════════════════════════════════
   if (isSplitDeck) {
     return (
-      <form onSubmit={handleLoginSubmit} className="w-full">
-        <div className="grid grid-cols-12 gap-6 items-stretch">
-          {/* CỘT TRÁI (col-span-7): Tiêu đề nhỏ + Form nhập + Nút đăng nhập + Khách */}
-          <div className="col-span-7 flex flex-col justify-between space-y-3.5">
-            {/* Header gọn */}
-            <div className="flex items-center gap-3">
-              <img
-                src="/Logo_QSQK7.png"
-                alt="Logo Trường Quân Sự Quân Khu 7"
-                style={{ aspectRatio: '1074 / 1465' }}
-                className="h-12 w-auto object-contain shrink-0 drop-shadow-md"
+      <>
+        <form onSubmit={handleLoginSubmit} className="w-full">
+          <div className="grid grid-cols-12 gap-6 items-stretch">
+            {/* CỘT TRÁI (col-span-7): Tiêu đề nhỏ + Form nhập + Nút đăng nhập + Khách */}
+            <div className="col-span-7 flex flex-col justify-between space-y-3.5">
+              {/* Header gọn */}
+              <div className="flex items-center gap-3">
+                <img
+                  src="/Logo_QSQK7.png"
+                  alt="Logo Trường Quân Sự Quân Khu 7"
+                  style={{ aspectRatio: '1074 / 1465' }}
+                  className="h-12 w-auto object-contain shrink-0 drop-shadow-md"
+                />
+                <div>
+                  <h1 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                    Đăng nhập
+                  </h1>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Hệ Thống Quản Lý Dữ Liệu Tập Trung
+                  </p>
+                </div>
+              </div>
+
+              {/* Input Tài khoản quân nhân */}
+              <NotchedInput
+                id="username-split"
+                label="Tài khoản quân nhân"
+                value={username}
+                onChange={handleUsernameChange}
+                icon={<UserIcon className="w-4 h-4" />}
+                errorMessage={usernameError}
+                shakeKey={usernameShake}
+                compact={true}
+                required
               />
+
+              {/* Input Mật khẩu */}
+              <NotchedInput
+                id="password-split"
+                label="Mật khẩu"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={handlePasswordChange}
+                icon={<Lock className="w-4 h-4" />}
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                    title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                }
+                errorMessage={passwordError}
+                shakeKey={passwordShake}
+                compact={true}
+                required
+              />
+
+              {/* Nút Đăng nhập */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-semibold text-xs shadow-md shadow-emerald-950/20 border border-amber-500/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang xác thực thông tin...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4" />
+                    <span>Đăng Nhập Hệ Thống</span>
+                  </>
+                )}
+              </button>
+
+              {/* Nút Khách Tra Cứu */}
+              <button
+                type="button"
+                onClick={handleContinueAsGuest}
+                className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 font-medium text-xs border border-slate-200 dark:border-slate-700/60 transition cursor-pointer"
+              >
+                Đại biểu (Dữ liệu công khai)
+              </button>
+            </div>
+
+            {/* CỘT PHẢI (col-span-5): 6 Thẻ Chọn Nhanh Tài Khoản Kiểm Thử */}
+            <div className="col-span-5 flex flex-col justify-between border-l border-slate-200 dark:border-slate-800/80 pl-6 space-y-2">
               <div>
-                <h1 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-                  Đăng nhập
-                </h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Hệ Thống Quản Lý Dữ Liệu Tập Trung
-                </p>
-              </div>
-            </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">
+                  <span className="font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+                    Tài khoản kiểm thử nhanh
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">Pass: 123456789</span>
+                </div>
 
-            {/* Input Tài khoản quân nhân */}
-            <NotchedInput
-              id="username-split"
-              label="Tài khoản quân nhân"
-              value={username}
-              onChange={handleUsernameChange}
-              icon={<UserIcon className="w-4 h-4" />}
-              errorMessage={usernameError}
-              shakeKey={usernameShake}
-              compact={true}
-              required
-            />
-
-            {/* Input Mật khẩu */}
-            <NotchedInput
-              id="password-split"
-              label="Mật khẩu"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={handlePasswordChange}
-              icon={<Lock className="w-4 h-4" />}
-              rightElement={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-              }
-              errorMessage={passwordError}
-              shakeKey={passwordShake}
-              compact={true}
-              required
-            />
-
-            {/* Nút Đăng nhập */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-semibold text-xs shadow-md shadow-emerald-950/20 border border-amber-500/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang xác thực thông tin...</span>
-                </>
-              ) : (
-                <>
-                  <UserCheck className="w-4 h-4" />
-                  <span>Đăng Nhập Hệ Thống</span>
-                </>
-              )}
-            </button>
-
-            {/* Nút Khách Tra Cứu */}
-            <button
-              type="button"
-              onClick={handleContinueAsGuest}
-              className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 font-medium text-xs border border-slate-200 dark:border-slate-700/60 transition cursor-pointer"
-            >
-              Đại biểu (Dữ liệu công khai)
-            </button>
-          </div>
-
-          {/* CỘT PHẢI (col-span-5): 6 Thẻ Chọn Nhanh Tài Khoản Kiểm Thử */}
-          <div className="col-span-5 flex flex-col justify-between border-l border-slate-200 dark:border-slate-800/80 pl-6 space-y-2">
-            <div>
-              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">
-                <span className="font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
-                  Tài khoản kiểm thử nhanh
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">Pass: 123456789</span>
-              </div>
-
-              <div className="space-y-1.5">
-                {/* 1. Chỉ huy (004) */}
-                <button
-                  type="button"
-                  onClick={() => quickFillRole('canbo')}
-                  className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'canbo'
-                      ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500/60 text-blue-800 dark:text-blue-300 ring-1 ring-blue-500/40 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="min-w-0 pr-1">
-                    <div className="font-bold text-xs flex items-center gap-1">
-                      <span>Chỉ huy</span>
-                      <span className="text-[10px] font-mono text-slate-400">004</span>
+                <div className="space-y-1.5">
+                  {/* 1. Chỉ huy (002) */}
+                  <button
+                    type="button"
+                    onClick={() => quickFillRole('chihuy')}
+                    title="Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính (Cấp 5 - Tuyệt Mật)"
+                    className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                      selectedRole === 'chihuy'
+                        ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500/60 text-blue-800 dark:text-blue-300 ring-1 ring-blue-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="min-w-0 pr-1">
+                      <div className="font-bold text-xs flex items-center gap-1">
+                        <span>Chỉ huy</span>
+                        <span className="text-[10px] font-mono text-slate-400">002</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
-                  </div>
-                  <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
-                </button>
+                    <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                  </button>
 
-                {/* 2. Trợ lý (003) */}
-                <button
-                  type="button"
-                  onClick={() => quickFillRole('thuky')}
-                  className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'thuky'
-                      ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500/60 text-teal-800 dark:text-teal-300 ring-1 ring-teal-500/40 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="min-w-0 pr-1">
-                    <div className="font-bold text-xs flex items-center gap-1">
-                      <span>Trợ lý</span>
-                      <span className="text-[10px] font-mono text-slate-400">003</span>
+                  {/* 2. Cơ yếu (003) */}
+                  <button
+                    type="button"
+                    onClick={() => quickFillRole('coyeu')}
+                    title="Phạm Trường Sơn - Cơ yếu (Cấp 5 - Tuyệt Mật)"
+                    className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                      selectedRole === 'coyeu'
+                        ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="min-w-0 pr-1">
+                      <div className="font-bold text-xs flex items-center gap-1">
+                        <span>Cơ yếu</span>
+                        <span className="text-[10px] font-mono text-slate-400">003</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 4 • Tối Mật</div>
-                  </div>
-                  <FileEdit className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
-                </button>
+                    <KeyRound className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
+                  </button>
 
-                {/* 3. Văn thư (005) */}
-                <button
-                  type="button"
-                  onClick={() => quickFillRole('vanthu')}
-                  className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'vanthu'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/60 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/40 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="min-w-0 pr-1">
-                    <div className="font-bold text-xs flex items-center gap-1">
-                      <span>Văn thư</span>
-                      <span className="text-[10px] font-mono text-slate-400">005</span>
+                  {/* 3. Trợ lý (004) */}
+                  <button
+                    type="button"
+                    onClick={() => quickFillRole('troly')}
+                    title="Nguyễn Xuân Thanh - Trợ lý tác chiến (Cấp 2 - Nội bộ)"
+                    className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                      selectedRole === 'troly'
+                        ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500/60 text-teal-800 dark:text-teal-300 ring-1 ring-teal-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="min-w-0 pr-1">
+                      <div className="font-bold text-xs flex items-center gap-1">
+                        <span>Trợ lý</span>
+                        <span className="text-[10px] font-mono text-slate-400">004</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 3 • Mật</div>
-                  </div>
-                  <FileText className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                </button>
+                    <FileEdit className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  </button>
 
-                {/* 4. Cơ yếu (002) */}
-                <button
-                  type="button"
-                  onClick={() => quickFillRole('coyeu')}
-                  className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'coyeu'
-                      ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="min-w-0 pr-1">
-                    <div className="font-bold text-xs flex items-center gap-1">
-                      <span>Cơ yếu</span>
-                      <span className="text-[10px] font-mono text-slate-400">002</span>
+                  {/* 4. Văn thư (005) */}
+                  <button
+                    type="button"
+                    onClick={() => quickFillRole('vanthu')}
+                    title="Trần Thị Ánh Tuyết - Cán bộ Văn thư (Cấp 3 - Mật)"
+                    className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                      selectedRole === 'vanthu'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/60 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="min-w-0 pr-1">
+                      <div className="font-bold text-xs flex items-center gap-1">
+                        <span>Văn thư</span>
+                        <span className="text-[10px] font-mono text-slate-400">005</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 3 • Mật</div>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
-                  </div>
-                  <KeyRound className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
-                </button>
+                    <FileText className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                  </button>
 
-                {/* 5. Nhân viên IT (006) */}
-                <button
-                  type="button"
-                  onClick={() => quickFillRole('it')}
-                  className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'it'
-                      ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-500/60 text-cyan-800 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="min-w-0 pr-1">
-                    <div className="font-bold text-xs flex items-center gap-1">
-                      <span>Nhân viên IT</span>
-                      <span className="text-[10px] font-mono text-slate-400">006</span>
+                  {/* 5. Nhân viên IT (006) */}
+                  <button
+                    type="button"
+                    onClick={() => quickFillRole('it')}
+                    title="Nguyễn Hải Anh - Nhân viên IT (Cấp 1 - Công khai)"
+                    className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                      selectedRole === 'it'
+                        ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-500/60 text-cyan-800 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="min-w-0 pr-1">
+                      <div className="font-bold text-xs flex items-center gap-1">
+                        <span>Nhân viên IT</span>
+                        <span className="text-[10px] font-mono text-slate-400">006</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 1 • Công khai</div>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 1 • Công khai</div>
-                  </div>
-                  <Monitor className="w-4 h-4 text-cyan-500 dark:text-cyan-400 shrink-0" />
-                </button>
+                    <Monitor className="w-4 h-4 text-cyan-500 dark:text-cyan-400 shrink-0" />
+                  </button>
 
-                {/* 6. Quản trị viên (Admin) */}
-                <button
-                  type="button"
-                  onClick={() => quickFillRole('admin')}
-                  className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                    selectedRole === 'admin'
-                      ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-500/60 text-amber-800 dark:text-amber-300 ring-1 ring-amber-500/40 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <div>
-                    <div className="font-bold text-xs flex items-center gap-1.5">
-                      <span>Quản trị viên (Admin)</span>
-                      <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/10 px-1 rounded">USR-001</span>
+                  {/* 6. Quản trị viên (Admin) */}
+                  <button
+                    type="button"
+                    onClick={() => quickFillRole('admin')}
+                    className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                      selectedRole === 'admin'
+                        ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-500/60 text-amber-800 dark:text-amber-300 ring-1 ring-amber-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-bold text-xs flex items-center gap-1.5">
+                        <span>Quản trị viên (Admin)</span>
+                        <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/10 px-1 rounded">USR-001</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Toàn quyền hệ thống • Quản lý</div>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Toàn quyền hệ thống • Quản lý</div>
-                  </div>
-                  <ShieldAlert className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
-                </button>
+                    <ShieldAlert className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </form>
+        </form>
+
+        {/* Modal Quét vân tay dành riêng cho Admin Login */}
+        <FingerprintScanModal
+          open={adminFpModalOpen}
+          purpose="admin_login"
+          tempTicket={tempTicket}
+          onSuccess={handleAdminFpSuccess}
+          onCancel={() => setAdminFpModalOpen(false)}
+        />
+      </>
     );
   }
 
@@ -479,204 +557,224 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   // BRANCH B: BỐ CỤC ĐỨNG TRUYỀN THỐNG (PC HOẶC IPAD PORTRAIT 834 x 1178)
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <form onSubmit={handleLoginSubmit} className="space-y-4">
-      {/* Input Tài khoản quân nhân */}
-      <NotchedInput
-        id="username-vertical"
-        label="Tài khoản quân nhân"
-        value={username}
-        onChange={handleUsernameChange}
-        icon={<UserIcon className="w-4.5 h-4.5" />}
-        errorMessage={usernameError}
-        shakeKey={usernameShake}
-        required
-      />
+    <>
+      <form onSubmit={handleLoginSubmit} className="space-y-4">
+        {/* Input Tài khoản quân nhân */}
+        <NotchedInput
+          id="username-vertical"
+          name="username"
+          autoComplete="username"
+          label="Tài khoản quân nhân"
+          value={username}
+          onChange={handleUsernameChange}
+          icon={<UserIcon className="w-4.5 h-4.5" />}
+          errorMessage={usernameError}
+          shakeKey={usernameShake}
+          required
+        />
 
-      {/* Input Mật khẩu */}
-      <NotchedInput
-        id="password-vertical"
-        label="Mật khẩu"
-        type={showPassword ? 'text' : 'password'}
-        value={password}
-        onChange={handlePasswordChange}
-        icon={<Lock className="w-4.5 h-4.5" />}
-        rightElement={
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-            title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-          >
-            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        }
-        errorMessage={passwordError}
-        shakeKey={passwordShake}
-        required
-      />
+        {/* Input Mật khẩu */}
+        <NotchedInput
+          id="password-vertical"
+          name="password"
+          autoComplete="current-password"
+          label="Mật khẩu"
+          type={showPassword ? 'text' : 'password'}
+          value={password}
+          onChange={handlePasswordChange}
+          icon={<Lock className="w-4.5 h-4.5" />}
+          rightElement={
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+              title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          }
+          errorMessage={passwordError}
+          shakeKey={passwordShake}
+          required
+        />
 
-      {/* Quick Fill Demo Roles - 6 Roles: Cán bộ, Thư ký, Văn thư, Cơ yếu, Nhân viên IT, Admin */}
-      <div className="space-y-2 pt-1">
-        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-          <span className="font-semibold uppercase tracking-wider">Tài khoản kiểm thử nhanh:</span>
-          <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono font-medium">Mật khẩu: 123456789</span>
-        </div>
+        {/* Quick Fill Demo Roles - 6 Roles: Cán bộ, Thư ký, Văn thư, Cơ yếu, Nhân viên IT, Admin */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="font-semibold uppercase tracking-wider">Tài khoản kiểm thử nhanh:</span>
+            <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono font-medium">Mật khẩu: 123456789</span>
+          </div>
 
-        {/* 4 Roles in 2x2 Grid + Nhân viên IT */}
-        <div className="grid grid-cols-2 gap-2">
-          {/* 1. Chỉ huy (004) */}
-          <button
-            type="button"
-            onClick={() => quickFillRole('canbo')}
-            className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedRole === 'canbo'
-                ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500/60 text-blue-800 dark:text-blue-300 ring-1 ring-blue-500/40 shadow-sm'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-            }`}
-          >
-            <div className="min-w-0 pr-1">
-              <div className="font-bold text-xs flex items-center gap-1">
-                <span>Chỉ huy</span>
-                <span className="text-[10px] font-mono text-slate-400">004</span>
+          {/* 4 Roles in 2x2 Grid + Nhân viên IT */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* 1. Chỉ huy (002) */}
+            <button
+              type="button"
+              onClick={() => quickFillRole('chihuy')}
+              title="Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính (Cấp 5 - Tuyệt Mật)"
+              className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                selectedRole === 'chihuy'
+                  ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500/60 text-blue-800 dark:text-blue-300 ring-1 ring-blue-500/40 shadow-sm'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+              }`}
+            >
+              <div className="min-w-0 pr-1">
+                <div className="font-bold text-xs flex items-center gap-1">
+                  <span>Chỉ huy</span>
+                  <span className="text-[10px] font-mono text-slate-400">002</span>
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
-            </div>
-            <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
-          </button>
+              <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
+            </button>
 
-          {/* 2. Trợ lý (003) */}
-          <button
-            type="button"
-            onClick={() => quickFillRole('thuky')}
-            className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedRole === 'thuky'
-                ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500/60 text-teal-800 dark:text-teal-300 ring-1 ring-teal-500/40 shadow-sm'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-            }`}
-          >
-            <div className="min-w-0 pr-1">
-              <div className="font-bold text-xs flex items-center gap-1">
-                <span>Trợ lý</span>
-                <span className="text-[10px] font-mono text-slate-400">003</span>
+            {/* 2. Cơ yếu (003) */}
+            <button
+              type="button"
+              onClick={() => quickFillRole('coyeu')}
+              title="Phạm Trường Sơn - Cơ yếu (Cấp 5 - Tuyệt Mật)"
+              className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                selectedRole === 'coyeu'
+                  ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-sm'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+              }`}
+            >
+              <div className="min-w-0 pr-1">
+                <div className="font-bold text-xs flex items-center gap-1">
+                  <span>Cơ yếu</span>
+                  <span className="text-[10px] font-mono text-slate-400">003</span>
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 4 • Tối Mật</div>
-            </div>
-            <FileEdit className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
-          </button>
+              <KeyRound className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
+            </button>
 
-          {/* 3. Văn thư (005) */}
-          <button
-            type="button"
-            onClick={() => quickFillRole('vanthu')}
-            className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedRole === 'vanthu'
-                ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/60 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/40 shadow-sm'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-            }`}
-          >
-            <div className="min-w-0 pr-1">
-              <div className="font-bold text-xs flex items-center gap-1">
-                <span>Văn thư</span>
-                <span className="text-[10px] font-mono text-slate-400">005</span>
+            {/* 3. Trợ lý (004) */}
+            <button
+              type="button"
+              onClick={() => quickFillRole('troly')}
+              title="Nguyễn Xuân Thanh - Trợ lý tác chiến (Cấp 2 - Nội bộ)"
+              className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                selectedRole === 'troly'
+                  ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500/60 text-teal-800 dark:text-teal-300 ring-1 ring-teal-500/40 shadow-sm'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+              }`}
+            >
+              <div className="min-w-0 pr-1">
+                <div className="font-bold text-xs flex items-center gap-1">
+                  <span>Trợ lý</span>
+                  <span className="text-[10px] font-mono text-slate-400">004</span>
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 3 • Mật</div>
-            </div>
-            <FileText className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-          </button>
+              <FileEdit className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+            </button>
 
-          {/* 4. Cơ yếu (002) */}
-          <button
-            type="button"
-            onClick={() => quickFillRole('coyeu')}
-            className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedRole === 'coyeu'
-                ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-sm'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-            }`}
-          >
-            <div className="min-w-0 pr-1">
-              <div className="font-bold text-xs flex items-center gap-1">
-                <span>Cơ yếu</span>
-                <span className="text-[10px] font-mono text-slate-400">002</span>
+            {/* 4. Văn thư (005) */}
+            <button
+              type="button"
+              onClick={() => quickFillRole('vanthu')}
+              title="Trần Thị Ánh Tuyết - Cán bộ Văn thư (Cấp 3 - Mật)"
+              className={`p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                selectedRole === 'vanthu'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/60 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/40 shadow-sm'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+              }`}
+            >
+              <div className="min-w-0 pr-1">
+                <div className="font-bold text-xs flex items-center gap-1">
+                  <span>Văn thư</span>
+                  <span className="text-[10px] font-mono text-slate-400">005</span>
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 3 • Mật</div>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
-            </div>
-            <KeyRound className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
-          </button>
+              <FileText className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
+            </button>
 
-          {/* 5. Nhân viên IT (006) - Col-span-2 */}
+            {/* 5. Nhân viên IT (006) - Col-span-2 */}
+            <button
+              type="button"
+              onClick={() => quickFillRole('it')}
+              title="Nguyễn Hải Anh - Nhân viên IT (Cấp 1 - Công khai)"
+              className={`col-span-2 p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+                selectedRole === 'it'
+                  ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-500/60 text-cyan-800 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-sm'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+              }`}
+            >
+              <div className="min-w-0 pr-1">
+                <div className="font-bold text-xs flex items-center gap-1.5">
+                  <span>Nhân viên IT</span>
+                  <span className="text-[10px] font-mono text-cyan-700 dark:text-cyan-400 font-semibold bg-cyan-500/10 px-1 rounded">006</span>
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 1 • Công khai • Kỹ thuật hệ thống</div>
+              </div>
+              <Monitor className="w-4 h-4 text-cyan-500 dark:text-cyan-400 shrink-0" />
+            </button>
+          </div>
+
+          {/* 6. Admin (Full width) - Giữ nguyên không đổi */}
           <button
             type="button"
-            onClick={() => quickFillRole('it')}
-            className={`col-span-2 p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedRole === 'it'
-                ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-500/60 text-cyan-800 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-sm'
+            onClick={() => quickFillRole('admin')}
+            className={`w-full p-2.5 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+              selectedRole === 'admin'
+                ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-500/60 text-amber-800 dark:text-amber-300 ring-1 ring-amber-500/40 shadow-sm'
                 : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
             }`}
           >
-            <div className="min-w-0 pr-1">
+            <div>
               <div className="font-bold text-xs flex items-center gap-1.5">
-                <span>Nhân viên IT</span>
-                <span className="text-[10px] font-mono text-cyan-700 dark:text-cyan-400 font-semibold bg-cyan-500/10 px-1 rounded">006</span>
+                <span>Quản trị viên (Admin)</span>
+                <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/10 px-1 rounded">USR-001</span>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 1 • Công khai • Kỹ thuật hệ thống</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">Toàn quyền hệ thống • Admin Dashboard & Quản lý User</div>
             </div>
-            <Monitor className="w-4 h-4 text-cyan-500 dark:text-cyan-400 shrink-0" />
+            <ShieldAlert className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
           </button>
         </div>
 
-        {/* 6. Admin (Full width) - Giữ nguyên không đổi */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-medium text-sm shadow-md shadow-emerald-950/20 border border-amber-500/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition-all duration-200 cursor-pointer"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Đang xác thực thông tin...</span>
+            </>
+          ) : (
+            <>
+              <UserCheck className="w-4 h-4" />
+              <span>Đăng Nhập Hệ Thống</span>
+            </>
+          )}
+        </button>
+
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+          <span className="flex-shrink mx-4 text-slate-400 text-xs">hoặc</span>
+          <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+        </div>
+
         <button
           type="button"
-          onClick={() => quickFillRole('admin')}
-          className={`w-full p-2.5 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-            selectedRole === 'admin'
-              ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-500/60 text-amber-800 dark:text-amber-300 ring-1 ring-amber-500/40 shadow-sm'
-              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
-          }`}
+          onClick={handleContinueAsGuest}
+          className="w-full py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-white font-medium text-xs border border-slate-200 dark:border-slate-700/60 transition-colors cursor-pointer"
         >
-          <div>
-            <div className="font-bold text-xs flex items-center gap-1.5">
-              <span>Quản trị viên (Admin)</span>
-              <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/10 px-1 rounded">USR-001</span>
-            </div>
-            <div className="text-[10px] text-slate-500 dark:text-slate-400">Toàn quyền hệ thống • Admin Dashboard & Quản lý User</div>
-          </div>
-          <ShieldAlert className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+          Đại biểu (Dữ liệu công khai)
         </button>
-      </div>
+      </form>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-medium text-sm shadow-md shadow-emerald-950/20 border border-amber-500/25 disabled:opacity-50 flex items-center justify-center space-x-2 transition-all duration-200 cursor-pointer"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Đang xác thực thông tin...</span>
-          </>
-        ) : (
-          <>
-            <UserCheck className="w-4 h-4" />
-            <span>Đăng Nhập Hệ Thống</span>
-          </>
-        )}
-      </button>
-
-      <div className="relative flex py-1 items-center">
-        <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-        <span className="flex-shrink mx-4 text-slate-400 text-xs">hoặc</span>
-        <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleContinueAsGuest}
-        className="w-full py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-white font-medium text-xs border border-slate-200 dark:border-slate-700/60 transition-colors cursor-pointer"
-      >
-        Đại biểu (Dữ liệu công khai)
-      </button>
-    </form>
+      {/* Modal Quét vân tay dành riêng cho Admin Login */}
+      <FingerprintScanModal
+        open={adminFpModalOpen}
+        purpose="admin_login"
+        tempTicket={tempTicket}
+        onSuccess={handleAdminFpSuccess}
+        onCancel={() => setAdminFpModalOpen(false)}
+      />
+    </>
   );
 };

@@ -68,19 +68,46 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
       data = await response.text();
     }
 
+
+    // ═══════════════════════════════════════════════════════════════
+    // [v4.3.2] 202 APPROVAL_REQUIRED — không phải lỗi, chỉ "chờ duyệt"
+    // Dispatch event để ApprovalListener toast toàn cục.
+    // Caller PHẢI check isApprovalRequired() để tránh show success sai.
+    // ═══════════════════════════════════════════════════════════════
+    if (
+      response.status === 202 &&
+      typeof data === 'object' &&
+      (data as any)?.code === 'APPROVAL_REQUIRED'
+    ) {
+      if (typeof window !== 'undefined' && !options.skipErrorNotification) {
+        window.dispatchEvent(
+          new CustomEvent('qk7:approval-required', { detail: data })
+        );
+      }
+      return data as T;
+    }
+
+
     if (!response.ok) {
       let errorMsg = `Lỗi HTTP ${response.status}`;
       if (typeof data === 'object' && data?.error) {
         errorMsg = data.error;
       } else if (typeof data === 'string' && data.trim()) {
-        errorMsg = data.trim();
+        const preMatch = data.match(/<pre>(.*?)<\/pre>/is);
+        if (preMatch) {
+          errorMsg = preMatch[1].trim();
+        } else if (data.includes('<!DOCTYPE') || data.includes('<html')) {
+          errorMsg = `Lỗi máy chủ (${response.status})`;
+        } else {
+          errorMsg = data.trim();
+        }
       } else if (response.status === 500 || response.status === 502 || response.status === 504) {
         errorMsg = 'Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend đang chạy!';
       }
 
       const httpError = new HttpError(response.status, errorMsg, data, url);
-      if (!options.silent) {
-        console.error(`[HTTP ${response.status}] ${options.method || 'GET'} ${url} ->`, errorMsg);
+      if (!options.silent && import.meta.env.DEV) {
+        console.error(`[HTTP ${response.status}] ${options.method || 'GET'} ${url.split('?')[0]}`);
       }
 
       // Kích hoạt custom event toàn cục để Router/App lắng nghe và điều hướng

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -9,12 +10,15 @@ import {
   Fingerprint,
 } from 'lucide-react';
 import { fingerprintService } from '../../services/fingerprintService';
+import { http } from '../../services/http';
 import { TouchIDFingerprint } from '../common/TouchIDFingerprint';
 import { CircularSpinner } from './FingerprintEnrollModal';
 
 export interface FingerprintScanModalProps {
   open: boolean;
-  fileId: string;
+  fileId?: string;
+  purpose?: 'file_access' | 'admin_login';
+  tempTicket?: string;
   onSuccess: (fingerprintToken: string) => void;
   onCancel: () => void;
 }
@@ -25,7 +29,9 @@ const MAX_AUTO_RETRY = 2;
 
 export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   open,
-  fileId,
+  fileId = '',
+  purpose = 'file_access',
+  tempTicket,
   onSuccess,
   onCancel,
 }) => {
@@ -109,6 +115,37 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
 
       if (signal.aborted || !mountedRef.current) return;
 
+      // ✅ PHÂN NHÁNH 1: XÁC THỰC 2FA ADMIN LOGIN
+      if (purpose === 'admin_login') {
+        if (!tempTicket) {
+          setError('Thiếu vé xác thực tạm thời. Vui lòng đăng nhập lại.');
+          setPhase('error');
+          return;
+        }
+
+        const res: any = await http('/api/auth/login/admin-fp-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ temp_ticket: tempTicket, device_id: deviceId }),
+          signal,
+        });
+
+        if (signal.aborted || !mountedRef.current) return;
+
+        setScore(res.score || 100);
+        setProgress(100);
+        setPhase('success');
+        retryCountRef.current = 0;
+
+        setTimeout(() => {
+          if (mountedRef.current && !signal.aborted) {
+            onSuccess(res.token); // Trả JWT thật về cho LoginForm
+          }
+        }, 900);
+        return;
+      }
+
+      // ✅ PHÂN NHÁNH 2: XÁC THỰC VÂN TAY XEM FILE (Mặc định)
       const res = await fingerprintService.verify(fileId, deviceId, signal);
 
       if (signal.aborted || !mountedRef.current) return;
@@ -140,8 +177,19 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       const msg = err.message || 'Xác thực thất bại';
       const isAgentOffline = Boolean(err.data?.agent_offline);
       const isNeedsEnroll = Boolean(err.data?.needs_enroll);
+      const isTemplateCorrupted =
+        err.data?.code === 'TEMPLATE_DECRYPT_FAILED' ||
+        /Template vân tay bị hỏng/i.test(msg);
       const isCancelled =
         Boolean(err.data?.cancelled) || err.message === 'CANCELLED';
+
+      console.error('[FingerprintScanModal] ❌ Lỗi xác thực vân tay:', {
+        message: err.message,
+        code: err.data?.code,
+        details: err.data?.details,
+        purpose,
+        fileId,
+      });
 
       if (isCancelled) {
         if (retryCountRef.current < 1) {
@@ -169,6 +217,13 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         );
         setNeedsEnroll(true);
         setPhase('error');
+      } else if (isTemplateCorrupted) {
+        setError(
+          err.data?.details ||
+            'Template vân tay bị hỏng hoặc sai khóa mã hóa hệ thống. Cần đăng ký lại (re-enroll).'
+        );
+        setPhase('error');
+        setRetryExhausted(true);
       } else {
         const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
         setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
@@ -222,14 +277,19 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
 
   if (!open) return null;
 
-  return (
+  const modalNode = (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/30 dark:bg-black/50 backdrop-blur-md transition-all duration-300"
+        onClick={handleCancel}
+      >
         <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.94 }}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md max-w-[calc(100vw-32px)] mx-auto overflow-hidden shadow-2xl"
+          initial={{ opacity: 0, scale: 0.94, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 10 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+          className="bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-800/90 rounded-3xl w-full max-w-md mx-auto overflow-hidden shadow-2xl backdrop-blur-xl"
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -238,10 +298,12 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
               </div>
               <div>
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                  Xác Thực Vân Tay
+                  {purpose === 'admin_login' ? 'Xác Thực Quản Trị Viên' : 'Xác Thực Vân Tay'}
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Tài liệu Mật / Tối mật / Tuyệt mật
+                  {purpose === 'admin_login' 
+                    ? 'Yêu cầu xác thực 2 lớp (2FA) cho Admin' 
+                    : 'Tài liệu Mật / Tối mật / Tuyệt mật'}
                 </p>
               </div>
             </div>
@@ -267,7 +329,9 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                   Đặt ngón tay lên máy quét
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 max-w-xs">
-                  Vui lòng đặt ngón tay đã đăng ký lên đầu đọc ZK9500
+                  {purpose === 'admin_login' 
+                    ? 'Vui lòng đặt ngón tay của Quản trị viên tối cao lên đầu đọc ZK9500'
+                    : 'Vui lòng đặt ngón tay đã đăng ký lên đầu đọc ZK9500'}
                 </p>
                 <div className="inline-flex items-center gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-1.5 rounded-full font-medium">
                   <CircularSpinner
@@ -284,10 +348,10 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
               <>
                 <div className="flex items-center justify-center gap-1.5 mb-1 text-emerald-600 dark:text-emerald-400 font-bold text-base">
                   <CheckCircle2 className="w-5 h-5" />
-                  <span>Quét vân tay thành công</span>
+                  <span>Xác thực thành công</span>
                 </div>
                 <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                  Đang mở tài liệu...
+                  {purpose === 'admin_login' ? 'Đang vào hệ thống...' : 'Đang mở tài liệu...'}
                 </p>
               </>
             )}
@@ -348,6 +412,10 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       </div>
     </AnimatePresence>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalNode, document.body)
+    : modalNode;
 };
 
 export default FingerprintScanModal;

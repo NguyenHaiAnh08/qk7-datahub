@@ -5,21 +5,17 @@ import {
   RotateCcw,
   AlertTriangle,
   RefreshCw,
-  FileText,
   ShieldAlert,
-  Clock,
-  Building,
-  User as UserIcon,
   CheckCircle2,
   AlertCircle,
-  X,
-  Layers,
 } from 'lucide-react';
+import { Tooltip } from 'antd';
 import { Header } from '../components/common/Header';
 import { toast } from '../components/common/Toast';
 import { documentsApi } from '../services/documentsApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem } from '../types';
+import { isApprovalRequired } from '../utils/approvalUtils';
 
 export interface TrashPageProps {
   /** Khi true: render inline trong AdminDashboardPage (không có Header riêng, không min-h-screen) */
@@ -27,7 +23,9 @@ export interface TrashPageProps {
 }
 
 export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const isAdminUser = (user?.roles || []).includes('ROL-01');
+
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -68,14 +66,22 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   }, []);
 
   // ═══════════════════════════════════════════════════════════
-  // 1. THAO TÁC KHÔI PHỤC ĐƠN LẺ (Kèm hiệu ứng mờ dần và trượt sang trái)
+  // 1. THAO TÁC KHÔI PHỤC ĐƠN LẺ (Kèm hiệu ứng mờ dần)
   // ═══════════════════════════════════════════════════════════
   const handleRestoreSingle = async (doc: DocumentItem) => {
     if (!doc.file_id) return;
     setAnimatingId(doc.file_id);
 
     try {
-      await documentsApi.restoreDocument(doc.file_id);
+      const res: any = await documentsApi.restoreDocument(doc.file_id);
+
+      // ✅ Nếu bị APPROVAL_REQUIRED → không báo success, chỉ refresh
+      if (isApprovalRequired(res)) {
+        setAnimatingId(null);
+        await load();
+        return;
+      }
+
       // Hiển thị Animated Toast màu Xanh Lục Quân
       toast.success(`Đã khôi phục thành công văn bản: "${doc.title}"`, {
         title: 'KHÔI PHỤC THÀNH CÔNG',
@@ -104,20 +110,37 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
 
     try {
       let successCount = 0;
+      let pendingCount = 0;
+
       for (const d of docs) {
         try {
-          await documentsApi.restoreDocument(d.file_id);
-          successCount++;
+          const res: any = await documentsApi.restoreDocument(d.file_id);
+          if (isApprovalRequired(res)) pendingCount++;
+          else successCount++;
         } catch (e) {
-          console.warn(`[RestoreAll] Failed for fileId ${d.file_id}`, e);
+          if (import.meta.env.DEV) console.warn('[RestoreAll] Lỗi khôi phục tài liệu:', e);
         }
       }
 
-      toast.success(`Đã khôi phục thành công toàn bộ ${successCount}/${docs.length} tài liệu về vị trí lưu trữ!`, {
-        title: 'HOÀN TẤT KHÔI PHỤC HÀNG LOẠT',
-        badge: 'BATCH-RESTORE',
-        duration: 4000,
-      });
+      if (pendingCount > 0) {
+        toast.success(
+          `Đã khôi phục ${successCount}/${docs.length} tài liệu. ${pendingCount} tài liệu chờ phê duyệt.`,
+          {
+            title: 'HOÀN TẤT KHÔI PHỤC HÀNG LOẠT',
+            badge: 'BATCH-RESTORE',
+            duration: 4000,
+          }
+        );
+      } else {
+        toast.success(
+          `Đã khôi phục thành công toàn bộ ${successCount}/${docs.length} tài liệu về vị trí lưu trữ!`,
+          {
+            title: 'HOÀN TẤT KHÔI PHỤC HÀNG LOẠT',
+            badge: 'BATCH-RESTORE',
+            duration: 4000,
+          }
+        );
+      }
 
       await load();
     } catch (err: any) {
@@ -139,20 +162,37 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
 
       try {
         let purgedCount = 0;
+        let pendingCount = 0;
+
         for (const d of docs) {
           try {
-            await documentsApi.purgeDocument(d.file_id);
-            purgedCount++;
+            const res: any = await documentsApi.purgeDocument(d.file_id);
+            if (isApprovalRequired(res)) pendingCount++;
+            else purgedCount++;
           } catch (e) {
-            console.warn(`[PurgeAll] Failed for fileId ${d.file_id}`, e);
+            if (import.meta.env.DEV) console.warn('[PurgeAll] Lỗi xóa vĩnh viễn tài liệu:', e);
           }
         }
 
-        toast.success(`Đã dọn rỗng hoàn toàn thùng rác (${purgedCount} tài liệu đã bị xóa vĩnh viễn khỏi máy chủ).`, {
-          title: 'ĐÃ DỌN RỖNG THÙNG RÁC',
-          badge: 'PURGED-ALL',
-          duration: 4000,
-        });
+        if (pendingCount > 0) {
+          toast.success(
+            `Đã xóa vĩnh viễn ${purgedCount}/${docs.length} tài liệu. ${pendingCount} yêu cầu chờ phê duyệt.`,
+            {
+              title: 'HOÀN TẤT DỌN RỖNG',
+              badge: 'PURGED-ALL',
+              duration: 4000,
+            }
+          );
+        } else {
+          toast.success(
+            `Đã dọn rỗng hoàn toàn thùng rác (${purgedCount} tài liệu đã bị xóa vĩnh viễn khỏi máy chủ).`,
+            {
+              title: 'ĐÃ DỌN RỖNG THÙNG RÁC',
+              badge: 'PURGED-ALL',
+              duration: 4000,
+            }
+          );
+        }
 
         await load();
       } catch (err: any) {
@@ -167,7 +207,15 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
       setPurgeModal({ open: false, doc: null, isAll: false });
 
       try {
-        await documentsApi.purgeDocument(targetDoc.file_id);
+        const res: any = await documentsApi.purgeDocument(targetDoc.file_id);
+
+        // ✅ Nếu bị APPROVAL_REQUIRED → không báo "đã xóa", chỉ refresh
+        if (isApprovalRequired(res)) {
+          setAnimatingId(null);
+          await load();
+          return;
+        }
+
         toast.success(`Đã xóa vĩnh viễn tệp PDF và dữ liệu của văn bản: "${targetDoc.title}".`, {
           title: 'ĐÃ XÓA VĨNH VIỄN',
           badge: 'PURGED',
@@ -192,28 +240,24 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
 
     switch (levelId) {
       case 1:
-        // Cấp 1: Công khai (Xám trung tính / Xanh nhạt)
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700 whitespace-nowrap">
             {levelName}
           </span>
         );
       case 2:
-        // Cấp 2: Nội bộ (Xanh dương, KHÔNG dùng viền đỏ)
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-500/30 whitespace-nowrap">
             {levelName}
           </span>
         );
       case 3:
-        // Cấp 3: Mật (Vàng Kim Quân Hiệu #fbbf24)
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-500/30 whitespace-nowrap">
             {levelName}
           </span>
         );
       case 4:
-        // Cấp 4: Tối mật (Đỏ thắm Quân đội)
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-500/40 whitespace-nowrap">
             {levelName}
@@ -221,7 +265,6 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
         );
       case 5:
       default:
-        // Cấp 5: Tuyệt mật (Đỏ Quân Kỳ Đậm)
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold border bg-red-100 text-red-800 border-red-300 dark:bg-red-950/70 dark:text-red-300 dark:border-red-500/50 whitespace-nowrap">
             {levelName}
@@ -275,7 +318,11 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
                 setPurgeModal({ open: true, doc: null, isAll: true });
               }}
               className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95 select-none"
-              title="Xóa vĩnh viễn toàn bộ tài liệu trong thùng rác (Không thể hoàn tác)"
+              title={
+                isAdminUser
+                  ? 'Xóa vĩnh viễn toàn bộ tài liệu trong thùng rác (Không thể hoàn tác)'
+                  : 'Gửi yêu cầu phê duyệt để xóa vĩnh viễn toàn bộ thùng rác'
+              }
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Dọn rỗng thùng rác</span>
@@ -298,7 +345,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
 
       {/* 2. Bảng Dữ Liệu High-craft Data Grid */}
       <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors duration-200">
-        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="overflow-x-auto">
           <table className="w-full text-xs text-left min-w-[1150px]">
             <colgroup>
               <col style={{ width: '160px' }} />
@@ -352,72 +399,81 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
                         isDeleting ? 'opacity-0 transition-opacity duration-200' : ''
                       }`}
                     >
-                      {/* 1. Cột Số hiệu: font-mono tabular-nums text-sm thẳng hàng tuyệt đối */}
+                      {/* 1. Cột Số hiệu */}
                       <td className="py-3.5 px-4 font-mono tabular-nums text-sm font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap overflow-hidden text-ellipsis">
                         {d.document_code || d.file_id}
                       </td>
 
-                      {/* 2. Cột Trích yếu: font-medium, dễ đọc */}
-                        <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
-                          <span className="line-clamp-2" title={d.title}>
-                            {d.title}
-                          </span>
-                        </td>
+                      {/* 2. Cột Trích yếu */}
+                      <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
+                        <span className="line-clamp-2" title={d.title}>
+                          {d.title}
+                        </span>
+                      </td>
 
-                        {/* 3. Cột Độ mật: chuẩn phân cấp màu sắc quân đội */}
-                        <td className="py-3.5 px-4">
-                          {renderSecurityBadge(d)}
-                        </td>
+                      {/* 3. Cột Độ mật */}
+                      <td className="py-3.5 px-4">{renderSecurityBadge(d)}</td>
 
-                        {/* 4. Cột Đơn vị */}
-                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                          <span className="truncate block max-w-[150px]" title={d.unit_name || '—'}>
-                            {d.unit_name || '—'}
-                          </span>
-                        </td>
+                      {/* 4. Cột Đơn vị */}
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                        <span className="truncate block max-w-[150px]" title={d.unit_name || '—'}>
+                          {d.unit_name || '—'}
+                        </span>
+                      </td>
 
-                        {/* 5. Cột Xóa lúc: font-mono tabular-nums text-sm thẳng hàng tuyệt đối */}
-                        <td className="py-3.5 px-4 font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                          {d.deleted_at ? new Date(d.deleted_at).toLocaleString('vi-VN') : '—'}
-                        </td>
+                      {/* 5. Cột Xóa lúc */}
+                      <td className="py-3.5 px-4 font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {d.deleted_at ? new Date(d.deleted_at).toLocaleString('vi-VN') : '—'}
+                      </td>
 
-                        {/* 6. Cột Người xóa */}
-                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                          {d.deleted_by_name || '—'}
-                        </td>
+                      {/* 6. Cột Người xóa */}
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {d.deleted_by_name || '—'}
+                      </td>
 
-                        {/* 7. Cột Thao tác: Hào quang xanh / đỏ khi hover kèm Tooltip tĩnh */}
-                        <td className="py-3.5 px-4 text-right space-x-2 whitespace-nowrap">
-                          {hasPermission('DOC_RESTORE') && (
-                            <button
-                              type="button"
-                              onClick={() => handleRestoreSingle(d)}
-                              disabled={isDeleting || batchLoading}
-                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:shadow-[0_0_12px_rgba(16,185,129,0.35)] transition-all duration-200 cursor-pointer active:scale-95 disabled:opacity-40"
-                              title="Khôi phục tài liệu"
-                              aria-label="Khôi phục tài liệu"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                      {/* 7. Cột Thao tác */}
+                      <td className="py-3.5 px-4 text-right space-x-2 whitespace-nowrap">
+                        {hasPermission('DOC_RESTORE') && (
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreSingle(d)}
+                            disabled={isDeleting || batchLoading}
+                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:shadow-[0_0_12px_rgba(16,185,129,0.35)] transition-all duration-200 cursor-pointer active:scale-95 disabled:opacity-40"
+                            title="Khôi phục tài liệu"
+                            aria-label="Khôi phục tài liệu"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
 
-                          {hasPermission('DOC_PURGE') && (
-                            <button
-                              type="button"
-                              onClick={() => setPurgeModal({ open: true, doc: d, isAll: false })}
-                              disabled={isDeleting || batchLoading}
-                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:shadow-[0_0_12px_rgba(239,68,68,0.35)] transition-all duration-200 cursor-pointer active:scale-95 disabled:opacity-40"
-                              title="Xóa vĩnh viễn (Không thể phục hồi)"
-                              aria-label="Xóa vĩnh viễn (Không thể phục hồi)"
-                            >
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                        {hasPermission('DOC_PURGE') && (
+                          <button
+                            type="button"
+                            onClick={() => setPurgeModal({ open: true, doc: d, isAll: false })}
+                            disabled={isDeleting || batchLoading}
+                            className={`
+                              p-1.5 rounded-lg border transition-all duration-200 cursor-pointer active:scale-95 disabled:opacity-40
+                              ${
+                                isAdminUser
+                                  ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-700/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 hover:shadow-[0_0_12px_rgba(239,68,68,0.35)]'
+                                  : 'bg-slate-100 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-400'
+                              }
+                            `}
+                            title={
+                              isAdminUser
+                                ? 'Xóa vĩnh viễn (Không thể phục hồi)'
+                                : '⚠️ Yêu cầu quyền Admin để xóa vĩnh viễn — bấm để gửi yêu cầu phê duyệt'
+                            }
+                            aria-label={isAdminUser ? 'Xóa vĩnh viễn' : 'Yêu cầu duyệt xóa vĩnh viễn'}
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -427,7 +483,6 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
 
   // ═══════════════════════════════════════════════════════════
   // 3. MODAL CẢNH BÁO NGUY HIỂM: XÓA VĨNH VIỄN (PURGE CONFIRMATION)
-  // Màu Đỏ Quân Kỳ & Xác nhận 2 bước an toàn tuyệt đối
   // ═══════════════════════════════════════════════════════════
   const dangerPurgeModal = (
     <AnimatePresence>
@@ -459,12 +514,18 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
             <div className="bg-red-500/10 border border-red-500/25 rounded-xl p-3.5 mb-4 text-xs text-red-700 dark:text-red-300 leading-relaxed font-medium space-y-2">
               <p className="font-bold flex items-center gap-1.5">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
-                <span>HÀNH ĐỘNG KHÔNG THỂ HOÀN TÁC!</span>
+                <span>{isAdminUser ? 'HÀNH ĐỘNG KHÔNG THỂ HOÀN TÁC!' : 'YÊU CẦU PHÊ DUYỆT'}</span>
               </p>
               <p>
-                {purgeModal.isAll
-                  ? `Toàn bộ ${docs.length} tài liệu trong thùng rác cùng toàn bộ tệp tin PDF gốc lưu trên ổ đĩa máy chủ sẽ bị xóa vĩnh viễn khỏi hệ thống.`
-                  : `Tệp PDF vật lý của văn bản "${purgeModal.doc?.title}" (${purgeModal.doc?.document_code || purgeModal.doc?.file_id}) sẽ bị xóa vĩnh viễn khỏi hệ thống lưu trữ.`}
+                {!isAdminUser ? (
+                  purgeModal.isAll
+                    ? `Yêu cầu xóa vĩnh viễn toàn bộ ${docs.length} tài liệu trong thùng rác sẽ được gửi đến Quản trị viên tối cao để phê duyệt. Hành động chưa được thực thi.`
+                    : `Yêu cầu xóa vĩnh viễn văn bản "${purgeModal.doc?.title}" (${purgeModal.doc?.document_code || purgeModal.doc?.file_id}) sẽ được gửi đến Quản trị viên tối cao để phê duyệt. Hành động chưa được thực thi.`
+                ) : purgeModal.isAll ? (
+                  `Toàn bộ ${docs.length} tài liệu trong thùng rác cùng toàn bộ tệp tin PDF gốc lưu trên ổ đĩa máy chủ sẽ bị xóa vĩnh viễn khỏi hệ thống.`
+                ) : (
+                  `Tệp PDF vật lý của văn bản "${purgeModal.doc?.title}" (${purgeModal.doc?.document_code || purgeModal.doc?.file_id}) sẽ bị xóa vĩnh viễn khỏi hệ thống lưu trữ.`
+                )}
               </p>
             </div>
 
@@ -500,7 +561,15 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
                 className="px-4 py-2 bg-gradient-to-r from-red-600 via-red-700 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold rounded-xl text-xs shadow-md shadow-red-950/30 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>{purgeModal.isAll ? 'Dọn rỗng vĩnh viễn' : 'Xóa vĩnh viễn'}</span>
+                <span>
+                  {purgeModal.isAll
+                    ? isAdminUser
+                      ? 'Dọn rỗng vĩnh viễn'
+                      : 'Gửi yêu cầu dọn rỗng'
+                    : isAdminUser
+                    ? 'Xóa vĩnh viễn'
+                    : 'Gửi yêu cầu xóa'}
+                </span>
               </button>
             </div>
           </motion.div>
@@ -531,7 +600,9 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
             </div>
 
             <p className="text-xs text-slate-600 dark:text-slate-300 mb-5 leading-relaxed font-medium">
-              Bạn có chắc chắn muốn khôi phục toàn bộ <span className="font-bold text-emerald-600 dark:text-emerald-400">{docs.length} tài liệu</span> trong thùng rác về trạng thái lưu trữ ban đầu?
+              Bạn có chắc chắn muốn khôi phục toàn bộ{' '}
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">{docs.length} tài liệu</span> trong
+              thùng rác về trạng thái lưu trữ ban đầu?
             </p>
 
             <div className="flex justify-end gap-2">
@@ -587,4 +658,4 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   );
 };
 
-export default TrashPage;
+export default TrashPage;

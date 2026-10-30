@@ -1,6 +1,6 @@
 # KIẾN TRÚC TOÀN BỘ HỆ THỐNG — TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB
 
-> **Bảo mật:** Cấp Bộ Tư Lệnh Quân Khu 7  
+> **Bảo mật:** Cấp Trường Quân sự Quân khu 7  
 > **Phiên bản kiến trúc:** v3.8-ENTERPRISE (Dual-Platform Desktop & iPadOS, React 18 + TS SPA, Express 5 Gateway, AI RAG & ZKTeco Biometric Engine)  
 > **Ngày cập nhật:** 21/10/2026  
 
@@ -544,13 +544,20 @@ erDiagram
 
 ## 7. Kiến Trúc Trợ Lý AI Tác Chiến & Văn Thư (boxchat Agentic RAG)
 
-### 7.1. Nguyên Lý Thiết Kế
+### 7.1. Nguyên Lý Thiết Kế & Cấu Hình Model Sản Xuất
 Microservice **boxchat** (Python FastAPI tại cổng `:8001`) được thiết kế theo kiến trúc **Citation-Grounded Agentic RAG (Retrieval-Augmented Generation)**:
-1. **Trích xuất PDF Chuyên Sâu (`PDFProcessor`):** Đọc tuần tự từng trang tài liệu PDF quân sự, bảo toàn bảng biểu số liệu, đánh dấu số trang tuyệt đối để phục vụ gắn nhãn trích dẫn.
-2. **Kho Vector Lai (`HybridVectorStore`):** Lưu trữ embedding văn bản vào CSDL vector **Qdrant** cục bộ (`local_storage/qdrant_data`), không truyền dữ liệu ra Internet, bảo đảm an ninh mạng quân sự nội bộ.
-3. **Agent Tutor & Thinking Process:** LLM suy luận nhiều bước, hiển thị quá trình tư duy (`think`) và sinh câu trả lời kèm chip dẫn chứng số trang. Người dùng bấm vào chip dẫn chứng sẽ nhảy trực tiếp đến trang văn bản PDF tương ứng.
-4. **Biên Soạn Giáo Trình Tác Chiến (`StudyBookGenerator`):** Tự động phân tích các văn kiện, chỉ thị lớn để tổng hợp thành tài liệu học tập, tóm tắt các điểm cốt lõi và sinh đề trắc nghiệm kiểm tra nhận thức chính trị/tác chiến.
-5. **Dòng Thời Gian Lịch Sử Quân Sự (`MediaTimelineManager`):** Tự động bóc tách các mốc thời gian, chiến dịch, sự kiện trong văn bản để hiển thị dạng dòng thời gian tương tác.
+1. **Lựa Chọn & Chuẩn Hóa Model Sản Xuất (`qwen2.5:3b`):**
+   - **Model LLM:** `qwen2.5:3b` (chạy qua Ollama cục bộ `http://127.0.0.1:11434`), kết hợp model embedding đa ngôn ngữ `bge-m3` (1024-d).
+   - **Cơ sở lựa chọn:** Dựa trên kết quả đo lường và khảo sát phần cứng thực tế (NVIDIA GeForce GTX 1650 4.0 GB VRAM) tại tài liệu `docs/MODEL_DECISION.md`. Model 3b chỉ chiếm ~1.9 GB (tổng hệ thống kèm bge-m3 và KV cache ~3.3 GB VRAM), vừa vặn 100% trong GPU VRAM mà không bị tràn sang RAM hệ thống.
+   - **Hiệu năng thực nghiệm (30 câu hỏi mở rộng):** Đạt **Hit Rate @5 100%**, **Citation Accuracy 100%**, **Clearance Leak = 0 (an toàn tuyệt đối)**, **Adversarial Refusal Rate 100%** trước các câu hỏi bẫy/ngoài phạm vi, với độ trễ phản hồi tối ưu **4.8 – 6.7 giây** (đáp ứng hoàn hảo cho kíp trực tác chiến).
+   - **Điều kiện nâng cấp `7b` trong tương lai:** Chỉ nâng cấp khi trang bị máy chủ có GPU chuyên dụng VRAM ≥ 8.0 GB (như RTX 3060 12GB hoặc RTX A4000).
+2. **Kho Vector Lai & Cơ Chế Khóa Tự Phục Hồi An Toàn (Self-Healing Qdrant with Process Safety Guard):**
+   - Lưu trữ embedding văn bản vào CSDL vector **Qdrant** cục bộ (`local_storage/qdrant_data`), không truyền dữ liệu ra Internet, bảo đảm an ninh mạng quân sự nội bộ.
+   - **Cơ chế Self-Healing an toàn:** Tự động phát hiện và dọn dẹp file `.lock` tồn dư do tắt máy đột ngột hoặc crash trước khi khởi tạo Qdrant. Để ngăn ngừa nguy cơ phá hỏng cơ sở dữ liệu khi có 2 tiến trình chạy song song, hệ thống áp dụng **Process Safety Guard** (rà soát PID và danh sách tiến trình `Win32_Process` của Windows, loại trừ PID hiện tại). Nếu phát hiện tiến trình AI khác đang hoạt động, hệ thống **tuyệt đối không xóa lock** và kích hoạt chế độ an toàn.
+3. **Trích xuất PDF Chuyên Sâu (`PDFProcessor`):** Đọc tuần tự từng trang tài liệu PDF quân sự, bảo toàn bảng biểu số liệu, đánh dấu số trang tuyệt đối để phục vụ gắn nhãn trích dẫn.
+4. **Agent Tutor, Hậu Kiểm Trích Dẫn & Thinking Process:** LLM suy luận nhiều bước, hiển thị quá trình tư duy (`think`), viết lại câu truy vấn ngữ cảnh (`_rewrite_query_with_history`), và áp dụng bộ lọc hậu kiểm trích dẫn số trang bằng biểu thức chính quy (`_verify_inline_citations`) nhằm triệt tiêu 100% ảo giác trích dẫn. Người dùng bấm vào chip dẫn chứng sẽ nhảy trực tiếp đến trang văn bản PDF tương ứng.
+5. **Biên Soạn Giáo Trình Tác Chiến (`StudyBookGenerator`):** Tự động phân tích các văn kiện, chỉ thị lớn để tổng hợp thành tài liệu học tập, tóm tắt các điểm cốt lõi và sinh đề trắc nghiệm kiểm tra nhận thức chính trị/tác chiến.
+6. **Dòng Thời Gian Lịch Sử Quân Sự (`MediaTimelineManager`):** Tự động bóc tách các mốc thời gian, chiến dịch, sự kiện trong văn bản để hiển thị dạng dòng thời gian tương tác.
 
 ### 7.2. Cơ Chế Chuyển Mạch Dự Phòng Thông Minh (Smart SQL Fallback)
 Nhằm đạt tiêu chuẩn sẵn sàng cao (High Availability), Express Gateway (`backend/src/ai-routes.js`) được tích hợp cơ chế bảo vệ kép:
@@ -978,7 +985,7 @@ Row N+6:                                       [H:I]   Thiếu tá QNCN Nguyễn
 ## 14. Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform Desktop & iPadOS Touch UI Engine)
 
 ### 14.1. Bối Cảnh & Thách Thức Vận Hành Đa Thiết Bị Quân Khu 7
-Trong môi trường công tác tại Bộ Tư Lệnh Quân Khu 7:
+Trong môi trường công tác tại Trường Quân sự Quân khu 7:
 - **80% thời gian chỉ huy & tác chiến:** Thủ trưởng, sĩ quan tác chiến sử dụng máy tính bảng **iPad Air M4 (11-inch & 13-inch)** khi cơ động tại sở chỉ huy, phòng họp tác chiến, thực địa.
 - **Tại văn phòng cố định:** Cán bộ văn thư, quản trị viên sử dụng máy tính bàn (Desktop PC Widescreen tỉ lệ 16:9).
 - **Thách thức:** Việc ép một layout PC co giãn thông thường (Responsive đơn thuần) khiến giao diện trên iPad bị bể nặng: Header rớt thành nhiều dòng, tên quân nhân bị cắt cụt, thanh điều hướng bị gãy đôi, và các nút bấm quá nhỏ không phù hợp thao tác ngón tay. Do đó, hệ thống đã kiến tạo kiến trúc **Dual-Platform chuyên biệt**.
@@ -1018,7 +1025,7 @@ Nhằm giải quyết triệt để lỗi nhảy giao diện và đáp ứng th�
 ## 15. Phân Hệ Quản Lý Tài Liệu Đơn Vị Trực Thuộc (`MyUnitPage`) & Chuẩn Hóa Danh Xưng Thư Viện Số
 
 ### 15.1. Chuẩn Hóa Danh Xưng "Trung Tâm Thư Viện Số" Toàn Diện
-Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Bộ Tư Lệnh Quân Khu 7:
+Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Trường Quân sự Quân khu 7:
 - Toàn bộ các chữ hiển thị `"Portal"` hoặc `"PORTAL"` trên toàn bộ giao diện đã được chuyển đổi thành **`"Trung tâm thư viện số"`**:
   - Thanh Header điều hướng (Desktop nav pills & iPad segmented glider).
   - Tiêu đề và biểu ngữ phụ của trang tra cứu văn bản (`PortalPage.tsx`).
@@ -1040,7 +1047,7 @@ Nhằm chuẩn hóa thuật ngữ hành chính quân sự của Bộ Tư Lệnh 
 ## 16. Kiến Trúc Giao Diện Tự Thích Ứng Chống Bể Layout Mọi Mức Phóng To (Adaptive Zoom-Proof Layout Engine)
 
 ### 16.1. Bối Cảnh & Thách Thức Khi Phóng To Màn Hình (Browser Zooming 125% – 200%)
-Trong môi trường công tác thực tế tại Bộ Tư Lệnh Quân Khu 7:
+Trong môi trường công tác thực tế tại Trường Quân sự Quân khu 7:
 - Cán bộ và chỉ huy thường phóng to trình duyệt (125%, 150%, 175%, 200%) để theo dõi chi tiết văn bản hoặc sử dụng màn hình laptop có độ phân giải phổ thông (1366×768, 1536×864).
 - Khi phóng to 175% trên màn hình Full HD (1920×1080), kích thước viewport thực tế co hẹp chỉ còn **~1097px** (trên màn hình 1536px chỉ còn ~877px).
 - **Hệ quả của layout cũ khi chưa tối ưu:**
@@ -1078,7 +1085,7 @@ Hệ thống thiết kế giải pháp phản hồi kích thước viewport theo
 ## 17. Kiến Trúc Phân Hệ Giám Sát Phiên Đang Trực Tuyến (Active Online Sessions Real-time Monitoring Engine)
 
 ### 17.1. Bối Cảnh Tác Chiến & Yêu Cầu An Ninh Mạng Quân Khu
-Trong môi trường mạng quân sự nội bộ của Bộ Tư Lệnh Quân Khu 7:
+Trong môi trường mạng quân sự nội bộ của Trường Quân sự Quân khu 7:
 - Các cán bộ, sĩ quan và nhân viên tác chiến đồng thời kết nối vào hệ thống từ nhiều loại thiết bị: máy tính bàn văn phòng (Desktop PC Widescreen), máy tính bảng tác chiến di động (**iPad Air M4**) và thiết bị đầu cuối chuyên dụng.
 - Nhằm phòng chống rủi ro chiếm đoạt phiên làm việc (Session Hijacking), tài khoản bị chia sẻ trái phép hoặc cán bộ rời vị trí quên đăng xuất, hệ thống triển khai phân hệ **Giám Sát Phiên Đang Trực Tuyến (`SessionsPage.tsx` - `/sessions`)** cung cấp bảng điều khiển trung tâm (Command Center Telemetry) cho kíp trực tác chiến mạng.
 
@@ -1193,6 +1200,145 @@ Nhằm hỗ trợ thủ trưởng và cán bộ tác chiến tra cứu nhanh đi
 - **Tinh giản giao diện Header:** Loại bỏ nút hướng dẫn nhanh thừa thãi trên Header bar để nhường không gian cho các công cụ điều khiển trọng yếu (`DeviceModeSwitch`, `ThemeToggle`, `User Profile`), chuyển toàn bộ điểm nhấn khám phá về đúng ngữ cảnh của Banner tác chiến.
 
 ---
-*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Bộ Tư Lệnh Quân Khu 7.*
+*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*
 
 
+
+
+---
+
+## 21. Kiến Trúc Watermark Động & Chống Rò Rỉ Tài Liệu Quân Sự (Dynamic Military Watermark Engine)
+
+### 21.1. Nguyên Tắc An Ninh Chống Chụp Màn Hình & Rò Rỉ Tài Liệu
+Nhằm ngăn chặn việc quay phim, chụp ảnh màn hình hoặc in ấn tài liệu nội bộ trái phép, hệ thống triển khai cơ chế **Watermark Động Đa Tầng (Dynamic Security Overlay)**:
+1. **Dữ liệu Watermark Nhúng Trực Tiếp:**
+   * Họ và tên quân nhân (`user.full_name`).
+   * Mã định danh tài khoản (`user.user_id` / `username`).
+   * Địa chỉ IP trạm máy khách (`client_ip`).
+   * Dấu thời gian thực (`YYYY-MM-DD HH:mm:ss`).
+2. **Kỹ Thuật Phủ Lưới Ma Trận SVG/Canvas:**
+   * Watermark được vẽ bằng lớp canvas/SVG trong suốt với góc nghiêng chuẩn **-45 độ**.
+   * Bố trí lặp tuần hoàn theo khoảng cách toán học cố định, đảm bảo mọi vị trí chụp trên màn hình đều dính ít nhất 1 dấu ấn định danh.
+   * Cưỡng chế CSS `pointer-events: none` và `user-select: none`, không cản trở thao tác đọc văn bản của quân nhân.
+
+### 21.2. Chuẩn Hóa Typography & Cưỡng Chế Kiểu Chữ Đồng Nhất
+* **Khắc phục lỗi chữ in nghiêng (Italic Bug Remediation):** Toàn bộ các lớp Watermark và vùng hiển thị văn bản PDF Markdown đều được cưỡng chế thuộc tính `font-style: normal !important`, kích thước font chuẩn hóa `13px - 14px`, loại bỏ hiện tượng chữ bị xiên vẹo hoặc lệch cỡ chữ giữa các hàng.
+* **Cơ chế Chống Xóa Phần Tử (Anti-Tamper DOM Mutation Observer):** Frontend giám sát liên tục lớp DOM Watermark. Nếu người dùng mở DevTools để sửa `display: none` hoặc xóa node watermark, `MutationObserver` lập tức phát hiện và tự động render lại ngay trong 16ms, đồng thời khóa màn hình xem văn bản.
+
+---
+
+## 22. Kiến Trúc Chốt Chặn Cứng 3 Lớp Khi Lệch Giờ Máy Trạm (Triple-Tier Hardened Clock Authority & Anti-Tampering Engine)
+
+### 22.1. Động Cơ Tấn Công Lệch Giờ & Rủi Ro An Ninh
+Trong môi trường văn thư bảo mật, kẻ tấn công hoặc quân nhân có ý định xem trộm tài liệu thường lùi đồng hồ máy trạm cục bộ (Client System Time) nhằm:
+* Gian lận thời hạn hiệu lực của `X-Fingerprint-Token` (vốn chỉ có hiệu lực 5 phút).
+* Gian lận thời gian phiên đăng nhập JWT (`exp` timestamp).
+* Giả mạo mốc thời gian ghi log trên hệ thống.
+
+### 22.2. Cơ Chế Chốt Chặn Cứng 3 Lớp (Triple-Tier Clock Enforcement)
+Để triệt tiêu hoàn toàn lỗ hổng trên, hệ thống thiết lập cơ chế kiểm soát thời gian chuẩn độc lập:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Máy Trạm Client
+    participant GW as Gateway Middleware (Express)
+    participant NTP as Clock Authority Server
+    participant DB as SQL Server & SOC
+
+    Note over Client,GW: Máy trạm gửi request kèm Client-Time-Header
+    GW->>NTP: Lấy mốc thời gian chuẩn đồng bộ (Google / NTP)
+    GW->>GW: Tính độ lệch Delta Drift = |Time_Client - Time_Server|
+    alt Delta Drift > Ngưỡng Cho Phép (60s)
+        GW-->>Client: ❌ 403 FORBIDDEN (TIME_DRIFT_EXCEEDED)
+        GW->>DB: Ghi ACCESS_LOG (Severity: CRITICAL)
+        Note over Client: UI kích hoạt Security Alert Modal & Khóa thao tác
+    else Thời gian hợp lệ
+        GW->>GW: Tiếp tục kiểm tra Clearance & Token vân tay
+        GW-->>Client: Cho phép truy xuất luồng tài liệu
+    end
+```
+
+1. **Lớp 1 — Gateway Clock Authority Middleware (`backend/server.js`):**
+   * Định kỳ mỗi 5 phút, Gateway tự động đồng bộ giờ chuẩn qua giao thức HTTP Date Header từ máy chủ thời gian tin cậy (`www.google.com` hoặc NTP nội bộ Quân đội).
+   * Mọi request yêu cầu mở tệp `/api/files/:fileId/view` đều được kiểm tra độ lệch thời gian $\Delta t = |t_{\text{client}} - t_{\text{authority}}|$.
+   * Nếu phát hiện lệch giờ vượt quá ngưỡng an toàn ($\pm 60$ giây) $\rightarrow$ Ngay lập tức từ chối `403 TIME_DRIFT_EXCEEDED`.
+2. **Lớp 2 — Giao Diện Client UI Security Guard:**
+   * Khi nhận mã lỗi `TIME_DRIFT_EXCEEDED`, giao diện hiển thị hộp thoại cảnh báo vi phạm an ninh nghiêm trọng.
+   * Tạm dừng toàn bộ tác vụ đọc văn bản, yêu cầu quân nhân chỉnh lại đồng hồ máy trạm về chế độ tự động đồng bộ (Automatic Time Sync).
+3. **Lớp 3 — Nhật Ký Kiểm Toán Tức Thì (SOC Incident Escalation):**
+   * Hệ thống tự động ghi bản ghi vào bảng `ACCESS_LOG` với hành động `TIME_DRIFT_SECURITY_ALERT`, mức độ nghiêm trọng `CRITICAL`, kèm địa chỉ IP và độ lệch thời gian thực tế để kíp trực an ninh xử lý.
+4. **Phạm Vi Bảo Vệ Toàn Diện:**
+   * Chốt chặn lệch giờ được kích hoạt trên **toàn bộ 5 cấp độ tài liệu (Cấp 1 Công khai, Cấp 2 Nội bộ, Cấp 3 Mật, Cấp 4 Tối Mật, Cấp 5 Tuyệt Mật)**, không có ngoại lệ.
+
+---
+
+## 23. Kiến Trúc Xác Thực 2FA Sinh Trắc Học Admin & Cơ Chế Fail-Safe Khi Khởi Tạo (Admin Biometric Guard & Fail-Safe Engine)
+
+### 23.1. Mô Hình Xác Thực Hai Lớp (2FA Biometric) Cho Quản Trị Viên
+* Tài khoản Quản trị viên tối cao (`USR-001`) nắm giữ toàn quyền kiểm soát hệ thống, do đó bắt buộc phải vượt qua 2 lớp bảo vệ vật lý:
+  * **Lớp 1:** Tên đăng nhập và Mật khẩu băm an toàn chuẩn bcrypt.
+  * **Lớp 2:** Xác thực sinh trắc học vân tay qua máy quét quang học chuyên dụng ZKTeco ZK9500 (500 DPI).
+* **Luồng Vé Tạm (Temp Ticket Protocol):**
+  * Sau khi kiểm tra đúng mật khẩu lớp 1, Gateway không cấp ngay JWT chính thức mà chỉ cấp một **Vé tạm thời (`temp_ticket`)** dạng JWT có thời hạn cực ngắn (2 phút), kèm trường `purpose: 'admin_login_fp'`.
+  * Vé tạm này chỉ có một quyền duy nhất: gọi endpoint `/api/auth/login/admin-fp-verify` kèm mã định danh máy quét `device_id`.
+  * Sau khi ngón tay đặt lên cảm biến ZK9500 và đối sánh đạt điểm số tin cậy (Score $\ge 45$), Gateway mới phát hành JWT chính thức với đầy đủ quyền hạn.
+
+### 23.2. Cơ Chế Khởi Tạo An Toàn Dự Phòng (Fail-Safe Initialization)
+* **Vấn Đề Kỹ Thuật (Chicken-and-Egg Dilemma):** Khi triển khai hệ thống mới tại đơn vị hoặc sau khi quản trị viên reset mẫu vân tay qua CLI, tài khoản Admin chưa có mẫu vân tay trong bảng `USER_FINGERPRINT` (`active = 0`). Nếu cưỡng chế 2FA ngay lập tức, Admin sẽ bị kẹt vĩnh viễn ở màn hình đăng nhập.
+* **Giải Pháp Fail-Safe:**
+  * Tại `backend/server.js`: Nếu kiểm tra thấy Admin chưa có mẫu vân tay `active = 1`, hệ thống tạm thời cho phép hoàn tất đăng nhập bằng mật khẩu lớp 1.
+  * Đồng thời ghi nhật ký cảnh báo an ninh: `LOGIN_NO_FP_WARNING: Admin đăng nhập không qua 2FA vân tay (chưa enroll) — Yêu cầu enroll ngay`.
+  * Trên giao diện Admin: Hiển thị thanh cảnh báo màu hổ phách nhắc nhở quản trị viên di chuyển ngay đến trang **Quản lý người dùng** để thực hiện thu thập mẫu vân tay 3 bước.
+
+---
+
+## 24. Kiến Trúc Whitelist IP Bảo Vệ Quản Trị & Chống Spam Cảnh Báo (Admin IP Whitelist & Toast Anti-Spam Engine)
+
+### 24.1. Danh Sách Trắng IP Dành Cho Quản Trị Viên (Admin IP Whitelist)
+* **Nguyên lý thu hẹp bề mặt tấn công (Attack Surface Reduction):** Chỉ cho phép đăng nhập tài khoản có clearance Cấp 5 / Quản trị viên từ các dải địa chỉ IP nội bộ đã đăng ký trước:
+  * Vòng lặp nội bộ (Loopback): `127.0.0.1`, `::1`.
+  * Dải mạng cố định của phòng máy chủ và phòng chỉ huy tham mưu.
+* **Cơ chế khóa IP tự động (Auto IP Blocklist):**
+  * Sử dụng bảng `IP_BLOCKLIST` theo dõi số lần đăng nhập thất bại.
+  * Nếu một địa chỉ IP nhập sai mật khẩu quá 5 lần hoặc cố tình dò quét tài khoản Admin, IP đó sẽ bị khóa truy cập tạm thời trong 15 phút.
+
+### 24.2. Bộ Đệm Chống Spam Thông Báo Lỗi 403 (Toast Debounce & Throttle)
+* **Vấn Đề Giao Diện:** Khi phiên làm việc hết hạn hoặc token bị thu hồi, các tác vụ nền định kỳ (Background Polling, Heartbeat, Notification check) liên tục gửi request đến Gateway và nhận về hàng loạt phản hồi `403 Forbidden`. Điều này khiến các hộp thông báo lỗi (`AnimatedToast`) nảy lên liên tục, làm giật lag trình duyệt và gây ức chế cho người dùng.
+* **Giải Pháp Kỹ Thuật:**
+  * Xây dựng bộ điều tốc (Throttle 2 giây) tại HTTP Client Interceptor (`frontend/src/services/http.ts`).
+  * Mọi lỗi `403` xảy ra trong khoảng thời gian $\le 2000$ ms chỉ được phép phát sinh duy nhất 1 thông báo Toast cảnh báo trên màn hình.
+
+---
+
+## 25. Kiến Trúc Kiểm Tra Trùng Lặp & Bóc Tách Văn Kiện PDF (PDF Deduplication SHA-256 & Smart Ingestion Engine)
+
+### 25.1. Chống Trùng Lặp Tài Liệu Bằng Mã Băm Mật Mã Học SHA-256
+* **Quy Trình Upload An Toàn:**
+  1. Khi quân nhân kéo-thả tệp PDF lên `DocumentDeskPage`, luồng dữ liệu binary được tính toán mã băm **SHA-256** ngay tại bộ đệm máy chủ.
+  2. Gateway thực hiện truy vấn đối chiếu: `SELECT file_id, title FROM DOCUMENT WHERE file_hash = @sha256`.
+  3. Nếu tìm thấy mã băm trùng khớp: Hệ thống lập tức từ chối lưu tệp mới, trả về thông báo văn bản đã tồn tại trong CSDL kèm số hiệu công văn cũ.
+  4. Giúp tiết kiệm tối đa tài nguyên lưu trữ và ngăn ngừa xung đột phiên bản văn kiện tác chiến.
+
+### 25.2. Pipeline Bóc Tách & Nạp Vector Ngữ Nghĩa Tự Động (AI Ingestion Pipeline)
+* Sau khi tệp PDF được lưu trữ thành công vào thư mục `uploads/YYYY/MM/`, Gateway tự động kích hoạt luồng xử lý AI không đồng bộ (Async Trigger) sang microservice Boxchat (`:8001`):
+  * `pdf_processor.py`: Trích xuất từng trang tài liệu kèm số trang gốc (`page_number`).
+  * `vector_store.py`: Phân mảnh thông minh (Chunking 900 ký tự, overlap 80 ký tự), chuyển đổi embedding qua model `bge-m3` và nạp vào Qdrant Local Engine.
+  * Tích hợp cờ bảo vệ độ mật: Gắn chặt metadata `security_level_id` vào từng vector chunk phục vụ lọc ngữ cảnh an toàn.
+
+---
+
+## 26. Quy Chuẩn Vận Hành AI Agent & Sổ Tay Khắc Phục Sự Cố (Agent Guidelines & Troubleshooting Engine)
+
+### 26.1. Quy Trình Phối Hợp Bắt Buộc Với AI Agent (Agent Workflow Guidelines)
+Toàn bộ đội ngũ kỹ sư và công cụ AI hỗ trợ lập trình (Antigravity Agent) bắt buộc phải tuân thủ nghiêm ngặt quy trình 3 bước đã được đặc tả tại [AGENT_WORKFLOW.md](./AGENT_WORKFLOW.md):
+1. **Bước 1 — Khởi động & Đọc tài liệu (Pre-task Context Loading):** Rà soát toàn bộ file Markdown, hiểu rõ kiến trúc 5 tầng và quy chuẩn an ninh 3 lớp trước khi gõ lệnh.
+2. **Bước 2 — Thực hiện tác vụ (Execution):** Triển khai thay đổi nhỏ, bảo toàn hợp đồng API Swagger, kiểm thử TypeScript và build sạch sẽ.
+3. **Bước 3 — Cập nhật tài liệu sau hoàn thành (Post-task Documentation Update):** Cập nhật đồng bộ các file tài liệu kiến trúc, nhật ký sự cố và changelog để đảm bảo tài liệu luôn là nguồn chân lý duy nhất.
+
+### 26.2. Sổ Tay Tổng Hợp Sự Cố & Giải Pháp (Troubleshooting Catalog)
+Toàn bộ danh mục 13 sự cố kỹ thuật điển hình đã từng gặp (từ lỗi DLL ZKTeco 32/64-bit, lỗi giải mã GCM Auth Tag, lỗi Stacking Context Modal, Stale lock Qdrant, xung đột cổng mạng đến lỗi Check Constraint SQL Server) được ghi chép đầy đủ kèm mã lỗi và hướng dẫn khắc phục chi tiết tại:
+👉 **[TROUBLESHOOTING_HISTORY.md](./TROUBLESHOOTING_HISTORY.md)**
+
+---
+*Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*

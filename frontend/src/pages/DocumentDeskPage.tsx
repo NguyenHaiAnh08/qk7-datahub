@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, RotateCw, FileCheck } from 'lucide-react';
 import { Header } from '../components/common/Header';
+import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { Toast, ToastState, toast } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { DocumentFilters } from '../components/document-desk/DocumentFilters';
@@ -11,13 +12,13 @@ import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
+import { isApprovalRequired } from '../utils/approvalUtils';
 
 const ITEMS_PER_PAGE = 8;
 
 export const DocumentDeskPage: React.FC = () => {
-  const { user } = useAuth();
-  const canUpload = (user?.roles || []).includes('ROL-01') || (user?.roles || []).includes('ROL-04');
-
+const { user, hasPermission } = useAuth(); 
+const canUpload = hasPermission('DOC_UPLOAD');
   // Metadata
   const [meta, setMeta] = useState<MetaData>({ types: [], units: [], levels: [] });
 
@@ -111,19 +112,15 @@ export const DocumentDeskPage: React.FC = () => {
   const handleDeleteConfirm = async () => {
     if (!deleteConfirmDoc) return;
     try {
-      await documentsApi.deleteDocument(deleteConfirmDoc.file_id);
+      const res: any = await documentsApi.deleteDocument(deleteConfirmDoc.file_id);
+      setDeleteConfirmDoc(null);
+      await loadDocuments();
+      if (isApprovalRequired(res)) return;
       toast.success(`Đã xóa văn bản ${deleteConfirmDoc.document_code} khỏi hệ thống văn thư.`, {
         title: 'XÓA TÀI LIỆU THÀNH CÔNG',
         badge: deleteConfirmDoc.document_code,
       });
-      setDeleteConfirmDoc(null);
-      await loadDocuments();
-    } catch (err: any) {
-      toast.error('Lỗi xóa văn bản: ' + err.message, {
-        title: 'LỖI THAO TÁC',
-        badge: 'DELETE-ERR',
-      });
-    }
+    } catch (err: any) { /* existing */ }
   };
 
   // Download Handler
@@ -212,6 +209,8 @@ export const DocumentDeskPage: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
+        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
+        <DataHubSubNav activeTab="desk" />
         {/* Top Action & Title Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>

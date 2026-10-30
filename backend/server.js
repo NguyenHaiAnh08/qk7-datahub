@@ -17,9 +17,12 @@ const rateLimit = require('express-rate-limit');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf } = require('./pdf-parser');
+const { getAuthoritativeServerTime, detectOsClockTamper } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
+const createApprovalWorkflow = require('./src/approval-workflow');
+const { getAutoRequiredPermission } = require('./src/route-permissions');
 require('dotenv').config({
-  path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env')],
+  path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')],
 });
 
 const {
@@ -51,6 +54,10 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const FINGERPRINT_TOKEN_EXPIRES_IN = '5m';
 const BRIDGE_TOKEN = process.env.FINGERPRINT_BRIDGE_TOKEN || '';
 
+// ✅ CẤU HÌNH BẢO MẬT ADMIN (2FA)
+const PROTECTED_ADMIN_USER_ID = process.env.PROTECTED_ADMIN_USER_ID || 'USR-001';
+const ADMIN_ALLOWED_IP = (process.env.ADMIN_ALLOWED_IP || '').split(',').map(ip => ip.trim()).filter(Boolean);
+
 const FP_ENC_KEY = process.env.FP_ENC_KEY
   ? crypto.scryptSync(process.env.FP_ENC_KEY, 'qk7-fp-salt', 32)
   : null;
@@ -81,9 +88,13 @@ app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
+  originAgentCluster: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  hsts: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
 }));
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['X-Server-Time', 'X-Trace-Id', 'X-Clock-Timestamp', 'Content-Disposition'],
+}));
 app.use(express.json({ limit: '2mb' }));
 app.disable('x-powered-by');
 
@@ -134,7 +145,16 @@ app.use('/api/fingerprint/enroll', fingerprintLimiter);
 // ═══════════════════════════════════════════════════════════════
 // STATIC & SWAGGER
 // ═══════════════════════════════════════════════════════════════
-app.use(express.static(publicDir));
+app.use(express.static(publicDir, {
+  setHeaders: (res, filePath) => {
+    // Không cache file HTML để client luôn cập nhật phiên bản mới nhất ngay lập tức
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 const ENABLE_SWAGGER = (process.env.ENABLE_SWAGGER || 'true').toLowerCase() === 'true';
 if (ENABLE_SWAGGER) {
@@ -147,9 +167,20 @@ if (ENABLE_SWAGGER) {
   console.log('[SWAGGER] Enabled at /api-docs');
 }
 
+app.get('/favicon.ico', (req, res) => {
+  const icoPath = path.join(publicDir, 'favicon.ico');
+  const pngPath = path.join(publicDir, 'favicon.png');
+  if (fs.existsSync(icoPath)) return res.type('image/x-icon').sendFile(icoPath);
+  if (fs.existsSync(pngPath)) return res.type('image/png').sendFile(pngPath);
+  res.status(204).end();
+});
+
 app.get('/', (req, res) => {
   const p = path.join(publicDir, 'index.html');
-  if (fs.existsSync(p)) res.sendFile(p);
+  if (fs.existsSync(p)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(p);
+  }
   else res.status(404).send('Không tìm thấy public/index.html');
 });
 
@@ -258,7 +289,7 @@ function getClientIp(req) {
 async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
   try {
     const pool = await getPool();
-    const logId = 'LOG-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    const logId = 'REF-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const validUserId = (userId && userId !== 'GUEST' && userId !== 'UNKNOWN') ? userId : null;
     await pool.request()
       .input('log_id', sql.VarChar(50), logId)
@@ -269,6 +300,7 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
       .input('note', sql.NVarChar(255), note ? String(note).slice(0, 255) : null)
       .query(`INSERT INTO ACCESS_LOG (log_id, user_id, file_id, [action], ip, note)
               VALUES (@log_id, @user_id, @file_id, @action, @ip, @note)`);
+    return logId;
   } catch (err) {
     console.error('[writeAccessLog]', err.message);
   }
@@ -277,9 +309,6 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
 // ═══════════════════════════════════════════════════════════════
 // DEPENDENCY INJECTION — Permissions / Sessions / Config
 // ═══════════════════════════════════════════════════════════════
-// ✅ FIX 2 (phần 1/2): MỘT instance permissions duy nhất
-//    → cache đồng bộ giữa requirePermission middleware và invalidateCache
-//    → loại bỏ dead-code `perms` không dùng, tránh bug chờ phát sinh
 const createPermissionsModule = require('./src/permissions');
 const perms = createPermissionsModule({
   sql, getPool, writeAccessLog, getClientIp,
@@ -329,6 +358,7 @@ app.use('/api', async (req, res, next) => {
 
   const isPublic =
     req.path === '/auth/login' ||
+    req.path === '/auth/login/admin-fp-verify' || // ✅ Thêm route xác thực vân tay Admin
     req.path === '/health' ||
     req.path === '/meta' ||
     req.path.startsWith('/test-http-error');
@@ -375,6 +405,18 @@ app.use('/api', async (req, res, next) => {
   }
 });
 
+// ============================================================
+// 2. SETUP APPROVAL WORKFLOW — NGAY SAU MIDDLEWARE JWT
+// ============================================================
+const { approvalInterceptor } = createApprovalWorkflow({
+  sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission
+});
+
+app.use('/api', approvalInterceptor);
+
+// ============================================================
+// 3. HELPER AUTH (function declaration → hoisted, vị trí tự do)
+// ============================================================
 function requireAuth(req, res, next) {
   if (!req.user || !req.user.is_authenticated) {
     return res.status(401).json({ error: 'Cần đăng nhập để thực hiện thao tác này' });
@@ -393,11 +435,22 @@ function encryptTemplate(buffer) {
   const tag = cipher.getAuthTag();
   return 'enc:' + Buffer.concat([iv, tag, enc]).toString('base64');
 }
-function decryptTemplate(encoded) {
+function decryptTemplate(encoded, context = {}) {
   if (!encoded) return null;
-  if (!FP_ENC_KEY || !encoded.startsWith('enc:')) return Buffer.from(encoded, 'base64');
+  if (!FP_ENC_KEY || !encoded.startsWith('enc:')) {
+    try {
+      return Buffer.from(encoded, 'base64');
+    } catch (err) {
+      console.error(`[decryptTemplate] Lỗi parse base64 plain cho user=${context.userId || 'N/A'}:`, err.message);
+      return null;
+    }
+  }
   try {
     const buf = Buffer.from(encoded.slice(4), 'base64');
+    if (buf.length < 28) {
+      console.error(`[decryptTemplate] Dữ liệu mã hóa không đủ độ dài header (length=${buf.length} < 28)`, context);
+      return null;
+    }
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const enc = buf.subarray(28);
@@ -405,7 +458,11 @@ function decryptTemplate(encoded) {
     d.setAuthTag(tag);
     return Buffer.concat([d.update(enc), d.final()]);
   } catch (err) {
-    console.error('[decryptTemplate]', err.message);
+    console.error(`[decryptTemplate] ❌ Lỗi giải mã AES-256-GCM cho user=${context.userId || 'N/A'}:`, {
+      error: err.message,
+      reason: 'GCM Auth Tag thất bại — FP_ENC_KEY hiện tại trong .env không khớp với khóa đã mã hóa template này trong DB, hoặc dữ liệu đã bị biến đổi.',
+      action: context.action || 'VERIFY'
+    });
     return null;
   }
 }
@@ -427,12 +484,15 @@ async function checkIpBlocked(ip) {
 }
 
 async function writeLoginAttempt({ ip, username, result }) {
+  // DB check constraint CK_LA_RESULT: ([result]='LOCKED' OR [result]='USERNAME_NOT_FOUND' OR [result]='WRONG_PASSWORD' OR [result]='SUCCESS')
+  const allowed = ['LOCKED', 'USERNAME_NOT_FOUND', 'WRONG_PASSWORD', 'SUCCESS'];
+  const sanitizedResult = allowed.includes(result) ? result : (result.includes('FAIL') ? 'WRONG_PASSWORD' : 'SUCCESS');
   try {
     const pool = await getPool();
     await pool.request()
       .input('ip', sql.VarChar(50), ip)
       .input('username', sql.NVarChar(50), username || null)
-      .input('result', sql.VarChar(30), result)
+      .input('result', sql.VarChar(30), sanitizedResult)
       .query(`INSERT INTO LOGIN_ATTEMPT (ip, username, result) VALUES (@ip, @username, @result)`);
   } catch (err) { console.error('[writeLoginAttempt]', err.message); }
 }
@@ -516,6 +576,17 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = r.recordset[0];
+
+    // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
+    // C
+    // if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+    //   if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
+    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
+    //     await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
+    //     return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
+    //   }
+    // }
+
     if (user.status !== 'active') {
       await writeLoginAttempt({ ip, username, result: 'LOCKED' });
       await writeAccessLog({
@@ -574,6 +645,43 @@ app.post('/api/auth/login', async (req, res) => {
       .input('uid', sql.VarChar(50), user.user_id)
       .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL, last_failed_at = NULL, status = 'active' WHERE user_id = @uid`);
 
+    // ✅ BƯỚC 2: NẾU LÀ ADMIN -> YÊU CẦU QUÉT VÂN TAY (2FA Biometric)
+    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+      const fpRes = await pool.request()
+        .input('uid', sql.VarChar(50), user.user_id)
+        .query(`SELECT template_enc FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
+      
+      if (fpRes.recordset.length === 0) {
+        // Tài khoản Admin chưa đăng ký vân tay (hoặc vừa reset qua CLI): Cho phép login password để tiến hành enroll ngay
+        console.warn(`[SECURITY] ⚠️ Tài khoản Quản trị viên tối cao (${user.user_id}) chưa kích hoạt vân tay active. Cho phép đăng nhập mật khẩu để tiến hành enroll tại Quản lý Người dùng.`);
+        await writeAccessLog({
+          userId: user.user_id,
+          fileId: null,
+          action: 'LOGIN_NO_FP_WARNING',
+          ip,
+          note: 'Admin đăng nhập không qua 2FA vân tay (chưa enroll hoặc vừa reset) — Yêu cầu enroll ngay'
+        });
+      } else {
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
+
+        // Tạo vé tạm (Temp Ticket) có hạn 2 phút
+        const tempTicket = jwt.sign(
+          { user_id: user.user_id, purpose: 'admin_login_fp' },
+          JWT_SECRET,
+          { expiresIn: '2m' }
+        );
+
+        return res.status(202).json({
+          success: true,
+          require_admin_fp: true,
+          temp_ticket: tempTicket,
+          message: 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+        });
+      }
+    }
+
+
+    // User thường -> Cấp JWT và cho vào luôn
     await writeLoginAttempt({ ip, username, result: 'SUCCESS' });
 
     delete user.password_hash;
@@ -629,6 +737,139 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (err) {
     console.error('[POST /api/auth/login]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ BƯỚC 3: API XÁC THỰC VÂN TAY ĐỂ HOÀN TẤT LOGIN ADMIN
+app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
+  const { temp_ticket, device_id } = req.body;
+  const ip = getClientIp(req);
+
+  try {
+    if (!temp_ticket || !device_id) return res.status(400).json({ error: 'Thiếu dữ liệu xác thực (temp_ticket hoặc device_id)' });
+    if (!isAgentOnline(device_id)) return res.status(503).json({ error: 'Máy quét vân tay chưa sẵn sàng.', agent_offline: true });
+
+    // 1. Verify vé tạm
+    let decoded;
+    try {
+      decoded = jwt.verify(temp_ticket, JWT_SECRET);
+      if (decoded.purpose !== 'admin_login_fp') throw new Error('Sai purpose');
+    } catch {
+      return res.status(401).json({ error: 'Phiên xác thực đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+
+    // 2. Lấy Template vân tay của Admin trong DB
+    const pool = await getPool();
+    const fpRes = await pool.request()
+      .input('uid', sql.VarChar(50), decoded.user_id)
+      .query(`SELECT template_enc FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
+    
+    if (fpRes.recordset.length === 0) {
+      return res.status(403).json({ error: 'Chưa đăng ký vân tay.' });
+    }
+
+    const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc, {
+      userId: decoded.user_id,
+      action: 'ADMIN_LOGIN_2FA'
+    });
+    if (!templateBuffer) {
+      console.error(`[admin-fp-verify] ❌ Template vân tay của Admin (${decoded.user_id}) bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY.`);
+      await writeAccessLog({
+        userId: decoded.user_id,
+        fileId: null,
+        action: 'LOGIN_FAIL_FP',
+        ip,
+        note: 'Admin 2FA thất bại: Template vân tay bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY'
+      });
+      return res.status(500).json({
+        error: 'Template vân tay bị hỏng hoặc sai khóa mã hóa hệ thống.',
+        code: 'TEMPLATE_DECRYPT_FAILED',
+        details: 'Không thể giải mã template vân tay bằng khóa FP_ENC_KEY hiện tại. Vui lòng kiểm tra khóa bí mật hoặc enroll lại vân tay.'
+      });
+    }
+    const templateB64 = templateBuffer.toString('base64');
+
+    // 3. Gửi lệnh quét xuống Agent
+    let scanResult;
+    try {
+      scanResult = await requestScan(device_id, { template_b64: templateB64, file_id: 'ADMIN_LOGIN' });
+    } catch (err) {
+      if (err.message === 'AGENT_OFFLINE' || err.message === 'AGENT_DISCONNECTED') {
+        return res.status(503).json({ error: 'Máy quét vừa mất kết nối.', agent_offline: true });
+      }
+      if (err.message === 'SCAN_TIMEOUT') {
+        return res.status(408).json({ error: 'Hết thời gian chờ quét vân tay.' });
+      }
+      throw err;
+    }
+
+    if (!scanResult.match) {
+      await writeAccessLog({ userId: decoded.user_id, fileId: null, action: 'LOGIN_FAIL_FP', ip, note: `Vân tay sai (score=${scanResult.score})` });
+      return res.status(403).json({ error: `Vân tay không khớp (score=${scanResult.score}). Vui lòng thử lại.` });
+    }
+
+    // 4. Vân tay khớp -> Lấy lại thông tin User và Cấp JWT chính thức
+    const uRes = await pool.request()
+      .input('uid', sql.VarChar(50), decoded.user_id)
+      .query(`
+        SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name,
+               u.[position], u.unit_id, u.status, u.clearance_level_id,
+               un.name AS unit_name, sl.name AS clearance_name, sl.code AS clearance_code,
+               CASE WHEN EXISTS (SELECT 1 FROM USER_FINGERPRINT uf WHERE uf.user_id = u.user_id AND uf.active = 1) THEN 1 ELSE 0 END AS has_fingerprint
+        FROM [USER] u
+        LEFT JOIN UNIT un ON un.unit_id = u.unit_id
+        LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
+        WHERE u.user_id = @uid
+      `);
+
+    if (uRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
+    const user = uRes.recordset[0];
+    user.has_fingerprint = user.has_fingerprint === 1;
+
+    const rolesRes = await pool.request()
+      .input('uid', sql.VarChar(50), user.user_id)
+      .query(`SELECT r.role_id, r.name FROM USER_ROLE ur JOIN [ROLE] r ON r.role_id = ur.role_id
+              WHERE ur.user_id = @uid AND (ur.expires_at IS NULL OR ur.expires_at > GETDATE())`);
+    user.roles = rolesRes.recordset.map((x) => x.role_id);
+    user.role_names = rolesRes.recordset.map((x) => x.name);
+
+    const token = jwt.sign(
+      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles },
+      JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    const match = JWT_EXPIRES_IN.match(/^(\d+)\s*([smhd])$/i);
+    let ttlMs = 8 * 60 * 60 * 1000;
+    if (match) {
+      const n = parseInt(match[1], 10);
+      const mult = { s: 1000, m: 60000, h: 3600000, d: 86400000 }[match[2].toLowerCase()] || 3600000;
+      ttlMs = n * mult;
+    }
+
+    await createSession({
+      userId: user.user_id,
+      clearanceLevelId: user.clearance_level_id,
+      token,
+      ip,
+      userAgent: req.headers['user-agent'],
+      expiresInMs: ttlMs,
+    });
+
+    await writeAccessLog({
+      userId: user.user_id, fileId: null, action: 'LOGIN_ADMIN_2FA', ip,
+      note: `${user.full_name} (Đăng nhập Admin 2FA vân tay)`,
+    });
+
+    const permissions = await getUserPermissions(user.user_id);
+
+    res.json({
+      success: true, token, expires_in: JWT_EXPIRES_IN,
+      user: { ...user, permissions },
+    });
+
+  } catch (err) {
+    console.error('[POST /api/auth/login/admin-fp-verify]', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -723,9 +964,25 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
       return res.status(403).json({ error: 'Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên.', needs_enroll: true });
     }
 
-    const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc);
+    const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc, {
+      userId: req.user.user_id,
+      action: 'FILE_VERIFY',
+      fileId
+    });
     if (!templateBuffer || templateBuffer.length < 100) {
-      return res.status(500).json({ error: 'Template vân tay bị hỏng. Vui lòng enroll lại.' });
+      console.error(`[fingerprint/verify] ❌ Template vân tay của user (${req.user.user_id}) bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY.`);
+      await writeAccessLog({
+        userId: req.user.user_id,
+        fileId,
+        action: 'VERIFY_FAIL_FP',
+        ip: getClientIp(req),
+        note: 'Xác thực vân tay thất bại: Template vân tay bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY'
+      });
+      return res.status(500).json({
+        error: 'Template vân tay bị hỏng hoặc sai khóa mã hóa. Vui lòng enroll lại.',
+        code: 'TEMPLATE_DECRYPT_FAILED',
+        details: 'Không thể giải mã template vân tay bằng khóa FP_ENC_KEY hiện tại.'
+      });
     }
     const templateB64 = templateBuffer.toString('base64');
 
@@ -1446,26 +1703,65 @@ app.get('/api/files/:fileId/view', async (req, res) => {
 
   try {
     const pool = await getPool();
-    const result = await pool.request()
-      .input('file_id', sql.VarChar(50), fileId)
-      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at FROM DOCUMENT WHERE file_id = @file_id`);
+    let result = await pool.request()
+      .input('file_id', sql.VarChar(100), fileId)
+      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE file_id = @file_id`);
+
+    // Smart Document Resolver Fallback: Nếu không tìm thấy theo file_id
+    if (result.recordset.length === 0) {
+      // 1. Thử tìm theo document_code
+      result = await pool.request()
+        .input('file_id', sql.NVarChar(100), fileId)
+        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE document_code = @file_id`);
+    }
+
+    if (result.recordset.length === 0) {
+      // 2. Thử tìm theo stored_path hoặc original_name chứa fileId
+      result = await pool.request()
+        .input('file_id_pattern', sql.NVarChar(200), `%${fileId}%`)
+        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE stored_path LIKE @file_id_pattern OR original_name LIKE @file_id_pattern`);
+    }
+
+    if (result.recordset.length === 0 && fileId.startsWith('PDF-')) {
+      // 3. Fallback cho synthetic ID dạng PDF-xxx: Lọc ký tự và so khớp với stored_path/document_code
+      const cleanStem = fileId.replace(/^PDF-/, '').replace(/[^a-zA-Z0-9]/g, '');
+      if (cleanStem.length >= 6) {
+        const allDocs = await pool.request().query(`
+          SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code 
+          FROM DOCUMENT WHERE deleted_at IS NULL
+        `);
+        const matched = allDocs.recordset.find((d) => {
+          const p = (d.stored_path || '').replace(/[^a-zA-Z0-9]/g, '');
+          const o = (d.original_name || '').replace(/[^a-zA-Z0-9]/g, '');
+          const c = (d.document_code || '').replace(/[^a-zA-Z0-9]/g, '');
+          return (p && (p.includes(cleanStem.slice(0, 16)) || cleanStem.includes(p.slice(-16)))) ||
+                 (o && (o.includes(cleanStem.slice(0, 16)) || cleanStem.includes(o.slice(-16)))) ||
+                 (c && cleanStem.includes(c));
+        });
+        if (matched) {
+          result = { recordset: [matched] };
+        }
+      }
+    }
+
     if (result.recordset.length === 0) {
       await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Không tìm thấy' });
       return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
     }
     const doc = result.recordset[0];
+    const canonicalFileId = doc.file_id || fileId;
 
     if (doc.deleted_at) {
       const canViewTrash = (req.user.permissions || []).includes('DOC_TRASH_VIEW')
                           || (req.user.roles || []).includes('ROL-01');
       if (!canViewTrash) {
-        await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa' });
+        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa' });
         return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
       }
     }
 
     if (doc.security_level_id > req.user.clearance_level_id) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Không đủ cấp' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Không đủ cấp' });
       return res.status(403).json({ error: 'Không có quyền truy cập' });
     }
 
@@ -1480,7 +1776,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       try {
         const decoded = jwt.verify(fpToken, JWT_SECRET);
         if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
-        if (decoded.file_id !== fileId) throw new Error('Token không khớp file');
+        if (decoded.file_id !== fileId && decoded.file_id !== canonicalFileId) throw new Error('Token không khớp file');
         if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
       } catch {
         return res.status(403).json({
@@ -1490,13 +1786,13 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       }
 
       if (isDownload) {
-        await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Cấp 3+ không được tải' });
+        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Cấp 3+ không được tải' });
         return res.status(403).json({ error: 'Tài liệu Cấp 3+ chỉ xem trực tiếp, không tải về.' });
       }
     }
 
     if (!validateStoredPath(doc.stored_path)) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Path không hợp lệ' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Path không hợp lệ' });
       return res.status(400).json({ error: 'Đường dẫn tệp không hợp lệ' });
     }
 
@@ -1511,27 +1807,46 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     }
 
     if (!filePath || !fs.existsSync(filePath)) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'ERROR', ip, note: 'File không tồn tại' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'ERROR', ip, note: 'File không tồn tại' });
       return res.status(404).json({ error: 'File không tồn tại trên hệ thống lưu trữ' });
     }
 
     const lst = fs.lstatSync(filePath);
     if (lst.isSymbolicLink()) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Symlink bị chặn' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Symlink bị chặn' });
       return res.status(403).json({ error: 'Không thể truy cập tệp' });
     }
     if (!filePath.toLowerCase().endsWith('.pdf')) {
-      await writeAccessLog({ userId: req.user.user_id, fileId, action: 'DENIED', ip, note: 'Extension không phải PDF' });
+      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Extension không phải PDF' });
       return res.status(403).json({ error: 'Chỉ chấp nhận tệp PDF' });
     }
 
-    await writeAccessLog({
-      userId: req.user.user_id, fileId,
+    const logId = await writeAccessLog({
+      userId: req.user.user_id, fileId: canonicalFileId,
       action: isDownload ? 'DOWNLOAD' : 'VIEW', ip,
     });
 
+    const serverNow = getAuthoritativeServerTime();
+    const tamper = detectOsClockTamper();
+    if (tamper.isTampered) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId: canonicalFileId,
+        action: 'CLOCK_TAMPER_ALERT', ip,
+        note: `CẢNH BÁO: Giờ hệ điều hành máy trạm bị sai lệch ${tamper.skewMinutes} phút so với giờ chuẩn máy chủ QK7.`,
+      });
+    }
+
     res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
     res.setHeader('Content-Disposition', `${isDownload ? 'attachment' : 'inline'}; filename="${encodeURIComponent(doc.original_name)}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'X-Server-Time, X-Trace-Id, X-Clock-Timestamp, X-Clock-Tamper, Content-Disposition');
+    res.setHeader('X-Server-Time', serverNow.toISOString());
+    res.setHeader('X-Clock-Timestamp', serverNow.getTime().toString());
+    if (tamper.isTampered) {
+      res.setHeader('X-Clock-Tamper', '1');
+    }
+    if (logId) {
+      res.setHeader('X-Trace-Id', logId);
+    }
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     console.error('[GET file view]', err);
@@ -1655,6 +1970,7 @@ app.use('/api/ai', requireAuth, require('./src/ai-routes')({
   requirePermission,
   writeAccessLog,
   getClientIp,
+  JWT_SECRET,
 }));
 
 // ═══════════════════════════════════════════════════════════════
@@ -1680,8 +1996,19 @@ app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs')) return next();
   const indexPath = path.join(publicDir, 'index.html');
-  if (fs.existsSync(indexPath)) res.sendFile(indexPath);
+  if (fs.existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(indexPath);
+  }
   else res.status(404).send('Không tìm thấy public/index.html');
+});
+
+// 404 Handler cho các API endpoint không tồn tại (trả về JSON thay vì HTML Express mặc định)
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: `API endpoint không tồn tại: ${req.method} ${req.originalUrl}`,
+    code: 'NOT_FOUND',
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════

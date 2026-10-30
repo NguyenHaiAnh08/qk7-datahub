@@ -11,7 +11,7 @@ require('dotenv').config({
 const config = {
   user:     process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  server:   process.env.DB_SERVER,
+  server:   (process.env.DB_SERVER === 'localhost' ? '127.0.0.1' : process.env.DB_SERVER) || '127.0.0.1',
   database: process.env.DB_DATABASE,
   port:     parseInt(process.env.DB_PORT || '1433', 10),
   options: {

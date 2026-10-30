@@ -24,6 +24,8 @@ export interface UserFormModalProps {
   user?: User | null;
   units: Unit[];
   securityLevels: SecurityLevel[];
+  currentUserClearance?: number;
+  isAdminUser?: boolean;
   roles?: Role[];
   ranks?: MilitaryRank[];
   positions?: MilitaryPosition[];
@@ -34,7 +36,7 @@ export interface UserFormModalProps {
 }
 
 /**
- * Tự động tính toán mã quân nhân kế tiếp theo thứ tự tăng dần, lấp đầy khoảng trống (ví dụ: có 1, 3, 4 -> lấy 2; có 1, 2, 3 -> lấy 4)
+ * Tự động tính toán mã quân nhân kế tiếp theo thứ tự tăng dần, lấp đầy khoảng trống
  */
 export const getNextUserId = (users: Array<{ user_id?: string }>): string => {
   const existingNums = new Set<number>();
@@ -55,7 +57,6 @@ export const getNextUserId = (users: Array<{ user_id?: string }>): string => {
   return `USR-${String(candidate).padStart(3, '0')}`;
 };
 
-
 export const DEFAULT_USER_PASSWORD = '123456789';
 
 export const UserFormModal: React.FC<UserFormModalProps> = ({
@@ -70,24 +71,49 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   onClose,
   onSave,
   onToast,
+  currentUserClearance = 1,
+  isAdminUser = false,
 }) => {
   const isEdit = Boolean(user);
+
+  // ── Ranks & Positions ──
+  const [availableRanks, setAvailableRanks] = useState<MilitaryRank[]>(ranks || []);
+  const [availablePositions, setAvailablePositions] = useState<MilitaryPosition[]>(positions || []);
 
   // ── Roles ──
   const [availableRoles, setAvailableRoles] = useState<Role[]>(roles || []);
 
-  // ── Ranks & Positions (thay vì hard-code) ──
-  const [availableRanks, setAvailableRanks] = useState<MilitaryRank[]>(ranks || []);
-  const [availablePositions, setAvailablePositions] = useState<MilitaryPosition[]>(positions || []);
+  // [FIX] State riêng cho kết quả API — KHÔNG trùng tên với prop `isAdminUser`
+  const [isAdminFromApi, setIsAdminFromApi] = useState<boolean | null>(null);
+  // Giá trị hợp nhất: ưu tiên kết quả API, fallback về prop
+  const resolvedIsAdmin = isAdminFromApi ?? isAdminUser;
 
-  // ── Đồng bộ props vào state ──
+  // [SECURITY FIX v4.3.1] Lọc levels theo quyền người đang thao tác
+  const availableLevels = React.useMemo(() => {
+    if (resolvedIsAdmin) return securityLevels;
+    return securityLevels.filter((lvl) => lvl.level_id <= currentUserClearance);
+  }, [securityLevels, resolvedIsAdmin, currentUserClearance]);
+
+  // ═══════════════════════════════════════════════════════════
+  // [NEW] Load danh sách role ĐƯỢC PHÉP TẠO theo quyền user hiện tại
+  // Admin → tất cả | IT → chỉ Trợ lý + Chỉ huy
+  // ═══════════════════════════════════════════════════════════
   useEffect(() => {
-    if (roles && roles.length > 0) {
-      setAvailableRoles(roles);
-    } else if (open) {
-      dashboardApi.getRoles().then((res) => setAvailableRoles(res.items || [])).catch(() => {});
-    }
-  }, [roles, open]);
+    if (!open) return;
+
+    dashboardApi
+      .getCreatableRoles?.()
+      .then((res: any) => {
+        setAvailableRoles(res.items || []);
+        setIsAdminFromApi(Boolean(res.is_admin));
+      })
+      .catch(() => {
+        if (roles && roles.length > 0) {
+          setAvailableRoles(roles);
+        }
+        setIsAdminFromApi(null);
+      });
+  }, [open, roles]);
 
   useEffect(() => {
     if (ranks && ranks.length > 0) {
@@ -96,9 +122,9 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     if (positions && positions.length > 0) {
       setAvailablePositions(positions);
     }
-    // Fallback: nếu parent không truyền, tự load từ /api/meta
     if (open && (!ranks || ranks.length === 0 || !positions || positions.length === 0)) {
-      dashboardApi.getMeta()
+      dashboardApi
+        .getMeta()
         .then((meta: any) => {
           if (!ranks || ranks.length === 0) setAvailableRanks(meta.ranks || []);
           if (!positions || positions.length === 0) setAvailablePositions(meta.positions || []);
@@ -107,7 +133,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     }
   }, [ranks, positions, open]);
 
-  // ── Đơn vị công tác (Hỗ trợ mô hình phân cấp cha - con) ──
+  // ── Đơn vị công tác ──
   const [availableUnits, setAvailableUnits] = useState<Unit[]>(units || []);
 
   useEffect(() => {
@@ -140,7 +166,6 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   );
   const unitTree = React.useMemo(() => buildUnitTree(filteredUnits), [filteredUnits]);
 
-  // Thu thập các cấp cha để tự động mở rộng (Quân khu 7, Trường Quân sự QK7)
   const defaultExpandedKeys = React.useMemo(() => {
     const keys: string[] = [];
     const collectParentKeys = (nodes: any[]) => {
@@ -237,6 +262,16 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       return;
     }
 
+    // [SECURITY FIX v4.3.1] Chặn chọn cấp bảo mật cao hơn cấp của caller
+    // (đồng bộ với check phía backend `CLEARANCE_ESCALATION_DENIED`)
+    const requestedClearance = Number(formData.clearance_level_id);
+    if (!resolvedIsAdmin && requestedClearance > currentUserClearance) {
+      setError(
+        `Không thể chọn cấp bảo mật (Cấp ${requestedClearance}) cao hơn cấp của bạn (Cấp ${currentUserClearance})!`
+      );
+      return;
+    }
+
     if (!isEdit) {
       if (!formData.username || !formData.username.trim()) {
         setError('Tên đăng nhập (Username) không được để trống!');
@@ -244,6 +279,11 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       }
       if (!formData.password || formData.password.length < 8) {
         setError('Mật khẩu cần ít nhất 8 ký tự!');
+        return;
+      }
+      // [SECURITY FIX v4.3.1] Non-admin phải chọn role (Trợ lý / Chỉ huy)
+      if (!resolvedIsAdmin && !formData.role_id) {
+        setError('Vui lòng chọn vai trò cho tài khoản mới (Trợ lý hoặc Chỉ huy).');
         return;
       }
     }
@@ -456,71 +496,68 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   Đơn vị công tác
                 </label>
-                <div
-                  className="unit-treeselect-wrapper"
-                  style={{ position: 'relative', width: '100%' }}
-                >
+                <div className="unit-treeselect-wrapper" style={{ position: 'relative', width: '100%' }}>
                   <TreeSelect
-                  value={formData.unit_id || undefined}
-                  onChange={(val) => setFormData({ ...formData, unit_id: val || '' })}
-                  treeData={unitTree}
-                  placeholder="Chọn đơn vị công tác"
-                  allowClear={{
-                    clearIcon: (
-                      <span
-                        className="flex items-center justify-center w-4 h-4 rounded-full bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-700/70 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 transition-all cursor-pointer"
-                        title="Xóa lựa chọn đơn vị"
-                      >
-                        <X className="w-2.5 h-2.5 stroke-[2]" />
-                      </span>
-                    ),
-                  }}
-                  treeExpandedKeys={treeExpandedKeys}
-                  onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
-                  onOpenChange={(visible) => {
-                    if (visible && defaultExpandedKeys.length > 0) {
-                      setTreeExpandedKeys(defaultExpandedKeys);
+                    value={formData.unit_id || undefined}
+                    onChange={(val) => setFormData({ ...formData, unit_id: val || '' })}
+                    treeData={unitTree}
+                    placeholder="Chọn đơn vị công tác"
+                    allowClear={{
+                      clearIcon: (
+                        <span
+                          className="flex items-center justify-center w-4 h-4 rounded-full bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-700/70 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 transition-all cursor-pointer"
+                          title="Xóa lựa chọn đơn vị"
+                        >
+                          <X className="w-2.5 h-2.5 stroke-[2]" />
+                        </span>
+                      ),
+                    }}
+                    treeExpandedKeys={treeExpandedKeys}
+                    onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
+                    onOpenChange={(visible) => {
+                      if (visible && defaultExpandedKeys.length > 0) {
+                        setTreeExpandedKeys(defaultExpandedKeys);
+                      }
+                    }}
+                    treeLine={{ showLeafIcon: false }}
+                    switcherIcon={(nodeProps: any) => {
+                      if (nodeProps.isLeaf) return null;
+                      const isExpanded = Boolean(nodeProps.expanded);
+                      return (
+                        <span
+                          className={`qk7-tree-switcher-btn ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+                          title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                        >
+                          {isExpanded ? (
+                            <Minus className="w-3 h-3 stroke-[2.5]" />
+                          ) : (
+                            <Plus className="w-3 h-3 stroke-[2.5]" />
+                          )}
+                        </span>
+                      );
+                    }}
+                    treeNodeLabelProp="name"
+                    treeNodeFilterProp="name"
+                    filterTreeNode={(input: string, node: any) =>
+                      String(node.name || '').toLowerCase().includes(input.toLowerCase().trim())
                     }
-                  }}
-                  treeLine={{ showLeafIcon: false }}
-                  switcherIcon={(nodeProps: any) => {
-                    if (nodeProps.isLeaf) return null;
-                    const isExpanded = Boolean(nodeProps.expanded);
-                    return (
-                      <span
-                        className={`qk7-tree-switcher-btn ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
-                        title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
-                      >
-                        {isExpanded ? (
-                          <Minus className="w-3 h-3 stroke-[2.5]" />
-                        ) : (
-                          <Plus className="w-3 h-3 stroke-[2.5]" />
-                        )}
-                      </span>
-                    );
-                  }}
-                  treeNodeLabelProp="name"
-                  treeNodeFilterProp="name"
-                  filterTreeNode={(input: string, node: any) =>
-                    String(node.name || '').toLowerCase().includes(input.toLowerCase().trim())
-                  }
-                  getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
-                  className="qk7-treeselect w-full"
-                  classNames={{ popup: { root: 'qk7-unit-treeselect-popup' } }}
-                  style={{ width: '100%', height: 38 }}
-                  popupMatchSelectWidth={false}
-                  styles={{
-                    popup: {
-                      root: {
-                        minWidth: 280,
-                        maxWidth: 'min(520px, 90vw)',
-                        maxHeight: 380,
-                        overflowX: 'hidden',
-                        overflowY: 'auto',
+                    getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
+                    className="qk7-treeselect w-full"
+                    classNames={{ popup: { root: 'qk7-unit-treeselect-popup' } }}
+                    style={{ width: '100%', height: 38 }}
+                    popupMatchSelectWidth={false}
+                    styles={{
+                      popup: {
+                        root: {
+                          minWidth: 280,
+                          maxWidth: 'min(520px, 90vw)',
+                          maxHeight: 380,
+                          overflowX: 'hidden',
+                          overflowY: 'auto',
+                        },
                       },
-                    },
-                  }}
-                />
+                    }}
+                  />
                 </div>
               </div>
 
@@ -531,15 +568,19 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 <select
                   value={formData.clearance_level_id || ''}
                   onChange={(e) =>
-                    setFormData({ ...formData, clearance_level_id: e.target.value ? Number(e.target.value) : undefined })
+                    setFormData({
+                      ...formData,
+                      clearance_level_id: e.target.value ? Number(e.target.value) : undefined,
+                    })
                   }
                   required
                   className="w-full h-9.5 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 cursor-pointer text-sm"
                 >
                   <option value=""> Chọn độ bảo mật </option>
-                  {securityLevels.map((lvl) => (
+                  {/* [FIX] Bỏ block `<option>` lặp lại gây lỗi syntax. */}
+                  {availableLevels.map((lvl) => (
                     <option key={lvl.level_id} value={lvl.level_id}>
-                      {lvl.name} 
+                      {lvl.name}
                     </option>
                   ))}
                 </select>
@@ -557,7 +598,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   <option value=""> Chọn vai trò</option>
                   {availableRoles.map((r) => (
                     <option key={r.role_id} value={r.role_id}>
-                      {r.name} 
+                      {r.name}
                     </option>
                   ))}
                 </select>

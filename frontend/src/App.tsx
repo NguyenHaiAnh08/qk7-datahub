@@ -4,13 +4,15 @@ import { ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { DeviceModeProvider } from './contexts/DeviceModeContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext'; // ✅ bỏ useAuth (không dùng)
 import { RouterProvider } from './routes/RouterProvider';
 import { HttpErrorListener } from './components/common/HttpErrorListener';
+import { ApprovalListener } from './components/common/ApprovalListener';
 import { ToastProvider } from './components/common/Toast';
 import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
-import { AIChatProvider } from './contexts/AIChatContext';
 import AIChatDrawer from './components/ai-chat/AIChatDrawer';
+import { ApprovalProvider } from './contexts/ApprovalContext';
+import { AIChatProvider } from './contexts/AIChatContext'
 import './index.css';
 
 /**
@@ -111,6 +113,7 @@ const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
     >
       <AntApp>
         <HttpErrorListener />
+        <ApprovalListener />
         {children}
       </AntApp>
     </ConfigProvider>
@@ -130,6 +133,7 @@ const AIChatWrapper: React.FC = () => {
     return null;
   }
 
+  // Render AIChatDrawer hiện đại (Slide-over Drawer) kích hoạt từ nút Bot trên Header
   return <AIChatDrawer />;
 };
 
@@ -148,8 +152,10 @@ export const App: React.FC = () => {
               <NetworkStatusProvider>
                 <AuthProvider>
                   <AIChatProvider>
-                    <RouterProvider />
-                    <AIChatWrapper />
+                    <ApprovalProvider pollMs={0}>
+                      <RouterProvider />
+                      <AIChatWrapper />
+                    </ApprovalProvider>
                   </AIChatProvider>
                 </AuthProvider>
               </NetworkStatusProvider>
@@ -162,4 +168,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

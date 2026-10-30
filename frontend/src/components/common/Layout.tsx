@@ -6,7 +6,7 @@ import { useDeviceMode } from '../../contexts/DeviceModeContext';
 
 export interface LayoutProps {
   children: ReactNode;
-  activeNav?: 'desk' | 'portal' | 'admin' | 'myunit' | 'login';
+  activeNav?: 'desk' | 'portal' | 'admin' | 'myunit' | 'login' | 'lectures' | 'materials' | 'library' | 'data';
   showSidebar?: boolean;
   activeSidebarItem?: string;
   onSidebarSelect?: (id: string) => void;

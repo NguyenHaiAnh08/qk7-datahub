@@ -2,14 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Modal,
-  Tabs,
-  Radio,
-  Tag,
   Spin,
-  Alert,
   Tooltip,
-  Button,
 } from 'antd';
 import {
   Bot,
@@ -20,18 +14,18 @@ import {
   FileText,
   Shield,
   ExternalLink,
-  ChevronDown,
-  ChevronRight,
-  BrainCircuit,
-  Network,
-  HelpCircle,
+
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAIChat } from '../../contexts/AIChatContext';
-import { aiService, AICitation, AIStudyBookResponse } from '../../services/aiService';
+import { aiService, AICitation } from '../../services/aiService';
 import { fileService } from '../../services/fileService';
 import { toast } from '../common/Toast';
+import { FingerprintScanModal } from '../users/FingerprintScanModal';
+import { DocumentPreviewModal } from '../document-desk/DocumentPreviewModal';
+import { DocumentItem } from '../../types';
+import { Fingerprint } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -39,19 +33,13 @@ interface ChatMessage {
   text: string;
   timestamp: string;
   citations?: AICitation[];
+  requires_biometric?: boolean;
   reasoning?: {
     mem?: string;
     think?: string;
     tool_call?: string;
   };
 }
-
-const QUICK_PROMPTS = [
-  '📋 Tóm tắt các văn bản mới nhất',
-  '🔒 Quy định 5 cấp độ bảo mật quân sự',
-  '🎯 Kế hoạch tác chiến và huấn luyện',
-  '⚡ Quy trình lưu trữ và băm tệp SHA-256',
-];
 
 export const AIChatDrawer: React.FC = () => {
   const { isDark } = useTheme();
@@ -61,17 +49,20 @@ export const AIChatDrawer: React.FC = () => {
   const [inputText, setInputText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [expandedReasoning, setExpandedReasoning] = useState<Record<string, boolean>>({});
 
-  // State cho Modal "02 Sơ đồ"
-  const [diagramModalVisible, setDiagramModalVisible] = useState<boolean>(false);
-  const [studyBookData, setStudyBookData] = useState<AIStudyBookResponse | null>(null);
-  const [loadingStudyBook, setLoadingStudyBook] = useState<boolean>(false);
+  // State lưu token vân tay đã xác thực trong phiên làm việc
+  const [fpToken, setFpToken] = useState<string | null>(null);
+  // Lưu câu hỏi gần nhất của user để auto-retry sau khi quét vân tay
+  const [lastQuery, setLastQuery] = useState<string>('');
+  const lastUserQueryRef = useRef<string>('');
 
-  // State cho Modal "03 Kiểm tra"
-  const [quizModalVisible, setQuizModalVisible] = useState<boolean>(false);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
-  const [submittedQuiz, setSubmittedQuiz] = useState<boolean>(false);
+  // State cho Khóa Bảo Vệ Sinh Trắc Học Vân Tay ZK9500 & Modal Xem trước PDF an toàn
+  const [scanModalOpen, setScanModalOpen] = useState<boolean>(false);
+  const [targetScanFileId, setTargetScanFileId] = useState<string>('');
+  const [targetScanDocCode, setTargetScanDocCode] = useState<string>('');
+  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
+  const [previewPage, setPreviewPage] = useState<number>(1);
+  const [previewOpen, setPreviewOpen] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -115,32 +106,67 @@ export const AIChatDrawer: React.FC = () => {
     }
   };
 
-  const handleSend = async (customPrompt?: string) => {
-    const textToSend = customPrompt || inputText;
-    if (!textToSend.trim() || loading) return;
+  const handleSend = async (customPrompt?: string, tokenOverride?: string, isRetry: boolean = false) => {
+    const textToSend = (customPrompt || inputText).trim();
+    if (!textToSend || (loading && !isRetry)) return;
 
-    const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      sender: 'user',
-      text: textToSend,
-      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-    };
+    setLastQuery(textToSend);
+    lastUserQueryRef.current = textToSend;
 
-    setMessages((prev) => [...prev, userMsg]);
-    if (!customPrompt) setInputText('');
+    if (!isRetry) {
+      const userMsg: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        sender: 'user',
+        text: textToSend,
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      if (!customPrompt) setInputText('');
+    }
+
     setLoading(true);
 
+    const history = messages
+      .filter((m) => m.id !== 'welcome')
+      .slice(-6)
+      .map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      }));
+
+    // P0 SECURITY: Câu hỏi mới (isRetry = false) TUYỆT ĐỐI KHÔNG tự động gửi kèm token cũ.
+    // Chỉ khi là retry sau khi quét vân tay (isRetry = true) thì mới dùng tokenOverride.
+    const activeToken = isRetry ? tokenOverride : undefined;
+
     try {
-      const res = await aiService.chat({ query: textToSend });
+      const res = await aiService.chat({
+        query: textToSend,
+        history,
+        fingerprint_token: activeToken,
+      });
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
         text: res.answer || 'Xin lỗi, không có câu trả lời từ máy chủ.',
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         citations: res.citations || [],
+        requires_biometric: res.requires_biometric,
         reasoning: res.reasoning,
       };
-      setMessages((prev) => [...prev, aiMsg]);
+
+      if (isRetry) {
+        setMessages((prev) => {
+          const lastAiIdx = prev.map((m) => m.sender).lastIndexOf('ai');
+          if (lastAiIdx !== -1) {
+            const next = [...prev];
+            next[lastAiIdx] = aiMsg;
+            return next;
+          }
+          return [...prev, aiMsg];
+        });
+      } else {
+        setMessages((prev) => [...prev, aiMsg]);
+      }
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
@@ -154,62 +180,58 @@ export const AIChatDrawer: React.FC = () => {
     }
   };
 
-  const handleOpenPdf = (fileId: string, page: number = 1) => {
-    try {
-      const url = fileService.getViewUrl(fileId, '0');
-      const targetUrl = `${url}#page=${page}`;
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
-    } catch (err: any) {
-      toast.error(`Không thể mở tệp: ${err.message}`, { title: 'TRUY CẬP TỆP THẤT BẠI' });
+  const handleOpenPdf = (
+    fileId: string,
+    page: number = 1,
+    docCode?: string,
+    title?: string,
+    secName?: string,
+    requiresBio: boolean = false
+  ) => {
+    let secLevel = 1;
+    if (requiresBio) {
+      secLevel = 3;
+    } else if (secName) {
+      const lower = secName.toLowerCase();
+      if (lower.includes('5') || lower.includes('tuyệt mật')) secLevel = 5;
+      else if (lower.includes('4') || lower.includes('tối mật')) secLevel = 4;
+      else if (lower.includes('3') || lower.includes('mật')) secLevel = 3;
+      else if (lower.includes('2') || lower.includes('nội bộ')) secLevel = 2;
     }
+
+    const docItem: DocumentItem = {
+      file_id: fileId,
+      document_code: docCode || fileId,
+      title: title || docCode || 'Văn kiện trích dẫn',
+      security_level_id: secLevel,
+      security_name: secName || `Cấp ${secLevel}`,
+      security_level_name: secName || `Cấp ${secLevel}`,
+    };
+
+    setPreviewDoc(docItem);
+    setPreviewPage(page);
+    setPreviewOpen(true);
   };
 
-  const fetchStudyBook = async (fileId: string) => {
-    setLoadingStudyBook(true);
-    try {
-      const data = await aiService.getStudyBook(fileId);
-      setStudyBookData(data);
-      setSelectedAnswers({});
-      setSubmittedQuiz(false);
-      return data;
-    } catch (err: any) {
-      toast.error(`Lỗi tải dữ liệu cuốn sách: ${err.message}`, { title: 'LỖI STUDY BOOK' });
-      return null;
-    } finally {
-      setLoadingStudyBook(false);
+  const handleFingerprintSuccess = async (token: string) => {
+    setScanModalOpen(false);
+    const validToken = token || '';
+    if (validToken) {
+      setFpToken(validToken);
     }
-  };
 
-  const handleOpenDiagram = async (fileId: string) => {
-    setDiagramModalVisible(true);
-    await fetchStudyBook(fileId);
-  };
+    toast.success(
+      `Xác thực vân tay ZK9500 thành công! Đang lấy câu trả lời...`,
+      { title: 'SINH TRẮC HỌC HỢP LỆ', duration: 3000 }
+    );
 
-  const handleOpenQuiz = async (fileId: string) => {
-    setQuizModalVisible(true);
-    await fetchStudyBook(fileId);
-  };
-
-  const handleSelectAnswer = (qId: number, answerKey: string) => {
-    if (submittedQuiz) return;
-    setSelectedAnswers((prev) => ({ ...prev, [qId]: answerKey }));
-  };
-
-  const handleSubmitQuiz = () => {
-    if (!studyBookData?.tab_quiz) return;
-    const answeredCount = Object.keys(selectedAnswers).length;
-    if (answeredCount < studyBookData.tab_quiz.length) {
-      toast.warning(`Đồng chí vui lòng hoàn thành tất cả ${studyBookData.tab_quiz.length} câu hỏi trước khi nộp bài.`, {
-        title: 'CHƯA HOÀN THÀNH BÀI THI',
-        badge: 'QUIZ',
-      });
-      return;
+    const queryToRetry = lastQuery || lastUserQueryRef.current || inputText.trim();
+    if (queryToRetry) {
+      setLoading(true);
+      await handleSend(queryToRetry, validToken, true);
+    } else if (targetScanFileId) {
+      handleOpenPdf(targetScanFileId, 1, targetScanDocCode, undefined, 'Cấp 3 - Mật');
     }
-    setSubmittedQuiz(true);
-  };
-
-  const toggleReasoning = (msgId: string) => {
-    setExpandedReasoning((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
   };
 
   return (
@@ -317,22 +339,6 @@ export const AIChatDrawer: React.FC = () => {
                         Đồng chí có thể đặt câu hỏi về quy định, kế hoạch huấn luyện hoặc văn bản được phân quyền.
                       </p>
                     </div>
-
-                    <div className="space-y-1.5 text-left pt-2">
-                      <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-1">
-                        Câu hỏi thường gặp:
-                      </div>
-                      {QUICK_PROMPTS.map((prompt, pIdx) => (
-                        <button
-                          key={pIdx}
-                          type="button"
-                          onClick={() => handleSend(prompt)}
-                          className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50/60 dark:bg-slate-900/60 dark:hover:bg-emerald-950/30 border border-slate-200/80 hover:border-emerald-500/40 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-all cursor-pointer shadow-2xs"
-                        >
-                          {prompt}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
 
@@ -356,34 +362,24 @@ export const AIChatDrawer: React.FC = () => {
                         {renderFormattedText(msg.text)}
                       </div>
 
-                      {/* Phân tích suy luận AI (Reasoning / Think) */}
-                      {msg.reasoning && (msg.reasoning.think || msg.reasoning.tool_call) && (
-                        <div className="mt-2.5 pt-2 border-t border-slate-200/40 dark:border-slate-800/60">
+                      {/* NÚT QUÉT VÂN TAY NẾU CÓ CỜ requires_biometric (chỉ hiện khi chưa có token) */}
+                      {msg.requires_biometric && (
+                        <div className="mt-2.5">
                           <button
                             type="button"
-                            onClick={() => toggleReasoning(msg.id)}
-                            className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                            onClick={() => {
+                              const targetCitation = msg.citations?.find((c) => c.requires_biometric);
+                              const fid = targetCitation?.file_id || targetScanFileId || '';
+                              const code = targetCitation?.document_code || 'Văn bản bảo mật';
+                              setTargetScanFileId(fid);
+                              setTargetScanDocCode(code);
+                              setScanModalOpen(true);
+                            }}
+                            className="w-full min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all duration-200 bg-gradient-to-r from-[#991b1b] via-[#b91c1c] to-[#d97706] hover:from-[#b91c1c] hover:to-[#f59e0b] text-white shadow-md active:scale-[0.98] border border-amber-400/40 cursor-pointer"
                           >
-                            <BrainCircuit className="w-3 h-3" />
-                            <span>
-                              {expandedReasoning[msg.id] ? 'Thu gọn suy luận' : 'Xem chuỗi suy luận AI'}
-                            </span>
-                            {expandedReasoning[msg.id] ? (
-                              <ChevronDown className="w-3 h-3" />
-                            ) : (
-                              <ChevronRight className="w-3 h-3" />
-                            )}
+                            <Fingerprint className="w-4 h-4 text-amber-300 animate-pulse flex-shrink-0" />
+                            <span>Quét vân tay để nhận câu trả lời</span>
                           </button>
-                          {expandedReasoning[msg.id] && (
-                            <div className="mt-1.5 p-2 rounded-lg bg-slate-900/10 dark:bg-black/30 font-mono text-[10px] text-slate-600 dark:text-slate-400 space-y-1">
-                              {msg.reasoning.think && <div>{msg.reasoning.think}</div>}
-                              {msg.reasoning.tool_call && (
-                                <div className="text-amber-600 dark:text-amber-400 font-semibold">
-                                  Lệnh gọi công cụ: {msg.reasoning.tool_call}
-                                </div>
-                              )}
-                            </div>
-                          )}
                         </div>
                       )}
 
@@ -399,7 +395,7 @@ export const AIChatDrawer: React.FC = () => {
                             <div key={cIdx} className="space-y-1">
                               <button
                                 type="button"
-                                onClick={() => handleOpenPdf(c.file_id, c.page)}
+                                onClick={() => handleOpenPdf(c.file_id, c.page, c.document_code, c.title, c.security_level_name, Boolean(c.requires_biometric))}
                                 className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-medium flex items-center justify-between transition-all cursor-pointer ${
                                   isDark
                                     ? 'bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700/50'
@@ -412,26 +408,6 @@ export const AIChatDrawer: React.FC = () => {
                                 </span>
                                 <ExternalLink className="w-3 h-3 ml-1 text-slate-400 shrink-0" />
                               </button>
-
-                              {/* Nút Sơ đồ & Kiểm tra nếu khả dụng */}
-                              <div className="flex gap-1.5 pt-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenDiagram(c.file_id)}
-                                  className="flex-1 py-1 px-1.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-1 transition cursor-pointer"
-                                >
-                                  <Network className="w-2.5 h-2.5" />
-                                  <span>02 Sơ đồ</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenQuiz(c.file_id)}
-                                  className="flex-1 py-1 px-1.5 rounded-md text-[10px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1 transition cursor-pointer"
-                                >
-                                  <HelpCircle className="w-2.5 h-2.5" />
-                                  <span>03 Kiểm tra</span>
-                                </button>
-                              </div>
                             </div>
                           ))}
                         </div>
@@ -444,11 +420,14 @@ export const AIChatDrawer: React.FC = () => {
                   </div>
                 ))}
 
+
                 {/* Trạng thái đang tải câu trả lời */}
                 {loading && (
-                  <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 pl-2">
+                  <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 pl-2 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/20 animate-pulse">
                     <Spin size="small" />
-                    <span>Trợ lý AI đang tra cứu kho dữ liệu số...</span>
+                    <span className="font-medium">
+                      {lastQuery ? 'Đang lấy câu trả lời...' : 'Trợ lý AI đang tra cứu kho dữ liệu số...'}
+                    </span>
                   </div>
                 )}
 
@@ -501,127 +480,23 @@ export const AIChatDrawer: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* 3. MODAL "02 SƠ ĐỒ" */}
-      <Modal
-        title={
-          <div className="flex items-center space-x-2 text-emerald-700 dark:text-emerald-400 font-bold">
-            <Network className="w-4 h-4" />
-            <span>02 Sơ Đồ Tổ Chức & Luồng Chỉ Đạo</span>
-          </div>
-        }
-        open={diagramModalVisible}
-        onCancel={() => setDiagramModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setDiagramModalVisible(false)}>
-            Đóng
-          </Button>,
-        ]}
-        width={700}
-        destroyOnHidden
-      >
-        {loadingStudyBook ? (
-          <div className="py-12 text-center space-y-3">
-            <Spin size="large" />
-            <div className="text-sm text-slate-500">Đang khởi tạo sơ đồ tổ chức tác chiến...</div>
-          </div>
-        ) : studyBookData ? (
-          <div className="space-y-4 py-2">
-            <Alert
-              type="info"
-              showIcon
-              message={studyBookData.title || studyBookData.document_code}
-              description={`Mã tệp: ${studyBookData.file_id} • Số trang: ${studyBookData.total_pages}`}
-            />
-            {studyBookData.tab_diagram && (
-              <div className="p-4 bg-slate-900 rounded-xl overflow-x-auto text-slate-200 font-mono text-xs border border-slate-700">
-                <pre>{studyBookData.tab_diagram.mermaid_code || studyBookData.tab_diagram.description}</pre>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="py-8 text-center text-slate-400">Không có sơ đồ cho văn bản này.</div>
-        )}
-      </Modal>
+      <FingerprintScanModal
+        open={scanModalOpen}
+        fileId={targetScanFileId}
+        onSuccess={handleFingerprintSuccess}
+        onCancel={() => setScanModalOpen(false)}
+      />
 
-      {/* 4. MODAL "03 KIỂM TRA" */}
-      <Modal
-        title={
-          <div className="flex items-center space-x-2 text-amber-600 dark:text-amber-400 font-bold">
-            <HelpCircle className="w-4 h-4" />
-            <span>03 Trắc Nghiệm Nhận Thức Tác Chiến</span>
-          </div>
-        }
-        open={quizModalVisible}
-        onCancel={() => setQuizModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setQuizModalVisible(false)}>
-            Đóng
-          </Button>,
-          !submittedQuiz && (
-            <Button
-              key="submit"
-              type="primary"
-              className="bg-emerald-600 hover:bg-emerald-700"
-              onClick={handleSubmitQuiz}
-            >
-              Nộp bài kiểm tra
-            </Button>
-          ),
-        ]}
-        width={720}
-        destroyOnHidden
-      >
-        {loadingStudyBook ? (
-          <div className="py-12 text-center space-y-3">
-            <Spin size="large" />
-            <div className="text-sm text-slate-500">Đang tạo bộ câu hỏi kiểm tra...</div>
-          </div>
-        ) : studyBookData?.tab_quiz ? (
-          <div className="space-y-4 py-2">
-            {studyBookData.tab_quiz.map((q, qIndex) => (
-              <div
-                key={q.id}
-                className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-2.5"
-              >
-                <div className="font-semibold text-xs text-slate-900 dark:text-white">
-                  Câu {qIndex + 1}: {q.question}
-                </div>
-                <div className="space-y-1.5 pl-2">
-                  {Object.entries(q.options).map(([optKey, optText]) => {
-                    const isSelected = selectedAnswers[q.id] === optKey;
-                    const isCorrect = q.correct_answer === optKey;
-                    let optionStyle = 'text-slate-700 dark:text-slate-300';
-                    if (submittedQuiz) {
-                      if (isCorrect) optionStyle = 'text-emerald-600 font-bold';
-                      else if (isSelected && !isCorrect) optionStyle = 'text-rose-600 line-through';
-                    }
-                    return (
-                      <label
-                        key={optKey}
-                        className={`flex items-center gap-2 text-xs cursor-pointer ${optionStyle}`}
-                      >
-                        <input
-                          type="radio"
-                          name={`quiz-q-${q.id}`}
-                          value={optKey}
-                          checked={isSelected}
-                          onChange={() => handleSelectAnswer(q.id, optKey)}
-                          disabled={submittedQuiz}
-                        />
-                        <span>
-                          <strong className="uppercase">{optKey}.</strong> {optText}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-8 text-center text-slate-400">Không có đề kiểm tra.</div>
-        )}
-      </Modal>
+      <DocumentPreviewModal
+        open={previewOpen}
+        document={previewDoc}
+        page={previewPage}
+        initialToken={fpToken}
+        onClose={() => {
+          setPreviewOpen(false);
+          setFpToken(null);
+        }}
+      />
     </>
   );
 };

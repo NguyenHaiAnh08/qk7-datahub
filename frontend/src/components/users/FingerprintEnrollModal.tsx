@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence, animate } from 'framer-motion';
 import {
@@ -327,18 +328,21 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
 
   if (!open) return null;
 
-  return (
+  const modalNode = (
     <AnimatePresence>
       <div
         key="fingerprint-enroll-modal-overlay"
-        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/30 dark:bg-black/50 backdrop-blur-md transition-all duration-300"
+        onClick={handleCancel}
       >
         <motion.div
           key="fingerprint-enroll-modal-card"
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.94 }}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md max-w-[calc(100vw-32px)] mx-auto overflow-hidden shadow-2xl"
+          initial={{ opacity: 0, scale: 0.94, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 10 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+          className="bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-800/90 rounded-3xl w-full max-w-md mx-auto overflow-hidden shadow-2xl backdrop-blur-xl"
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -538,4 +542,8 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
       </div>
     </AnimatePresence>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalNode, document.body)
+    : modalNode;
 };

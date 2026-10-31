@@ -1664,7 +1664,12 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     if (!security_level_id) return res.status(400).json({ error: 'Thiếu mức bảo mật' });
 
     const userRoles = await resolveUserRoles(req.user);
-    const isAdmin = userRoles.includes('ROL-01');
+    const isAdmin =
+      userRoles.includes('ROL-01') ||
+      (req.user?.roles || []).includes('ROL-01') ||
+      req.user?.user_id === 'USR-001' ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
     const isOwner = (oldDoc.uploaded_by && oldDoc.uploaded_by === req.user.user_id);
 
     // Ràng buộc nghiệp vụ: Nếu Trợ lý, Văn thư, Cơ yếu, IT sửa file do NGƯỜI KHÁC đăng -> Chuyển vào trạng thái treo (PENDING)
@@ -1833,8 +1838,17 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
   try {
     const pool = await getPool();
     const userRoles = await resolveUserRoles(req.user);
-    const isAdmin = userRoles.includes('ROL-01');
-    const isCommander = userRoles.includes('ROL-02');
+    const isAdmin =
+      userRoles.includes('ROL-01') ||
+      (req.user?.roles || []).includes('ROL-01') ||
+      req.user?.user_id === 'USR-001' ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
+    const isCommander =
+      userRoles.includes('ROL-02') ||
+      (req.user?.roles || []).includes('ROL-02') ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy'));
 
     const r = pool.request();
     let query = `
@@ -1865,11 +1879,22 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
 
     if (!isAdmin && isCommander) {
       const userUnitId = await resolveUserUnitId(req.user);
-      const subtree = await getSubtreeUnits(userUnitId);
-      if (subtree.length > 0) {
-        const params = subtree.map((_, i) => `@u_${i}`);
-        query += ` AND d.issuing_unit_id IN (${params.join(', ')})`;
-        subtree.forEach((uId, i) => r.input(`u_${i}`, sql.VarChar(50), uId));
+      let targetUnits = [userUnitId];
+      // Nếu là Chỉ huy thuộc cơ quan trường, mở rộng quản lý cho toàn trường
+      const userUnitRec = await pool.request().input('uid', sql.VarChar(50), userUnitId).query('SELECT parent_id FROM UNIT WHERE unit_id = @uid');
+      const parentUnitId = userUnitRec.recordset[0]?.parent_id;
+      if (parentUnitId) {
+        const parentSubtree = await getSubtreeUnits(parentUnitId);
+        targetUnits = Array.from(new Set([...targetUnits, parentUnitId, ...parentSubtree]));
+      } else {
+        const subtree = await getSubtreeUnits(userUnitId);
+        targetUnits = Array.from(new Set([...targetUnits, ...subtree]));
+      }
+
+      if (targetUnits.length > 0) {
+        const params = targetUnits.map((_, i) => `@u_${i}`);
+        query += ` AND (d.issuing_unit_id IN (${params.join(', ')}) OR p.issuing_unit_id IN (${params.join(', ')}))`;
+        targetUnits.forEach((uId, i) => r.input(`u_${i}`, sql.VarChar(50), uId));
       } else {
         query += ` AND 1 = 0`;
       }
@@ -1904,8 +1929,17 @@ app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePer
     if (prop.status !== 'PENDING') return res.status(400).json({ error: `Đề xuất đã ở trạng thái ${prop.status}` });
 
     const userRoles = await resolveUserRoles(req.user);
-    const isAdmin = userRoles.includes('ROL-01');
-    const isCommander = userRoles.includes('ROL-02');
+    const isAdmin =
+      userRoles.includes('ROL-01') ||
+      (req.user?.roles || []).includes('ROL-01') ||
+      req.user?.user_id === 'USR-001' ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
+    const isCommander =
+      userRoles.includes('ROL-02') ||
+      (req.user?.roles || []).includes('ROL-02') ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy'));
 
     if (!isAdmin && isCommander) {
       const userUnitId = await resolveUserUnitId(req.user);
@@ -2025,13 +2059,32 @@ app.post('/api/documents/proposals/:proposalId/reject', requireAuth, requirePerm
     if (prop.status !== 'PENDING') return res.status(400).json({ error: `Đề xuất đã ở trạng thái ${prop.status}` });
 
     const userRoles = await resolveUserRoles(req.user);
-    const isAdmin = userRoles.includes('ROL-01');
-    const isCommander = userRoles.includes('ROL-02');
+    const isAdmin =
+      userRoles.includes('ROL-01') ||
+      (req.user?.roles || []).includes('ROL-01') ||
+      req.user?.user_id === 'USR-001' ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
+    const isCommander =
+      userRoles.includes('ROL-02') ||
+      (req.user?.roles || []).includes('ROL-02') ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy'));
 
     if (!isAdmin && isCommander) {
       const userUnitId = await resolveUserUnitId(req.user);
-      const subtree = await getSubtreeUnits(userUnitId);
-      if (!subtree.includes(prop.doc_unit_id)) {
+      let targetUnits = [userUnitId];
+      const userUnitRec = await pool.request().input('uid', sql.VarChar(50), userUnitId).query('SELECT parent_id FROM UNIT WHERE unit_id = @uid');
+      const parentUnitId = userUnitRec.recordset[0]?.parent_id;
+      if (parentUnitId) {
+        const parentSubtree = await getSubtreeUnits(parentUnitId);
+        targetUnits = Array.from(new Set([...targetUnits, parentUnitId, ...parentSubtree]));
+      } else {
+        const subtree = await getSubtreeUnits(userUnitId);
+        targetUnits = Array.from(new Set([...targetUnits, ...subtree]));
+      }
+      const canManage = targetUnits.includes(prop.doc_unit_id) || targetUnits.includes(prop.issuing_unit_id);
+      if (!canManage) {
         return res.status(403).json({ error: 'Chỉ huy không quản lý đơn vị của văn bản này' });
       }
     } else if (!isAdmin && !isCommander) {

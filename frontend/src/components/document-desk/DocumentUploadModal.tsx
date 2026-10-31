@@ -14,7 +14,7 @@ export interface DocumentUploadModalProps {
   units: Unit[];
   levels: SecurityLevel[];
   onClose: () => void;
-  onSave: (formData: FormData, isEdit: boolean) => Promise<void> | void;
+  onSave: (formData: FormData, isEdit: boolean) => Promise<any> | any;
   onToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
@@ -254,8 +254,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         formData.append('force_upload', '1');
       }
 
-      await onSave(formData, isEdit);
-      if (onToast) {
+      const saveRes: any = await onSave(formData, isEdit);
+      if (onToast && !saveRes?.pending_approval) {
         onToast(isEdit ? `Đã cập nhật văn bản ${code} thành công!` : `Đã tiếp nhận văn bản ${code} thành công!`, 'success');
       }
       setShowConfirmModal(false);

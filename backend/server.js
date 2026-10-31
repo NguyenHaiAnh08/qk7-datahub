@@ -595,13 +595,13 @@ app.post('/api/auth/login', async (req, res) => {
 
     // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
     // C
-    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
-      if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
-        await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
-        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
-        return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
-      }
-    }
+    // if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+    //   if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
+    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
+    //     await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
+    //     return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
+    //   }
+    // }
 
     if (user.status !== 'active') {
       await writeLoginAttempt({ ip, username, result: 'LOCKED' });
@@ -670,61 +670,61 @@ app.post('/api/auth/login', async (req, res) => {
     const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
     const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
 
-    if (isProtectedAdmin || hasAdminRole) {
-      // Dùng luôn user.has_fingerprint đã load trong query đầu
-      const hasFingerprint = user.has_fingerprint === 1;
+    // if (isProtectedAdmin || hasAdminRole) {
+    //   // Dùng luôn user.has_fingerprint đã load trong query đầu
+    //   const hasFingerprint = user.has_fingerprint === 1;
 
-      if (!hasFingerprint) {
-        if (isProtectedAdmin) {
-          // USR-001 chưa enroll → cho qua password-only để enroll admin khác
-          console.warn(
-            `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
-            `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
-          );
-          await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN_NO_FP_WARNING', ip,
-            note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
-          });
-          // Không return — rơi xuống nhánh cấp JWT bên dưới
+    //   if (!hasFingerprint) {
+    //     if (isProtectedAdmin) {
+    //       // USR-001 chưa enroll → cho qua password-only để enroll admin khác
+    //       console.warn(
+    //         `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
+    //         `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
+    //       );
+    //       await writeAccessLog({
+    //         userId: user.user_id, fileId: null,
+    //         action: 'LOGIN_NO_FP_WARNING', ip,
+    //         note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
+    //       });
+    //       // Không return — rơi xuống nhánh cấp JWT bên dưới
 
-        } else {
-          // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
-          await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
-            note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
-                  `nhưng chưa enroll vân tay — từ chối đăng nhập`
-          });
-          return res.status(403).json({
-            error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
-                   'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
-            code: 'ADMIN_FINGERPRINT_REQUIRED',
-            needs_enroll: true,
-            enroll_via: PROTECTED_ADMIN_USER_ID,
-          });
-        }
-      } else {
-        // Đã có vân tay → yêu cầu quét qua 202
-        await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
+    //     } else {
+    //       // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
+    //       await writeAccessLog({
+    //         userId: user.user_id, fileId: null,
+    //         action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
+    //         note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
+    //               `nhưng chưa enroll vân tay — từ chối đăng nhập`
+    //       });
+    //       return res.status(403).json({
+    //         error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
+    //                'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
+    //         code: 'ADMIN_FINGERPRINT_REQUIRED',
+    //         needs_enroll: true,
+    //         enroll_via: PROTECTED_ADMIN_USER_ID,
+    //       });
+    //     }
+    //   } else {
+    //     // Đã có vân tay → yêu cầu quét qua 202
+    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
 
-        const tempTicket = jwt.sign(
-          { user_id: user.user_id, purpose: 'admin_login_fp' },
-          JWT_SECRET,
-          { expiresIn: '2m' }
-        );
+    //     const tempTicket = jwt.sign(
+    //       { user_id: user.user_id, purpose: 'admin_login_fp' },
+    //       JWT_SECRET,
+    //       { expiresIn: '2m' }
+    //     );
 
-        return res.status(202).json({
-          success: true,
-          require_admin_fp: true,
-          temp_ticket: tempTicket,
-          is_protected_admin: isProtectedAdmin,
-          message: isProtectedAdmin
-            ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
-            : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
-        });
-      }
-    }
+    //     return res.status(202).json({
+    //       success: true,
+    //       require_admin_fp: true,
+    //       temp_ticket: tempTicket,
+    //       is_protected_admin: isProtectedAdmin,
+    //       message: isProtectedAdmin
+    //         ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+    //         : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
+    //     });
+    //   }
+    // }
 
 
     // User thường -> Cấp JWT và cho vào luôn

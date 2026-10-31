@@ -391,3 +391,4 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
     </div>
   );
 };
+

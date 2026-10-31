@@ -80,16 +80,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const canDownload = !document || (docLevel <= 2 && docLevel <= clearanceLevel);
   const isSecretLevel = docLevel >= 3;
 
+  // ✅ SỬA clearBiometricSession: Chỉ xóa token của file hiện tại + dọn key global cũ
   const clearBiometricSession = () => {
     setFingerprintToken(null);
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && document?.file_id) {
       try {
+        sessionStorage.removeItem(`qk7_fp_token_${document.file_id}`);
+        // Xóa luôn key global nếu trước đó có sót lại
         sessionStorage.removeItem('qk7_fp_token');
-        Object.keys(sessionStorage).forEach((key) => {
-          if (key.startsWith('qk7_fp_token')) {
-            sessionStorage.removeItem(key);
-          }
-        });
       } catch (e) {}
     }
   };
@@ -101,9 +99,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       return;
     }
 
-    // Biometric Guard: Chỉ dùng token vừa xác thực trong phiên modal hiện hành (in-memory)
-    // Tuyệt đối không đọc lại token cũ từ sessionStorage để chống vượt rào khi mở lại hoặc đổi file
-    const effectiveToken = fpToken || fingerprintToken;
+    // Biometric Guard: Ưu tiên token truyền vào → state phiên hiện hành → sessionStorage per-file.
+    // Token được bind chặt với file_id ở server-side (JWT claim file_id) nên không thể dùng chéo file khác.
+    // ✅ SỬA: thêm fallback đọc từ sessionStorage cho đúng file này để đồng bộ với fileService
+    const sessionToken = typeof window !== 'undefined'
+      ? sessionStorage.getItem(`qk7_fp_token_${docId}`)
+      : null;
+
+    const effectiveToken = fpToken || fingerprintToken || sessionToken;
 
     if (docLevel >= 3 && !effectiveToken) {
       setShowScanModal(true);
@@ -159,9 +162,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   useEffect(() => {
     if (open && document) {
-      // Khi mở modal, chỉ dùng propInitialToken nếu có, tuyệt đối không lấy token cũ từ sessionStorage.
-      // Đối với tài liệu Cấp 3+, fingerprintToken ban đầu là null nên sẽ kích hoạt quét vân tay ngay lập tức.
-      const tokenToUse = propInitialToken || null;
+      // Khi mở modal: ưu tiên propInitialToken, sau đó fallback sang sessionStorage per-file (đồng bộ với fileService).
+      // Token được bind chặt với file_id ở server-side nên không thể dùng chéo file khác.
+      // Đối với tài liệu Cấp 3+ chưa có token hợp lệ, fingerprintToken ban đầu là null nên sẽ kích hoạt quét vân tay ngay lập tức.
+      const sessionToken = typeof window !== 'undefined'
+        ? sessionStorage.getItem(`qk7_fp_token_${document.file_id}`)
+        : null;
+      const tokenToUse = propInitialToken || sessionToken || null;
       setFingerprintToken(tokenToUse);
       loadPdfBlob(document.file_id, tokenToUse);
     } else {
@@ -585,6 +592,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           setShowScanModal(false);
           const validToken = token || "";
           setFingerprintToken(validToken || null);
+          // ✅ Lưu token vào sessionStorage per-file để đồng bộ 2 chiều với fileService
+          if (validToken && document?.file_id && typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem(`qk7_fp_token_${document.file_id}`, validToken);
+            } catch (e) {}
+          }
           if (document) {
             loadPdfBlob(document.file_id, validToken || null);
           }

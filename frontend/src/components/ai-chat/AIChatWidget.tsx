@@ -152,7 +152,13 @@ export const AIChatWidget: React.FC = () => {
   }, [user]);
 
   // Gửi tin nhắn (hỗ trợ Auto-retry khi quét vân tay ZK9500 thành công)
-  const handleSend = async (queryText?: string, tokenOverride?: string, isRetry: boolean = false) => {
+  // ✅ SỬA: Thêm tham số fileIdOverride để truyền file_id lên Backend kiểm tra chéo token
+  const handleSend = async (
+    queryText?: string,
+    tokenOverride?: string,
+    isRetry: boolean = false,
+    fileIdOverride?: string
+  ) => {
     const textToSend = (queryText || inputText).trim();
     if (!textToSend || (loading && !isRetry)) return;
 
@@ -190,6 +196,7 @@ export const AIChatWidget: React.FC = () => {
         query: textToSend,
         history,
         fingerprint_token: activeToken,
+        file_id: fileIdOverride, // ✅ Truyền file_id lên Backend
       });
 
       const aiMsg: ChatMessage = {
@@ -240,8 +247,11 @@ export const AIChatWidget: React.FC = () => {
   const handleFingerprintSuccess = async (token: string) => {
     setScanModalOpen(false);
     const validToken = token || '';
-    if (validToken) {
-      setFpToken(validToken);
+  if (validToken && typeof window !== 'undefined') {
+    if (targetScanFileId) {
+      sessionStorage.setItem(`qk7_fp_token_${targetScanFileId}`, validToken);
+    }
+  setFpToken(validToken);
     }
 
     toast.success(
@@ -253,7 +263,8 @@ export const AIChatWidget: React.FC = () => {
     const queryToRetry = lastQuery || lastUserQueryRef.current || inputText.trim();
     if (queryToRetry) {
       setLoading(true);
-      await handleSend(queryToRetry, validToken, true);
+      // ✅ SỬA: Truyền targetScanFileId vào để Backend kiểm tra chéo token-file
+      await handleSend(queryToRetry, validToken, true, targetScanFileId);
     } else if (targetScanFileId) {
       handleOpenPdf(targetScanFileId, 1, targetScanDocCode, undefined, 'Cấp 3 - Mật');
     }
@@ -268,6 +279,11 @@ export const AIChatWidget: React.FC = () => {
     secName?: string,
     requiresBio: boolean = false
   ) => {
+    // ✅ FIX: Nếu chuyển sang file khác, xóa sạch token cũ trong state
+    if (fileId !== previewDoc?.file_id) {
+      setFpToken(null);
+    }
+
     let secLevel = 1;
     if (requiresBio) {
       secLevel = 3;

@@ -126,6 +126,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await authService.logout();
     setUser(null);
     navigate(ROUTE_PATHS.LOGIN);
+
+    if (typeof window !== 'undefined') {
+    try {
+      Object.keys(sessionStorage)
+        .filter(k => k.startsWith('qk7_fp_token'))
+        .forEach(k => sessionStorage.removeItem(k));
+    } catch (e) {}
+  }
   }, [navigate]);
 
   const continueAsGuest = useCallback(() => {

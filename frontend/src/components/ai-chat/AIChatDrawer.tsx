@@ -106,7 +106,13 @@ export const AIChatDrawer: React.FC = () => {
     }
   };
 
-  const handleSend = async (customPrompt?: string, tokenOverride?: string, isRetry: boolean = false) => {
+  // ✅ SỬA: Thêm tham số fileIdOverride để truyền file_id lên Backend kiểm tra chéo token
+  const handleSend = async (
+    customPrompt?: string,
+    tokenOverride?: string,
+    isRetry: boolean = false,
+    fileIdOverride?: string
+  ) => {
     const textToSend = (customPrompt || inputText).trim();
     if (!textToSend || (loading && !isRetry)) return;
 
@@ -143,6 +149,7 @@ export const AIChatDrawer: React.FC = () => {
         query: textToSend,
         history,
         fingerprint_token: activeToken,
+        file_id: fileIdOverride, // ✅ Truyền file_id lên Backend
       });
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
@@ -188,6 +195,11 @@ export const AIChatDrawer: React.FC = () => {
     secName?: string,
     requiresBio: boolean = false
   ) => {
+    // ✅ FIX: Nếu chuyển sang file khác, xóa sạch token cũ trong state
+    if (fileId !== previewDoc?.file_id) {
+      setFpToken(null);
+    }
+
     let secLevel = 1;
     if (requiresBio) {
       secLevel = 3;
@@ -216,7 +228,10 @@ export const AIChatDrawer: React.FC = () => {
   const handleFingerprintSuccess = async (token: string) => {
     setScanModalOpen(false);
     const validToken = token || '';
-    if (validToken) {
+    if (validToken && typeof window !== 'undefined') {
+      if (targetScanFileId) {
+      sessionStorage.setItem(`qk7_fp_token_${targetScanFileId}`, validToken);
+    }
       setFpToken(validToken);
     }
 
@@ -228,7 +243,8 @@ export const AIChatDrawer: React.FC = () => {
     const queryToRetry = lastQuery || lastUserQueryRef.current || inputText.trim();
     if (queryToRetry) {
       setLoading(true);
-      await handleSend(queryToRetry, validToken, true);
+      // ✅ SỬA: Truyền targetScanFileId vào để Backend kiểm tra chéo token-file
+      await handleSend(queryToRetry, validToken, true, targetScanFileId);
     } else if (targetScanFileId) {
       handleOpenPdf(targetScanFileId, 1, targetScanDocCode, undefined, 'Cấp 3 - Mật');
     }

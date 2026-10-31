@@ -29,10 +29,23 @@ export const fileService = {
     const url = fileService.getViewUrl(fileId, download);
 
     const headers: Record<string, string> = { ...getAuthHeaders() };
-    // Chỉ gửi X-Fingerprint-Token khi được truyền trực tiếp từ modal xác thực vân tay hiện hành
-    // Tuyệt đối không fallback sang sessionStorage để ngăn ngừa tái sử dụng token giữa các tài liệu
-    if (fingerprintToken) {
-      headers['X-Fingerprint-Token'] = fingerprintToken;
+
+    // ✅ FIX: CHỈ lấy token của chính file này (key có ${fileId}).
+    // - Ưu tiên token được truyền trực tiếp từ modal xác thực vân tay hiện hành.
+    // - Fallback chỉ đọc sessionStorage theo từng file; KHÔNG còn fallback toàn cục.
+    let effectiveToken = fingerprintToken;
+    if (!effectiveToken && typeof window !== 'undefined') {
+      try {
+        effectiveToken =
+          window.sessionStorage.getItem(`qk7_fp_token_${fileId}`) ?? undefined;
+      } catch {
+        // sessionStorage có thể bị chặn (private mode / iframe sandbox)
+        effectiveToken = undefined;
+      }
+    }
+
+    if (effectiveToken) {
+      headers['X-Fingerprint-Token'] = effectiveToken;
     }
 
     const response = await fetch(url, { headers, signal });
@@ -94,7 +107,12 @@ export const fileService = {
     fingerprintToken?: string,
     signal?: AbortSignal,
   ): Promise<Blob> => {
-    const res = await fileService.fetchFileBlobWithMeta(fileId, download, fingerprintToken, signal);
+    const res = await fileService.fetchFileBlobWithMeta(
+      fileId,
+      download,
+      fingerprintToken,
+      signal,
+    );
     return res.blob;
   },
 

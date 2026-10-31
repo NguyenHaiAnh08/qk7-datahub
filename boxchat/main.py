@@ -195,10 +195,16 @@ async def ingest_document(req: IngestRequest):
 async def sync_all_documents(req: SyncAllRequest):
     """
     Đồng bộ hàng loạt tài liệu từ backend sang vector store.
+    Tự động dọn dẹp các tài liệu cũ đã bị xóa khỏi CSDL SQL Server.
     """
     success_count = 0
     failed_items = []
     total_new_chunks = 0
+
+    active_file_ids = set(doc.file_id for doc in req.documents)
+    stale_file_ids = set(c.get("file_id") for c in vector_store.chunks_cache if c.get("file_id") and c.get("file_id") not in active_file_ids)
+    for stale_id in stale_file_ids:
+        vector_store.delete_file(stale_id)
 
     for doc in req.documents:
         try:
@@ -223,6 +229,15 @@ async def sync_all_documents(req: SyncAllRequest):
         "total_chunks_added": total_new_chunks,
         "failed_items": failed_items
     }
+
+
+@app.delete("/ai/documents/{file_id}")
+async def delete_document_chunks(file_id: str):
+    """
+    Xóa toàn bộ chunks của tài liệu khỏi kho vector khi văn thư xóa tài liệu trong CSDL.
+    """
+    removed = vector_store.delete_file(file_id)
+    return {"success": True, "file_id": file_id, "chunks_removed": removed}
 
 
 @app.post("/ai/chat")
@@ -270,7 +285,8 @@ async def chat_with_tutor(req: ChatRequest):
             retrieved_chunks=retrieved_chunks,
             file_id=req.file_id,
             history=req.history,
-            biometric_verified=bool(req.biometric_verified)
+            biometric_verified=bool(req.biometric_verified),
+            all_chunks=vector_store.chunks_cache
         )
 
         # Track metrics

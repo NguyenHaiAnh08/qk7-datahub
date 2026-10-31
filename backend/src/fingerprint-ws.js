@@ -105,6 +105,7 @@ function setupFingerprintWS(httpServer, { BRIDGE_TOKEN }) {
     }
   }, 30000);
 
+  wss.on('error', (err) => console.warn('[WSS error]:', err.message));
   wss.on('close', () => clearInterval(heartbeat));
   return wss;
 }

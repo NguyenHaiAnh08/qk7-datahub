@@ -322,11 +322,16 @@ class FingerprintAgent:
         print(f"\n[Agent] 📥 scan {job_id} | timeout={timeout}s")
 
         if not self._ensure_device_open():
-            await ws.send(json.dumps({
-                "type": "scan_result", "job_id": job_id,
-                "match": False, "score": 0, "error": "DEVICE_OFFLINE",
-            }))
-            return
+            # Tự phục hồi: reload SDK và thử mở lại 1 lần nữa trước khi báo lỗi
+            print("[Agent] ⚠️ Mở thiết bị lần 1 thất bại, đang thử reload SDK...")
+            self.svc.load_sdk()
+            if not self._ensure_device_open():
+                print("[Agent] ❌ Thiết bị ZK9500 không sẵn sàng sau khi thử tự phục hồi.")
+                await ws.send(json.dumps({
+                    "type": "scan_result", "job_id": job_id,
+                    "match": False, "score": 0, "error": "DEVICE_OFFLINE",
+                }))
+                return
 
         print(f"[Agent] 👉 Đặt tay lên máy quét...")
 
@@ -382,11 +387,16 @@ class FingerprintAgent:
         print(f"\n[Agent] 📥 enroll {job_id} | user={user_id} | {step_timeout}s/lần")
 
         if not self._ensure_device_open():
-            await ws.send(json.dumps({
-                "type": "enroll_result", "job_id": job_id,
-                "success": False, "error": "DEVICE_OFFLINE",
-            }))
-            return
+            # Tự phục hồi: reload SDK và thử mở lại 1 lần nữa trước khi báo lỗi
+            print("[Agent] ⚠️ Mở thiết bị enroll lần 1 thất bại, đang thử reload SDK...")
+            self.svc.load_sdk()
+            if not self._ensure_device_open():
+                print("[Agent] ❌ Thiết bị ZK9500 enroll không sẵn sàng.")
+                await ws.send(json.dumps({
+                    "type": "enroll_result", "job_id": job_id,
+                    "success": False, "error": "DEVICE_OFFLINE",
+                }))
+                return
 
         self.busy = True
         self.enroll_step = 0

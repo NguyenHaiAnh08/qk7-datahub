@@ -22,6 +22,11 @@ echo.
 echo   Config: %ROOT%.env
 echo.
 
+REM --- Kiem tra va giai phong port backend neu bi chiem ---
+echo [Kiem tra] Giai phong port %PORT_BACKEND% neu bi chiem...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort %PORT_BACKEND% -State Listen -ErrorAction Stop).OwningProcess | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Port ' + '%PORT_BACKEND%' + ' dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port %PORT_BACKEND% thanh cong.' } else { Write-Host '[OK] Port %PORT_BACKEND% dang san sang.' } } catch { Write-Host '[OK] Port %PORT_BACKEND% dang san sang.' }; exit 0"
+echo.
+
 REM --- 1. Backend ---
 echo [1/3] Khoi dong Backend (:%PORT_BACKEND%)...
 start "QK7 Backend" cmd /k "cd /d "%ROOT%backend" && npm start"

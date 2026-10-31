@@ -137,8 +137,40 @@ export const fileService = {
     filename?: string,
     fingerprintToken?: string,
   ): Promise<void> => {
+    const finalFilename = filename || `${fileId}.pdf`;
+    let fileHandle: any = null;
+
+    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+      try {
+        fileHandle = await (window as any).showSaveFilePicker({
+          suggestedName: finalFilename,
+          types: [
+            {
+              description: 'Tài liệu PDF (*.pdf)',
+              accept: { 'application/pdf': ['.pdf'] },
+            },
+          ],
+        });
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+        console.warn('[downloadFile] showSaveFilePicker fallback:', err);
+      }
+    }
+
     const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken);
-    fileService.saveBlobToFile(blob, filename || `${fileId}.pdf`);
+
+    if (fileHandle) {
+      try {
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (err) {
+        console.warn('[downloadFile] Ghi vào fileHandle thất bại, fallback:', err);
+      }
+    }
+
+    fileService.saveBlobToFile(blob, finalFilename);
   },
 
   prepareDownload: async (
@@ -146,10 +178,47 @@ export const fileService = {
     filename?: string,
     fingerprintToken?: string,
     signal?: AbortSignal,
-  ): Promise<() => void> => {
+  ): Promise<() => Promise<void>> => {
+    const finalFilename = filename || `${fileId}.pdf`;
+    let fileHandle: any = null;
+
+    // File System Access API: Kích hoạt ngay trong stack tương tác người dùng (User Gesture)
+    // Cho phép mở hộp thoại Save As trên Windows/PWA để người dùng chọn ổ đĩa/thư mục lưu
+    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+      try {
+        fileHandle = await (window as any).showSaveFilePicker({
+          suggestedName: finalFilename,
+          types: [
+            {
+              description: 'Tài liệu PDF (*.pdf)',
+              accept: { 'application/pdf': ['.pdf'] },
+            },
+          ],
+        });
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          const abortErr = new Error('Người dùng đã hủy chọn nơi lưu tệp');
+          abortErr.name = 'AbortError';
+          throw abortErr;
+        }
+        console.warn('[prepareDownload] showSaveFilePicker fallback:', err);
+      }
+    }
+
     const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken, signal);
-    return () => {
-      fileService.saveBlobToFile(blob, filename || `${fileId}.pdf`);
+
+    return async () => {
+      if (fileHandle) {
+        try {
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return;
+        } catch (err) {
+          console.warn('[prepareDownload] Ghi vào fileHandle thất bại, fallback:', err);
+        }
+      }
+      fileService.saveBlobToFile(blob, finalFilename);
     };
   },
 };

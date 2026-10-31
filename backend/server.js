@@ -1306,7 +1306,7 @@ app.get('/api/documents', async (req, res) => {
     `;
     r.input('clearance', sql.Int, req.user.clearance_level_id);
     if (req.query.q) {
-      query += ` AND (d.document_code LIKE '%' + @q + '%' OR d.title LIKE N'%' + @q + N'%' OR d.summary LIKE N'%' + @q + N'%')`;
+      query += ` AND (d.document_code LIKE '%' + @q + '%' OR d.title LIKE N'%' + @q + N'%' OR d.summary LIKE N'%' + @q + N'%' OR u.name LIKE N'%' + @q + N'%' OR d.signer LIKE N'%' + @q + N'%')`;
       r.input('q', sql.NVarChar(500), req.query.q);
     }
     if (req.query.code) { query += ` AND d.document_code LIKE '%' + @code + '%'`; r.input('code', sql.NVarChar(100), req.query.code); }
@@ -1384,7 +1384,7 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
     `;
     r.input('clearance', sql.Int, req.user.clearance_level_id);
     if (req.query.q) {
-      query += ` AND (d.document_code LIKE '%' + @q + '%' OR d.title LIKE N'%' + @q + N'%' OR d.summary LIKE N'%' + @q + N'%')`;
+      query += ` AND (d.document_code LIKE '%' + @q + '%' OR d.title LIKE N'%' + @q + N'%' OR d.summary LIKE N'%' + @q + N'%' OR u.name LIKE N'%' + @q + N'%' OR d.signer LIKE N'%' + @q + N'%')`;
       r.input('q', sql.NVarChar(500), req.query.q);
     }
     if (req.query.type) { query += ` AND d.doc_type_id = @type`; r.input('type', sql.VarChar(20), req.query.type); }
@@ -1652,7 +1652,7 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     const pool = await getPool();
     const exist = await pool.request()
       .input('fid', sql.VarChar(50), fileId)
-      .query(`SELECT stored_path, original_name, sha256 FROM DOCUMENT WHERE file_id = @fid`);
+      .query(`SELECT stored_path, original_name, sha256, uploaded_by, issuing_unit_id FROM DOCUMENT WHERE file_id = @fid`);
     if (exist.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
     const oldDoc = exist.recordset[0];
 
@@ -1662,6 +1662,84 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     } = req.body;
     if (!title || !title.trim()) return res.status(400).json({ error: 'Thiếu trích yếu' });
     if (!security_level_id) return res.status(400).json({ error: 'Thiếu mức bảo mật' });
+
+    const userRoles = await resolveUserRoles(req.user);
+    const isAdmin = userRoles.includes('ROL-01');
+    const isOwner = (oldDoc.uploaded_by && oldDoc.uploaded_by === req.user.user_id);
+
+    // Ràng buộc nghiệp vụ: Nếu Trợ lý, Văn thư, Cơ yếu, IT sửa file do NGƯỜI KHÁC đăng -> Chuyển vào trạng thái treo (PENDING)
+    if (!isAdmin && !isOwner) {
+      let newStoredPath = null;
+      let newOriginalName = null;
+      let newMimeType = null;
+      let newFileSize = null;
+      let newSha256 = null;
+
+      if (req.file) {
+        newSha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+        const sha8 = newSha256.slice(0, 8);
+        const yyyy = new Date().getFullYear();
+        const mm = String(new Date().getMonth() + 1).padStart(2, '0');
+        const relPath = `uploads/proposals/${yyyy}/${mm}/prop_${fileId}_${sha8}.pdf`;
+        const absPath = safePathJoin(ROOT_DIR, relPath);
+        if (absPath) {
+          fs.mkdirSync(path.dirname(absPath), { recursive: true });
+          fs.writeFileSync(absPath, req.file.buffer);
+          newStoredPath = relPath;
+          newOriginalName = req.file.originalname;
+          newMimeType = req.file.mimetype;
+          newFileSize = req.file.size;
+        }
+      }
+
+      const proposalId = 'PROP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+      await pool.request()
+        .input('pid', sql.VarChar(50), proposalId)
+        .input('fid', sql.VarChar(50), fileId)
+        .input('req_id', sql.VarChar(50), req.user.user_id)
+        .input('doc_code', sql.NVarChar(100), document_code || null)
+        .input('title', sql.NVarChar(500), title.trim())
+        .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
+        .input('issued_date', sql.Date, issued_date || null)
+        .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+        .input('signer', sql.NVarChar(100), signer || null)
+        .input('summary', sql.NVarChar(sql.MAX), summary || null)
+        .input('sec_id', sql.Int, parseInt(security_level_id, 10))
+        .input('new_path', sql.NVarChar(500), newStoredPath)
+        .input('new_name', sql.NVarChar(255), newOriginalName)
+        .input('new_mime', sql.VarChar(100), newMimeType)
+        .input('new_size', sql.BigInt, newFileSize)
+        .input('new_sha', sql.Char(64), newSha256)
+        .input('note', sql.NVarChar(500), req.body.note || req.body.proposal_note || 'Đề xuất chuẩn hóa thông tin văn bản')
+        .query(`
+          INSERT INTO DOCUMENT_REVISION_PROPOSAL (
+            proposal_id, file_id, requester_id,
+            document_code, title, doc_type_id, issued_date, issuing_unit_id,
+            signer, summary, security_level_id,
+            new_stored_path, new_original_name, new_mime_type, new_file_size, new_sha256,
+            status, note, created_at, updated_at
+          ) VALUES (
+            @pid, @fid, @req_id,
+            @doc_code, @title, @doc_type_id, @issued_date, @issuing_unit_id,
+            @signer, @summary, @sec_id,
+            @new_path, @new_name, @new_mime, @new_size, @new_sha,
+            'PENDING', @note, GETDATE(), GETDATE()
+          )
+        `);
+
+      await writeAccessLog({
+        userId: req.user.user_id, fileId, action: 'PROPOSAL_CREATED',
+        ip: getClientIp(req),
+        note: `Đề xuất chỉnh sửa văn bản ${fileId}: ${title.trim()}`,
+      });
+
+      return res.json({
+        success: true,
+        pending_approval: true,
+        proposal_id: proposalId,
+        message: 'Đề xuất chỉnh sửa đã được chuyển vào trạng thái chờ duyệt bởi Chỉ huy / Quản trị viên.',
+      });
+    }
 
     let storedPath = oldDoc.stored_path;
     let originalName = oldDoc.original_name;
@@ -1744,6 +1822,242 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     res.json({ success: true, file_id: fileId, replaced_file: replacedFile, stored_path: storedPath });
   } catch (err) {
     console.error('[PUT documents]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PROPOSALS MANAGEMENT (Đề xuất sửa đổi tài liệu chờ duyệt)
+// ─────────────────────────────────────────────────────────────
+app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_VIEW'), async (req, res) => {
+  try {
+    const pool = await getPool();
+    const userRoles = await resolveUserRoles(req.user);
+    const isAdmin = userRoles.includes('ROL-01');
+    const isCommander = userRoles.includes('ROL-02');
+
+    const r = pool.request();
+    let query = `
+      SELECT p.*,
+             d.document_code AS current_document_code,
+             d.title AS current_title,
+             d.signer AS current_signer,
+             d.security_level_id AS current_security_level_id,
+             d.doc_type_id AS current_doc_type_id,
+             d.issued_date AS current_issued_date,
+             d.issuing_unit_id AS current_issuing_unit_id,
+             u.full_name AS requester_name,
+             u.rank AS requester_rank,
+             u.position AS requester_position,
+             unit.name AS issuing_unit_name,
+             cur_unit.name AS current_unit_name,
+             sl.name AS security_level_name,
+             cur_sl.name AS current_security_name
+      FROM DOCUMENT_REVISION_PROPOSAL p
+      JOIN DOCUMENT d ON d.file_id = p.file_id
+      JOIN [USER] u ON u.user_id = p.requester_id
+      LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
+      LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
+      LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = p.security_level_id
+      LEFT JOIN SECURITY_LEVEL cur_sl ON cur_sl.level_id = d.security_level_id
+      WHERE p.status = 'PENDING'
+    `;
+
+    if (!isAdmin && isCommander) {
+      const userUnitId = await resolveUserUnitId(req.user);
+      const subtree = await getSubtreeUnits(userUnitId);
+      if (subtree.length > 0) {
+        const params = subtree.map((_, i) => `@u_${i}`);
+        query += ` AND d.issuing_unit_id IN (${params.join(', ')})`;
+        subtree.forEach((uId, i) => r.input(`u_${i}`, sql.VarChar(50), uId));
+      } else {
+        query += ` AND 1 = 0`;
+      }
+    } else if (!isAdmin && !isCommander) {
+      query += ` AND p.requester_id = @my_uid`;
+      r.input('my_uid', sql.VarChar(50), req.user.user_id);
+    }
+
+    query += ` ORDER BY p.created_at DESC`;
+    const result = await r.query(query);
+    res.json({ total: result.recordset.length, items: result.recordset });
+  } catch (err) {
+    console.error('[GET proposals pending]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePermission('DOC_EDIT'), async (req, res) => {
+  const proposalId = req.params.proposalId;
+  try {
+    const pool = await getPool();
+    const propRes = await pool.request()
+      .input('pid', sql.VarChar(50), proposalId)
+      .query(`
+        SELECT p.*, d.stored_path AS old_stored_path, d.issuing_unit_id AS doc_unit_id
+        FROM DOCUMENT_REVISION_PROPOSAL p
+        JOIN DOCUMENT d ON d.file_id = p.file_id
+        WHERE p.proposal_id = @pid
+      `);
+    if (propRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy đề xuất' });
+    const prop = propRes.recordset[0];
+    if (prop.status !== 'PENDING') return res.status(400).json({ error: `Đề xuất đã ở trạng thái ${prop.status}` });
+
+    const userRoles = await resolveUserRoles(req.user);
+    const isAdmin = userRoles.includes('ROL-01');
+    const isCommander = userRoles.includes('ROL-02');
+
+    if (!isAdmin && isCommander) {
+      const userUnitId = await resolveUserUnitId(req.user);
+      const subtree = await getSubtreeUnits(userUnitId);
+      const canManage = subtree.includes(prop.doc_unit_id) || subtree.includes(prop.issuing_unit_id);
+      if (!canManage) {
+        return res.status(403).json({ error: 'Chỉ huy không quản lý đơn vị của văn bản này' });
+      }
+    } else if (!isAdmin && !isCommander) {
+      return res.status(403).json({ error: 'Chỉ có Chỉ huy hoặc Quản trị viên mới có quyền phê duyệt đề xuất' });
+    }
+
+    let finalStoredPath = prop.old_stored_path;
+    let finalOriginalName = null;
+    let finalMimeType = null;
+    let finalFileSize = null;
+    let finalSha256 = null;
+    let replacedFile = false;
+
+    if (prop.new_stored_path) {
+      const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+        docTypeId: prop.doc_type_id, documentCode: prop.document_code, fallbackId: prop.file_id,
+      });
+      const sha8 = (prop.new_sha256 || '00000000').slice(0, 8);
+      const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
+      const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
+      const absPath = safePathJoin(ROOT_DIR, relPath);
+      const propAbs = safePathJoin(ROOT_DIR, prop.new_stored_path);
+
+      if (absPath && propAbs && fs.existsSync(propAbs)) {
+        fs.mkdirSync(path.dirname(absPath), { recursive: true });
+        fs.copyFileSync(propAbs, absPath);
+        finalStoredPath = relPath;
+        finalOriginalName = prop.new_original_name;
+        finalMimeType = prop.new_mime_type;
+        finalFileSize = prop.new_file_size;
+        finalSha256 = prop.new_sha256;
+        replacedFile = true;
+      }
+    }
+
+    const reqUpdate = pool.request()
+      .input('fid', sql.VarChar(50), prop.file_id)
+      .input('code', sql.NVarChar(100), prop.document_code || null)
+      .input('title', sql.NVarChar(500), prop.title)
+      .input('type', sql.VarChar(20), prop.doc_type_id || null)
+      .input('issued', sql.Date, prop.issued_date || null)
+      .input('unit', sql.VarChar(50), prop.issuing_unit_id || null)
+      .input('signer', sql.NVarChar(100), prop.signer || null)
+      .input('summary', sql.NVarChar(sql.MAX), prop.summary || null)
+      .input('level', sql.Int, prop.security_level_id)
+      .input('path', sql.NVarChar(500), finalStoredPath);
+
+    let sqlUpdate = `
+      UPDATE DOCUMENT SET
+        document_code = @code, title = @title, doc_type_id = @type,
+        issued_date = @issued, issuing_unit_id = @unit,
+        signer = @signer, summary = @summary, security_level_id = @level,
+        stored_path = @path, updated_at = GETDATE()
+    `;
+    if (replacedFile) {
+      sqlUpdate += `, original_name = @orig, mime_type = @mime, file_size = @size, sha256 = @sha`;
+      reqUpdate.input('orig', sql.NVarChar(255), finalOriginalName);
+      reqUpdate.input('mime', sql.VarChar(100), finalMimeType);
+      reqUpdate.input('size', sql.BigInt, finalFileSize);
+      reqUpdate.input('sha', sql.Char(64), finalSha256);
+    }
+    sqlUpdate += ` WHERE file_id = @fid`;
+    await reqUpdate.query(sqlUpdate);
+
+    await pool.request()
+      .input('pid', sql.VarChar(50), proposalId)
+      .input('reviewer', sql.VarChar(50), req.user.user_id)
+      .input('note', sql.NVarChar(500), req.body.review_note || 'Đã chấp thuận đề xuất')
+      .query(`
+        UPDATE DOCUMENT_REVISION_PROPOSAL SET
+          status = 'APPROVED', reviewed_by = @reviewer, reviewed_at = GETDATE(),
+          review_note = @note, updated_at = GETDATE()
+        WHERE proposal_id = @pid
+      `);
+
+    await writeAccessLog({
+      userId: req.user.user_id, fileId: prop.file_id, action: 'PROPOSAL_APPROVED',
+      ip: getClientIp(req),
+      note: `Phê duyệt đề xuất ${proposalId} cho văn bản ${prop.file_id}`,
+    });
+
+    syncToAI('ingest', {
+      file_id: prop.file_id,
+      document_code: prop.document_code || prop.file_id,
+      title: prop.title,
+      stored_path: finalStoredPath,
+      security_level_id: prop.security_level_id,
+    });
+
+    res.json({ success: true, message: 'Đã phê duyệt và áp dụng đề xuất chỉnh sửa văn bản thành công' });
+  } catch (err) {
+    console.error('[POST proposals approve]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/documents/proposals/:proposalId/reject', requireAuth, requirePermission('DOC_EDIT'), async (req, res) => {
+  const proposalId = req.params.proposalId;
+  try {
+    const pool = await getPool();
+    const propRes = await pool.request()
+      .input('pid', sql.VarChar(50), proposalId)
+      .query(`
+        SELECT p.*, d.issuing_unit_id AS doc_unit_id
+        FROM DOCUMENT_REVISION_PROPOSAL p
+        JOIN DOCUMENT d ON d.file_id = p.file_id
+        WHERE p.proposal_id = @pid
+      `);
+    if (propRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy đề xuất' });
+    const prop = propRes.recordset[0];
+    if (prop.status !== 'PENDING') return res.status(400).json({ error: `Đề xuất đã ở trạng thái ${prop.status}` });
+
+    const userRoles = await resolveUserRoles(req.user);
+    const isAdmin = userRoles.includes('ROL-01');
+    const isCommander = userRoles.includes('ROL-02');
+
+    if (!isAdmin && isCommander) {
+      const userUnitId = await resolveUserUnitId(req.user);
+      const subtree = await getSubtreeUnits(userUnitId);
+      if (!subtree.includes(prop.doc_unit_id)) {
+        return res.status(403).json({ error: 'Chỉ huy không quản lý đơn vị của văn bản này' });
+      }
+    } else if (!isAdmin && !isCommander) {
+      return res.status(403).json({ error: 'Chỉ có Chỉ huy hoặc Quản trị viên mới có quyền từ chối đề xuất' });
+    }
+
+    await pool.request()
+      .input('pid', sql.VarChar(50), proposalId)
+      .input('reviewer', sql.VarChar(50), req.user.user_id)
+      .input('note', sql.NVarChar(500), req.body.review_note || req.body.reason || 'Không chấp thuận đề xuất')
+      .query(`
+        UPDATE DOCUMENT_REVISION_PROPOSAL SET
+          status = 'REJECTED', reviewed_by = @reviewer, reviewed_at = GETDATE(),
+          review_note = @note, updated_at = GETDATE()
+        WHERE proposal_id = @pid
+      `);
+
+    await writeAccessLog({
+      userId: req.user.user_id, fileId: prop.file_id, action: 'PROPOSAL_REJECTED',
+      ip: getClientIp(req),
+      note: `Từ chối đề xuất ${proposalId} cho văn bản ${prop.file_id}`,
+    });
+
+    res.json({ success: true, message: 'Đã từ chối đề xuất chỉnh sửa' });
+  } catch (err) {
+    console.error('[POST proposals reject]', err);
     res.status(500).json({ error: err.message });
   }
 });

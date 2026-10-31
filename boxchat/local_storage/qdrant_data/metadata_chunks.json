@@ -1,21 +1,5 @@
 [
   {
-    "chunk_id": "DOC-1793263778293-V362_p1_c1",
-    "file_id": "DOC-1793263778293-V362",
-    "document_code": "494/TQS-TM",
-    "title": "V/v bảo đảm công tác SSCĐ và huấn luyện chiến đấu",
-    "section_title": "",
-    "security_level_id": 1,
-    "page": 1,
-    "bbox": [
-      84.02,
-      67.17,
-      551.52,
-      803.62
-    ],
-    "text": "QUÂN KHU 7 \nTRƯỜNG QUÂN SỰ\n\nSố: 494 /TQS-TM\n\nV/v bảo đảm công tác SSCĐ\n\nvà huấn luyện chiến đấu\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n\nĐộc lập - Tự do - Hạnh phúc\n\nThành phố Hồ Chí Minh, ngày 15 tháng 5 năm 2026\n\nNỘI DUNG THỬ NGHIỆM\n\nNơi nhận: \n- Như trên; \n- Ban Giám hiệu; \n- Lưu: VT, TC/PTM-HC. D24.\n\nKT. HIỆU TRƯỞNG \nPHÓ HIỆU TRƯỞNG\n\nĐại tá Cao Xuân Thủy"
-  },
-  {
     "chunk_id": "DOC-1793263858381-JCJC_p1_c1",
     "file_id": "DOC-1793263858381-JCJC",
     "document_code": "532/KH-CT",
@@ -190,5 +174,21 @@
       781.47
     ],
     "text": "TRƯỜNG QUÂN SỰ QK7\n\nPHÒNG CHÍNH TRỊ\n\nSố: 603/KH-CT\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n\nĐộc lập – Tự do – Hạnh phúc\n\nThành phố Hồ Chí Minh, ngày 30 tháng 9 năm 2026\n\nKẾ HOẠCH \nThực hiện chế độ thông báo chính trị - thời sự, \nđọc báo, nghe đài, xem truyền hình trong Nhà trường\n\nĐANG THỬ NGHIỆM\n\nKính trình Chính ủy phê duyệt để cơ quan phối hợp triển khai thực hiện./.\n\nNơi nhận: \n- Thủ trưởng Ban Giám hiệu (để b/c); \n- Các phòng, khoa, đơn vị; \n- Lưu: VT, TH. T25.\n\nĐại tá Nguyễn Đức Thịnh"
+  },
+  {
+    "chunk_id": "DOC-1793263778293-V362_p1_c1",
+    "file_id": "DOC-1793263778293-V362",
+    "document_code": "DOC-1793263778293-V362",
+    "title": "V/v bảo đảm công tác SSCĐ và huấn luyện chiến đấu",
+    "section_title": "",
+    "security_level_id": 1,
+    "page": 1,
+    "bbox": [
+      84.02,
+      67.17,
+      551.52,
+      803.62
+    ],
+    "text": "QUÂN KHU 7 \nTRƯỜNG QUÂN SỰ\n\nSố: 494 /TQS-TM\n\nV/v bảo đảm công tác SSCĐ\n\nvà huấn luyện chiến đấu\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n\nĐộc lập - Tự do - Hạnh phúc\n\nThành phố Hồ Chí Minh, ngày 15 tháng 5 năm 2026\n\nNỘI DUNG THỬ NGHIỆM\n\nNơi nhận: \n- Như trên; \n- Ban Giám hiệu; \n- Lưu: VT, TC/PTM-HC. D24.\n\nKT. HIỆU TRƯỞNG \nPHÓ HIỆU TRƯỞNG\n\nĐại tá Cao Xuân Thủy"
   }
 ]

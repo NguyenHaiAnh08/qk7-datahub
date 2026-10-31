@@ -1,6 +1,10 @@
 // src/admin-routes.js
 const bcrypt = require('bcryptjs');
 const { AUTO_PERMISSIONS, getAutoRequiredPermission } = require('./route-permissions');
+let invalidateCatalogCache;
+try {
+    invalidateCatalogCache = require('../pdf-parser').invalidateCatalogCache;
+} catch (e) {}
 
 module.exports = (app, deps) => {
     const {
@@ -1454,7 +1458,7 @@ module.exports = (app, deps) => {
                 .input('a', sql.NVarChar(200), alias_text.trim())
                 .input('p', sql.Int, priority || 0)
                 .query(`INSERT INTO UNIT_ALIAS (unit_id, alias_text, priority) OUTPUT INSERTED.alias_id VALUES (@uid, @a, @p)`);
-            await log(req, 'CREATE_UNIT_ALIAS', `Thêm alias "${alias_text}" cho ${unit_id}`);
+            await log(req, 'CREATE_UNIT_ALIAS', `Thêm alias "${alias_text}" cho ${unit_id}`); if (invalidateCatalogCache) invalidateCatalogCache();
             res.json({ success: true, alias_id: r.recordset[0].alias_id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -1480,7 +1484,7 @@ module.exports = (app, deps) => {
             const pool = await getPool();
             const r = await pool.request().input('id', sql.Int, parseInt(req.params.id, 10)).query(`DELETE FROM UNIT_ALIAS WHERE alias_id = @id`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy alias' });
-            await log(req, 'DELETE_UNIT_ALIAS', `Xóa alias #${req.params.id}`);
+            await log(req, 'DELETE_UNIT_ALIAS', `Xóa alias #${req.params.id}`); if (invalidateCatalogCache) invalidateCatalogCache();
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });

@@ -11,6 +11,7 @@ const EXCLUDED_PATHS = [
   /^\/api\/admin\/protected-permissions/,
   /^\/api\/auth\//,
   /^\/api\/admin\/creatable-roles$/,
+  /^\/api\/documents\/proposals\//,
 ];
 
 module.exports = function createApprovalWorkflow({ 

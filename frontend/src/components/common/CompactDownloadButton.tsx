@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Download, Check, X, Loader2 } from 'lucide-react';
 
 export interface CompactDownloadButtonProps {
-  onDownload: (signal?: AbortSignal) => Promise<(() => void) | void> | (() => void) | void;
+  onDownload: (signal?: AbortSignal) => Promise<(() => Promise<void> | void) | void> | (() => Promise<void> | void) | void;
   onCancel?: () => void;
   disabled?: boolean;
   disabledTitle?: string;
@@ -40,7 +40,7 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
   const resetTimerRef = useRef<NodeJS.Timeout | null>(null);
   const foldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const releaseActionRef = useRef<(() => void) | null>(null);
+  const releaseActionRef = useRef<(() => Promise<void> | void) | null>(null);
   const isCancelledRef = useRef<boolean>(false);
 
   const DURATION = 3200; // 3200ms motion duration as specified in prompt #004
@@ -148,7 +148,10 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
             // CRITICAL REQUIREMENT: Release the file to disk now that UI UX is done!
             if (releaseActionRef.current) {
               try {
-                releaseActionRef.current();
+                const res = releaseActionRef.current();
+                if (res && typeof (res as Promise<void>).then === 'function') {
+                  (res as Promise<void>).catch((e: any) => console.error('Error executing async file release:', e));
+                }
               } catch (e) {
                 console.error('Error executing file release:', e);
               }
@@ -261,7 +264,7 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
       aria-valuemin={state === 'run' ? 0 : undefined}
       aria-valuemax={state === 'run' ? 100 : undefined}
       aria-live="polite"
-      title={state === 'run' ? 'Bấm để hủy' : disabledTitle || idleLabel}
+      title={state === 'run' ? 'Bấm để hủy' : disabled ? (disabledTitle || 'Không thể tải về') : idleLabel}
       style={
         {
           '--p': `${progress}%`,

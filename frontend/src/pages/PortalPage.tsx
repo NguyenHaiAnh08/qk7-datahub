@@ -96,62 +96,49 @@ export const PortalPage: React.FC = () => {
       .catch((err) => console.error('[loadMeta]', err));
   }, [user]);
 
-  // Nhóm đơn vị phân cấp động từ CSDL
-  const groupedUnits = useMemo(() => {
-    const parentMap = new Map<string, { parent: Unit; children: Unit[] }>();
-    const roots: { parent: Unit; children: Unit[] }[] = [];
-
-    for (const u of meta.units) {
-      if (!u.parent_id) {
-        const item = { parent: u, children: [] };
-        parentMap.set(u.unit_id, item);
-        roots.push(item);
-      }
-    }
-
-    for (const u of meta.units) {
-      if (u.parent_id && parentMap.has(u.parent_id)) {
-        parentMap.get(u.parent_id)!.children.push(u);
-      } else if (u.parent_id && !parentMap.has(u.parent_id)) {
-        roots.push({ parent: u, children: [] });
-      }
-    }
-
-    roots.sort((a, b) => a.parent.name.localeCompare(b.parent.name, 'vi'));
-    for (const r of roots) {
-      r.children.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-    }
-
-    return roots;
+  // Sub-departments of Truong Quan su Quan khu 7 (TQS)
+  const tqsDepartments = useMemo(() => {
+    const list = meta.units.filter((u) => u.parent_id === 'TQS' || u.parent_id === 'U-TQS');
+    if (list.length > 0) return list;
+    return [
+      { unit_id: 'U-BGH', name: 'Ban Giám hiệu' },
+      { unit_id: 'U-TM', name: 'Phòng Tham mưu - Hành chính' },
+      { unit_id: 'U-CT', name: 'Phòng Chính trị' },
+      { unit_id: 'U-DT', name: 'Phòng Đào tạo' },
+      { unit_id: 'U-HC', name: 'Phòng Hậu cần - Kỹ thuật' },
+    ];
   }, [meta.units]);
 
-  // Phòng ban / đơn vị trực thuộc của đơn vị đang chọn
-  const subDepartments = useMemo(() => {
-    if (!selectedUnit) return [];
-    const list = meta.units.filter((u) => u.parent_id === selectedUnit);
-    if (list.length > 0) return list;
-    if (selectedUnit === 'TQS' || selectedUnit === 'U-TQS') {
-      return [
-        { unit_id: 'U-BGH', name: 'Ban Giám hiệu' },
-        { unit_id: 'U-TM', name: 'Phòng Tham mưu - Hành chính' },
-        { unit_id: 'U-CT', name: 'Phòng Chính trị' },
-        { unit_id: 'U-HC', name: 'Phòng Hậu cần - Kỹ thuật' },
-      ];
-    }
-    return [];
-  }, [meta.units, selectedUnit]);
+  // Main units excluding child departments of TQS
+  const mainUnits = useMemo(() => {
+    const tqsIds = new Set(tqsDepartments.map((d) => d.unit_id));
+    const nonDeptUnits = meta.units.filter(
+      (u) => !tqsIds.has(u.unit_id) && u.parent_id !== 'TQS' && u.parent_id !== 'U-TQS'
+    );
+    return [...nonDeptUnits].sort((a, b) => {
+      if (a.unit_id === 'TQS') return -1;
+      if (b.unit_id === 'TQS') return 1;
+      if (a.unit_id === 'QK7') return -1;
+      if (b.unit_id === 'QK7') return 1;
+      return a.name.localeCompare(b.name, 'vi');
+    });
+  }, [meta.units, tqsDepartments]);
 
   // Load Documents
   const loadDocuments = async () => {
-    
     setLoading(true);
     try {
       let queryUnit: string | undefined = undefined;
       let includeChildren: boolean | undefined = undefined;
 
-      if (selectedDepartment) {
-        queryUnit = selectedDepartment;
-        includeChildren = false;
+      if (selectedUnit === 'TQS') {
+        if (selectedDepartment) {
+          queryUnit = selectedDepartment;
+          includeChildren = false;
+        } else {
+          queryUnit = 'TQS';
+          includeChildren = true;
+        }
       } else if (selectedUnit) {
         queryUnit = selectedUnit;
         includeChildren = true;
@@ -170,7 +157,6 @@ export const PortalPage: React.FC = () => {
       setCurrentPage(1);
     } catch (err: any) {
       if (err?.status === 401) {
-        // Đã xử lý global bởi HttpErrorListener, bỏ qua local toast
         return;
       }
       showToast('Lỗi tải tài liệu: ' + err.message, 'error');
@@ -346,24 +332,11 @@ export const PortalPage: React.FC = () => {
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition cursor-pointer [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
               >
                 <option value="">Tất cả đơn vị ban hành</option>
-                {groupedUnits.map((group) =>
-                  group.children.length > 0 ? (
-                    <optgroup key={group.parent.unit_id} label={`🏢 ${group.parent.name}`}>
-                      <option value={group.parent.unit_id}>
-                        {group.parent.name} (Tất cả trực thuộc)
-                      </option>
-                      {group.children.map((c) => (
-                        <option key={c.unit_id} value={c.unit_id}>
-                          &nbsp;&nbsp;└─ {c.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ) : (
-                    <option key={group.parent.unit_id} value={group.parent.unit_id}>
-                      {group.parent.name}
-                    </option>
-                  )
-                )}
+                {mainUnits.map((u) => (
+                  <option key={u.unit_id} value={u.unit_id}>
+                    {u.name}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -405,17 +378,19 @@ export const PortalPage: React.FC = () => {
                 />
               </div>
 
-              {/* Col 3: Ô chọn phòng ban / trực thuộc (Nằm ở Cột 3 - ĐỐI DIỆN VÀ NẰM NGAY DƯỚI Ô "Đơn vị ban hành") */}
+              {/* Col 3: Ô chọn phòng ban (Nằm ở Cột 3 - ĐỐI DIỆN VÀ NẰM NGAY DƯỚI Ô "Đơn vị ban hành") */}
               <div>
-                {subDepartments.length > 0 ? (
+                {selectedUnit === 'TQS' ? (
                   <div className="animate-in fade-in duration-200">
                     <select
+                      id="portal-department-select"
+                      name="portal_department"
                       value={selectedDepartment}
                       onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="w-full px-3 py-2 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-400 dark:border-emerald-700/70 rounded-xl text-xs font-medium text-emerald-950 dark:text-emerald-200 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition shadow-sm cursor-pointer"
+                      className="w-full px-3 py-2 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-400 dark:border-emerald-700/70 rounded-xl text-xs font-medium text-emerald-950 dark:text-emerald-200 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition shadow-sm cursor-pointer [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                     >
-                      <option value="">Tất cả phòng ban / trực thuộc</option>
-                      {subDepartments.map((d) => (
+                      <option value="">Tất cả phòng ban</option>
+                      {tqsDepartments.map((d) => (
                         <option key={d.unit_id} value={d.unit_id}>
                           {d.name}
                         </option>
@@ -466,7 +441,7 @@ export const PortalPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={loadDocuments}
+                  onClick={() => loadDocuments()}
                   className="px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-600/20 hover:bg-emerald-100 dark:hover:bg-emerald-600/30 border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium flex items-center gap-1 transition cursor-pointer shrink-0 whitespace-nowrap"
                 >
                   <RotateCw className="w-3.5 h-3.5" />
@@ -477,7 +452,7 @@ export const PortalPage: React.FC = () => {
           </div>
 
           {/* Active Filter Chips (Shopify Polaris Pattern) */}
-          {(searchQuery || selectedType || selectedUnit || selectedLevel !== '' || dateFrom || dateTo) && (
+          {(searchQuery || selectedType || selectedUnit || selectedDepartment || selectedLevel !== '' || dateFrom || dateTo) && (
             <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100 dark:border-white/[0.04]">
               <span className="text-xs text-slate-500 dark:text-slate-400 font-medium mr-1">Đang lọc theo:</span>
               {searchQuery && (
@@ -495,13 +470,28 @@ export const PortalPage: React.FC = () => {
               {selectedUnit && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-slate-100 dark:bg-white/[0.05] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10">
                   <span>Đơn vị: {meta.units.find((u) => u.unit_id === selectedUnit)?.name || selectedUnit}</span>
-                  <button type="button" onClick={() => { setSelectedUnit(''); setSelectedDepartment(''); }} className="hover:text-rose-500 cursor-pointer font-bold">×</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnit('');
+                      setSelectedDepartment('');
+                    }}
+                    className="hover:text-rose-500 cursor-pointer font-bold"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {selectedDepartment && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-slate-100 dark:bg-white/[0.05] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10">
-                  <span>Phòng ban: {meta.units.find((u) => u.unit_id === selectedDepartment)?.name || selectedDepartment}</span>
-                  <button type="button" onClick={() => setSelectedDepartment('')} className="hover:text-rose-500 cursor-pointer font-bold">×</button>
+                  <span>Phòng ban: {tqsDepartments.find((d) => String(d.unit_id) === String(selectedDepartment))?.name || selectedDepartment}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDepartment('')}
+                    className="hover:text-rose-500 cursor-pointer font-bold"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {selectedLevel !== '' && (

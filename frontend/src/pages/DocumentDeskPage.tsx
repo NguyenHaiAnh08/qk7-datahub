@@ -12,6 +12,8 @@ import { DocumentPreviewModal } from '../components/document-desk/DocumentPrevie
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
+import { isUserAdmin, isUserManager } from '../contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
 
@@ -26,7 +28,8 @@ const canUpload = hasPermission('DOC_UPLOAD');
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('');
+  const [searchParams] = useSearchParams();
+  const [selectedUnit, setSelectedUnit] = useState(searchParams.get('unit') || '');
   const [selectedLevel, setSelectedLevel] = useState<number>(0);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -45,8 +48,20 @@ const canUpload = hasPermission('DOC_UPLOAD');
   const [pendingProposals, setPendingProposals] = useState<PendingProposalItem[]>([]);
 
   const canApproveProposals = useMemo(() => {
-    const roles = user?.roles || [];
-    return roles.includes('ROL-01') || roles.includes('ROL-02');
+    if (!user) return false;
+    const r = (user.roles || []).map((x) => String(x).toUpperCase());
+    const rn = (user.role_names || []).map((x) => String(x).toLowerCase());
+    return (
+      isUserAdmin(user) ||
+      isUserManager(user) ||
+      user.user_id === 'USR-001' ||
+      r.includes('ROL-01') ||
+      r.includes('ROL-02') ||
+      r.includes('ADMIN') ||
+      rn.some((n) => n.includes('admin') || n.includes('quản trị') || n.includes('chỉ huy'))
+    );
+
+
   }, [user]);
 
   const loadPendingProposals = useCallback(async () => {
@@ -73,6 +88,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
         setMeta(res);
       })
       .catch((err) => console.error('[loadMeta]', err));
+    loadPendingProposals();
   }, []);
 
   // Load Documents
@@ -117,8 +133,10 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
   // Save Document (Create or Edit)
   const handleSaveDocument = async (formData: FormData, isEdit: boolean) => {
+    let result: any = null;
     if (isEdit && editingDoc) {
       const res: any = await documentsApi.updateDocument(editingDoc.file_id, formData);
+      result = res;
       if (res?.pending_approval) {
         toast.info(res.message || 'Đề xuất chỉnh sửa đã được chuyển vào trạng thái treo chờ Chỉ huy / Admin duyệt.', {
           title: 'ĐÃ GỬI ĐỀ XUẤT CHỈNH SỬA',
@@ -132,7 +150,8 @@ const canUpload = hasPermission('DOC_UPLOAD');
         });
       }
     } else {
-      await documentsApi.uploadDocument(formData);
+      const res = await documentsApi.uploadDocument(formData);
+      result = res;
       toast.success('Đã tiếp nhận và lưu trữ văn bản mới thành công', {
         title: 'TIẾP NHẬN THÀNH CÔNG',
         badge: 'UPLOADED',
@@ -140,6 +159,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
     }
     await loadDocuments();
     await loadPendingProposals();
+    return result;
   };
 
   // Delete Document
@@ -259,7 +279,10 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
-            onClick={() => setProposalsModalOpen(true)}
+            onClick={() => {
+              loadPendingProposals();
+              setProposalsModalOpen(true);
+            }}
             className="px-3.5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold rounded-lg text-xs flex items-center gap-2 border border-amber-500/30 transition-colors cursor-pointer shrink-0 active:scale-[0.98]"
             title="Xem và xét duyệt các đề xuất chỉnh sửa văn bản"
           >
@@ -357,7 +380,10 @@ const canUpload = hasPermission('DOC_UPLOAD');
         proposals={pendingProposals}
         canApprove={canApproveProposals}
         onClose={() => setProposalsModalOpen(false)}
-        onRefresh={loadPendingProposals}
+        onRefresh={async () => {
+          await loadPendingProposals();
+          await loadDocuments();
+        }}
       />
 
       {/* Delete Confirmation */}

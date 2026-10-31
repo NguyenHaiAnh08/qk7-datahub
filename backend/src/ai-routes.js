@@ -271,27 +271,57 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
         });
 
         if (!hasDocMatch) {
-          const clrNames = {
-            1: 'Cấp 1 - Công khai',
-            2: 'Cấp 2 - Nội bộ',
-            3: 'Cấp 3 - Mật',
-            4: 'Cấp 4 - Tối mật',
-            5: 'Cấp 5 - Tuyệt mật',
-          };
-          const clrName = clrNames[user_clearance] || `Cấp ${user_clearance}`;
-          const refusalAnswer = `Báo cáo đồng chí, tài liệu ${docCodeMatches[0]} không phù hợp với cấp bảo mật hiện tại của đồng chí (${clrName}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật.`;
-          return res.json({
-            answer: refusalAnswer,
-            citations: [],
-            reasoning: {
-              mem: `[Smart SQL Fallback] Cấp bảo mật: ${clrName}`,
-              think: `[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản ${docCodeMatches[0]} nhưng không có trong danh mục được cấp quyền.`,
-              tool_call: `[Security Refusal] Chặn trích dẫn văn bản ${docCodeMatches[0]}.`,
-            },
-            retrieval_mode: 'sql_fallback',
-            synthesis_mode: 'clearance_blocked',
-            requires_biometric: false,
-          });
+          const checkDocRes = await pool.request()
+            .input('targetCode', sql.NVarChar(100), `%${docCodeMatches[0]}%`)
+            .query(`
+              SELECT TOP 1 file_id, document_code, title, summary, security_level_id
+              FROM DOCUMENT
+              WHERE deleted_at IS NULL
+                AND (document_code LIKE @targetCode OR file_id LIKE @targetCode)
+            `);
+
+          const foundDoc = checkDocRes.recordset && checkDocRes.recordset[0];
+          if (foundDoc) {
+            if (foundDoc.security_level_id > user_clearance) {
+              const clrNames = {
+                1: 'Cấp 1 - Công khai',
+                2: 'Cấp 2 - Nội bộ',
+                3: 'Cấp 3 - Mật',
+                4: 'Cấp 4 - Tối mật',
+                5: 'Cấp 5 - Tuyệt mật',
+              };
+              const clrName = clrNames[user_clearance] || `Cấp ${user_clearance}`;
+              const refusalAnswer = `Báo cáo đồng chí, tài liệu ${docCodeMatches[0]} không phù hợp với cấp bảo mật hiện tại của đồng chí (${clrName}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật.`;
+              return res.json({
+                answer: refusalAnswer,
+                citations: [],
+                reasoning: {
+                  mem: `[Smart SQL Fallback] Cấp bảo mật: ${clrName}`,
+                  think: `[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản ${docCodeMatches[0]} (Cấp ${foundDoc.security_level_id}), vượt quá cấp quyền Cấp ${user_clearance} (${clrName}).`,
+                  tool_call: `[Security Refusal] Chặn trích dẫn văn bản ${docCodeMatches[0]}.`,
+                },
+                retrieval_mode: 'sql_fallback',
+                synthesis_mode: 'clearance_blocked',
+                requires_biometric: false,
+              });
+            } else {
+              items.push(foundDoc);
+            }
+          } else {
+            const notFoundAnswer = `Báo cáo đồng chí, không tìm thấy văn bản có số hiệu "${docCodeMatches[0]}" trong hệ thống thư viện dữ liệu số. Xin đồng chí vui lòng kiểm tra lại số hiệu văn bản hoặc tra cứu tài liệu khác.`;
+            return res.json({
+              answer: notFoundAnswer,
+              citations: [],
+              reasoning: {
+                mem: `[Smart SQL Fallback] Không tìm thấy văn bản: ${docCodeMatches[0]}`,
+                think: `[Lookup Guard] Không tìm thấy tài liệu có số hiệu ${docCodeMatches[0]} trong CSDL.`,
+                tool_call: `[NotFound] Văn bản không tồn tại.`,
+              },
+              retrieval_mode: 'sql_fallback',
+              synthesis_mode: 'not_found',
+              requires_biometric: false,
+            });
+          }
         }
       }
 

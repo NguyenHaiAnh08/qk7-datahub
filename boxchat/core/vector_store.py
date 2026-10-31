@@ -224,6 +224,28 @@ class HybridVectorStore:
             pass
         return None
 
+    def delete_file(self, file_id: str) -> int:
+        """
+        Xóa toàn bộ các chunk của một file_id khỏi Qdrant và metadata store.
+        """
+        if not file_id:
+            return 0
+        initial_count = len(self.chunks_cache)
+        if self.qdrant_client and HAS_QDRANT:
+            try:
+                self.qdrant_client.delete(
+                    collection_name=self.COLLECTION_NAME,
+                    points_selector=Filter(
+                        must=[FieldCondition(key="file_id", match=MatchValue(value=file_id))]
+                    )
+                )
+            except Exception as e:
+                print(f"[VectorStore] Qdrant delete notice cho file_id {file_id}: {e}")
+
+        self.chunks_cache = [c for c in self.chunks_cache if c.get("file_id") != file_id]
+        self._save_meta_store()
+        return initial_count - len(self.chunks_cache)
+
     def add_chunks(self, chunks: List[Dict[str, Any]]) -> int:
         """
         Nạp mảng chunks vào kho vector và metadata store.

@@ -175,13 +175,23 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       }
 
       const msg = err.message || 'Xác thực thất bại';
-      const isAgentOffline = Boolean(err.data?.agent_offline);
+      const isAgentOffline = Boolean(
+        err.data?.agent_offline ||
+        err.data?.device_offline ||
+        /DEVICE_OFFLINE/i.test(msg) ||
+        /Không tìm thấy.+đầu đọc/i.test(msg) ||
+        /Chưa kết nối máy quét/i.test(msg)
+      );
       const isNeedsEnroll = Boolean(err.data?.needs_enroll);
       const isTemplateCorrupted =
         err.data?.code === 'TEMPLATE_DECRYPT_FAILED' ||
         /Template vân tay bị hỏng/i.test(msg);
       const isCancelled =
         Boolean(err.data?.cancelled) || err.message === 'CANCELLED';
+      const isTimeout =
+        Boolean(err.data?.timeout) || err.status === 408 || /Hết thời gian/i.test(msg);
+      const isDeviceError =
+        Boolean(err.data?.device_error) || /Lỗi máy quét/i.test(msg);
 
       console.error('[FingerprintScanModal] ❌ Lỗi xác thực vân tay:', {
         message: err.message,
@@ -200,7 +210,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
           }, 800);
           return;
         }
-        setError('Quá trình quét bị gián đoạn. Vui lòng bấm Thử lại.');
+        setError('Quá trình quét bị gián đoạn. Vui lòng bấm Quét ngay.');
         setPhase('error');
         setRetryExhausted(true);
         return;
@@ -208,15 +218,26 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
 
       if (isAgentOffline) {
         setError(
-          'Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.'
+          err.data?.error ||
+          'Chưa kết nối hoặc chưa mở được đầu đọc vân tay ZK9500. Vui lòng kiểm tra cáp USB và Agent.'
         );
         setPhase('error');
+        setRetryExhausted(true); // Dừng lại, không auto-retry lặp vô ích khi thiết bị offline
+      } else if (isTimeout) {
+        setError('Hết thời gian chờ đặt ngón tay lên máy quét (quá 30 giây). Vui lòng bấm "Quét ngay" để thử lại.');
+        setPhase('error');
+        setRetryExhausted(true);
+      } else if (isDeviceError) {
+        setError(err.data?.error || 'Lỗi thiết bị máy quét vân tay ZK9500.');
+        setPhase('error');
+        setRetryExhausted(true);
       } else if (isNeedsEnroll) {
         setError(
           'Bạn chưa đăng ký vân tay. Vui lòng liên hệ quản trị viên để đăng ký.'
         );
         setNeedsEnroll(true);
         setPhase('error');
+        setRetryExhausted(true);
       } else if (isTemplateCorrupted) {
         setError(
           err.data?.details ||
@@ -225,6 +246,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         setPhase('error');
         setRetryExhausted(true);
       } else {
+        // Chỉ khi thật sự là không khớp vân tay (đã đặt ngón tay lên quét nhưng không đúng người)
         const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
         setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
         setPhase('error');

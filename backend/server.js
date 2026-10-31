@@ -841,9 +841,39 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
         return res.status(503).json({ error: 'Máy quét vừa mất kết nối.', agent_offline: true });
       }
       if (err.message === 'SCAN_TIMEOUT') {
-        return res.status(408).json({ error: 'Hết thời gian chờ quét vân tay.' });
+        return res.status(408).json({ error: 'Hết thời gian chờ quét vân tay.', timeout: true });
       }
       throw err;
+    }
+
+    if (!scanResult.match) {
+      if (scanResult.error === 'CANCELLED') {
+        return res.status(409).json({ error: 'Yêu cầu đã bị hủy bởi thao tác mới.', cancelled: true });
+      }
+      if (scanResult.error === 'DEVICE_OFFLINE') {
+        return res.status(503).json({
+          error: 'Không tìm thấy đầu đọc vân tay ZK9500 hoặc thiết bị đang bận. Vui lòng kiểm tra cáp USB.',
+          device_offline: true,
+          agent_offline: true,
+        });
+      }
+      if (scanResult.error === 'TIMEOUT') {
+        return res.status(408).json({ error: 'Hết thời gian chờ quét vân tay.', timeout: true });
+      }
+      if (scanResult.error) {
+        return res.status(500).json({ error: `Lỗi máy quét vân tay: ${scanResult.error}`, device_error: true });
+      }
+      await writeAccessLog({
+        userId: decoded.user_id,
+        fileId: null,
+        action: 'LOGIN_FAIL_FP',
+        ip,
+        note: `Admin 2FA không khớp (score=${scanResult.score})`,
+      });
+      return res.status(403).json({
+        error: `Vân tay quản trị viên không khớp (score=${scanResult.score}). Vui lòng thử lại.`,
+        score: scanResult.score,
+      });
     }
 
     // Defense-in-depth: kiểm tra template vẫn tồn tại sau khi quét
@@ -1060,15 +1090,45 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
       if (scanResult.error === 'CANCELLED') {
         return res.status(409).json({ error: 'Yêu cầu đã bị hủy bởi thao tác mới.', cancelled: true });
       }
-      const note = scanResult.error ? `Lỗi: ${scanResult.error}` : `Không khớp (score=${scanResult.score})`;
+      if (scanResult.error === 'DEVICE_OFFLINE') {
+        await writeAccessLog({
+          userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_FAIL',
+          ip: getClientIp(req), note: 'Lỗi: DEVICE_OFFLINE',
+        });
+        return res.status(503).json({
+          error: 'Không tìm thấy hoặc chưa mở được đầu đọc vân tay ZK9500. Vui lòng kiểm tra lại kết nối cáp USB.',
+          device_offline: true,
+          agent_offline: true,
+        });
+      }
+      if (scanResult.error === 'TIMEOUT') {
+        await writeAccessLog({
+          userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_FAIL',
+          ip: getClientIp(req), note: 'Timeout chờ quét',
+        });
+        return res.status(408).json({
+          error: 'Hết thời gian chờ quét vân tay (quá 30 giây). Vui lòng thử lại.',
+          timeout: true,
+        });
+      }
+      if (scanResult.error) {
+        await writeAccessLog({
+          userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_FAIL',
+          ip: getClientIp(req), note: `Lỗi thiết bị: ${scanResult.error}`,
+        });
+        return res.status(500).json({
+          error: `Lỗi máy quét vân tay: ${scanResult.error}`,
+          device_error: true,
+        });
+      }
+
+      const note = `Không khớp (score=${scanResult.score})`;
       await writeAccessLog({
         userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_FAIL',
         ip: getClientIp(req), note,
       });
       return res.status(403).json({
-        error: scanResult.error === 'TIMEOUT'
-          ? 'Hết thời gian chờ quét vân tay.'
-          : `Vân tay không khớp (score=${scanResult.score}). Vui lòng thử lại.`,
+        error: `Vân tay không khớp (score=${scanResult.score}). Vui lòng thử lại.`,
         score: scanResult.score,
       });
     }
@@ -1481,6 +1541,25 @@ function buildStoredPath({ docTypeId, documentCode, fallbackId }) {
   return { yyyy, mm, yyyymmdd, typeSafe, codeSafe };
 }
 
+const AI_BASE = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8001';
+const syncToAI = async (action, doc) => {
+  try {
+    if (action === 'ingest') {
+      await fetch(`${AI_BASE}/ai/ingest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(doc),
+      });
+    } else if (action === 'delete') {
+      await fetch(`${AI_BASE}/ai/documents/${encodeURIComponent(doc.file_id)}`, {
+        method: 'DELETE',
+      });
+    }
+  } catch (aiErr) {
+    console.warn(`[AI Sync ${action} notice]:`, aiErr.message);
+  }
+};
+
 app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
@@ -1550,6 +1629,16 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       userId: req.user.user_id, fileId, action: 'UPLOAD',
       ip: getClientIp(req), note: `Upload: ${req.file.originalname}`,
     });
+
+    // Tự động đồng bộ tài liệu sang Boxchat Vector Store
+    syncToAI('ingest', {
+      file_id: fileId,
+      document_code: document_code || fileId,
+      title: title.trim(),
+      stored_path: relPath,
+      security_level_id: parseInt(security_level_id, 10),
+    });
+
     res.json({ success: true, file_id: fileId, stored_path: relPath, sha256 });
   } catch (err) {
     console.error('[POST upload]', err);
@@ -1642,6 +1731,16 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       ip: getClientIp(req),
       note: replacedFile ? `Sửa metadata + thay file: ${originalName}` : `Sửa metadata: ${title.trim()}`,
     });
+
+    // Cập nhật lại vector store trong Boxchat
+    syncToAI('ingest', {
+      file_id: fileId,
+      document_code: document_code || fileId,
+      title: title.trim(),
+      stored_path: storedPath,
+      security_level_id: parseInt(security_level_id, 10),
+    });
+
     res.json({ success: true, file_id: fileId, replaced_file: replacedFile, stored_path: storedPath });
   } catch (err) {
     console.error('[PUT documents]', err);
@@ -1672,6 +1771,9 @@ app.delete('/api/documents/:fileId', requireAuth, requirePermission('DOC_DELETE'
       note: `Xóa mềm: ${check.recordset[0].title}${reason ? ` — Lý do: ${reason}` : ''}`,
     });
 
+    // Đồng bộ gỡ khỏi kho Vector
+    syncToAI('delete', { file_id: fileId });
+
     res.json({ success: true, file_id: fileId, soft_deleted: true });
   } catch (err) {
     console.error('[DELETE soft]', err);
@@ -1697,6 +1799,15 @@ app.post('/api/documents/:fileId/restore', requireAuth, requirePermission('DOC_R
       userId: req.user.user_id, fileId, action: 'DOC_RESTORE',
       ip: getClientIp(req), note: `Khôi phục: ${check.recordset[0].title}`,
     });
+
+    // Tự động nạp lại vào kho Vector
+    pool.request()
+      .input('fid', sql.VarChar(50), fileId)
+      .query(`SELECT file_id, document_code, title, stored_path, security_level_id FROM DOCUMENT WHERE file_id = @fid`)
+      .then((r) => {
+        if (r.recordset && r.recordset[0]) syncToAI('ingest', r.recordset[0]);
+      })
+      .catch((err) => console.warn('[restore AI notice]:', err.message));
 
     res.json({ success: true, file_id: fileId, restored: true });
   } catch (err) {
@@ -1729,6 +1840,9 @@ app.delete('/api/documents/:fileId/purge', requireAuth, requirePermission('DOC_P
     }
 
     await pool.request().input('fid', sql.VarChar(50), fileId).query(`DELETE FROM DOCUMENT WHERE file_id = @fid`);
+
+    // Đồng bộ gỡ hoàn toàn khỏi kho Vector
+    syncToAI('delete', { file_id: fileId });
 
     await writeAccessLog({
       userId: req.user.user_id, fileId: null, action: 'DOC_PURGE',
@@ -2115,3 +2229,9 @@ start();
 
 process.on('SIGINT', async () => { await closePool(); process.exit(0); });
 process.on('SIGTERM', async () => { await closePool(); process.exit(0); });
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason);
+});

@@ -50,11 +50,46 @@ export const AIChatDrawer: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // State lưu token vân tay đã xác thực trong phiên làm việc
+  // State lưu token vân tay đã xác thực trong phiên làm việc (kèm hạn 5 phút nội bộ Chatbox)
   const [fpToken, setFpToken] = useState<string | null>(null);
+  const [fpTokenExpiresAt, setFpTokenExpiresAt] = useState<number | null>(null);
   // Lưu câu hỏi gần nhất của user để auto-retry sau khi quét vân tay
   const [lastQuery, setLastQuery] = useState<string>('');
   const lastUserQueryRef = useRef<string>('');
+
+  // Lấy token vân tay còn hiệu lực nội bộ trong Chatbox (hạn 5 phút từ khi quét và đúng file)
+  const getActiveFpToken = (forFileId?: string): string | null => {
+    if (!fpToken || !fpTokenExpiresAt) return null;
+    if (Date.now() >= fpTokenExpiresAt) {
+      setFpToken(null);
+      setFpTokenExpiresAt(null);
+      return null;
+    }
+    if (forFileId && targetScanFileId && forFileId !== targetScanFileId) {
+      return null;
+    }
+    return fpToken;
+  };
+
+  // Đóng khung chat và xóa sạch toàn bộ token bảo mật để không rò rỉ ra trang ngoài
+  const handleCloseChat = () => {
+    setIsChatOpen(false);
+    setFpToken(null);
+    setFpTokenExpiresAt(null);
+    setTargetScanFileId('');
+    setTargetScanDocCode('');
+    setScanModalOpen(false);
+    setPreviewOpen(false);
+    if (typeof window !== 'undefined') {
+      try {
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('qk7_fp_token')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch (_) {}
+    }
+  };
 
   // State cho Khóa Bảo Vệ Sinh Trắc Học Vân Tay ZK9500 & Modal Xem trước PDF an toàn
   const [scanModalOpen, setScanModalOpen] = useState<boolean>(false);
@@ -81,17 +116,38 @@ export const AIChatDrawer: React.FC = () => {
     }
   }, [isChatOpen, messages]);
 
-  // Đóng Drawer bằng phím ESC
+  // Đóng Drawer bằng phím ESC và dọn dẹp phiên sinh trắc học
   useEffect(() => {
     if (!isChatOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsChatOpen(false);
+        handleCloseChat();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isChatOpen, setIsChatOpen]);
+  }, [isChatOpen]);
+
+  // Dọn dẹp phiên sinh trắc học khi Chatbox bị đóng qua bất kỳ luồng nào
+  useEffect(() => {
+    if (!isChatOpen) {
+      setFpToken(null);
+      setFpTokenExpiresAt(null);
+      setTargetScanFileId('');
+      setTargetScanDocCode('');
+      setScanModalOpen(false);
+      setPreviewOpen(false);
+      if (typeof window !== 'undefined') {
+        try {
+          Object.keys(sessionStorage).forEach((key) => {
+            if (key.startsWith('qk7_fp_token')) {
+              sessionStorage.removeItem(key);
+            }
+          });
+        } catch (_) {}
+      }
+    }
+  }, [isChatOpen]);
 
   const checkServiceStatus = async () => {
     try {
@@ -195,9 +251,11 @@ export const AIChatDrawer: React.FC = () => {
     secName?: string,
     requiresBio: boolean = false
   ) => {
-    // ✅ FIX: Nếu chuyển sang file khác, xóa sạch token cũ trong state
-    if (fileId !== previewDoc?.file_id) {
+    // Nếu mở file khác với file đã quét vân tay hoặc token đã quá 5 phút -> reset token
+    const activeToken = getActiveFpToken(fileId);
+    if (!activeToken && fileId !== targetScanFileId) {
       setFpToken(null);
+      setFpTokenExpiresAt(null);
     }
 
     let secLevel = 1;
@@ -228,11 +286,13 @@ export const AIChatDrawer: React.FC = () => {
   const handleFingerprintSuccess = async (token: string) => {
     setScanModalOpen(false);
     const validToken = token || '';
-    if (validToken && typeof window !== 'undefined') {
-      if (targetScanFileId) {
-      sessionStorage.setItem(`qk7_fp_token_${targetScanFileId}`, validToken);
-    }
+    if (validToken) {
+      // ✅ BẢO MẬT P0: CHỈ LƯU VÀO STATE NỘI BỘ CỦA CHATBOX KÈM THỜI HẠN 5 PHÚT.
+      // TUYỆT ĐỐI KHÔNG LƯU VÀO sessionStorage per-file `qk7_fp_token_${targetScanFileId}`
+      // ĐỂ TRÁNH RÒ RỈ SANG CÁC TRANG NGOÀI (Bàn làm việc, Danh mục, Đơn vị của tôi).
+      const expiresAt = Date.now() + 5 * 60 * 1000;
       setFpToken(validToken);
+      setFpTokenExpiresAt(expiresAt);
     }
 
     toast.success(
@@ -262,7 +322,7 @@ export const AIChatDrawer: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
-              onClick={() => setIsChatOpen(false)}
+              onClick={handleCloseChat}
               className="fixed inset-0 bg-black/50 backdrop-blur-md cursor-pointer"
               aria-label="Đóng khung chat trợ lý AI"
             />
@@ -329,7 +389,7 @@ export const AIChatDrawer: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={() => setIsChatOpen(false)}
+                    onClick={handleCloseChat}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
                     aria-label="Đóng khung chat (ESC)"
                     title="Đóng (Esc)"
@@ -507,10 +567,11 @@ export const AIChatDrawer: React.FC = () => {
         open={previewOpen}
         document={previewDoc}
         page={previewPage}
-        initialToken={fpToken}
+        initialToken={getActiveFpToken(previewDoc?.file_id)}
         onClose={() => {
           setPreviewOpen(false);
-          setFpToken(null);
+          // Không xóa fpToken nội bộ của Chatbox để duy trì token 5 phút trong phiên trò chuyện Chatbox
+          // Người dùng có thể tiếp tục hỏi hoặc xem lại trích dẫn trong thời hạn 5 phút
         }}
       />
     </>

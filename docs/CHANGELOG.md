@@ -4,6 +4,43 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.2.3-biometric-device-recovery-fix] — 2026-10-31
+
+### Khắc Phục Lỗi Báo Ảo "Vân Tay Không Khớp" Khi Chưa Đặt Tay Quét & Tự Phục Hồi Thiết Bị ZK9500
+- **Khắc phục lỗi nuốt mã lỗi phần cứng tại Gateway (`server.js`):** Phân biệt rành mạch giữa lỗi thiết bị ngoại vi (`DEVICE_OFFLINE` $\rightarrow$ `503`, `TIMEOUT` $\rightarrow$ `408`, `device_error` $\rightarrow$ `500`) và lỗi dữ liệu sinh trắc học không khớp (`403`). Loại bỏ hoàn toàn tình trạng Gateway tự ý gộp lỗi `DEVICE_OFFLINE` thành *"Vân tay không khớp (score=0)"*.
+- **Tự động đánh thức và nạp lại SDK ZKTeco (`zk_service.py` & `agent.py`):** Bổ sung cơ chế **Self-Healing SDK Reload**: khi `GetDeviceCount() <= 0` hoặc thiết bị ở trạng thái ngủ sau thời gian idle dài, Agent tự động reload fresh instance để re-enumerate lại cổng USB và khởi động lại đầu đọc ZK9500.
+- **Ngắt vòng lặp Auto-retry tại UI (`FingerprintScanModal.tsx`):** Khi gặp lỗi thiết bị offline hoặc timeout, dừng ngay lập tức việc tự động thử lại 2 lần liên tiếp gây cạn lượt quét trong 2 giây; hiển thị thông báo trung thực để người dùng kiểm tra kết nối cáp USB hoặc chủ động bấm nút "Quét ngay".
+- **Bảo vệ luồng Admin 2FA (`server.js`):** Thêm khối kiểm tra bắt buộc `!scanResult.match` cho API xác thực 2FA đăng nhập Admin (`/api/auth/login/admin-fp-verify`), vá triệt để lỗ hổng bỏ qua xác thực vân tay quản trị viên.
+
+---
+
+## [v1.2.2-chatbox-biometric-token-scoping] — 2026-10-31
+
+### Cô Lập Vùng Nhớ Token Sinh Trắc Học Của Chatbox & Chống Bỏ Qua Quét Vân Tay Ngoài Trang
+- **Hiện tượng trước khi sửa:** Khi người dùng tra cứu văn bản Cấp 3+ trong Chatbox và hoàn tất quét vân tay ZK9500, Chatbox lưu token vào `sessionStorage` per-file (`qk7_fp_token_${targetScanFileId}`). Khi đóng Chatbox (`tắt chatbox`) rồi truy cập cùng văn bản tại Bàn làm việc (Document Desk), hệ thống tự động bypass quét vân tay do token vẫn còn hiệu lực 5 phút trong `sessionStorage`.
+- **Cơ chế cô lập mới (In-Memory Scoped Token):**
+  - **Loại bỏ ghi `sessionStorage` từ Chatbox:** Xóa bỏ hoàn toàn thao tác ghi `sessionStorage.setItem('qk7_fp_token_' + targetScanFileId, ...)` trong `AIChatDrawer.tsx` và `AIChatWidget.tsx`.
+  - **Quản lý vòng đời token trong bộ nhớ nội bộ:** Token sinh trắc học của Chatbox được lưu trong React State (`fpToken`) kèm mốc thời gian hết hạn 5 phút (`fpTokenExpiresAt`), chỉ dùng riêng cho các truy vấn chat và trích dẫn nội bộ của Chatbox.
+  - **Tự động hủy khi đóng Chatbox:** Khi người dùng đóng Chatbox (qua nút `X`, click lớp phủ backdrop, hoặc phím `ESC`), hàm `handleCloseChat` lập tức dọn sạch token trong bộ nhớ (`fpToken = null`), đồng thời chủ động quét xóa mọi khóa `qk7_fp_token*` trong `sessionStorage`.
+  - **Bảo toàn 3 tầng phòng thủ Zero-Trust:** Khi ra ngoài Bàn làm việc (Document Desk), Đơn vị của tôi hoặc Danh mục, người dùng bắt buộc phải quét vân tay ZK9500 độc lập để xem tài liệu Cấp 3+, không còn hiện tượng rò rỉ token làm bypass sinh trắc học.
+
+---
+
+## [v1.2.1-chatbox-clearance-sync-fix] — 2026-10-31
+
+### 1. Sửa Lỗi Clearance Guard & Ngộ Nhận Vượt Cấp Mật Trong Chatbox
+- **Khắc phục ngộ nhận trong `agent_tutor.py` & `ai-routes.js`:** Loại bỏ giả định sai lầm "không tìm thấy chunk = vượt cấp mật". Cập nhật cơ chế tra cứu toàn diện kho dữ liệu (`all_chunks`/CSDL) để xác minh chính xác cấp mật thực tế của văn bản trước khi đưa ra quyết định từ chối.
+- **Tài khoản Tuyệt mật (Cấp 5):** Xem và tra cứu bình thường toàn bộ tài liệu Cấp 1–5 (bao gồm `39-KH/ĐU`), không còn bị thông báo vô lý "không phù hợp cấp bảo mật".
+- **Tài khoản cùng cấp mật (Cấp 3 - Mật):** Tra cứu đúng tài liệu Cấp 3 (`880/KH`), tự động kích hoạt luồng Biometric Guard ZK9500 (`requires_biometric: true`) và mở khóa sau khi quét vân tay.
+- **Tài liệu không tồn tại:** Trả về thông báo chuẩn xác "không tìm thấy văn bản trong hệ thống" thay vì đổ lỗi cho cấp bậc quân nhân.
+
+### 2. Tự Động Hóa Đồng Bộ 2 Chiều Giữa SQL Server & Boxchat Vector Store
+- **Webhook tự động tại Express Gateway (`server.js`):** Các thao tác tải lên văn bản mới (`upload`), cập nhật metadata/file (`edit`), xóa mềm (`delete`), khôi phục (`restore`), và xóa vĩnh viễn (`purge`) đều tự động gửi tín hiệu đồng bộ sang `:8001` (`/ai/ingest` & `/ai/documents/:fileId`).
+- **Nâng cấp `/ai/sync-all`:** Bổ sung cơ chế tự động dọn dẹp các tài liệu cũ/đã bị xóa khỏi CSDL SQL Server (stale document cleanup), loại bỏ triệt để tình trạng lệch pha dữ liệu cũ.
+- **Chuẩn hóa bộ phân giải đường dẫn PDF (`pdf_processor.py`):** Đa dạng hóa danh sách thư mục `uploads` theo ngữ cảnh thực thi, đảm bảo bóc tách chính xác tệp PDF trong mọi môi trường.
+
+---
+
 ## [v1.2.0-security-ecosystem-complete] — 2026-10-30
 
 ### 1. Quy hoạch Hệ sinh thái 4 phân hệ số hóa cốt lõi

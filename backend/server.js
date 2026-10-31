@@ -21,6 +21,7 @@ const { getAuthoritativeServerTime, detectOsClockTamper } = require('./src/clock
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 const createApprovalWorkflow = require('./src/approval-workflow');
 const { getAutoRequiredPermission } = require('./src/route-permissions');
+
 require('dotenv').config({
   path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')],
 });
@@ -575,17 +576,32 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không chính xác' });
     }
 
-    const user = r.recordset[0];
+       const user = r.recordset[0];
+
+    // ═══════════════════════════════════════════════════════════
+    // LOAD ROLES EARLY — cần cho kiểm tra Admin 2FA ở BƯỚC 2
+    // (sẽ tái dùng để cấp JWT ở nhánh thường)
+    // ═══════════════════════════════════════════════════════════
+    const rolesRes = await pool.request()
+      .input('uid', sql.VarChar(50), user.user_id)
+      .query(`SELECT r.role_id, r.name FROM USER_ROLE ur
+              JOIN [ROLE] r ON r.role_id = ur.role_id
+              WHERE ur.user_id = @uid
+                AND (ur.expires_at IS NULL OR ur.expires_at > GETDATE())`);
+    const userRoles = rolesRes.recordset.map((x) => x.role_id);
+    const userRoleNames = rolesRes.recordset.map((x) => x.name);
+
+    // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
 
     // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
     // C
-    // if (user.user_id === PROTECTED_ADMIN_USER_ID) {
-    //   if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
-    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
-    //     await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
-    //     return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
-    //   }
-    // }
+    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+      if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
+        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
+        return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
+      }
+    }
 
     if (user.status !== 'active') {
       await writeLoginAttempt({ ip, username, result: 'LOCKED' });
@@ -645,26 +661,53 @@ app.post('/api/auth/login', async (req, res) => {
       .input('uid', sql.VarChar(50), user.user_id)
       .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL, last_failed_at = NULL, status = 'active' WHERE user_id = @uid`);
 
-    // ✅ BƯỚC 2: NẾU LÀ ADMIN -> YÊU CẦU QUÉT VÂN TAY (2FA Biometric)
-    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
-      const fpRes = await pool.request()
-        .input('uid', sql.VarChar(50), user.user_id)
-        .query(`SELECT template_enc FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
-      
-      if (fpRes.recordset.length === 0) {
-        // Tài khoản Admin chưa đăng ký vân tay (hoặc vừa reset qua CLI): Cho phép login password để tiến hành enroll ngay
-        console.warn(`[SECURITY] ⚠️ Tài khoản Quản trị viên tối cao (${user.user_id}) chưa kích hoạt vân tay active. Cho phép đăng nhập mật khẩu để tiến hành enroll tại Quản lý Người dùng.`);
-        await writeAccessLog({
-          userId: user.user_id,
-          fileId: null,
-          action: 'LOGIN_NO_FP_WARNING',
-          ip,
-          note: 'Admin đăng nhập không qua 2FA vân tay (chưa enroll hoặc vừa reset) — Yêu cầu enroll ngay'
-        });
+    // ═══════════════════════════════════════════════════════════
+    // ✅ BƯỚC 2: 2FA VÂN TAY CHO **MỌI** TÀI KHOẢN ADMIN
+    // - USR-001 (Quản trị tối cao): bắt buộc nếu đã enroll, cảnh báo nếu chưa
+    // - Admin tạm thời (được gán ROL-01): BẮT BUỘC phải có vân tay
+    // ═══════════════════════════════════════════════════════════
+    const PROTECTED_ADMIN_ROLE_ID = process.env.PROTECTED_ADMIN_ROLE_ID || 'ROL-01';
+    const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
+    const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
+
+    if (isProtectedAdmin || hasAdminRole) {
+      // Dùng luôn user.has_fingerprint đã load trong query đầu
+      const hasFingerprint = user.has_fingerprint === 1;
+
+      if (!hasFingerprint) {
+        if (isProtectedAdmin) {
+          // USR-001 chưa enroll → cho qua password-only để enroll admin khác
+          console.warn(
+            `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
+            `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
+          );
+          await writeAccessLog({
+            userId: user.user_id, fileId: null,
+            action: 'LOGIN_NO_FP_WARNING', ip,
+            note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
+          });
+          // Không return — rơi xuống nhánh cấp JWT bên dưới
+
+        } else {
+          // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
+          await writeAccessLog({
+            userId: user.user_id, fileId: null,
+            action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
+            note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
+                  `nhưng chưa enroll vân tay — từ chối đăng nhập`
+          });
+          return res.status(403).json({
+            error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
+                   'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
+            code: 'ADMIN_FINGERPRINT_REQUIRED',
+            needs_enroll: true,
+            enroll_via: PROTECTED_ADMIN_USER_ID,
+          });
+        }
       } else {
+        // Đã có vân tay → yêu cầu quét qua 202
         await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
 
-        // Tạo vé tạm (Temp Ticket) có hạn 2 phút
         const tempTicket = jwt.sign(
           { user_id: user.user_id, purpose: 'admin_login_fp' },
           JWT_SECRET,
@@ -675,7 +718,10 @@ app.post('/api/auth/login', async (req, res) => {
           success: true,
           require_admin_fp: true,
           temp_ticket: tempTicket,
-          message: 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+          is_protected_admin: isProtectedAdmin,
+          message: isProtectedAdmin
+            ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+            : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
         });
       }
     }
@@ -690,12 +736,8 @@ app.post('/api/auth/login', async (req, res) => {
     delete user.locked_at;
     delete user.last_failed_at;
 
-    const rolesRes = await pool.request()
-      .input('uid', sql.VarChar(50), user.user_id)
-      .query(`SELECT r.role_id, r.name FROM USER_ROLE ur JOIN [ROLE] r ON r.role_id = ur.role_id
-              WHERE ur.user_id = @uid AND (ur.expires_at IS NULL OR ur.expires_at > GETDATE())`);
-    user.roles = rolesRes.recordset.map((x) => x.role_id);
-    user.role_names = rolesRes.recordset.map((x) => x.name);
+    user.roles = userRoles;
+    user.role_names = userRoleNames;
     user.has_fingerprint = user.has_fingerprint === 1;
 
     const token = jwt.sign(
@@ -804,9 +846,16 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
       throw err;
     }
 
-    if (!scanResult.match) {
-      await writeAccessLog({ userId: decoded.user_id, fileId: null, action: 'LOGIN_FAIL_FP', ip, note: `Vân tay sai (score=${scanResult.score})` });
-      return res.status(403).json({ error: `Vân tay không khớp (score=${scanResult.score}). Vui lòng thử lại.` });
+    // Defense-in-depth: kiểm tra template vẫn tồn tại sau khi quét
+    // (phòng trường hợp admin bị xoá template trong 2 phút temp_ticket)
+    const fpCheckAgain = await pool.request()
+      .input('uid', sql.VarChar(50), decoded.user_id)
+      .query(`SELECT 1 FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
+    if (fpCheckAgain.recordset.length === 0) {
+      return res.status(403).json({
+        error: 'Vân tay của bạn vừa bị xoá khỏi hệ thống. Vui lòng liên hệ USR-001.',
+        code: 'FINGERPRINT_REMOVED_DURING_LOGIN',
+      });
     }
 
     // 4. Vân tay khớp -> Lấy lại thông tin User và Cấp JWT chính thức
@@ -967,13 +1016,13 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
     const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc, {
       userId: req.user.user_id,
       action: 'FILE_VERIFY',
-      fileId
+      fileId: file_id,
     });
     if (!templateBuffer || templateBuffer.length < 100) {
       console.error(`[fingerprint/verify] ❌ Template vân tay của user (${req.user.user_id}) bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY.`);
       await writeAccessLog({
         userId: req.user.user_id,
-        fileId,
+        fileId: file_id,
         action: 'VERIFY_FAIL_FP',
         ip: getClientIp(req),
         note: 'Xác thực vân tay thất bại: Template vân tay bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY'

@@ -198,3 +198,51 @@ export function filterSchoolUnits(units: Unit[], currentUnitId?: string): Unit[]
 
   return units.filter((u) => allowedUnitIds.has(u.unit_id));
 }
+
+/**
+ * Thứ tự ưu tiên hiển thị đơn vị ban hành theo chuẩn quân sự:
+ * 1. Trường quân sự Quân khu 7
+ * 2. Quân khu 7
+ * 3. Bộ Tổng Tham mưu
+ * 4. Tổng cục Chính trị
+ * 5. Bộ Quốc Phòng
+ * 6. Chính Phủ
+ * 7. Sư đoàn 5
+ * (các đơn vị được thêm sau sẽ thêm ở dưới dần dần)
+ */
+export function getIssuingUnitPriority(u: { unit_id?: string; name?: string }): number {
+  const id = (u.unit_id || '').toUpperCase().trim();
+  const name = (u.name || '').toLowerCase().trim();
+
+  // 1. Trường quân sự Quân khu 7
+  if (id === 'TQS' || (name.includes('trường quân sự') && name.includes('quân khu 7')) || name.startsWith('trường quân sự')) {
+    return 1;
+  }
+  // 2. Quân khu 7
+  if (id === 'QK7' || name === 'quân khu 7' || (name.includes('quân khu 7') && !name.includes('trường'))) {
+    return 2;
+  }
+  // 3. Bộ Tổng Tham mưu
+  if (id === 'BTTM' || name.includes('tổng tham mưu')) {
+    return 3;
+  }
+  // 4. Tổng cục Chính trị
+  if (id === 'TCCT' || name.includes('tổng cục chính trị')) {
+    return 4;
+  }
+  // 5. Bộ Quốc Phòng
+  if (id === 'BQP' || name.includes('bộ quốc phòng')) {
+    return 5;
+  }
+  // 6. Chính Phủ
+  if (id === 'CP' || name.includes('chính phủ')) {
+    return 6;
+  }
+  // 7. Sư đoàn 5
+  if (id === 'SD5' || name.includes('sư đoàn 5') || name.includes('f5')) {
+    return 7;
+  }
+
+  // Các đơn vị được thêm sau sẽ thêm ở dưới dần dần
+  return 999;
+}

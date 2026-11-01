@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Loader2, FileText, Sparkles, AlertCircle, Plus, Minus, CheckCircle2, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Clock, X, Save, Loader2, FileText, Sparkles, AlertCircle, Plus, Minus, CheckCircle2, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { TreeSelect } from 'antd';
 import { Dropzone } from './Dropzone';
 import { DocumentItem, DocumentType, Unit, SecurityLevel } from '../../types';
@@ -63,6 +63,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const parsedFileRef = React.useRef<File | null>(null);
   const [duplicateInfo, setDuplicateInfo] = useState<CheckDuplicateResult | null>(null);
   const [allowOverride, setAllowOverride] = useState(false);  
+  const [proposalReason, setProposalReason] = useState('Đề xuất chuẩn hóa thông tin văn bản');
 
   // Prefill on edit
   useEffect(() => {
@@ -226,6 +227,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     setSubmitting(true);
     try {
       const formData = new FormData();
+      formData.append('proposal_note', proposalReason.trim() || 'Đề xuất chuẩn hóa thông tin văn bản');
+      formData.append('note', proposalReason.trim() || 'Đề xuất chuẩn hóa thông tin văn bản');
       formData.append('document_code', code.trim());
       formData.append('title', title.trim());
       if (typeId) {
@@ -737,6 +740,26 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 )}
               </div>
             </div>
+              {/* Lý do đề xuất chỉnh sửa văn bản (chế độ sửa) */}
+              {isEdit && (
+                <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      Lý do đề xuất chỉnh sửa văn bản:
+                    </label>
+                    <span className="text-[10px] text-slate-500 italic">Có thể giữ nguyên hoặc sửa lại</span>
+                  </div>
+                  <textarea
+                    value={proposalReason}
+                    onChange={(e) => setProposalReason(e.target.value)}
+                    rows={2}
+                    placeholder="Nhập lý do đề xuất chỉnh sửa văn bản..."
+                    className="w-full p-2.5 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700/60 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500 leading-relaxed font-sans"
+                  />
+                </div>
+              )}
+
 
             {/* Footer hành động xác nhận */}
             <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-end space-x-2.5">

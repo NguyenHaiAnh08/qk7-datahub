@@ -4,6 +4,51 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.2.4-anti-screenshot-approval-workflow-unit-sort] — 2026-11-01
+
+### 1. Lá Chắn Chống Chụp Màn Hình & Cảnh Báo An Ninh Tác Chiến (Anti-Screenshot Security Shield)
+- **Đánh chặn phím tắt toàn diện:** Bắt và triệt tiêu các tổ hợp phím chụp màn hình hệ điều hành: `PrintScreen` (Key code 44), `Win + Shift + S` (Snipping Tool trên Windows), `Cmd + Shift + 3/4` (trên macOS/iPadOS).
+- **Cơ chế Blackout DOM tức thì (0ms):** Ngay khi phát hiện sự kiện phím tắt hoặc sự kiện mất tiêu điểm cửa sổ (`window.blur` do Snipping Tool mở lên), hệ thống tự động cưỡng chế che đen/mờ toàn bộ vùng nội dung tài liệu tác chiến trước khi Windows kịp ghi khung hình.
+- **Tiêu hủy bộ nhớ tạm Clipboard đa nhịp:** Thực hiện ghi đè nội dung rỗng/vô hiệu hóa vào Clipboard hệ điều hành ngay lập tức (0ms) và kích hoạt nhắc lại liên tiếp sau 200ms, 500ms, 1000ms để triệt tiêu hoàn toàn khả năng người dùng nhấn `Ctrl + V` lấy ra hình ảnh.
+- **Chặn dán nội dung hình ảnh:** Kiểm tra sự kiện `paste`, nếu clipboard chứa mime-type `image/*`, lập tức từ chối và cảnh báo an ninh vi phạm quy chế bảo vệ bí mật quân sự.
+- **Tích hợp cảnh báo thời gian thực về SOC:** Phát tín hiệu báo cáo về Gateway qua endpoint `/api/security/screenshot-alert`. Tự động trích xuất đầy đủ thông tin: Mã tệp (`file_id`), Số hiệu văn bản, Trích yếu nội dung, Cấp độ bảo mật, Đơn vị ban hành, Thời gian vi phạm và Địa chỉ IP máy trạm.
+- **Hiển thị trực quan trên Nhật ký SOC (`SecurityAuditLog.tsx`):** Thiết kế thẻ cảnh báo chuyên biệt màu đỏ tươi (`border-rose-300 bg-rose-50`), biểu tượng `CameraOff`, hiển thị rõ văn bản đang bị tác động và thông điệp: *"HÀNH VI CHỤP MÀN HÌNH ĐÃ BỊ CHẶN & TIÊU HỦY DỮ LIỆU BỘ NHỚ TẠM"*.
+- **Mở rộng cột `ACCESS_LOG.note`:** Nâng cấp cấu trúc trường dữ liệu `note` từ `NVARCHAR(255)` lên `NVARCHAR(1000)` trong CSDL SQL Server, loại bỏ triệt để hiện tượng cắt cụt trích yếu hoặc mất thông tin đơn vị/cấp mật khi ghi nhận nhật ký kiểm toán an ninh.
+- **Công tắc Dev Switch an toàn:** Bổ sung tùy chọn *"Dev: Cho phép chụp ảnh"* (`qk7_dev_allow_screenshot`) trong menu người dùng (Header Profile) để lập trình viên/kiểm thử viên có thể chụp màn hình giao diện khi cần mà không bị lá chắn an ninh kích hoạt.
+
+### 2. Hợp Nhất Luồng Đề Xuất Sửa Đổi & Chuẩn Hóa Văn Bản Vào Hàng Đợi Phê Duyệt Của Admin
+- **Hợp nhất hàng đợi tập trung (`ApprovalQueuePage.tsx`):**
+  - Tích hợp toàn diện các đề xuất chỉnh sửa văn bản từ bảng `DOCUMENT_REVISION_PROPOSAL` vào chung hàng đợi duyệt `/api/admin/approval-requests` của Quản trị viên tối cao.
+  - Loại bỏ hoàn toàn sự rườm rà khi Quản trị viên phải vào trang bàn làm việc để tìm modal cũ; toàn bộ yêu cầu khóa quyền (`APPROVAL_REQUEST`) và đề xuất chuẩn hóa văn bản (`PROP-*`) giờ đây tập trung tại một nơi duy nhất.
+- **Nhận diện trực quan & Bảng đối chiếu 2 cột:**
+  - Đề xuất sửa văn bản được phân loại với Badge màu xanh ngọc bích: `ĐỀ XUẤT SỬA VĂN BẢN`.
+  - Hộp thoại chi tiết cung cấp **BẢNG ĐỐI CHIẾU THÔNG TIN CHUẨN HÓA** 2 cột trực quan:
+    - *Cột hiện tại:* Số hiệu, Trích yếu, Đơn vị & Người ký, Cấp độ mật ban đầu.
+    - *Cột đề xuất:* Các thông tin mới do trợ lý/văn thư đề xuất thay đổi.
+    - *Lý do đề xuất:* Hiển thị rõ ràng ghi chú giải trình của người đề xuất.
+- **Xử lý 1-click & Đồng bộ đa tầng:**
+  - Phê duyệt / Từ chối trực tiếp ngay tại Hàng đợi, tự động cập nhật bảng `DOCUMENT`, đồng bộ kho vector ngữ nghĩa AI Boxchat (`:8001`), ghi nhận `ACCESS_LOG` kiểm toán và tự động cập nhật số lượng badge chờ duyệt qua `ApprovalContext`.
+- **Trang theo dõi của người dùng ("Yêu Cầu Chỉnh Sửa Của Tôi" - `MyApprovalsPage.tsx`):**
+  - Đồng bộ API `/api/my-approval-requests` giúp quân nhân theo dõi tiến độ của đề xuất: Đang chờ duyệt (`PENDING`), Đã phê duyệt (`APPROVED`), hoặc Bị từ chối (`REJECTED`) kèm lý do từ chối cụ thể từ Chỉ huy/Admin.
+- **Mặc định lý do chuẩn hóa (`DocumentUploadModal.tsx`):**
+  - Khi trợ lý/văn thư gửi đề xuất chỉnh sửa, ô nhập lý do đã để sẵn văn bản mẫu: `"Đề xuất chuẩn hóa thông tin văn bản"` để tối ưu hóa tốc độ thao tác, người dùng có thể giữ nguyên hoặc xóa đi nhập lý do riêng.
+
+### 3. Chuẩn Hóa Thứ Tự Ưu Tiên Đơn Vị Ban Hành Trong Bộ Lọc & Lọc Sâu Phòng Ban
+- **Thứ tự hiển thị chuẩn quân sự:** Sắp xếp lại danh mục đơn vị ban hành trong dropdown bộ lọc tìm kiếm theo đúng phân cấp quản lý quân sự:
+  1. Tất cả đơn vị ban hành
+  2. Trường Quân sự Quân khu 7 (`TQS`)
+  3. Quân khu 7 (`QK7`)
+  4. Bộ Tổng Tham mưu (`BTTM`)
+  5. Tổng cục Chính trị (`TCCT`)
+  6. Bộ Quốc Phòng (`BQP`)
+  7. Chính Phủ (`CP`)
+  8. Sư đoàn 5 (`SD5`)
+  *(Các đơn vị mới được thêm sau này sẽ tự động xếp ở dưới dần dần)*
+- **Bộ lọc sâu phòng ban trực thuộc TQS:** Khi người dùng chọn *"Trường Quân sự Quân khu 7"*, ô chọn phòng ban (*Ban Giám hiệu, Phòng Tham mưu - Hành chính, Phòng Chính trị, Phòng Đào tạo, Phòng Hậu cần - Kỹ thuật*) tự động xuất hiện đối diện ngay bên dưới để tra cứu chi tiết; khi chọn các đơn vị khác, ô phòng ban tự động ẩn đi để giao diện gọn gàng.
+- **Xuất helper dùng chung:** Cung cấp hàm `getIssuingUnitPriority` trong `frontend/src/utils/unitTree.tsx` để đồng bộ thứ tự ưu tiên trên toàn bộ các trang (`PortalPage.tsx`, `DocumentFilters.tsx`).
+
+---
+
 ## [v1.2.3-biometric-device-recovery-fix] — 2026-10-31
 
 ### Khắc Phục Lỗi Báo Ảo "Vân Tay Không Khớp" Khi Chưa Đặt Tay Quét & Tự Phục Hồi Thiết Bị ZK9500

@@ -298,7 +298,7 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
       .input('file_id', sql.VarChar(50), fileId || null)
       .input('action', sql.VarChar(50), action)
       .input('ip', sql.VarChar(50), ip || '')
-      .input('note', sql.NVarChar(255), note ? String(note).slice(0, 255) : null)
+      .input('note', sql.NVarChar(1000), note ? String(note).slice(0, 1000) : null)
       .query(`INSERT INTO ACCESS_LOG (log_id, user_id, file_id, [action], ip, note)
               VALUES (@log_id, @user_id, @file_id, @action, @ip, @note)`);
     return logId;
@@ -592,16 +592,13 @@ app.post('/api/auth/login', async (req, res) => {
     const userRoleNames = rolesRes.recordset.map((x) => x.name);
 
     // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
-
-    // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
-    // C
-    // if (user.user_id === PROTECTED_ADMIN_USER_ID) {
-    //   if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
-    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
-    //     await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
-    //     return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
-    //   }
-    // }
+    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+      if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
+        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
+        return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
+      }
+    }
 
     if (user.status !== 'active') {
       await writeLoginAttempt({ ip, username, result: 'LOCKED' });
@@ -670,61 +667,61 @@ app.post('/api/auth/login', async (req, res) => {
     const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
     const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
 
-    // if (isProtectedAdmin || hasAdminRole) {
-    //   // Dùng luôn user.has_fingerprint đã load trong query đầu
-    //   const hasFingerprint = user.has_fingerprint === 1;
+    if (isProtectedAdmin || hasAdminRole) {
+      // Dùng luôn user.has_fingerprint đã load trong query đầu
+      const hasFingerprint = user.has_fingerprint === 1;
 
-    //   if (!hasFingerprint) {
-    //     if (isProtectedAdmin) {
-    //       // USR-001 chưa enroll → cho qua password-only để enroll admin khác
-    //       console.warn(
-    //         `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
-    //         `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
-    //       );
-    //       await writeAccessLog({
-    //         userId: user.user_id, fileId: null,
-    //         action: 'LOGIN_NO_FP_WARNING', ip,
-    //         note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
-    //       });
-    //       // Không return — rơi xuống nhánh cấp JWT bên dưới
+      if (!hasFingerprint) {
+        if (isProtectedAdmin) {
+          // USR-001 chưa enroll → cho qua password-only để enroll admin khác
+          console.warn(
+            `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
+            `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
+          );
+          await writeAccessLog({
+            userId: user.user_id, fileId: null,
+            action: 'LOGIN_NO_FP_WARNING', ip,
+            note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
+          });
+          // Không return — rơi xuống nhánh cấp JWT bên dưới
 
-    //     } else {
-    //       // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
-    //       await writeAccessLog({
-    //         userId: user.user_id, fileId: null,
-    //         action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
-    //         note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
-    //               `nhưng chưa enroll vân tay — từ chối đăng nhập`
-    //       });
-    //       return res.status(403).json({
-    //         error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
-    //                'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
-    //         code: 'ADMIN_FINGERPRINT_REQUIRED',
-    //         needs_enroll: true,
-    //         enroll_via: PROTECTED_ADMIN_USER_ID,
-    //       });
-    //     }
-    //   } else {
-    //     // Đã có vân tay → yêu cầu quét qua 202
-    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
+        } else {
+          // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
+          await writeAccessLog({
+            userId: user.user_id, fileId: null,
+            action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
+            note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
+                  `nhưng chưa enroll vân tay — từ chối đăng nhập`
+          });
+          return res.status(403).json({
+            error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
+                   'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
+            code: 'ADMIN_FINGERPRINT_REQUIRED',
+            needs_enroll: true,
+            enroll_via: PROTECTED_ADMIN_USER_ID,
+          });
+        }
+      } else {
+        // Đã có vân tay → yêu cầu quét qua 202
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
 
-    //     const tempTicket = jwt.sign(
-    //       { user_id: user.user_id, purpose: 'admin_login_fp' },
-    //       JWT_SECRET,
-    //       { expiresIn: '2m' }
-    //     );
+        const tempTicket = jwt.sign(
+          { user_id: user.user_id, purpose: 'admin_login_fp' },
+          JWT_SECRET,
+          { expiresIn: '2m' }
+        );
 
-    //     return res.status(202).json({
-    //       success: true,
-    //       require_admin_fp: true,
-    //       temp_ticket: tempTicket,
-    //       is_protected_admin: isProtectedAdmin,
-    //       message: isProtectedAdmin
-    //         ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
-    //         : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
-    //     });
-    //   }
-    // }
+        return res.status(202).json({
+          success: true,
+          require_admin_fp: true,
+          temp_ticket: tempTicket,
+          is_protected_admin: isProtectedAdmin,
+          message: isProtectedAdmin
+            ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+            : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
+        });
+      }
+    }
 
 
     // User thường -> Cấp JWT và cho vào luôn
@@ -1912,121 +1909,96 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
   }
 });
 
-app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePermission('DOC_EDIT'), async (req, res) => {
-  const proposalId = req.params.proposalId;
-  try {
-    const pool = await getPool();
-    const propRes = await pool.request()
-      .input('pid', sql.VarChar(50), proposalId)
-      .query(`
-        SELECT p.*, d.stored_path AS old_stored_path, d.issuing_unit_id AS doc_unit_id
-        FROM DOCUMENT_REVISION_PROPOSAL p
-        JOIN DOCUMENT d ON d.file_id = p.file_id
-        WHERE p.proposal_id = @pid
-      `);
-    if (propRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy đề xuất' });
-    const prop = propRes.recordset[0];
-    if (prop.status !== 'PENDING') return res.status(400).json({ error: `Đề xuất đã ở trạng thái ${prop.status}` });
+async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clientIp }) {
+  const pool = await getPool();
+  const propRes = await pool.request()
+    .input('pid', sql.VarChar(50), proposalId)
+    .query(`
+      SELECT p.*, d.stored_path AS old_stored_path, d.issuing_unit_id AS doc_unit_id
+      FROM DOCUMENT_REVISION_PROPOSAL p
+      JOIN DOCUMENT d ON d.file_id = p.file_id
+      WHERE p.proposal_id = @pid
+    `);
+  if (propRes.recordset.length === 0) throw new Error('Không tìm thấy đề xuất');
+  const prop = propRes.recordset[0];
+  if (prop.status !== 'PENDING') throw new Error(`Đề xuất đã ở trạng thái ${prop.status}`);
 
-    const userRoles = await resolveUserRoles(req.user);
-    const isAdmin =
-      userRoles.includes('ROL-01') ||
-      (req.user?.roles || []).includes('ROL-01') ||
-      req.user?.user_id === 'USR-001' ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
-      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
-    const isCommander =
-      userRoles.includes('ROL-02') ||
-      (req.user?.roles || []).includes('ROL-02') ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
-      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy'));
+  let finalStoredPath = prop.old_stored_path;
+  let finalOriginalName = null;
+  let finalMimeType = null;
+  let finalFileSize = null;
+  let finalSha256 = null;
+  let replacedFile = false;
 
-    if (!isAdmin && isCommander) {
-      const userUnitId = await resolveUserUnitId(req.user);
-      const subtree = await getSubtreeUnits(userUnitId);
-      const canManage = subtree.includes(prop.doc_unit_id) || subtree.includes(prop.issuing_unit_id);
-      if (!canManage) {
-        return res.status(403).json({ error: 'Chỉ huy không quản lý đơn vị của văn bản này' });
-      }
-    } else if (!isAdmin && !isCommander) {
-      return res.status(403).json({ error: 'Chỉ có Chỉ huy hoặc Quản trị viên mới có quyền phê duyệt đề xuất' });
-    }
-
-    let finalStoredPath = prop.old_stored_path;
-    let finalOriginalName = null;
-    let finalMimeType = null;
-    let finalFileSize = null;
-    let finalSha256 = null;
-    let replacedFile = false;
-
-    if (prop.new_stored_path) {
-      const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
-        docTypeId: prop.doc_type_id, documentCode: prop.document_code, fallbackId: prop.file_id,
-      });
-      const sha8 = (prop.new_sha256 || '00000000').slice(0, 8);
-      const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
-      const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
-      const absPath = safePathJoin(ROOT_DIR, relPath);
-      const propAbs = safePathJoin(ROOT_DIR, prop.new_stored_path);
-
-      if (absPath && propAbs && fs.existsSync(propAbs)) {
-        fs.mkdirSync(path.dirname(absPath), { recursive: true });
-        fs.copyFileSync(propAbs, absPath);
-        finalStoredPath = relPath;
-        finalOriginalName = prop.new_original_name;
-        finalMimeType = prop.new_mime_type;
-        finalFileSize = prop.new_file_size;
-        finalSha256 = prop.new_sha256;
-        replacedFile = true;
-      }
-    }
-
-    const reqUpdate = pool.request()
-      .input('fid', sql.VarChar(50), prop.file_id)
-      .input('code', sql.NVarChar(100), prop.document_code || null)
-      .input('title', sql.NVarChar(500), prop.title)
-      .input('type', sql.VarChar(20), prop.doc_type_id || null)
-      .input('issued', sql.Date, prop.issued_date || null)
-      .input('unit', sql.VarChar(50), prop.issuing_unit_id || null)
-      .input('signer', sql.NVarChar(100), prop.signer || null)
-      .input('summary', sql.NVarChar(sql.MAX), prop.summary || null)
-      .input('level', sql.Int, prop.security_level_id)
-      .input('path', sql.NVarChar(500), finalStoredPath);
-
-    let sqlUpdate = `
-      UPDATE DOCUMENT SET
-        document_code = @code, title = @title, doc_type_id = @type,
-        issued_date = @issued, issuing_unit_id = @unit,
-        signer = @signer, summary = @summary, security_level_id = @level,
-        stored_path = @path, updated_at = GETDATE()
-    `;
-    if (replacedFile) {
-      sqlUpdate += `, original_name = @orig, mime_type = @mime, file_size = @size, sha256 = @sha`;
-      reqUpdate.input('orig', sql.NVarChar(255), finalOriginalName);
-      reqUpdate.input('mime', sql.VarChar(100), finalMimeType);
-      reqUpdate.input('size', sql.BigInt, finalFileSize);
-      reqUpdate.input('sha', sql.Char(64), finalSha256);
-    }
-    sqlUpdate += ` WHERE file_id = @fid`;
-    await reqUpdate.query(sqlUpdate);
-
-    await pool.request()
-      .input('pid', sql.VarChar(50), proposalId)
-      .input('reviewer', sql.VarChar(50), req.user.user_id)
-      .input('note', sql.NVarChar(500), req.body.review_note || 'Đã chấp thuận đề xuất')
-      .query(`
-        UPDATE DOCUMENT_REVISION_PROPOSAL SET
-          status = 'APPROVED', reviewed_by = @reviewer, reviewed_at = GETDATE(),
-          review_note = @note, updated_at = GETDATE()
-        WHERE proposal_id = @pid
-      `);
-
-    await writeAccessLog({
-      userId: req.user.user_id, fileId: prop.file_id, action: 'PROPOSAL_APPROVED',
-      ip: getClientIp(req),
-      note: `Phê duyệt đề xuất ${proposalId} cho văn bản ${prop.file_id}`,
+  if (prop.new_stored_path) {
+    const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+      docTypeId: prop.doc_type_id, documentCode: prop.document_code, fallbackId: prop.file_id,
     });
+    const sha8 = (prop.new_sha256 || '00000000').slice(0, 8);
+    const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
+    const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
+    const absPath = safePathJoin(ROOT_DIR, relPath);
+    const propAbs = safePathJoin(ROOT_DIR, prop.new_stored_path);
 
+    if (absPath && propAbs && fs.existsSync(propAbs)) {
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.copyFileSync(propAbs, absPath);
+      finalStoredPath = relPath;
+      finalOriginalName = prop.new_original_name;
+      finalMimeType = prop.new_mime_type;
+      finalFileSize = prop.new_file_size;
+      finalSha256 = prop.new_sha256;
+      replacedFile = true;
+    }
+  }
+
+  const reqUpdate = pool.request()
+    .input('fid', sql.VarChar(50), prop.file_id)
+    .input('code', sql.NVarChar(100), prop.document_code || null)
+    .input('title', sql.NVarChar(500), prop.title)
+    .input('type', sql.VarChar(20), prop.doc_type_id || null)
+    .input('issued', sql.Date, prop.issued_date || null)
+    .input('unit', sql.VarChar(50), prop.issuing_unit_id || null)
+    .input('signer', sql.NVarChar(100), prop.signer || null)
+    .input('summary', sql.NVarChar(sql.MAX), prop.summary || null)
+    .input('level', sql.Int, prop.security_level_id)
+    .input('path', sql.NVarChar(500), finalStoredPath);
+
+  let sqlUpdate = `
+    UPDATE DOCUMENT SET
+      document_code = @code, title = @title, doc_type_id = @type,
+      issued_date = @issued, issuing_unit_id = @unit,
+      signer = @signer, summary = @summary, security_level_id = @level,
+      stored_path = @path, updated_at = GETDATE()
+  `;
+  if (replacedFile) {
+    sqlUpdate += `, original_name = @orig, mime_type = @mime, file_size = @size, sha256 = @sha`;
+    reqUpdate.input('orig', sql.NVarChar(255), finalOriginalName);
+    reqUpdate.input('mime', sql.VarChar(100), finalMimeType);
+    reqUpdate.input('size', sql.BigInt, finalFileSize);
+    reqUpdate.input('sha', sql.Char(64), finalSha256);
+  }
+  sqlUpdate += ` WHERE file_id = @fid`;
+  await reqUpdate.query(sqlUpdate);
+
+  await pool.request()
+    .input('pid', sql.VarChar(50), proposalId)
+    .input('reviewer', sql.VarChar(50), reviewerUser.user_id)
+    .input('note', sql.NVarChar(500), reviewNote || 'Đã chấp thuận đề xuất')
+    .query(`
+      UPDATE DOCUMENT_REVISION_PROPOSAL SET
+        status = 'APPROVED', reviewed_by = @reviewer, reviewed_at = GETDATE(),
+        review_note = @note, updated_at = GETDATE()
+      WHERE proposal_id = @pid
+    `);
+
+  await writeAccessLog({
+    userId: reviewerUser.user_id, fileId: prop.file_id, action: 'PROPOSAL_APPROVED',
+    ip: clientIp || '',
+    note: `Phê duyệt đề xuất ${proposalId} cho văn bản ${prop.file_id}`,
+  });
+
+  try {
     syncToAI('ingest', {
       file_id: prop.file_id,
       document_code: prop.document_code || prop.file_id,
@@ -2034,8 +2006,54 @@ app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePer
       stored_path: finalStoredPath,
       security_level_id: prop.security_level_id,
     });
+  } catch (_) {}
 
-    res.json({ success: true, message: 'Đã phê duyệt và áp dụng đề xuất chỉnh sửa văn bản thành công' });
+  return { success: true, message: 'Đã phê duyệt và áp dụng đề xuất chỉnh sửa văn bản thành công', file_id: prop.file_id };
+}
+
+async function rejectProposalCore({ proposalId, reviewerUser, reviewNote, clientIp }) {
+  const pool = await getPool();
+  const propRes = await pool.request()
+    .input('pid', sql.VarChar(50), proposalId)
+    .query(`
+      SELECT p.*, d.issuing_unit_id AS doc_unit_id
+      FROM DOCUMENT_REVISION_PROPOSAL p
+      JOIN DOCUMENT d ON d.file_id = p.file_id
+      WHERE p.proposal_id = @pid
+    `);
+  if (propRes.recordset.length === 0) throw new Error('Không tìm thấy đề xuất');
+  const prop = propRes.recordset[0];
+  if (prop.status !== 'PENDING') throw new Error(`Đề xuất đã ở trạng thái ${prop.status}`);
+
+  await pool.request()
+    .input('pid', sql.VarChar(50), proposalId)
+    .input('reviewer', sql.VarChar(50), reviewerUser.user_id)
+    .input('note', sql.NVarChar(500), reviewNote || 'Không chấp thuận đề xuất')
+    .query(`
+      UPDATE DOCUMENT_REVISION_PROPOSAL SET
+        status = 'REJECTED', reviewed_by = @reviewer, reviewed_at = GETDATE(),
+        review_note = @note, updated_at = GETDATE()
+      WHERE proposal_id = @pid
+    `);
+
+  await writeAccessLog({
+    userId: reviewerUser.user_id, fileId: prop.file_id, action: 'PROPOSAL_REJECTED',
+    ip: clientIp || '',
+    note: `Từ chối đề xuất ${proposalId} cho văn bản ${prop.file_id}`,
+  });
+
+  return { success: true, message: 'Đã từ chối đề xuất chỉnh sửa' };
+}
+
+app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePermission('DOC_EDIT'), async (req, res) => {
+  try {
+    const result = await approveProposalCore({
+      proposalId: req.params.proposalId,
+      reviewerUser: req.user,
+      reviewNote: req.body?.review_note,
+      clientIp: getClientIp(req),
+    });
+    res.json(result);
   } catch (err) {
     console.error('[POST proposals approve]', err);
     res.status(500).json({ error: err.message });
@@ -2043,72 +2061,14 @@ app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePer
 });
 
 app.post('/api/documents/proposals/:proposalId/reject', requireAuth, requirePermission('DOC_EDIT'), async (req, res) => {
-  const proposalId = req.params.proposalId;
   try {
-    const pool = await getPool();
-    const propRes = await pool.request()
-      .input('pid', sql.VarChar(50), proposalId)
-      .query(`
-        SELECT p.*, d.issuing_unit_id AS doc_unit_id
-        FROM DOCUMENT_REVISION_PROPOSAL p
-        JOIN DOCUMENT d ON d.file_id = p.file_id
-        WHERE p.proposal_id = @pid
-      `);
-    if (propRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy đề xuất' });
-    const prop = propRes.recordset[0];
-    if (prop.status !== 'PENDING') return res.status(400).json({ error: `Đề xuất đã ở trạng thái ${prop.status}` });
-
-    const userRoles = await resolveUserRoles(req.user);
-    const isAdmin =
-      userRoles.includes('ROL-01') ||
-      (req.user?.roles || []).includes('ROL-01') ||
-      req.user?.user_id === 'USR-001' ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
-      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
-    const isCommander =
-      userRoles.includes('ROL-02') ||
-      (req.user?.roles || []).includes('ROL-02') ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
-      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy'));
-
-    if (!isAdmin && isCommander) {
-      const userUnitId = await resolveUserUnitId(req.user);
-      let targetUnits = [userUnitId];
-      const userUnitRec = await pool.request().input('uid', sql.VarChar(50), userUnitId).query('SELECT parent_id FROM UNIT WHERE unit_id = @uid');
-      const parentUnitId = userUnitRec.recordset[0]?.parent_id;
-      if (parentUnitId) {
-        const parentSubtree = await getSubtreeUnits(parentUnitId);
-        targetUnits = Array.from(new Set([...targetUnits, parentUnitId, ...parentSubtree]));
-      } else {
-        const subtree = await getSubtreeUnits(userUnitId);
-        targetUnits = Array.from(new Set([...targetUnits, ...subtree]));
-      }
-      const canManage = targetUnits.includes(prop.doc_unit_id) || targetUnits.includes(prop.issuing_unit_id);
-      if (!canManage) {
-        return res.status(403).json({ error: 'Chỉ huy không quản lý đơn vị của văn bản này' });
-      }
-    } else if (!isAdmin && !isCommander) {
-      return res.status(403).json({ error: 'Chỉ có Chỉ huy hoặc Quản trị viên mới có quyền từ chối đề xuất' });
-    }
-
-    await pool.request()
-      .input('pid', sql.VarChar(50), proposalId)
-      .input('reviewer', sql.VarChar(50), req.user.user_id)
-      .input('note', sql.NVarChar(500), req.body.review_note || req.body.reason || 'Không chấp thuận đề xuất')
-      .query(`
-        UPDATE DOCUMENT_REVISION_PROPOSAL SET
-          status = 'REJECTED', reviewed_by = @reviewer, reviewed_at = GETDATE(),
-          review_note = @note, updated_at = GETDATE()
-        WHERE proposal_id = @pid
-      `);
-
-    await writeAccessLog({
-      userId: req.user.user_id, fileId: prop.file_id, action: 'PROPOSAL_REJECTED',
-      ip: getClientIp(req),
-      note: `Từ chối đề xuất ${proposalId} cho văn bản ${prop.file_id}`,
+    const result = await rejectProposalCore({
+      proposalId: req.params.proposalId,
+      reviewerUser: req.user,
+      reviewNote: req.body?.review_note || req.body?.reason,
+      clientIp: getClientIp(req),
     });
-
-    res.json({ success: true, message: 'Đã từ chối đề xuất chỉnh sửa' });
+    res.json(result);
   } catch (err) {
     console.error('[POST proposals reject]', err);
     res.status(500).json({ error: err.message });
@@ -2397,11 +2357,14 @@ app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async 
     if (scope === 'archive') {
       // Chỉ xem trong kho lưu trữ ACCESS_LOG_ARCHIVE
       query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
+        SELECT l.log_id, l.user_id, u.full_name, l.file_id, 
+               d.title AS doc_title, d.document_code, sl.name AS security_name, un.name AS unit_name,
                l.[action], l.[timestamp], l.ip, l.note, 1 AS is_archived
         FROM ACCESS_LOG_ARCHIVE l
         LEFT JOIN [USER] u ON u.user_id = l.user_id
         LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
+        LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
+        LEFT JOIN UNIT un ON un.unit_id = d.issuing_unit_id
         WHERE 1 = 1
       `;
       if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
@@ -2410,11 +2373,14 @@ app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async 
     } else if (scope === 'all') {
       // Hợp nhất cả hai bảng
       query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
+        SELECT l.log_id, l.user_id, u.full_name, l.file_id, 
+               d.title AS doc_title, d.document_code, sl.name AS security_name, un.name AS unit_name,
                l.[action], l.[timestamp], l.ip, l.note, 0 AS is_archived
         FROM ACCESS_LOG l
         LEFT JOIN [USER] u ON u.user_id = l.user_id
         LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
+        LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
+        LEFT JOIN UNIT un ON un.unit_id = d.issuing_unit_id
         WHERE 1 = 1
       `;
       if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
@@ -2422,11 +2388,14 @@ app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async 
 
       query += `
         UNION ALL
-        SELECT la.log_id, la.user_id, u2.full_name, la.file_id, d2.title AS doc_title,
+        SELECT la.log_id, la.user_id, u2.full_name, la.file_id, 
+               d2.title AS doc_title, d2.document_code, sl2.name AS security_name, un2.name AS unit_name,
                la.[action], la.[timestamp], la.ip, la.note, 1 AS is_archived
         FROM ACCESS_LOG_ARCHIVE la
         LEFT JOIN [USER] u2 ON u2.user_id = la.user_id
         LEFT JOIN DOCUMENT d2 ON d2.file_id = la.file_id
+        LEFT JOIN SECURITY_LEVEL sl2 ON sl2.level_id = d2.security_level_id
+        LEFT JOIN UNIT un2 ON un2.unit_id = d2.issuing_unit_id
         WHERE 1 = 1
       `;
       if (req.query.user) { query += ` AND la.user_id = @user`; }
@@ -2435,11 +2404,14 @@ app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async 
     } else {
       // Mặc định 'active': Sự kiện tháng hiện tại từ ACCESS_LOG (không giới hạn TOP 200, bắt đầu từ 0 mỗi đầu tháng)
       query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, d.title AS doc_title,
+        SELECT l.log_id, l.user_id, u.full_name, l.file_id, 
+               d.title AS doc_title, d.document_code, sl.name AS security_name, un.name AS unit_name,
                l.[action], l.[timestamp], l.ip, l.note, 0 AS is_archived
         FROM ACCESS_LOG l
         LEFT JOIN [USER] u ON u.user_id = l.user_id
         LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
+        LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
+        LEFT JOIN UNIT un ON un.unit_id = d.issuing_unit_id
         WHERE l.[timestamp] >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
       `;
       if (req.query.user) { query += ` AND l.user_id = @user`; r.input('user', sql.VarChar(50), req.query.user); }
@@ -2485,6 +2457,109 @@ app.post('/api/access-logs/archive-run', requireAuth, requirePermission('AUDIT_V
 });
 
 // ═══════════════════════════════════════════════════════════════
+// SECURITY ALERT API — Screenshot & Screen Capture Guard
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/security/screenshot-alert', async (req, res) => {
+  try {
+    let userId = req.user?.user_id || 'GUEST';
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ') && userId === 'GUEST') {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET || 'fallback_secret');
+        if (decoded?.user_id) userId = decoded.user_id;
+      } catch (_) {}
+    }
+
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (_) {}
+    }
+    const { file_id, document_code, title, security_name, unit_name, trigger_type } = body || {};
+    const ip = getClientIp(req);
+    const triggerLabel = trigger_type === 'WIN_SHIFT_S' ? 'Win+Shift+S (Snipping Tool)' : 'PrintScreen';
+
+    let docInfo = {
+      document_code: document_code || '',
+      title: title || '',
+      security_name: security_name || '',
+      unit_name: unit_name || '',
+    };
+
+    if (file_id) {
+      try {
+        const pool = await getPool();
+        const dbDoc = await pool.request()
+          .input('file_id', sql.VarChar(100), file_id)
+          .query(`
+            SELECT d.file_id, d.document_code, d.title, sl.name AS security_name, u.name AS unit_name
+            FROM DOCUMENT d
+            LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
+            LEFT JOIN UNIT u ON u.unit_id = d.issuing_unit_id
+            WHERE d.file_id = @file_id
+          `);
+        if (dbDoc.recordset && dbDoc.recordset.length > 0) {
+          const row = dbDoc.recordset[0];
+          docInfo.document_code = row.document_code || docInfo.document_code;
+          docInfo.title = row.title || docInfo.title;
+          docInfo.security_name = row.security_name || docInfo.security_name;
+          docInfo.unit_name = row.unit_name || docInfo.unit_name;
+        }
+      } catch (dbErr) {
+        console.warn('[screenshot-alert] Tra cứu tài liệu DB thất bại:', dbErr.message);
+      }
+    }
+
+    const docParts = [];
+    if (docInfo.document_code) docParts.push(`Số hiệu: ${docInfo.document_code}`);
+    if (docInfo.title) docParts.push(`Trích yếu: ${docInfo.title}`);
+    if (docInfo.security_name) docParts.push(`Độ mật: ${docInfo.security_name}`);
+    if (docInfo.unit_name) docParts.push(`Đơn vị: ${docInfo.unit_name}`);
+
+    const docDesc = docParts.length > 0 ? `[${docParts.join(' | ')}]` : (file_id || 'N/A');
+    const note = `Cảnh báo an ninh: Phát hiện hành vi chụp màn hình (${triggerLabel}) trên văn bản ${docDesc}`;
+
+    const logId = await writeAccessLog({
+      userId,
+      fileId: file_id || null,
+      action: 'SCREENSHOT_ATTEMPT',
+      ip,
+      note,
+    });
+
+    console.warn(`[SECURITY ALERT] Screenshot attempt by ${userId} on file ${file_id || 'N/A'} via ${triggerLabel} (IP: ${ip})`);
+
+    res.json({
+      ok: true,
+      log_id: logId,
+      message: 'Security alert successfully recorded in ACCESS_LOG',
+      document: docInfo,
+    });
+  } catch (err) {
+    console.error('[screenshot-alert]', err.message);
+    res.status(500).json({ error: 'Failed to record screenshot alert' });
+  }
+});
+
+app.get('/api/security/alerts/recent', requireAuth, async (req, res) => {
+  try {
+    const pool = await getPool();
+    const result = await pool.request()
+      .query(`
+        SELECT TOP 10 l.log_id, l.user_id, u.full_name, l.file_id, d.document_code, d.title AS doc_title,
+               l.[action], l.[timestamp], l.ip, l.note
+        FROM ACCESS_LOG l
+        LEFT JOIN [USER] u ON u.user_id = l.user_id
+        LEFT JOIN DOCUMENT d ON d.file_id = l.file_id
+        WHERE l.[action] = 'SCREENSHOT_ATTEMPT'
+        ORDER BY l.[timestamp] DESC
+      `);
+    res.json({ ok: true, alerts: result.recordset || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // MOUNT SUB-ROUTERS
 // ═══════════════════════════════════════════════════════════════
 require('./src/admin-routes')(app, {
@@ -2494,6 +2569,8 @@ require('./src/admin-routes')(app, {
   invalidateCache: perms.invalidateCache,
   revokeAllUserSessions, killSessionById, listActiveSessions,
   sessionIdleTimeoutMinutes: SESSION_IDLE_TIMEOUT_MINUTES,
+  approveProposalCore,
+  rejectProposalCore,
 });
 
 app.use('/api/ai', requireAuth, require('./src/ai-routes')({

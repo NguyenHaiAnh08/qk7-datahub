@@ -20,7 +20,12 @@ import {
   Shield,
   Bell,
   Bot,
+  Camera,
+  CameraOff,
 } from 'lucide-react';
+import { isScreenshotAllowed, setDevScreenshotAllowed } from '../../hooks/useAntiScreenshot';
+import { http } from '../../services/http';
+import { toast } from './Toast';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceMode } from '../../contexts/DeviceModeContext';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
@@ -233,6 +238,9 @@ export const Header: React.FC<HeaderProps> = ({
     return () => clearInterval(timer);
   }, [showClock]);
 
+  // 🛡️ Dev mode toggle
+  const [isDevScreenshotAllowed, setIsDevScreenshotAllowed] = useState<boolean>(isScreenshotAllowed());
+
   const isIPadPortrait = deviceMode === 'ipad' && orientation === 'portrait';
   const isGuestUser = !user || user.user_id === 'GUEST';
   const avatarInitial = getAvatarInitial(user?.full_name);
@@ -250,6 +258,16 @@ export const Header: React.FC<HeaderProps> = ({
 
   const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
   const canAccessSessions = hasPermission('SESSION_VIEW');
+
+  useEffect(() => {
+    const handleDevChanged = () => {
+      setIsDevScreenshotAllowed(isScreenshotAllowed());
+    };
+    window.addEventListener('qk7_dev_screenshot_changed', handleDevChanged);
+    return () => {
+      window.removeEventListener('qk7_dev_screenshot_changed', handleDevChanged);
+    };
+  }, []);
 
   // (liveClock hiện không render – giữ state để tương thích nếu sau này cần hiển thị)
   void liveClock;
@@ -494,6 +512,46 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
       </div>
+
+      {/* Developer Screenshot Bypass Switch */}
+      {canAccessAdmin && (
+        <div className="px-3 py-2 my-1 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+              <Camera className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Dev: Cho phép chụp ảnh</span>
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const nextState = !isDevScreenshotAllowed;
+                setDevScreenshotAllowed(nextState);
+                setIsDevScreenshotAllowed(nextState);
+                toast.info(
+                  nextState
+                    ? 'Đã BẬT chế độ chụp ảnh màn hình (Dành cho Lập trình viên / Báo cáo).'
+                    : 'Đã TẮT chế độ dev, khôi phục bảo vệ chống chụp màn hình nghiêm ngặt.',
+                  { title: 'CHẾ ĐỘ LẬP TRÌNH', badge: nextState ? 'DEV-BYPASS' : 'SECURE' }
+                );
+              }}
+              className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                isDevScreenshotAllowed ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
+              }`}
+              title="Bật/Tắt cờ cho phép chụp ảnh màn hình"
+            >
+              <span
+                className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  isDevScreenshotAllowed ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
+            Bật để bạn thoải mái chụp màn hình giao diện khi đang lập trình hoặc kiểm thử.
+          </p>
+        </div>
+      )}
 
       <div className="border-t border-slate-100 dark:border-slate-800 pt-1">
         <button

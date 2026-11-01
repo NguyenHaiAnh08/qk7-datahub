@@ -123,6 +123,35 @@ graph TD
 
 ---
 
+### 12. Lá chắn chống chụp màn hình & Đánh chặn phím tắt tác chiến (Anti-Screenshot Security Shield)
+* **Đánh chặn phím tắt toàn diện:** Bắt và triệt tiêu tức thì các tổ hợp phím chụp màn hình: `PrintScreen` (Key code 44), `Win + Shift + S` (Windows Snipping Tool), `Cmd + Shift + 3/4` (macOS/iPadOS).
+* **Cơ chế Blackout DOM 0ms:** Cưỡng chế che đen/mờ toàn bộ vùng tài liệu khi phím tắt được nhấn hoặc khi cửa sổ trình duyệt mất tiêu điểm (`window.blur`), vô hiệu hóa hoàn toàn ảnh chụp của hệ điều hành.
+* **Tiêu hủy bộ nhớ tạm Clipboard đa nhịp:** Tự động dọn sạch và ghi đè nội dung rỗng vào Clipboard của OS ngay lập tức và sau 200ms, 500ms, 1000ms; ngăn ngừa triệt để hành vi dán (`Ctrl + V`) lấy ảnh.
+* **Cảnh báo thời gian thực về SOC:** Tự động gửi cảnh báo qua `/api/security/screenshot-alert`, ghi nhận vào `ACCESS_LOG` (action `SCREENSHOT_ATTEMPT`) kèm đầy đủ Mã tệp (`file_id`), Số hiệu, Trích yếu, Độ mật và Đơn vị ban hành.
+* **Công tắc Dev Switch:** Cung cấp tùy chọn *"Dev: Cho phép chụp ảnh"* (`qk7_dev_allow_screenshot`) trong menu tài khoản giúp lập trình viên chụp màn hình khi làm việc mà không kích hoạt lá chắn an ninh.
+
+### 13. Hàng đợi phê duyệt tích hợp đa nhiệm & Luồng chuẩn hóa thông tin văn bản
+* **Tích hợp hàng đợi tập trung (`/portal?tab=approval-requests`):** Toàn bộ các yêu cầu khóa quyền tác chiến (`APPROVAL_REQUEST`) VÀ các đề xuất chỉnh sửa chuẩn hóa văn bản (`DOCUMENT_REVISION_PROPOSAL`) được hợp nhất vào chung một màn hình Hàng Đợi Phê Duyệt của Quản trị viên.
+* **Bảng đối chiếu thông tin 2 cột:** Cung cấp bảng đối chiếu trực quan 2 cột so sánh trực tiếp dữ liệu hiện tại và dữ liệu mới đề xuất (Số hiệu, Trích yếu, Đơn vị & Người ký, Cấp độ mật) cùng Lý do đề xuất của cán bộ.
+* **Phê duyệt 1-click & Đồng bộ tự động:** Phê duyệt / Từ chối trực tiếp tại Hàng đợi, tự động cập nhật CSDL, kho vector AI Boxchat và trừ badge đếm chờ duyệt.
+* **Theo dõi tiến độ người dùng:** Phân hệ *"Yêu Cầu Chỉnh Sửa Của Tôi"* (`/portal?tab=my-approvals`) hiển thị đầy đủ tiến độ: Đang chờ duyệt, Đã phê duyệt, Bị từ chối kèm lý do từ chối cụ thể.
+* **Mặc định lý do chuẩn hóa:** Modal gửi đề xuất chỉnh sửa văn bản có sẵn nội dung: `"Đề xuất chuẩn hóa thông tin văn bản"` giúp tiết kiệm thời gian thao tác.
+
+### 14. Chuẩn hóa thứ tự danh mục đơn vị ban hành quân sự & Bộ lọc sâu phòng ban
+* **Thứ tự ưu tiên danh mục chuẩn:** Cấu hình thứ tự hiển thị chuẩn xác trong bộ lọc đơn vị ban hành:
+  1. Tất cả đơn vị ban hành *(mặc định)*
+  2. Trường Quân sự Quân khu 7 (`TQS`)
+  3. Quân khu 7 (`QK7`)
+  4. Bộ Tổng Tham mưu (`BTTM`)
+  5. Tổng cục Chính trị (`TCCT`)
+  6. Bộ Quốc Phòng (`BQP`)
+  7. Chính Phủ (`CP`)
+  8. Sư đoàn 5 (`SD5`)
+  *(Các đơn vị thêm sau sẽ tự động xếp ở dưới dần dần)*
+* **Lọc sâu phòng ban trực thuộc TQS:** Khi chọn *"Trường Quân sự Quân khu 7"*, ô chọn phòng ban (*Ban Giám hiệu, Phòng Tham mưu - Hành chính, Phòng Chính trị, Phòng Đào tạo, Phòng Hậu cần - Kỹ thuật*) tự động hiển thị đối diện để lọc chi tiết.
+
+---
+
 ## 📁 Cấu Trúc Dự Án Toàn Diện
 
 ```text

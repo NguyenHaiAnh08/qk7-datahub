@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, RotateCw, Eraser, Calendar } from 'lucide-react';
 import { DocumentType, Unit, SecurityLevel } from '../../types';
+import { getIssuingUnitPriority } from '../../utils/unitTree';
 import { DateRangePicker } from '../common/DateRangePicker';
 
 export interface DocumentFiltersProps {
@@ -63,7 +64,12 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
       }
     }
 
-    roots.sort((a, b) => a.parent.name.localeCompare(b.parent.name, 'vi'));
+    roots.sort((a, b) => {
+      const pA = getIssuingUnitPriority(a.parent);
+      const pB = getIssuingUnitPriority(b.parent);
+      if (pA !== pB) return pA - pB;
+      return a.parent.name.localeCompare(b.parent.name, 'vi');
+    });
     for (const r of roots) {
       r.children.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
     }

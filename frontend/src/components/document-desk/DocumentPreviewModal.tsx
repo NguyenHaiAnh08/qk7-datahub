@@ -28,6 +28,8 @@ import {
   formatWatermarkDateTime,
 } from '../../hooks/useFloatingWatermark';
 import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
+import { useAntiScreenshot } from '../../hooks/useAntiScreenshot';
+import { SecurityScreenShield } from '../common/SecurityScreenShield';
 
 export interface DocumentPreviewModalProps {
   open: boolean;
@@ -58,6 +60,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [showScanModal, setShowScanModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const modalContainerRef = React.useRef<HTMLDivElement>(null);
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  // 🛡️ Chống chụp màn hình & cảnh báo an ninh (PrintScreen, Win+Shift+S)
+  const { isShieldActive, violationInfo, dismissShield } = useAntiScreenshot({
+    document,
+    enabled: open && Boolean(document),
+    iframeRef,
+  });
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -573,10 +583,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
             {!loading && !error && blobUrl && (
               <div className="relative overflow-hidden w-full h-full flex items-center justify-center">
-                <iframe
-                  src={`${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0`}
-                  title={document.title}
-                  className="w-full h-full border-none"
+                <div className={`w-full h-full secure-pdf-content ${isShieldActive ? 'hidden opacity-0 pointer-events-none' : ''}`}>
+                  <iframe
+                    ref={iframeRef}
+                    src={`${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0`}
+                    title={document.title}
+                    className="w-full h-full border-none secure-pdf-content"
+                  />
+                </div>
+                {/* Lá chắn bảo vệ khi phát hiện phím chụp màn hình */}
+                <SecurityScreenShield
+                  active={isShieldActive}
+                  document={document}
+                  violationInfo={violationInfo}
+                  onDismiss={dismissShield}
                 />
               </div>
             )}

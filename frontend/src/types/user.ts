@@ -51,7 +51,10 @@ export interface AccessLog {
   user_id?: string;
   full_name?: string;
   file_id?: string;
+  document_code?: string;
   doc_title?: string;
+  security_name?: string;
+  unit_name?: string;
   action: string;
   timestamp?: string;
   created_at?: string;

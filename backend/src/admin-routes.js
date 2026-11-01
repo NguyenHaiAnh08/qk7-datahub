@@ -69,34 +69,83 @@ module.exports = (app, deps) => {
 
         let query = `
           SELECT 
-            request_id, requester_id, required_permission, http_method, http_path,
-            target_summary, status, reviewed_by, reviewed_at, review_note,
-            executed_at, execution_error, created_at
-          FROM APPROVAL_REQUEST
-          WHERE requester_id = @uid
+            ar.request_id, ar.requester_id, ar.required_permission, ar.http_method, ar.http_path,
+            ar.target_summary, ar.status, ar.reviewed_by, ar.reviewed_at, ar.review_note,
+            ar.executed_at, ar.execution_error, ar.created_at,
+            u.full_name AS requester_name
+          FROM APPROVAL_REQUEST ar
+          LEFT JOIN [USER] u ON u.user_id = ar.requester_id
+          WHERE ar.requester_id = @uid
         `;
 
         if (status === 'PENDING_REJECTED') {
-          query += ` AND status IN ('PENDING', 'REJECTED')`;
+          query += ` AND ar.status IN ('PENDING', 'REJECTED')`;
         } else if (status !== 'ALL') {
-          query += ` AND status = @status`;
+          query += ` AND ar.status = @status`;
           request.input('status', sql.VarChar(20), status);
         }
 
-        query += ` ORDER BY created_at DESC`;
-
+        query += ` ORDER BY ar.created_at DESC`;
         const result = await request.query(query);
+        const standardMine = result.recordset || [];
+
+        // Lấy thêm các đề xuất chỉnh sửa văn bản của user
+        const propReq = pool.request().input('uid', sql.VarChar(50), userId);
+        let propQuery = `
+          SELECT 
+            p.proposal_id, p.file_id, p.requester_id, p.status, p.note, p.review_note,
+            p.reviewed_by, p.reviewed_at, p.created_at, p.updated_at,
+            p.document_code, p.title,
+            u.full_name AS requester_name,
+            d.document_code AS current_document_code, d.title AS current_title
+          FROM DOCUMENT_REVISION_PROPOSAL p
+          JOIN DOCUMENT d ON d.file_id = p.file_id
+          JOIN [USER] u ON u.user_id = p.requester_id
+          WHERE p.requester_id = @uid
+        `;
+        if (status === 'PENDING_REJECTED') {
+          propQuery += ` AND p.status IN ('PENDING', 'REJECTED')`;
+        } else if (status !== 'ALL') {
+          propQuery += ` AND p.status = @pstatus`;
+          propReq.input('pstatus', sql.VarChar(20), status);
+        }
+        propQuery += ` ORDER BY p.created_at DESC`;
+        const propResult = await propReq.query(propQuery);
+
+        const proposalMine = (propResult.recordset || []).map((p) => {
+          const docCodeDisplay = p.document_code || p.current_document_code || p.file_id;
+          return {
+            request_id: p.proposal_id,
+            requester_id: p.requester_id,
+            requester_name: p.requester_name,
+            required_permission: 'DOC_EDIT',
+            http_method: 'PUT',
+            http_path: `/api/documents/${p.file_id}`,
+            target_summary: `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
+            status: p.status,
+            reviewed_by: p.reviewed_by,
+            reviewed_at: p.reviewed_at,
+            review_note: p.review_note,
+            created_at: p.created_at,
+            request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+            document_code: docCodeDisplay,
+            doc_title: p.title,
+          };
+        });
+
+        const allMine = [...standardMine, ...proposalMine].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
 
         res.json({
-          total: result.recordset.length,
-          items: result.recordset,
+          total: allMine.length,
+          items: allMine,
         });
       } catch (err) {
         console.error('[GET /api/my-approval-requests]', err);
         res.status(500).json({ error: err.message });
       }
     });
-
 
     // ═══ Cache invalidation helpers ═══
     const _invalidateUser = (uid) => {
@@ -1569,15 +1618,147 @@ module.exports = (app, deps) => {
             }
             query += ` ORDER BY ar.created_at DESC`;
             const r = await request.query(query);
-            res.json({ total: r.recordset.length, items: r.recordset });
+            const standardItems = r.recordset || [];
+
+            // 2. Lấy thêm đề xuất sửa đổi văn bản từ DOCUMENT_REVISION_PROPOSAL
+            const propRequest = pool.request();
+            let propQuery = `
+                SELECT 
+                  p.proposal_id, p.file_id, p.requester_id, p.status, p.note, p.review_note,
+                  p.reviewed_by, p.reviewed_at, p.created_at, p.updated_at,
+                  p.document_code, p.title, p.doc_type_id, p.issued_date, p.issuing_unit_id,
+                  p.signer, p.summary, p.security_level_id,
+                  p.new_original_name, p.new_file_size,
+                  u.full_name AS requester_name, u.[rank] AS requester_rank,
+                  rv.full_name AS reviewer_name,
+                  d.document_code AS current_document_code, d.title AS current_title,
+                  d.signer AS current_signer, d.issued_date AS current_issued_date,
+                  d.security_level_id AS current_security_level_id,
+                  cur_unit.name AS current_unit_name,
+                  unit.name AS issuing_unit_name,
+                  sl.name AS security_level_name,
+                  cur_sl.name AS current_security_name
+                FROM DOCUMENT_REVISION_PROPOSAL p
+                JOIN DOCUMENT d ON d.file_id = p.file_id
+                JOIN [USER] u ON u.user_id = p.requester_id
+                LEFT JOIN [USER] rv ON rv.user_id = p.reviewed_by
+                LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
+                LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
+                LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = p.security_level_id
+                LEFT JOIN SECURITY_LEVEL cur_sl ON cur_sl.level_id = d.security_level_id
+            `;
+            if (status !== 'ALL') {
+                propRequest.input('ps', sql.VarChar(20), status);
+                propQuery += ` WHERE p.status = @ps`;
+            }
+            propQuery += ` ORDER BY p.created_at DESC`;
+            const propRes = await propRequest.query(propQuery);
+
+            const proposalItems = (propRes.recordset || []).map((p) => {
+              const docCodeDisplay = p.document_code || p.current_document_code || p.file_id;
+              return {
+                request_id: p.proposal_id,
+                requester_id: p.requester_id,
+                requester_name: p.requester_name,
+                requester_rank: p.requester_rank,
+                required_permission: 'DOC_EDIT',
+                http_method: 'PUT',
+                http_path: `/api/documents/${p.file_id}`,
+                http_body: JSON.stringify({
+                  file_id: p.file_id,
+                  document_code: p.document_code,
+                  title: p.title,
+                  signer: p.signer,
+                  issuing_unit_name: p.issuing_unit_name,
+                  security_level_name: p.security_level_name,
+                  note: p.note,
+                }),
+                target_summary: `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
+                status: p.status,
+                reviewed_by: p.reviewed_by,
+                reviewer_name: p.reviewer_name,
+                reviewed_at: p.reviewed_at,
+                review_note: p.review_note,
+                created_at: p.created_at,
+                request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+                proposal_data: {
+                  proposal_id: p.proposal_id,
+                  file_id: p.file_id,
+                  document_code: p.document_code || p.current_document_code,
+                  title: p.title,
+                  doc_type_id: p.doc_type_id,
+                  issued_date: p.issued_date,
+                  issuing_unit_id: p.issuing_unit_id,
+                  issuing_unit_name: p.issuing_unit_name,
+                  signer: p.signer,
+                  summary: p.summary,
+                  security_level_id: p.security_level_id,
+                  security_level_name: p.security_level_name,
+                  current_document_code: p.current_document_code,
+                  current_title: p.current_title,
+                  current_signer: p.current_signer,
+                  current_security_level_id: p.current_security_level_id,
+                  current_security_name: p.current_security_name,
+                  current_unit_name: p.current_unit_name,
+                  current_issued_date: p.current_issued_date,
+                  new_original_name: p.new_original_name,
+                  new_file_size: p.new_file_size,
+                  note: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+                }
+              };
+            });
+
+            const allItems = [...standardItems, ...proposalItems].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+
+            res.json({ total: allItems.length, items: allItems });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.get('/api/admin/approval-requests/:id', async (req, res) => {
         try {
+            const id = req.params.id;
             const pool = await getPool();
+            if (id.startsWith('PROP-')) {
+              const propRes = await pool.request()
+                .input('pid', sql.VarChar(50), id)
+                .query(`
+                  SELECT 
+                    p.*, u.full_name AS requester_name, u.[rank] AS requester_rank,
+                    d.document_code AS current_document_code, d.title AS current_title,
+                    d.signer AS current_signer, d.issued_date AS current_issued_date,
+                    d.security_level_id AS current_security_level_id,
+                    cur_unit.name AS current_unit_name, unit.name AS issuing_unit_name,
+                    sl.name AS security_level_name, cur_sl.name AS current_security_name
+                  FROM DOCUMENT_REVISION_PROPOSAL p
+                  JOIN DOCUMENT d ON d.file_id = p.file_id
+                  JOIN [USER] u ON u.user_id = p.requester_id
+                  LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
+                  LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
+                  LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = p.security_level_id
+                  LEFT JOIN SECURITY_LEVEL cur_sl ON cur_sl.level_id = d.security_level_id
+                  WHERE p.proposal_id = @pid
+                `);
+              if (propRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
+              const p = propRes.recordset[0];
+              return res.json({
+                request_id: p.proposal_id,
+                requester_id: p.requester_id,
+                requester_name: p.requester_name,
+                requester_rank: p.requester_rank,
+                required_permission: 'DOC_EDIT',
+                http_method: 'PUT',
+                http_path: `/api/documents/${p.file_id}`,
+                target_summary: `Đề xuất chỉnh sửa: ${p.document_code || p.file_id} - ${p.title}`,
+                status: p.status,
+                created_at: p.created_at,
+                request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+                proposal_data: p,
+              });
+            }
             const r = await pool.request()
-                .input('rid', sql.VarChar(50), req.params.id)
+                .input('rid', sql.VarChar(50), id)
                 .query(`SELECT ar.*, u.full_name AS requester_name FROM APPROVAL_REQUEST ar
                         LEFT JOIN [USER] u ON u.user_id = ar.requester_id
                         WHERE ar.request_id = @rid`);
@@ -1588,9 +1769,21 @@ module.exports = (app, deps) => {
 
     app.post('/api/admin/approval-requests/:id/approve', requireProtectedAdmin, async (req, res) => {
         try {
+            const id = req.params.id;
+            if (id.startsWith('PROP-')) {
+              if (deps.approveProposalCore) {
+                const result = await deps.approveProposalCore({
+                  proposalId: id,
+                  reviewerUser: req.user,
+                  reviewNote: req.body?.review_note,
+                  clientIp: getClientIp(req),
+                });
+                return res.json(result);
+              }
+            }
             const pool = await getPool();
             const r = await pool.request()
-                .input('rid', sql.VarChar(50), req.params.id)
+                .input('rid', sql.VarChar(50), id)
                 .input('by', sql.VarChar(50), req.user.user_id)
                 .input('note', sql.NVarChar(500), req.body?.review_note || null)
                 .query(`UPDATE APPROVAL_REQUEST SET status='APPROVED', reviewed_by=@by,
@@ -1598,18 +1791,30 @@ module.exports = (app, deps) => {
                         WHERE request_id=@rid AND status='PENDING';
                         SELECT @@ROWCOUNT AS n;`);
             if (r.recordset[0].n === 0) return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
-            await log(req, 'APPROVAL_APPROVED', `Duyệt yêu cầu ${req.params.id}`);
-            res.json({ success: true, request_id: req.params.id });
+            await log(req, 'APPROVAL_APPROVED', `Duyệt yêu cầu ${id}`);
+            res.json({ success: true, request_id: id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.post('/api/admin/approval-requests/:id/reject', requireProtectedAdmin, async (req, res) => {
         try {
+            const id = req.params.id;
             const note = req.body?.review_note;
             if (!note || !note.trim()) return res.status(400).json({ error: 'Cần ghi lý do từ chối' });
+            if (id.startsWith('PROP-')) {
+              if (deps.rejectProposalCore) {
+                const result = await deps.rejectProposalCore({
+                  proposalId: id,
+                  reviewerUser: req.user,
+                  reviewNote: note.trim(),
+                  clientIp: getClientIp(req),
+                });
+                return res.json(result);
+              }
+            }
             const pool = await getPool();
             const r = await pool.request()
-                .input('rid', sql.VarChar(50), req.params.id)
+                .input('rid', sql.VarChar(50), id)
                 .input('by', sql.VarChar(50), req.user.user_id)
                 .input('note', sql.NVarChar(500), note.trim())
                 .query(`UPDATE APPROVAL_REQUEST SET status='REJECTED', reviewed_by=@by,
@@ -1617,16 +1822,18 @@ module.exports = (app, deps) => {
                         WHERE request_id=@rid AND status='PENDING';
                         SELECT @@ROWCOUNT AS n;`);
             if (r.recordset[0].n === 0) return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
-            await log(req, 'APPROVAL_REJECTED', `Từ chối ${req.params.id} — ${note}`);
-            res.json({ success: true, request_id: req.params.id });
+            await log(req, 'APPROVAL_REJECTED', `Từ chối ${id} — ${note}`);
+            res.json({ success: true, request_id: id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.post('/api/admin/approval-requests/:id/mark-executed', requireProtectedAdmin, async (req, res) => {
         try {
+            const id = req.params.id;
+            if (id.startsWith('PROP-')) return res.json({ success: true });
             const pool = await getPool();
             await pool.request()
-                .input('rid', sql.VarChar(50), req.params.id)
+                .input('rid', sql.VarChar(50), id)
                 .query(`UPDATE APPROVAL_REQUEST SET status='EXECUTED' 
                         WHERE request_id=@rid AND status IN ('EXECUTING','APPROVED')`);
             res.json({ success: true });

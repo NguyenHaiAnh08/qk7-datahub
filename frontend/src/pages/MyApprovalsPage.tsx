@@ -46,6 +46,8 @@ const formatRequestAction = (method: string, path: string): string => {
   const docPurgeMatch = cleanPath.match(/^\/api\/documents\/([^/]+)\/purge$/);
   if (docPurgeMatch && m === 'DELETE') return `Xóa vĩnh viễn văn bản (${docPurgeMatch[1]})`;
 
+  const docEditMatch = cleanPath.match(/^\/api\/documents\/([^/]+)$/);
+  if (docEditMatch && m === 'PUT') return `Đề xuất chỉnh sửa thông tin văn bản (${docEditMatch[1]})`;
   const docMatch = cleanPath.match(/^\/api\/documents\/([^/]+)$/);
   if (docMatch && m === 'DELETE') return `Xóa tạm văn bản (${docMatch[1]})`;
 
@@ -62,6 +64,7 @@ const formatRequestAction = (method: string, path: string): string => {
 // Helper: Dịch Mã Quyền
 // ============================================================
 const PERMISSION_NAMES: Record<string, string> = {
+  DOC_EDIT: 'Sửa văn bản',
   USER_DELETE:            'Xóa tài khoản',
   USER_ROLE_ASSIGN:       'Gán vai trò',
   USER_PERMISSION_ASSIGN: 'Cấp quyền',
@@ -82,6 +85,7 @@ const formatPermissionName = (code: string): string => {
 // Meta hiển thị theo loại hành động
 // ============================================================
 const ACTION_META: Record<string, { icon: any; label: string; tone: string }> = {
+  edit_doc:     { icon: FileText,      label: 'SỬA ĐỔI VĂN BẢN', tone: 'emerald' },
   delete_user:  { icon: Trash2,        label: 'XÓA QUÂN NHÂN',  tone: 'rose'  },
   delete_role:  { icon: Trash2,        label: 'XÓA VAI TRÒ',    tone: 'rose'  },
   delete_doc:   { icon: AlertTriangle, label: 'XÓA TÀI LIỆU',   tone: 'rose'  },
@@ -90,7 +94,8 @@ const ACTION_META: Record<string, { icon: any; label: string; tone: string }> = 
   assign_role:  { icon: KeyRound,      label: 'GÁN VAI TRÒ',    tone: 'amber' },
 };
 
-function classify(method: string, path: string) {
+function classify(method: string, path: string, requestId?: string) {
+  if (requestId?.startsWith('PROP-') || (method === 'PUT' && path.includes('/documents/'))) return ACTION_META.edit_doc;
   if (path.includes('/purge')) return ACTION_META.purge_doc;
   if (method === 'DELETE' && path.includes('/users/') && !path.includes('/permissions')) return ACTION_META.delete_user;
   if (method === 'DELETE' && path.includes('/roles/'))   return ACTION_META.delete_role;
@@ -101,6 +106,7 @@ function classify(method: string, path: string) {
 }
 
 const TONE_STYLES: Record<string, string> = {
+  emerald: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
   rose:  'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30',
   amber: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
   slate: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30',
@@ -197,7 +203,7 @@ export const MyApprovalsPage: React.FC = () => {
         ) : (
           <div className="space-y-2">
             {items.map((req) => {
-              const meta = classify(req.http_method, req.http_path);
+              const meta = classify(req.http_method, req.http_path, req.request_id);
               const Icon = meta.icon;
               const isPending = req.status === 'PENDING';
               const isRejected = req.status === 'REJECTED';
@@ -239,6 +245,12 @@ export const MyApprovalsPage: React.FC = () => {
                         <Lock className="w-3 h-3" /> Quyền bị khóa:{' '}
                         <strong className="font-mono">{formatPermissionName(req.required_permission)}</strong>
                       </div>
+                      {req.request_reason && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/30 text-xs text-amber-900 dark:text-amber-300">
+                          <span className="font-bold">Lý do đề xuất: </span>
+                          <span className="italic font-sans">"{req.request_reason}"</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Trạng thái */}

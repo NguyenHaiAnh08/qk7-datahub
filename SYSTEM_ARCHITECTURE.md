@@ -27,6 +27,15 @@
 18. [Kiến Trúc Thùng Rác Tài Liệu Tác Chiến & Khôi Phục Dữ Liệu An Toàn 2 Bước (Tactical Trash Bin & Double-Safety Recovery Engine)](#18-kiến-trúc-thùng-rác-tài-liệu-tác-chiến--khôi-phục-dữ-liệu-an-toàn-2-bước-tactical-trash-bin--double-safety-recovery-engine)
 19. [Kiến Trúc Quản Lý Phân Quyền Nâng Cao & Kéo Thả Thứ Tự Trực Quan (Granular Permissions, Subgroups & Drag-and-Drop Order Engine)](#19-kiến-trúc-quản-lý-phân-quyền-nâng-cao--kéo-thả-thứ-tự-trực-quan-granular-permissions-subgroups--drag-and-drop-order-engine)
 20. [Kiến Trúc Header AI Slide-Over Drawer & Khám Phá Hệ Thống Tự Động (Header AI Drawer & Guided Tour Engine)](#20-kiến-trúc-header-ai-slide-over-drawer--khám-phá-hệ-thống-tự-động-header-ai-drawer--guided-tour-engine)
+21. [Kiến Trúc Đồng Bộ Thời Gian Thực & Cơ Chế Chốt Chặn Lệch Giờ Máy Trạm (Clock Authority Engine)](#21-kiến-trúc-đồng-bộ-thời-gian-thực--cơ-chế-chốt-chặn-lệch-giờ-máy-trạm-clock-authority-engine)
+22. [Kiến Trúc Xác Thực Sinh Trắc Học Vân Tay Quản Trị Viên 2FA (Admin 2FA ZK9500 Hardware Guard)](#22-kiến-trúc-xác-thực-sinh-trắc-học-vân-tay-quản-trị-viên-2fa-admin-2fa-zk9500-hardware-guard)
+23. [Kiến Trúc Đánh Dấu Bản Quyền Động Chống Chụp Màn Hình (Dynamic Military Watermark Engine)](#23-kiến-trúc-đánh-dấu-bản-quyền-động-chống-chụp-màn-hình-dynamic-military-watermark-engine)
+24. [Kiến Trúc Giới Hạn Truy Cập IP Quản Trị & Điều Tốc Lỗi 403 (Admin IP Whitelist & Toast Throttle Engine)](#24-kiến-trúc-giới-hạn-truy-cập-ip-quản-trị--điều-tốc-lỗi-403-admin-ip-whitelist--toast-throttle-engine)
+25. [Kiến Trúc Kiểm Tra Trùng Lặp & Bóc Tách Văn Kiện PDF (PDF Deduplication SHA-256 & Smart Ingestion Engine)](#25-kiến-trúc-kiểm-tra-trùng-lặp--bóc-tách-văn-kiện-pdf-pdf-deduplication-sha-256--smart-ingestion-engine)
+26. [Quy Chuẩn Vận Hành AI Agent & Sổ Tay Khắc Phục Sự Cố (Agent Guidelines & Troubleshooting Engine)](#26-quy-chuẩn-vận-hành-ai-agent--sổ-tay-khắc-phục-sự-cố-agent-guidelines--troubleshooting-engine)
+27. [Kiến Trúc Lá Chắn Chống Chụp Màn Hình & Cảnh Báo An Ninh Tác Chiến (Anti-Screenshot Security Shield & Real-Time SOC Alert Engine)](#27-kiến-trúc-lá-chắn-chống-chụp-màn-hình--cảnh-báo-an-ninh-tác-chiến-anti-screenshot-security-shield--real-time-soc-alert-engine)
+28. [Kiến Trúc Hàng Đợi Phê Duyệt Tích Hợp Đa Nhiệm & Luồng Đề Xuất Chuẩn Hóa Văn Bản (Unified Approval Queue & Document Revision Proposal Engine)](#28-kiến-trúc-hàng-đợi-phê-duyệt-tích-hợp-đa-nhiệm--luồng-đề-xuất-chuẩn-hóa-văn-bản-unified-approval-queue--document-revision-proposal-engine)
+29. [Chuẩn Hóa Phân Cấp & Thứ Tự Danh Mục Đơn Vị Ban Hành Quân Sự (Military Issuing Unit Hierarchy & Priority Order Engine)](#29-chuẩn-hóa-phân-cấp--thứ-tự-danh-mục-đơn-vị-ban-hành-quân-sự-military-issuing-unit-hierarchy--priority-order-engine)
 
 ---
 
@@ -1200,6 +1209,86 @@ Nhằm hỗ trợ thủ trưởng và cán bộ tác chiến tra cứu nhanh đi
 - **Tinh giản giao diện Header:** Loại bỏ nút hướng dẫn nhanh thừa thãi trên Header bar để nhường không gian cho các công cụ điều khiển trọng yếu (`DeviceModeSwitch`, `ThemeToggle`, `User Profile`), chuyển toàn bộ điểm nhấn khám phá về đúng ngữ cảnh của Banner tác chiến.
 
 ---
+---
+
+## 27. Kiến Trúc Lá Chắn Chống Chụp Màn Hình & Cảnh Báo An Ninh Tác Chiến (Anti-Screenshot Security Shield & Real-Time SOC Alert Engine)
+
+### 27.1. Đánh Chặn Phím Tắt Toàn Diện (Keyboard Interception Guard)
+* **Phạm vi bảo vệ:** Tự động kích hoạt khi quân nhân mở xem bất kỳ văn bản quân sự nào trong `DocumentPreviewModal` (`enabled: open && Boolean(document)`).
+* **Tổ hợp phím bị chặn:**
+  * `PrintScreen` (KeyCode 44, code `PrintScreen`) — phím chụp toàn màn hình truyền thống.
+  * `Win + Shift + S` (hoặc `Ctrl + Shift + S`) — công cụ Windows Snipping Tool.
+  * `Cmd + Shift + 3 / 4 / 5` — tổ hợp phím chụp màn hình trên máy Mac/iPadOS có kết nối bàn phím ngoài.
+* **Cơ chế kích hoạt:** Bắt chặn ở cấp độ capture phase (`e.preventDefault()`, `e.stopPropagation()`), ngăn chặn hoàn toàn trình duyệt và hệ điều hành tiếp nhận mã phím.
+
+### 27.2. Cơ Chế Che Mờ Tức Thời 0ms (Instant Blackout Engine) & Tiêu Hủy Clipboard Đa Nhịp
+* **Bảo vệ trước khi OS ghi hình:** Khi người dùng kích hoạt Snipping Tool (làm cửa sổ trình duyệt mất tiêu điểm `window.blur`), hàm `applyInstantBlackout(true)` áp dụng style che đen và mờ 100% (`backdrop-filter: blur(40px)`, `visibility: hidden`) lên vùng render PDF trong 0ms trước khi công cụ chụp kịp lưu khung hình.
+* **Tiêu hủy bộ nhớ tạm Clipboard (Wipe Clipboard):**
+  * Hàm `wipeClipboard()` ghi đè dữ liệu rỗng và văn bản cảnh báo: `"⚠️ [AN NINH TRƯỜNG QUÂN SỰ QUÂN KHU 7] Dữ liệu hình ảnh đã bị hủy tự động do vi phạm quy chế bảo vệ bí mật nhà nước. Nghiêm cấm mọi hành vi chụp và trích xuất tài liệu quân sự!"`.
+  * Kích hoạt liên tiếp 4 nhịp: **0ms, 200ms, 500ms, 1000ms** để đảm bảo triệt tiêu hoàn toàn độ trễ bất đồng bộ của luồng ghi Clipboard từ Windows Snipping Tool.
+* **Chặn dán hình ảnh (Paste Blocker):** Lắng nghe sự kiện `paste` toàn cục; nếu bộ nhớ tạm chứa dữ liệu hình ảnh (`image/*`), hệ thống lập tức hủy thao tác và phát cảnh báo vi phạm.
+
+### 27.3. Cảnh Báo Tác Chiến & Ghi Nhận SOC Thời Gian Thực
+* **Gửi tín hiệu vi phạm:** Hook `useAntiScreenshot` tự động gọi POST sang `/api/security/screenshot-alert` kèm payload chứa:
+  * Mã tệp (`file_id`), Số hiệu công văn (`document_code`), Trích yếu (`title`), Cấp mật (`security_name`), Đơn vị ban hành (`unit_name`), Loại phím tắt và Thời gian vi phạm.
+* **Mở rộng cột `ACCESS_LOG.note`:** CSDL SQL Server nâng cấp cột `note` lên `NVARCHAR(1000)` (thay vì 255), đảm bảo lưu đầy đủ trích yếu dài và toàn bộ metadata văn bản.
+* **Hiển thị trực quan tại SOC:** Component `SecurityAuditLog.tsx` nhận diện hành vi `SCREENSHOT_ATTEMPT`, render thẻ cảnh báo chuyên biệt màu đỏ tươi, hiển thị chính xác văn bản bị tác động thay vì báo `N/A`.
+* **Tùy chọn Dev Switch:** Menu người dùng cung cấp công tắc *"Dev: Cho phép chụp ảnh"* (`qk7_dev_allow_screenshot`) để kỹ sư phần mềm chụp ảnh màn hình trong quá trình lập trình/kiểm thử mà không bị lá chắn chặn.
+
+---
+
+## 28. Kiến Trúc Hàng Đợi Phê Duyệt Tích Hợp Đa Nhiệm & Luồng Đề Xuất Chuẩn Hóa Văn Bản (Unified Approval Queue & Document Revision Proposal Engine)
+
+### 28.1. Hợp Nhất Hàng Đợi Phê Duyệt Tập Trung (Unified Approval Queue Architecture)
+* **Vấn đề trước đây:** Hệ thống tồn tại 2 luồng phê duyệt riêng rẽ: `APPROVAL_REQUEST` (yêu cầu mở khóa bảo vệ quyền) và `DOCUMENT_REVISION_PROPOSAL` (đề xuất chỉnh sửa văn bản của trợ lý/văn thư). Điều này khiến Quản trị viên phải tìm kiếm ở nhiều màn hình khác nhau, gây rườm rà trong công tác quản lý.
+* **Kiến trúc Hợp nhất mới:**
+  * Endpoint `/api/admin/approval-requests` và `/api/my-approval-requests` thực hiện hợp nhất kết quả từ cả 2 bảng `APPROVAL_REQUEST` và `DOCUMENT_REVISION_PROPOSAL`.
+  * Đề xuất sửa văn bản có định danh tiền tố `PROP-*`, được gắn Badge chuyên biệt `ĐỀ XUẤT SỬA VĂN BẢN` màu ngọc bích.
+  * Quản trị viên chỉ cần vào duy nhất mục **Quản trị > Phê duyệt yêu cầu** (`ApprovalQueuePage.tsx`) để xử lý toàn bộ các nhiệm vụ.
+
+### 28.2. Bảng Đối Chiếu Thông Tin Chuẩn Hóa 2 Cột & Phê Duyệt 1-Click
+* **Giao diện đối chiếu trực quan:** Modal chi tiết hiển thị bảng 2 cột so sánh song song giữa dữ liệu hiện tại trong CSDL và dữ liệu đề xuất mới:
+  * Số hiệu văn bản (Hiện tại vs Đề xuất).
+  * Trích yếu nội dung (Hiện tại vs Đề xuất).
+  * Đơn vị ban hành & Người ký (Hiện tại vs Đề xuất).
+  * Cấp độ bảo mật (Hiện tại vs Đề xuất).
+  * Lý do đề xuất của cán bộ (mặc định: *"Đề xuất chuẩn hóa thông tin văn bản"*).
+* **Luồng xử lý nguyên tử (Atomic Approve/Reject):**
+  * Khi bấm **"Phê Duyệt Đề Xuất"**: Gateway cập nhật bảng `DOCUMENT`, cập nhật trạng thái đề xuất thành `APPROVED`, ghi nhật ký `ACCESS_LOG`, gửi webhook đồng bộ sang microservice AI Boxchat (`:8001`) và tự động làm mới badge đếm số lượng qua `ApprovalContext`.
+  * Khi bấm **"Từ Chối Đề Xuất"**: Admin nhập lý do từ chối; hệ thống cập nhật trạng thái `REJECTED` và lưu lý do giải trình.
+
+### 28.3. Phân Hệ Theo Dõi Dành Cho Cán Bộ ("Yêu Cầu Chỉnh Sửa Của Tôi")
+* Cán bộ, trợ lý, văn thư truy cập trang `MyApprovalsPage.tsx` để theo dõi trực tiếp các yêu cầu của mình:
+  * Trạng thái Đang chờ duyệt (🟡 `PENDING`).
+  * Trạng thái Đã phê duyệt (🟢 `APPROVED`).
+  * Trạng thái Bị từ chối (🔴 `REJECTED`) kèm lý do từ chối cụ thể của Thủ trưởng/Quản trị viên.
+
+---
+
+## 29. Chuẩn Hóa Phân Cấp & Thứ Tự Danh Mục Đơn Vị Ban Hành Quân Sự (Military Issuing Unit Hierarchy & Priority Order Engine)
+
+### 29.1. Quy Chuẩn Thứ Tự Ưu Tiên Hiển Thị Đơn Vị Ban Hành
+Nhằm phản ánh chính xác cấu trúc tổ chức và phân cấp quản lý quân sự trong toàn Quân khu 7, danh mục đơn vị ban hành trong toàn bộ hệ thống (`PortalPage.tsx`, `DocumentFilters.tsx`) được cấu hình thứ tự ưu tiên hiển thị đồng nhất qua hàm `getIssuingUnitPriority`:
+
+$	ext{Priority}(U) = egin{cases} 
+1 & 	ext{Trường Quân sự Quân khu 7 (TQS - Đơn vị chủ quản nền tảng)} \
+2 & 	ext{Quân khu 7 (QK7 - Cơ quan lãnh đạo cấp trên)} \
+3 & 	ext{Bộ Tổng Tham mưu (BTTM)} \
+4 & 	ext{Tổng cục Chính trị (TCCT)} \
+5 & 	ext{Bộ Quốc Phòng (BQP)} \
+6 & 	ext{Chính Phủ (CP)} \
+7 & 	ext{Sư đoàn 5 (SD5)} \
+999 & 	ext{Các cơ quan, đơn vị được bổ sung sau này (xếp ở dưới dần dần)}
+end{cases}$
+
+### 29.2. Cơ Chế Bộ Lọc Sâu Phòng Ban Trực Thuộc (Dynamic Sub-Department Filter)
+* **Kích hoạt theo ngữ cảnh:**
+  * Khi quân nhân chọn đơn vị ban hành là **"Trường Quân sự Quân khu 7"** (`selectedUnit === 'TQS'`), hệ thống tự động hiển thị dropdown phòng ban trực thuộc (*Ban Giám hiệu, Phòng Tham mưu - Hành chính, Phòng Chính trị, Phòng Đào tạo, Phòng Hậu cần - Kỹ thuật*) nằm ngay đối diện bên dưới để lọc sâu theo từng phòng ban.
+  * Khi chọn các đơn vị khác (Quân khu 7, Bộ Quốc phòng, Sư đoàn 5...), ô chọn phòng ban tự động ẩn đi để tối ưu diện tích và đơn giản hóa trải nghiệm người dùng.
+* **Đồng bộ đa nền tảng:** Áp dụng đồng nhất cho cả giao diện máy tính để bàn (PC Widescreen) và máy tính bảng iPad Air M4 Touch UI.
+
+---
+
 *Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*
 
 

@@ -4,6 +4,7 @@ export interface ApprovalRequest {
   request_id: string;
   requester_id: string;
   requester_name?: string;
+  requester_rank?: string;
   required_permission: string;
   http_method: string;
   http_path: string;
@@ -16,6 +17,10 @@ export interface ApprovalRequest {
   review_note?: string;
   executed_at?: string;
   created_at: string;
+  request_reason?: string;
+  document_code?: string;
+  doc_title?: string;
+  proposal_data?: any;
 }
 
 export const approvalService = {

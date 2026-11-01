@@ -26,6 +26,7 @@ import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData, Unit } from '../types';
+import { getIssuingUnitPriority } from '../utils/unitTree';
 
 const ITEMS_PER_PAGE = 9;
 
@@ -116,10 +117,9 @@ export const PortalPage: React.FC = () => {
       (u) => !tqsIds.has(u.unit_id) && u.parent_id !== 'TQS' && u.parent_id !== 'U-TQS'
     );
     return [...nonDeptUnits].sort((a, b) => {
-      if (a.unit_id === 'TQS') return -1;
-      if (b.unit_id === 'TQS') return 1;
-      if (a.unit_id === 'QK7') return -1;
-      if (b.unit_id === 'QK7') return 1;
+      const pA = getIssuingUnitPriority(a);
+      const pB = getIssuingUnitPriority(b);
+      if (pA !== pB) return pA - pB;
       return a.name.localeCompare(b.name, 'vi');
     });
   }, [meta.units, tqsDepartments]);

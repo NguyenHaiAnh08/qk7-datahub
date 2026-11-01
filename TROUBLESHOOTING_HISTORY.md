@@ -326,5 +326,39 @@
 * **Cách phòng ngừa:**
   Không bao giờ ánh xạ lỗi kết nối vật lý/phần cứng thành lỗi sai thông tin định danh sinh trắc học của người dùng. Cần phân loại rõ mã lỗi hệ thống và có cơ chế tự phục hồi ở tầng Driver/Agent.
 
+---
 
+### Sự cố 17: Cắt cụt ghi chú kiểm toán an ninh do giới hạn độ dài NVARCHAR(255) & Thông tin văn bản bị chụp hiển thị N/A
 
+* **Triệu chứng:**
+  Khi mở xem chi tiết một sự kiện cảnh báo chụp màn hình (`SCREENSHOT_ATTEMPT`) trong Nhật ký kiểm toán an ninh SOC (`SecurityAuditLog.tsx`), phần *Văn bản / Đối tượng tác động* chỉ hiển thị dấu gạch `—` và phần ghi chú hiển thị: *`Cảnh báo an ninh: Phát hiện hành vi chụp màn hình (PrintScreen) trên văn bản N/A`*. Trong các trường hợp khác có thông tin văn bản, chuỗi trích yếu dài bị cắt cụt lửng lơ ở cuối mà không có dấu ngoặc đóng `]`.
+* **Nguyên nhân gốc rễ:**
+  1. **Kích hoạt lá chắn bị trễ:** Trong `DocumentPreviewModal.tsx`, hook `useAntiScreenshot` ban đầu dùng điều kiện `enabled: open && Boolean(blobUrl)`. Trong khoảng 1–2 giây đầu khi modal mở lên và đang tải file PDF, `blobUrl` vẫn là `null` nên lá chắn chưa được kích hoạt, dẫn đến việc chụp màn hình lúc này không gửi kèm thông tin tài liệu (`file_id = null`).
+  2. **Giới hạn độ dài cột CSDL SQL Server:** Bảng `ACCESS_LOG` và `ACCESS_LOG_ARCHIVE` định nghĩa cột `note NVARCHAR(255)`. Đồng thời hàm `writeAccessLog` trong `server.js` cắt chuỗi bằng `String(note).slice(0, 255)`. Chuỗi ghi chú chuẩn chứa đầy đủ Số hiệu, Trích yếu dài, Cấp mật và Đơn vị ban hành thường vượt quá 255 ký tự, khiến chuỗi bị cắt cụt và regex ở frontend không thể parse được các trường dữ liệu.
+* **Cách khắc phục:**
+  1. **Kích hoạt tức thì khi mở modal:** Đổi điều kiện kích hoạt thành `enabled: open && Boolean(document)`. Ngay khi người dùng nhấp xem văn bản, lá chắn kích hoạt ngay lập tức và gắn chặt metadata (`file_id`, `document_code`, `title`, `security_name`, `unit_name`).
+  2. **Mở rộng cột CSDL:** Thực thi lệnh T-SQL:
+     ```sql
+     ALTER TABLE ACCESS_LOG ALTER COLUMN note NVARCHAR(1000) NULL;
+     ALTER TABLE ACCESS_LOG_ARCHIVE ALTER COLUMN note NVARCHAR(1000) NULL;
+     ```
+  3. **Cập nhật Backend:** Nâng `.input('note', sql.NVarChar(1000), note ? String(note).slice(0, 1000) : null)` trong `writeAccessLog`.
+  4. **Tối ưu hóa hiển thị SOC:** Component `SecurityAuditLog.tsx` bóc tách trực tiếp quan hệ `JOIN` giữa `ACCESS_LOG.file_id` và bảng `DOCUMENT` để render thẻ cảnh báo chuyên biệt màu đỏ tươi có đầy đủ huy hiệu Cấp mật, Số hiệu, Mã tệp và Đơn vị ban hành.
+* **Cách phòng ngừa:**
+  Tránh giới hạn độ dài cột ghi chú kiểm toán quá ngắn (`NVARCHAR(255)`) đối với các hệ thống quản lý văn bản có trích yếu nội dung dài. Luôn thiết kế độ rộng tối thiểu 1.000 ký tự cho các cột lưu vết audit log.
+
+---
+
+### Sự cố 18: Hàng đợi phê duyệt không hiển thị đề xuất chỉnh sửa văn bản do lệch cấu trúc cột DB (proposal_data vs cột độc lập) & Lỗi cú pháp scope async
+
+* **Triệu chứng:**
+  Sau khi chuyển đổi luồng phê duyệt sang trang Hàng Đợi Phê Duyệt (`ApprovalQueuePage.tsx`), mặc dù trong bảng đề xuất sửa đổi văn bản (`DOCUMENT_REVISION_PROPOSAL`) đang có 4 yêu cầu chờ duyệt, nhưng giao diện Admin lại báo: *"Hàng Đợi Phê Duyệt (0 chờ) - Không có yêu cầu nào đang chờ duyệt"*. Người dùng vào trang *"Yêu cầu chỉnh sửa của tôi"* cũng không thấy đề xuất nào của mình.
+* **Nguyên nhân gốc rễ:**
+  1. **Lệch cấu trúc bảng CSDL:** Khi xây dựng truy vấn hợp nhất trong `backend/src/admin-routes.js`, câu lệnh SQL giả định bảng có cột chứa JSON `proposal_data` (`SELECT p.proposal_data ...`). Tuy nhiên, cấu trúc bảng `DOCUMENT_REVISION_PROPOSAL` trong CSDL thực tế lưu từng trường dữ liệu độc lập (`document_code`, `title`, `signer`, `issued_date`, `issuing_unit_id`, `security_level_id`, `note`, `review_note`). Lỗi `Invalid column name 'proposal_data'` làm truy vấn ném ngoại lệ và trả về mảng rỗng.
+  2. **Lỗi cú pháp khối lệnh async:** Trong quá trình tích hợp vào `admin-routes.js`, một đoạn code thừa ngoài phạm vi handler chứa lệnh `await getPool()` khiến trình thông dịch Node.js báo lỗi `SyntaxError: await is only valid in async functions` khi khởi động lại server.
+* **Cách khắc phục:**
+  1. **Khắc phục câu lệnh truy vấn SQL:** Đọc đúng từng cột dữ liệu trong bảng `DOCUMENT_REVISION_PROPOSAL`, `JOIN` với bảng `DOCUMENT` và `[USER]`, đóng gói thành đối tượng `proposal_data` chuẩn hóa trước khi trả về cho Frontend.
+  2. **Dọn sạch scope handler:** Xóa bỏ đoạn mã dư thừa, đảm bảo toàn bộ lệnh `await` nằm trọn vẹn trong các hàm async middleware của Express.
+  3. **Khởi động lại tiến trình Daemon:** Chạy lại tiến trình backend daemon trên cổng 8000. Kết quả API `/api/admin/approval-requests?status=PENDING` lập tức trả về chính xác 4 đề xuất chờ duyệt kèm đầy đủ bảng đối chiếu so sánh thông tin chuẩn hóa 2 cột.
+* **Cách phòng ngừa:**
+  Trước khi viết câu lệnh truy vấn SQL mới trên các bảng nghiệp vụ nhạy cảm, luôn kiểm tra schema thực tế bằng `INFORMATION_SCHEMA.COLUMNS`. Luôn kiểm tra cú pháp (`node -c`) trước khi khởi chạy tiến trình nền.

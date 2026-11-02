@@ -1,7 +1,6 @@
 import { http } from './http';
 import { API_ENDPOINTS } from '../constants/apiEndpoints';
-import { User } from '../types/user';
-
+import { User, GeneratePinResult } from '../types/user';
 /**
  * User Service — Quản lý tài khoản quân nhân và phân quyền truy cập
  */
@@ -68,4 +67,21 @@ export const userService = {
       method: 'DELETE',
     });
   },
+
+    // [v5.1] Admin random PIN 6 số — chỉ ROL-01, không cho nhập tay
+  generatePin: async (userId: string): Promise<GeneratePinResult> => {
+    return http<GeneratePinResult>(
+      `/api/admin/users/${encodeURIComponent(userId)}/pin/generate`,
+      { method: 'POST' }
+    );
+  },
+
+    requestPin: async (fileId?: string): Promise<{ success: boolean; request_id: string; message: string }> => {
+    return http('/api/pin/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_id: fileId || null }),
+    });
+  },
+
 };

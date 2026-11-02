@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Drawer } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PinManageModal } from '../components/users/PinManageModal';
 
 import {
   LayoutDashboard,
@@ -30,6 +31,7 @@ import {
   ShieldCheck,
   GripVertical,
   Bell,
+  AlertCircle,
 } from 'lucide-react';
 
 import { TrashPage } from './TrashPage';
@@ -307,9 +309,22 @@ export const AdminDashboardPage: React.FC = () => {
 
   const [userSearch, setUserSearch] = useState('');
 
+// ✅ state mới: lọc người đang chờ cấp PIN
+const [filterPinPending, setFilterPinPending] = useState(false);
+
+// ✅ đếm số user đang chờ cấp PIN — dùng ở badge trên nút bấm
+const pinPendingCount = useMemo(
+  () => usersList.filter((u) => u.pin_requested && !u.has_pin).length,
+  [usersList]
+);
+
   // === MODALS ===
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  const [pinManageModal, setPinManageModal] = useState<{ open: boolean; user: User | null }>({
+    open: false, user: null,
+  });
 
   const [credModal, setCredModal] = useState<{ open: boolean; userId: string; username: string }>({
     open: false, userId: '', username: '',
@@ -697,18 +712,29 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const filteredUsers = useMemo(() => {
-    if (!userSearch.trim()) return usersList;
-    const q = userSearch.toLowerCase().trim();
-    return usersList.filter(
-      (u) =>
-        (u.user_id || '').toLowerCase().includes(q) ||
-        (u.full_name || '').toLowerCase().includes(q) ||
-        (u.rank_name || '').toLowerCase().includes(q) ||
-        (u.position || '').toLowerCase().includes(q) ||
-        (u.unit_name || '').toLowerCase().includes(q) ||
-        (u.role_names || []).some((rn) => rn.toLowerCase().includes(q))
-    );
-  }, [usersList, userSearch]);
+  let result = usersList;
+
+    // 1️⃣ Lọc theo từ khóa tìm kiếm
+    if (userSearch.trim()) {
+      const q = userSearch.toLowerCase().trim();
+      result = result.filter(
+        (u) =>
+          (u.user_id || '').toLowerCase().includes(q) ||
+          (u.full_name || '').toLowerCase().includes(q) ||
+          (u.rank_name || '').toLowerCase().includes(q) ||
+          (u.position || '').toLowerCase().includes(q) ||
+          (u.unit_name || '').toLowerCase().includes(q) ||
+          (u.role_names || []).some((rn) => rn.toLowerCase().includes(q))
+      );
+    }
+
+    // 2️⃣ Lọc người đang chờ cấp PIN (badge đỏ)
+    if (filterPinPending) {
+      result = result.filter((u) => u.pin_requested && !u.has_pin);
+    }
+
+    return result;
+  }, [usersList, userSearch, filterPinPending]);
 
   // ============================================================
   // RENDER
@@ -891,34 +917,63 @@ export const AdminDashboardPage: React.FC = () => {
                   </p>
                 </div>
                 <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
-                  <div className="relative flex-1 sm:flex-initial">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
-                      placeholder="Tìm theo mã, tên, đơn vị..."
-                      className="w-full sm:w-64 pl-9 pr-8 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-amber-500 transition shadow-2xs"
-                    />
-                    {userSearch && (
-                      <button
-                        onClick={() => setUserSearch('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedUser(null);
-                      setUserModalOpen(true);
-                    }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-xs whitespace-nowrap"
-                  >
-                    <Plus className="w-4 h-4" /> Thêm người dùng
-                  </button>
-                </div>
+  <div className="relative flex-1 sm:flex-initial">
+    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+    <input
+      type="text"
+      value={userSearch}
+      onChange={(e) => setUserSearch(e.target.value)}
+      placeholder="Tìm theo mã, tên, đơn vị..."
+      className="w-full sm:w-64 pl-9 pr-8 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-amber-500 transition shadow-2xs"
+    />
+    {userSearch && (
+      <button
+        onClick={() => setUserSearch('')}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    )}
+  </div>
+
+              {/* ✅ NÚT LỌC NGƯỜI CHỜ CẤP PIN */}
+              <button
+                type="button"
+                onClick={() => setFilterPinPending((v) => !v)}
+                title={filterPinPending ? 'Bấm để bỏ lọc' : 'Chỉ hiện người đang chờ Admin cấp PIN'}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition shrink-0 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  filterPinPending
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-sm border border-rose-700'
+                    : pinPendingCount > 0
+                    ? 'bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 animate-pulse'
+                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                <AlertCircle className="w-4 h-4" />
+                <span>Chờ cấp PIN</span>
+                <span
+                  className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                    filterPinPending
+                      ? 'bg-white/25 text-white'
+                      : pinPendingCount > 0
+                      ? 'bg-rose-500 text-white'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {pinPendingCount}
+                </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSelectedUser(null);
+                    setUserModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-xs whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" /> Thêm người dùng
+                </button>
+              </div>
               </div>
 
               <UserTable
@@ -933,6 +988,7 @@ export const AdminDashboardPage: React.FC = () => {
                 onEnrollFingerprint={(u) => setFpEnrollModal({ open: true, user: u })}
                 onGrantPermission={(u) => setGrantPermModal({ open: true, user: u })}
                 onViewPermissions={(u) => setGrantPermModal({ open: true, user: u })}
+                onManagePin={(u) => setPinManageModal({ open: true, user: u })}
               />
             </div>
           )}
@@ -1581,6 +1637,16 @@ export const AdminDashboardPage: React.FC = () => {
         onSuccess={loadUsers}
         onToast={showToast}
       />
+
+
+            <PinManageModal
+        open={pinManageModal.open}
+        user={pinManageModal.user}
+        onClose={() => setPinManageModal({ open: false, user: null })}
+        onChanged={loadUsers}
+        onToast={showToast}
+      />
+
 
       <AssignRoleModal
         open={assignRoleModal.open}

@@ -1,6 +1,6 @@
 # 🛡️ SỔ TAY TỔNG HỢP SỰ CỐ & GIẢI PHÁP KỸ THUẬT (TROUBLESHOOTING HISTORY)
 > **Dự án:** TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB  
-> **Cập nhật lần cuối:** 30/10/2026  
+> **Cập nhật lần cuối:** 02/11/2026  
 > **Mục đích:** Tài liệu tra cứu và khắc phục nhanh toàn bộ các lỗi kỹ thuật phát sinh từ trước đến nay trong quá trình phát triển, tích hợp phần cứng và vận hành hệ thống.
 
 ---
@@ -19,6 +19,12 @@
 11. [Sự cố 11: Tràn bộ nhớ VRAM GPU khi chạy Model AI lớn (7B) trên card đồ họa GTX 1650 (4GB)](#sự-cố-11-tràn-bộ-nhớ-vram-gpu-khi-chạy-model-ai-lớn-7b-trên-card-đồ-họa-gtx-1650-4gb)
 12. [Sự cố 12: Đơn vị trực thuộc bị "mồ côi" (Orphan Unit) do `parent_id` không tồn tại trong CSDL](#sự-cố-12-đơn-vị-trực-thuộc-bị-mồ-côi-orphan-unit-do-parent_id-không-tồn-tại-trong-csdl)
 13. [Sự cố 13: Xung đột lệnh shell PowerShell không nhận diện cú pháp `&&`](#sự-cố-13-xung-đột-lệnh-shell-powershell-không-nhận-diện-cú-pháp-)
+14. [Sự cố 14: Chatbox từ chối tài liệu cùng cấp/tuyệt mật và chặn sai cơ chế bảo mật (>= 3)](#sự-cố-14-chatbox-từ-chối-tài-liệu-cùng-cấptuyệt-mật-và-chặn-sai-cơ-chế-bảo-mật--3)
+15. [Sự cố 15: Rò rỉ token sinh trắc học 5 phút của Chatbox sang Bàn làm việc (Bypass quét vân tay khi đóng Chatbox)](#sự-cố-15-rò-rỉ-token-sinh-trắc-học-5-phút-của-chatbox-sang-bàn-làm-việc-bypass-quét-vân-tay-khi-đóng-chatbox)
+16. [Sự cố 16: Chưa đặt tay quét đã báo "Xác thực thất bại - Vân tay không khớp" và hết lượt tự động](#sự-cố-16-chưa-đặt-tay-quét-đã-báo-xác-thực-thất-bại---vân-tay-không-khớp-và-hết-lượt-tự-động)
+17. [Sự cố 17: Cắt cụt ghi chú kiểm toán an ninh do giới hạn độ dài NVARCHAR(255) & Thông tin văn bản bị chụp hiển thị N/A](#sự-cố-17-cắt-cụt-ghi-chú-kiểm-toán-an-ninh-do-giới-hạn-độ-dài-nvarchar255--thông-tin-văn-bản-bị-chụp-hiển-thị-na)
+18. [Sự cố 18: Hàng đợi phê duyệt không hiển thị đề xuất chỉnh sửa văn bản do lệch cấu trúc cột DB & Lỗi cú pháp scope async](#sự-cố-18-hàng-đợi-phê-duyệt-không-hiển-thị-đề-xuất-chỉnh-sửa-văn-bản-do-lệch-cấu-trúc-cột-db-proposal_data-vs-cột-độc-lập--lỗi-cú-pháp-scope-async)
+19. [Sự cố 19: Báo động giả chụp màn hình khi click/di chuột, lệch độ tương phản tên quân nhân chế độ ngày/đêm, và các kỹ thuật lách chống chụp màn hình (Đa màn hình, Zalo Snipping, Clipboard dán vào Paint)](#sự-cố-19-báo-động-giả-chụp-màn-hình-khi-clickdi-chuột-lệch-độ-tương-phản-tên-quân-nhân-chế-độ-ngàyđêm-và-các-kỹ-thuật-lách-chống-chụp-màn-hình-đa-màn-hình-zalo-snipping-clipboard-dán-vào-paint)
 
 ---
 
@@ -362,3 +368,75 @@
   3. **Khởi động lại tiến trình Daemon:** Chạy lại tiến trình backend daemon trên cổng 8000. Kết quả API `/api/admin/approval-requests?status=PENDING` lập tức trả về chính xác 4 đề xuất chờ duyệt kèm đầy đủ bảng đối chiếu so sánh thông tin chuẩn hóa 2 cột.
 * **Cách phòng ngừa:**
   Trước khi viết câu lệnh truy vấn SQL mới trên các bảng nghiệp vụ nhạy cảm, luôn kiểm tra schema thực tế bằng `INFORMATION_SCHEMA.COLUMNS`. Luôn kiểm tra cú pháp (`node -c`) trước khi khởi chạy tiến trình nền.
+
+---
+
+### Sự cố 19: Báo động giả chụp màn hình khi click/di chuột, lệch độ tương phản tên quân nhân chế độ ngày/đêm, và các kỹ thuật lách chống chụp màn hình (Đa màn hình, Zalo Snipping, Clipboard dán vào Paint)
+
+* **Triệu chứng:**
+  1. Khi quân nhân mở xem tài liệu PDF trong hộp thoại xem trước (`DocumentPreviewModal`), chỉ cần click chuột vào nội dung PDF để cuộn trang hoặc di chuyển chuột thì hệ thống lập tức nảy popup đỏ cảnh báo vi phạm an ninh chụp màn hình (`SecurityScreenShield`).
+  2. Khi chuyển sang Chế độ ban ngày (Light Mode), tên quân nhân trên Header bar và các nhãn định danh hiển thị màu xám mờ (`text-slate-800` / `text-slate-400`), độ tương phản kém và không đúng giao thức Ngày/Đêm của Quân khu.
+  3. Khi sử dụng hệ thống 2 màn hình: Tài liệu mở ở màn hình 1 nhưng dùng chuột sang màn hình 2 mở Zalo (phím tắt `Ctrl + Alt + S`) hoặc Snipping Tool thì vẫn chụp lén được nội dung; mở Paint bấm `Ctrl + V` vẫn dán được hình ảnh tài liệu vừa chụp; bật phần mềm quay màn hình từ trước thì quay được hết tài liệu, chỉ khi đóng cửa sổ mới phát cảnh báo vi phạm.
+* **Nguyên nhân gốc rễ:**
+  1. **Báo động giả do cơ chế Blur của Chromium:** Khi người dùng click vào thẻ `<iframe>` nhúng PDF, trình duyệt chuyển `activeElement` sang iframe khiến sự kiện `window.onblur` bị kích hoạt. Bộ lắng nghe sự kiện cũ coi việc focus trở lại trang web sau đó là hành vi chụp màn hình bằng phím tắt ngoài (`Win + Shift + S`) và kích hoạt cảnh báo đỏ.
+  2. **Lệch màu giao thức Ngày/Đêm:** Thiếu sự tách bạch giữa Chế độ ban ngày (`text-slate-900 font-bold`, clearance `text-emerald-800`, nút `bg-slate-100 border-slate-300`) và Chế độ ban đêm (`dark:text-white font-bold`, clearance `dark:text-emerald-400`, nút `dark:bg-slate-800 dark:border-slate-700`).
+  3. **Lỗ hổng đa màn hình và ứng dụng chụp ngoài:**
+     - Sự kiện mất tiêu điểm (`blur`) trước đây có độ trễ `setTimeout` 100ms, tạo khoảng trống thời gian cho Zalo và Snipping Tool chụp đóng băng khung hình.
+     - Tổ hợp phím chụp màn hình chuyên dụng của Zalo (`Ctrl + Alt + S`), WeChat (`Ctrl + Alt + A`), Game Bar (`Win + Alt + R`) chưa được đưa vào danh mục phím nóng bị chặn ở tầng `keydown`.
+     - Bộ nhớ tạm Clipboard của hệ điều hành chưa được ghi đè tự động khi mất focus, dẫn tới việc dán (`Ctrl + V`) ảnh chụp vào MS Paint thành công.
+* **Cách khắc phục:**
+  1. **Triệt tiêu 100% báo động giả:** Trong `useAntiScreenshot.ts`, kiểm tra `activeElement === iframeRef.current` và các phần tử con `.secure-pdf-content`. Khi focus nằm trong iframe hoặc người dùng thao tác cuộn/click đọc tài liệu, hệ thống bỏ qua và không kích hoạt rèm che hay cảnh báo an ninh.
+  2. **Cơ chế Rèm che bảo mật vật lý tức thì (Blackout Curtain 0ms):**
+     - Khi con trỏ chuột rời khỏi biên cửa sổ sang Màn hình 2 (`mouseleave`) hoặc khi cửa sổ thực sự mất tiêu điểm sang ứng dụng khác (`blur`): Kéo rèm che đen `isCurtainActive = true` và làm mờ sâu `applyInstantBlackout(true)` với độ trễ 0ms. Mọi công cụ chụp từ Màn hình 2 hoặc Zalo chỉ chụp được một màn hình màu đen tuyền kèm thông điệp *"Nội Dung Tạm Ẩn Bảo Mật"*.
+     - Khi người dùng click quay lại cửa sổ: Rèm che tự động mở mượt mà để tiếp tục đọc tài liệu, không hiện popup đe dọa.
+  3. **Mở rộng danh mục phím tắt chặn đứng:** Bắt chặn `e.preventDefault()` và `wipeClipboard()` cho: `PrintScreen`, `Win + Shift + S`, `Ctrl + Shift + S`, `Ctrl + Alt + S` (Zalo), `Ctrl + Alt + A`, `Win + Alt + R`, `Cmd + Shift + 3/4/5`, `Ctrl + P`, `Ctrl + S`.
+  4. **Tiêu hủy dữ liệu hình ảnh trong Clipboard (Anti-Paste):**
+     - Hàm `wipeClipboard()` kết hợp cả Clipboard API hiện đại và Fallback Textarea `execCommand`, ghi đè Clipboard bằng thông điệp cảnh báo an ninh bảo vệ bí mật nhà nước.
+     - Lắng nghe sự kiện dán `paste` để hủy bỏ bất kỳ luồng paste ảnh nào; quét định kỳ 1.5 giây khi cửa sổ không có focus để triệt tiêu ảnh trong clipboard trước khi người dùng kịp dán vào MS Paint.
+  5. **Forensic DRM Watermark chống quay lén:** Duy trì 4 vị trí Watermark chuẩn hóa (18%, 38%, 62%, 82%) nhúng chìm vĩnh viễn tên quân nhân, chức vụ, đơn vị, timestamp NTP và mã truy vết vào từng trang PDF canvas qua `stampWatermarkOnPdf`. Mọi video quay màn hình trái phép từ trước đều mang bằng chứng định danh không thể chối cãi.
+  6. **Chuẩn hóa hiển thị Ngày/Đêm cho SecurityScreenShield & Hệ thống:**
+     - Thiết kế giao diện cảnh báo đỏ `SecurityScreenShield` hài hòa, tương phản cao trên cả 2 chế độ:
+       + **Chế độ Ban ngày (Light Mode):** Card trắng bo góc 3xl (`bg-white`), viền đỏ tươi rực rỡ (`border-2 border-rose-300`), bóng đổ viền hồng neon mềm mại (`shadow-[0_10px_50px_rgba(244,63,94,0.22)]`), các khung chi tiết chữ đen sắc nét tương phản cao.
+       + **Chế độ Ban đêm (Dark Mode):** Card tối (`dark:bg-slate-900`), viền đỏ phát quang (`dark:border-rose-600/70`), shadow dạ quang đỏ chuẩn tác chiến.
+     - Cập nhật đồng bộ `Header.tsx` và `UnitOverviewStrip.tsx` hiển thị tên quân nhân màu đen đậm tương phản cao `text-slate-900 font-bold` ban ngày và `dark:text-white font-bold` ban đêm.
+  7. **Tối ưu hóa UX/UI & Nhận diện chính xác thao tác (Fix Compact & Trigger Matching):**
+     - **Thu nhỏ khung cảnh báo (Compact Modal):** Rút gọn kích thước thẻ `SecurityScreenShield` về chuẩn `max-w-md`, chiều cao an toàn `max-h-[92vh] overflow-y-auto`, bo góc `rounded-2xl`, căn chỉnh padding `p-4 sm:p-5` để vừa khít 100% trên các màn hình laptop và iPad mà không bị tràn viền hay che khuất nút bấm.
+     - **Bóc tách danh mục phím nóng chính xác (Exact Trigger Mapping):** Phân định rạch ròi từng loại hành vi:
+       + `Win + Shift + S`: Hiển thị chuẩn *"Tổ hợp phím Win + Shift + S (Snipping Tool)"* (không còn bị gộp nhầm Zalo).
+       + `Ctrl + Alt + S`: Hiển thị chuẩn *"Tổ hợp phím Ctrl + Alt + S (Chụp ảnh Zalo)"*.
+       + `PrintScreen`: Hiển thị *"Phím PrintScreen (Chụp toàn màn hình)"*.
+       + Snipping Tool ngoài: Hiển thị *"Công cụ cắt ảnh màn hình (Snipping Tool)"*.
+     - **Triệt tiêu độ trễ làm mờ (0ms Instant Blackout):** Khi Windows Snipping Tool kích hoạt làm mất focus, CSS `applyInstantBlackout(true)` làm mờ sâu 60px và giảm opacity về 0.02 ngay tại 0ms (thay vì trễ 150ms như trước). Do đó khi Windows đóng băng khung hình, ảnh chụp thu được chỉ là màn hình cảnh báo đỏ hoặc khung mờ, bảo vệ hoàn toàn nội dung tài liệu.
+     - **Tách biệt luồng Sao chép văn bản & Chụp màn hình:** Cập nhật thông điệp cảnh báo phù hợp khi sao chép đoạn văn (*"Nghiêm cấm sao chép, trích xuất văn bản quân sự bảo mật"* thay vì báo nhầm "dữ liệu hình ảnh").
+   8. **Cơ chế Chặn Liên Tục & Giải phóng bẫy Focus Iframe (Continuous Protection Engine):**
+      - **Nguyên nhân lần 2 bị lọt:** Sau khi đóng cảnh báo lần đầu, nếu người dùng nhấp chuột vào văn bản PDF để đọc, `document.activeElement` trở thành `<iframe>`. Đoạn mã cũ kiểm tra `if (activeEl === iframe) return;` trong `handleWindowBlur` khiến mọi lần bấm `Win + Shift + S` hay mất tiêu điểm về sau ĐỀU BỊ BỎ QUA hoàn toàn.
+      - **Giải pháp Chặn Liên Tục:**
+        + Tự động thu hồi tiêu điểm về Window (`window.focus()`) sau khi click vào PDF và sau khi đóng modal cảnh báo, đảm bảo Window luôn sẵn sàng lắng nghe `keydown` và `blur` cho mọi lần chụp tiếp theo (lần 2, lần 3, liên tục 100%).
+        + Trong `handleWindowBlur`: Nếu phát hiện có phím bổ trợ chụp ảnh (`Win`, `Shift`, `Ctrl`, `Alt`) vừa được bấm trong 1.5 giây gần nhất, lập tức kích hoạt `triggerViolation(...)` và `applyInstantBlackout(true)` mà KHÔNG bỏ qua, dù `activeElement` đang ở đâu.
+        + Tự động dọn sạch Clipboard liên tục (0ms, 100ms, 300ms, 800ms) để ngăn chặn triệt để hành vi dán ảnh vào MS Paint hay Zalo.
+
+   9. **Loại bỏ hoàn toàn cơ chế Chuột/Rèm che & CHỈ cảnh báo khi sử dụng phím tắt bàn phím:**
+      - **Loại bỏ cơ chế của chuột & Rèm che:** Xóa bỏ hoàn toàn lắng nghe `mouseleave`, `mouseenter`, `visibilitychange` và cơ chế rèm che *"Nội Dung Tạm Ẩn Bảo Mật"*. Người dùng di chuyển chuột, rê chuột sang Màn hình 2, hoặc click chuột chuyển tab hoàn toàn bình thường, tuyệt đối KHÔNG bị báo động giả nhầm là đang chụp màn hình.
+      - **Chỉ cảnh báo khi sử dụng phím tắt bàn phím:** Chỉ kích hoạt cảnh báo khi người dùng thực sự bấm các phím/tổ hợp phím chụp màn hình (`PrintScreen`, `Win + Shift + S`, `Ctrl + Alt + S` Zalo, `Ctrl + Shift + S`, `Ctrl + P`,...).
+      - **Nấc thang cảnh báo 3 lần chuẩn hóa:**
+        + **Lần 1 / 3:** Cảnh báo an ninh quân sự, che mờ PDF 0ms và dọn sạch clipboard.
+        + **Lần 2 / 3:** Cảnh báo nghiêm trọng, thông báo quy chế tái phạm quá 3 lần sẽ khóa tài khoản toàn hệ thống.
+        + **Lần 3 / 3:** CẢNH BÁO KHẨN CẤP (Ngưỡng tối đa) - Thông báo đây là cơ hội cuối cùng trước khi bị khóa cứng.
+      - **Khóa tài khoản tự động (Khi vi phạm quá 3 lần, tức từ lần thứ 4):**
+        + **Backend Gateway & SQL Server:** Cập nhật ngay `UPDATE [USER] SET status = 'locked', locked_at = GETDATE()`, thu hồi toàn bộ phiên làm việc (`USER_SESSION`), ghi nhận nhật ký kiểm toán đặc biệt nghiêm trọng `ACCOUNT_LOCKED` trong `ACCESS_LOG`.
+        + **Frontend UX/UI:** Modal đỏ chuyển sang chế độ Khóa cứng (`🚨 TÀI KHOẢN ĐÃ BỊ KHÓA TOÀN HỆ THỐNG`), vô hiệu hóa nút bỏ qua, buộc quân nhân phải bấm *"Đăng xuất khỏi hệ thống"* và liên hệ Trực ban Tác chiến / Quản trị viên để giải trình và thực hiện thủ tục mở khóa tài khoản qua API `/api/admin/users/:id/unlock`.
+
+   10. **Bịt kín lỗ hổng Toàn màn hình & Cơ chế Reset số lần vi phạm về 0 khi Admin mở khóa:**
+       - **Lỗ hổng Toàn màn hình (Fullscreen Vulnerability Fix):**
+         + *Nguyên nhân:* Nút "Toàn màn hình" trước đây gọi hàm `handleOpenNewTab`, tạo một Blob HTML chứa iframe PDF thô và mở tab trình duyệt mới (`blob:https://...`). Tab mới này tách rời khỏi React SPA, không có hook `useAntiScreenshot`, khiến người dùng có thể chụp màn hình mà không bị chặn.
+         + *Khắc phục:* Chuyển đổi nút "Toàn màn hình" sang gọi trực tiếp `handleToggleFullscreen()` kích hoạt HTML5 Fullscreen API (`modalContainerRef.current.requestFullscreen()`). Toàn bộ khung xem văn bản phóng to 100% màn hình thiết bị nhưng vẫn nằm trọn vẹn bên trong React SPA, có đầy đủ lá chắn an ninh, bắt trọn phím tắt `Win + Shift + S`, `PrintScreen` và hiển thị modal cảnh báo đỏ bảo vệ ngay trong chế độ fullscreen. Xóa bỏ hoàn toàn hàm `handleOpenNewTab` để không còn luồng rò rỉ nào qua tab ngoài.
+       - **Cơ chế Reset số lần vi phạm về 0 khi Admin mở khóa tài khoản:**
+         + *Nguyên nhân:* Endpoint `POST /api/admin/users/:id/unlock` trước đây chỉ cập nhật `status = 'active'` trên bảng `[USER]`, mà không xử lý các bản ghi `SCREENSHOT_ATTEMPT` cũ trong `ACCESS_LOG`. Khi người dùng được mở khóa đăng nhập lại và chụp màn hình lần đầu, câu lệnh SQL `SELECT COUNT(*) ... WHERE action = 'SCREENSHOT_ATTEMPT'` đếm cộng dồn cả 9 lần cũ cộng 1 lần mới thành 10 lần, khiến tài khoản lập tức bị khóa lại ngay tại lần chụp đầu tiên.
+         + *Khắc phục:*
+           1. Trong `backend/src/admin-routes.js`: Khi Admin bấm "Mở khóa tài khoản", hệ thống tự động chạy lệnh `UPDATE ACCESS_LOG SET action = 'SCREENSHOT_RESOLVED', note = ISNULL(note, '') + ' [ĐÃ ĐƯỢC ADMIN MỞ KHÓA & RESET VI PHẠM]' WHERE user_id = @uid AND action = 'SCREENSHOT_ATTEMPT'`. Giữ nguyên 100% lịch sử kiểm toán SOC nhưng đưa số lần vi phạm chưa giải quyết về đúng 0 lần.
+           2. Trong `backend/server.js`: Bổ sung endpoint `GET /api/security/violation-status` để frontend chủ động đồng bộ số lần vi phạm thực tế từ máy chủ.
+           3. Trong `frontend/src/hooks/useAntiScreenshot.ts` & `AuthContext.tsx`: Tự động đồng bộ số lần vi phạm từ server khi mở văn bản, dọn sạch `sessionStorage` khi login/logout; sau khi Admin mở khóa, số lần đếm bắt đầu lại từ Lần 1/3 chuẩn xác.
+
+* **Phân tích Kiến trúc Bảo vệ (Web Client vs. Native OS):**
+  - **Trên Web (Browser):** Chạy trong Chromium Sandbox, không thể gọi trực tiếp Win32 API kernel. Áp dụng chuẩn công nghiệp tương đương thư viện `Screenshot-PrivacyProtectionWeb`: kết hợp **0ms Client Shielding (CSS/JS Blurring)** + **Ghi đè Clipboard** + **Forensic Dynamic Watermark** (4 vị trí khắc vĩnh viễn Họ tên, Đơn vị, Timestamp NTP) để triệt tiêu giá trị trích xuất dữ liệu.
+  - **Khuyến nghị lộ trình Native Desktop:** Nếu đơn vị yêu cầu chặn chụp màn hình cứng ở tầng hệ điều hành Windows (khiến Snipping Tool / OBS / Zalo chụp ra màn hình đen tuyền), giải pháp là đóng gói client thành ứng dụng Desktop (Electron / C# WebView2) và gọi Win32 API `SetWindowDisplayAffinity(hWnd, WDA_MONITOR)` hoặc trên Mobile dùng `FLAG_SECURE`.

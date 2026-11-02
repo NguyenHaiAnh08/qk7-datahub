@@ -933,6 +933,17 @@ export const AdminDashboardPage: React.FC = () => {
                 onEnrollFingerprint={(u) => setFpEnrollModal({ open: true, user: u })}
                 onGrantPermission={(u) => setGrantPermModal({ open: true, user: u })}
                 onViewPermissions={(u) => setGrantPermModal({ open: true, user: u })}
+                onUnlock={async (u) => {
+                  try {
+                    const res = await usersApi.unlockUser(u.user_id);
+                    if (res?.success) {
+                      showToast(`Đã mở khóa tài khoản cho quân nhân ${u.full_name || u.user_id}`, 'success');
+                      loadUsers();
+                    }
+                  } catch (err: any) {
+                    showToast('Lỗi khi mở khóa tài khoản: ' + err.message, 'error');
+                  }
+                }}
               />
             </div>
           )}

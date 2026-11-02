@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../hooks/useAuth';
+import { isUserAdmin } from '../../contexts/AuthContext';
 import {
   X,
   Clock,
@@ -63,19 +65,53 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
   onClose,
   onRefresh,
 }) => {
+  const { user, hasPermission } = useAuth();
+
   const [selectedProposal, setSelectedProposal] = useState<PendingProposalItem | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
-  if (!open) return null;
-
+  // ─────────────────────────────────────────────────────────
+  // DERIVED VALUES — phải khai báo TRƯỚC mọi biến phụ thuộc
+  // ─────────────────────────────────────────────────────────
   const activeItem = selectedProposal || (proposals.length > 0 ? proposals[0] : null);
 
+  // Người dùng đang xem có phải là người tạo đề xuất không?
+  const isSelfRequest = activeItem?.requester_id === user?.user_id;
+
+  // Defense-in-depth: prop canApprove phải true VÀ user phải có quyền thực sự.
+  // ⚠️ Lưu ý: KHÔNG chỉ check isUserAdmin — vì Chỉ huy (ROL-02) không phải Admin
+  //         nhưng có quyền DOC_EDIT ở backend. Dùng hasPermission('DOC_EDIT') để
+  //         khớp đúng với middleware requirePermission('DOC_EDIT') của server.
+  const hasRealPermissionToApprove =
+    canApprove &&
+    (isUserAdmin(user) ||
+      user?.user_id === 'USR-001' ||
+      hasPermission('DOC_EDIT'));
+
+  if (!open) return null;
+
+  // ─────────────────────────────────────────────────────────
+  // HANDLERS — có guard tự duyệt bên trong (defense-in-depth tầng 2)
+  // ─────────────────────────────────────────────────────────
   const handleApprove = async (proposalId: string) => {
+    // 🛡️ Chặn tự duyệt ở tầng handler (phòng trường hợp UI bị bypass)
+    const target = proposals.find((p) => p.proposal_id === proposalId);
+    if (target && target.requester_id === user?.user_id) {
+      toast.error('Bạn không thể tự phê duyệt đề xuất của chính mình.', {
+        title: 'BỊ CHẶN',
+        badge: 'SELF_APPROVE_DENIED',
+      });
+      return;
+    }
+
     setActionLoading(true);
     try {
-      const res = await documentService.approveProposal(proposalId, 'Chỉ huy / Admin đã phê duyệt đề xuất chuẩn hóa');
+      const res = await documentService.approveProposal(
+        proposalId,
+        'Chỉ huy / Admin đã phê duyệt đề xuất chuẩn hóa'
+      );
       toast.success(res.message || 'Đã phê duyệt đề xuất thành công', {
         title: 'PHÊ DUYỆT THÀNH CÔNG',
         badge: 'APPROVED',
@@ -92,6 +128,16 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
   };
 
   const handleReject = async (proposalId: string) => {
+    // 🛡️ Chặn tự từ chối ở tầng handler
+    const target = proposals.find((p) => p.proposal_id === proposalId);
+    if (target && target.requester_id === user?.user_id) {
+      toast.error('Bạn không thể tự từ chối đề xuất của chính mình.', {
+        title: 'BỊ CHẶN',
+        badge: 'SELF_REJECT_DENIED',
+      });
+      return;
+    }
+
     if (!rejectReason.trim()) {
       toast.error('Vui lòng nhập lý do từ chối đề xuất', { title: 'YÊU CẦU LÝ DO' });
       return;
@@ -167,6 +213,7 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
               </div>
               {proposals.map((item) => {
                 const isSelected = activeItem?.proposal_id === item.proposal_id;
+                const isOwnProposal = item.requester_id === user?.user_id;
                 return (
                   <button
                     key={item.proposal_id}
@@ -195,6 +242,11 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                       <User className="w-3 h-3 shrink-0" />
                       <span className="truncate">{item.requester_name}</span>
+                      {isOwnProposal && (
+                        <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                          CỦA BẠN
+                        </span>
+                      )}
                     </div>
                   </button>
                 );
@@ -215,7 +267,8 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
                         {activeItem.requester_name} {activeItem.requester_rank ? `(${activeItem.requester_rank})` : ''}
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Chức vụ: {activeItem.requester_position || 'Cán bộ nghiệp vụ'} • Gửi lúc: {new Date(activeItem.created_at).toLocaleString('vi-VN')}
+                        Chức vụ: {activeItem.requester_position || 'Cán bộ nghiệp vụ'} • Gửi lúc:{' '}
+                        {new Date(activeItem.created_at).toLocaleString('vi-VN')}
                       </div>
                     </div>
                   </div>
@@ -348,35 +401,46 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
                   </div>
                 )}
 
-                {/* Nút hành động duyệt / từ chối */}
+                {/* Nút hành động duyệt / từ chối — 3 tầng bảo vệ */}
                 <div className="pt-2 flex items-center justify-end gap-3">
-                  {canApprove ? (
-                    <>
-                      {!showRejectInput && (
+                  {hasRealPermissionToApprove ? (
+                    isSelfRequest ? (
+                      // 🛡️ TẦNG 1 (UI): Chặn hiển thị nút khi là đề xuất của chính mình
+                      <div className="flex items-start gap-2 text-xs text-rose-600 dark:text-rose-400 font-semibold bg-rose-50 dark:bg-rose-950/30 px-3.5 py-2.5 rounded-xl border border-rose-300 dark:border-rose-800 max-w-md">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>
+                          Bạn không thể tự phê duyệt hoặc từ chối đề xuất của chính mình.
+                          Vui lòng chuyển cho Chỉ huy / Quản trị viên khác xử lý.
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        {!showRejectInput && (
+                          <button
+                            type="button"
+                            onClick={() => setShowRejectInput(true)}
+                            disabled={actionLoading}
+                            className="px-4 py-2 border border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            <span>Từ Chối Đề Xuất</span>
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setShowRejectInput(true)}
+                          onClick={() => handleApprove(activeItem.proposal_id)}
                           disabled={actionLoading}
-                          className="px-4 py-2 border border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                          className="px-5 py-2 bg-[#166534] hover:bg-[#15803d] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/20 transition cursor-pointer disabled:opacity-50"
                         >
-                          <XCircle className="w-4 h-4" />
-                          <span>Từ Chối Đề Xuất</span>
+                          {actionLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4" />
+                          )}
+                          <span>Phê Duyệt & Áp Dụng Ngay</span>
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(activeItem.proposal_id)}
-                        disabled={actionLoading}
-                        className="px-5 py-2 bg-[#166534] hover:bg-[#15803d] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/20 transition cursor-pointer disabled:opacity-50"
-                      >
-                        {actionLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="w-4 h-4" />
-                        )}
-                        <span>Phê Duyệt & Áp Dụng Ngay</span>
-                      </button>
-                    </>
+                      </>
+                    )
                   ) : (
                     <div className="text-xs text-slate-500 italic">
                       Đề xuất đang ở trạng thái chờ Chỉ huy hoặc Quản trị viên duyệt.
@@ -391,4 +455,3 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
     </div>
   );
 };
-

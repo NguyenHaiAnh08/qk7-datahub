@@ -310,7 +310,7 @@ export const Header: React.FC<HeaderProps> = ({
             className={`text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 ${
               (user?.clearance_level_id || 1) >= 4
                 ? 'bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30'
-                : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                : 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30 font-semibold'
             }`}
           >
             {user?.clearance_name || 'Công khai'}
@@ -330,7 +330,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
         {user?.unit_name && (
-          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 font-medium whitespace-nowrap">
+          <div className="text-[11px] text-emerald-800 dark:text-emerald-400 mt-0.5 font-semibold whitespace-nowrap">
             {user.unit_name}
           </div>
         )}
@@ -670,7 +670,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <button
               type="button"
-              className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:border-slate-700 dark:text-white px-2 sm:px-2.5 py-1 rounded-xl border transition cursor-pointer shrink-0"
             >
               <div
                 className="relative w-6 h-6 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
@@ -690,7 +690,7 @@ export const Header: React.FC<HeaderProps> = ({
                   title={isOnline ? 'Đang trực tuyến' : 'Mất kết nối máy chủ'}
                 />
               </div>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap leading-none">
+              <span className="text-xs font-bold text-slate-900 dark:text-white whitespace-nowrap leading-none">
                 {user?.full_name || (isGuestUser ? 'Đại biểu' : 'Khách')}
               </span>
 
@@ -843,7 +843,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <button
               type="button"
-              className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
+              className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:border-slate-700 dark:text-white px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border transition cursor-pointer shrink-0"
             >
               <div
                 className="relative w-7 h-7 rounded-lg bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center shrink-0 shadow-xs"
@@ -864,10 +864,10 @@ export const Header: React.FC<HeaderProps> = ({
                 />
               </div>
               <div className="text-left hidden md:block whitespace-nowrap">
-                <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
+                <span className="block text-xs font-bold text-slate-900 dark:text-white leading-tight">
                   {user?.full_name || (isGuestUser ? 'Đại biểu' : 'Khách')}
                 </span>
-                <span className="block text-[10px] text-amber-600 dark:text-amber-400 leading-tight font-medium">
+                <span className="block text-[10px] text-emerald-800 dark:text-emerald-400 leading-tight font-semibold">
                   {user?.clearance_name || `Mức ${user?.clearance_level_id || 1}`}
                 </span>
               </div>

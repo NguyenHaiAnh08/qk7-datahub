@@ -12,6 +12,7 @@ export interface UserTableProps {
   onEnrollFingerprint?: (user: User) => void;
   onGrantPermission?: (user: User) => void; // ⭐ MỚI
   onViewPermissions?: (user: User) => void; // ⭐ MỚI
+  onUnlock?: (user: User) => void;
   loading?: boolean;
   pageSize?: number;
 }
@@ -24,6 +25,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   onEnrollFingerprint,
   onGrantPermission,
   onViewPermissions,
+  onUnlock,
   loading = false,
   pageSize = 5,
 }) => {
@@ -168,15 +170,27 @@ export const UserTable: React.FC<UserTableProps> = ({
                     </div>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
-                    <span
-                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
-                        u.status === 'active' || !u.status
-                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
-                          : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30'
-                      }`}
-                    >
-                      {u.status === 'active' || !u.status ? 'Hoạt động' : 'Khóa'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
+                          u.status === 'active' || !u.status
+                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+                            : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30'
+                        }`}
+                      >
+                        {u.status === 'active' || !u.status ? 'Hoạt động' : 'Khóa'}
+                      </span>
+                      {u.status === 'locked' && onUnlock && (
+                        <button
+                          onClick={() => onUnlock(u)}
+                          className="px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 transition cursor-pointer text-[10px] font-bold flex items-center gap-1 shadow-2xs"
+                          title="Mở khóa tài khoản ngay"
+                        >
+                          <KeyRound className="w-2.5 h-2.5" />
+                          <span>Mở</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-right whitespace-nowrap">
                     {onEnrollFingerprint && (

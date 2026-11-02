@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
   Download,
-  ExternalLink,
   Maximize2,
   Minimize2,
   FileText,
   Calendar,
   Building,
   Shield,
+  ShieldAlert,
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -48,7 +48,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   page = 1,
   onClose,
 }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const clearanceLevel = propClearanceLevel ?? (user?.clearance_level_id || 1);
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -62,8 +62,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const modalContainerRef = React.useRef<HTMLDivElement>(null);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
 
-  // 🛡️ Chống chụp màn hình & cảnh báo an ninh (PrintScreen, Win+Shift+S)
-  const { isShieldActive, violationInfo, dismissShield } = useAntiScreenshot({
+  // 🛡️ Chống chụp màn hình & cảnh báo an ninh (PrintScreen, Win+Shift+S, Quá 3 lần khóa tài khoản)
+  const { isShieldActive, violationInfo, violationCount, isAccountLocked, dismissShield } = useAntiScreenshot({
     document,
     enabled: open && Boolean(document),
     iframeRef,
@@ -288,147 +288,6 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     onClose();
   };
 
-  const handleOpenNewTab = () => {
-    if (!blobUrl || !document) return;
-
-    const titleEscaped = (document.title || 'Văn bản QK7 DataHub')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-    const codeEscaped = (document.document_code || 'VĂN BẢN')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-    const securityEscaped = (document.security_name || document.security_level_name || `Cấp ${document.security_level_id || 1}`)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-
-    const htmlContent = `<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${codeEscaped} - ${titleEscaped} | QK7 DataHub</title>
-  <link rel="icon" type="image/png" href="/favicon.png" />
-  <style>
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #0f172a;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    .hud-bar {
-      height: 46px;
-      background: linear-gradient(90deg, #092e20 0%, #064e3b 50%, #0f172a 100%);
-      border-bottom: 1px solid rgba(16, 185, 129, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      color: #f8fafc;
-      z-index: 10;
-      user-select: none;
-    }
-    .hud-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      overflow: hidden;
-    }
-    .code-badge {
-      background: rgba(245, 158, 11, 0.15);
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      color: #fbbf24;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 4px;
-      white-space: nowrap;
-    }
-    .sec-badge {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: #f87171;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 4px;
-      white-space: nowrap;
-    }
-    .doc-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #e2e8f0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 50vw;
-    }
-    .hud-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    .viewer-container {
-      position: relative;
-      width: 100%;
-      height: calc(100% - 46px);
-      background-color: #525659;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-    @media print {
-      .hud-bar { display: none !important; }
-      .viewer-container { height: 100% !important; background: transparent !important; }
-    }
-  </style>
-</head>
-<body>
-  <div class="hud-bar">
-    <div class="hud-left">
-      <span class="code-badge">${codeEscaped}</span>
-      <span class="doc-title">${titleEscaped}</span>
-      <span class="sec-badge">${securityEscaped}</span>
-    </div>
-    <div class="hud-right"></div>
-  </div>
-  <div class="viewer-container">
-    <iframe src="${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0"></iframe>
-  </div>
-</body>
-</html>`;
-
-    const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-    const htmlUrl = URL.createObjectURL(htmlBlob);
-    const newTab = window.open(htmlUrl, '_blank');
-    if (!newTab) {
-      const a = window.document.createElement('a');
-      a.href = htmlUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      window.document.body.appendChild(a);
-      a.click();
-      a.remove();
-    }
-  };
-
   return (
     <AnimatePresence>
       <div
@@ -463,7 +322,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   </span>
                   <span className="text-slate-400 text-xs shrink-0 select-none">•</span>
                   <span
-                    className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-bold truncate min-w-0 flex-1"
+                    className="text-xs sm:text-sm text-slate-900 dark:text-white font-bold truncate min-w-0 flex-1"
                     title={document.title}
                   >
                     {document.title}
@@ -497,14 +356,23 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
-              {/* Nút mở PDF Toàn màn hình (Tích hợp DRM Watermark chuẩn hóa) */}
+              {/* Nút bật/tắt Chế độ Toàn màn hình chuẩn HTML5 an ninh cao */}
               <button
-                onClick={handleOpenNewTab}
+                onClick={handleToggleFullscreen}
                 className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                title="Mở toàn màn hình xem PDF trong tab mới (Tích hợp Watermark bảo mật)"
+                title={isFullscreen ? 'Thu nhỏ cửa sổ xem văn bản (Esc)' : 'Mở toàn màn hình xem văn bản (Bảo vệ an ninh cao)'}
               >
-                <ExternalLink className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                <span className="hidden sm:inline">Toàn màn hình</span>
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                    <span className="hidden sm:inline">Thu nhỏ</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                    <span className="hidden sm:inline">Toàn màn hình</span>
+                  </>
+                )}
               </button>
               <CompactDownloadButton
                 onDownload={handleDownload}
@@ -523,13 +391,6 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 }
                 size="compact"
               />
-              <button
-                onClick={handleToggleFullscreen}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                title={isFullscreen ? 'Thu nhỏ hộp thoại' : 'Phóng to hộp thoại'}
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </button>
               <button
                 onClick={handleClose}
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
@@ -583,7 +444,27 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
             {!loading && !error && blobUrl && (
               <div className="relative overflow-hidden w-full h-full flex items-center justify-center">
-                <div className={`w-full h-full secure-pdf-content ${isShieldActive ? 'hidden opacity-0 pointer-events-none' : ''}`}>
+                {/* ⚡ MÀN TRẬP BẢO MẬT ĐÓN ĐẦU 0MS (PRE-EMPTIVE SHUTTER):
+                    Đóng tức thì không độ trễ khi phát hiện tổ hợp phím chụp trước khi OS kịp freeze frame */}
+                <div
+                  id="qk7-blackout-shutter"
+                  className="absolute inset-0 z-30 bg-slate-950 flex flex-col items-center justify-center select-none"
+                  style={{ display: 'none', transition: 'none' }}
+                >
+                  <div className="flex flex-col items-center justify-center gap-2.5 text-rose-500">
+                    <ShieldAlert className="w-10 h-10 animate-pulse text-rose-500" />
+                    <p className="text-[11px] font-mono font-bold tracking-wider text-rose-400 uppercase">
+                      ĐÃ KÍCH HOẠT MÀN TRẬP BẢO MẬT AN NINH 0MS
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={`w-full h-full secure-pdf-content ${
+                    isShieldActive ? 'hidden opacity-0 pointer-events-none' : ''
+                  }`}
+                  style={{ transition: 'none' }}
+                >
                   <iframe
                     ref={iframeRef}
                     src={`${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0`}
@@ -591,12 +472,23 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                     className="w-full h-full border-none secure-pdf-content"
                   />
                 </div>
-                {/* Lá chắn bảo vệ khi phát hiện phím chụp màn hình */}
+
+                {/* Lá chắn cảnh báo đỏ vi phạm an ninh (Liên tục & Quá 3 lần khóa tài khoản) */}
                 <SecurityScreenShield
                   active={isShieldActive}
                   document={document}
                   violationInfo={violationInfo}
+                  violationCount={violationCount}
+                  isAccountLocked={isAccountLocked}
                   onDismiss={dismissShield}
+                  onLockoutLogout={async () => {
+                    clearBiometricSession();
+                    onClose();
+                    try {
+                      await logout();
+                    } catch (_) {}
+                    window.location.href = '/login';
+                  }}
                 />
               </div>
             )}

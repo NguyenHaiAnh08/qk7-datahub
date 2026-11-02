@@ -279,7 +279,7 @@ export const UnitOverviewStrip: React.FC<UnitOverviewStripProps> = ({
             {userLevelName}
           </span>
           {userName && (
-            <span className="text-slate-400 dark:text-slate-500 truncate">
+            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
               ({userName})
             </span>
           )}

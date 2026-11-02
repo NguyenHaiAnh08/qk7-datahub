@@ -460,7 +460,30 @@ module.exports = (app, deps) => {
                     WHERE user_id=@user_id`);
         if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
 
-        await log(req, 'UPDATE_USER', `Sửa user ${userId}`);
+        // Nếu chuyển trạng thái từ 'locked' sang 'active' (Mở khóa qua form sửa):
+        const isUnlocking = targetUser.status === 'locked' && (status === 'active' || (!status && targetUser.status === 'locked'));
+        if (isUnlocking) {
+            // Reset vi phạm chụp màn hình cũ
+            await pool.request()
+                .input('uid', sql.VarChar(50), userId)
+                .query(`
+                    UPDATE ACCESS_LOG 
+                    SET [action] = 'SCREENSHOT_RESOLVED',
+                        note = ISNULL(note, '') + ' [ĐÃ ĐƯỢC ADMIN MỞ KHÓA & RESET VI PHẠM]'
+                    WHERE user_id = @uid AND [action] = 'SCREENSHOT_ATTEMPT'
+                `);
+
+            const adminUserRes = await pool.request()
+                .input('aid', sql.VarChar(50), req.user?.user_id || '')
+                .query(`SELECT user_id, full_name FROM [USER] WHERE user_id = @aid`);
+            const adminUser = adminUserRes.recordset[0];
+            const adminDesc = adminUser?.full_name ? `${adminUser.full_name} (${req.user?.user_id})` : (req.user?.user_id || 'Quản trị viên');
+            const targetDesc = full_name ? `${full_name} (${userId})` : userId;
+
+            await log(req, 'UNLOCK_USER', `Quản trị viên ${adminDesc} đã mở khóa tài khoản cho ${targetDesc}`);
+        } else {
+            await log(req, 'UPDATE_USER', `Sửa user ${userId}`);
+        }
         _invalidateUser(userId);
         res.json({ success: true });
     } catch (e) {
@@ -1429,12 +1452,37 @@ module.exports = (app, deps) => {
     app.post('/api/admin/users/:id/unlock', async (req, res) => {
         try {
             const pool = await getPool();
+            const targetId = req.params.id;
             const r = await pool.request()
-                .input('uid', sql.VarChar(50), req.params.id)
+                .input('uid', sql.VarChar(50), targetId)
                 .query(`UPDATE [USER] SET status = 'active', failed_attempts = 0, locked_at = NULL, last_failed_at = NULL WHERE user_id = @uid`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
-            await log(req, 'UNLOCK_USER', `Mở khóa tài khoản ${req.params.id}`);
-            res.json({ success: true, user_id: req.params.id });
+
+            // 🔄 RESET TOÀN BỘ VI PHẠM CHỤP MÀN HÌNH VỀ 0:
+            await pool.request()
+                .input('uid', sql.VarChar(50), targetId)
+                .query(`
+                    UPDATE ACCESS_LOG 
+                    SET [action] = 'SCREENSHOT_RESOLVED',
+                        note = ISNULL(note, '') + ' [ĐÃ ĐƯỢC ADMIN MỞ KHÓA & RESET VI PHẠM]'
+                    WHERE user_id = @uid AND [action] = 'SCREENSHOT_ATTEMPT'
+                `);
+
+            // Tra cứu tên hiển thị đầy đủ của Admin và User để ghi nhật ký SOC rõ ràng
+            const [targetUserRes, adminUserRes] = await Promise.all([
+                pool.request().input('uid', sql.VarChar(50), targetId).query(`SELECT user_id, full_name FROM [USER] WHERE user_id = @uid`),
+                pool.request().input('aid', sql.VarChar(50), req.user?.user_id || '').query(`SELECT user_id, full_name FROM [USER] WHERE user_id = @aid`),
+            ]);
+
+            const targetUser = targetUserRes.recordset[0];
+            const adminUser = adminUserRes.recordset[0];
+
+            const targetDesc = targetUser?.full_name ? `${targetUser.full_name} (${targetId})` : targetId;
+            const adminDesc = adminUser?.full_name ? `${adminUser.full_name} (${req.user?.user_id})` : (req.user?.user_id || 'Quản trị viên');
+
+            await log(req, 'UNLOCK_USER', `Quản trị viên ${adminDesc} đã mở khóa tài khoản cho ${targetDesc}`);
+            _invalidateUser(targetId);
+            res.json({ success: true, user_id: targetId, reset_violations: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 

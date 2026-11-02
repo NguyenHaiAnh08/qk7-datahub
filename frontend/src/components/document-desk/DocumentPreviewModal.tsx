@@ -458,7 +458,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                     ref={iframeRef}
                     src={`${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0`}
                     title={document.title}
-                    className="w-full h-full border-none secure-pdf-content"
+                    className="w-full h-full border-none secure-pdf-content select-none" onContextMenu={(e) => e.preventDefault()}
                   />
                 </div>
 

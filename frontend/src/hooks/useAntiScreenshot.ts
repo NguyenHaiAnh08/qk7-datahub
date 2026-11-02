@@ -544,7 +544,18 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       });
     };
 
-    // 6. Định kỳ giữ tiêu điểm sẵn sàng trên Window để bắt trọn phím tắt liên tục
+    // 6. Chặn chuột phải (Context Menu) để ngăn mở frame trong tab mới hoặc in trộm
+    const handleContextMenu = (e: MouseEvent) => {
+      if (isScreenshotAllowed()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toast.warning('Quy chế an ninh: Thao tác chuột phải bị vô hiệu hóa khi đang xem tài liệu bảo mật.', {
+        title: 'VÔ HIỆU HÓA CHUỘT PHẢI',
+        badge: 'CONTEXT-DISABLED',
+      });
+    };
+
+    // 7. Định kỳ giữ tiêu điểm sẵn sàng trên Window để bắt trọn phím tắt liên tục
     const keepWindowFocused = () => {
       try {
         if (
@@ -566,6 +577,7 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
     window.addEventListener('focus', handleWindowFocus);
     window.addEventListener('paste', handlePaste, true);
     window.addEventListener('copy', handleCopy, true);
+    window.addEventListener('contextmenu', handleContextMenu, true);
 
     // 8. Gắn listener liên tục vào iframe PDF ngay khi iframe được nạp Blob
     const attachToIframe = () => {
@@ -599,6 +611,7 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       window.removeEventListener('focus', handleWindowFocus);
       window.removeEventListener('paste', handlePaste, true);
       window.removeEventListener('copy', handleCopy, true);
+      window.removeEventListener('contextmenu', handleContextMenu, true);
 
       clearInterval(iframeInterval);
       clearInterval(focusInterval);

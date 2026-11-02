@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { UserTable } from '../components/users/UserTable';
 import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
+import { PinManageModal } from '../components/users/PinManageModal'; // ✅ sửa path cho khớp
 import { usersApi } from '../services/usersApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { isApprovalRequired } from '../utils/approvalUtils';
@@ -27,6 +28,9 @@ export const UsersPage: React.FC = () => {
   const [positionsList, setPositionsList] = useState<MilitaryPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [userSearch, setUserSearch] = useState('');
+
+  // ✅ Pin manage state (đã có trong file gốc)
+  const [pinManageUser, setPinManageUser] = useState<User | null>(null);
 
   // Modals
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -55,13 +59,12 @@ export const UsersPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // ✅ FIX: Chỉ gọi API Public/Meta và API lấy Users. Tránh gọi các API Admin gây lỗi 403
       const [uRes, metaRes, rolesRes] = await Promise.all([
         usersApi.getUsers(),
         dashboardApi.getMeta(),
-        dashboardApi.getCreatableRoles().catch(() => ({ items: [] })), // Fallback nếu không có quyền
+        dashboardApi.getCreatableRoles().catch(() => ({ items: [] })),
       ]);
-      
+
       const sortedUsers = [...(uRes.items || [])].sort((a, b) => {
         const parseNum = (id?: string) => {
           const m = (id || '').match(/USR-(\d+)/i);
@@ -69,16 +72,12 @@ export const UsersPage: React.FC = () => {
         };
         return parseNum(a.user_id) - parseNum(b.user_id);
       });
-      
+
       setUsersList(sortedUsers);
-      
-      // Lấy dữ liệu danh mục từ Meta
       setUnitsList(metaRes.units || []);
       setLevelsList(metaRes.levels || []);
       setRanksList((metaRes as any).ranks || []);
       setPositionsList((metaRes as any).positions || []);
-      
-      // Roles lấy từ getCreatableRoles
       setRolesList(rolesRes.items || []);
     } catch (err: any) {
       showToast('Lỗi tải dữ liệu quân nhân: ' + err.message, 'error');
@@ -119,9 +118,8 @@ export const UsersPage: React.FC = () => {
       await loadData();
 
       if (isApprovalRequired(res)) {
-       // ApprovalListener đã toast — không show success sai
-      return;
-     }
+        return;
+      }
 
       toast.success(`Đã xóa quân nhân ${deletedName} khỏi danh bạ đơn vị.`, {
         title: 'XÓA QUÂN NHÂN',
@@ -216,6 +214,7 @@ export const UsersPage: React.FC = () => {
             });
           }}
           onDelete={(u) => setDeleteConfirm({ open: true, user: u })}
+          onManagePin={(u) => setPinManageUser(u)} // ✅ THÊM
         />
       </main>
 
@@ -242,6 +241,15 @@ export const UsersPage: React.FC = () => {
         onClose={() => setCredModal({ open: false, userId: '', username: '' })}
         onSuccess={loadData}
         onToast={showToast}
+      />
+
+      {/* ✅ THÊM: Modal quản lý PIN */}
+      <PinManageModal
+        open={Boolean(pinManageUser)}
+        user={pinManageUser}
+        onClose={() => setPinManageUser(null)}
+        onChanged={() => loadData()}        // ✅ dùng loadData, không phải loadUsers
+        onToast={showToast}                 // ✅ dùng showToast, không phải onToast
       />
 
       <ConfirmDialog

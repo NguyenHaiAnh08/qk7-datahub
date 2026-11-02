@@ -13,7 +13,6 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf } = require('./pdf-parser');
@@ -21,6 +20,7 @@ const { getAuthoritativeServerTime, detectOsClockTamper } = require('./src/clock
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 const createApprovalWorkflow = require('./src/approval-workflow');
 const { getAutoRequiredPermission } = require('./src/route-permissions');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 require('dotenv').config({
   path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')],
@@ -667,61 +667,61 @@ app.post('/api/auth/login', async (req, res) => {
     const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
     const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
 
-    if (isProtectedAdmin || hasAdminRole) {
-      // Dùng luôn user.has_fingerprint đã load trong query đầu
-      const hasFingerprint = user.has_fingerprint === 1;
+    // if (isProtectedAdmin || hasAdminRole) {
+    //   // Dùng luôn user.has_fingerprint đã load trong query đầu
+    //   const hasFingerprint = user.has_fingerprint === 1;
 
-      if (!hasFingerprint) {
-        if (isProtectedAdmin) {
-          // USR-001 chưa enroll → cho qua password-only để enroll admin khác
-          console.warn(
-            `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
-            `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
-          );
-          await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN_NO_FP_WARNING', ip,
-            note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
-          });
-          // Không return — rơi xuống nhánh cấp JWT bên dưới
+    //   if (!hasFingerprint) {
+    //     if (isProtectedAdmin) {
+    //       // USR-001 chưa enroll → cho qua password-only để enroll admin khác
+    //       console.warn(
+    //         `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
+    //         `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
+    //       );
+    //       await writeAccessLog({
+    //         userId: user.user_id, fileId: null,
+    //         action: 'LOGIN_NO_FP_WARNING', ip,
+    //         note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
+    //       });
+    //       // Không return — rơi xuống nhánh cấp JWT bên dưới
 
-        } else {
-          // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
-          await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
-            note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
-                  `nhưng chưa enroll vân tay — từ chối đăng nhập`
-          });
-          return res.status(403).json({
-            error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
-                   'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
-            code: 'ADMIN_FINGERPRINT_REQUIRED',
-            needs_enroll: true,
-            enroll_via: PROTECTED_ADMIN_USER_ID,
-          });
-        }
-      } else {
-        // Đã có vân tay → yêu cầu quét qua 202
-        await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
+    //     } else {
+    //       // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
+    //       await writeAccessLog({
+    //         userId: user.user_id, fileId: null,
+    //         action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
+    //         note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
+    //               `nhưng chưa enroll vân tay — từ chối đăng nhập`
+    //       });
+    //       return res.status(403).json({
+    //         error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
+    //                'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
+    //         code: 'ADMIN_FINGERPRINT_REQUIRED',
+    //         needs_enroll: true,
+    //         enroll_via: PROTECTED_ADMIN_USER_ID,
+    //       });
+    //     }
+    //   } else {
+    //     // Đã có vân tay → yêu cầu quét qua 202
+    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
 
-        const tempTicket = jwt.sign(
-          { user_id: user.user_id, purpose: 'admin_login_fp' },
-          JWT_SECRET,
-          { expiresIn: '2m' }
-        );
+    //     const tempTicket = jwt.sign(
+    //       { user_id: user.user_id, purpose: 'admin_login_fp' },
+    //       JWT_SECRET,
+    //       { expiresIn: '2m' }
+    //     );
 
-        return res.status(202).json({
-          success: true,
-          require_admin_fp: true,
-          temp_ticket: tempTicket,
-          is_protected_admin: isProtectedAdmin,
-          message: isProtectedAdmin
-            ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
-            : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
-        });
-      }
-    }
+    //     return res.status(202).json({
+    //       success: true,
+    //       require_admin_fp: true,
+    //       temp_ticket: tempTicket,
+    //       is_protected_admin: isProtectedAdmin,
+    //       message: isProtectedAdmin
+    //         ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+    //         : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
+    //     });
+    //   }
+    // }
 
 
     // User thường -> Cấp JWT và cho vào luôn
@@ -950,6 +950,154 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
   }
 });
 
+
+
+// ═══════════════════════════════════════════════════════════════
+// [v5.1] XÁC THỰC MÃ PIN 6 SỐ CHO TÀI LIỆU CẤP 4-5
+// ═══════════════════════════════════════════════════════════════
+const pinLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => {
+    // Ưu tiên user_id nếu đã xác thực, nếu không thì dùng IP đã chuẩn hóa
+    const identifier = req.user?.user_id || ipKeyGenerator(req.ip);
+    return `${identifier}:pin`;
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Quá nhiều lần nhập mã PIN. Vui lòng thử lại sau 1 phút.',
+    code: 'PIN_RATE_LIMITED',
+  },
+});
+
+app.post('/api/auth/pin/verify', requireAuth, pinLimiter, async (req, res) => {
+  try {
+    const { pin_challenge_token, pin } = req.body;
+    if (!pin_challenge_token || pin === undefined || pin === null) {
+      return res.status(400).json({ error: 'Thiếu dữ liệu (token hoặc PIN)', code: 'PIN_MISSING_INPUT' });
+    }
+    const pinStr = String(pin).trim();
+    if (!/^\d{6}$/.test(pinStr)) {
+      return res.status(400).json({ error: 'Mã PIN phải gồm đúng 6 chữ số', code: 'PIN_INVALID_FORMAT' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(pin_challenge_token, JWT_SECRET);
+      if (decoded.purpose !== 'pin_challenge') throw new Error('Sai purpose');
+    } catch {
+      return res.status(401).json({
+        error: 'Phiên xác thực PIN đã hết hạn (2 phút). Vui lòng quét lại vân tay.',
+        code: 'PIN_CHALLENGE_EXPIRED',
+      });
+    }
+    if (decoded.user_id !== req.user.user_id) {
+      return res.status(403).json({ error: 'Token không khớp người dùng', code: 'PIN_USER_MISMATCH' });
+    }
+
+    const pool = await getPool();
+    const uRes = await pool.request()
+      .input('uid', sql.VarChar(50), req.user.user_id)
+      .query(`SELECT pin_hash FROM [USER] WHERE user_id = @uid`);
+    const pinHash = uRes.recordset[0]?.pin_hash;
+    if (!pinHash) {
+      return res.status(403).json({
+        error: 'Tài khoản chưa được cấp PIN. Vui lòng liên hệ Quản trị viên.',
+        code: 'PIN_NOT_SET',
+        needs_admin_pin: true,
+      });
+    }
+
+    const pinOk = await bcrypt.compare(pinStr, pinHash);
+    if (!pinOk) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId: decoded.file_id, action: 'PIN_FAIL',
+        ip: getClientIp(req), note: `Sai mã PIN (Cấp ${decoded.security_level_id})`,
+      });
+      return res.status(401).json({ error: 'Mã PIN không đúng. Vui lòng kiểm tra lại.', code: 'PIN_INVALID' });
+    }
+
+    // FP + PIN đều OK → cấp final token
+    const fpToken = jwt.sign(
+      {
+        user_id: req.user.user_id,
+        file_id: decoded.file_id,
+        purpose: 'file_access',
+        pin_verified: true,
+      },
+      JWT_SECRET,
+      { expiresIn: FINGERPRINT_TOKEN_EXPIRES_IN }
+    );
+
+    await writeAccessLog({
+      userId: req.user.user_id, fileId: decoded.file_id, action: 'PIN_OK',
+      ip: getClientIp(req), note: `Xác thực PIN thành công (Cấp ${decoded.security_level_id})`,
+    });
+
+    res.json({
+      success: true,
+      fingerprint_token: fpToken,
+      expires_in: FINGERPRINT_TOKEN_EXPIRES_IN,
+    });
+  } catch (err) {
+    console.error('[POST /api/auth/pin/verify]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// [v5.1] USER GỬI YÊU CẦU CẤP PIN (khi chưa có pin_hash)
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/pin/request', requireAuth, async (req, res) => {
+    try {
+        const pool = await getPool();
+        const userId = req.user.user_id;
+        const requestId = 'REQ-PIN-' + Date.now(); 
+
+        // 1. Kiểm tra xem User này ĐÃ TỪNG có PIN chưa?
+        const uRes = await pool.request()
+            .input('uid', sql.VarChar(50), userId)
+            .query(`SELECT pin_hash FROM [USER] WHERE user_id = @uid`);
+        
+        const hasPin = uRes.recordset[0]?.pin_hash !== null;
+        
+        // 2. PHÂN LOẠI NỘI DUNG (Sửa lại câu chữ theo đúng yêu cầu của bạn)
+        const requestSummary = hasPin 
+            ? 'Yêu cầu cấp lại mã PIN do Quên mã PIN' 
+            : 'Yêu cầu cấp mã PIN lần đầu';
+
+        // 3. Chống spam
+        const check = await pool.request()
+            .input('uid', sql.VarChar(50), userId)
+            .query(`SELECT 1 FROM APPROVAL_REQUEST WHERE requester_id = @uid AND status = 'PENDING' AND required_permission = 'PERM-USR-08'`);
+        
+        if (check.recordset.length > 0) {
+            return res.status(400).json({ error: 'Bạn đã gửi yêu cầu rồi. Vui lòng chờ Admin duyệt.' });
+        }
+
+        // 4. Insert vào bảng APPROVAL_REQUEST
+        await pool.request()
+            .input('rid', sql.VarChar(50), requestId)
+            .input('uid', sql.VarChar(50), userId)
+            .input('path', sql.VarChar(500), `/api/admin/users/${userId}/pin/generate`)
+            .input('summary', sql.NVarChar(500), requestSummary)
+            .query(`
+                INSERT INTO APPROVAL_REQUEST (request_id, requester_id, required_permission, http_method, http_path, target_summary, status)
+                VALUES (@rid, @uid, 'PERM-USR-08', 'POST', @path, @summary, 'PENDING')
+            `);
+
+        await writeAccessLog({ userId, action: 'PIN_REQUEST', ip: getClientIp(req), note: `Gửi yêu cầu: ${requestSummary}` });
+        res.json({ success: true, request_id: requestId, message: 'Đã gửi yêu cầu' });
+    } catch (e) {
+        console.error('[POST /api/pin/request]', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+
 app.post('/api/auth/logout', requireAuth, async (req, res) => {
   try {
     await revokeSession({
@@ -1130,21 +1278,74 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
       });
     }
 
-    const fpToken = jwt.sign(
-      { user_id: req.user.user_id, file_id, purpose: 'file_access' },
-      JWT_SECRET, { expiresIn: FINGERPRINT_TOKEN_EXPIRES_IN }
-    );
+    // ═══════════════════════════════════════════════════════════════
+// [v5.1] Cấp 4-5: kiểm tra PIN trước khi cấp token
+// ═══════════════════════════════════════════════════════════════
+if (doc.security_level_id >= 4) {
+  const pinRes = await pool.request()
+    .input('uid', sql.VarChar(50), req.user.user_id)
+    .query(`SELECT pin_hash FROM [USER] WHERE user_id = @uid`);
+  const pinHash = pinRes.recordset[0]?.pin_hash;
 
+  // Chưa có PIN → ghi log yêu cầu Admin cấp, từ chối
+  if (!pinHash) {
     await writeAccessLog({
-      userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_OK',
-      ip: getClientIp(req), note: `OK (score=${scanResult.score}, device=${deviceId})`,
+      userId: req.user.user_id, fileId: file_id, action: 'PIN_REQUEST',
+      ip: getClientIp(req),
+      note: `Vân tay OK nhưng chưa có PIN — yêu cầu Admin cấp (Cấp ${doc.security_level_id})`,
     });
+    return res.status(403).json({
+      error: 'Tài khoản chưa được cấp mã PIN. Vui lòng gửi yêu cầu đến Quản trị viên (USR-001) để được cấp PIN trước khi mở tài liệu Cấp 4-5.',
+      code: 'PIN_NOT_SET',
+      needs_admin_pin: true,
+    });
+  }
 
-    res.json({
-      success: true, required: true,
-      fingerprint_token: fpToken, expires_in: FINGERPRINT_TOKEN_EXPIRES_IN,
-      score: scanResult.score,
-    });
+  // Đã có PIN → cấp challenge token 2 phút
+  const pinChallenge = jwt.sign(
+    {
+      user_id: req.user.user_id,
+      file_id,
+      security_level_id: doc.security_level_id,
+      purpose: 'pin_challenge',
+    },
+    JWT_SECRET,
+    { expiresIn: '2m' }
+  );
+
+  await writeAccessLog({
+    userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_OK_PIN_PENDING',
+    ip: getClientIp(req),
+    note: `FP OK (score=${scanResult.score}, device=${deviceId}) — chờ PIN (Cấp ${doc.security_level_id})`,
+  });
+
+  return res.json({
+    success: true,
+    required: true,
+    require_pin: true,
+    pin_challenge_token: pinChallenge,
+    pin_expires_in: '2m',
+    score: scanResult.score,
+    security_level_id: doc.security_level_id,
+  });
+}
+
+// ─── Level 3 (hoặc thấp hơn): cấp token ngay như cũ ───
+const fpToken = jwt.sign(
+  { user_id: req.user.user_id, file_id, purpose: 'file_access' },
+  JWT_SECRET, { expiresIn: FINGERPRINT_TOKEN_EXPIRES_IN }
+);
+
+await writeAccessLog({
+  userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_OK',
+  ip: getClientIp(req), note: `OK (score=${scanResult.score}, device=${deviceId})`,
+});
+
+res.json({
+  success: true, required: true,
+  fingerprint_token: fpToken, expires_in: FINGERPRINT_TOKEN_EXPIRES_IN,
+  score: scanResult.score,
+});
   } catch (err) {
     console.error('[fingerprint/verify]', err);
     res.status(500).json({ error: err.message });
@@ -1215,6 +1416,110 @@ app.post('/api/admin/fingerprint/enroll/:userId', requireAuth, requirePermission
     res.status(500).json({ error: err.message });
   }
 });
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// [v5.1] ADMIN TẠO MÃ PIN 6 SỐ (Lưu vào PIN_DELIVERY để User xem 1 lần)
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/admin/users/:userId/pin/generate', requireAuth, async (req, res) => {
+  try {
+    if (!(req.user?.roles || []).includes('ROL-01')) {
+      return res.status(403).json({ error: 'Chỉ Quản trị viên tối cao (ROL-01) được cấp mã PIN.' });
+    }
+
+    const targetUserId = req.params.userId;
+    const pool = await getPool();
+    const uRes = await pool.request()
+      .input('uid', sql.VarChar(50), targetUserId)
+      .query(`SELECT user_id, full_name, clearance_level_id FROM [USER] WHERE user_id = @uid`);
+    if (uRes.recordset.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy quân nhân' });
+    }
+    const target = uRes.recordset[0];
+
+    // 1. Tạo mã PIN 6 số ngẫu nhiên
+    const pin = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    const hash = await bcrypt.hash(pin, 10);
+
+    // 2. Cập nhật hash vào bảng USER (để verify sau này)
+    await pool.request()
+      .input('uid', sql.VarChar(50), targetUserId)
+      .input('hash', sql.VarChar(255), hash)
+      .query(`UPDATE [USER] SET pin_hash = @hash, updated_at = GETDATE() WHERE user_id = @uid`);
+
+    // 3. Đánh dấu yêu cầu PENDING đã được duyệt
+    await pool.request()
+      .input('uid', sql.VarChar(50), targetUserId)
+      .query(`UPDATE APPROVAL_REQUEST SET status = 'EXECUTED' WHERE requester_id = @uid AND required_permission = 'PERM-USR-08' AND status = 'PENDING'`);
+
+    // 4. Lưu PIN thô vào bảng PIN_DELIVERY (để user xem)
+    await pool.request()
+      .input('uid', sql.VarChar(50), targetUserId)
+      .input('pin', sql.VarChar(10), pin)
+      .query(`
+          INSERT INTO PIN_DELIVERY (user_id, pin_code, expires_at) 
+          VALUES (@uid, @pin, DATEADD(HOUR, 24, GETDATE()))
+      `);
+
+    await writeAccessLog({
+      userId: req.user.user_id, fileId: null, action: 'PIN_GENERATED',
+      ip: getClientIp(req),
+      note: `Cấp PIN mới cho ${targetUserId} (${target.full_name}). Đã gửi vào PIN_DELIVERY.`,
+    });
+
+    res.json({
+      success: true,
+      user_id: targetUserId,
+      full_name: target.full_name,
+      pin, // Trả về cho Admin copy nếu muốn
+    });
+  } catch (err) {
+    console.error('[POST /api/admin/users/:userId/pin/generate]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// [MỚI] API CHO USER LẤY MÃ PIN (CHỈ XEM 1 LẦN)
+// ═══════════════════════════════════════════════════════════════
+
+// 1. Kiểm tra xem User có PIN chưa xem không (để hiện chấm đỏ)
+app.get('/api/user/check-new-pin', requireAuth, async (req, res) => {
+    try {
+        const pool = await getPool();
+        const r = await pool.request()
+            .input('uid', sql.VarChar(50), req.user.user_id)
+            .query(`SELECT COUNT(*) AS count FROM PIN_DELIVERY WHERE user_id = @uid AND is_read = 0 AND expires_at > GETDATE()`);
+        res.json({ has_new_pin: r.recordset[0].count > 0 });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 2. Lấy PIN thô (Xem xong là xóa luôn khỏi DB)
+app.get('/api/user/my-pin', requireAuth, async (req, res) => {
+    try {
+        const pool = await getPool();
+        const r = await pool.request()
+            .input('uid', sql.VarChar(50), req.user.user_id)
+            .query(`SELECT TOP 1 id, pin_code FROM PIN_DELIVERY WHERE user_id = @uid AND is_read = 0 AND expires_at > GETDATE() ORDER BY created_at DESC`);
+
+        if (r.recordset.length === 0) {
+            return res.status(404).json({ error: 'Không có mã PIN nào đang chờ.' });
+        }
+
+        const pinData = r.recordset[0];
+
+        // XÓA NGAY LẬP TỨC ĐỂ CHỈ XEM ĐƯỢC 1 LẦN
+        await pool.request()
+            .input('id', sql.Int, pinData.id)
+            .query(`DELETE FROM PIN_DELIVERY WHERE id = @id`);
+
+        res.json({ success: true, pin: pinData.pin_code });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 
 app.get('/api/admin/fingerprint/enroll-status', requireAuth, requirePermission('FP_ENROLL'), (req, res) => {
   const deviceId = req.query.deviceId || req.headers['x-device-fp'];
@@ -2264,16 +2569,24 @@ app.get('/api/files/:fileId/view', async (req, res) => {
         });
       }
       try {
-        const decoded = jwt.verify(fpToken, JWT_SECRET);
-        if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
-        if (decoded.file_id !== fileId && decoded.file_id !== canonicalFileId) throw new Error('Token không khớp file');
-        if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
-      } catch {
-        return res.status(403).json({
-          error: 'Phiên xác thực vân tay đã hết hạn. Vui lòng quét lại.',
-          require_fingerprint: true,
-        });
-      }
+  const decoded = jwt.verify(fpToken, JWT_SECRET);
+  if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
+  if (decoded.file_id !== fileId && decoded.file_id !== canonicalFileId) throw new Error('Token không khớp file');
+  if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
+  // [v5.1] Cấp 4-5 bắt buộc phải có pin_verified trong token
+  if (doc.security_level_id >= 4 && !decoded.pin_verified) {
+    throw new Error('PIN_NOT_VERIFIED');
+  }
+  } catch (err) {
+    const isPinMissing = err.message === 'PIN_NOT_VERIFIED';
+    return res.status(403).json({
+      error: isPinMissing
+        ? 'Tài liệu Cấp 4+ yêu cầu nhập mã PIN. Vui lòng quét vân tay và nhập PIN.'
+        : 'Phiên xác thực vân tay đã hết hạn. Vui lòng quét lại.',
+      require_fingerprint: true,
+      require_pin: isPinMissing,
+    });
+  }
 
       if (isDownload) {
         await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Cấp 3+ không được tải' });

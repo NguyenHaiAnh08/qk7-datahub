@@ -148,6 +148,8 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
   const lastAlertTimeRef = useRef<number>(0);
   const modifierKeysRef = useRef({ win: false, shift: false, ctrl: false, alt: false, time: 0 });
   const recentCaptureKeyRef = useRef<{ type: ViolationInfo['triggerType']; time: number } | null>(null);
+  const lastCtrlAltComboTimeRef = useRef<number>(0);
+  const lastWinShiftComboTimeRef = useRef<number>(0);
   const isMouseInsideWindowRef = useRef<boolean>(true);
 
   // Gửi báo cáo vi phạm về Gateway Backend (/api/security/screenshot-alert)
@@ -297,18 +299,33 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isScreenshotAllowed()) return;
 
-      // Cập nhật trạng thái các phím bổ trợ
-      if (e.key === 'Meta' || e.key === 'OS' || e.code === 'MetaLeft' || e.code === 'MetaRight') {
+      const now = Date.now();
+
+      // Cập nhật trạng thái các phím bổ trợ (hỗ trợ cả thuộc tính trực tiếp và code phím)
+      if (e.key === 'Meta' || e.key === 'OS' || e.code === 'MetaLeft' || e.code === 'MetaRight' || e.metaKey) {
         modifierKeysRef.current.win = true;
       }
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.shiftKey) {
         modifierKeysRef.current.shift = true;
       }
-      if (e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
+      if (e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight' || e.ctrlKey) {
         modifierKeysRef.current.ctrl = true;
       }
-      if (e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight') {
+      if (e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight' || e.altKey) {
         modifierKeysRef.current.alt = true;
+      }
+
+      // Ghi nhận dấu mốc thời gian khi tổ hợp bổ trợ đang được giữ
+      const isCtrlActive = Boolean(e.ctrlKey || modifierKeysRef.current.ctrl);
+      const isAltActive = Boolean(e.altKey || modifierKeysRef.current.alt);
+      const isWinActive = Boolean(e.metaKey || modifierKeysRef.current.win);
+      const isShiftActive = Boolean(e.shiftKey || modifierKeysRef.current.shift);
+
+      if (isCtrlActive && isAltActive) {
+        lastCtrlAltComboTimeRef.current = now;
+      }
+      if (isWinActive && isShiftActive) {
+        lastWinShiftComboTimeRef.current = now;
       }
 
       // =========================================================================
@@ -333,23 +350,23 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       // =========================================================================
       // 🚨 NHẬN DIỆN THAO TÁC CHỤP MÀN HÌNH (WIN+SHIFT+S, PRINTSCREEN, CTRL+ALT+S...)
       // =========================================================================
-      const isWinActive = Boolean(e.metaKey || modifierKeysRef.current.win);
-      const isShiftActive = Boolean(e.shiftKey || modifierKeysRef.current.shift);
-      const isCtrlActive = Boolean(e.ctrlKey || modifierKeysRef.current.ctrl);
-      const isAltActive = Boolean(e.altKey || modifierKeysRef.current.alt);
-
+      const isKeyS = e.key === 's' || e.key === 'S' || e.code === 'KeyS' || e.keyCode === 83 || e.which === 83;
+      const isKeyA = e.key === 'a' || e.key === 'A' || e.code === 'KeyA' || e.keyCode === 65 || e.which === 65;
       const isPrintScreen = e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44;
-      const isWinShiftS = isWinActive && isShiftActive && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
-      const isZaloCapture = isCtrlActive && isAltActive && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
-      const isThirdPartyCapture = isCtrlActive && isAltActive && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA');
-      const isCtrlP = (e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P' || e.code === 'KeyP');
-      const isCtrlS = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
+
+      // Zalo Chụp màn hình (Ctrl + Alt + S hoặc Ctrl + Alt + A)
+      const isZaloCapture = isCtrlActive && isAltActive && (isKeyS || isKeyA);
+      // Snipping Tool (Win + Shift + S)
+      const isWinShiftS = isWinActive && isShiftActive && isKeyS;
+      // In tài liệu trái phép (Ctrl + P)
+      const isCtrlP = (e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P' || e.code === 'KeyP' || e.keyCode === 80);
+      // Lưu tài liệu trái phép (Ctrl + S)
+      const isCtrlS = (e.ctrlKey || e.metaKey) && !isShiftActive && !isAltActive && isKeyS;
 
       if (
         isPrintScreen ||
         isWinShiftS ||
         isZaloCapture ||
-        isThirdPartyCapture ||
         isCtrlP ||
         isCtrlS
       ) {
@@ -362,8 +379,6 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
           ? 'ZALO_CAPTURE'
           : isWinShiftS
           ? 'WIN_SHIFT_S'
-          : isThirdPartyCapture
-          ? 'OS_SNIPPING'
           : 'PRINT_SCREEN';
 
         recentCaptureKeyRef.current = {
@@ -371,9 +386,9 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
           time: Date.now(),
         };
 
-        // 1. Phủ màn đen bảo vệ tức thì 0ms (Snipping Tool chỉ thu được màn hình đen)
+        // 1. Phủ màn đen bảo vệ tức thì 0ms (Snipping Tool / Zalo chỉ thu được màn hình đen)
         applyInstantBlackout(true);
-        // 2. Tiêu hủy Clipboard
+        // 2. Tiêu hủy Clipboard liên tục
         wipeClipboardBurst();
         // 3. Bật Modal Cảnh Báo Đỏ ngay lập tức, đếm số lần vi phạm và khóa nếu > 3 lần
         triggerViolation(detectedType);
@@ -399,20 +414,38 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
     };
 
     // 2. Bắt sự kiện Window Blur:
-    // Nếu blur do phím tắt chụp màn hình vừa bấm (trong vòng 2000ms):
-    // Giữ màn đen bảo vệ và kích hoạt Modal Cảnh Báo Đỏ
+    // Cực kỳ quan trọng: Khi Zalo hoặc Snipping Tool cướp phím S ở tầng Hệ điều hành (Global Hotkey),
+    // trình duyệt sẽ bị cướp focus (blur) ngay sau khi vừa nhận tổ hợp Ctrl+Alt hoặc Win+Shift!
     const handleWindowBlur = () => {
       if (isScreenshotAllowed()) return;
 
       const now = Date.now();
       const recentCapture = recentCaptureKeyRef.current;
-      const isRecentDirectCapture = Boolean(recentCapture && now - recentCapture.time < 2000);
+      const isRecentDirectCapture = Boolean(recentCapture && now - recentCapture.time < 2500);
 
-      if (isRecentDirectCapture && recentCapture) {
+      const isRecentCtrlAltBlur =
+        now - lastCtrlAltComboTimeRef.current < 2000 ||
+        (modifierKeysRef.current.ctrl && modifierKeysRef.current.alt);
+
+      const isRecentWinShiftBlur =
+        now - lastWinShiftComboTimeRef.current < 2000 ||
+        (modifierKeysRef.current.win && modifierKeysRef.current.shift);
+
+      // Nếu cửa sổ bị blur ngay sau khi bấm phím chụp HOẶC do Zalo/Snipping tool cướp phím S ở tầng Windows:
+      if (isRecentDirectCapture || isRecentCtrlAltBlur || isRecentWinShiftBlur) {
+        const triggerType: ViolationInfo['triggerType'] =
+          recentCapture?.type || (isRecentCtrlAltBlur ? 'ZALO_CAPTURE' : 'WIN_SHIFT_S');
+
+        lastCtrlAltComboTimeRef.current = 0;
+        lastWinShiftComboTimeRef.current = 0;
         recentCaptureKeyRef.current = null;
+
+        // Phủ màn đen bảo vệ tức thì 0ms (Zalo / Snipping tool chỉ thu được màn hình đen)
         applyInstantBlackout(true);
+        // Tiêu hủy Clipboard
         wipeClipboardBurst();
-        triggerViolation(recentCapture.type);
+        // 🚨 KÍCH HOẠT MODAL CẢNH BÁO ĐỎ
+        triggerViolation(triggerType);
         return;
       }
 

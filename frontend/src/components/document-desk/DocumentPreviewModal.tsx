@@ -446,6 +446,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               <div className="relative overflow-hidden w-full h-full flex items-center justify-center">
                 {/* ⚡ MÀN TRẬP BẢO MẬT ĐÓN ĐẦU 0MS (PRE-EMPTIVE SHUTTER):
                     Đóng tức thì không độ trễ khi phát hiện tổ hợp phím chụp trước khi OS kịp freeze frame */}
+                <button id="qk7-focus-trap" className="sr-only opacity-0 pointer-events-none absolute -top-10 -left-10" tabIndex={-1} aria-hidden="true" />
                 <div id="qk7-blackout-shutter" className="absolute inset-0 z-30 bg-slate-950 select-none pointer-events-none" style={{ display: 'none' }} />
 
                 <div

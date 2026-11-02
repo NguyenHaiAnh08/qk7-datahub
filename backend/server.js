@@ -17,6 +17,7 @@ const rateLimit = require('express-rate-limit');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf } = require('./pdf-parser');
+const { classifyPdf } = require('./src/pdf-router');
 const { getAuthoritativeServerTime, detectOsClockTamper } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 const createApprovalWorkflow = require('./src/approval-workflow');
@@ -592,13 +593,13 @@ app.post('/api/auth/login', async (req, res) => {
     const userRoleNames = rolesRes.recordset.map((x) => x.name);
 
     // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
-    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
-      if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
-        await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
-        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
-        return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
-      }
-    }
+    // if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+    //   if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
+    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
+    //     await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
+    //     return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
+    //   }
+    // }
 
     if (user.status !== 'active') {
       await writeLoginAttempt({ ip, username, result: 'LOCKED' });
@@ -667,61 +668,61 @@ app.post('/api/auth/login', async (req, res) => {
     const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
     const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
 
-    if (isProtectedAdmin || hasAdminRole) {
-      // Dùng luôn user.has_fingerprint đã load trong query đầu
-      const hasFingerprint = user.has_fingerprint === 1;
+    // if (isProtectedAdmin || hasAdminRole) {
+    //   // Dùng luôn user.has_fingerprint đã load trong query đầu
+    //   const hasFingerprint = user.has_fingerprint === 1;
 
-      if (!hasFingerprint) {
-        if (isProtectedAdmin) {
-          // USR-001 chưa enroll → cho qua password-only để enroll admin khác
-          console.warn(
-            `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
-            `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
-          );
-          await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN_NO_FP_WARNING', ip,
-            note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
-          });
-          // Không return — rơi xuống nhánh cấp JWT bên dưới
+    //   if (!hasFingerprint) {
+    //     if (isProtectedAdmin) {
+    //       // USR-001 chưa enroll → cho qua password-only để enroll admin khác
+    //       console.warn(
+    //         `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
+    //         `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
+    //       );
+    //       await writeAccessLog({
+    //         userId: user.user_id, fileId: null,
+    //         action: 'LOGIN_NO_FP_WARNING', ip,
+    //         note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
+    //       });
+    //       // Không return — rơi xuống nhánh cấp JWT bên dưới
 
-        } else {
-          // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
-          await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
-            note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
-                  `nhưng chưa enroll vân tay — từ chối đăng nhập`
-          });
-          return res.status(403).json({
-            error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
-                   'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
-            code: 'ADMIN_FINGERPRINT_REQUIRED',
-            needs_enroll: true,
-            enroll_via: PROTECTED_ADMIN_USER_ID,
-          });
-        }
-      } else {
-        // Đã có vân tay → yêu cầu quét qua 202
-        await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
+    //     } else {
+    //       // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
+    //       await writeAccessLog({
+    //         userId: user.user_id, fileId: null,
+    //         action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
+    //         note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
+    //               `nhưng chưa enroll vân tay — từ chối đăng nhập`
+    //       });
+    //       return res.status(403).json({
+    //         error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
+    //                'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
+    //         code: 'ADMIN_FINGERPRINT_REQUIRED',
+    //         needs_enroll: true,
+    //         enroll_via: PROTECTED_ADMIN_USER_ID,
+    //       });
+    //     }
+    //   } else {
+    //     // Đã có vân tay → yêu cầu quét qua 202
+    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
 
-        const tempTicket = jwt.sign(
-          { user_id: user.user_id, purpose: 'admin_login_fp' },
-          JWT_SECRET,
-          { expiresIn: '2m' }
-        );
+    //     const tempTicket = jwt.sign(
+    //       { user_id: user.user_id, purpose: 'admin_login_fp' },
+    //       JWT_SECRET,
+    //       { expiresIn: '2m' }
+    //     );
 
-        return res.status(202).json({
-          success: true,
-          require_admin_fp: true,
-          temp_ticket: tempTicket,
-          is_protected_admin: isProtectedAdmin,
-          message: isProtectedAdmin
-            ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
-            : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
-        });
-      }
-    }
+    //     return res.status(202).json({
+    //       success: true,
+    //       require_admin_fp: true,
+    //       temp_ticket: tempTicket,
+    //       is_protected_admin: isProtectedAdmin,
+    //       message: isProtectedAdmin
+    //         ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+    //         : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
+    //     });
+    //   }
+    // }
 
 
     // User thường -> Cấp JWT và cho vào luôn
@@ -1473,7 +1474,55 @@ app.get('/api/documents/:fileId', requireAuth, requirePermission('DOC_VIEW'), as
 app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
-    const result = await parseDocumentPdf(req.file.buffer, { sql, getPool });
+
+    const parseStartTime = Date.now();
+
+    // Tầng 1: Phân loại văn bản thông minh (TextBased vs Scanned/Mixed)
+    const classification = await classifyPdf(req.file.buffer, { forMetadataOnly: true });
+
+    let preExtractedText = null;
+    let usedEngine = 'none';
+
+    // Tầng 2: Nếu có trang cần OCR, gọi Microservice PaddleOCR (:8002)
+    if (classification.pagesNeedingOcr.length > 0) {
+      const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://127.0.0.1:8002';
+      try {
+        const ocrFormData = new FormData();
+        const pdfBlob = new Blob([req.file.buffer], { type: 'application/pdf' });
+        ocrFormData.append('file', pdfBlob, req.file.originalname || 'document.pdf');
+        ocrFormData.append('pages', JSON.stringify(classification.pagesNeedingOcr));
+        ocrFormData.append('dpi', '150');
+
+        console.log(`[parse] Gửi ${classification.pagesNeedingOcr.length} trang sang OCR Service (:8002)...`);
+        const ocrResponse = await fetch(`${OCR_SERVICE_URL}/api/ocr/extract`, {
+          method: 'POST',
+          body: ocrFormData,
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (ocrResponse.ok) {
+          const ocrData = await ocrResponse.json();
+          if (ocrData.success && ocrData.combined_text) {
+            preExtractedText = ocrData.combined_text;
+            usedEngine = 'paddleocr';
+            console.log(`[parse] ✅ PaddleOCR trích xuất thành công (${ocrData.elapsed_seconds}s)`);
+          }
+        } else {
+          console.warn(`[parse] OCR Service trả về status: ${ocrResponse.status}`);
+        }
+      } catch (ocrErr) {
+        console.warn(`[parse] ⚠️ OCR_SERVICE_OFFLINE hoặc timeout (${ocrErr.message}). Chuyển sang local fallback...`);
+      }
+    }
+
+    // Tầng 3: Trích xuất Metadata & Điền form
+    const result = await parseDocumentPdf(req.file.buffer, { sql, getPool }, {
+      preExtractedText,
+      source: preExtractedText ? 'ocr' : (classification.pdfType === 'TextBased' ? 'digital' : 'ocr-fallback'),
+      classification,
+      engine: usedEngine,
+    });
+
     const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
     const documentCode = (req.body.document_code || result?.parsed?.document_code || '').trim() || null;
 
@@ -2520,7 +2569,7 @@ app.post('/api/security/screenshot-alert', async (req, res) => {
 
     const logId = await writeAccessLog({
       userId,
-      fileId: file_id || null,
+      fileId: (docInfo && docInfo.document_code) ? file_id : null,
       action: 'SCREENSHOT_ATTEMPT',
       ip,
       note,

@@ -519,7 +519,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center justify-between text-xs">
             <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
               <Camera className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Dev: Cho phép chụp ảnh</span>
+              <span>Cơ chế dành cho Dev: Cho phép chụp ảnh</span>
             </span>
             <button
               type="button"
@@ -548,7 +548,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
           <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
-            Bật để bạn thoải mái chụp màn hình giao diện khi đang lập trình hoặc kiểm thử.
+            Cơ chế này dành cho Dev để lập trình và kiểm thử giao diện
           </p>
         </div>
       )}

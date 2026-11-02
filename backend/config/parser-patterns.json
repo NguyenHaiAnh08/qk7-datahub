@@ -1,20 +1,20 @@
 {
-  "_comment": "Cấu hình Regex cho PDF parser QK7 — Sửa file này thay vì sửa code (v4.3)",
+  "_comment": "Cấu hình Regex cho PDF parser QK7 — Sửa file này thay vì sửa code (v4.4)",
 
-  "document_code": "S\\s*[ốo]\\s*[:.]?\\s*(\\d{1,5})?\\s*([\\/\\-])?\\s*([A-ZĐ][A-ZĐ0-9\\-]*(?:[\\/\\-][A-ZĐ0-9]+)*)",
-  "issued_date": "ng[àa]y\\s*(\\d+)?\\s*th[áa]ng\\s*(\\d+)\\s*n[ăa]m\\s*(\\d{4})",
+  "document_code": "S\\s*[ốo06]\\s*[:.]?\\s*(\\d{1,5})?\\s*([\\/\\-])?\\s*([A-ZĐ0-9][A-ZĐ0-9\\-]*(?:[\\/\\-][A-ZĐ0-9]+)*)",
+  "issued_date": "ng[àaäáâ]?y\\s*(\\d{1,2})?\\s*th[áaäâ]?ng\\s*(\\d{1,2})\\s*n[ăaäâ]?m\\s*(\\d{4})",
   "title_stop": "^(Căn cứ|Kính gửi|Thực hiện|Căn cứ vào|HIỆU TRƯỞNG|CHỦ TỊCH|KT\\.|TM\\.|T\\/M|Nơi nhận)",
   "roman_heading": "^\\s*(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)[\\-\\s\\.]",
   "signer_name": "^[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,4}$",
 
   "suspicious_code_patterns": [
     "^\\d{1,3}/\\d{1,3}$",
-    "^/[^A-ZĐ]",
+    "^/[^A-ZĐ0-9]",
     "^-",
     "^\\d+$"
   ],
 
-  "code_rematch_strict": "S[ốo]\\s*[:\\.]?\\s*(\\d{1,5})\\s*[\\/\\-]\\s*([A-ZĐ][A-ZĐ0-9\\/\\-]*(?:\\s+[A-ZĐ0-9][A-ZĐ0-9\\/\\-]+)*)",
+  "code_rematch_strict": "S[ốo06]\\s*[:\\.]?\\s*(\\d{1,5})\\s*[\\/\\-]\\s*([A-ZĐ0-9][A-ZĐ0-9\\/\\-]*(?:\\s+[A-ZĐ0-9][A-ZĐ0-9\\/\\-]+)*)",
 
   "fallback_command": "^(Đ[ẢA]NG\\s*B[ỘO]|QU[ÂA]N\\s*KHU|B[ỘO]\\s*T[ƯU]\\s*L[ỆE]NH|S[ƯU]\\s*ĐO[ÀA]N|TRUNG\\s*ĐO[ÀA]N|L[ỮU]\\s*ĐO[ÀA]N|TI[ỂE]U\\s*ĐO[ÀA]N|Đ[ẠA]I\\s*Đ[ỘO]I)",
 

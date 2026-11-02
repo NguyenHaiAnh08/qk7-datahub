@@ -34,6 +34,14 @@ export interface ParseDocumentResult {
     sha256?: string;
     error?: string;
     duplicate_check?: CheckDuplicateResult;
+    classification?: {
+        pdfType: 'TextBased' | 'Scanned' | 'Mixed';
+        totalPages: number;
+        pagesNeedingOcr: number[];
+        elapsedMs: number;
+    };
+    ocr_engine?: string;
+    total_duration_ms?: number;
 }
 
 /**

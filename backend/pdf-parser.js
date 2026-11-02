@@ -333,10 +333,20 @@ async function extractTextItems(buffer) {
     const sameLineTol = PARSER_CONFIG.extract_text?.same_line_tolerance_px ?? 5;
     const midColRatio = PARSER_CONFIG.extract_text?.mid_column_tolerance_ratio ?? 0.08;
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1 });
-        const textContent = await page.getTextContent();
+    const totalPages = pdf.numPages;
+    const pageIndices = totalPages <= 5
+        ? Array.from({ length: totalPages }, (_, i) => i + 1)
+        : [1, 2, 3, totalPages - 1, totalPages];
+
+    for (const i of pageIndices) {
+        let page, viewport, textContent;
+        try {
+            page = await pdf.getPage(i);
+            viewport = page.getViewport({ scale: 1 });
+            textContent = await page.getTextContent();
+        } catch (pageErr) {
+            continue;
+        }
 
         const rawItems = textContent.items
             .filter(it => typeof it.str === 'string' && it.str.length > 0)
@@ -406,12 +416,15 @@ async function extractTextItems(buffer) {
 }
 
 // [PATCH 3 — 4.5] renderPdfToImages đọc scale mặc định từ PARSER_THRESHOLDS
-async function renderPdfToImages(buffer, scale = PARSER_THRESHOLDS.renderScale) {
+async function renderPdfToImages(buffer, scale = PARSER_THRESHOLDS.renderScale, maxPages = 2) {
     try {
         const { pdf: pdfToImg } = await import('pdf-to-img');
         const images = [];
         const document = await pdfToImg(buffer, { scale });
-        for await (const page of document) images.push(page);
+        for await (const page of document) {
+            images.push(page);
+            if (maxPages && images.length >= maxPages) break;
+        }
         return images;
     } catch (err) {
         console.error('[renderPdfToImages]', err.message);
@@ -651,11 +664,25 @@ function extractMetadata(rawText, catalog) {
         if (num) {
             result.document_number = num;
             result.document_code = `${num}${sep}${rawSuffix}`;
-            const guessType = rawSuffix.split(/[\/\-]/)[0];
-            const catalogType = catalog.docTypes.find(t => t.type_id.toUpperCase() === guessType.toUpperCase());
+            result.document_code = result.document_code.replace(/ND-CP/g, 'NĐ-CP').replace(/QD-/g, 'QĐ-');
+
+            // [v2026.11] Hỗ trợ dạng văn bản có năm: ví dụ 224/2026/NĐ-CP hoặc 224/2026/ND-CP
+            let guessType = rawSuffix.split(/[\/\-]/)[0];
+            if (/^\d{4}$/.test(guessType)) {
+                const parts = rawSuffix.split(/[\/\-]/);
+                if (parts.length > 1) guessType = parts[1];
+            }
+
+            const catalogType = (catalog.docTypes || []).find(t => 
+                t.type_id.toUpperCase() === guessType.toUpperCase() ||
+                removeDiacritics(t.type_id).toUpperCase() === removeDiacritics(guessType).toUpperCase()
+            );
             if (catalogType) {
                 result.doc_type_code = catalogType.type_id;
                 result.doc_type_name = catalogType.name.toUpperCase();
+                if (rawSuffix.includes('ND-CP')) {
+                    result.document_code = result.document_code.replace(/ND-CP/g, 'NĐ-CP');
+                }
             }
         }
     }
@@ -737,6 +764,50 @@ function extractMetadata(rawText, catalog) {
             }
         }
         break;
+    }
+
+    // [v2026.11] Hỗ trợ nhận diện Loại văn bản & Tiêu đề cho bản quét OCR (không dấu hoặc bố cục scan)
+    if (!result.doc_type_code && catalog.docTypes) {
+        for (const dt of catalog.docTypes) {
+            const normName = removeDiacritics(dt.name).toUpperCase();
+            if (removeDiacritics(text).includes(normName)) {
+                result.doc_type_code = dt.type_id;
+                result.doc_type_name = dt.name.toUpperCase();
+                break;
+            }
+        }
+    }
+
+    if (!result.title) {
+        const normLines = lines.map(l => removeDiacritics(l).toUpperCase());
+        const docTypeIdx = normLines.findIndex(l => 
+            /^(NGHI DINH|NGHI QUYET|QUYET DINH|THONG TU|KE HOACH|THONG BAO|BAO CAO)\b/.test(l)
+        );
+        if (docTypeIdx >= 0 && docTypeIdx + 1 < lines.length) {
+            const candidateTitle = lines[docTypeIdx + 1];
+            if (candidateTitle && !COMPILED.titleStop.test(candidateTitle) && candidateTitle.length > 10) {
+                result.title = candidateTitle;
+            }
+        }
+    }
+
+    // [v2026.11] Nhận diện cơ quan ban hành cấp Chính phủ / Bộ
+    if (!result.issuer_unit_name && /CH[ÍI]NH\s*PH[ỦU]/i.test(text)) {
+        result.issuer_parent_unit_name = 'CHÍNH PHỦ';
+        result.issuer_unit_name = 'VĂN PHÒNG CHÍNH PHỦ';
+    }
+
+    // [v2026.11] Nhận diện người ký từ chữ ký số / con dấu điện tử
+    if (!result.signer) {
+        const digitalSigner = text.match(/CONG\s*THONG\s*TIN\s*DIEN\s*TU\s*CHINH\s*PH[UOU]/i);
+        if (digitalSigner) {
+            result.signer = 'CỔNG THÔNG TIN ĐIỆN TỬ CHÍNH PHỦ';
+        } else {
+            const signerMatch = text.match(/Ng[uư][ờo]i\s*k[ýy]\s*[:.]\s*([^\n\r]+)/i);
+            if (signerMatch && signerMatch[1].trim().length > 3) {
+                result.signer = signerMatch[1].trim();
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -952,12 +1023,13 @@ async function ocrSignerFromTail(buffer, catalog, nLastPages = PARSER_THRESHOLDS
     return null;
 }
 
-async function ocrWholeDocument(buffer) {
-    console.log('[full-ocr] OCR toàn bộ document (phát hiện garbage text)...');
-    const images = await renderPdfToImages(buffer, PARSER_THRESHOLDS.renderScale);
+async function ocrWholeDocument(buffer, maxPages = 2) {
+    console.log(`[full-ocr] Fallback OCR tối đa ${maxPages} trang (tránh block event loop)...`);
+    const images = await renderPdfToImages(buffer, 2, maxPages);
     if (images.length === 0) return '';
     let fullText = '';
-    for (let i = 0; i < images.length; i++) {
+    const count = Math.min(images.length, maxPages);
+    for (let i = 0; i < count; i++) {
         const t = await ocrImage(images[i]);
         fullText += t + '\n\n';
     }
@@ -982,7 +1054,7 @@ function normalizeRankName(signer, catalog) {
 // ═══════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════
-async function parseDocumentPdf(buffer, deps = {}) {
+async function parseDocumentPdf(buffer, deps = {}, options = {}) {
     let catalog = null;
     if (deps.sql && deps.getPool) {
         try { catalog = await loadCatalogs(deps.getPool, deps.sql); }
@@ -996,39 +1068,54 @@ async function parseDocumentPdf(buffer, deps = {}) {
         };
     }
 
-    const { pages, fullText } = await extractTextItems(buffer);
-
-    const pageTexts = pages.map(p => p.items.map(it => it.str).join(' '));
-    const garbageFlags = pageTexts.map(t => isGarbageText(t));
-    const garbageCount = garbageFlags.filter(Boolean).length;
-    const garbageRatio = pages.length > 0 ? garbageCount / pages.length : 0;
-
-    console.log(`[parse] Pages: ${pages.length}, garbage: ${garbageCount}/${pages.length} (${(garbageRatio * 100).toFixed(0)}%)`);
-
-    const isDigital = fullText.trim().length > 50 && garbageRatio < 0.5;
-
     let parsed;
     let sources = {};
+    let isDigital = true;
+    let pages = [];
+    let garbageCount = 0, garbageRatio = 0;
 
-    if (isDigital) {
+    // [v2026.11] Kiểm tra xem đã có preExtractedText từ OCR Microservice hoặc Router chưa
+    if (options.preExtractedText && options.preExtractedText.trim().length > 10) {
+        const fullText = options.preExtractedText;
+        isDigital = options.source !== 'ocr';
+        console.log(`[parse] Sử dụng text nạp sẵn (${fullText.length} ký tự, engine: ${options.engine || 'ocr'})...`);
         parsed = extractMetadata(fullText, catalog);
-        if (garbageCount > 0) {
-            console.log(`[parse] ⚠️ Có ${garbageCount} trang bị garbage (sẽ OCR bổ sung nếu thiếu trường)`);
-        }
+        const tag = options.engine || (isDigital ? 'text' : 'ocr');
+        sources = Object.fromEntries(Object.keys(parsed).filter(k => parsed[k]).map(k => [k, tag]));
     } else {
-        console.log('[parse] Phát hiện scan/garbage → OCR toàn bộ document');
-        const ocrFullText = await ocrWholeDocument(buffer);
-        if (ocrFullText && ocrFullText.trim().length > 20) {
-            parsed = extractMetadata(ocrFullText, catalog);
-            sources = Object.fromEntries(Object.keys(parsed).filter(k => parsed[k]).map(k => [k, 'ocr']));
+        const extracted = await extractTextItems(buffer);
+        pages = extracted.pages;
+        const fullText = extracted.fullText;
+
+        const pageTexts = pages.map(p => p.items.map(it => it.str).join(' '));
+        const garbageFlags = pageTexts.map(t => isGarbageText(t));
+        garbageCount = garbageFlags.filter(Boolean).length;
+        garbageRatio = pages.length > 0 ? garbageCount / pages.length : 0;
+
+        console.log(`[parse] Pages: ${pages.length}, garbage: ${garbageCount}/${pages.length} (${(garbageRatio * 100).toFixed(0)}%)`);
+
+        isDigital = fullText.trim().length > 50 && garbageRatio < 0.5;
+
+        if (isDigital) {
+            parsed = extractMetadata(fullText, catalog);
+            if (garbageCount > 0) {
+                console.log(`[parse] ⚠️ Có ${garbageCount} trang bị garbage (sẽ OCR bổ sung nếu thiếu trường)`);
+            }
         } else {
-            parsed = {
-                document_code: null, document_number: null,
-                doc_type_code: null, doc_type_name: null,
-                title: null, issued_date: null,
-                signer: null, signer_position: null,
-                issuer_unit_name: null, issuer_parent_unit_name: null,
-            };
+            console.log('[parse] Phát hiện scan/garbage → Fallback OCR an toàn cho trang đầu...');
+            const ocrFullText = await ocrWholeDocument(buffer, 2);
+            if (ocrFullText && ocrFullText.trim().length > 20) {
+                parsed = extractMetadata(ocrFullText, catalog);
+                sources = Object.fromEntries(Object.keys(parsed).filter(k => parsed[k]).map(k => [k, 'ocr-fallback']));
+            } else {
+                parsed = {
+                    document_code: null, document_number: null,
+                    doc_type_code: null, doc_type_name: null,
+                    title: null, issued_date: null,
+                    signer: null, signer_position: null,
+                    issuer_unit_name: null, issuer_parent_unit_name: null,
+                };
+            }
         }
     }
 
@@ -1041,21 +1128,48 @@ async function parseDocumentPdf(buffer, deps = {}) {
         ['signer', 'signer_position'].includes(f)
     );
 
-    if (earlyMissing.length > 0) {
+    if (earlyMissing.length > 0 && !options.preExtractedText) {
         console.log(`[parse] Thiếu (đầu VB): ${earlyMissing.join(', ')} → OCR page 1`);
-        const images = await renderPdfToImages(buffer, PARSER_THRESHOLDS.renderScale);
-        if (images.length > 0) {
-            const ocrText = await ocrImage(images[0]);
-            if (ocrText && ocrText.trim().length > 20) {
-                const ocrParsed = extractMetadata(ocrText, catalog);
-                const merged = mergeMissingFields(parsed, ocrParsed, earlyMissing);
-                parsed = merged.merged;
-                sources = { ...sources, ...merged.sources };
+        let ocrText = '';
+        // Ưu tiên gọi PaddleOCR Service (:8002) cho chất lượng cao và tốc độ nhanh
+        try {
+            const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://127.0.0.1:8002';
+            const formData = new FormData();
+            formData.append('file', new Blob([buffer], { type: 'application/pdf' }), 'page1.pdf');
+            formData.append('pages', '1');
+            const ocrResp = await fetch(`${OCR_SERVICE_URL}/api/ocr/extract`, {
+                method: 'POST',
+                body: formData,
+                signal: AbortSignal.timeout(8000),
+            });
+            if (ocrResp.ok) {
+                const data = await ocrResp.json();
+                if (data.success && data.combined_text) {
+                    ocrText = data.combined_text;
+                    console.log(`[parse] ✅ PaddleOCR Page 1 thành công (${data.elapsed_seconds}s)`);
+                }
             }
+        } catch (e) {
+            console.warn('[parse] PaddleOCR Page 1 không phản hồi, fallback Tesseract:', e.message);
+        }
+
+        // Fallback Tesseract nếu PaddleOCR offline
+        if (!ocrText) {
+            const images = await renderPdfToImages(buffer, PARSER_THRESHOLDS.renderScale);
+            if (images.length > 0) {
+                ocrText = await ocrImage(images[0]);
+            }
+        }
+
+        if (ocrText && ocrText.trim().length > 20) {
+            const ocrParsed = extractMetadata(ocrText, catalog);
+            const merged = mergeMissingFields(parsed, ocrParsed, earlyMissing);
+            parsed = merged.merged;
+            sources = { ...sources, ...merged.sources };
         }
     }
 
-    if (lateMissing.includes('signer')) {
+    if (lateMissing.includes('signer') && !options.preExtractedText) {
         console.log(`[parse] Thiếu (cuối VB): signer → OCR các trang cuối`);
         // [PATCH 3 — 4.7] không truyền cứng 3 → dùng PARSER_THRESHOLDS.signerTailPages
         const signerResult = await ocrSignerFromTail(buffer, catalog);

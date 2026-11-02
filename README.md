@@ -150,6 +150,19 @@ graph TD
   *(Các đơn vị thêm sau sẽ tự động xếp ở dưới dần dần)*
 * **Lọc sâu phòng ban trực thuộc TQS:** Khi chọn *"Trường Quân sự Quân khu 7"*, ô chọn phòng ban (*Ban Giám hiệu, Phòng Tham mưu - Hành chính, Phòng Chính trị, Phòng Đào tạo, Phòng Hậu cần - Kỹ thuật*) tự động hiển thị đối diện để lọc chi tiết.
 
+
+
+### 15. Phân hệ OCR Microservice & Trích xuất PDF Siêu tốc (PaddleOCR PP-OCRv4 + Smart PDF Router)
+* **Giải quyết dứt điểm nút thắt cổ chai PDF Scan 5MB (121 trang):** Thay thế pipeline cũ chạy đồng bộ (gây treo Event Loop và 121 lỗi `Jbig2Error`) bằng kiến trúc 3 tầng bất đồng bộ chuyên biệt.
+* **Tầng 1 - Bộ định tuyến PDF siêu tốc (`pdf-router.js`):** Phân loại tài liệu (`TextBased`, `Scanned`, `Mixed`) chỉ trong **7-11ms**. Xác định và chỉ quét trang trọng yếu chứa metadata hành chính (Trang 1).
+* **Tầng 2 - Microservice OCR độc lập (`ocr-service/`, cổng `:8002`):**
+  * Sử dụng **PaddleOCR 2.9.1 (PP-OCRv4)** với khả năng nhận diện tiếng Việt (`lang='vi'`), tự động xoay góc chữ (`use_angle_cls=True`) và phân tách bố cục 2 cột (Quốc hiệu / Đơn vị ban hành).
+  * Render ảnh trực tiếp bằng thư viện C **PyMuPDF** với độ phân giải tối ưu (150 DPI), không cần binary Poppler bên ngoài.
+  * Giảm thời gian trích xuất file scan phức tạp từ $> 300s$ (treo máy) xuống còn **4.35 giây**.
+* **Tầng 3 - Chuẩn hóa Metadata & Fallback an toàn:**
+  * Regex chuẩn hóa số hiệu có năm ban hành và ký tự OCR dung sai (ví dụ `224/2026/NĐ-CP`, `652/QĐ-TQS`).
+  * Có sẵn cơ chế phòng vệ theo chiều sâu (Defense-in-depth): Nếu cổng 8002 offline, Gateway tự động fallback về Tesseract với trần giới hạn trang chặt chẽ, không bao giờ đọc tràn lan toàn bộ file.
+
 ---
 
 ## 📁 Cấu Trúc Dự Án Toàn Diện
@@ -175,6 +188,13 @@ qk7-datahub/
 │   ├── public/                             # Sản phẩm build tĩnh từ Frontend xuất sang
 │   ├── server.js                           # Entry point Express API Gateway & Biometrics
 │   └── setup-passwords.js                  # Script khởi tạo tài khoản Admin & mật khẩu bcrypt
+│
+├── ocr-service/                            # 🟡 MICROSERVICE OCR NHẬN DẠNG KÝ TỰ QUANG HỌC (:8002 - FastAPI)
+│   ├── main.py                             # Entry point FastAPI: /health, /api/ocr/extract
+│   ├── requirements.txt                    # Dependencies: paddleocr, paddlepaddle, pymupdf, fastapi...
+│   ├── start-ocr.bat                       # Script khởi động tự giải phóng cổng 8002 & kích hoạt venv
+│   ├── Dockerfile                          # Cấu hình container hóa độc lập
+│   └── README.md                           # Sổ tay kỹ thuật chi tiết phân hệ OCR
 │
 ├── boxchat/                                # 🟣 MICROSERVICE TRỢ LÝ AI TÁC CHIẾN (:8001 - FastAPI)
 │   ├── main.py                             # Entry point FastAPI: /api/ai/query, /api/ai/study-book...

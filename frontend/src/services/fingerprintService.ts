@@ -8,16 +8,24 @@ export interface FingerprintVerifyResponse {
   success: boolean;
   required: boolean;
   fingerprint_token: string | null;
+  // [v5.1] Cấp 4-5 yêu cầu PIN
+  require_pin?: boolean;
+  pin_challenge_token?: string;
+  pin_expires_in?: string;
+  security_level_id?: number;
+  // Cũ
   expires_in?: string;
   score?: number;
   error?: string;
   agent_offline?: boolean;
   needs_enroll?: boolean;
+  needs_admin_pin?: boolean;
 }
 
 export interface FingerprintStatusResponse {
   user_id: string;
   has_fingerprint: boolean;
+  has_pin?: boolean;
   enrolled_at?: string;
 }
 

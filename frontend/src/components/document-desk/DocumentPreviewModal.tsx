@@ -450,47 +450,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 <button id="qk7-focus-trap" className="sr-only opacity-0 pointer-events-none absolute -top-10 -left-10" tabIndex={-1} aria-hidden="true" />
                 <div
                   id="qk7-blackout-shutter"
-                  className={`absolute inset-0 z-30 bg-slate-950/90 dark:bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-6 select-none transition-none ${
-                    isShieldActive ? '!hidden opacity-0 pointer-events-none' : ''
-                  }`}
+                  className="absolute inset-0 z-30 bg-black select-none pointer-events-none transition-none"
                   style={{ display: 'none' }}
-                >
-                  {/* Dual-Theme Cyber Glass Card (Thích ứng hoàn hảo cả Light Mode & Dark Mode) */}
-                  <div className="relative z-10 max-w-md w-full mx-auto p-5 sm:p-6 rounded-2xl bg-white/95 dark:bg-slate-900/95 border-2 border-emerald-500/40 dark:border-emerald-500/50 shadow-2xl shadow-emerald-950/30 dark:shadow-[0_0_50px_rgba(16,185,129,0.25)] text-center flex flex-col items-center gap-3.5 transition-colors">
-                    {/* Glowing Animated Shield Badge */}
-                    <div className="relative flex items-center justify-center">
-                      <span className="animate-ping absolute inline-flex h-14 w-14 rounded-full bg-emerald-500/25" />
-                      <div className="relative w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-300 dark:border-emerald-500/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-md dark:shadow-[0_0_20px_rgba(16,185,129,0.35)]">
-                        <ShieldCheck className="w-7 h-7 text-emerald-600 dark:text-emerald-400 animate-pulse" />
-                      </div>
-                    </div>
-
-                    {/* Security Department Badge */}
-                    <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-300 dark:border-emerald-500/35 text-emerald-800 dark:text-emerald-300 font-mono text-[11px] font-bold tracking-wider uppercase shadow-xs">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                      <span>HỆ THỐNG PHÒNG THỦ KHÔNG GIAN SỐ</span>
-                    </div>
-
-                    {/* Main Headline & Description */}
-                    <div className="space-y-1">
-                      <h3 className="text-sm sm:text-base font-black tracking-wide text-slate-900 dark:text-white uppercase leading-snug">
-                        ĐÃ KÍCH HOẠT BẢO MẬT AN NINH CHỐNG CHỤP MÀN HÌNH
-                      </h3>
-                      <p className="text-[11.5px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-sm mx-auto">
-                        Màn trập quang học 0ms đang che chắn dữ liệu văn bản. Mọi hình ảnh chụp trộm từ hệ điều hành sẽ chỉ ghi nhận được khung đen bảo vệ.
-                      </p>
-                    </div>
-
-                    {/* Telemetry Status Line */}
-                    <div className="w-full pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono font-semibold text-emerald-700 dark:text-emerald-400">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        TRẠNG THÁI: 0MS SHUTTER ACTIVE
-                      </span>
-                      <span>TIÊU CHUẨN: QK7-SEC-2026</span>
-                    </div>
-                  </div>
-                </div>
+                />
 
                     <div
                   className={`w-full h-full secure-pdf-content ${

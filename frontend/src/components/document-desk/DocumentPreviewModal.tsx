@@ -446,18 +446,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               <div className="relative overflow-hidden w-full h-full flex items-center justify-center">
                 {/* ⚡ MÀN TRẬP BẢO MẬT ĐÓN ĐẦU 0MS (PRE-EMPTIVE SHUTTER):
                     Đóng tức thì không độ trễ khi phát hiện tổ hợp phím chụp trước khi OS kịp freeze frame */}
-                <div
-                  id="qk7-blackout-shutter"
-                  className="absolute inset-0 z-30 bg-slate-950 flex flex-col items-center justify-center select-none"
-                  style={{ display: 'none', transition: 'none' }}
-                >
-                  <div className="flex flex-col items-center justify-center gap-2.5 text-rose-500">
-                    <ShieldAlert className="w-10 h-10 animate-pulse text-rose-500" />
-                    <p className="text-[11px] font-mono font-bold tracking-wider text-rose-400 uppercase">
-                      ĐÃ KÍCH HOẠT MÀN TRẬP BẢO MẬT AN NINH 0MS
-                    </p>
-                  </div>
-                </div>
+                <div id="qk7-blackout-shutter" className="absolute inset-0 z-30 bg-slate-950 select-none pointer-events-none" style={{ display: 'none' }} />
 
                 <div
                   className={`w-full h-full secure-pdf-content ${

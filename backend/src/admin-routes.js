@@ -241,14 +241,24 @@ module.exports = (app, deps) => {
     // ═══════════════════════════════════════════════════════════
     // 1. USER CRUD
     // ═══════════════════════════════════════════════════════════
-    app.get('/api/admin/users', async (req, res) => {
+        app.get('/api/admin/users', async (req, res) => {
         try {
             const pool = await getPool();
             const r = await pool.request().query(`
                 SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name, u.[position],
                        u.unit_id, un.name AS unit_name, u.status, u.clearance_level_id,
                        sl.name AS clearance_name, sl.code AS clearance_code,
-                       CASE WHEN EXISTS (SELECT 1 FROM USER_FINGERPRINT uf WHERE uf.user_id = u.user_id AND uf.active = 1) THEN 1 ELSE 0 END AS has_fingerprint
+                       CASE WHEN EXISTS (SELECT 1 FROM USER_FINGERPRINT uf WHERE uf.user_id = u.user_id AND uf.active = 1) THEN 1 ELSE 0 END AS has_fingerprint,
+                       CASE WHEN u.pin_hash IS NOT NULL AND LEN(u.pin_hash) > 0 THEN 1 ELSE 0 END AS has_pin,
+                       
+                       -- ✅ THÊM ĐOẠN NÀY: Kiểm tra xem user có yêu cầu cấp PIN nào đang chờ không
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM APPROVAL_REQUEST ar 
+                           WHERE ar.requester_id = u.user_id 
+                             AND ar.status = 'PENDING' 
+                             AND ar.required_permission = 'PERM-USR-08'
+                       ) THEN 1 ELSE 0 END AS pin_requested
+
                 FROM [USER] u
                 LEFT JOIN UNIT un ON un.unit_id = u.unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
@@ -266,6 +276,8 @@ module.exports = (app, deps) => {
             const items = r.recordset.map(u => ({
                 ...u,
                 has_fingerprint: u.has_fingerprint === 1,
+                has_pin: u.has_pin === 1,
+                pin_requested: u.pin_requested === 1, // ✅ THÊM DÒNG NÀY ĐỂ MAP SANG BOOLEAN
                 roles: rolesByUser[u.user_id] || [],
                 role_names: roleNamesByUser[u.user_id] || [],
             }));
@@ -1927,5 +1939,65 @@ module.exports = (app, deps) => {
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
+
+
+    // ═══════════════════════════════════════════════════════════════
+    // [v5.1] ADMIN XEM YÊU CẦU CẤP PIN ĐANG CHỜ
+    // ═══════════════════════════════════════════════════════════════
+    app.get('/api/admin/pin-requests', requireAuth, async (req, res) => {
+    try {
+        if (!(req.user?.roles || []).includes('ROL-01')) {
+        return res.status(403).json({ error: 'Chỉ Quản trị viên tối cao được xem yêu cầu PIN.' });
+        }
+        const pool = await getPool();
+        const r = await pool.request().query(`
+        SELECT l.log_id, l.user_id, u.full_name, u.[rank] AS rank_name,
+                l.file_id, l.[timestamp], l.ip, l.note,
+                CASE WHEN u.pin_hash IS NOT NULL AND LEN(u.pin_hash) > 0 THEN 1 ELSE 0 END AS has_pin
+        FROM ACCESS_LOG l
+        LEFT JOIN [USER] u ON u.user_id = l.user_id
+        WHERE l.[action] = 'PIN_REQUEST'
+            AND l.[timestamp] >= DATEADD(DAY, -7, GETDATE())
+        ORDER BY l.[timestamp] DESC
+        `);
+        res.json({ total: r.recordset.length, items: r.recordset });
+    } catch (e) {
+        console.error('[GET /api/admin/pin-requests]', e);
+        res.status(500).json({ error: e.message });
+    }
+    });
+
+
+            // Thêm API này vào file admin-routes.js hoặc file routes dành cho user
+        app.post('/api/pin/request', requireAuth, async (req, res) => {
+            try {
+                const pool = await getPool();
+                const userId = req.user.user_id;
+                const requestId = 'REQ-PIN-' + Date.now(); // Tạo ID ngẫu nhiên
+
+                // Kiểm tra xem đã có yêu cầu PENDING nào chưa để tránh spam
+                const check = await pool.request()
+                    .input('uid', sql.VarChar(50), userId)
+                    .query(`SELECT 1 FROM APPROVAL_REQUEST WHERE requester_id = @uid AND status = 'PENDING' AND required_permission = 'PERM-USR-08'`);
+                
+                if (check.recordset.length > 0) {
+                    return res.status(400).json({ error: 'Bạn đã gửi yêu cầu rồi. Vui lòng chờ Admin duyệt.' });
+                }
+
+                // Insert vào bảng APPROVAL_REQUEST
+                await pool.request()
+                    .input('rid', sql.VarChar(50), requestId)
+                    .input('uid', sql.VarChar(50), userId)
+                    .input('path', sql.VarChar(500), `/api/admin/users/${userId}/pin/generate`)
+                    .query(`
+                        INSERT INTO APPROVAL_REQUEST (request_id, requester_id, required_permission, http_method, http_path, target_summary, status)
+                        VALUES (@rid, @uid, 'PERM-USR-08', 'POST', @path, N'Yêu cầu cấp mã PIN bảo mật', 'PENDING')
+                    `);
+
+                res.json({ success: true, message: 'Đã gửi yêu cầu cấp PIN' });
+            } catch (e) {
+                res.status(500).json({ error: e.message });
+            }
+        });
 
 };

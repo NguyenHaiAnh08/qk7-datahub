@@ -75,7 +75,7 @@ export function wipeClipboard(customMessage?: string) {
  */
 export function wipeClipboardBurst(customMessage?: string) {
   wipeClipboard(customMessage);
-  const pulses = [60, 150, 300, 600, 1000, 1800, 3000];
+  const pulses = [50, 120, 250, 500, 900, 1600, 2800];
   pulses.forEach((ms) => {
     setTimeout(() => {
       wipeClipboard(customMessage);
@@ -93,7 +93,7 @@ export function applyInstantBlackout(active: boolean) {
     const htmlEl = el as HTMLElement;
     if (active) {
       htmlEl.style.filter = 'blur(60px)';
-      htmlEl.style.opacity = '0.02';
+      htmlEl.style.opacity = '0.01';
       htmlEl.style.pointerEvents = 'none';
       htmlEl.style.visibility = 'hidden';
     } else {
@@ -149,6 +149,7 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
   const modifierKeysRef = useRef({ win: false, shift: false, ctrl: false, alt: false, time: 0 });
   const recentCaptureKeyRef = useRef<{ type: ViolationInfo['triggerType']; time: number } | null>(null);
   const preemptiveArmedRef = useRef<boolean>(false);
+  const preemptiveArmedTimeRef = useRef<number>(0);
 
   // Gửi báo cáo vi phạm về Gateway Backend (/api/security/screenshot-alert)
   const sendSecurityAlert = useCallback(
@@ -327,7 +328,6 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       // ⚡ MÀN TRẬP BẢO MẬT ĐÓN ĐẦU 0MS (PRE-EMPTIVE SHUTTER):
       // Khi ngón tay người dùng bắt đầu đè (Win + Shift) hoặc (Ctrl + Alt):
       // Lập tức đóng màn trập đen trước khi phím 'S' được kích hoạt!
-      // Khi Snipping Tool đóng băng màn hình, khung hình PDF đã là màu đen tuyền!
       // =========================================================================
       const isPreemptiveCombination =
         (e.shiftKey && (e.metaKey || modifierKeysRef.current.win)) || // Đang giữ Win + Shift
@@ -335,6 +335,7 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
 
       if (isPreemptiveCombination) {
         preemptiveArmedRef.current = true;
+        preemptiveArmedTimeRef.current = Date.now();
         applyInstantBlackout(true);
       }
 
@@ -346,7 +347,7 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
         ((e.metaKey || modifierKeysRef.current.win) && e.shiftKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) ||
         (e.shiftKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS') && (e.metaKey || modifierKeysRef.current.win));
 
-      // Zalo Screenshot: BẮT BUỘC ĐỒNG THỜI CẢ Ctrl VÀ Alt VÀ phím S (Tuyệt đối không kiểm tra rời rạc!)
+      // Zalo Screenshot: BẮT BUỘC ĐỒNG THỜI CẢ Ctrl VÀ Alt VÀ phím S
       const isZaloCapture =
         e.ctrlKey && e.altKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
 
@@ -442,29 +443,32 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
     };
 
     // 2. Bắt sự kiện Window Blur:
-    // TUYỆT ĐỐI CHỈ CẢNH BÁO KHI VỪA CÓ PHÍM TẮT CHỤP ẢNH THỰC TẾ (PrintScreen, Win+Shift+S, Ctrl+Alt+S)
-    // Thao tác bấm các phím khác (Shift, Ctrl, Alt đơn lẻ, chữ hoa, tìm kiếm...), rê chuột ra ngoài,
-    // chuyển sang Màn hình 2, click đổi tab -> HOÀN TOÀN KHÔNG BỊ CẢNH BÁO, BỎ QUA 100%!
+    // KHI CỬA SỔ BỊ MẤT FOCUS VÀ TRƯỚC ĐÓ CÓ TỔ HỢP PHÍM CHỤP (Win + Shift hoặc Ctrl + Alt hoặc PrintScreen):
+    // ĐÂY CHÍNH LÀ LÚC SNIPPING TOOL HOẶC ZALO OVERLAY MỞ RA LẤY CẮP FOCUS CỦA TRÌNH DUYỆT!
+    // -> LẬP TỨC KÍCH HOẠT CẢNH BÁO ĐỎ!
     const handleWindowBlur = () => {
       if (isScreenshotAllowed()) return;
 
       const now = Date.now();
       const recentCapture = recentCaptureKeyRef.current;
+      const isRecentlyArmed = preemptiveArmedRef.current && now - preemptiveArmedTimeRef.current < 2500;
 
-      // CHỈ KÍCH HOẠT KHI CÓ PHÍM CHỤP MÀN HÌNH THỰC TẾ VỪA ĐƯỢC BẤM TRONG VÒNG 400MS
-      if (recentCapture && now - recentCapture.time < 400) {
+      // 🚨 KÍCH HOẠT CẢNH BÁO ĐỎ KHI CÓ HÀNH VI CHỤP MÀN HÌNH LÀM BLUR CỬA SỔ
+      if ((recentCapture && now - recentCapture.time < 1500) || isRecentlyArmed) {
+        const isCtrlAlt = modifierKeysRef.current.ctrl && modifierKeysRef.current.alt;
+        const triggerType: ViolationInfo['triggerType'] =
+          recentCapture?.type || (isCtrlAlt ? 'ZALO_CAPTURE' : 'WIN_SHIFT_S');
+
+        preemptiveArmedRef.current = false;
+        recentCaptureKeyRef.current = null;
         applyInstantBlackout(true);
         wipeClipboardBurst();
-        triggerViolation(recentCapture.type);
-        recentCaptureKeyRef.current = null;
+        triggerViolation(triggerType);
         return;
       }
 
-      // Xóa cờ đón đầu nếu cửa sổ blur mà không có phím chụp
-      if (preemptiveArmedRef.current && !isShieldActive) {
-        preemptiveArmedRef.current = false;
-        applyInstantBlackout(false);
-      }
+      // Nếu không phải do tổ hợp chụp: reset cờ an toàn
+      preemptiveArmedRef.current = false;
 
       // Kiểm tra nếu tiêu điểm chuyển vào trong iframe PDF (người dùng vừa click vào nội dung PDF để cuộn/đọc)
       const activeEl = window.document.activeElement;
@@ -482,8 +486,7 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       }
 
       // BẢO VỆ CHỦ ĐỘNG KHI TÀI LIỆU MỞ SẴN:
-      // Khi cửa sổ mất focus (người dùng mở app khác hoặc kích hoạt chụp từ bên ngoài):
-      // Xóa bộ nhớ tạm 1 lần để ngăn chặn việc dán trộm, NHƯNG TUYỆT ĐỐI KHÔNG BÁO ĐỘNG NHẦM!
+      // Xóa bộ nhớ tạm 1 lần để ngăn chặn việc dán trộm
       wipeClipboard();
     };
 
@@ -499,7 +502,6 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
     // 4. Chặn dán nội dung hình ảnh vào hệ thống (Ctrl + V)
     const handlePaste = (e: ClipboardEvent) => {
       if (isScreenshotAllowed()) return;
-      // Chặn 100% mọi hành vi paste trong lúc đang mở xem tài liệu bảo mật
       e.preventDefault();
       e.stopPropagation();
       wipeClipboard();

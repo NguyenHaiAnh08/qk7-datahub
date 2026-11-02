@@ -49,19 +49,11 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
   const canApproveProposals = useMemo(() => {
     if (!user) return false;
-    const r = (user.roles || []).map((x) => String(x).toUpperCase());
-    const rn = (user.role_names || []).map((x) => String(x).toLowerCase());
-    return (
-      isUserAdmin(user) ||
-      isUserManager(user) ||
-      user.user_id === 'USR-001' ||
-      r.includes('ROL-01') ||
-      r.includes('ROL-02') ||
-      r.includes('ADMIN') ||
-      rn.some((n) => n.includes('admin') || n.includes('quản trị') || n.includes('chỉ huy'))
-    );
+    const isAdmin = isUserAdmin(user) || 
+                    user.user_id === 'USR-001' || 
+                    (user.roles || []).includes('ROL-01');
 
-
+    return isAdmin;
   }, [user]);
 
   const loadPendingProposals = useCallback(async () => {

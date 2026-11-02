@@ -2525,7 +2525,12 @@ app.post('/api/security/screenshot-alert', async (req, res) => {
     }
     const { file_id, document_code, title, security_name, unit_name, trigger_type } = body || {};
     const ip = getClientIp(req);
-    const triggerLabel = trigger_type === 'WIN_SHIFT_S' ? 'Win+Shift+S (Snipping Tool)' : 'PrintScreen';
+    let triggerLabel = 'Phím tắt chụp màn hình';
+    if (trigger_type === 'WIN_SHIFT_S') triggerLabel = 'Win+Shift+S (Snipping Tool)';
+    else if (trigger_type === 'ZALO_CAPTURE') triggerLabel = 'Ctrl+Alt+S (Chụp ảnh Zalo)';
+    else if (trigger_type === 'PRINT_SCREEN') triggerLabel = 'PrintScreen';
+    else if (trigger_type === 'OS_SNIPPING') triggerLabel = 'Công cụ cắt ảnh (Snipping Tool)';
+    else if (trigger_type === 'CLIPBOARD_PASTE') triggerLabel = 'Trích xuất hình ảnh trái phép';
 
     let docInfo = {
       document_code: document_code || '',
@@ -2577,15 +2582,107 @@ app.post('/api/security/screenshot-alert', async (req, res) => {
 
     console.warn(`[SECURITY ALERT] Screenshot attempt by ${userId} on file ${file_id || 'N/A'} via ${triggerLabel} (IP: ${ip})`);
 
+        // 🚨 CƠ CHẾ ĐẾM SỐ LẦN VI PHẠM & KHÓA TÀI KHOẢN KHI QUÁ 3 LẦN
+    let violationCount = 1;
+    let isLocked = false;
+
+    if (userId && userId !== 'GUEST') {
+      try {
+        const pool = await getPool();
+        const countRes = await pool.request()
+          .input('uid', sql.VarChar(50), userId)
+          .query(`
+            SELECT COUNT(*) AS total 
+            FROM ACCESS_LOG 
+            WHERE user_id = @uid 
+              AND [action] = 'SCREENSHOT_ATTEMPT' 
+              AND [timestamp] >= DATEADD(HOUR, -24, GETDATE())
+          `);
+        violationCount = countRes.recordset[0]?.total || 1;
+
+        // Quá 3 lần vi phạm (tức là từ lần thứ 4 trở đi) -> TỰ ĐỘNG KHÓA TÀI KHOẢN NGAY LẬP TỨC
+        if (violationCount > 3) {
+          isLocked = true;
+          await pool.request()
+            .input('uid', sql.VarChar(50), userId)
+            .query(`UPDATE [USER] SET status = 'locked', locked_at = GETDATE() WHERE user_id = @uid`);
+
+          await writeAccessLog({
+            userId,
+            fileId: (docInfo && docInfo.document_code) ? file_id : null,
+            action: 'ACCOUNT_LOCKED',
+            ip,
+            note: `TỰ ĐỘNG KHÓA TÀI KHOẢN: Người dùng cố tình vi phạm quy chế an ninh chụp màn hình ${violationCount} lần (quá 3 lần). Toàn bộ quyền truy cập đã bị đình chỉ. Yêu cầu liên hệ Quản trị viên để mở khóa.`,
+          });
+
+          if (typeof revokeAllUserSessions === 'function') {
+            try {
+              await revokeAllUserSessions(userId, null, 'CHỤP MÀN HÌNH QUÁ 3 LẦN');
+            } catch (_) {}
+          }
+
+          console.error(`[SECURITY LOCKOUT] 🔒 Tài khoản ${userId} ĐÃ BỊ KHÓA do vi phạm chụp màn hình ${violationCount} lần!`);
+        }
+      } catch (lockErr) {
+        console.warn('[screenshot-alert] Lỗi kiểm tra số lần vi phạm hoặc khóa tài khoản:', lockErr.message);
+      }
+    }
+
     res.json({
       ok: true,
       log_id: logId,
-      message: 'Security alert successfully recorded in ACCESS_LOG',
+      message: isLocked
+        ? 'Tài khoản đã bị khóa do vi phạm chụp màn hình quá 3 lần. Vui lòng liên hệ Quản trị viên.'
+        : 'Security alert successfully recorded in ACCESS_LOG',
       document: docInfo,
+      violation_count: violationCount,
+      is_locked: isLocked,
     });
   } catch (err) {
     console.error('[screenshot-alert]', err.message);
     res.status(500).json({ error: 'Failed to record screenshot alert' });
+  }
+});
+
+app.get('/api/security/violation-status', async (req, res) => {
+  try {
+    let userId = req.user?.user_id;
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ') && !userId) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET || 'fallback_secret');
+        if (decoded?.user_id) userId = decoded.user_id;
+      } catch (_) {}
+    }
+    if (!userId || userId === 'GUEST') {
+      return res.json({ ok: true, violation_count: 0, is_locked: false });
+    }
+
+    const pool = await getPool();
+    const countRes = await pool.request()
+      .input('uid', sql.VarChar(50), userId)
+      .query(`
+        SELECT COUNT(*) AS total 
+        FROM ACCESS_LOG 
+        WHERE user_id = @uid 
+          AND [action] = 'SCREENSHOT_ATTEMPT' 
+          AND [timestamp] >= DATEADD(HOUR, -24, GETDATE())
+      `);
+    const userRes = await pool.request()
+      .input('uid', sql.VarChar(50), userId)
+      .query(`SELECT status FROM [USER] WHERE user_id = @uid`);
+
+    const isLocked = userRes.recordset[0]?.status === 'locked';
+    const totalCount = countRes.recordset[0]?.total || 0;
+
+    res.json({
+      ok: true,
+      violation_count: totalCount,
+      is_locked: isLocked,
+    });
+  } catch (err) {
+    console.warn('[violation-status]', err.message);
+    res.json({ ok: true, violation_count: 0, is_locked: false });
   }
 });
 

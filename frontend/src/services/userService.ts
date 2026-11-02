@@ -68,4 +68,10 @@ export const userService = {
       method: 'DELETE',
     });
   },
+
+  unlockUser: async (userId: string): Promise<{ success: boolean; user_id: string; reset_violations?: boolean }> => {
+    return http(API_ENDPOINTS.ADMIN.USER_UNLOCK(userId), {
+      method: 'POST',
+    });
+  },
 };

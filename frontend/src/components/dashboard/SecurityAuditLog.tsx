@@ -62,6 +62,7 @@ export function getActionCategory(action: string = '', note: string = ''): 'ALER
   if (
     act.includes('ROLE') ||
     act.includes('USER') ||
+    act.includes('UNLOCK') ||
     act.includes('FINGERPRINT') ||
     act.includes('CREDENTIAL') ||
     act.includes('PERMISSION') ||
@@ -393,6 +394,15 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
       );
     }
 
+    if (act === 'UNLOCK_USER' || act.includes('UNLOCK')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider font-mono uppercase bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-500/30 dark:shadow-[0_0_8px_rgba(16,185,129,0.15)]">
+          <KeyRound className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
+          MỞ KHÓA
+        </span>
+      );
+    }
+
     if (cat === 'ALERT') {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold tracking-wider font-mono uppercase bg-rose-50 text-rose-700 border border-rose-300 dark:bg-red-950/40 dark:text-red-400 dark:border-red-500/30 dark:shadow-[0_0_10px_rgba(239,68,68,0.15)]">
@@ -609,7 +619,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
     );
   };
 
-  // Highlight nội dung ghi chú
+  // Highlight nội dung ghi chú (dùng cho modal chi tiết đầy đủ 100%)
   const renderHighlightedNote = (note?: string, isAlert = false) => {
     if (!note) return <span className="text-slate-400 dark:text-slate-500">—</span>;
 
@@ -651,6 +661,53 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
         })}
       </span>
     );
+  };
+
+  // Rút gọn nội dung ghi chú hiển thị ở danh sách bảng (Table List)
+  const renderTableCellNote = (l: AccessLog) => {
+    const note = l.note || '';
+    const act = (l.action || '').toUpperCase();
+    const isAlert = getActionCategory(l.action, l.note) === 'ALERT';
+
+    if (!note) return <span className="text-slate-400 dark:text-slate-500">—</span>;
+
+    // 1. Tự động khóa tài khoản (ACCOUNT_LOCKED) -> Rút gọn gọn gàng theo yêu cầu
+    if (act === 'ACCOUNT_LOCKED' || note.toUpperCase().includes('TỰ ĐỘNG KHÓA TÀI KHOẢN') || note.toLowerCase().includes('tự động khóa')) {
+      return (
+        <span
+          className="text-xs font-semibold text-rose-700 dark:text-rose-300 inline-flex items-center gap-1.5 whitespace-nowrap"
+          title={note}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0" />
+          <span>Tự động khóa tài khoản...</span>
+        </span>
+      );
+    }
+
+    // 2. Cảnh báo an ninh chụp màn hình (SCREENSHOT_ATTEMPT) -> Rút gọn theo yêu cầu
+    if (act === 'SCREENSHOT_ATTEMPT' || act.includes('SCREENSHOT') || note.includes('Phát hiện hành vi chụp màn hình')) {
+      return (
+        <span
+          className="text-xs font-medium text-rose-700 dark:text-rose-300 inline-flex items-center gap-1.5 whitespace-nowrap"
+          title={note}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0" />
+          <span>Cảnh báo an ninh: Phát hiện hành vi chụp màn hình...</span>
+        </span>
+      );
+    }
+
+    // 3. Mở khóa tài khoản (UNLOCK_USER)
+    if (act === 'UNLOCK_USER' || note.toLowerCase().includes('mở khóa tài khoản')) {
+      return (
+        <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300" title={note}>
+          {renderHighlightedNote(note, false)}
+        </span>
+      );
+    }
+
+    // Các ghi chú khác
+    return renderHighlightedNote(note, isAlert);
   };
 
   return (
@@ -934,6 +991,9 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
               <option value="">Tất cả hành động</option>
               <option value="LOGIN">LOGIN (Đăng nhập)</option>
               <option value="LOGIN_FAIL">LOGIN_FAIL (Đăng nhập thất bại)</option>
+              <option value="UNLOCK_USER">UNLOCK_USER (Mở khóa tài khoản)</option>
+              <option value="ACCOUNT_LOCKED">ACCOUNT_LOCKED (Tự động khóa tài khoản)</option>
+              <option value="SCREENSHOT_ATTEMPT">SCREENSHOT_ATTEMPT (Chụp màn hình)</option>
               <option value="VIEW">VIEW (Xem tài liệu)</option>
               <option value="DOWNLOAD">DOWNLOAD (Tải tệp)</option>
               <option value="UPLOAD">UPLOAD (Tải lên)</option>
@@ -1162,7 +1222,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
 
                       {/* Cột GHI CHÚ */}
                       <td className="py-3 px-4 text-xs max-w-md">
-                        {renderHighlightedNote(l.note, isAlert)}
+                        {renderTableCellNote(l)}
                       </td>
 
                       {/* Nút Xem Chi Tiết */}

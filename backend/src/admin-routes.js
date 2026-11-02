@@ -472,17 +472,25 @@ module.exports = (app, deps) => {
                     WHERE user_id=@user_id`);
         if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
 
-        // Nếu chuyển trạng thái từ 'locked' sang 'active' (Mở khóa qua form sửa):
-        const isUnlocking = targetUser.status === 'locked' && (status === 'active' || (!status && targetUser.status === 'locked'));
+        // Nếu chuyển trạng thái từ 'locked'/'blocked' sang 'active' (Mở khóa qua form sửa):
+        const oldStatus = (targetUser.status || '').trim().toLowerCase();
+        const newStatus = (status || '').trim().toLowerCase();
+        const isUnlocking = (oldStatus === 'locked' || oldStatus === 'blocked') && newStatus === 'active';
+
         if (isUnlocking) {
-            // Reset vi phạm chụp màn hình cũ
+            // Xóa sạch trạng thái khóa và số lần nhập sai trong bảng USER
+            await pool.request()
+                .input('uid', sql.VarChar(50), userId)
+                .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL, last_failed_at = NULL WHERE user_id = @uid`);
+
+            // 🔄 RESET TOÀN BỘ VI PHẠM CHỤP MÀN HÌNH VÀ KHÓA TÀI KHOẢN VỀ 0 LẦN
             await pool.request()
                 .input('uid', sql.VarChar(50), userId)
                 .query(`
                     UPDATE ACCESS_LOG 
                     SET [action] = 'SCREENSHOT_RESOLVED',
                         note = ISNULL(note, '') + ' [ĐÃ ĐƯỢC ADMIN MỞ KHÓA & RESET VI PHẠM]'
-                    WHERE user_id = @uid AND [action] = 'SCREENSHOT_ATTEMPT'
+                    WHERE user_id = @uid AND [action] IN ('SCREENSHOT_ATTEMPT', 'ACCOUNT_LOCKED')
                 `);
 
             const adminUserRes = await pool.request()
@@ -497,7 +505,7 @@ module.exports = (app, deps) => {
             await log(req, 'UPDATE_USER', `Sửa user ${userId}`);
         }
         _invalidateUser(userId);
-        res.json({ success: true });
+        res.json({ success: true, reset_violations: isUnlocking });
     } catch (e) {
         console.error('[PUT /api/admin/users/:id]', e);
         res.status(500).json({ error: e.message });
@@ -1470,14 +1478,14 @@ module.exports = (app, deps) => {
                 .query(`UPDATE [USER] SET status = 'active', failed_attempts = 0, locked_at = NULL, last_failed_at = NULL WHERE user_id = @uid`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
 
-            // 🔄 RESET TOÀN BỘ VI PHẠM CHỤP MÀN HÌNH VỀ 0:
+            // 🔄 RESET TOÀN BỘ VI PHẠM CHỤP MÀN HÌNH VỀ 0 LẦN:
             await pool.request()
                 .input('uid', sql.VarChar(50), targetId)
                 .query(`
                     UPDATE ACCESS_LOG 
                     SET [action] = 'SCREENSHOT_RESOLVED',
                         note = ISNULL(note, '') + ' [ĐÃ ĐƯỢC ADMIN MỞ KHÓA & RESET VI PHẠM]'
-                    WHERE user_id = @uid AND [action] = 'SCREENSHOT_ATTEMPT'
+                    WHERE user_id = @uid AND [action] IN ('SCREENSHOT_ATTEMPT', 'ACCOUNT_LOCKED')
                 `);
 
             // Tra cứu tên hiển thị đầy đủ của Admin và User để ghi nhật ký SOC rõ ràng

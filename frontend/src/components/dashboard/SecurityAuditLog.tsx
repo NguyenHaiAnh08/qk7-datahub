@@ -667,12 +667,21 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
   const renderTableCellNote = (l: AccessLog) => {
     const note = l.note || '';
     const act = (l.action || '').toUpperCase();
+    const lowerNote = note.toLowerCase();
     const isAlert = getActionCategory(l.action, l.note) === 'ALERT';
 
     if (!note) return <span className="text-slate-400 dark:text-slate-500">—</span>;
 
-    // 1. Tự động khóa tài khoản (ACCOUNT_LOCKED) -> Rút gọn gọn gàng theo yêu cầu
-    if (act === 'ACCOUNT_LOCKED' || note.toUpperCase().includes('TỰ ĐỘNG KHÓA TÀI KHOẢN') || note.toLowerCase().includes('tự động khóa')) {
+    // 1. Tự động khóa tài khoản (ACCOUNT_LOCKED / LOGIN_BLOCKED / vi phạm quá 3 lần) -> Rút gọn ngắn gọn
+    if (
+      act === 'ACCOUNT_LOCKED' ||
+      act === 'LOGIN_BLOCKED' ||
+      lowerNote.includes('tự động khóa') ||
+      lowerNote.includes('tu dong khoa') ||
+      lowerNote.includes('khóa tài khoản') ||
+      lowerNote.includes('khoa tai khoan') ||
+      lowerNote.includes('tài khoản đang bị khóa')
+    ) {
       return (
         <span
           className="text-xs font-semibold text-rose-700 dark:text-rose-300 inline-flex items-center gap-1.5 whitespace-nowrap"
@@ -684,8 +693,13 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
       );
     }
 
-    // 2. Cảnh báo an ninh chụp màn hình (SCREENSHOT_ATTEMPT) -> Rút gọn theo yêu cầu
-    if (act === 'SCREENSHOT_ATTEMPT' || act.includes('SCREENSHOT') || note.includes('Phát hiện hành vi chụp màn hình')) {
+    // 2. Cảnh báo an ninh chụp màn hình (SCREENSHOT_ATTEMPT / SCREENSHOT_RESOLVED) -> Rút gọn ngắn gọn
+    if (
+      act.includes('SCREENSHOT') ||
+      lowerNote.includes('chụp màn hình') ||
+      lowerNote.includes('chup man hinh') ||
+      lowerNote.includes('screenshot')
+    ) {
       return (
         <span
           className="text-xs font-medium text-rose-700 dark:text-rose-300 inline-flex items-center gap-1.5 whitespace-nowrap"
@@ -698,10 +712,11 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
     }
 
     // 3. Mở khóa tài khoản (UNLOCK_USER)
-    if (act === 'UNLOCK_USER' || note.toLowerCase().includes('mở khóa tài khoản')) {
+    if (act === 'UNLOCK_USER' || lowerNote.includes('mở khóa') || lowerNote.includes('mo khoa')) {
       return (
-        <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300" title={note}>
-          {renderHighlightedNote(note, false)}
+        <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300 inline-flex items-center gap-1.5" title={note}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0" />
+          <span>{renderHighlightedNote(note, false)}</span>
         </span>
       );
     }

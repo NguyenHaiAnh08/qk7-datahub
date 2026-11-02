@@ -108,6 +108,22 @@ export const UsersPage: React.FC = () => {
     }
   };
 
+  const handleUnlockUser = async (u: User) => {
+    try {
+      await usersApi.unlockUser(u.user_id);
+      await loadData();
+      toast.success(`Đã mở khóa tài khoản và đặt lại số lần vi phạm an ninh về 0 cho ${u.full_name} (${u.user_id})`, {
+        title: 'MỞ KHÓA THÀNH CÔNG',
+        badge: u.user_id,
+      });
+    } catch (err: any) {
+      toast.error('Lỗi khi mở khóa tài khoản: ' + err.message, {
+        title: 'LỖI THAO TÁC',
+        badge: 'USER-ERR',
+      });
+    }
+  };
+
   const handleDeleteUser = async () => {
     if (!deleteConfirm.user) return;
     try {
@@ -206,6 +222,7 @@ export const UsersPage: React.FC = () => {
             setSelectedUser(u);
             setUserModalOpen(true);
           }}
+          onUnlock={handleUnlockUser}
           onUpdateCredentials={(u) => {
             setCredModal({
               open: true,

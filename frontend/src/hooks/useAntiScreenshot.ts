@@ -150,9 +150,10 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
   const recentCaptureKeyRef = useRef<{ type: ViolationInfo['triggerType']; time: number } | null>(null);
   const preemptiveArmedRef = useRef<boolean>(false);
   const preemptiveArmedTimeRef = useRef<number>(0);
-  const lastShiftPressTimeRef = useRef<number>(0);
-  const lastCtrlAltPressTimeRef = useRef<number>(0);
-  const lastAnyModifierTimeRef = useRef<number>(0);
+  const lastWinShiftTimeRef = useRef<number>(0);
+  const lastShiftTimeRef = useRef<number>(0);
+  const lastMetaTimeRef = useRef<number>(0);
+  const lastCtrlAltTimeRef = useRef<number>(0);
   const isMouseInsideWindowRef = useRef<boolean>(true);
 
   // Gửi báo cáo vi phạm về Gateway Backend (/api/security/screenshot-alert)
@@ -307,9 +308,11 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       // Cập nhật trạng thái các phím bổ trợ
       if (e.key === 'Meta' || e.key === 'OS' || e.code === 'MetaLeft' || e.code === 'MetaRight') {
         modifierKeysRef.current.win = true;
+        lastMetaTimeRef.current = now;
       }
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.shiftKey) {
         modifierKeysRef.current.shift = true;
+        lastShiftTimeRef.current = now;
       }
       if (e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
         modifierKeysRef.current.ctrl = true;
@@ -321,16 +324,21 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       // ⚡ TẦNG 1: MÀN TRẬP 0MS "ĐÃ KÍCH HOẠT BẢO MẬT AN NINH CHỐNG CHỤP MÀN HÌNH"
       // CHỈ KÍCH HOẠT KHI ĐỒNG THỜI CẢ WIN VÀ SHIFT (HOẶC CẢ CTRL VÀ ALT)
       // TUYỆT ĐỐI KHÔNG KÍCH HOẠT KHI CHỈ BẤM MỖI PHÍM WIN HOẶC MỖI PHÍM SHIFT ĐƠN ĐỘC!
-      const isHoldingWinShift =
-        (e.shiftKey && (e.metaKey || modifierKeysRef.current.win)) ||
-        (modifierKeysRef.current.shift && (e.metaKey || modifierKeysRef.current.win));
+      const isWinActive = e.metaKey || modifierKeysRef.current.win || (now - lastMetaTimeRef.current < 1500);
+      const isShiftActive = e.shiftKey || modifierKeysRef.current.shift || (now - lastShiftTimeRef.current < 1500);
+
+      const isWinShiftPair =
+        (e.key === 'Meta' && isShiftActive) ||
+        (e.key === 'Shift' && isWinActive) ||
+        ((e.key === 'Meta' || e.key === 'Shift' || e.code.includes('Shift') || e.code.includes('Meta')) && isWinActive && isShiftActive);
 
       const isHoldingCtrlAlt = e.ctrlKey && e.altKey;
 
-      if (isHoldingWinShift || isHoldingCtrlAlt) {
+      if (isWinShiftPair || isHoldingCtrlAlt) {
         preemptiveArmedRef.current = true;
         preemptiveArmedTimeRef.current = now;
-        lastShiftPressTimeRef.current = now;
+        lastWinShiftTimeRef.current = now;
+        if (isHoldingCtrlAlt) lastCtrlAltTimeRef.current = now;
         applyInstantBlackout(true);
       }
 
@@ -354,30 +362,12 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       }
 
       // 🚨 TẦNG 2: KHI BẤM HOÀN TẤT THAO TÁC CHỤP ẢNH
-      // Phím PrintScreen độc lập hoặc đi kèm Alt / Ctrl / Win / Shift
       const isPrintScreen = e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44;
-
-      // Zalo Screenshot: BẮT BUỘC ĐỒNG THỜI CẢ Ctrl VÀ Alt VÀ phím S
-      const isZaloCapture =
-        isHoldingCtrlAlt && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
-
-      // WeChat / phần mềm chụp ngoài khác: Ctrl + Alt + A
-      const isThirdPartyCapture =
-        isHoldingCtrlAlt && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA');
-
-      // Windows Snipping Tool (nếu nhận được cả phím S khi đang giữ Win + Shift)
-      const isWinShiftS =
-        isHoldingWinShift && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
-
-      // In ấn / Xuất PDF: Ctrl + P hoặc Cmd + P
+      const isZaloCapture = isHoldingCtrlAlt && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
+      const isThirdPartyCapture = isHoldingCtrlAlt && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA');
+      const isWinShiftS = (isWinShiftPair || isWinActive || isShiftActive) && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
       const isCtrlP = (e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P' || e.code === 'KeyP');
-
-      // Lưu trang web: Ctrl + S (không kèm shift/alt)
-      const isCtrlS =
-        (e.ctrlKey || e.metaKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
+      const isCtrlS = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS');
 
       if (
         isPrintScreen ||
@@ -430,51 +420,61 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       }
 
       // Khi người dùng nhả phím Win hoặc Shift hoặc Ctrl hoặc Alt:
-      // Kiểm tra xem có còn giữ tổ hợp Win + Shift hoặc Ctrl + Alt không:
-      const stillHoldingWinShift =
+      // TUYỆT ĐỐI KHÔNG TẮT MÀN TRẬP NGAY LẬP TỨC!
+      // Chờ 500ms: Chỉ khi cửa sổ VẪN CÓ FOCUS (nghĩa là KHÔNG có Snipping Tool nào xuất hiện cướp focus):
+      // Lúc đó mới an toàn mở lại màn trập cho người dùng đọc tiếp!
+      const isHoldingNow =
         (e.shiftKey && (e.metaKey || modifierKeysRef.current.win)) ||
-        (modifierKeysRef.current.shift && (e.metaKey || modifierKeysRef.current.win));
-      const stillHoldingCtrlAlt = e.ctrlKey && e.altKey;
+        (e.ctrlKey && e.altKey);
 
-      // Nếu KHÔNG còn giữ tổ hợp chụp nữa và CHƯA BỊ BÁO ĐỎ:
-      // Tự động mở lại màn trập sau 250ms (nếu cửa sổ vẫn có focus, không bị Snipping Tool cướp focus)
-      if (!stillHoldingWinShift && !stillHoldingCtrlAlt && !isShieldActive) {
+      if (!isHoldingNow && !isShieldActive) {
         setTimeout(() => {
           if (!isShieldActive && typeof window !== 'undefined' && window.document.hasFocus()) {
             applyInstantBlackout(false);
             preemptiveArmedRef.current = false;
           }
-        }, 250);
+        }, 500);
       }
     };
 
     // 2. Bắt sự kiện Window Blur:
     // KHI CỬA SỔ BỊ MẤT FOCUS VÀ TRƯỚC ĐÓ CÓ GIỮ TỔ HỢP CHỤP (Win+Shift hoặc Ctrl+Alt):
     // ĐÂY CHÍNH LÀ LÚC SNIPPING TOOL HOẶC ZALO OVERLAY MỞ RA LẤY CẮP FOCUS CỦA TRÌNH DUYỆT!
-    // -> LẬP TỨC KÍCH HOẠT CẢNH BÁO ĐỎ LIÊN TỤC!
+    // -> LẬP TỨC TIẾP TỤC GIỮ MÀN TRẬP ĐEN VÀ KÍCH HOẠT CẢNH BÁO ĐỎ LIÊN TỤC!
     const handleWindowBlur = () => {
       if (isScreenshotAllowed()) return;
 
       const now = Date.now();
+      const timeSinceWinShift = now - lastWinShiftTimeRef.current;
+      const timeSinceCtrlAlt = now - lastCtrlAltTimeRef.current;
+      const timeSinceShift = now - lastShiftTimeRef.current;
       const recentCapture = recentCaptureKeyRef.current;
-      const isRecentCapture = Boolean(recentCapture && now - recentCapture.time < 2000);
+      const isRecentDirectCapture = Boolean(recentCapture && now - recentCapture.time < 2500);
 
-      // CHỈ KÍCH HOẠT CẢNH BÁO ĐỎ KHI CỬA SỔ BỊ BLUR DO:
-      // 1. Vừa giữ tổ hợp Win + Shift hoặc Ctrl + Alt (preemptiveArmedRef.current = true) trong vòng 2.5 giây!
-      // 2. Hoặc vừa có sự kiện chụp trực tiếp (isRecentCapture)!
-      // TUYỆT ĐỐI KHÔNG BÁO ĐỎ KHI CHỈ BẤM PHÍM WIN HOẶC CHỈ BẤM PHÍM SHIFT ĐƠN ĐỘC!
-      const isArmedBlur = preemptiveArmedRef.current && (now - preemptiveArmedTimeRef.current < 2500);
+      // Nhận diện 100% sự kiện Snipping Tool mở ra:
+      const isScreenshotBlur =
+        preemptiveArmedRef.current ||
+        timeSinceWinShift < 3500 ||
+        timeSinceCtrlAlt < 3500 ||
+        (timeSinceShift < 2500 && (now - lastMetaTimeRef.current < 2500 || modifierKeysRef.current.win)) ||
+        isRecentDirectCapture;
 
-      if (isArmedBlur || isRecentCapture) {
-        const isCtrlAlt = modifierKeysRef.current.ctrl && modifierKeysRef.current.alt;
+      if (isScreenshotBlur) {
+        const isCtrlAlt = timeSinceCtrlAlt < 3500 || (modifierKeysRef.current.ctrl && modifierKeysRef.current.alt);
         const triggerType: ViolationInfo['triggerType'] =
           recentCapture?.type || (isCtrlAlt ? 'ZALO_CAPTURE' : 'WIN_SHIFT_S');
 
         preemptiveArmedRef.current = false;
         recentCaptureKeyRef.current = null;
+        lastWinShiftTimeRef.current = 0;
+        lastCtrlAltTimeRef.current = 0;
+        lastShiftTimeRef.current = 0;
+        lastMetaTimeRef.current = 0;
 
+        // GIỮ MÀN TRẬP BẢO VỆ ĐEN ĐỂ TÀI LIỆU TUYỆT ĐỐI KHÔNG BỊ CHỤP
         applyInstantBlackout(true);
         wipeClipboardBurst();
+        // 🚨 KÍCH HOẠT MODAL CẢNH BÁO ĐỎ NGAY LẬP TỨC
         triggerViolation(triggerType);
         return;
       }

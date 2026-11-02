@@ -101,7 +101,7 @@ export const SecurityScreenShield: React.FC<SecurityScreenShieldProps> = ({
         exit={{ opacity: 0 }}
         className="absolute inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/65 dark:bg-slate-950/95 backdrop-blur-md select-none"
       >
-        <div className={`relative max-w-[390px] w-full bg-white dark:bg-slate-900 border-2 ${
+        <div className={`relative max-w-[450px] w-full bg-white dark:bg-slate-900 border-2 ${
           locked ? 'border-red-600 dark:border-red-500' : 'border-rose-300 dark:border-rose-600/70'
         } rounded-2xl p-3.5 sm:p-4 text-center shadow-[0_10px_35px_rgba(244,63,94,0.25)] dark:shadow-[0_0_40px_rgba(225,29,72,0.4)] space-y-2.5 max-h-[88vh] overflow-y-auto transition-colors`}>
           
@@ -200,26 +200,26 @@ export const SecurityScreenShield: React.FC<SecurityScreenShieldProps> = ({
             </p>
           </div>
 
-          {/* Nút hành động */}
+          {/* Nút hành động - Chuẩn 1 dòng duy nhất (whitespace-nowrap) */}
           {locked ? (
             <button
               type="button"
               onClick={onLockoutLogout}
-              className="w-full py-2 px-3 bg-gradient-to-r from-red-700 via-rose-800 to-red-700 hover:from-red-600 hover:to-red-700 text-white text-[11px] font-bold rounded-xl transition cursor-pointer shadow-md shadow-rose-950/40 border border-rose-500/50 flex items-center justify-center gap-1.5 active:scale-[0.98]"
+              className="w-full py-2.5 px-3 bg-gradient-to-r from-red-700 via-rose-800 to-red-700 hover:from-red-600 hover:to-red-700 text-white text-[11px] font-bold rounded-xl transition cursor-pointer shadow-md shadow-rose-950/40 border border-rose-500/50 flex items-center justify-center gap-1.5 active:scale-[0.98] whitespace-nowrap"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Đăng xuất (Liên hệ Quản trị viên mở khóa)</span>
+              <LogOut className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap truncate">Đăng xuất (Liên hệ Quản trị viên mở khóa)</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={onDismiss}
-              className="w-full py-2 px-3 bg-gradient-to-r from-rose-600 via-rose-700 to-rose-600 hover:from-rose-500 hover:to-rose-600 text-white text-[11px] font-bold rounded-xl transition cursor-pointer shadow-md shadow-rose-600/20 dark:shadow-rose-950/30 border border-rose-500/40 flex items-center justify-center gap-1.5 active:scale-[0.98]"
+              className="w-full py-2.5 px-3 bg-gradient-to-r from-rose-600 via-rose-700 to-rose-600 hover:from-rose-500 hover:to-rose-600 text-white text-[11px] font-bold rounded-xl transition cursor-pointer shadow-md shadow-rose-600/20 dark:shadow-rose-950/30 border border-rose-500/40 flex items-center justify-center gap-1.5 active:scale-[0.98] whitespace-nowrap"
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>
-                {violationCount === 3
-                  ? 'Tôi đã hiểu và cam kết tuyệt đối không tái phạm (Lần 3/3)'
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap truncate">
+                {violationCount >= 3
+                  ? 'Tôi đã hiểu và cam kết không tái phạm (Lần 3/3)'
                   : violationCount === 2
                   ? 'Tôi đã hiểu và cam kết không tái phạm (Lần 2/3)'
                   : 'Tôi đã hiểu và cam kết không tái phạm (Lần 1/3)'}

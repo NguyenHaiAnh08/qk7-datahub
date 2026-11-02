@@ -450,7 +450,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 <button id="qk7-focus-trap" className="sr-only opacity-0 pointer-events-none absolute -top-10 -left-10" tabIndex={-1} aria-hidden="true" />
                 <div
                   id="qk7-blackout-shutter"
-                  className="absolute inset-0 z-30 bg-slate-950/90 dark:bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-6 select-none transition-none"
+                  className={`absolute inset-0 z-30 bg-slate-950/90 dark:bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-6 select-none transition-none ${
+                    isShieldActive ? '!hidden opacity-0 pointer-events-none' : ''
+                  }`}
                   style={{ display: 'none' }}
                 >
                   {/* Dual-Theme Cyber Glass Card (Thích ứng hoàn hảo cả Light Mode & Dark Mode) */}

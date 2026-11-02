@@ -994,7 +994,7 @@ const pinPendingCount = useMemo(
                     if (res?.success) {
                       showToast(`Đã mở khóa tài khoản thành công cho quân nhân ${u.full_name} (${u.user_id})!`, 'success');
                       loadUsers();
-                      loadOverview();
+                      loadStats();
                     }
                   } catch (err: any) {
                     showToast('Lỗi khi mở khóa tài khoản: ' + err.message, 'error');

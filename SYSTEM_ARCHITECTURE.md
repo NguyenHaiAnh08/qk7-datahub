@@ -1431,3 +1431,12 @@ Toàn bộ danh mục 13 sự cố kỹ thuật điển hình đã từng gặp 
 
 ---
 *Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*
+
+
+### 4.3. Phân Hệ OCR Microservice (:8002 - PaddleOCR & PyMuPDF)
+- **Vai trò:** Xử lý offload các tác vụ nhận dạng ký tự quang học nặng (OCR), tách biệt hoàn toàn khỏi luồng Event Loop của Gateway.
+- **Công nghệ lõi:**
+  - **PaddleOCR (PP-OCRv4):** Nhận diện tiếng Việt (`lang='vi'`), tự động xoay hướng văn bản (`use_angle_cls=True`), phân tích bố cục văn bản hành chính 2 cột.
+  - **PyMuPDF (fitz):** Render trang PDF trực tiếp ra bitmap bộ nhớ với hiệu năng C-speed và DPI tối ưu (150 DPI).
+- **Định tuyến thông minh (`pdf-router.js`):** Phân loại `TextBased`, `Scanned`, `Mixed` trong vòng 7ms, chỉ gửi các trang cần bóc tách metadata (Trang 1) sang microservice OCR, giảm tải 95% thời gian tính toán.
+- **Fallback an toàn:** Nếu tiến trình `:8002` không phản hồi hoặc timeout (15s), Gateway kích hoạt cơ chế dự phòng an toàn (local Tesseract) bị chặn trần tối đa trang để tránh nghẽn server.

@@ -7,6 +7,8 @@ import { DocumentItem, DocumentType, Unit, SecurityLevel } from '../../types';
 import { documentService, ParseDocumentResult, CheckDuplicateResult } from '../../services/documentService';
 import { buildUnitTree } from '../../utils/unitTree';
 
+export type ParseStatus = 'idle' | 'classifying' | 'ocr_processing' | 'extracting' | 'done' | 'error';
+
 export interface DocumentUploadModalProps {
   open: boolean;
   document?: DocumentItem | null;
@@ -56,8 +58,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   }, [rootUnitKeys]);
 
 
-  // ── Auto-parse PDF ──
+  // ── Auto-parse PDF (Đa giai đoạn & Timeout UX) ──
   const [parsing, setParsing] = useState(false);
+  const [parseStatus, setParseStatus] = useState<ParseStatus>('idle');
+  const [parseTimeoutWarning, setParseTimeoutWarning] = useState(false);
   const [parseResult, setParseResult] = useState<ParseDocumentResult | null>(null);
   const [parseError, setParseError] = useState('');
   const parsedFileRef = React.useRef<File | null>(null);
@@ -94,6 +98,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     // Reset parse state khi modal đóng/mở
     setParseResult(null);
     setParseError('');
+    setParseStatus('idle');
+    setParseTimeoutWarning(false);
     parsedFileRef.current = null;
   }, [document, open, types, units]);
 
@@ -112,13 +118,26 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   parsedFileRef.current = selectedFile;
 
   setParsing(true);
+  setParseStatus('classifying');
+  setParseTimeoutWarning(false);
   setParseError('');
   setDuplicateInfo(null);
   setAllowOverride(false);
 
+  // Tiến trình giả lập phản hồi các pha xử lý nếu mạng/OCR chạy
+  const stageTimer = setTimeout(() => {
+    setParseStatus((prev) => (prev === 'classifying' ? 'ocr_processing' : prev));
+  }, 1200);
+
+  // Cảnh báo thời gian chờ quá 25 giây
+  const timeoutTimer = setTimeout(() => {
+    setParseTimeoutWarning(true);
+  }, 25000);
+
   // ✅ CHỈ 1 API call — parse đã trả về cả duplicate_check (SHA256 + code)
   documentService.parseDocument(selectedFile)
     .then((parseRes) => {
+      setParseStatus('extracting');
       if (parseRes.success && parseRes.parsed) {
         const p = parseRes.parsed;
         if (p.document_code) setCode(p.document_code);
@@ -134,8 +153,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           setUnitId(parsedUnitId);
         }
         setParseResult(parseRes);
+        setParseStatus('done');
       } else if (parseRes.error) {
         setParseError(parseRes.error);
+        setParseStatus('error');
       }
 
       // ✅ Map duplicate_check từ parse response → state duplicateInfo
@@ -146,8 +167,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     .catch((err) => {
       if (import.meta.env.DEV) console.warn('[parse PDF] Lỗi phân tích văn bản');
       setParseError(err?.message || 'Không thể đọc PDF. Vui lòng nhập tay.');
+      setParseStatus('error');
     })
-    .finally(() => setParsing(false));
+    .finally(() => {
+      clearTimeout(stageTimer);
+      clearTimeout(timeoutTimer);
+      setParsing(false);
+    });
   // eslint-disable-next-line
 }, [selectedFile, isEdit, types, units]);
 
@@ -342,11 +368,28 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               );
             })()}
 
-            {/* Trạng thái auto-parse PDF */}
+            {/* Trạng thái auto-parse PDF đa giai đoạn */}
             {parsing && (
-              <div className="flex items-center gap-2 p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-700 dark:text-blue-300 text-xs">
-                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                <span>Đang đọc nội dung PDF và điền form...</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-700 dark:text-blue-300 text-xs">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0 text-blue-600 dark:text-blue-400" />
+                  <span className="font-medium">
+                    {parseStatus === 'classifying' && 'Đang phân tích cấu trúc văn bản (Text vs Bản scan)...'}
+                    {parseStatus === 'ocr_processing' && 'Đang nhận dạng ký tự quang học (PaddleOCR / Xử lý mộc đỏ & bố cục)...'}
+                    {parseStatus === 'extracting' && 'Đang trích xuất siêu dữ liệu và điền biểu mẫu...'}
+                    {!['classifying', 'ocr_processing', 'extracting'].includes(parseStatus) && 'Đang đọc nội dung PDF và điền form...'}
+                  </span>
+                </div>
+
+                {parseTimeoutWarning && (
+                  <div className="flex items-start gap-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-300 text-xs">
+                    <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                    <div>
+                      <span className="font-semibold">Quá trình xử lý kéo dài: </span>
+                      <span>Tệp scan dung lượng lớn đang được phân tích qua OCR Microservice. Hệ thống vẫn đang xử lý, bạn có thể chờ thêm hoặc chủ động nhập thông tin thủ công bên dưới.</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

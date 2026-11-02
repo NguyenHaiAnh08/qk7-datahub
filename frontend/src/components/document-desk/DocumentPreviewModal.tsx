@@ -10,6 +10,7 @@ import {
   Building,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -447,7 +448,50 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 {/* ⚡ MÀN TRẬP BẢO MẬT ĐÓN ĐẦU 0MS (PRE-EMPTIVE SHUTTER):
                     Đóng tức thì không độ trễ khi phát hiện tổ hợp phím chụp trước khi OS kịp freeze frame */}
                 <button id="qk7-focus-trap" className="sr-only opacity-0 pointer-events-none absolute -top-10 -left-10" tabIndex={-1} aria-hidden="true" />
-                <div id="qk7-blackout-shutter" className="absolute inset-0 z-30 bg-slate-950 select-none pointer-events-none" style={{ display: 'none' }} />
+                <div
+                  id="qk7-blackout-shutter"
+                  className="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 select-none"
+                  style={{ display: 'none', transition: 'none' }}
+                >
+                  {/* Cyber Military HUD Glow & Grid */}
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-950/40 via-slate-950/80 to-slate-950 pointer-events-none" />
+
+                  {/* HUD Security Glass Card */}
+                  <div className="relative z-10 max-w-md w-full mx-auto p-6 rounded-2xl bg-slate-900/85 border-2 border-emerald-500/40 shadow-[0_0_50px_rgba(16,185,129,0.2)] text-center flex flex-col items-center gap-4">
+                    {/* Glowing Animated Shield Badge */}
+                    <div className="relative flex items-center justify-center">
+                      <span className="animate-ping absolute inline-flex h-16 w-16 rounded-full bg-emerald-500/20" />
+                      <div className="relative w-14 h-14 rounded-2xl bg-emerald-950/90 border border-emerald-500/50 flex items-center justify-center text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.35)]">
+                        <ShieldCheck className="w-8 h-8 animate-pulse text-emerald-400" />
+                      </div>
+                    </div>
+
+                    {/* Security Department Badge */}
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-semibold tracking-wider uppercase">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span>HỆ THỐNG PHÒNG THỦ KHÔNG GIAN SỐ</span>
+                    </div>
+
+                    {/* Main Headline */}
+                    <div className="space-y-1.5">
+                      <h3 className="text-base sm:text-lg font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300 uppercase">
+                        ĐÃ KÍCH HOẠT BẢO MẬT AN NINH CHỐNG CHỤP MÀN HÌNH
+                      </h3>
+                      <p className="text-xs text-slate-300 font-medium leading-relaxed max-w-sm">
+                        Màn trập quang học 0ms đã che chắn dữ liệu văn bản. Mọi hình ảnh chụp trộm từ hệ điều hành sẽ chỉ ghi nhận được khung đen bảo vệ.
+                      </p>
+                    </div>
+
+                    {/* Telemetry Status Line */}
+                    <div className="w-full pt-3 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-emerald-500/80">
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        TRẠNG THÁI: 0MS SHUTTER ACTIVE
+                      </span>
+                      <span>TIÊU CHUẨN: QK7-SEC-2026</span>
+                    </div>
+                  </div>
+                </div>
 
                 <div
                   className={`w-full h-full secure-pdf-content ${

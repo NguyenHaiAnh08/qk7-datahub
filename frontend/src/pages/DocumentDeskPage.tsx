@@ -12,7 +12,7 @@ import { DocumentPreviewModal } from '../components/document-desk/DocumentPrevie
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
-import { isUserAdmin, isUserManager } from '../contexts/AuthContext';
+import { isUserAdmin } from '../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
@@ -49,11 +49,17 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
   const canApproveProposals = useMemo(() => {
     if (!user) return false;
-    const isAdmin = isUserAdmin(user) || 
-                    user.user_id === 'USR-001' || 
-                    (user.roles || []).includes('ROL-01');
 
-    return isAdmin;
+    const isAdmin =
+      isUserAdmin(user) ||
+      user.user_id === 'USR-001' ||
+      (user.roles || []).includes('ROL-01');
+
+    const isCommander = (user.roles || []).includes('ROL-02');
+
+    // Admin HOẶC Chỉ huy được duyệt đề xuất chỉnh sửa văn bản
+    // (ROL-03 KHÔNG được duyệt — tránh mở rộng nhầm qua isUserManager)
+    return isAdmin || isCommander;
   }, [user]);
 
   const loadPendingProposals = useCallback(async () => {

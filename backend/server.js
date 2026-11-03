@@ -664,9 +664,9 @@ app.post('/api/auth/login', async (req, res) => {
     // - USR-001 (Quản trị tối cao): bắt buộc nếu đã enroll, cảnh báo nếu chưa
     // - Admin tạm thời (được gán ROL-01): BẮT BUỘC phải có vân tay
     // ═══════════════════════════════════════════════════════════
-    const PROTECTED_ADMIN_ROLE_ID = process.env.PROTECTED_ADMIN_ROLE_ID || 'ROL-01';
-    const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
-    const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
+    // const PROTECTED_ADMIN_ROLE_ID = process.env.PROTECTED_ADMIN_ROLE_ID || 'ROL-01';
+    // const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
+    // const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
 
     // if (isProtectedAdmin || hasAdminRole) {
     //   // Dùng luôn user.has_fingerprint đã load trong query đầu
@@ -2905,11 +2905,16 @@ app.post('/api/security/screenshot-alert', async (req, res) => {
         violationCount = countRes.recordset[0]?.total || 1;
 
         // Quá 3 lần vi phạm (tức là từ lần thứ 4 trở đi) -> TỰ ĐỘNG KHÓA TÀI KHOẢN NGAY LẬP TỨC
-        if (violationCount > 3) {
+        const userRes = await pool.request()
+          .input('uid', sql.VarChar(50), userId)
+          .query(`SELECT status FROM [USER] WHERE user_id = @uid`);
+        const currentStatus = userRes.recordset[0]?.status;
+
+        if (violationCount > 3 || currentStatus === 'locked') {
           isLocked = true;
           await pool.request()
             .input('uid', sql.VarChar(50), userId)
-            .query(`UPDATE [USER] SET status = 'locked', locked_at = GETDATE() WHERE user_id = @uid`);
+            .query(`UPDATE [USER] SET status = 'locked', locked_at = ISNULL(locked_at, GETDATE()) WHERE user_id = @uid`);
 
           await writeAccessLog({
             userId,

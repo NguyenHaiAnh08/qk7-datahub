@@ -163,6 +163,15 @@ graph TD
   * Regex chuẩn hóa số hiệu có năm ban hành và ký tự OCR dung sai (ví dụ `224/2026/NĐ-CP`, `652/QĐ-TQS`).
   * Có sẵn cơ chế phòng vệ theo chiều sâu (Defense-in-depth): Nếu cổng 8002 offline, Gateway tự động fallback về Tesseract với trần giới hạn trang chặt chẽ, không bao giờ đọc tràn lan toàn bộ file.
 
+### 16. Quy Trình Số Hóa Tài Liệu Chia Đôi Màn Hình & Xem Trước Tức Thì (Split-Pane Digitization & Local Preview)
+* **Giao diện Split-Pane Side-by-Side:** Nâng cấp toàn diện hộp thoại *"Tiếp Nhận & Lưu Trữ Văn Bản Mới"* và *"Hiệu Chỉnh Văn Bản"* từ dạng popup nhỏ giữa màn hình sang Modal toàn màn hình chia 2 khung làm việc song song độc lập:
+  * **Khung trái (35% - 40%):** Biểu mẫu nhập liệu (Số hiệu, trích yếu, người ký, độ mật, đơn vị...) có thanh cuộn dọc riêng biệt (`overflow-y-auto`).
+  * **Khung phải (60% - 65%):** Trình xem trước PDF toàn màn hình phục vụ đối chiếu dữ liệu văn bản theo thời gian thực.
+* **Xem trước cục bộ tức thì (Real-time Local Preview 0ms):** Sử dụng `URL.createObjectURL(file)` hiển thị ngay lập tức văn bản khi người dùng kéo/thả tệp PDF mà không cần đợi nạp lên máy chủ; tự động giải phóng URL (`URL.revokeObjectURL`) khi đóng form để ngăn ngừa rò rỉ bộ nhớ.
+* **Tự động đối chiếu văn bản máy chủ khi hiệu chỉnh:** Khung bên phải tự động nạp tệp PDF gốc của văn bản thông qua luồng bảo mật `/api/files/:id/view` khi mở chế độ hiệu chỉnh.
+* **Công nghệ chống nhấp nháy PDF Canvas (Flicker-Free Canvas Rendering):** Áp dụng kiến trúc memoization (`React.memo`, `useMemo`) phân tách độc lập vòng đời render của biểu mẫu nhập liệu và canvas PDF; cô lập layer vẽ điểm nhấn (highlight canvas) khỏi render pipeline của PDF, đảm bảo gõ phím mượt mà và không giật nháy hình ảnh tài liệu.
+* **Đồng bộ cơ chế an ninh Watermark & Công thái học:** Khung xem tài liệu luôn tự động phủ lớp Sparse Dynamic Watermark (Họ tên cán bộ, IP, Timestamp) bảo vệ dữ liệu kể cả trong quá trình nhập liệu; nút đóng được bố trí tinh tế ở góc trên bên phải khung tài liệu, tối ưu theo bản sắc quân đội.
+
 ---
 
 ## 📁 Cấu Trúc Dự Án Toàn Diện

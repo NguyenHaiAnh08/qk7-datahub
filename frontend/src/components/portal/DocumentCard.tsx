@@ -116,7 +116,14 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         ) : (
           <>
             <button
-              onClick={() => onPreview(document)}
+              onClick={() => {
+                try {
+                  if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+                    window.document.documentElement.requestFullscreen().catch(() => {});
+                  }
+                } catch (_) {}
+                onPreview(document);
+              }}
               className="flex-1 min-h-[40px] py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5" />

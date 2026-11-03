@@ -2228,23 +2228,14 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
       WHERE p.status = 'PENDING'
     `;
 
-    if (!isAdmin && isCommander) {
+       if (!isAdmin && isCommander) {
       const userUnitId = await resolveUserUnitId(req.user);
-      let targetUnits = [userUnitId];
-      // Nếu là Chỉ huy thuộc cơ quan trường, mở rộng quản lý cho toàn trường
-      const userUnitRec = await pool.request().input('uid', sql.VarChar(50), userUnitId).query('SELECT parent_id FROM UNIT WHERE unit_id = @uid');
-      const parentUnitId = userUnitRec.recordset[0]?.parent_id;
-      if (parentUnitId) {
-        const parentSubtree = await getSubtreeUnits(parentUnitId);
-        targetUnits = Array.from(new Set([...targetUnits, parentUnitId, ...parentSubtree]));
-      } else {
-        const subtree = await getSubtreeUnits(userUnitId);
-        targetUnits = Array.from(new Set([...targetUnits, ...subtree]));
-      }
+      const targetUnits = userUnitId ? await getSubtreeUnits(userUnitId) : [];
 
       if (targetUnits.length > 0) {
         const params = targetUnits.map((_, i) => `@u_${i}`);
-        query += ` AND (d.issuing_unit_id IN (${params.join(', ')}) OR p.issuing_unit_id IN (${params.join(', ')}))`;
+        // ✅ SỬA: Lọc theo u.unit_id (Đơn vị của người gửi đề xuất)
+        query += ` AND u.unit_id IN (${params.join(', ')})`;
         targetUnits.forEach((uId, i) => r.input(`u_${i}`, sql.VarChar(50), uId));
       } else {
         query += ` AND 1 = 0`;

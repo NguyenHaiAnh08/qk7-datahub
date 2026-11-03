@@ -165,7 +165,14 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                       ) : (
                         <div className="inline-flex items-center space-x-1">
                           <button
-                            onClick={() => onPreview(doc)}
+                            onClick={() => {
+                            try {
+                              if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+                                window.document.documentElement.requestFullscreen().catch(() => {});
+                              }
+                            } catch (_) {}
+                            onPreview(doc);
+                          }}
                             className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg transition cursor-pointer"
                             title="Xem trước tài liệu"
                           >

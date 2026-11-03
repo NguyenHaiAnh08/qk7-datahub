@@ -1,10 +1,11 @@
+import { PdfPagesViewer } from './PdfPagesViewer';
+import { HIGHLIGHTER_COLORS } from './DocumentHighlighter';
+import { Highlighter, Trash2, Undo2 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
   Download,
-  Maximize2,
-  Minimize2,
   FileText,
   Calendar,
   Building,
@@ -59,9 +60,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const [fingerprintToken, setFingerprintToken] = useState<string | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const modalContainerRef = React.useRef<HTMLDivElement>(null);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  // 🖊️ Bút dạ quang ghi chú (Hỗ trợ toàn diện từ Cấp 1 đến Cấp 5)
+  const [isHighlighterActive, setIsHighlighterActive] = useState<boolean>(false);
+  const [highlighterColor, setHighlighterColor] = useState<string>(HIGHLIGHTER_COLORS[0].value);
+  const [strokeCount, setStrokeCount] = useState<number>(0);
+  const highlighterRef = React.useRef<{ undo: () => void; clear: () => void; getStrokeCount: () => number } | null>(null);
 
   // 🛡️ Chống chụp màn hình & cảnh báo an ninh (PrintScreen, Win+Shift+S, Quá 3 lần khóa tài khoản)
   const { isShieldActive, violationInfo, violationCount, isAccountLocked, dismissShield } = useAntiScreenshot({
@@ -70,28 +76,51 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     iframeRef,
   });
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
-        setIsFullscreen(false);
-      }
-    };
-    if (typeof window !== 'undefined') {
-      window.document.addEventListener('fullscreenchange', handleFullscreenChange);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      }
-    };
-  }, []);
-
   const docLevel = document ? (document.security_level_id || 1) : 1;
   const canView = !document || docLevel <= clearanceLevel;
   const canDownload = !document || (docLevel <= 2 && docLevel <= clearanceLevel);
   const isSecretLevel = docLevel >= 3;
 
-  // ✅ SỬA clearBiometricSession: Chỉ xóa token của file hiện tại + dọn key global cũ
+  // 🔒 Khóa cuộn trang web cha (document-desk) để loại bỏ 100% thanh cuộn kép (double scrollbar)
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+    const prevBodyOverflow = window.document.body.style.overflow;
+    const prevHtmlOverflow = window.document.documentElement.style.overflow;
+    window.document.body.style.overflow = 'hidden';
+    window.document.documentElement.style.overflow = 'hidden';
+    return () => {
+      window.document.body.style.overflow = prevBodyOverflow;
+      window.document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, [open]);
+
+  // 🚪 Khi bấm phím Esc hoặc người dùng thoát Fullscreen -> TỰ ĐỘNG THOÁT TÀI LIỆU
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+    const winDoc = window.document;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleClose();
+      }
+    };
+
+    const handleFsChange = () => {
+      if (!winDoc.fullscreenElement && open) {
+        handleClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    winDoc.addEventListener('fullscreenchange', handleFsChange);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      winDoc.removeEventListener('fullscreenchange', handleFsChange);
+    };
+  }, [open]);
+
   const clearBiometricSession = () => {
     setFingerprintToken(null);
     if (typeof window !== 'undefined' && document?.file_id) {
@@ -258,34 +287,19 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     }
   };
 
-  const handleToggleFullscreen = () => {
-    if (!isFullscreen) {
-      setIsFullscreen(true);
-      try {
-        if (modalContainerRef.current?.requestFullscreen) {
-          modalContainerRef.current.requestFullscreen().catch(() => {});
-        }
-      } catch (e) {}
-    } else {
-      setIsFullscreen(false);
-      try {
-        if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
-          window.document.exitFullscreen().catch(() => {});
-        }
-      } catch (e) {}
-    }
-  };
-
   const handleClose = () => {
+    setShowScanModal(false);
     clearBiometricSession();
-    if (isFullscreen) {
-      try {
-        if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
-          window.document.exitFullscreen().catch(() => {});
-        }
-      } catch (e) {}
-      setIsFullscreen(false);
-    }
+    setIsHighlighterActive(false);
+    setBlobUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    try {
+      if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
+        window.document.exitFullscreen().catch(() => {});
+      }
+    } catch (_) {}
     onClose();
   };
 
@@ -294,19 +308,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       <div
         key="preview-backdrop"
         ref={modalContainerRef}
-        className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 dark:bg-slate-950/85 backdrop-blur-sm transition-all duration-200 ${
-          isFullscreen ? 'p-0' : 'p-2 sm:p-4 md:p-6'
+        className={`fixed inset-0 z-50 flex flex-col w-screen h-screen bg-white dark:bg-slate-900 overflow-hidden ${
+          isSecretLevel ? 'select-none' : 'select-text'
         }`}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl flex flex-col mx-auto transition-all duration-200 ${
-            isFullscreen
-              ? 'w-full h-full max-w-none max-h-none rounded-none border-none'
-              : 'rounded-2xl w-full max-w-5xl h-[92vh] max-h-[calc(100dvh-2rem)]'
-          }`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="w-full h-full flex flex-col bg-white dark:bg-slate-900 overflow-hidden"
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-3 overflow-hidden min-w-0 flex-1 mr-3">
@@ -357,24 +367,63 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
-              {/* Nút bật/tắt Chế độ Toàn màn hình chuẩn HTML5 an ninh cao */}
-              <button
-                onClick={handleToggleFullscreen}
-                className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                title={isFullscreen ? 'Thu nhỏ cửa sổ xem văn bản (Esc)' : 'Mở toàn màn hình xem văn bản (Bảo vệ an ninh cao)'}
-              >
-                {isFullscreen ? (
-                  <>
-                    <Minimize2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                    <span className="hidden sm:inline">Thu nhỏ</span>
-                  </>
-                ) : (
-                  <>
-                    <Maximize2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                    <span className="hidden sm:inline">Toàn màn hình</span>
-                  </>
+              {/* 🖊️ Bút dạ quang ghi chú (Hỗ trợ toàn diện từ Cấp 1 đến Cấp 5) */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setIsHighlighterActive((prev) => !prev)}
+                  className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition cursor-pointer ${
+                    isHighlighterActive
+                      ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                  title={isHighlighterActive ? 'Đang bật bút dạ quang (Click để tắt và thao tác văn bản)' : 'Bật bút dạ quang ghi chú giáo trình'}
+                >
+                  <Highlighter className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">
+                    {isHighlighterActive ? 'Đang vẽ ghi chú' : 'Bút dạ quang'}
+                  </span>
+                </button>
+
+                {/* Bảng chọn màu bút dạ quang & nút Hoàn tác (Undo) */}
+                {isHighlighterActive && (
+                  <div className="flex items-center gap-1 pl-1.5 border-l border-slate-300 dark:border-slate-600">
+                    {HIGHLIGHTER_COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setHighlighterColor(c.value)}
+                        className={`w-5 h-5 rounded-full ${c.bgClass} border transition-all cursor-pointer ${
+                          highlighterColor === c.value
+                            ? 'scale-115 ring-2 ring-slate-800 dark:ring-white border-white shadow-xs'
+                            : 'opacity-70 hover:opacity-100 border-transparent'
+                        }`}
+                        title={c.name}
+                      />
+                    ))}
+                    {strokeCount > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => highlighterRef.current?.undo()}
+                          className="p-1 text-slate-500 hover:text-amber-500 dark:text-slate-300 dark:hover:text-amber-400 transition cursor-pointer ml-0.5"
+                          title="Hoàn tác nét vẽ vừa bôi (Ctrl + Z)"
+                        >
+                          <Undo2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => highlighterRef.current?.clear()}
+                          className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition cursor-pointer"
+                          title="Xóa tất cả nét ghi chú"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
-              </button>
+              </div>
               <CompactDownloadButton
                 onDownload={handleDownload}
                 onCancel={() =>
@@ -395,6 +444,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               <button
                 onClick={handleClose}
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                title="Thoát tài liệu (Esc)"
+                aria-label="Thoát tài liệu (Esc)"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -444,29 +495,17 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             )}
 
             {!loading && !error && blobUrl && (
-              <div className="relative overflow-hidden w-full h-full flex items-center justify-center">
-                {/* ⚡ MÀN TRẬP BẢO MẬT ĐÓN ĐẦU 0MS (PRE-EMPTIVE SHUTTER):
-                    Đóng tức thì không độ trễ khi phát hiện tổ hợp phím chụp trước khi OS kịp freeze frame */}
-                <button id="qk7-focus-trap" className="sr-only opacity-0 pointer-events-none absolute -top-10 -left-10" tabIndex={-1} aria-hidden="true" />
-                <div
-                  id="qk7-blackout-shutter"
-                  className="absolute inset-0 z-30 bg-white dark:bg-black select-none pointer-events-none transition-none"
-                  style={{ display: 'none' }}
+              <div className="relative overflow-hidden w-full h-full flex flex-col items-center">
+                {/* 📄 Bộ hiển thị trang PDF chuẩn + Bút dạ quang ĂN CỨNG THEO TÀI LIỆU (giống Watermark) */}
+                <PdfPagesViewer
+                  blobUrl={blobUrl}
+                  fileId={document.file_id}
+                  securityLevel={docLevel}
+                  isHighlighterActive={isHighlighterActive}
+                  highlighterColor={highlighterColor}
+                  onStrokeCountChange={(count) => setStrokeCount(count)}
+                  highlighterRef={highlighterRef}
                 />
-
-                    <div
-                  className={`w-full h-full secure-pdf-content ${
-                    isShieldActive ? 'hidden opacity-0 pointer-events-none' : ''
-                  }`}
-                  style={{ transition: 'none' }}
-                >
-                  <iframe
-                    ref={iframeRef}
-                    src={`${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0`}
-                    title={document.title}
-                    className="w-full h-full border-none secure-pdf-content select-none" onContextMenu={(e) => e.preventDefault()}
-                  />
-                </div>
 
                 {/* Lá chắn cảnh báo đỏ vi phạm an ninh (Liên tục & Quá 3 lần khóa tài khoản) */}
                 <SecurityScreenShield
@@ -510,11 +549,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           }
         }}
         onCancel={() => {
-          setShowScanModal(false);
-          clearBiometricSession();
-          if (!blobUrl) {
-            onClose();
-          }
+          handleClose();
         }}
       />
     </AnimatePresence>

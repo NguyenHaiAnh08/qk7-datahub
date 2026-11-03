@@ -4,6 +4,32 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.2.5-split-pane-digitization-workflow] — 2026-11-03
+
+### 1. Quy Trình Số Hóa Tài Liệu Chia Đôi Màn Hình (Split-Pane Digitization Side-by-Side)
+- **Tái cấu trúc Modal Đăng Tải & Hiệu Chỉnh:** Chuyển đổi hộp thoại popup nhỏ sang giao diện toàn màn hình (Full-screen Modal) chia đôi 2 vùng làm việc độc lập:
+  - *Khung bên trái (35% - 40%):* Biểu mẫu nhập liệu (Số hiệu, trích yếu, người ký, đơn vị, độ mật) với thanh cuộn dọc độc lập `overflow-y-auto`.
+  - *Khung bên phải (60% - 65%):* Trình xem trước PDF toàn màn hình (PDF Viewer) phục vụ đối chiếu dữ liệu theo thời gian thực.
+- **Xem trước cục bộ tức thì (Real-time Local Preview 0ms):**
+  - Kéo thả tệp PDF vào Dropzone ở form trái sẽ render ngay lập tức sang khung phải thông qua `URL.createObjectURL(file)` mà không cần upload lên máy chủ.
+  - Tự động thu hồi `URL.revokeObjectURL` khi unmount hoặc đổi file để ngăn ngừa rò rỉ bộ nhớ.
+  - Tự động tải stream văn bản gốc `/api/files/:id/view` khi mở chế độ "Hiệu Chỉnh Văn Bản".
+- **Empty State chuyên nghiệp:** Hiển thị màn hình chờ trực quan với biểu tượng tài liệu lớn và thông báo hướng dẫn kéo thả khi chưa chọn tệp.
+
+### 2. Tối Ưu Hiệu Năng & Khắc Phục Triệt Để Hiện Tượng Nhấp Nháy (Flicker-Free Canvas)
+- **Khắc phục lỗi giật nhấp nháy PDF Canvas khi nhập liệu:**
+  - Bọc `SinglePdfPage` và `PdfPagesViewer` trong `React.memo` với hàm so sánh props tùy biến.
+  - Tách `redrawStrokes` khỏi dependency array của effect render PDF trong `SinglePdfPage.tsx`, tránh việc xóa trắng canvas (`canvas.width = canvas.width`) và hủy render task mỗi khi gõ phím.
+  - Memoize hoàn toàn node PDF Viewer bằng `useMemo` trong `DocumentUploadModal.tsx`, cô lập khỏi state thay đổi của form nhập liệu (`formData`).
+  - Dùng `prevSelectedFileRef` và `initializedDocIdRef` ngăn chặn gọi lại không cần thiết các hàm nạp dữ liệu.
+
+### 3. Tinh Chỉnh UX/UI Theo Bản Sắc Quân Đội & Bảo Mật Đa Tầng
+- **Tối ưu màu sắc Light Mode thanh lịch:** Đồng bộ bảng màu nền, viền, shadow tạo độ tương phản cao, dịu mắt và trang nhã.
+- **Loại bỏ công cụ thừa & Công thái học nút đóng:** Loại bỏ bút dạ quang khỏi thanh công cụ modal đăng tải/hiệu chỉnh; đưa nút đóng `[X]` lên góc trên bên phải thanh tiêu đề khung PDF.
+- **Bảo mật Sparse Dynamic Watermark:** Luôn tự động kích hoạt watermark mờ phủ chéo 45 độ trên khung PDF xem trước cục bộ và máy chủ để bảo vệ an ninh văn bản quân sự.
+
+---
+
 ## [v1.2.4-anti-screenshot-approval-workflow-unit-sort] — 2026-11-01
 
 ### 1. Lá Chắn Chống Chụp Màn Hình & Cảnh Báo An Ninh Tác Chiến (Anti-Screenshot Security Shield)

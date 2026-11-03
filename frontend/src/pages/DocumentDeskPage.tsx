@@ -176,6 +176,15 @@ const canUpload = hasPermission('DOC_UPLOAD');
   };
 
   // Download Handler
+  const handlePreviewDocument = (doc: DocumentItem) => {
+    try {
+      if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+        window.document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch (_) {}
+    setPreviewDoc(doc);
+  };
+
   const handleDownload = async (doc: DocumentItem, signal?: AbortSignal) => {
     const userClearance = user?.clearance_level_id || 1;
     const docLevel = doc.security_level_id || 1;
@@ -369,7 +378,14 @@ const canUpload = hasPermission('DOC_UPLOAD');
         open={Boolean(previewDoc)}
         document={previewDoc}
         userClearanceLevel={user?.clearance_level_id || 1}
-        onClose={() => setPreviewDoc(null)}
+        onClose={() => {
+          setPreviewDoc(null);
+          try {
+            if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
+              window.document.exitFullscreen().catch(() => {});
+            }
+          } catch (_) {}
+        }}
       />
 
       {/* Pending Proposals Modal */}

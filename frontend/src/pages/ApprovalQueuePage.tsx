@@ -214,7 +214,13 @@ export const ApprovalQueuePage: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const isAdminRole = (user?.roles || []).includes('ROL-01') || user?.user_id === 'USR-001';
+  const isCommanderRole = (user?.roles || []).includes('ROL-02');
+  const canSelfApprove = isAdminRole || isCommanderRole;
+
   const isSelfRequest = selected?.requester_id === user?.user_id;
+  // Chỉ chặn nếu là nhân viên thường tự duyệt phiếu của mình
+  const blockSelfApprove = isSelfRequest && !canSelfApprove;
 
   return (
     <div className="space-y-4">
@@ -314,7 +320,7 @@ export const ApprovalQueuePage: React.FC = () => {
             </div>
             
             <div className="p-4 space-y-3 text-xs">
-              {isSelfRequest && (
+              {blockSelfApprove && (
                 <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-2">
                   <Lock className="w-4 h-4 shrink-0" />
                   Cảnh báo: Đây là yêu cầu do chính bạn tạo ra. Bạn không thể tự phê duyệt.
@@ -393,11 +399,11 @@ export const ApprovalQueuePage: React.FC = () => {
             </div>
 
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
-              <button onClick={handleReject} disabled={processing || isSelfRequest || !rejectNote.trim()}
+              <button onClick={handleReject} disabled={processing || blockSelfApprove || !rejectNote.trim()}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                 {processing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />} Từ chối
               </button>
-              <button onClick={handleApprove} disabled={processing || isSelfRequest}
+              <button onClick={handleApprove} disabled={processing || blockSelfApprove}
                 className={`px-4 py-2 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   selected.http_path.includes('/pin') ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'
                 }`}>

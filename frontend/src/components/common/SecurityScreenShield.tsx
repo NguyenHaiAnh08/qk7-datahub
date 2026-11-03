@@ -99,7 +99,7 @@ export const SecurityScreenShield: React.FC<SecurityScreenShieldProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/65 dark:bg-slate-950/95 backdrop-blur-md select-none"
+        className="absolute inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md select-none"
       >
         <div className={`relative max-w-[450px] w-full bg-white dark:bg-slate-900 border-2 ${
           locked ? 'border-red-600 dark:border-red-500' : 'border-rose-300 dark:border-rose-600/70'

@@ -93,14 +93,20 @@ export function applyInstantBlackout(active: boolean) {
     const htmlEl = el as HTMLElement;
     if (active) {
       htmlEl.style.filter = 'blur(60px)';
-      htmlEl.style.opacity = '0.01';
+      htmlEl.style.opacity = '0.001';
       htmlEl.style.pointerEvents = 'none';
       htmlEl.style.visibility = 'hidden';
+      if (htmlEl.tagName === 'IFRAME') {
+        htmlEl.style.display = 'none';
+      }
     } else {
       htmlEl.style.filter = '';
       htmlEl.style.opacity = '';
       htmlEl.style.pointerEvents = '';
       htmlEl.style.visibility = '';
+      if (htmlEl.tagName === 'IFRAME') {
+        htmlEl.style.display = 'block';
+      }
     }
   });
 
@@ -150,10 +156,6 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
   const recentCaptureKeyRef = useRef<{ type: ViolationInfo['triggerType']; time: number } | null>(null);
   const lastCtrlAltComboTimeRef = useRef<number>(0);
   const lastWinShiftComboTimeRef = useRef<number>(0);
-  const lastWinKeyTimeRef = useRef<number>(0);
-  const lastShiftKeyTimeRef = useRef<number>(0);
-  const lastCtrlKeyTimeRef = useRef<number>(0);
-  const lastAltKeyTimeRef = useRef<number>(0);
   const isMouseInsideWindowRef = useRef<boolean>(true);
 
   // Gửi báo cáo vi phạm về Gateway Backend (/api/security/screenshot-alert)
@@ -308,32 +310,37 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       // Cập nhật trạng thái các phím bổ trợ (hỗ trợ cả thuộc tính trực tiếp và code phím)
       if (e.key === 'Meta' || e.key === 'OS' || e.code === 'MetaLeft' || e.code === 'MetaRight' || e.metaKey) {
         modifierKeysRef.current.win = true;
-        lastWinKeyTimeRef.current = now;
       }
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.shiftKey) {
         modifierKeysRef.current.shift = true;
-        lastShiftKeyTimeRef.current = now;
       }
       if (e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight' || e.ctrlKey) {
         modifierKeysRef.current.ctrl = true;
-        lastCtrlKeyTimeRef.current = now;
       }
       if (e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight' || e.altKey) {
         modifierKeysRef.current.alt = true;
-        lastAltKeyTimeRef.current = now;
       }
 
-      // Ghi nhận dấu mốc thời gian khi tổ hợp bổ trợ đang được giữ
+      // Ghi nhận dấu mốc thời gian khi CẢ TỔ HỢP đang được giữ đồng thời
       const isCtrlActive = Boolean(e.ctrlKey || modifierKeysRef.current.ctrl);
       const isAltActive = Boolean(e.altKey || modifierKeysRef.current.alt);
       const isWinActive = Boolean(e.metaKey || modifierKeysRef.current.win);
       const isShiftActive = Boolean(e.shiftKey || modifierKeysRef.current.shift);
 
-      if (isCtrlActive && isAltActive) {
+      const isCtrlAltCombo = isCtrlActive && isAltActive;
+      const isWinShiftCombo = isWinActive && isShiftActive;
+
+      // ⚡ MÀN TRẬP ĐÓN ĐẦU 0MS (PRE-EMPTIVE SHUTTER):
+      // Ngay khi người dùng giữ CẢ 2 PHÍM (Win+Shift hoặc Ctrl+Alt), màn trập trắng lập tức đóng kín!
+      // Khi ngón tay nhấn tiếp phím S (sau khoảng 80-200ms), DWM / Snipping Tool CHỈ THU ĐƯỢC MÀN TRẬP TRẮNG,
+      // tuyệt đối không thu được bất kỳ nội dung văn bản nào để lưu vào thư mục Screenshots!
+      if (isCtrlAltCombo) {
         lastCtrlAltComboTimeRef.current = now;
+        applyInstantBlackout(true);
       }
-      if (isWinActive && isShiftActive) {
+      if (isWinShiftCombo) {
         lastWinShiftComboTimeRef.current = now;
+        applyInstantBlackout(true);
       }
 
       // =========================================================================
@@ -363,9 +370,9 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
       const isPrintScreen = e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44;
 
       // Zalo Chụp màn hình (Ctrl + Alt + S hoặc Ctrl + Alt + A)
-      const isZaloCapture = isCtrlActive && isAltActive && (isKeyS || isKeyA);
+      const isZaloCapture = isCtrlAltCombo && (isKeyS || isKeyA);
       // Snipping Tool (Win + Shift + S)
-      const isWinShiftS = isWinActive && isShiftActive && isKeyS;
+      const isWinShiftS = isWinShiftCombo && isKeyS;
       // In tài liệu trái phép (Ctrl + P)
       const isCtrlP = (e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P' || e.code === 'KeyP' || e.keyCode === 80);
       // Lưu tài liệu trái phép (Ctrl + S)
@@ -418,59 +425,66 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
         applyInstantBlackout(true);
         wipeClipboardBurst();
         triggerViolation('PRINT_SCREEN');
+        return;
+      }
+
+      // Nếu người dùng chỉ giữ Win+Shift hoặc Ctrl+Alt rồi nhả ra mà không bấm chụp:
+      // Mở lại văn bản bình thường nếu không có cảnh báo đỏ đang bật
+      const isWinShiftStillHeld = modifierKeysRef.current.win && modifierKeysRef.current.shift;
+      const isCtrlAltStillHeld = modifierKeysRef.current.ctrl && modifierKeysRef.current.alt;
+      if (!isWinShiftStillHeld && !isCtrlAltStillHeld && !isShieldActive && document.hasFocus()) {
+        applyInstantBlackout(false);
       }
     };
 
     // 2. Bắt sự kiện Window Blur:
     // Cực kỳ quan trọng:
-    // a) Màn trập 0ms LUÔN LUÔN được đóng lại ngay khi cửa sổ bị mất focus (blur) để ngăn chặn 100%
-    //    bất kỳ công cụ chụp màn hình nào (Windows Snipping Tool, Zalo Desktop, ShareX, OBS) thu được nội dung văn bản.
-    // b) Nếu mất focus do tổ hợp phím chụp (Win+Shift+S, Ctrl+Alt+S, PrintScreen): Kích hoạt ngay Modal Cảnh Báo Đỏ!
+    // a) Màn trập 0ms được đóng lại khi cửa sổ thực sự mất focus ra ngoài OS (Windows Snipping Tool, Zalo Desktop, ShareX, OBS).
+    // b) Nếu mất focus do người dùng click/cuộn chuột vào iframe PDF: Bỏ qua hoàn toàn, không phạt!
+    // c) Nếu mất focus do tổ hợp phím chụp (Win+Shift+S, Ctrl+Alt+S, PrintScreen): Kích hoạt ngay Modal Cảnh Báo Đỏ!
     const handleWindowBlur = () => {
       if (isScreenshotAllowed()) return;
 
+      // 🛡️ BƯỚC 1: Kiểm tra nếu tiêu điểm chuyển vào iframe PDF (người dùng click/cuộn chuột trong tài liệu)
+      const activeEl = document.activeElement;
+      if (activeEl === iframeRef?.current || (activeEl && activeEl.tagName === 'IFRAME')) {
+        // Thao tác chuột bình thường trong tài liệu -> KHÔNG BẬT CẢNH BÁO, KHÔNG CHE!
+        return;
+      }
+
       const now = Date.now();
-
-      // ⚡ BƯỚC 1: LUÔN LUÔN CHE TỨC THÌ 0MS NỘI DUNG VĂN BẢN KHI CỬA SỔ MẤT FOCUS
-      // Bất kể Snipping Tool hay phần mềm bên ngoài chụp vào khoảnh khắc nào, chỉ thu được màn trập trắng (hoặc đen)
-      applyInstantBlackout(true);
-
       const recentCapture = recentCaptureKeyRef.current;
-      const isRecentDirectCapture = Boolean(recentCapture && now - recentCapture.time < 3500);
+      const isRecentDirectCapture = Boolean(recentCapture && now - recentCapture.time < 2000);
 
+      // Chỉ coi là chụp màn hình khi CẢ TỔ HỢP được giữ trong vòng 1.5s trước đó:
       const isRecentCtrlAltBlur =
-        now - lastCtrlAltComboTimeRef.current < 3500 ||
-        (now - lastCtrlKeyTimeRef.current < 3500 && now - lastAltKeyTimeRef.current < 3500) ||
+        now - lastCtrlAltComboTimeRef.current < 1500 ||
         (modifierKeysRef.current.ctrl && modifierKeysRef.current.alt);
 
       const isRecentWinShiftBlur =
-        now - lastWinShiftComboTimeRef.current < 3500 ||
-        (now - lastWinKeyTimeRef.current < 3500 && now - lastShiftKeyTimeRef.current < 3500) ||
-        (modifierKeysRef.current.win && modifierKeysRef.current.shift) ||
-        (now - lastWinKeyTimeRef.current < 2500) ||
-        (modifierKeysRef.current.win && now - lastShiftKeyTimeRef.current < 3500);
+        now - lastWinShiftComboTimeRef.current < 1500 ||
+        (modifierKeysRef.current.win && modifierKeysRef.current.shift);
 
-      // Nếu cửa sổ bị blur ngay sau khi bấm phím chụp HOẶC do Zalo/Snipping tool cướp phím S ở tầng Windows:
+      // Nếu cửa sổ bị cướp focus do tổ hợp phím chụp (Win+Shift+S hoặc Ctrl+Alt+S):
       if (isRecentDirectCapture || isRecentCtrlAltBlur || isRecentWinShiftBlur) {
         const triggerType: ViolationInfo['triggerType'] =
           recentCapture?.type || (isRecentCtrlAltBlur ? 'ZALO_CAPTURE' : 'WIN_SHIFT_S');
 
         lastCtrlAltComboTimeRef.current = 0;
         lastWinShiftComboTimeRef.current = 0;
-        lastWinKeyTimeRef.current = 0;
-        lastShiftKeyTimeRef.current = 0;
-        lastCtrlKeyTimeRef.current = 0;
-        lastAltKeyTimeRef.current = 0;
         recentCaptureKeyRef.current = null;
 
+        // Đóng kín màn trập tức thì
+        applyInstantBlackout(true);
         // Tiêu hủy Clipboard liên tục đa xung
         wipeClipboardBurst();
-        // 🚨 KÍCH HOẠT MODAL CẢNH BÁO ĐỎ
+        // Kích hoạt Modal Cảnh Báo Đỏ
         triggerViolation(triggerType);
         return;
       }
 
-      // Thao tác chuột hoặc chuyển cửa sổ thông thường: chỉ tiêu hủy Clipboard đề phòng, giữ màn che an toàn, KHÔNG PHẠT VI PHẠM
+      // Thao tác chuyển cửa sổ / Alt+Tab thông thường: che mờ màn hình bảo vệ, KHÔNG PHẠT VI PHẠM
+      applyInstantBlackout(true);
       wipeClipboard();
     };
 
@@ -622,10 +636,6 @@ export function useAntiScreenshot({ document: docItem, enabled = true, iframeRef
     recentCaptureKeyRef.current = null;
     lastCtrlAltComboTimeRef.current = 0;
     lastWinShiftComboTimeRef.current = 0;
-    lastWinKeyTimeRef.current = 0;
-    lastShiftKeyTimeRef.current = 0;
-    lastCtrlKeyTimeRef.current = 0;
-    lastAltKeyTimeRef.current = 0;
     modifierKeysRef.current = { win: false, shift: false, ctrl: false, alt: false, time: 0 };
     if (typeof window !== 'undefined') {
       try {

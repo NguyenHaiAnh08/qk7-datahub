@@ -294,7 +294,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       <div
         key="preview-backdrop"
         ref={modalContainerRef}
-        className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm transition-all duration-200 ${
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 dark:bg-slate-950/85 backdrop-blur-sm transition-all duration-200 ${
           isFullscreen ? 'p-0' : 'p-2 sm:p-4 md:p-6'
         }`}
       >
@@ -450,7 +450,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 <button id="qk7-focus-trap" className="sr-only opacity-0 pointer-events-none absolute -top-10 -left-10" tabIndex={-1} aria-hidden="true" />
                 <div
                   id="qk7-blackout-shutter"
-                  className="absolute inset-0 z-30 bg-black select-none pointer-events-none transition-none"
+                  className="absolute inset-0 z-30 bg-white dark:bg-black select-none pointer-events-none transition-none"
                   style={{ display: 'none' }}
                 />
 

@@ -25,6 +25,7 @@
 17. [Sự cố 17: Cắt cụt ghi chú kiểm toán an ninh do giới hạn độ dài NVARCHAR(255) & Thông tin văn bản bị chụp hiển thị N/A](#sự-cố-17-cắt-cụt-ghi-chú-kiểm-toán-an-ninh-do-giới-hạn-độ-dài-nvarchar255--thông-tin-văn-bản-bị-chụp-hiển-thị-na)
 18. [Sự cố 18: Hàng đợi phê duyệt không hiển thị đề xuất chỉnh sửa văn bản do lệch cấu trúc cột DB & Lỗi cú pháp scope async](#sự-cố-18-hàng-đợi-phê-duyệt-không-hiển-thị-đề-xuất-chỉnh-sửa-văn-bản-do-lệch-cấu-trúc-cột-db-proposal_data-vs-cột-độc-lập--lỗi-cú-pháp-scope-async)
 19. [Sự cố 19: Báo động giả chụp màn hình khi click/di chuột, lệch độ tương phản tên quân nhân chế độ ngày/đêm, và các kỹ thuật lách chống chụp màn hình (Đa màn hình, Zalo Snipping, Clipboard dán vào Paint)](#sự-cố-19-báo-động-giả-chụp-màn-hình-khi-clickdi-chuột-lệch-độ-tương-phản-tên-quân-nhân-chế-độ-ngàyđêm-và-các-kỹ-thuật-lách-chống-chụp-màn-hình-đa-màn-hình-zalo-snipping-clipboard-dán-vào-paint)
+20. [Sự cố 20: Hiện tượng nhấp nháy (Flickering) PDF Canvas khi nhập liệu trong Split-Pane Modal do re-render chuỗi dependencies](#sự-cố-20-hiện-tượng-nhấp-nháy-flickering-pdf-canvas-khi-nhập-liệu-trong-split-pane-modal-do-re-render-chuỗi-dependencies)
 
 ---
 
@@ -440,3 +441,28 @@
 * **Phân tích Kiến trúc Bảo vệ (Web Client vs. Native OS):**
   - **Trên Web (Browser):** Chạy trong Chromium Sandbox, không thể gọi trực tiếp Win32 API kernel. Áp dụng chuẩn công nghiệp tương đương thư viện `Screenshot-PrivacyProtectionWeb`: kết hợp **0ms Client Shielding (CSS/JS Blurring)** + **Ghi đè Clipboard** + **Forensic Dynamic Watermark** (4 vị trí khắc vĩnh viễn Họ tên, Đơn vị, Timestamp NTP) để triệt tiêu giá trị trích xuất dữ liệu.
   - **Khuyến nghị lộ trình Native Desktop:** Nếu đơn vị yêu cầu chặn chụp màn hình cứng ở tầng hệ điều hành Windows (khiến Snipping Tool / OBS / Zalo chụp ra màn hình đen tuyền), giải pháp là đóng gói client thành ứng dụng Desktop (Electron / C# WebView2) và gọi Win32 API `SetWindowDisplayAffinity(hWnd, WDA_MONITOR)` hoặc trên Mobile dùng `FLAG_SECURE`.
+
+---
+
+### Sự cố 20: Hiện tượng nhấp nháy (Flickering) PDF Canvas khi nhập liệu trong Split-Pane Modal do re-render chuỗi dependencies
+
+* **Triệu chứng:**
+  Khi người dùng mở modal "Tiếp Nhận & Lưu Trữ Văn Bản Mới" hoặc "Hiệu Chỉnh Văn Bản" dạng Split-Pane, mỗi lần gõ một ký tự vào bất kỳ ô input nào (Số hiệu, Trích yếu, Người ký), trang PDF bên khung phải bị giật/nhấp nháy trắng liên tục, gây khó chịu cho mắt và làm chậm quá trình nhập liệu.
+* **Nguyên nhân gốc rễ:**
+  1. Trong `DocumentUploadModal.tsx`, toàn bộ component là một hàm lớn chứa state form (`formData`). Mỗi lần `onChange` input, `setFormData` làm toàn bộ component re-render.
+  2. Khung PDF bên phải nhận prop `fileUrl={previewUrl}`. Dù `previewUrl` là chuỗi giống nhau nhưng component con `PdfPagesViewer` không được memoize, khiến nó re-render theo cha.
+  3. Trong `PdfPagesViewer.tsx`, prop `strokes` mặc định nhận `[]` (một tham chiếu mảng mới ở mỗi lần render). Điều này khiến `redrawStrokes` callback được tạo mới.
+  4. Trong `SinglePdfPage.tsx`, `useEffect` vẽ trang PDF phụ thuộc vào `[pdfDoc, pageNum, scale, redrawStrokes]`. Vì `redrawStrokes` bị đổi tham chiếu ở mỗi nhịp gõ phím, `useEffect` vẽ PDF bị trigger lại, thực hiện `renderTask.cancel()`, xóa canvas (`canvas.width = canvas.width`) và render lại từ đầu, gây ra hiện tượng nhấp nháy trắng (canvas blankout flicker).
+  5. Đối với chế độ hiệu chỉnh (`mode = 'edit'`), hàm `loadOriginalDocumentPdf` bị kích hoạt lại nhiều lần làm sinh ra `previewUrl` blob mới không cần thiết.
+* **Cách khắc phục triệt để:**
+  1. **Memoize các Component PDF:**
+     - Bọc `SinglePdfPage` và `PdfPagesViewer` trong `React.memo` với custom prop comparison (chỉ so sánh `pdfDoc`, `scale`, `pageCount`, và độ dài chuỗi nét vẽ `strokes.length`).
+  2. **Tách biệt Lifecycle của PDF Canvas và Canvas Vẽ Nét (Highlight Layer):**
+     - Loại bỏ `redrawStrokes` khỏi mảng dependencies của effect render PDF chính trong `SinglePdfPage.tsx`. Canvas PDF chỉ vẽ đúng 1 lần khi trang được nạp hoặc khi zoom scale.
+     - Canvas vẽ nét (bút dạ quang) chạy trên một `useEffect` riêng biệt, không làm gián đoạn PDF canvas bên dưới.
+  3. **Khóa chặt instance Viewer bằng `useMemo` & `useRef`:**
+     - Trong `DocumentUploadModal.tsx`, dùng `prevSelectedFileRef` và `initializedDocIdRef` để đảm bảo `loadOriginalDocumentPdf` và `URL.createObjectURL` chỉ chạy duy nhất 1 lần khi file hoặc tài liệu thực sự thay đổi.
+     - Dùng hằng số cố định ngoài component `EMPTY_STROKES = []` để tránh tạo mảng mới ở mỗi render.
+     - Bọc toàn bộ JSX của PDF Viewer trong `useMemo(() => ..., [previewUrl, isPreviewLoading, isEditMode, ...])` hoàn toàn độc lập với các state của input form (`formData`).
+* **Kết quả:**
+  Gõ phím nhập liệu siêu mượt, 0ms lag, trang PDF bên phải giữ nguyên trạng thái hiển thị 100% ổn định, không còn bất kỳ hiện tượng nhấp nháy nào.

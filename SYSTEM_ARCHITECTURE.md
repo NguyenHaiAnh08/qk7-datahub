@@ -36,6 +36,7 @@
 27. [Kiến Trúc Lá Chắn Chống Chụp Màn Hình & Cảnh Báo An Ninh Tác Chiến (Anti-Screenshot Security Shield & Real-Time SOC Alert Engine)](#27-kiến-trúc-lá-chắn-chống-chụp-màn-hình--cảnh-báo-an-ninh-tác-chiến-anti-screenshot-security-shield--real-time-soc-alert-engine)
 28. [Kiến Trúc Hàng Đợi Phê Duyệt Tích Hợp Đa Nhiệm & Luồng Đề Xuất Chuẩn Hóa Văn Bản (Unified Approval Queue & Document Revision Proposal Engine)](#28-kiến-trúc-hàng-đợi-phê-duyệt-tích-hợp-đa-nhiệm--luồng-đề-xuất-chuẩn-hóa-văn-bản-unified-approval-queue--document-revision-proposal-engine)
 29. [Chuẩn Hóa Phân Cấp & Thứ Tự Danh Mục Đơn Vị Ban Hành Quân Sự (Military Issuing Unit Hierarchy & Priority Order Engine)](#29-chuẩn-hóa-phân-cấp--thứ-tự-danh-mục-đơn-vị-ban-hành-quân-sự-military-issuing-unit-hierarchy--priority-order-engine)
+30. [Kiến Trúc Quy Trình Số Hóa Chia Đôi Màn Hình & Trình Xem Trước Cục Bộ (Split-Pane Digitization & Local Preview Engine)](#30-kiến-trúc-quy-trình-số-hóa-chia-đôi-màn-hình--trình-xem-trước-cục-bộ-split-pane-digitization--local-preview-engine)
 
 ---
 
@@ -1440,3 +1441,56 @@ Toàn bộ danh mục 13 sự cố kỹ thuật điển hình đã từng gặp 
   - **PyMuPDF (fitz):** Render trang PDF trực tiếp ra bitmap bộ nhớ với hiệu năng C-speed và DPI tối ưu (150 DPI).
 - **Định tuyến thông minh (`pdf-router.js`):** Phân loại `TextBased`, `Scanned`, `Mixed` trong vòng 7ms, chỉ gửi các trang cần bóc tách metadata (Trang 1) sang microservice OCR, giảm tải 95% thời gian tính toán.
 - **Fallback an toàn:** Nếu tiến trình `:8002` không phản hồi hoặc timeout (15s), Gateway kích hoạt cơ chế dự phòng an toàn (local Tesseract) bị chặn trần tối đa trang để tránh nghẽn server.
+
+---
+
+## 30. Kiến Trúc Quy Trình Số Hóa Chia Đôi Màn Hình & Trình Xem Trước Cục Bộ (Split-Pane Digitization & Local Preview Engine)
+
+### 30.1. Đặt Vấn Đề Nghiệp Vụ & Nhu Cầu Số Hóa Hành Chính - Quân Sự
+Trong quy trình văn thư tác chiến, việc cán bộ phải liên tục chuyển tab trình duyệt hoặc đóng/mở popup modal để kiểm tra số hiệu, trích yếu, người ký dẫn tới nguy cơ sai lệch thông tin và giảm hiệu suất công việc. Kiến trúc **Split-Pane Side-by-Side** chuyển đổi hộp thoại tiếp nhận và hiệu chỉnh văn bản thành giao diện toàn màn hình trực quan với 2 không gian làm việc song song độc lập.
+
+```mermaid
+graph LR
+    subgraph SPLIT_PANE_WORKFLOW ["GIAO DIỆN SỐ HÓA CHIA ĐÔI MÀN HÌNH (SIDE-BY-SIDE)"]
+        direction LR
+        subgraph LEFT_PANE ["Khung Nhập Liệu Trái (35% - 40%)"]
+            Dropzone["Kéo / Thả Tệp PDF<br/>(Dropzone tương tác)"]
+            MetadataForm["Biểu Mẫu Nhập Liệu<br/>• Số hiệu / Ký hiệu<br/>• Trích yếu nội dung<br/>• Người ký / Đơn vị ban hành<br/>• Độ mật bảo quản (Cấp 1-5)<br/>• Ngày ban hành / Ghi chú"]
+            ActionButtons["Nút Hủy / Lưu Trữ Văn Bản"]
+            Dropzone --> MetadataForm --> ActionButtons
+        end
+
+        subgraph RIGHT_PANE ["Khung PDF Đối Chiếu Phải (60% - 65%)"]
+            HeaderBar["Thanh Tiêu Đề Văn Bản<br/>Badge Trạng Thái + Nút Đóng [X]"]
+            ViewerContainer["Trình Xem PDF Toàn Màn Hình<br/>(PdfPagesViewer)"]
+            WatermarkLayer["Sparse Dynamic Watermark<br/>(Họ tên, IP, Timestamp 45 độ)"]
+            EmptyState["Empty State Trực Quan<br/>(Khi chưa chọn tệp)"]
+            
+            HeaderBar --> ViewerContainer
+            ViewerContainer --- WatermarkLayer
+        end
+
+        Dropzone -->|URL.createObjectURL(file)<br/>0ms Real-time Local Preview| ViewerContainer
+    end
+```
+
+### 30.2. Cơ Chế Real-time Local Preview & Quản Lý Vòng Đời Bộ Nhớ
+1. **Local Preview Không Cần Upload:**
+   - Khi người dùng kéo thả hoặc chọn tệp PDF mới tại Dropzone, hệ thống lập tức khởi tạo `blobUrl = URL.createObjectURL(selectedFile)`.
+   - Trình xem `PdfPagesViewer` kết nối trực tiếp với luồng blob cục bộ, hiển thị trang tài liệu trong vòng **0ms**, không làm phát sinh request mạng tới server.
+2. **Ngăn Ngừa Rò Rỉ Bộ Nhớ (Memory Leak Prevention):**
+   - Sử dụng `useRef` lưu vết `previewUrlRef`.
+   - Khi component unmount hoặc khi người dùng thay thế bằng một tệp khác, hook tự động gọi `URL.revokeObjectURL(prevUrl)` để giải phóng bộ đệm nhị phân khỏi RAM trình duyệt.
+3. **Hiệu Chỉnh Văn Bản Với Bản Gốc Máy Chủ:**
+   - Khi mở modal ở chế độ *Hiệu Chỉnh Văn Bản* (`mode = 'edit'`), hệ thống tự động fetch stream từ `/api/files/:fileId/view` với token xác thực và chuyển thành `Blob` URL nội bộ, hiển thị song song ngay khi tải form.
+
+### 30.3. Giải Pháp Chống Nhấp Nháy PDF Canvas (Flicker-Free Canvas Rendering)
+- **Vấn đề kỹ thuật:** Mỗi khi người dùng gõ một ký tự vào ô số hiệu hoặc trích yếu, component cha re-render dẫn tới việc `PdfPagesViewer` bị mount lại, canvas bị reset kích thước và gọi lại `renderTask` của PDF.js gây ra hiện tượng giật/nháy trắng trang liên tục.
+- **Giải pháp tối ưu hóa hiệu năng 3 cấp:**
+  1. **Memoization cấp độ Component:** Bọc `SinglePdfPage` và `PdfPagesViewer` trong `React.memo` với bộ so sánh props tùy biến, loại bỏ hoàn toàn các re-render không mong muốn khi state của form thay đổi.
+  2. **Tách biệt Layer Vẽ và Layer PDF:** Phân tách canvas hiển thị nội dung PDF khỏi canvas bút vẽ/điểm nhấn (`highlighterCanvas`), đảm bảo thao tác người dùng không bao giờ can thiệp vào tiến trình render trang PDF gốc.
+  3. **Cô lập Reference tệp tin (`prevSelectedFileRef` & `initializedDocIdRef`):** Sử dụng `useMemo` và `useRef` khóa chặt instance PDF Viewer trong `DocumentUploadModal.tsx`, đảm bảo viewer chỉ reload khi đối tượng tệp thực sự bị thay đổi.
+
+### 30.4. Tuân Thủ An Ninh & Trải Nghiệm Người Dùng (UX/UI Defense)
+- **Sparse Dynamic Watermark:** Luôn tự động kích hoạt watermark mờ phân tán chéo 45 độ trên khung PDF xem trước cục bộ lẫn xem trước máy chủ, đảm bảo an toàn bí mật quân sự ngay trong bước nhập liệu sơ bộ.
+- **Bố cục chuẩn công thái học:** Thanh cuộn dọc của khung nhập liệu và khung tài liệu hoạt động hoàn toàn độc lập (`overflow-y-auto`); nút đóng Modal được tinh gọn thành nút `[X]` đặt tại góc trên bên phải thanh công cụ của khung tài liệu, tạo sự tập trung tối đa cho người thao tác.

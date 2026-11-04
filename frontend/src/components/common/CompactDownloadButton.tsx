@@ -102,11 +102,11 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
             return releaseFn;
           })
           .catch((err) => {
+            cancelDownload(false);
             if (controller.signal.aborted || err?.name === 'AbortError') {
               return;
             }
             console.error('Download error:', err);
-            cancelDownload(false);
             throw err;
           });
       } else {

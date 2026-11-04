@@ -57,6 +57,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<boolean>(false);
+  const isDownloadingRef = React.useRef<boolean>(false);
 
   const [fingerprintToken, setFingerprintToken] = useState<string | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
@@ -101,6 +102,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'Esc') {
+        if (isDownloadingRef.current) return;
         e.preventDefault();
         e.stopPropagation();
         handleClose();
@@ -108,6 +110,10 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     };
 
     const handleFsChange = () => {
+      // 🛡️ Khi người dùng mở hộp thoại chọn ổ đĩa/thư mục lưu (showSaveFilePicker),
+      // Chromium tự động tạm thoát Fullscreen để hiển thị native OS dialog.
+      // Cờ isDownloadingRef chặn không cho unmount modal, bảo toàn luồng stream ghi tệp tránh lỗi 0 KB!
+      if (isDownloadingRef.current) return;
       if (!winDoc.fullscreenElement && open) {
         handleClose();
       }
@@ -236,6 +242,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const handleDownload = async (signal?: AbortSignal): Promise<() => void> => {
     if (!canDownload || !document) throw new Error('Không có quyền tải về');
+    isDownloadingRef.current = true;
     try {
       setDownloading(true);
       toast.info(`Đang truyền phát và chuẩn bị văn bản ${document.document_code}...`, {
@@ -272,13 +279,22 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       );
 
       return async () => {
-        await release();
-        toast.success(`Đã tải xuống thành công văn bản ${document.document_code}`, {
-          title: 'TẢI TỆP HOÀN TẤT',
-          badge: 'PDF-READY',
-        });
+        try {
+          await release();
+          toast.success(`Đã tải xuống thành công văn bản ${document.document_code}`, {
+            title: 'TẢI TỆP HOÀN TẤT',
+            badge: 'PDF-READY',
+          });
+        } finally {
+          setTimeout(() => {
+            isDownloadingRef.current = false;
+          }, 1500);
+        }
       };
     } catch (err: any) {
+      setTimeout(() => {
+        isDownloadingRef.current = false;
+      }, 1000);
       if (err?.name !== 'AbortError') {
         setError(err.message || 'Lỗi khi tải tệp');
       }
@@ -427,13 +443,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               </div>
               <CompactDownloadButton
                 onDownload={handleDownload}
-                onCancel={() =>
+                onCancel={() => {
+                  isDownloadingRef.current = false;
                   toast.info(`Đã hủy tải văn bản ${document.document_code}`, {
                     title: 'ĐÃ HỦY TẢI',
                     badge: 'CANCELLED',
                     duration: 2000,
-                  })
-                }
+                  });
+                }}
                 disabled={!canDownload}
                 disabledTitle={
                   isSecretLevel
@@ -443,7 +460,16 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 size="compact"
               />
               <button
-                onClick={handleClose}
+                onClick={() => {
+                  if (downloading || isDownloadingRef.current) {
+                    toast.warning('Tệp đang được tải xuống, vui lòng chờ trong giây lát...', {
+                      title: 'ĐANG TẢI TỆP',
+                      badge: 'DOWNLOADING',
+                    });
+                    return;
+                  }
+                  handleClose();
+                }}
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                 title="Thoát tài liệu (Esc)"
                 aria-label="Thoát tài liệu (Esc)"

@@ -7,6 +7,7 @@ import {
   Award,
   Flag,
   GraduationCap,
+  Landmark,
   ChevronDown,
   ChevronRight,
   Plus,
@@ -26,6 +27,7 @@ import { Unit } from '../../types';
 
 export type UnitCategory =
   | 'all'
+  | 'trung_uong'
   | 'quan_khu'
   | 'su_doan'
   | 'trung_doan'
@@ -58,6 +60,20 @@ export const getUnitCategory = (unit: Unit): Exclude<UnitCategory, 'all'> => {
   const id = (unit.unit_id || '').toUpperCase();
   const name = (unit.name || '').toLowerCase();
 
+  // 1. Cấp Trung ương / Bộ (Chính phủ, Bộ Quốc phòng, Bộ Tổng Tham mưu, Tổng cục Chính trị...)
+  if (
+    id === 'BQP' ||
+    id === 'BTTM' ||
+    id === 'TCCT' ||
+    id === 'CP' ||
+    name.includes('bộ quốc phòng') ||
+    name.includes('tổng tham mưu') ||
+    (name.includes('chính trị') && name.includes('tổng cục')) ||
+    name.includes('chính phủ') ||
+    name.includes('trung ương')
+  ) {
+    return 'trung_uong';
+  }
   if (id === 'QK7' || name.includes('quân khu') || name.includes('bộ tư lệnh')) {
     return 'quan_khu';
   }
@@ -91,6 +107,14 @@ export const CATEGORY_CONFIG: Record<
     iconBgClass: string;
   }
 > = {
+  trung_uong: {
+    label: 'Cấp Trung ương / Bộ',
+    icon: Landmark,
+    badgeClass:
+      'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30',
+    iconBgClass:
+      'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30',
+  },
   quan_khu: {
     label: 'Cấp Quân khu',
     icon: Award,
@@ -266,28 +290,26 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
 
   // ── Tính toán Mini Stat Pills ──
   const stats = useMemo(() => {
+    let trungUong = 0;
     let quanKhu = 0;
     let suDoan = 0;
-    let trungDoan = 0;
-    let tieuDoan = 0;
     let phongBan = 0;
     let nhaTruong = 0;
 
     for (const u of units) {
       const cat = getUnitCategory(u);
-      if (cat === 'quan_khu') quanKhu++;
+      if (cat === 'trung_uong') trungUong++;
+      else if (cat === 'quan_khu') quanKhu++;
       else if (cat === 'su_doan') suDoan++;
-      else if (cat === 'trung_doan') trungDoan++;
-      else if (cat === 'tieu_doan') tieuDoan++;
       else if (cat === 'nha_truong') nhaTruong++;
       else phongBan++;
     }
 
     return {
       total: units.length,
+      trungUong,
       commandAndDivision: quanKhu + suDoan,
-      regimentAndBattalion: trungDoan + tieuDoan,
-      staffAndSchool: phongBan + nhaTruong,
+      schoolAndDepts: nhaTruong + phongBan,
       orphan: orphanCount,
     };
   }, [units, orphanCount]);
@@ -531,7 +553,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Toàn quân khu</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Toàn hệ thống</p>
               <p className="text-xl font-bold text-slate-900 dark:text-white leading-tight">
                 {stats.total} <span className="text-xs font-normal text-slate-500">đơn vị</span>
               </p>
@@ -542,13 +564,43 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
           )}
         </div>
 
-        {/* Pill 2: Quân khu & Sư đoàn */}
+        {/* Pill 2: Cấp Trung ương / Bộ */}
         <div
           onClick={() =>
-            setSelectedCategory((prev) => (prev === 'su_doan' ? 'all' : 'su_doan'))
+            setSelectedCategory((prev) => (prev === 'trung_uong' ? 'all' : 'trung_uong'))
           }
           className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
-            selectedCategory === 'su_doan' || selectedCategory === 'quan_khu'
+            selectedCategory === 'trung_uong'
+              ? 'bg-rose-100/90 border-rose-400 text-rose-950 dark:bg-rose-950/50 dark:border-rose-500/50 dark:text-rose-300 shadow-xs'
+              : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:border-rose-500/30 dark:text-rose-300 flex items-center justify-center shrink-0">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Cấp Trung ương / Bộ</p>
+              <p className="text-xl font-bold text-rose-700 dark:text-rose-400 leading-tight">
+                {stats.trungUong}{' '}
+                <span className="text-xs font-normal text-slate-500">cơ quan</span>
+              </p>
+            </div>
+          </div>
+          {selectedCategory === 'trung_uong' && (
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-600 dark:bg-rose-400" />
+          )}
+        </div>
+
+        {/* Pill 3: Quân khu & Sư đoàn */}
+        <div
+          onClick={() =>
+            setSelectedCategory((prev) =>
+              prev === 'quan_khu' || prev === 'su_doan' ? 'all' : 'quan_khu'
+            )
+          }
+          className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
+            selectedCategory === 'quan_khu' || selectedCategory === 'su_doan'
               ? 'bg-amber-100/90 border-amber-400 text-amber-950 dark:bg-amber-950/50 dark:border-amber-500/50 dark:text-amber-300 shadow-xs'
               : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
           }`}
@@ -558,53 +610,27 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               <Shield className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">QK & Sư đoàn</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Quân khu & Sư đoàn</p>
               <p className="text-xl font-bold text-amber-700 dark:text-amber-400 leading-tight">
                 {stats.commandAndDivision}{' '}
                 <span className="text-xs font-normal text-slate-500">đầu mối</span>
               </p>
             </div>
           </div>
-          {(selectedCategory === 'su_doan' || selectedCategory === 'quan_khu') && (
+          {(selectedCategory === 'quan_khu' || selectedCategory === 'su_doan') && (
             <div className="w-2.5 h-2.5 rounded-full bg-amber-600 dark:bg-amber-400" />
           )}
         </div>
 
-        {/* Pill 3: Trung đoàn & Tiểu đoàn */}
+        {/* Pill 4: Trường Quân sự & Trực thuộc */}
         <div
           onClick={() =>
-            setSelectedCategory((prev) => (prev === 'trung_doan' ? 'all' : 'trung_doan'))
+            setSelectedCategory((prev) =>
+              prev === 'nha_truong' || prev === 'phong_ban' ? 'all' : 'nha_truong'
+            )
           }
           className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
-            selectedCategory === 'trung_doan' || selectedCategory === 'tieu_doan'
-              ? 'bg-cyan-100/90 border-cyan-400 text-cyan-950 dark:bg-cyan-950/50 dark:border-cyan-500/50 dark:text-cyan-300 shadow-xs'
-              : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 border border-cyan-200 dark:bg-cyan-500/15 dark:border-cyan-500/30 dark:text-cyan-300 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Trung / Tiểu đoàn</p>
-              <p className="text-xl font-bold text-cyan-700 dark:text-cyan-400 leading-tight">
-                {stats.regimentAndBattalion}{' '}
-                <span className="text-xs font-normal text-slate-500">đơn vị</span>
-              </p>
-            </div>
-          </div>
-          {(selectedCategory === 'trung_doan' || selectedCategory === 'tieu_doan') && (
-            <div className="w-2.5 h-2.5 rounded-full bg-cyan-600 dark:bg-cyan-400" />
-          )}
-        </div>
-
-        {/* Pill 4: Phòng Ban & Trường */}
-        <div
-          onClick={() =>
-            setSelectedCategory((prev) => (prev === 'phong_ban' ? 'all' : 'phong_ban'))
-          }
-          className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
-            selectedCategory === 'phong_ban' || selectedCategory === 'nha_truong'
+            selectedCategory === 'nha_truong' || selectedCategory === 'phong_ban'
               ? 'bg-sky-100/90 border-sky-400 text-sky-950 dark:bg-sky-950/50 dark:border-sky-500/50 dark:text-sky-300 shadow-xs'
               : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
           }`}
@@ -614,14 +640,14 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Phòng Ban & Trường</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Trường QS & Trực thuộc</p>
               <p className="text-xl font-bold text-sky-700 dark:text-sky-400 leading-tight">
-                {stats.staffAndSchool}{' '}
-                <span className="text-xs font-normal text-slate-500">cơ quan</span>
+                {stats.schoolAndDepts}{' '}
+                <span className="text-xs font-normal text-slate-500">đơn vị</span>
               </p>
             </div>
           </div>
-          {(selectedCategory === 'phong_ban' || selectedCategory === 'nha_truong') && (
+          {(selectedCategory === 'nha_truong' || selectedCategory === 'phong_ban') && (
             <div className="w-2.5 h-2.5 rounded-full bg-sky-600 dark:bg-sky-400" />
           )}
         </div>
@@ -671,10 +697,9 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-all font-semibold cursor-pointer"
             >
               <option value="all">Tất cả các cấp đơn vị</option>
+              <option value="trung_uong">Cấp Trung ương / Bộ</option>
               <option value="quan_khu">Cấp Quân khu</option>
               <option value="su_doan">Cấp Sư đoàn</option>
-              <option value="trung_doan">Cấp Trung đoàn</option>
-              <option value="tieu_doan">Cấp Tiểu đoàn / Đội</option>
               <option value="nha_truong">Nhà trường / Viện</option>
               <option value="phong_ban">Phòng / Ban / Cơ quan</option>
             </select>

@@ -263,15 +263,16 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         };
       }
 
+      const sanitizedFilename = (document.original_name || `${document.document_code}.pdf`).replace(/[\/\\?%*:|"<>]/g, '_');
       const release = await fileService.prepareDownload(
         document.file_id,
-        document.original_name || `${document.document_code}.pdf`,
+        sanitizedFilename,
         fingerprintToken || undefined,
         signal
       );
 
-      return () => {
-        release();
+      return async () => {
+        await release();
         toast.success(`Đã tải xuống thành công văn bản ${document.document_code}`, {
           title: 'TẢI TỆP HOÀN TẤT',
           badge: 'PDF-READY',

@@ -233,15 +233,16 @@ const canUpload = hasPermission('DOC_UPLOAD');
       duration: 3200,
     });
 
+    const sanitizedFilename = (doc.original_name || `${doc.document_code}.pdf`).replace(/[\/\\?%*:|"<>]/g, '_');
     const release = await documentsApi.prepareDownload(
       doc.file_id,
-      doc.original_name || `${doc.document_code}.pdf`,
+      sanitizedFilename,
       undefined,
       signal
     );
 
-    return () => {
-      release();
+    return async () => {
+      await release();
       toast.success(`Đã tải xuống thành công văn bản ${doc.document_code}`, {
         title: 'TẢI TỆP HOÀN TẤT',
         badge: 'PDF-READY',

@@ -4,6 +4,40 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.2.8-fix-download-0kb-and-central-units-kpi] — 2026-11-04
+
+### 1. Khắc Phục Triệt Để Lỗi Tải Xuống Bị 0 KB & Không Mở Được Tệp PDF
+- **Nguyên nhân cốt lõi:**
+  - Cơ chế cũ dùng `showSaveFilePicker` tạo sẵn một file 0 byte trên đĩa ngay khi người dùng bấm Save. Khi quá trình fetch dữ liệu và animation 3.2s của nút tải (`CompactDownloadButton`) hoàn tất, quyền ghi tạm thời (`transient user activation`) của Chromium bị hết hạn, khiến lệnh `createWritable()` bị chặn và file trên đĩa vĩnh viễn là 0 KB.
+  - Tên file khi tải về lấy trực tiếp từ `document_code` có chứa ký tự gạch chéo `/` (ví dụ: `769/KH-CT`), gây xung đột đường dẫn trên hệ điều hành Windows.
+- **Giải pháp xử lý:**
+  - **Tải tệp Native chuẩn hoá (`saveBlobToFile`):** Chuyển sang phương thức tải native qua Blob URL và thẻ `<a>` ẩn, đảm bảo 100% dữ liệu được trình duyệt lưu trọn vẹn (không bao giờ để lại file 0 byte rác). Tương thích hoàn hảo cả PC Widescreen và iPad Air M4.
+  - **Kiểm tra tính toàn vẹn (Zero-byte Guard):** Chủ động kiểm tra `blob.size === 0`, ném cảnh báo rõ ràng nếu dữ liệu rỗng thay vì tạo file hỏng.
+  - **Tăng thời gian thu hồi URL (Safe Revoke):** Kéo dài thời gian `URL.revokeObjectURL` lên 5000ms đảm bảo trình duyệt hoàn tất quá trình stream ghi vào đĩa cứng.
+  - **Sanitize tên tệp Windows:** Tự động thay thế toàn bộ ký tự cấm (`/`, `\`, `?`, `%`, `*`, `:`, `|`, `"`, `<`, `>`) thành dấu gạch dưới `_` (ví dụ: `769/KH-CT` $\rightarrow$ `769_KH-CT.pdf`).
+  - **Đồng bộ toàn diện:** Áp dụng cho cả khi bấm Tải về ở ngoài danh sách (`DocumentDeskPage`, `PortalPage`, `MyUnitPage`) và bên trong modal xem trước (`DocumentPreviewModal`).
+
+### 2. Chuẩn Hóa Cấp Bậc Cơ Quan Trung Ương / Bộ (`UnitTreeTable`)
+- **Bổ sung cấp bậc "Cấp Trung ương / Bộ" (`trung_uong`):**
+  - Tự động nhận diện chính xác các cơ quan cấp chiến lược tối cao: `Bộ Quốc Phòng` (BQP), `Bộ Tổng Tham mưu` (BTTM), `Tổng cục Chính trị` (TCCT), `Chính Phủ` (CP).
+  - Không còn bị xếp sai thành "Phòng / Ban / Cơ quan".
+  - Hiển thị biểu tượng `Landmark` và Badge màu Đỏ Cờ Rose trang trọng (`bg-rose-100 text-rose-900 border-rose-300`).
+- **Tái cấu trúc 4 Thẻ KPI Phân Nhóm Chiến Thuật (Mini Stat Pills):**
+  - Loại bỏ hoàn toàn thẻ "Trung / Tiểu đoàn: 0 đơn vị" không có dữ liệu thực tế.
+  - Thay bằng 4 thẻ KPI phản ánh chính xác 100% cơ cấu 13 đơn vị toàn hệ thống:
+    1. *Thẻ 1:* `Toàn hệ thống: 13 đơn vị` (Tất cả)
+    2. *Thẻ 2:* `Cấp Trung ương / Bộ: 4 cơ quan` (BQP, BTTM, TCCT, CP)
+    3. *Thẻ 3:* `Quân khu & Sư đoàn: 2 đầu mối` (QK7, Sư đoàn 5)
+    4. *Thẻ 4:* `Trường QS & Trực thuộc: 7 đơn vị` (TQS, BGH, TM, CT, ĐT, HC, Bếp cơ quan)
+  - Hỗ trợ Click-to-filter mượt mà trên từng thẻ thống kê.
+- **Tối ưu Dropdown Lọc Cấp Đơn Vị:**
+  - Đưa "Cấp Trung ương / Bộ" lên vị trí ưu tiên cao nhất, loại bỏ các cấp trung gian không dùng đến.
+
+### 3. Bỏ Ký Tự Thụt Lề `└─ ` Của Bếp Cơ Quan
+- Trong ô chọn "Tất cả phòng ban trực thuộc", Bếp cơ quan hiển thị tên thuần túy: `Bếp cơ quan` (không còn tiền tố `└─ ` gây khó nhìn).
+
+---
+
 ## [v1.2.7-unit-filters-and-scroll-preservation] — 2026-11-04
 
 ### 1. Chuẩn Hóa Dropdown "Tất Cả Đơn Vị Ban Hành" (Clean Main Issuing Units Dropdown)

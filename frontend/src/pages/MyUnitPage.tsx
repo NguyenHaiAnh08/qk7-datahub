@@ -227,16 +227,17 @@ export const MyUnitPage: React.FC = () => {
     });
 
     // Chuẩn bị tệp tải về và giữ lại (hold) cho đến khi thanh tiến trình UI hoàn tất 100%
+    const sanitizedFilename = (doc.original_name || `${doc.document_code}.pdf`).replace(/[\/\\?%*:|"<>]/g, '_');
     const release = await documentsApi.prepareDownload(
       doc.file_id,
-      doc.original_name || `${doc.document_code}.pdf`,
+      sanitizedFilename,
       undefined,
       signal
     );
 
     // Trả về hàm release để CompactDownloadButton chỉ kích hoạt tải file về máy khi UI đã 'done'
-    return () => {
-      release();
+    return async () => {
+      await release();
       toast.success(`Đã tải xuống thành công văn bản ${doc.document_code}`, {
         title: 'TẢI TỆP HOÀN TẤT',
         badge: 'PDF-READY',

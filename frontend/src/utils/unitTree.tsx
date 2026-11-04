@@ -349,10 +349,9 @@ export function getSchoolDepartmentsTree(
 
   const flatList: (Unit & { displayName: string; level: number })[] = [];
   const traverse = (u: Unit, level: number) => {
-    const prefix = level > 0 ? `${'\u00A0'.repeat(level * 2)}└─ ` : '';
     flatList.push({
       ...u,
-      displayName: `${prefix}${u.name}`,
+      displayName: u.name,
       level,
     });
     const children = childrenMap.get(u.unit_id) || [];

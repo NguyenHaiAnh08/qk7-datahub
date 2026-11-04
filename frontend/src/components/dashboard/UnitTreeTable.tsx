@@ -295,10 +295,15 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
       }
     }
 
-    // Thứ tự ưu tiên sắp xếp quân sự: Trường Quân sự đứng trước, Sư đoàn 5 đứng dưới
+    // Thứ tự ưu tiên sắp xếp quân sự:
+    // 1. Cấp Quân khu (Quân khu 7)
+    // 2. Nhà trường / Viện (Trường Quân sự QK7)
+    // 3. Sư đoàn (Sư đoàn 5)
+    // 4. Các cơ quan Cấp Trung ương / Bộ nằm ở dưới Sư đoàn 5 (BQP, BTTM, CP, TCCT)
     const getSortWeight = (u: Unit): number => {
       const cat = getUnitCategory(u);
-      if (cat === 'trung_uong') return 0;
+      const id = (u.unit_id || '').toUpperCase();
+
       if (cat === 'quan_khu') return 1;
       if (cat === 'nha_truong') return 2;
       if (cat === 'su_doan') return 3;
@@ -306,7 +311,16 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
       if (cat === 'phong') return 5;
       if (cat === 'ban') return 6;
       if (cat === 'trung_doan') return 7;
-      return 8;
+
+      // Cấp Trung ương / Bộ nằm ở dưới Sư đoàn 5
+      if (cat === 'trung_uong') {
+        if (id === 'BQP') return 10;
+        if (id === 'BTTM') return 11;
+        if (id === 'CP') return 12;
+        if (id === 'TCCT') return 13;
+        return 14;
+      }
+      return 20;
     };
 
     const sortUnits = (list: Unit[]) => {

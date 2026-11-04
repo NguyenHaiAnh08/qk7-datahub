@@ -1311,9 +1311,9 @@ const pinPendingCount = useMemo(
                 setGenericModal({ open: true, type: 'units', item: null });
               }}
               onAddChild={(parentUnit) => {
-                let defaultType = 'phong_ban';
+                let defaultType = 'phong';
                 if (parentUnit.unit_id === 'QK7') defaultType = 'su_doan';
-                else if (parentUnit.unit_id === 'TQS') defaultType = 'phong_ban';
+                else if (parentUnit.unit_id === 'TQS') defaultType = 'phong';
                 setGenericFormData({ unit_id: '', name: '', parent_id: parentUnit.unit_id, unit_type: defaultType });
                 setGenericModal({ open: true, type: 'units', item: null });
               }}
@@ -1755,21 +1755,22 @@ const pinPendingCount = useMemo(
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Tên Đơn Vị *</label>
                         <input type="text" value={genericFormData.name || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })} required
-                          placeholder="VD: Đảng bộ Cộng Sản, Phòng Chính trị..."
+                          placeholder="VD: Trường Quân sự Quân khu 7"
                           className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-medium" />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Phân Loại Đơn Vị *</label>
-                        <select value={genericFormData.unit_type || 'phong_ban'}
+                        <select value={genericFormData.unit_type || 'phong'}
                           onChange={(e) => setGenericFormData({ ...genericFormData, unit_type: e.target.value })} required
                           className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-medium text-sm cursor-pointer">
-                          <option value="trung_uong">Cấp Trung ương / Bộ (Chính phủ, Bộ Quốc phòng, Đảng...)</option>
-                          <option value="quan_khu">Cấp Quân khu (Bộ Tư lệnh Quân khu 7)</option>
+                          <option value="trung_uong">Cấp Trung ương / Bộ</option>
+                          <option value="quan_khu">Cấp Quân khu</option>
                           <option value="su_doan">Sư đoàn</option>
-                          <option value="nha_truong">Nhà trường / Viện (Trường Quân sự QK7...)</option>
-                          <option value="phong_ban">Phòng / Ban / Cơ quan</option>
+                          <option value="nha_truong">Nhà trường / Viện</option>
+                          <option value="co_quan">Cơ quan</option>
+                          <option value="phong">Phòng</option>
+                          <option value="ban">Ban</option>
                           <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
-                          <option value="tieu_doan">Tiểu đoàn / Đại đội</option>
                         </select>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Quy định cấp bậc hiển thị và thẩm quyền quản lý của đơn vị</p>
                       </div>

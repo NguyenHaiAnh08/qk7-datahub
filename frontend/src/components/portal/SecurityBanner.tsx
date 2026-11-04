@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, ShieldAlert, Lock, AlertTriangle, Compass } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Lock, AlertTriangle, Compass, BarChart2, ChevronDown } from 'lucide-react';
 import { User } from '../../types';
 import { ROUTE_PATHS } from '../../routes/routePaths';
 
@@ -8,12 +8,16 @@ export interface SecurityBannerProps {
   user: User | null;
   onOpenPolicy?: () => void;
   onStartTour?: () => void;
+  showStats?: boolean;
+  onToggleStats?: () => void;
 }
 
 export const SecurityBanner: React.FC<SecurityBannerProps> = ({
   user,
   onOpenPolicy,
   onStartTour,
+  showStats,
+  onToggleStats,
 }) => {
   const level = user?.clearance_level_id || 1;
   const isGuest = !user || user.user_id === 'GUEST';
@@ -23,31 +27,31 @@ export const SecurityBanner: React.FC<SecurityBannerProps> = ({
       case 5:
         return {
           title: 'TUYỆT MẬT (Cấp 5)',
-          desc: 'Toàn quyền tra cứu và truy xuất tài liệu tối mật quân khu',
+          desc: 'Toàn quyền tra cứu và truy xuất tài liệu tối mật của toàn Trường Quân sự Quân khu 7',
           badgeClass: 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30',
         };
       case 4:
         return {
           title: 'TỐI MẬT (Cấp 4)',
-          desc: 'Được phép tra cứu tài liệu đến cấp Tối mật',
+          desc: 'Được phép tra cứu tài liệu đến cấp Tối mật của toàn Trường Quân sự Quân khu 7',
           badgeClass: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30',
         };
       case 3:
         return {
           title: 'MẬT (Cấp 3)',
-          desc: 'Được phép tra cứu tài liệu nghiệp vụ đến cấp Mật',
+          desc: 'Được phép tra cứu tài liệu nghiệp vụ đến cấp Mật của toàn Trường Quân sự Quân khu 7',
           badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
         };
       case 2:
         return {
           title: 'NỘI BỘ (Cấp 2)',
-          desc: 'Tra cứu tài liệu lưu hành nội bộ quân khu',
+          desc: 'Tra cứu tài liệu lưu hành nội bộ của toàn Trường Quân sự Quân khu 7',
           badgeClass: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
         };
       default:
         return {
           title: 'CÔNG KHAI (Cấp 1)',
-          desc: 'Chỉ tra cứu văn bản và thông báo công khai',
+          desc: 'Chỉ tra cứu văn bản và thông báo công khai của toàn Trường Quân sự Quân khu 7',
           badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
         };
     }
@@ -80,12 +84,25 @@ export const SecurityBanner: React.FC<SecurityBannerProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {badgeInfo.desc} • Mọi thao tác đều được kiểm toán và ghi nhận nhật ký an ninh.
+            {badgeInfo.desc}</p>
+            <p className="text-[11.5px] text-slate-400 dark:text-slate-500">Mọi thao tác đều được kiểm toán và ghi nhận nhật ký an ninh.
           </p>
         </div>
       </div>
 
       <div className="flex items-center space-x-2 self-end md:self-auto shrink-0 flex-wrap gap-y-2">
+        {onToggleStats && (
+          <button
+            type="button"
+            onClick={onToggleStats}
+            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer select-none shrink-0 group"
+            title={showStats ? 'Thu gọn khung thống kê toàn trường' : 'Mở rộng khung thống kê toàn trường'}
+          >
+            <BarChart2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span>{showStats ? 'Ẩn thống kê toàn trường' : 'Hiện thống kê toàn trường'}</span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showStats ? 'rotate-180' : ''}`} />
+          </button>
+        )}
         {onStartTour && (
           <button
             type="button"

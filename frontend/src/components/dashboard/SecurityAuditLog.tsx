@@ -183,9 +183,13 @@ export function extractTargets(log: AccessLog): ExtractedTarget[] {
 
 function getInitials(name?: string, fallback = 'QN'): string {
   if (!name || !name.trim()) return fallback;
-  const parts = name.trim().split(/\s+/);
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return fallback;
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  // Lấy 2 chữ cái đầu của 2 từ cuối cùng: Nguyễn Thị Ánh Tuyết -> ÁT, Nguyễn Hải Anh -> HA
+  const penult = parts[parts.length - 2];
+  const last = parts[parts.length - 1];
+  return (penult.charAt(0) + last.charAt(0)).toUpperCase();
 }
 
 interface SecurityAuditLogProps {

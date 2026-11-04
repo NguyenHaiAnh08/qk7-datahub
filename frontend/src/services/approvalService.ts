@@ -27,7 +27,7 @@ export const approvalService = {
   listPending: () => http<{ total: number; items: ApprovalRequest[] }>(
     `/api/admin/approval-requests?status=PENDING`
   ),
-  listMine: (status: 'PENDING_REJECTED' | 'PENDING' | 'REJECTED' | 'ALL' = 'PENDING_REJECTED') =>
+  listMine: (status: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'PENDING_REJECTED' = 'ALL') =>
    http<{ total: number; items: ApprovalRequest[] }>(
      `/api/my-approval-requests?status=${status}`
    ),

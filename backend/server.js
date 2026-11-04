@@ -1616,7 +1616,9 @@ app.get('/api/documents', async (req, res) => {
     if (req.query.title) { query += ` AND d.title LIKE N'%' + @title + N'%'`; r.input('title', sql.NVarChar(500), req.query.title); }
     if (req.query.type) { query += ` AND d.doc_type_id = @type`; r.input('type', sql.VarChar(20), req.query.type); }
     if (req.query.unit) {
-      if (req.query.include_children === 'true' || req.query.include_children === '1') {
+      if (req.query.unit === 'U-BGH') {
+        query += ` AND (d.issuing_unit_id = 'U-BGH' OR d.issuing_unit_id = 'TQS' OR d.issuing_unit_id = 'U-TQS')`;
+      } else if (req.query.include_children === 'true' || req.query.include_children === '1') {
         const subtree = await getSubtreeUnits(req.query.unit);
         if (subtree.length > 0) {
           const params = subtree.map((_, i) => `@u_${i}`);
@@ -2025,6 +2027,19 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
 
     // Ràng buộc nghiệp vụ: Nếu Trợ lý, Văn thư, Cơ yếu, IT sửa file do NGƯỜI KHÁC đăng -> Chuyển vào trạng thái treo (PENDING)
     if (!isAdmin && !isOwner) {
+      // ✅ Quyền Chỉnh sửa cục bộ (Local Edit Rule):
+      // Người dùng thuộc đơn vị nào (VD: Phòng Tham mưu - Hành chính) thì được phép tạo yêu cầu chỉnh sửa tài liệu của đơn vị đó.
+      const userUnitId = await resolveUserUnitId(req.user);
+      if (oldDoc.issuing_unit_id && userUnitId && userUnitId !== 'TQS') {
+        const allowedUnits = await getSubtreeUnits(userUnitId);
+        const isSameUnit = (oldDoc.issuing_unit_id === userUnitId || allowedUnits.includes(oldDoc.issuing_unit_id));
+        if (!isSameUnit) {
+          return res.status(403).json({
+            error: 'Quy tắc chỉnh sửa cục bộ: Bạn chỉ được phép đề xuất chỉnh sửa văn bản thuộc đơn vị công tác của mình.',
+          });
+        }
+      }
+
       let newStoredPath = null;
       let newOriginalName = null;
       let newMimeType = null;
@@ -2234,8 +2249,8 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
 
       if (targetUnits.length > 0) {
         const params = targetUnits.map((_, i) => `@u_${i}`);
-        // ✅ SỬA: Lọc theo u.unit_id (Đơn vị của người gửi đề xuất)
-        query += ` AND u.unit_id IN (${params.join(', ')})`;
+        // ✅ Lọc theo u.unit_id (Đơn vị người đề xuất) HOẶC d.issuing_unit_id (Đơn vị của văn bản)
+        query += ` AND (u.unit_id IN (${params.join(', ')}) OR d.issuing_unit_id IN (${params.join(', ')}))`;
         targetUnits.forEach((uId, i) => r.input(`u_${i}`, sql.VarChar(50), uId));
       } else {
         query += ` AND 1 = 0`;
@@ -2356,6 +2371,46 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
   return { success: true, message: 'Đã phê duyệt và áp dụng đề xuất chỉnh sửa văn bản thành công', file_id: prop.file_id };
 }
 
+async function requireProposalApprover(req, res, next) {
+  if (!req.user?.is_authenticated) {
+    return res.status(401).json({ error: 'Cần đăng nhập để thực hiện thao tác này', code: 'UNAUTHENTICATED' });
+  }
+  try {
+    const userRoles = await resolveUserRoles(req.user);
+    const isAdmin =
+      userRoles.includes('ROL-01') ||
+      req.user?.user_id === 'USR-001' ||
+      (req.user?.roles || []).includes('ROL-01') ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
+
+    const isCommander =
+      userRoles.includes('ROL-02') ||
+      (req.user?.roles || []).includes('ROL-02') ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
+      (req.user?.role_names || []).some((r) =>
+        String(r).toLowerCase().includes('chỉ huy') ||
+        String(r).toLowerCase().includes('trưởng phòng') ||
+        String(r).toLowerCase().includes('thủ trưởng')
+      );
+
+    if (isAdmin || isCommander) return next();
+
+    const codes = await getUserPermissions(req.user.user_id);
+    if (codes.includes('DOC_EDIT') || codes.includes('APPROVAL_VALIDATE')) {
+      return next();
+    }
+
+    return res.status(403).json({
+      error: 'Chỉ Chỉ huy đơn vị hoặc Quản trị viên mới có thẩm quyền xét duyệt đề xuất',
+      code: 'PERMISSION_DENIED',
+    });
+  } catch (err) {
+    console.error('[requireProposalApprover]', err);
+    res.status(500).json({ error: 'Lỗi kiểm tra quyền phê duyệt đề xuất' });
+  }
+}
+
 async function rejectProposalCore({ proposalId, reviewerUser, reviewNote, clientIp }) {
   const pool = await getPool();
   const propRes = await pool.request()
@@ -2390,7 +2445,7 @@ async function rejectProposalCore({ proposalId, reviewerUser, reviewNote, client
   return { success: true, message: 'Đã từ chối đề xuất chỉnh sửa' };
 }
 
-app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePermission('DOC_EDIT'), async (req, res) => {
+app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requireProposalApprover, async (req, res) => {
   try {
     const result = await approveProposalCore({
       proposalId: req.params.proposalId,
@@ -2405,7 +2460,7 @@ app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePer
   }
 });
 
-app.post('/api/documents/proposals/:proposalId/reject', requireAuth, requirePermission('DOC_EDIT'), async (req, res) => {
+app.post('/api/documents/proposals/:proposalId/reject', requireAuth, requireProposalApprover, async (req, res) => {
   try {
     const result = await rejectProposalCore({
       proposalId: req.params.proposalId,

@@ -37,6 +37,7 @@
 28. [Kiến Trúc Hàng Đợi Phê Duyệt Tích Hợp Đa Nhiệm & Luồng Đề Xuất Chuẩn Hóa Văn Bản (Unified Approval Queue & Document Revision Proposal Engine)](#28-kiến-trúc-hàng-đợi-phê-duyệt-tích-hợp-đa-nhiệm--luồng-đề-xuất-chuẩn-hóa-văn-bản-unified-approval-queue--document-revision-proposal-engine)
 29. [Chuẩn Hóa Phân Cấp & Thứ Tự Danh Mục Đơn Vị Ban Hành Quân Sự (Military Issuing Unit Hierarchy & Priority Order Engine)](#29-chuẩn-hóa-phân-cấp--thứ-tự-danh-mục-đơn-vị-ban-hành-quân-sự-military-issuing-unit-hierarchy--priority-order-engine)
 30. [Kiến Trúc Quy Trình Số Hóa Chia Đôi Màn Hình & Trình Xem Trước Cục Bộ (Split-Pane Digitization & Local Preview Engine)](#30-kiến-trúc-quy-trình-số-hóa-chia-đôi-màn-hình--trình-xem-trước-cục-bộ-split-pane-digitization--local-preview-engine)
+31. [Kiến Trúc Phân Cấp Phê Duyệt Chỉ Huy & Bảng Giám Sát Tiến Độ Phòng Ban Nhà Trường](#31-kiến-trúc-phân-cấp-phê-duyệt-chỉ-huy--bảng-giám-sát-tiến-độ-phòng-ban-nhà-trường)
 
 ---
 
@@ -1494,3 +1495,28 @@ graph LR
 ### 30.4. Tuân Thủ An Ninh & Trải Nghiệm Người Dùng (UX/UI Defense)
 - **Sparse Dynamic Watermark:** Luôn tự động kích hoạt watermark mờ phân tán chéo 45 độ trên khung PDF xem trước cục bộ lẫn xem trước máy chủ, đảm bảo an toàn bí mật quân sự ngay trong bước nhập liệu sơ bộ.
 - **Bố cục chuẩn công thái học:** Thanh cuộn dọc của khung nhập liệu và khung tài liệu hoạt động hoàn toàn độc lập (`overflow-y-auto`); nút đóng Modal được tinh gọn thành nút `[X]` đặt tại góc trên bên phải thanh công cụ của khung tài liệu, tạo sự tập trung tối đa cho người thao tác.
+
+
+---
+
+## 31. Kiến Trúc Phân Cấp Phê Duyệt Chỉ Huy & Bảng Giám Sát Tiến Độ Phòng Ban Nhà Trường
+
+### 31.1. Phân Cấp Phê Duyệt Thực Tế (Hierarchical Approval Workflow)
+Trong cấu trúc tổ chức của Trường Quân sự Quân khu 7, các đề xuất chỉnh sửa văn bản nội bộ của từng Phòng, Ban không nhất thiết phải dồn toàn bộ lên Quản trị viên tối cao:
+- **Quyền Chỉnh Sửa Cục Bộ (`Local Edit Rule`):** Quân nhân chỉ được đề xuất chỉnh sửa các văn bản thuộc đơn vị công tác của mình.
+- **Hàng Đợi Phê Duyệt Phân Cấp:** Yêu cầu chỉnh sửa tài liệu của Phòng nào được đưa thẳng vào hàng đợi duyệt của Chỉ huy/Trưởng phòng đó (`Thẩm quyền duyệt: Chỉ huy cấp Phòng`). Quản trị viên hệ thống giữ vai trò giám sát vĩ mô và duyệt các văn bản cấp Trường.
+- **Modal Đối Chiếu Dữ Liệu Chuẩn Hóa (Visual Diff Viewer):** Đối chiếu trực quan dữ liệu hiện tại với dữ liệu đề xuất (gạch đỏ dữ liệu cũ, xanh lục dữ liệu mới, làm mờ các trường giữ nguyên). Bố trí cụm 2 nút hành động chỉ huy dứt khoát: `[ ✖ Từ chối ]` (kèm ô nhập lý do gửi về cán bộ) và `[ ✓ Phê duyệt & Cập nhật ]`.
+
+### 31.2. Hệ Thống Macro KPI & Radar Tiến Độ Phòng Ban Nhà Trường
+Tại phân hệ "Kho dữ liệu chung" (`PortalPage`), tích hợp hệ thống đo lường tiến độ số hóa toàn trường:
+1. **Nút Bật/Tắt Thống Kê Trên Banner:** Cho phép ẩn/hiện khung phân tích vĩ mô mượt mà theo nhu cầu tra cứu.
+2. **Lưới 4 Thẻ KPI Vĩ Mô Toàn Trường:**
+   - *Tổng kho dữ liệu:* Tổng số văn bản, dung lượng kho số hóa, số văn bản mới trong 30 ngày.
+   - *Tiến độ phòng ban:* Tỷ lệ phòng ban Nhà trường đã tham gia số hóa (4/5 đơn vị = 80%), cảnh báo đơn vị chậm tiến độ.
+   - *Quyền khai thác của bạn:* Tỷ lệ văn bản khả dụng theo cấp độ mật cá nhân (`15/15 khả dụng [100%]`), hiển thị số lượng tài liệu yêu cầu xác thực 2FA vân tay.
+   - *Chuẩn hóa phân bổ:* Tỷ lệ gán đủ đơn vị và thể loại văn bản.
+3. **Bảng Tiến Độ Số Hóa Các Phòng Ban Nhà Trường (Command Matrix):**
+   - Lọc duy nhất 5 phòng ban trực thuộc Trường Quân sự Quân khu 7: Ban Giám hiệu (7 Văn bản - Đúng tiến độ), Phòng Chính trị (2 Văn bản - Cần bổ sung), Phòng Đào tạo (1 Văn bản - Cần bổ sung), Phòng Tham mưu - Hành chính (1 Văn bản - Cần bổ sung), Phòng Hậu cần - Kỹ thuật (0 Văn bản - Chậm tiến độ).
+   - Tự động gộp toàn bộ văn bản do Ban Giám hiệu ký (`TQS` và `U-BGH`) về Ban Giám hiệu; loại bỏ 100% các cơ quan bên ngoài/cấp trên.
+   - Thiết kế Header 2 tầng phân cấp chuẩn Command Center, chống ngắt dòng chữ "Vị" và số "7".
+   - Tích hợp Click-to-filter tương tác hai chiều và đồng bộ Gateway `/api/documents`.

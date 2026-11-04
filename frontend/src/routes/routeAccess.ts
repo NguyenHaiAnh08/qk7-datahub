@@ -57,12 +57,11 @@ export const ROUTE_ACCESS: Record<string, RouteAccessConfig> = {
     description: 'Trung tâm văn bản và số hóa tài liệu',
   },
 
-  // Protected - Quản trị trung tâm (BẮT BUỘC ROLE ADMIN)
+  // Protected - Quản trị trung tâm
   [ROUTE_PATHS.ADMIN]: {
     path: ROUTE_PATHS.ADMIN,
     requiresAuth: true,
-    requiredRole: 'admin',
-    description: 'Bảng điều khiển quản trị trung tâm (Chỉ dành cho Quản trị viên)',
+    description: 'Bảng điều khiển quản trị trung tâm',
   },
 
   // Protected - Quản trị tài khoản & phân quyền (BẮT BUỘC ROLE ADMIN)

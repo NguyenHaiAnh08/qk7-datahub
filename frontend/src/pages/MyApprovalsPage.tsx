@@ -115,16 +115,43 @@ const TONE_STYLES: Record<string, string> = {
 // ============================================================
 // Component
 // ============================================================
+type FilterType = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
+const TABS: Array<{ k: FilterType; l: string }> = [
+  { k: 'ALL',      l: 'Tất cả' },
+  { k: 'PENDING',  l: 'Đang chờ' },
+  { k: 'APPROVED', l: 'Đã Duyệt' },
+  { k: 'REJECTED', l: 'Từ chối' },
+];
+
 export const MyApprovalsPage: React.FC = () => {
   const [items, setItems] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'PENDING_REJECTED' | 'ALL'>('PENDING_REJECTED');
+  const [filter, setFilter] = useState<FilterType>('ALL');
+  const [counts, setCounts] = useState<{ ALL?: number; PENDING?: number; APPROVED?: number; REJECTED?: number }>({});
+
+  const updateCountsFromList = (all: ApprovalRequest[]) => {
+    setCounts({
+      ALL: all.length,
+      PENDING: all.filter((i) => i.status === 'PENDING').length,
+      APPROVED: all.filter((i) => i.status === 'APPROVED' || i.status === 'EXECUTED').length,
+      REJECTED: all.filter((i) => i.status === 'REJECTED').length,
+    });
+  };
 
   const load = async () => {
     setLoading(true);
     try {
       const res = await approvalService.listMine(filter);
       setItems(res.items || []);
+
+      if (filter === 'ALL') {
+        updateCountsFromList(res.items || []);
+      } else {
+        approvalService.listMine('ALL').then((allRes) => {
+          updateCountsFromList(allRes.items || []);
+        }).catch(() => {});
+      }
     } catch (err: any) {
       toast.error('Lỗi tải yêu cầu: ' + err.message);
     } finally {
@@ -165,24 +192,36 @@ export const MyApprovalsPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
-          {[
-            { k: 'PENDING_REJECTED', l: 'Đang chờ & Bị từ chối' },
-            { k: 'ALL',              l: 'Tất cả (kể cả đã duyệt)' },
-          ].map(({ k, l }) => (
-            <button
-              key={k}
-              onClick={() => setFilter(k as any)}
-              className={`px-3 py-2 text-xs font-semibold border-b-2 transition cursor-pointer ${
-                filter === k
-                  ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              {l}
-            </button>
-          ))}
+        {/* Filter Tabs (Tất cả, Đang chờ, Đã Duyệt, Từ chối) */}
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
+          {TABS.map(({ k, l }) => {
+            const isActive = filter === k;
+            const count = counts[k];
+            return (
+              <button
+                key={k}
+                onClick={() => setFilter(k)}
+                className={`relative pb-2.5 pt-1 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isActive
+                    ? 'border-b-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 font-bold'
+                    : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <span>{l}</span>
+                {count !== undefined && (
+                  <span
+                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                      isActive
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* List */}
@@ -195,8 +234,12 @@ export const MyApprovalsPage: React.FC = () => {
           <div className="p-12 text-center bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800">
             <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500 mb-3" />
             <p className="text-sm text-slate-500">
-              {filter === 'PENDING_REJECTED'
-                ? 'Không có yêu cầu nào đang chờ hoặc bị từ chối'
+              {filter === 'PENDING'
+                ? 'Không có yêu cầu nào đang chờ xét duyệt'
+                : filter === 'APPROVED'
+                ? 'Chưa có yêu cầu nào được phê duyệt'
+                : filter === 'REJECTED'
+                ? 'Không có yêu cầu nào bị từ chối'
                 : 'Bạn chưa gửi yêu cầu nào'}
             </p>
           </div>

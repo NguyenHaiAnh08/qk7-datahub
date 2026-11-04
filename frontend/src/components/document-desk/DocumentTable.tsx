@@ -197,15 +197,40 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                               />
                             );
                           })()}
-                          {onEdit && (
-                            <button
-                              onClick={() => onEdit(doc)}
-                              className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 dark:text-blue-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                              title="Chỉnh sửa văn bản"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          {onEdit && (() => {
+                            const docUnit = doc.issuing_unit_id || doc.unit_id;
+                            const isOwner = Boolean(doc.uploaded_by && doc.uploaded_by === user?.user_id);
+                            const isSameUnit = Boolean(!docUnit || !user?.unit_id || docUnit === user.unit_id || user.unit_id === 'TQS');
+                            const canLocalEdit = isAdminUser || isOwner || isSameUnit;
+
+                            if (!canLocalEdit) {
+                              return (
+                                <Tooltip
+                                  title={`Chỉ cán bộ thuộc đơn vị ban hành (${doc.unit_name || docUnit}) mới có quyền đề xuất chỉnh sửa văn bản này`}
+                                  placement="top"
+                                  arrow
+                                >
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="p-1.5 opacity-35 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-lg cursor-not-allowed border border-transparent"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                </Tooltip>
+                              );
+                            }
+
+                            return (
+                              <button
+                                onClick={() => onEdit(doc)}
+                                className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 dark:text-blue-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                title="Chỉnh sửa văn bản"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            );
+                          })()}
                           {onDelete && (() => {
                             const canDelete = hasPermission('DOC_DELETE');
                             // Nếu user hoàn toàn không có quyền xóa → không hiện nút

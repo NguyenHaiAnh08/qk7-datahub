@@ -17,6 +17,7 @@ import { Header } from '../components/common/Header';
 import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { toast } from '../components/common/Toast';
 import { SecurityBanner } from '../components/portal/SecurityBanner';
+import { SchoolOverviewSection } from '../components/portal/SchoolOverviewSection';
 import { PortalDocumentList } from '../components/portal/PortalDocumentList';
 import { DocumentTable } from '../components/document-desk/DocumentTable';
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
@@ -47,6 +48,8 @@ export const PortalPage: React.FC = () => {
 
   // Documents
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [allSchoolDocuments, setAllSchoolDocuments] = useState<DocumentItem[]>([]);
+  const [showStats, setShowStats] = useState(true);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -86,6 +89,20 @@ export const PortalPage: React.FC = () => {
     setDateTo('');
     setCurrentPage(1);
   };
+
+  // Load toàn bộ dữ liệu văn bản vĩ mô toàn trường phục vụ 4 thẻ KPI và Radar Tiến Độ Phòng Ban
+  useEffect(() => {
+    documentsApi
+      .getDocuments({})
+      .then((res) => {
+        setAllSchoolDocuments(res.items || []);
+      })
+      .catch((err) => {
+        if (import.meta.env.DEV) {
+          console.warn('[loadAllSchoolDocuments] Lỗi tải tổng kho toàn trường:', err?.message);
+        }
+      });
+  }, [user]);
 
   // Load Metadata
   useEffect(() => {
@@ -172,6 +189,37 @@ export const PortalPage: React.FC = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
+
+  // Xử lý lọc dữ liệu tương tác từ Radar Tiến Độ Phòng Ban
+  const handleSelectDepartmentFromRadar = (unitId: string, isDeptOfTqs: boolean) => {
+    if (isDeptOfTqs) {
+      if (selectedDepartment === unitId && selectedUnit === 'TQS') {
+        setSelectedDepartment('');
+        setSelectedUnit('');
+      } else {
+        setSelectedUnit('TQS');
+        setSelectedDepartment(unitId);
+      }
+    } else {
+      if (selectedUnit === unitId && !selectedDepartment) {
+        setSelectedUnit('');
+      } else {
+        setSelectedUnit(unitId);
+        setSelectedDepartment('');
+      }
+    }
+    setCurrentPage(1);
+  };
+
+  const handleSelectTypeFromRadar = (typeId: string) => {
+    setSelectedType((prev) => (prev === typeId ? '' : typeId));
+    setCurrentPage(1);
+  };
+
+  const handleSelectLevelFromRadar = (levelId: number | '') => {
+    setSelectedLevel((prev) => (prev === levelId ? '' : levelId));
+    setCurrentPage(1);
+  };
 
   // Reset Filters
   const handleResetFilters = () => {
@@ -279,7 +327,40 @@ export const PortalPage: React.FC = () => {
           user={user}
           onOpenPolicy={() => setShowSecurityPolicy(true)}
           onStartTour={() => setIsTourOpen(true)}
+          showStats={showStats}
+          onToggleStats={() => setShowStats((prev) => !prev)}
         />
+
+        {/* Hệ Thống KPI Toàn Trường & Radar Tiến Độ Phòng Ban */}
+        <AnimatePresence initial={false}>
+          {showStats && (
+            <motion.div
+              key="school-overview-section"
+              initial={{ opacity: 0, height: 0, y: -8 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <SchoolOverviewSection
+                documents={allSchoolDocuments.length > 0 ? allSchoolDocuments : documents}
+                meta={meta}
+                tqsDepartments={tqsDepartments}
+                mainUnits={mainUnits}
+                selectedUnit={selectedUnit}
+                selectedDepartment={selectedDepartment}
+                selectedType={selectedType}
+                selectedLevel={selectedLevel}
+                onSelectDepartment={handleSelectDepartmentFromRadar}
+                onSelectType={handleSelectTypeFromRadar}
+                onSelectLevel={handleSelectLevelFromRadar}
+                onResetFilters={handleResetFilters}
+                user={user}
+                userClearanceLevel={user?.clearance_level_id || 1}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Filter & View Mode Controls */}
         <div

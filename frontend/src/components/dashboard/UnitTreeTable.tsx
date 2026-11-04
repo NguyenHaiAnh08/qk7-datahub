@@ -33,7 +33,14 @@ export type UnitCategory =
   | 'trung_doan'
   | 'tieu_doan'
   | 'nha_truong'
-  | 'phong_ban';
+  | 'phong_ban'
+  | 'command_and_div'
+  | 'school_and_depts';
+
+export type ConcreteUnitCategory = Exclude<
+  UnitCategory,
+  'all' | 'command_and_div' | 'school_and_depts'
+>;
 
 export interface UnitTreeNode {
   unit: Unit;
@@ -43,7 +50,7 @@ export interface UnitTreeNode {
   isOrphan?: boolean;
   directChildCount: number;
   totalDescendants: number;
-  category: Exclude<UnitCategory, 'all'>;
+  category: ConcreteUnitCategory;
 }
 
 export interface UnitTreeTableProps {
@@ -56,11 +63,27 @@ export interface UnitTreeTableProps {
 }
 
 // ── Phân loại đơn vị tự động theo Mã & Tên ──
-export const getUnitCategory = (unit: Unit): Exclude<UnitCategory, 'all'> => {
+export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
+  // 0. Ưu tiên cao nhất: Giá trị cấu hình cứng unit_type từ CSDL hoặc Form
+  if (unit.unit_type) {
+    const t = unit.unit_type.toLowerCase();
+    if (
+      t === 'trung_uong' ||
+      t === 'quan_khu' ||
+      t === 'su_doan' ||
+      t === 'trung_doan' ||
+      t === 'tieu_doan' ||
+      t === 'nha_truong' ||
+      t === 'phong_ban'
+    ) {
+      return t as ConcreteUnitCategory;
+    }
+  }
+
   const id = (unit.unit_id || '').toUpperCase();
   const name = (unit.name || '').toLowerCase();
 
-  // 1. Cấp Trung ương / Bộ (Chính phủ, Bộ Quốc phòng, Bộ Tổng Tham mưu, Tổng cục Chính trị...)
+  // 1. Cấp Trung ương / Bộ (Chính phủ, Bộ Quốc phòng, Bộ Tổng Tham mưu, Tổng cục Chính trị, Ban Đảng...)
   if (
     id === 'BQP' ||
     id === 'BTTM' ||
@@ -70,19 +93,28 @@ export const getUnitCategory = (unit: Unit): Exclude<UnitCategory, 'all'> => {
     name.includes('tổng tham mưu') ||
     (name.includes('chính trị') && name.includes('tổng cục')) ||
     name.includes('chính phủ') ||
-    name.includes('trung ương')
+    name.includes('trung ương') ||
+    name.includes('đảng')
   ) {
     return 'trung_uong';
   }
+  // 2. Nhà trường / Viện (Đặt TRƯỚC cấp Quân khu để tránh "Trường Quân sự Quân khu 7" bị xếp nhầm)
+  if (id.startsWith('TQS') || name.includes('trường') || name.includes('học viện') || name.includes('viện')) {
+    return 'nha_truong';
+  }
+  // 3. Cấp Quân khu
   if (id === 'QK7' || name.includes('quân khu') || name.includes('bộ tư lệnh')) {
     return 'quan_khu';
   }
+  // 4. Sư đoàn
   if (id.startsWith('SD') || name.includes('sư đoàn')) {
     return 'su_doan';
   }
+  // 5. Trung đoàn
   if (id.startsWith('TD') || name.includes('trung đoàn') || name.includes('lữ đoàn')) {
     return 'trung_doan';
   }
+  // 6. Tiểu đoàn
   if (
     id.startsWith('TB') ||
     id.startsWith('D') ||
@@ -91,15 +123,12 @@ export const getUnitCategory = (unit: Unit): Exclude<UnitCategory, 'all'> => {
   ) {
     return 'tieu_doan';
   }
-  if (id.startsWith('TQS') || name.includes('trường') || name.includes('học viện') || name.includes('viện')) {
-    return 'nha_truong';
-  }
   return 'phong_ban';
 };
 
 // ── Cấu hình hiển thị theo loại đơn vị (Tương thích hoàn hảo Sáng & Tối) ──
 export const CATEGORY_CONFIG: Record<
-  Exclude<UnitCategory, 'all'>,
+  ConcreteUnitCategory,
   {
     label: string;
     icon: React.ElementType;
@@ -163,6 +192,33 @@ export const CATEGORY_CONFIG: Record<
     iconBgClass:
       'bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30',
   },
+};
+
+// ── Nhãn mô tả thân thiện của từng bộ lọc phân loại đơn vị ──
+export const getCategoryFilterLabel = (cat: UnitCategory): string => {
+  switch (cat) {
+    case 'trung_uong':
+      return 'Cấp Trung ương / Bộ';
+    case 'quan_khu':
+      return 'Cấp Quân khu';
+    case 'su_doan':
+      return 'Sư đoàn';
+    case 'trung_doan':
+      return 'Trung đoàn';
+    case 'tieu_doan':
+      return 'Tiểu đoàn / Đội';
+    case 'nha_truong':
+      return 'Nhà trường / Viện';
+    case 'phong_ban':
+      return 'Phòng / Ban / Cơ quan';
+    case 'command_and_div':
+      return 'Quân khu & Sư đoàn';
+    case 'school_and_depts':
+      return 'Trường QS & Trực thuộc';
+    case 'all':
+    default:
+      return 'Tất cả các cấp đơn vị';
+  }
 };
 
 // ── Hàm chuẩn hoá chuỗi tìm kiếm không dấu ──
@@ -314,22 +370,47 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
     };
   }, [units, orphanCount]);
 
-  // ── Xử lý Tìm kiếm Thông Minh & Tự động Mở Rộng Cha - Con ──
+  // ── Xử lý Tìm kiếm Thông Minh & Tự động Mở Rộng Cha - Con khi Tìm kiếm hoặc Lọc ──
   const normalizedQuery = useMemo(() => normalizeSearchText(searchQuery), [searchQuery]);
 
+  // ── Kiểm tra hiển thị node theo Tìm kiếm & Bộ lọc ──
+  const isNodeMatching = (node: UnitTreeNode): boolean => {
+    if (selectedCategory !== 'all') {
+      if (selectedCategory === 'school_and_depts') {
+        const isSchoolOrDept =
+          node.category === 'nha_truong' ||
+          node.category === 'phong_ban' ||
+          node.unit.unit_id === 'TQS' ||
+          node.unit.parent_id === 'TQS' ||
+          node.parent?.unit_id === 'TQS';
+        if (!isSchoolOrDept) return false;
+      } else if (selectedCategory === 'command_and_div') {
+        const isCmdOrDiv = node.category === 'quan_khu' || node.category === 'su_doan';
+        if (!isCmdOrDiv) return false;
+      } else {
+        if (node.category !== selectedCategory) return false;
+      }
+    }
+    if (normalizedQuery) {
+      const id = normalizeSearchText(node.unit.unit_id);
+      const name = normalizeSearchText(node.unit.name);
+      return id.includes(normalizedQuery) || name.includes(normalizedQuery);
+    }
+    return true;
+  };
+
+  const hasMatchingDescendant = (node: UnitTreeNode): boolean => {
+    if (isNodeMatching(node)) return true;
+    return node.children.some((child) => hasMatchingDescendant(child));
+  };
+
   useEffect(() => {
-    if (!normalizedQuery) return;
+    if (!normalizedQuery && selectedCategory === 'all') return;
 
     const matchedAncestorKeys = new Set<string>();
 
-    const checkMatch = (u: Unit): boolean => {
-      const id = normalizeSearchText(u.unit_id);
-      const name = normalizeSearchText(u.name);
-      return id.includes(normalizedQuery) || name.includes(normalizedQuery);
-    };
-
     const traverse = (node: UnitTreeNode, ancestorPath: string[]): boolean => {
-      const isSelfMatch = checkMatch(node.unit);
+      const isSelfMatch = isNodeMatching(node);
       let isChildMatch = false;
 
       const currentPath = [...ancestorPath, node.unit.unit_id];
@@ -363,7 +444,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
         return next;
       });
     }
-  }, [normalizedQuery, rootNodes]);
+  }, [normalizedQuery, selectedCategory, rootNodes]);
 
   // ── Thao tác Đóng / Mở cây ──
   const toggleExpand = (unitId: string) => {
@@ -394,24 +475,6 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
 
   const handleCollapseAll = () => {
     setExpandedKeys(new Set());
-  };
-
-  // ── Kiểm tra hiển thị node theo Tìm kiếm & Bộ lọc ──
-  const isNodeMatching = (node: UnitTreeNode): boolean => {
-    if (selectedCategory !== 'all') {
-      if (node.category !== selectedCategory) return false;
-    }
-    if (normalizedQuery) {
-      const id = normalizeSearchText(node.unit.unit_id);
-      const name = normalizeSearchText(node.unit.name);
-      return id.includes(normalizedQuery) || name.includes(normalizedQuery);
-    }
-    return true;
-  };
-
-  const hasMatchingDescendant = (node: UnitTreeNode): boolean => {
-    if (isNodeMatching(node)) return true;
-    return node.children.some((child) => hasMatchingDescendant(child));
   };
 
   // ── Làm phẳng cây thành danh sách hàng hiển thị (Flatten for Table) ──
@@ -595,12 +658,10 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
         {/* Pill 3: Quân khu & Sư đoàn */}
         <div
           onClick={() =>
-            setSelectedCategory((prev) =>
-              prev === 'quan_khu' || prev === 'su_doan' ? 'all' : 'quan_khu'
-            )
+            setSelectedCategory((prev) => (prev === 'command_and_div' ? 'all' : 'command_and_div'))
           }
           className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
-            selectedCategory === 'quan_khu' || selectedCategory === 'su_doan'
+            selectedCategory === 'command_and_div' || selectedCategory === 'quan_khu' || selectedCategory === 'su_doan'
               ? 'bg-amber-100/90 border-amber-400 text-amber-950 dark:bg-amber-950/50 dark:border-amber-500/50 dark:text-amber-300 shadow-xs'
               : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
           }`}
@@ -617,7 +678,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               </p>
             </div>
           </div>
-          {(selectedCategory === 'quan_khu' || selectedCategory === 'su_doan') && (
+          {(selectedCategory === 'command_and_div' || selectedCategory === 'quan_khu' || selectedCategory === 'su_doan') && (
             <div className="w-2.5 h-2.5 rounded-full bg-amber-600 dark:bg-amber-400" />
           )}
         </div>
@@ -625,12 +686,10 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
         {/* Pill 4: Trường Quân sự & Trực thuộc */}
         <div
           onClick={() =>
-            setSelectedCategory((prev) =>
-              prev === 'nha_truong' || prev === 'phong_ban' ? 'all' : 'nha_truong'
-            )
+            setSelectedCategory((prev) => (prev === 'school_and_depts' ? 'all' : 'school_and_depts'))
           }
           className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
-            selectedCategory === 'nha_truong' || selectedCategory === 'phong_ban'
+            selectedCategory === 'school_and_depts' || selectedCategory === 'nha_truong'
               ? 'bg-sky-100/90 border-sky-400 text-sky-950 dark:bg-sky-950/50 dark:border-sky-500/50 dark:text-sky-300 shadow-xs'
               : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
           }`}
@@ -647,7 +706,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               </p>
             </div>
           </div>
-          {(selectedCategory === 'nha_truong' || selectedCategory === 'phong_ban') && (
+          {(selectedCategory === 'school_and_depts' || selectedCategory === 'nha_truong') && (
             <div className="w-2.5 h-2.5 rounded-full bg-sky-600 dark:bg-sky-400" />
           )}
         </div>
@@ -697,6 +756,8 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-all font-semibold cursor-pointer"
             >
               <option value="all">Tất cả các cấp đơn vị</option>
+              <option value="school_and_depts">Trường QS & Trực thuộc</option>
+              <option value="command_and_div">Quân khu & Sư đoàn</option>
               <option value="trung_uong">Cấp Trung ương / Bộ</option>
               <option value="quan_khu">Cấp Quân khu</option>
               <option value="su_doan">Cấp Sư đoàn</option>
@@ -995,7 +1056,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
             </span>
             {selectedCategory !== 'all' && (
               <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
-                (Đang lọc theo: {CATEGORY_CONFIG[selectedCategory]?.label})
+                (Đang lọc theo: {getCategoryFilterLabel(selectedCategory)})
               </span>
             )}
             {searchQuery && (

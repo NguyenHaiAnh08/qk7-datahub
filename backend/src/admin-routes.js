@@ -1255,21 +1255,22 @@ module.exports = (app, deps) => {
     app.get('/api/admin/units', async (req, res) => {
         try {
             const pool = await getPool();
-            const r = await pool.request().query(`SELECT u.unit_id, u.name, u.parent_id, p.name AS parent_name FROM UNIT u LEFT JOIN UNIT p ON p.unit_id = u.parent_id ORDER BY u.name`);
+            const r = await pool.request().query(`SELECT u.unit_id, u.name, u.parent_id, u.unit_type, p.name AS parent_name FROM UNIT u LEFT JOIN UNIT p ON p.unit_id = u.parent_id ORDER BY u.name`);
             res.json({ items: r.recordset });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.post('/api/admin/units', async (req, res) => {
         try {
-            const { unit_id, name, parent_id } = req.body;
+            const { unit_id, name, parent_id, unit_type } = req.body;
             if (!unit_id || !name) return res.status(400).json({ error: 'Thiếu unit_id/name' });
             const pool = await getPool();
             await pool.request()
                 .input('id', sql.VarChar(50), unit_id)
                 .input('n', sql.NVarChar(200), name)
                 .input('p', sql.VarChar(50), parent_id || null)
-                .query(`INSERT INTO UNIT (unit_id, name, parent_id) VALUES (@id, @n, @p)`);
+                .input('t', sql.VarChar(50), unit_type || null)
+                .query(`INSERT INTO UNIT (unit_id, name, parent_id, unit_type) VALUES (@id, @n, @p, @t)`);
             res.json({ success: true });
         } catch (e) {
             if (e.message.includes('PRIMARY KEY') || e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Trùng unit_id hoặc tên' });
@@ -1279,13 +1280,14 @@ module.exports = (app, deps) => {
 
     app.put('/api/admin/units/:id', async (req, res) => {
         try {
-            const { name, parent_id } = req.body;
+            const { name, parent_id, unit_type } = req.body;
             const pool = await getPool();
             const r = await pool.request()
                 .input('id', sql.VarChar(50), req.params.id)
                 .input('n', sql.NVarChar(200), name)
                 .input('p', sql.VarChar(50), parent_id || null)
-                .query(`UPDATE UNIT SET name=@n, parent_id=@p WHERE unit_id=@id`);
+                .input('t', sql.VarChar(50), unit_type || null)
+                .query(`UPDATE UNIT SET name=@n, parent_id=@p, unit_type=@t WHERE unit_id=@id`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy' });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }

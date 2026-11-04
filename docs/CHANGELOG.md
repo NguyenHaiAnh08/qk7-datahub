@@ -6,16 +6,15 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ## [v1.2.8-fix-download-0kb-and-central-units-kpi] — 2026-11-04
 
-### 1. Khắc Phục Triệt Để Lỗi Tải Xuống Bị 0 KB & Không Mở Được Tệp PDF
-- **Nguyên nhân cốt lõi:**
-  - Cơ chế cũ dùng `showSaveFilePicker` tạo sẵn một file 0 byte trên đĩa ngay khi người dùng bấm Save. Khi quá trình fetch dữ liệu và animation 3.2s của nút tải (`CompactDownloadButton`) hoàn tất, quyền ghi tạm thời (`transient user activation`) của Chromium bị hết hạn, khiến lệnh `createWritable()` bị chặn và file trên đĩa vĩnh viễn là 0 KB.
-  - Tên file khi tải về lấy trực tiếp từ `document_code` có chứa ký tự gạch chéo `/` (ví dụ: `769/KH-CT`), gây xung đột đường dẫn trên hệ điều hành Windows.
-- **Giải pháp xử lý:**
-  - **Tải tệp Native chuẩn hoá (`saveBlobToFile`):** Chuyển sang phương thức tải native qua Blob URL và thẻ `<a>` ẩn, đảm bảo 100% dữ liệu được trình duyệt lưu trọn vẹn (không bao giờ để lại file 0 byte rác). Tương thích hoàn hảo cả PC Widescreen và iPad Air M4.
-  - **Kiểm tra tính toàn vẹn (Zero-byte Guard):** Chủ động kiểm tra `blob.size === 0`, ném cảnh báo rõ ràng nếu dữ liệu rỗng thay vì tạo file hỏng.
-  - **Tăng thời gian thu hồi URL (Safe Revoke):** Kéo dài thời gian `URL.revokeObjectURL` lên 5000ms đảm bảo trình duyệt hoàn tất quá trình stream ghi vào đĩa cứng.
-  - **Sanitize tên tệp Windows:** Tự động thay thế toàn bộ ký tự cấm (`/`, `\`, `?`, `%`, `*`, `:`, `|`, `"`, `<`, `>`) thành dấu gạch dưới `_` (ví dụ: `769/KH-CT` $\rightarrow$ `769_KH-CT.pdf`).
-  - **Đồng bộ toàn diện:** Áp dụng cho cả khi bấm Tải về ở ngoài danh sách (`DocumentDeskPage`, `PortalPage`, `MyUnitPage`) và bên trong modal xem trước (`DocumentPreviewModal`).
+### 1. Cơ Chế Luôn Mở Hộp Thoại Chọn Ổ Đĩa / Thư Mục Lưu & Khắc Phục Triệt Để File 0 KB
+- **Cơ chế chọn nơi lưu chủ động mỗi lần bấm (Active Drive/Folder Picker on Every Download):**
+  - Cứ mỗi lần người dùng bấm nút **Tải về** (dù ở ngoài danh sách hay trong modal xem trước), hệ thống luôn kích hoạt hộp thoại chọn nơi lưu (`showSaveFilePicker`), cho phép cán bộ tự do chọn lưu vào ổ đĩa C:, D:, E:, USB hoặc các thư mục văn thư chuyên biệt.
+- **Khắc phục lỗi file 0 KB bằng luồng ghi tức thời (Immediate Writable Stream Pipeline):**
+  - Ngay khi người dùng chọn vị trí lưu và bấm Save, hệ thống khởi tạo ngay luồng ghi tệp `fileHandle.createWritable()` trong phạm vi quyền tương tác hợp lệ (`User Activation Window`), loại bỏ hoàn toàn hiện tượng timeout quyền ghi sau animation 3.2s của nút bấm.
+  - Tải trọn vẹn dữ liệu từ máy chủ và ghi trực tiếp 100% nội dung (160 KB - 5 MB+) vào tệp trước khi đóng luồng. File lưu về luôn hoàn chỉnh, mở xem bình thường, không bao giờ bị lỗi `Failed to load PDF document`.
+  - **Hủy an toàn khi bấm Cancel:** Nếu người dùng bấm Hủy trên hộp thoại lưu, nút tải lập tức quay về trạng thái ban đầu, không tải file rác.
+  - **Sanitize tên tệp Windows:** Tự động chuẩn hóa tên file loại bỏ toàn bộ ký tự cấm (`/`, `\`, `?`, `%`, `*`, `:`, `|`, `"`, `<`, `>`) thành dấu gạch dưới `_` (ví dụ: `603/KH-CT` $\rightarrow$ `603_KH-CT.pdf`).
+  - **Fallback an toàn:** Nếu trình duyệt không hỗ trợ File System API (như iPad, Safari), tự động chuyển sang tải native qua Blob URL chuẩn.
 
 ### 2. Chuẩn Hóa Cấp Bậc Cơ Quan Trung Ương / Bộ (`UnitTreeTable`)
 - **Bổ sung cấp bậc "Cấp Trung ương / Bộ" (`trung_uong`):**

@@ -9,6 +9,9 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 ### 1. Cơ Chế Luôn Mở Hộp Thoại Chọn Ổ Đĩa / Thư Mục Lưu & Khắc Phục Triệt Để File 0 KB
 - **Cơ chế chọn nơi lưu chủ động mỗi lần bấm (Active Drive/Folder Picker on Every Download):**
   - Cứ mỗi lần người dùng bấm nút **Tải về** (dù ở ngoài danh sách hay trong modal xem trước), hệ thống luôn kích hoạt hộp thoại chọn nơi lưu (`showSaveFilePicker`), cho phép cán bộ tự do chọn lưu vào ổ đĩa C:, D:, E:, USB hoặc các thư mục văn thư chuyên biệt.
+- **Khắc phục lỗi file 0 KB khi tải từ trong modal xem trước (`DocumentPreviewModal`):**
+  - *Nguyên nhân:* Khi xem PDF ở chế độ toàn màn hình (`Fullscreen`), người dùng bấm tải về $\rightarrow$ hộp thoại Save As native của OS mở ra khiến Chromium tự động thoát Fullscreen $\rightarrow$ sự kiện `fullscreenchange` kích hoạt đóng modal $\rightarrow$ component unmount làm hủy (`abort()`) luồng fetch và stream ghi file, để lại file rác 0 KB trên đĩa.
+  - *Giải pháp triệt để:* Thêm cờ bảo vệ `isDownloadingRef` trong `DocumentPreviewModal`. Khi đang trong tiến trình chọn nơi lưu hoặc ghi file, sự kiện `fullscreenchange` bị chặn không cho đóng modal, bảo đảm luồng ghi file hoàn tất 100% (đủ 168 KB+) và file mở xem bình thường.
 - **Khắc phục lỗi file 0 KB bằng luồng ghi tức thời (Immediate Writable Stream Pipeline):**
   - Ngay khi người dùng chọn vị trí lưu và bấm Save, hệ thống khởi tạo ngay luồng ghi tệp `fileHandle.createWritable()` trong phạm vi quyền tương tác hợp lệ (`User Activation Window`), loại bỏ hoàn toàn hiện tượng timeout quyền ghi sau animation 3.2s của nút bấm.
   - Tải trọn vẹn dữ liệu từ máy chủ và ghi trực tiếp 100% nội dung (160 KB - 5 MB+) vào tệp trước khi đóng luồng. File lưu về luôn hoàn chỉnh, mở xem bình thường, không bao giờ bị lỗi `Failed to load PDF document`.

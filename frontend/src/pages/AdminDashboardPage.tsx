@@ -789,7 +789,7 @@ const pinPendingCount = useMemo(
           </Drawer>
         )}
 
-        <main className="flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-5 lg:p-6 xl:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-5">
+        <main className="flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-5 lg:p-6 xl:p-8 bg-slate-50 dark:bg-slate-950/60 space-y-5 scroll-smooth overscroll-contain">
           {isPortraitMode && (
             <div className="flex items-center gap-1.5 sm:gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800/80 select-none">
               <button

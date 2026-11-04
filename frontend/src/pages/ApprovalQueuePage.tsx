@@ -116,15 +116,15 @@ export const ApprovalQueuePage: React.FC = () => {
   const [generatedPinResult, setGeneratedPinResult] = useState<{ pin: string; userId: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const r = await approvalService.listPending();
       setItems(r.items || []);
     } catch (err: any) {
       toast.error('Lỗi tải danh sách: ' + err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -150,7 +150,7 @@ export const ApprovalQueuePage: React.FC = () => {
         badge: 'APPROVED',
       });
       setSelected(null);
-      await load();
+      await load(true);
       await refreshApprovalCount();
     } catch (err: any) {
       toast.error('Lỗi duyệt: ' + err.message);
@@ -169,7 +169,7 @@ export const ApprovalQueuePage: React.FC = () => {
         badge: 'REJECTED',
       });
       setSelected(null);
-      await load();
+      await load(true);
       await refreshApprovalCount();
     } catch (err: any) {
       toast.error('Lỗi từ chối: ' + err.message);
@@ -188,7 +188,7 @@ export const ApprovalQueuePage: React.FC = () => {
         badge: 'EXPLANATION_REQUIRED',
       });
       setSelected(null);
-      await load();
+      await load(true);
       await refreshApprovalCount();
     } catch (err: any) {
       toast.error('Lỗi: ' + err.message);
@@ -247,7 +247,7 @@ export const ApprovalQueuePage: React.FC = () => {
         setSelected(null);
       }
 
-      await load();
+      await load(true);
       await refreshApprovalCount();
     } catch (err: any) {
       toast.error('Lỗi duyệt: ' + err.message);
@@ -271,7 +271,7 @@ export const ApprovalQueuePage: React.FC = () => {
       setSelected(null);
       setRejectNote('');
       setActionInputMode('idle');
-      await load();
+      await load(true);
       await refreshApprovalCount();
     } catch (err: any) {
       toast.error('Lỗi: ' + err.message);
@@ -356,7 +356,7 @@ export const ApprovalQueuePage: React.FC = () => {
         </div>
 
         <button
-          onClick={load}
+          onClick={() => load()}
           disabled={loading}
           className="px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0"
         >

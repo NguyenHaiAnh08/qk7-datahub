@@ -66,11 +66,46 @@ export const AIChatWidget: React.FC = () => {
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [previewPage, setPreviewPage] = useState<number>(1);
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
-  // State lưu token vân tay đã xác thực trong phiên làm việc
+  // State lưu token vân tay đã xác thực trong phiên làm việc (kèm hạn 5 phút nội bộ Chatbox)
   const [fpToken, setFpToken] = useState<string | null>(null);
+  const [fpTokenExpiresAt, setFpTokenExpiresAt] = useState<number | null>(null);
   // Lưu câu hỏi gần nhất của user để auto-retry sau khi quét vân tay
   const [lastQuery, setLastQuery] = useState<string>('');
   const lastUserQueryRef = useRef<string>('');
+
+  // Lấy token vân tay còn hiệu lực nội bộ trong Chatbox (hạn 5 phút từ khi quét và đúng file)
+  const getActiveFpToken = (forFileId?: string): string | null => {
+    if (!fpToken || !fpTokenExpiresAt) return null;
+    if (Date.now() >= fpTokenExpiresAt) {
+      setFpToken(null);
+      setFpTokenExpiresAt(null);
+      return null;
+    }
+    if (forFileId && targetScanFileId && forFileId !== targetScanFileId) {
+      return null;
+    }
+    return fpToken;
+  };
+
+  // Đóng khung chat và xóa sạch toàn bộ token bảo mật để không rò rỉ ra trang ngoài
+  const handleCloseWidget = () => {
+    setIsOpen(false);
+    setFpToken(null);
+    setFpTokenExpiresAt(null);
+    setTargetScanFileId('');
+    setTargetScanDocCode('');
+    setScanModalOpen(false);
+    setPreviewOpen(false);
+    if (typeof window !== 'undefined') {
+      try {
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('qk7_fp_token')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch (_) {}
+    }
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -108,6 +143,22 @@ export const AIChatWidget: React.FC = () => {
   useEffect(() => {
     if (isOpen) {
       checkServiceStatus();
+    } else {
+      setFpToken(null);
+      setFpTokenExpiresAt(null);
+      setTargetScanFileId('');
+      setTargetScanDocCode('');
+      setScanModalOpen(false);
+      setPreviewOpen(false);
+      if (typeof window !== 'undefined') {
+        try {
+          Object.keys(sessionStorage).forEach((key) => {
+            if (key.startsWith('qk7_fp_token')) {
+              sessionStorage.removeItem(key);
+            }
+          });
+        } catch (_) {}
+      }
     }
   }, [isOpen]);
 
@@ -152,7 +203,13 @@ export const AIChatWidget: React.FC = () => {
   }, [user]);
 
   // Gửi tin nhắn (hỗ trợ Auto-retry khi quét vân tay ZK9500 thành công)
-  const handleSend = async (queryText?: string, tokenOverride?: string, isRetry: boolean = false) => {
+  // ✅ SỬA: Thêm tham số fileIdOverride để truyền file_id lên Backend kiểm tra chéo token
+  const handleSend = async (
+    queryText?: string,
+    tokenOverride?: string,
+    isRetry: boolean = false,
+    fileIdOverride?: string
+  ) => {
     const textToSend = (queryText || inputText).trim();
     if (!textToSend || (loading && !isRetry)) return;
 
@@ -190,6 +247,7 @@ export const AIChatWidget: React.FC = () => {
         query: textToSend,
         history,
         fingerprint_token: activeToken,
+        file_id: fileIdOverride, // ✅ Truyền file_id lên Backend
       });
 
       const aiMsg: ChatMessage = {
@@ -241,7 +299,9 @@ export const AIChatWidget: React.FC = () => {
     setScanModalOpen(false);
     const validToken = token || '';
     if (validToken) {
+      const expiresAt = Date.now() + 5 * 60 * 1000;
       setFpToken(validToken);
+      setFpTokenExpiresAt(expiresAt);
     }
 
     toast.success(
@@ -253,7 +313,8 @@ export const AIChatWidget: React.FC = () => {
     const queryToRetry = lastQuery || lastUserQueryRef.current || inputText.trim();
     if (queryToRetry) {
       setLoading(true);
-      await handleSend(queryToRetry, validToken, true);
+      // ✅ SỬA: Truyền targetScanFileId vào để Backend kiểm tra chéo token-file
+      await handleSend(queryToRetry, validToken, true, targetScanFileId);
     } else if (targetScanFileId) {
       handleOpenPdf(targetScanFileId, 1, targetScanDocCode, undefined, 'Cấp 3 - Mật');
     }
@@ -268,6 +329,12 @@ export const AIChatWidget: React.FC = () => {
     secName?: string,
     requiresBio: boolean = false
   ) => {
+    const activeToken = getActiveFpToken(fileId);
+    if (!activeToken && fileId !== targetScanFileId) {
+      setFpToken(null);
+      setFpTokenExpiresAt(null);
+    }
+
     let secLevel = 1;
     if (requiresBio) {
       secLevel = 3;
@@ -413,7 +480,7 @@ export const AIChatWidget: React.FC = () => {
               </Tooltip>
 
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleCloseWidget}
                 className="p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-colors"
               >
                 <CloseOutlined className="text-xs" />
@@ -712,10 +779,9 @@ export const AIChatWidget: React.FC = () => {
         open={previewOpen}
         document={previewDoc}
         page={previewPage}
-        initialToken={fpToken}
+        initialToken={getActiveFpToken(previewDoc?.file_id)}
         onClose={() => {
           setPreviewOpen(false);
-          setFpToken(null);
         }}
       />
     </>

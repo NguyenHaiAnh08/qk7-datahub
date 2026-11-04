@@ -4,6 +4,312 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.3.0-clean-unit-types-and-hierarchy-sorting] — 2026-11-04
+
+### 1. Tinh Gọn Modal Thêm Mới / Chỉnh Sửa Đơn Vị (`AdminDashboardPage.tsx`)
+- **Placeholder chuẩn hóa:** Đổi ô nhập "Tên Đơn Vị *" thành `VD: Trường Quân sự Quân khu 7` (thay vì ví dụ cũ dài dòng).
+- **Tinh gọn danh mục phân loại đơn vị:**
+  - `Cấp Trung ương / Bộ` (loại bỏ chú thích ngoặc đơn)
+  - `Cấp Quân khu` (loại bỏ chú thích ngoặc đơn)
+  - `Sư đoàn` (giữ nguyên)
+  - `Nhà trường / Viện` (loại bỏ chú thích ngoặc đơn)
+  - **Tách riêng Phòng / Ban / Cơ quan** thành 3 phân loại độc lập:
+    - `Cơ quan` (màu Chàm Indigo, icon `Building`)
+    - `Phòng` (màu Da trời Sky, icon `Building2`)
+    - `Ban` (màu Xanh mòng két Teal, icon `Users`)
+  - `Trung đoàn / Lữ đoàn` (giữ nguyên)
+  - **Loại bỏ hoàn toàn cấp:** `Tiểu đoàn / Đại đội`.
+
+### 2. Tái Cấu Trúc Thẻ KPI & Bộ Lọc "Cấp Quân Khu" (`UnitTreeTable.tsx`)
+- **Độc lập hóa Cấp Quân khu:**
+  - Đổi thẻ KPI 3 từ *"Quân khu & Sư đoàn"* thành **"Cấp Quân khu"** (icon `Award`), hiển thị riêng số lượng đầu mối thực tế: `1 đầu mối` (Quân khu 7).
+  - Khi người dùng nhấp vào thẻ KPI này, hệ thống chỉ lọc duy nhất các đơn vị thuộc Cấp Quân khu, không còn gộp lẫn Sư đoàn.
+  - Loại bỏ tùy chọn gộp `Quân khu & Sư đoàn` khỏi dropdown phân loại.
+
+### 3. Điều Chỉnh Thứ Tự Sắp Xếp Phân Cấp (Hierarchy Sorting)
+- **Cấu trúc hiển thị toàn diện theo cấp bậc chỉ huy:**
+  - Cập nhật hàm trọng số thứ tự quân sự `getSortWeight`:
+    1. `Cấp Quân khu` (`Quân khu 7`): trọng số `1` (hiển thị trên cùng).
+    2. `Nhà trường / Viện` (`Trường Quân sự Quân khu 7` cùng 5 phòng ban trực thuộc): trọng số `2`.
+    3. `Sư đoàn` (`Sư đoàn 5`): trọng số `3` (xếp dưới Trường Quân sự).
+    4. `Cấp Trung ương / Bộ` xếp ở dưới Sư đoàn 5 với thứ tự chuẩn:
+       - `Bộ Quốc Phòng` (`BQP`, trọng số `10`)
+       - `Bộ Tổng Tham mưu` (`BTTM`, trọng số `11`)
+       - `Chính Phủ` (`CP`, trọng số `12`)
+       - `Tổng cục Chính trị` (`TCCT`, trọng số `13`)
+  - Kết quả hiển thị: Toàn bộ cấu trúc thực thể tác chiến và đào tạo trực thuộc Quân khu 7 hiển thị trang trọng ở phần trên; các cơ quan Cấp Trung ương / Bộ được xếp phía dưới Sư đoàn 5 đúng chuẩn định hướng nghiệp vụ.
+
+### 4. Đồng Bộ Dữ Liệu CSDL SQL Server
+- Cập nhật trực tiếp `UNIT.unit_type`:
+  - `U-BGH` (Ban Giám hiệu) $\rightarrow$ `ban`
+  - `U-CT`, `U-DT`, `U-HC`, `U-TM` (Phòng Chính trị, Đào tạo, Hậu cần, Tham mưu) $\rightarrow$ `phong`.
+
+---
+
+## [v1.2.9-fix-school-filter-and-unit-classification] — 2026-11-04
+
+### 1. Khắc Phục Triệt Để Lọc Thẻ KPI "Trường QS & Trực Thuộc" (`UnitTreeTable`)
+- **Khắc phục lỗi 0 kết quả:**
+  - *Nguyên nhân:* Trước đó hàm phân loại tự động `getUnitCategory` kiểm tra từ khóa `'quân khu'` trước `'trường'`, khiến `Trường Quân sự Quân khu 7` (TQS) bị phân loại nhầm thành `'quan_khu'` (thay vì `'nha_truong'`). Đồng thời thẻ KPI "Trường QS & Trực thuộc" chỉ lọc strictly `'nha_truong'` trong khi 5 phòng ban trực thuộc mang phân loại `'phong_ban'`, dẫn đến bảng hiển thị "Không tìm thấy đơn vị nào (0 / 12 đơn vị)".
+  - *Giải pháp:*
+    - Bổ sung danh mục phân loại tổng hợp `school_and_depts` ("Trường QS & Trực thuộc") và `command_and_div` ("Quân khu & Sư đoàn").
+    - Cập nhật logic `isNodeMatching`: Khi chọn `school_and_depts`, hệ thống tự động khớp cả Nhà trường (`TQS`) và toàn bộ các phòng ban cấp con trực tiếp/gián tiếp của Nhà trường.
+    - Cơ chế **Auto-Expand Ancestors**: Khi kích hoạt lọc, hệ thống tự động mở rộng toàn bộ các nút cha cấp trên (`QK7`, `TQS`), giúp hiển thị đầy đủ cấu trúc phả hệ trực quan mà không cần người dùng nhấp mở rộng thủ công.
+    - Cập nhật số liệu thống kê chuẩn xác trên các thẻ KPI: `Toàn hệ thống (12)`, `Cấp Trung ương / Bộ (4)`, `Quân khu & Sư đoàn (2)`, `Trường QS & Trực thuộc (6)`.
+
+### 2. Cơ Chế Thiết Lập Cứng Phân Loại Đơn Vị (Explicit Unit Classification)
+- **Cơ sở dữ liệu (Database Migration):**
+  - Bổ sung trường `unit_type VARCHAR(50) NULL` vào bảng `UNIT` trong CSDL SQL Server `QK7_ThuVienSo`.
+  - Cập nhật và chuẩn hóa toàn bộ 12 đơn vị hiện có trong hệ thống: `BQP`, `BTTM`, `CP`, `TCCT` $\rightarrow$ `trung_uong`; `QK7` $\rightarrow$ `quan_khu`; `SD5` $\rightarrow$ `su_doan`; `TQS` $\rightarrow$ `nha_truong`; các phòng ban (`U-BGH`, `U-CT`, `U-DT`, `U-HC`, `U-TM`) $\rightarrow$ `phong_ban`.
+- **Backend API:**
+  - `backend/src/admin-routes.js`: Endpoint `GET /api/admin/units` trả về thuộc tính `u.unit_type`; `POST` và `PUT` lưu nhận và cập nhật trường `unit_type`.
+  - `backend/server.js`: Endpoint `/api/meta` bổ sung `u.unit_type` phục vụ khởi tạo metadata toàn hệ thống.
+- **Frontend Types & Services:**
+  - `frontend/src/types/user.ts`: Bổ sung `unit_type?: string` vào giao diện TypeScript `Unit`.
+  - `frontend/src/services/unitService.ts`: Cập nhật `createUnit` và `updateUnit` hỗ trợ truyền `unit_type`.
+- **Modal Thêm mới & Chỉnh sửa Đơn vị (`AdminDashboardPage.tsx`):**
+  - Bổ sung trường `<select>` "Phân Loại Đơn Vị *" với các tùy chọn chuẩn hóa:
+    - `Cấp Trung ương / Bộ` (Chính phủ, Bộ Quốc phòng, Đảng...)
+    - `Cấp Quân khu` (Bộ Tư lệnh Quân khu 7)
+    - `Sư đoàn`
+    - `Nhà trường / Viện` (Trường Quân sự QK7...)
+    - `Phòng / Ban / Cơ quan`
+    - `Trung đoàn / Lữ đoàn`
+    - `Tiểu đoàn / Đại đội`
+  - Tự động điền trước phân loại phù hợp theo ngữ cảnh khi nhấp thêm cấp con (`onAddChild`) hoặc chỉnh sửa (`onEdit`).
+  - Loại bỏ hoàn toàn tình trạng đặt tên đơn vị mới (như "Đảng bộ Cộng Sản") bị tự động đoán nhầm thành "Phòng / Ban / Cơ quan".
+
+---
+
+## [v1.2.8-fix-download-0kb-and-central-units-kpi] — 2026-11-04
+
+### 1. Chuẩn Hóa Quy Trình Tải Về 3 Bước & Khắc Phục Triệt Để File 0 KB
+- **Quy trình tải về 3 bước chuẩn nghiệp vụ (3-Stage Download Lifecycle):**
+  - **Bước 1 (Bấm tải về):** Người dùng bấm nút "Tải về". Nút bấm lập tức chuyển sang trạng thái xử lý tiến trình (`CompactDownloadButton`). Hệ thống ngầm nạp trước toàn bộ dữ liệu file từ server vào bộ nhớ (RAM Blob) và kiểm tra dung lượng hợp lệ (> 0 bytes).
+  - **Bước 2 (Chờ chạy xong UX/UI % tiến trình):** Thanh tiến trình hiển thị tỷ lệ % tải tăng dần mượt mà từ 0% đến 100% trong 2.4s (`DURATION = 2400ms`), cho người dùng phản hồi trực quan sinh động mà không bị bất kỳ cửa sổ popup nào làm gián đoạn.
+  - **Bước 3 (Nhả file & Chọn ổ đĩa lưu):** Ngay khi UX/UI chạm mốc 100%, hệ thống mới "nhả file" bằng cách kích hoạt hộp thoại chọn nơi lưu (`showSaveFilePicker`). Cán bộ tùy ý chọn ổ đĩa (C:, D:, E:...) hoặc thư mục chuyên biệt. Khi bấm Save, dữ liệu sạch từ RAM được ghi lập tức vào file và đóng luồng stream.
+- **Khắc phục lỗi file 0 KB khi tải từ trong modal xem trước (`DocumentPreviewModal`):**
+  - *Nguyên nhân:* Khi xem PDF ở chế độ toàn màn hình (`Fullscreen`), hộp thoại Save As native của OS mở ra khiến Chromium tự động thoát Fullscreen $\rightarrow$ sự kiện `fullscreenchange` kích hoạt đóng modal $\rightarrow$ component unmount làm hủy (`abort()`) luồng fetch và stream ghi file, để lại file rác 0 KB trên đĩa.
+  - *Giải pháp triệt để:* Thêm cờ bảo vệ `isDownloadingRef` trong `DocumentPreviewModal`. Khi đang trong tiến trình chọn nơi lưu hoặc ghi file, sự kiện `fullscreenchange` bị chặn không cho đóng modal, bảo đảm luồng ghi file hoàn tất 100% (đủ 168 KB+) và file mở xem bình thường.
+- **Tự động khôi phục chế độ Fullscreen sau khi tải xong (`Auto Re-enter Fullscreen`):**
+  - Ngay sau khi hộp thoại lưu tệp đóng lại và tệp đã lưu thành công (hoặc người dùng bấm Hủy), hệ thống tự động gọi `modalContainerRef.current.requestFullscreen()` để đưa tài liệu trở lại chế độ Toàn màn hình ngay lập tức, giúp cán bộ tiếp tục nghiên cứu và đọc tài liệu tập trung, không bị vướng các thanh công cụ/URL của trình duyệt.
+- **Bảo toàn dữ liệu an toàn & Chống lỗi:**
+  - Dữ liệu file được fetch hoàn tất trước khi ghi nên không bị ảnh hưởng bởi độ trễ mạng trong lúc ghi ra đĩa. File lưu về máy đạt 100% dung lượng, mở xem chuẩn xác trên mọi trình đọc PDF.
+  - **Hủy an toàn khi bấm Cancel:** Nếu người dùng bấm Hủy trên hộp thoại lưu, nút tải lập tức quay về trạng thái ban đầu, không tải file rác.
+  - **Sanitize tên tệp Windows:** Tự động chuẩn hóa tên file loại bỏ toàn bộ ký tự cấm (`/`, `\`, `?`, `%`, `*`, `:`, `|`, `"`, `<`, `>`) thành dấu gạch dưới `_` (ví dụ: `603/KH-CT` $\rightarrow$ `603_KH-CT.pdf`).
+  - **Fallback an toàn:** Nếu trình duyệt không hỗ trợ File System API (như iPad, Safari), tự động chuyển sang tải native qua Blob URL chuẩn.
+
+### 2. Chuẩn Hóa Cấp Bậc Cơ Quan Trung Ương / Bộ (`UnitTreeTable`)
+- **Bổ sung cấp bậc "Cấp Trung ương / Bộ" (`trung_uong`):**
+  - Tự động nhận diện chính xác các cơ quan cấp chiến lược tối cao: `Bộ Quốc Phòng` (BQP), `Bộ Tổng Tham mưu` (BTTM), `Tổng cục Chính trị` (TCCT), `Chính Phủ` (CP).
+  - Không còn bị xếp sai thành "Phòng / Ban / Cơ quan".
+  - Hiển thị biểu tượng `Landmark` và Badge màu Đỏ Cờ Rose trang trọng (`bg-rose-100 text-rose-900 border-rose-300`).
+- **Tái cấu trúc 4 Thẻ KPI Phân Nhóm Chiến Thuật (Mini Stat Pills):**
+  - Loại bỏ hoàn toàn thẻ "Trung / Tiểu đoàn: 0 đơn vị" không có dữ liệu thực tế.
+  - Thay bằng 4 thẻ KPI phản ánh chính xác 100% cơ cấu 13 đơn vị toàn hệ thống:
+    1. *Thẻ 1:* `Toàn hệ thống: 13 đơn vị` (Tất cả)
+    2. *Thẻ 2:* `Cấp Trung ương / Bộ: 4 cơ quan` (BQP, BTTM, TCCT, CP)
+    3. *Thẻ 3:* `Quân khu & Sư đoàn: 2 đầu mối` (QK7, Sư đoàn 5)
+    4. *Thẻ 4:* `Trường QS & Trực thuộc: 7 đơn vị` (TQS, BGH, TM, CT, ĐT, HC, Bếp cơ quan)
+  - Hỗ trợ Click-to-filter mượt mà trên từng thẻ thống kê.
+- **Tối ưu Dropdown Lọc Cấp Đơn Vị:**
+  - Đưa "Cấp Trung ương / Bộ" lên vị trí ưu tiên cao nhất, loại bỏ các cấp trung gian không dùng đến.
+
+### 3. Bỏ Ký Tự Thụt Lề `└─ ` Của Bếp Cơ Quan
+- Trong ô chọn "Tất cả phòng ban trực thuộc", Bếp cơ quan hiển thị tên thuần túy: `Bếp cơ quan` (không còn tiền tố `└─ ` gây khó nhìn).
+
+---
+
+## [v1.2.7-unit-filters-and-scroll-preservation] — 2026-11-04
+
+### 1. Chuẩn Hóa Dropdown "Tất Cả Đơn Vị Ban Hành" (Clean Main Issuing Units Dropdown)
+- **Tách bạch cơ quan ban hành chính:** Dropdown "Tất cả đơn vị ban hành" giữ danh mục cơ quan ban hành lớn gọn gàng như cũ (Trường Quân sự Quân khu 7, Quân khu 7, Bộ Tổng Tham mưu, Tổng cục Chính trị, Bộ Quốc Phòng, Chính Phủ, Sư đoàn 5...).
+- **Ngăn ngừa bung dữ liệu con:** Tự động loại trừ 100% các phòng ban, đơn vị con cháu nội bộ của Nhà trường (`Ban Giám hiệu`, `Bếp cơ quan`, `Phòng Chính trị`, `Phòng Đào tạo`, `Phòng Hậu cần - Kỹ thuật`, `Phòng Tham mưu - Hành chính`) khỏi dropdown chính, loại bỏ hiện tượng bị bung ra thành các tùy chọn riêng lẻ.
+
+### 2. Bộ Lọc Phòng Ban Phụ Thuộc (Dependent School Department Filter)
+- **Kích hoạt động theo ngữ cảnh:** Khi người dùng chọn "Trường Quân sự Quân khu 7", hệ thống tự động hiển thị ô chọn filter chuyên biệt "Tất cả phòng ban trực thuộc" (ở hàng thứ 2, ngay dưới ô đơn vị ban hành).
+- **Cấu trúc cây đa cấp thụt lề chuẩn (`└─ `):** Đổ toàn bộ danh mục phòng ban con cháu trực thuộc Nhà trường với tiền tố thụt lề trực quan, hỗ trợ vô hạn cấp (`Phòng Hậu cần - Kỹ thuật` $\rightarrow$ `└─ Bếp cơ quan`).
+- **Truy vấn phân cấp (`include_children`):** Tự động truy vấn văn bản của cả đơn vị cha và các đơn vị con cháu trực thuộc khi lọc theo phòng ban.
+- **Đồng bộ toàn diện:** Áp dụng thống nhất trên cả `DocumentDeskPage` (Trung tâm văn bản) và `PortalPage` (Kho dữ liệu chung).
+
+### 3. Khắc Phục Triệt Để Hiện Tượng Giật/Nhảy Cuộn Trang (Scroll Jump Prevention)
+- **Trang Cấu hình Khóa bảo vệ (`ProtectedPermissionsConfigPage.tsx`):** Áp dụng cơ chế **Optimistic UI Update** và **Silent Refresh** (`load(silent=true)`).
+- Không unmount/sụp đổ chiều cao DOM khi click mở khóa/bật khóa, giữ nguyên 100% vị trí thanh cuộn (`scrollTop`) của người dùng tại điểm thao tác.
+- Bổ sung hiệu ứng xoay loading cục bộ (`togglingId`) ngay tại nút bấm được click.
+- Chuẩn hóa cơ chế Silent Refresh tương tự cho `ApprovalQueuePage` và `MyApprovalsPage`.
+
+### 4. Nâng Cấp Bảng Cây Đơn Vị & Khắc Phục Vỡ Layout (`UnitTreeTable`)
+- Bổ sung `flex-nowrap`, `truncate min-w-0` cho tên đơn vị và `shrink-0 whitespace-nowrap` cho nhãn loại đơn vị, loại bỏ hiện tượng xuống hàng làm vỡ bảng khi thêm đơn vị con.
+- Kéo dài đường kẻ định hướng phân cấp liên tục (`-top-3.5` đến `-bottom-3.5`), loại bỏ đứt gãy nét kẻ giữa các cấp cha - con.
+
+---
+
+## [v1.2.6-hierarchical-approval-diff-school-radar-kpi] — 2026-11-04
+
+### 1. Phân Cấp Phê Duyệt Chỉ Huy & Visual Diff Viewer (GitHub-style Diff)
+- **Chuẩn hóa đối chiếu dữ liệu:** Tiêu đề đổi thành **"Đối Chiếu Dữ Liệu Chuẩn Hóa"**, loại bỏ đuôi kỹ thuật thừa.
+- **Cụm nút hành động chiến thuật (Commander Action Hub):**
+  - `[ ✖ Từ chối ]`: Nút Ghost viền đỏ, mở ô nhập lý do từ chối để phản hồi về cán bộ đề xuất.
+  - `[ ✓ Phê duyệt & Cập nhật ]`: Nút Solid Xanh Lục Quân Đậm.
+  - Đã loại bỏ nút giải trình trung gian gây thừa thao tác cho chỉ huy.
+- **Badge thẩm quyền phê duyệt phân cấp:**
+  - `Thẩm quyền duyệt: Chỉ huy cấp Phòng` (Màu Vàng Kim quân hiệu) khi đối tượng đề xuất thuộc đơn vị phòng ban của Chỉ huy.
+  - `Thẩm quyền duyệt: Quản trị viên` (Màu Đỏ Quân Kỳ) khi xem xét trên phạm vi toàn trường.
+- **Quy tắc chỉnh sửa & duyệt cục bộ (`Local Edit & Hierarchical Approval Rule`):**
+  - Cán bộ thuộc đơn vị nào được phép tạo đề xuất chỉnh sửa văn bản của đơn vị đó.
+  - Đề xuất được đưa thẳng vào hàng đợi duyệt của Chỉ huy/Trưởng phòng tương ứng, giảm tải cho Admin tối cao.
+
+### 2. Chuẩn Hóa Avatar Quân Nhân Theo 2 Chữ Cái Cuối Họ Tên Tiếng Việt
+- **Quy chuẩn hiển thị:** Tự động lấy 2 chữ cái đầu của 2 từ cuối họ tên:
+  - `Nguyễn Thị Ánh Tuyết` $\rightarrow$ **ÁT**
+  - `Trần Thị Ánh Tuyết` $\rightarrow$ **ÁT**
+  - `Nguyễn Hải Anh` $\rightarrow$ **HA**
+  - `Lương Nhật Thăng` $\rightarrow$ **NT**
+  - `Mạc Lương Thanh Tình` $\rightarrow$ **TT**
+- **Đồng bộ toàn hệ thống:** Áp dụng trên Modal Kiểm duyệt, Dropdown User Profile, và Bảng Nhật Ký Hoạt Động & Kiểm Toán An Ninh (`SecurityAuditLog`).
+
+### 3. Điều Hướng "Quản Trị" Trên Topbar Dành Cho Nhân Viên IT
+- Trên thanh điều hướng trung tâm (`NavigationGlider`), tài khoản có vai trò/chức vụ IT hoặc được phân bổ quyền quản trị danh mục (như `USR-009` Mạc Lương Thanh Tình) sẽ hiển thị tab **"Quản trị"** (kèm icon Khiên `Shield`), cho phép truy cập trực tiếp Trung tâm Quản trị tương tự Admin.
+
+### 4. Tách 4 Tab Trạng Thái Độc Lập Tại "Yêu Cầu Chỉnh Sửa Của Tôi"
+- Tách biệt rõ ràng từ trái sang phải: `Tất cả` $\rightarrow$ `Đang chờ` $\rightarrow$ `Đã Duyệt` $\rightarrow$ `Từ chối`.
+- Tích hợp Badge đếm số lượng động trên từng tab theo thời gian thực.
+- Khắc phục lỗi lọc trạng thái `APPROVED` ở backend bằng cách gom cả đề xuất `APPROVED` và `EXECUTED`.
+
+### 5. Khắc Phục Lỗi Ngắt Dòng & Cắt Cụt Ký Tự Toast Thông Báo
+- Mở rộng chiều rộng Toast Container lên `min-w-[480px] md:min-w-[540px]`.
+- Loại bỏ thuộc tính `truncate` ở tiêu đề thông báo `ĐÃ GỬI ĐỀ XUẤT CHỈNH SỬA`, giữ nguyên dòng không bị cắt cụt ba chấm `S...`.
+
+### 6. Nâng Cấp UX/UI Kho Dữ Liệu Chung (`PortalPage`)
+- **Banner Phạm vi tra cứu tài liệu quân sự:**
+  - Nút bật/tắt thống kê toàn trường: `[ 📊 Ẩn thống kê toàn trường ^ ]` / `[ 📊 Hiện thống kê toàn trường v ]`.
+  - Tách nội dung thành 2 dòng rõ ràng:
+    + Dòng 1: `Toàn quyền tra cứu và truy xuất tài liệu tối mật của toàn Trường Quân sự Quân khu 7`
+    + Dòng 2: `Mọi thao tác đều được kiểm toán và ghi nhận nhật ký an ninh.`
+- **4 Thẻ KPI Vĩ Mô Toàn Trường:**
+  1. *Thẻ 1 - Tổng kho toàn trường:* Tổng số tài liệu, dung lượng kho số (`KB/MB`), số văn bản mới trong 30 ngày qua.
+  2. *Thẻ 2 - Tiến độ các phòng ban:* Tỷ lệ phòng ban Nhà trường đã nộp dữ liệu (4/5 đơn vị = 80%), cảnh báo phòng ban chậm tiến độ.
+  3. *Thẻ 3 - Quyền khai thác của bạn (Mới):* Số lượng văn bản khả dụng theo cấp độ mật cá nhân (`15/15 khả dụng [100%]`), kèm thông tin cấp độ và số lượng tài liệu yêu cầu xác thực 2FA vân tay.
+  4. *Thẻ 4 - Chuẩn hóa phân bổ:* Tỷ lệ `%` chuẩn hóa gán đúng đơn vị & thể loại, ngày cập nhật văn bản mới nhất.
+- **Bảng Tiến Độ Số Hóa & Phân Bổ Theo Đơn Vị:**
+  - Lọc duy nhất các phòng ban con trực thuộc Trường Quân sự Quân khu 7 (BGH: 7 Văn bản, Chính trị: 2, Đào tạo: 1, Tham mưu: 1, Hậu cần: 0 - Chậm tiến độ).
+  - Loại bỏ hoàn toàn các đơn vị bên ngoài / cấp trên (Quân khu 7, Chính phủ, Bộ Quốc phòng, Sư đoàn 5...).
+  - Thiết kế lại Header 2 tầng phân cấp chuẩn Command Center, chống ngắt dòng chữ "Vị" và số "7".
+  - Chuẩn hóa chú thích SLA: `Tối đa 3 Văn bản`, `Cần bổ sung (1-2 Văn bản)`, `Chậm tiến độ (0 Văn bản)`.
+  - Thay thế toàn bộ từ viết tắt `VB` thành chữ đầy đủ **`Văn bản`**.
+  - Tích hợp Click-to-filter tương tác hai chiều và đồng bộ Gateway `/api/documents` cho Ban Giám hiệu.
+- **Bảng Cơ Cấu Thể Loại & Mức Bảo Mật Toàn Trường:** Có Mini Segmented Switcher chuyển đổi mượt mà giữa Thể loại và Cấp độ bảo mật.
+
+---
+
+## [v1.2.5-split-pane-digitization-workflow] — 2026-11-03
+
+### 1. Quy Trình Số Hóa Tài Liệu Chia Đôi Màn Hình (Split-Pane Digitization Side-by-Side)
+- **Tái cấu trúc Modal Đăng Tải & Hiệu Chỉnh:** Chuyển đổi hộp thoại popup nhỏ sang giao diện toàn màn hình (Full-screen Modal) chia đôi 2 vùng làm việc độc lập:
+  - *Khung bên trái (35% - 40%):* Biểu mẫu nhập liệu (Số hiệu, trích yếu, người ký, đơn vị, độ mật) với thanh cuộn dọc độc lập `overflow-y-auto`.
+  - *Khung bên phải (60% - 65%):* Trình xem trước PDF toàn màn hình (PDF Viewer) phục vụ đối chiếu dữ liệu theo thời gian thực.
+- **Xem trước cục bộ tức thì (Real-time Local Preview 0ms):**
+  - Kéo thả tệp PDF vào Dropzone ở form trái sẽ render ngay lập tức sang khung phải thông qua `URL.createObjectURL(file)` mà không cần upload lên máy chủ.
+  - Tự động thu hồi `URL.revokeObjectURL` khi unmount hoặc đổi file để ngăn ngừa rò rỉ bộ nhớ.
+  - Tự động tải stream văn bản gốc `/api/files/:id/view` khi mở chế độ "Hiệu Chỉnh Văn Bản".
+- **Empty State chuyên nghiệp:** Hiển thị màn hình chờ trực quan với biểu tượng tài liệu lớn và thông báo hướng dẫn kéo thả khi chưa chọn tệp.
+
+### 2. Tối Ưu Hiệu Năng & Khắc Phục Triệt Để Hiện Tượng Nhấp Nháy (Flicker-Free Canvas)
+- **Khắc phục lỗi giật nhấp nháy PDF Canvas khi nhập liệu:**
+  - Bọc `SinglePdfPage` và `PdfPagesViewer` trong `React.memo` với hàm so sánh props tùy biến.
+  - Tách `redrawStrokes` khỏi dependency array của effect render PDF trong `SinglePdfPage.tsx`, tránh việc xóa trắng canvas (`canvas.width = canvas.width`) và hủy render task mỗi khi gõ phím.
+  - Memoize hoàn toàn node PDF Viewer bằng `useMemo` trong `DocumentUploadModal.tsx`, cô lập khỏi state thay đổi của form nhập liệu (`formData`).
+  - Dùng `prevSelectedFileRef` và `initializedDocIdRef` ngăn chặn gọi lại không cần thiết các hàm nạp dữ liệu.
+
+### 3. Tinh Chỉnh UX/UI Theo Bản Sắc Quân Đội & Bảo Mật Đa Tầng
+- **Tối ưu màu sắc Light Mode thanh lịch:** Đồng bộ bảng màu nền, viền, shadow tạo độ tương phản cao, dịu mắt và trang nhã.
+- **Loại bỏ công cụ thừa & Công thái học nút đóng:** Loại bỏ bút dạ quang khỏi thanh công cụ modal đăng tải/hiệu chỉnh; đưa nút đóng `[X]` lên góc trên bên phải thanh tiêu đề khung PDF.
+- **Bảo mật Sparse Dynamic Watermark:** Luôn tự động kích hoạt watermark mờ phủ chéo 45 độ trên khung PDF xem trước cục bộ và máy chủ để bảo vệ an ninh văn bản quân sự.
+
+---
+
+## [v1.2.4-anti-screenshot-approval-workflow-unit-sort] — 2026-11-01
+
+### 1. Lá Chắn Chống Chụp Màn Hình & Cảnh Báo An Ninh Tác Chiến (Anti-Screenshot Security Shield)
+- **Đánh chặn phím tắt toàn diện:** Bắt và triệt tiêu các tổ hợp phím chụp màn hình hệ điều hành: `PrintScreen` (Key code 44), `Win + Shift + S` (Snipping Tool trên Windows), `Cmd + Shift + 3/4` (trên macOS/iPadOS).
+- **Cơ chế Blackout DOM tức thì (0ms):** Ngay khi phát hiện sự kiện phím tắt hoặc sự kiện mất tiêu điểm cửa sổ (`window.blur` do Snipping Tool mở lên), hệ thống tự động cưỡng chế che đen/mờ toàn bộ vùng nội dung tài liệu tác chiến trước khi Windows kịp ghi khung hình.
+- **Tiêu hủy bộ nhớ tạm Clipboard đa nhịp:** Thực hiện ghi đè nội dung rỗng/vô hiệu hóa vào Clipboard hệ điều hành ngay lập tức (0ms) và kích hoạt nhắc lại liên tiếp sau 200ms, 500ms, 1000ms để triệt tiêu hoàn toàn khả năng người dùng nhấn `Ctrl + V` lấy ra hình ảnh.
+- **Chặn dán nội dung hình ảnh:** Kiểm tra sự kiện `paste`, nếu clipboard chứa mime-type `image/*`, lập tức từ chối và cảnh báo an ninh vi phạm quy chế bảo vệ bí mật quân sự.
+- **Tích hợp cảnh báo thời gian thực về SOC:** Phát tín hiệu báo cáo về Gateway qua endpoint `/api/security/screenshot-alert`. Tự động trích xuất đầy đủ thông tin: Mã tệp (`file_id`), Số hiệu văn bản, Trích yếu nội dung, Cấp độ bảo mật, Đơn vị ban hành, Thời gian vi phạm và Địa chỉ IP máy trạm.
+- **Hiển thị trực quan trên Nhật ký SOC (`SecurityAuditLog.tsx`):** Thiết kế thẻ cảnh báo chuyên biệt màu đỏ tươi (`border-rose-300 bg-rose-50`), biểu tượng `CameraOff`, hiển thị rõ văn bản đang bị tác động và thông điệp: *"HÀNH VI CHỤP MÀN HÌNH ĐÃ BỊ CHẶN & TIÊU HỦY DỮ LIỆU BỘ NHỚ TẠM"*.
+- **Mở rộng cột `ACCESS_LOG.note`:** Nâng cấp cấu trúc trường dữ liệu `note` từ `NVARCHAR(255)` lên `NVARCHAR(1000)` trong CSDL SQL Server, loại bỏ triệt để hiện tượng cắt cụt trích yếu hoặc mất thông tin đơn vị/cấp mật khi ghi nhận nhật ký kiểm toán an ninh.
+- **Công tắc Dev Switch an toàn:** Bổ sung tùy chọn *"Dev: Cho phép chụp ảnh"* (`qk7_dev_allow_screenshot`) trong menu người dùng (Header Profile) để lập trình viên/kiểm thử viên có thể chụp màn hình giao diện khi cần mà không bị lá chắn an ninh kích hoạt.
+
+### 2. Hợp Nhất Luồng Đề Xuất Sửa Đổi & Chuẩn Hóa Văn Bản Vào Hàng Đợi Phê Duyệt Của Admin
+- **Hợp nhất hàng đợi tập trung (`ApprovalQueuePage.tsx`):**
+  - Tích hợp toàn diện các đề xuất chỉnh sửa văn bản từ bảng `DOCUMENT_REVISION_PROPOSAL` vào chung hàng đợi duyệt `/api/admin/approval-requests` của Quản trị viên tối cao.
+  - Loại bỏ hoàn toàn sự rườm rà khi Quản trị viên phải vào trang bàn làm việc để tìm modal cũ; toàn bộ yêu cầu khóa quyền (`APPROVAL_REQUEST`) và đề xuất chuẩn hóa văn bản (`PROP-*`) giờ đây tập trung tại một nơi duy nhất.
+- **Nhận diện trực quan & Bảng đối chiếu 2 cột:**
+  - Đề xuất sửa văn bản được phân loại với Badge màu xanh ngọc bích: `ĐỀ XUẤT SỬA VĂN BẢN`.
+  - Hộp thoại chi tiết cung cấp **BẢNG ĐỐI CHIẾU THÔNG TIN CHUẨN HÓA** 2 cột trực quan:
+    - *Cột hiện tại:* Số hiệu, Trích yếu, Đơn vị & Người ký, Cấp độ mật ban đầu.
+    - *Cột đề xuất:* Các thông tin mới do trợ lý/văn thư đề xuất thay đổi.
+    - *Lý do đề xuất:* Hiển thị rõ ràng ghi chú giải trình của người đề xuất.
+- **Xử lý 1-click & Đồng bộ đa tầng:**
+  - Phê duyệt / Từ chối trực tiếp ngay tại Hàng đợi, tự động cập nhật bảng `DOCUMENT`, đồng bộ kho vector ngữ nghĩa AI Boxchat (`:8001`), ghi nhận `ACCESS_LOG` kiểm toán và tự động cập nhật số lượng badge chờ duyệt qua `ApprovalContext`.
+- **Trang theo dõi của người dùng ("Yêu Cầu Chỉnh Sửa Của Tôi" - `MyApprovalsPage.tsx`):**
+  - Đồng bộ API `/api/my-approval-requests` giúp quân nhân theo dõi tiến độ của đề xuất: Đang chờ duyệt (`PENDING`), Đã phê duyệt (`APPROVED`), hoặc Bị từ chối (`REJECTED`) kèm lý do từ chối cụ thể từ Chỉ huy/Admin.
+- **Mặc định lý do chuẩn hóa (`DocumentUploadModal.tsx`):**
+  - Khi trợ lý/văn thư gửi đề xuất chỉnh sửa, ô nhập lý do đã để sẵn văn bản mẫu: `"Đề xuất chuẩn hóa thông tin văn bản"` để tối ưu hóa tốc độ thao tác, người dùng có thể giữ nguyên hoặc xóa đi nhập lý do riêng.
+
+### 3. Chuẩn Hóa Thứ Tự Ưu Tiên Đơn Vị Ban Hành Trong Bộ Lọc & Lọc Sâu Phòng Ban
+- **Thứ tự hiển thị chuẩn quân sự:** Sắp xếp lại danh mục đơn vị ban hành trong dropdown bộ lọc tìm kiếm theo đúng phân cấp quản lý quân sự:
+  1. Tất cả đơn vị ban hành
+  2. Trường Quân sự Quân khu 7 (`TQS`)
+  3. Quân khu 7 (`QK7`)
+  4. Bộ Tổng Tham mưu (`BTTM`)
+  5. Tổng cục Chính trị (`TCCT`)
+  6. Bộ Quốc Phòng (`BQP`)
+  7. Chính Phủ (`CP`)
+  8. Sư đoàn 5 (`SD5`)
+  *(Các đơn vị mới được thêm sau này sẽ tự động xếp ở dưới dần dần)*
+- **Bộ lọc sâu phòng ban trực thuộc TQS:** Khi người dùng chọn *"Trường Quân sự Quân khu 7"*, ô chọn phòng ban (*Ban Giám hiệu, Phòng Tham mưu - Hành chính, Phòng Chính trị, Phòng Đào tạo, Phòng Hậu cần - Kỹ thuật*) tự động xuất hiện đối diện ngay bên dưới để tra cứu chi tiết; khi chọn các đơn vị khác, ô phòng ban tự động ẩn đi để giao diện gọn gàng.
+- **Xuất helper dùng chung:** Cung cấp hàm `getIssuingUnitPriority` trong `frontend/src/utils/unitTree.tsx` để đồng bộ thứ tự ưu tiên trên toàn bộ các trang (`PortalPage.tsx`, `DocumentFilters.tsx`).
+
+---
+
+## [v1.2.3-biometric-device-recovery-fix] — 2026-10-31
+
+### Khắc Phục Lỗi Báo Ảo "Vân Tay Không Khớp" Khi Chưa Đặt Tay Quét & Tự Phục Hồi Thiết Bị ZK9500
+- **Khắc phục lỗi nuốt mã lỗi phần cứng tại Gateway (`server.js`):** Phân biệt rành mạch giữa lỗi thiết bị ngoại vi (`DEVICE_OFFLINE` $\rightarrow$ `503`, `TIMEOUT` $\rightarrow$ `408`, `device_error` $\rightarrow$ `500`) và lỗi dữ liệu sinh trắc học không khớp (`403`). Loại bỏ hoàn toàn tình trạng Gateway tự ý gộp lỗi `DEVICE_OFFLINE` thành *"Vân tay không khớp (score=0)"*.
+- **Tự động đánh thức và nạp lại SDK ZKTeco (`zk_service.py` & `agent.py`):** Bổ sung cơ chế **Self-Healing SDK Reload**: khi `GetDeviceCount() <= 0` hoặc thiết bị ở trạng thái ngủ sau thời gian idle dài, Agent tự động reload fresh instance để re-enumerate lại cổng USB và khởi động lại đầu đọc ZK9500.
+- **Ngắt vòng lặp Auto-retry tại UI (`FingerprintScanModal.tsx`):** Khi gặp lỗi thiết bị offline hoặc timeout, dừng ngay lập tức việc tự động thử lại 2 lần liên tiếp gây cạn lượt quét trong 2 giây; hiển thị thông báo trung thực để người dùng kiểm tra kết nối cáp USB hoặc chủ động bấm nút "Quét ngay".
+- **Bảo vệ luồng Admin 2FA (`server.js`):** Thêm khối kiểm tra bắt buộc `!scanResult.match` cho API xác thực 2FA đăng nhập Admin (`/api/auth/login/admin-fp-verify`), vá triệt để lỗ hổng bỏ qua xác thực vân tay quản trị viên.
+
+---
+
+## [v1.2.2-chatbox-biometric-token-scoping] — 2026-10-31
+
+### Cô Lập Vùng Nhớ Token Sinh Trắc Học Của Chatbox & Chống Bỏ Qua Quét Vân Tay Ngoài Trang
+- **Hiện tượng trước khi sửa:** Khi người dùng tra cứu văn bản Cấp 3+ trong Chatbox và hoàn tất quét vân tay ZK9500, Chatbox lưu token vào `sessionStorage` per-file (`qk7_fp_token_${targetScanFileId}`). Khi đóng Chatbox (`tắt chatbox`) rồi truy cập cùng văn bản tại Bàn làm việc (Document Desk), hệ thống tự động bypass quét vân tay do token vẫn còn hiệu lực 5 phút trong `sessionStorage`.
+- **Cơ chế cô lập mới (In-Memory Scoped Token):**
+  - **Loại bỏ ghi `sessionStorage` từ Chatbox:** Xóa bỏ hoàn toàn thao tác ghi `sessionStorage.setItem('qk7_fp_token_' + targetScanFileId, ...)` trong `AIChatDrawer.tsx` và `AIChatWidget.tsx`.
+  - **Quản lý vòng đời token trong bộ nhớ nội bộ:** Token sinh trắc học của Chatbox được lưu trong React State (`fpToken`) kèm mốc thời gian hết hạn 5 phút (`fpTokenExpiresAt`), chỉ dùng riêng cho các truy vấn chat và trích dẫn nội bộ của Chatbox.
+  - **Tự động hủy khi đóng Chatbox:** Khi người dùng đóng Chatbox (qua nút `X`, click lớp phủ backdrop, hoặc phím `ESC`), hàm `handleCloseChat` lập tức dọn sạch token trong bộ nhớ (`fpToken = null`), đồng thời chủ động quét xóa mọi khóa `qk7_fp_token*` trong `sessionStorage`.
+  - **Bảo toàn 3 tầng phòng thủ Zero-Trust:** Khi ra ngoài Bàn làm việc (Document Desk), Đơn vị của tôi hoặc Danh mục, người dùng bắt buộc phải quét vân tay ZK9500 độc lập để xem tài liệu Cấp 3+, không còn hiện tượng rò rỉ token làm bypass sinh trắc học.
+
+---
+
+## [v1.2.1-chatbox-clearance-sync-fix] — 2026-10-31
+
+### 1. Sửa Lỗi Clearance Guard & Ngộ Nhận Vượt Cấp Mật Trong Chatbox
+- **Khắc phục ngộ nhận trong `agent_tutor.py` & `ai-routes.js`:** Loại bỏ giả định sai lầm "không tìm thấy chunk = vượt cấp mật". Cập nhật cơ chế tra cứu toàn diện kho dữ liệu (`all_chunks`/CSDL) để xác minh chính xác cấp mật thực tế của văn bản trước khi đưa ra quyết định từ chối.
+- **Tài khoản Tuyệt mật (Cấp 5):** Xem và tra cứu bình thường toàn bộ tài liệu Cấp 1–5 (bao gồm `39-KH/ĐU`), không còn bị thông báo vô lý "không phù hợp cấp bảo mật".
+- **Tài khoản cùng cấp mật (Cấp 3 - Mật):** Tra cứu đúng tài liệu Cấp 3 (`880/KH`), tự động kích hoạt luồng Biometric Guard ZK9500 (`requires_biometric: true`) và mở khóa sau khi quét vân tay.
+- **Tài liệu không tồn tại:** Trả về thông báo chuẩn xác "không tìm thấy văn bản trong hệ thống" thay vì đổ lỗi cho cấp bậc quân nhân.
+
+### 2. Tự Động Hóa Đồng Bộ 2 Chiều Giữa SQL Server & Boxchat Vector Store
+- **Webhook tự động tại Express Gateway (`server.js`):** Các thao tác tải lên văn bản mới (`upload`), cập nhật metadata/file (`edit`), xóa mềm (`delete`), khôi phục (`restore`), và xóa vĩnh viễn (`purge`) đều tự động gửi tín hiệu đồng bộ sang `:8001` (`/ai/ingest` & `/ai/documents/:fileId`).
+- **Nâng cấp `/ai/sync-all`:** Bổ sung cơ chế tự động dọn dẹp các tài liệu cũ/đã bị xóa khỏi CSDL SQL Server (stale document cleanup), loại bỏ triệt để tình trạng lệch pha dữ liệu cũ.
+- **Chuẩn hóa bộ phân giải đường dẫn PDF (`pdf_processor.py`):** Đa dạng hóa danh sách thư mục `uploads` theo ngữ cảnh thực thi, đảm bảo bóc tách chính xác tệp PDF trong mọi môi trường.
+
+---
+
 ## [v1.2.0-security-ecosystem-complete] — 2026-10-30
 
 ### 1. Quy hoạch Hệ sinh thái 4 phân hệ số hóa cốt lõi

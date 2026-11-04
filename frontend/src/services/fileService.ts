@@ -29,10 +29,23 @@ export const fileService = {
     const url = fileService.getViewUrl(fileId, download);
 
     const headers: Record<string, string> = { ...getAuthHeaders() };
-    // Chỉ gửi X-Fingerprint-Token khi được truyền trực tiếp từ modal xác thực vân tay hiện hành
-    // Tuyệt đối không fallback sang sessionStorage để ngăn ngừa tái sử dụng token giữa các tài liệu
-    if (fingerprintToken) {
-      headers['X-Fingerprint-Token'] = fingerprintToken;
+
+    // ✅ FIX: CHỈ lấy token của chính file này (key có ${fileId}).
+    // - Ưu tiên token được truyền trực tiếp từ modal xác thực vân tay hiện hành.
+    // - Fallback chỉ đọc sessionStorage theo từng file; KHÔNG còn fallback toàn cục.
+    let effectiveToken = fingerprintToken;
+    if (!effectiveToken && typeof window !== 'undefined') {
+      try {
+        effectiveToken =
+          window.sessionStorage.getItem(`qk7_fp_token_${fileId}`) ?? undefined;
+      } catch {
+        // sessionStorage có thể bị chặn (private mode / iframe sandbox)
+        effectiveToken = undefined;
+      }
+    }
+
+    if (effectiveToken) {
+      headers['X-Fingerprint-Token'] = effectiveToken;
     }
 
     const response = await fetch(url, { headers, signal });
@@ -94,14 +107,24 @@ export const fileService = {
     fingerprintToken?: string,
     signal?: AbortSignal,
   ): Promise<Blob> => {
-    const res = await fileService.fetchFileBlobWithMeta(fileId, download, fingerprintToken, signal);
+    const res = await fileService.fetchFileBlobWithMeta(
+      fileId,
+      download,
+      fingerprintToken,
+      signal,
+    );
     return res.blob;
   },
 
   saveBlobToFile: (blob: Blob, filename?: string): void => {
+    if (!blob || blob.size === 0) {
+      console.error('[saveBlobToFile] Blob rỗng hoặc không hợp lệ');
+      return;
+    }
     const blobUrl = URL.createObjectURL(blob);
     const a = window.document.createElement('a');
 
+    a.style.display = 'none';
     a.href = blobUrl;
     a.download = filename || 'document.pdf';
 
@@ -109,8 +132,12 @@ export const fileService = {
     try {
       a.click();
     } finally {
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+      setTimeout(() => {
+        try {
+          a.remove();
+          URL.revokeObjectURL(blobUrl);
+        } catch (_) {}
+      }, 5000);
     }
   },
 
@@ -119,8 +146,54 @@ export const fileService = {
     filename?: string,
     fingerprintToken?: string,
   ): Promise<void> => {
+    let rawName = filename || `${fileId}.pdf`;
+    if (!rawName.toLowerCase().endsWith('.pdf')) {
+      rawName += '.pdf';
+    }
+    const finalFilename = rawName.replace(/[\/\\?%*:|"<>]/g, '_');
+
+    // 1. Tải toàn vẹn blob từ server trước
     const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken);
-    fileService.saveBlobToFile(blob, filename || `${fileId}.pdf`);
+    if (!blob || blob.size === 0) {
+      throw new Error('Dữ liệu tài liệu tải về rỗng (0 KB). Vui lòng kiểm tra lại quyền truy cập hoặc liên hệ Quản trị viên.');
+    }
+
+    // 2. Kích hoạt hộp thoại chọn ổ đĩa / chỗ lưu
+    let fileHandle: any = null;
+    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+      try {
+        fileHandle = await (window as any).showSaveFilePicker({
+          suggestedName: finalFilename,
+          types: [
+            {
+              description: 'Tài liệu PDF (*.pdf)',
+              accept: { 'application/pdf': ['.pdf'] },
+            },
+          ],
+        });
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+        console.warn('[downloadFile] showSaveFilePicker fallback:', err);
+      }
+    }
+
+    if (fileHandle) {
+      let writable: any = null;
+      try {
+        writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (err: any) {
+        if (writable) {
+          try { await writable.abort(); } catch (_) {}
+        }
+        if (err?.name === 'AbortError') return;
+        console.warn('[downloadFile] Ghi vào fileHandle thất bại, fallback:', err);
+      }
+    }
+
+    fileService.saveBlobToFile(blob, finalFilename);
   },
 
   prepareDownload: async (
@@ -128,10 +201,66 @@ export const fileService = {
     filename?: string,
     fingerprintToken?: string,
     signal?: AbortSignal,
-  ): Promise<() => void> => {
+  ): Promise<() => Promise<void>> => {
+    let rawName = filename || `${fileId}.pdf`;
+    if (!rawName.toLowerCase().endsWith('.pdf')) {
+      rawName += '.pdf';
+    }
+    const finalFilename = rawName.replace(/[\/\\?%*:|"<>]/g, '_');
+
+    // BƯỚC 1 & 2: Tải trước toàn bộ dữ liệu file từ server vào bộ nhớ (RAM Blob)
+    // trong lúc nút bấm đang chạy hiệu ứng % UX/UI (0% -> 100%)
     const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken, signal);
-    return () => {
-      fileService.saveBlobToFile(blob, filename || `${fileId}.pdf`);
+
+    if (!blob || blob.size === 0) {
+      throw new Error('Dữ liệu tài liệu tải về rỗng (0 KB). Vui lòng kiểm tra lại quyền truy cập hoặc liên hệ Quản trị viên.');
+    }
+
+    // BƯỚC 3: Trả về hàm release. Khi UI % chạy xong 100% thì mới MỞ HỘP THOẠI CHỌN Ổ ĐĨA / CHỖ LƯU
+    return async () => {
+      let fileHandle: any = null;
+
+      if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+        try {
+          fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: finalFilename,
+            types: [
+              {
+                description: 'Tài liệu PDF (*.pdf)',
+                accept: { 'application/pdf': ['.pdf'] },
+              },
+            ],
+          });
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            const abortErr = new Error('Người dùng đã hủy chọn nơi lưu tệp');
+            abortErr.name = 'AbortError';
+            throw abortErr;
+          }
+          console.warn('[prepareDownload release] showSaveFilePicker fallback:', err);
+        }
+      }
+
+      // Ghi trực tiếp dữ liệu sạch đã nạp sẵn trong RAM vào ổ đĩa người dùng vừa chọn
+      if (fileHandle) {
+        let writable: any = null;
+        try {
+          writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          writable = null;
+          return;
+        } catch (writeErr: any) {
+          if (writable) {
+            try { await writable.abort(); } catch (_) {}
+          }
+          if (writeErr?.name === 'AbortError') throw writeErr;
+          console.warn('[prepareDownload release] Ghi vào fileHandle thất bại, fallback:', writeErr);
+        }
+      }
+
+      // Fallback an toàn cho trình duyệt không hỗ trợ File System Access API (Safari, iPad...)
+      fileService.saveBlobToFile(blob, finalFilename);
     };
   },
 };

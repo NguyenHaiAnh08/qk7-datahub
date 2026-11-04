@@ -52,23 +52,25 @@ class PDFProcessor:
         if clean_rel.startswith("uploads/"):
             clean_rel = clean_rel[len("uploads/"):]
 
-        direct_candidate = os.path.join(self.uploads_dir, clean_rel)
-        if os.path.exists(direct_candidate):
-            return direct_candidate
+        candidate_dirs = [
+            self.uploads_dir,
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "backend", "uploads")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend", "uploads")),
+            os.path.abspath("./backend/uploads"),
+            os.path.abspath("../backend/uploads"),
+        ]
 
-        # Thử tìm theo base path của backend
-        backend_base = os.path.dirname(self.uploads_dir)
-        backend_candidate = os.path.join(backend_base, stored_path.replace("\\", "/"))
-        if os.path.exists(backend_candidate):
-            return backend_candidate
+        for u_dir in candidate_dirs:
+            if os.path.exists(u_dir):
+                candidate = os.path.join(u_dir, clean_rel)
+                if os.path.exists(candidate):
+                    return candidate
+                file_name = os.path.basename(stored_path)
+                for root, _, files in os.walk(u_dir):
+                    if file_name in files:
+                        return os.path.join(root, file_name)
 
-        # Quét tìm kiếm file theo tên trong uploads nếu không khớp thư mục con
-        file_name = os.path.basename(stored_path)
-        for root, _, files in os.walk(self.uploads_dir):
-            if file_name in files:
-                return os.path.join(root, file_name)
-
-        return direct_candidate
+        return os.path.join(self.uploads_dir, clean_rel)
 
     def extract_chunks(
         self,

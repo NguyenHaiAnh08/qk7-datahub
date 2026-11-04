@@ -123,6 +123,72 @@ graph TD
 
 ---
 
+### 12. Lá chắn chống chụp màn hình & Đánh chặn phím tắt tác chiến (Anti-Screenshot Security Shield)
+* **Đánh chặn phím tắt toàn diện:** Bắt và triệt tiêu tức thì các tổ hợp phím chụp màn hình: `PrintScreen` (Key code 44), `Win + Shift + S` (Windows Snipping Tool), `Cmd + Shift + 3/4` (macOS/iPadOS).
+* **Cơ chế Blackout DOM 0ms:** Cưỡng chế che đen/mờ toàn bộ vùng tài liệu khi phím tắt được nhấn hoặc khi cửa sổ trình duyệt mất tiêu điểm (`window.blur`), vô hiệu hóa hoàn toàn ảnh chụp của hệ điều hành.
+* **Tiêu hủy bộ nhớ tạm Clipboard đa nhịp:** Tự động dọn sạch và ghi đè nội dung rỗng vào Clipboard của OS ngay lập tức và sau 200ms, 500ms, 1000ms; ngăn ngừa triệt để hành vi dán (`Ctrl + V`) lấy ảnh.
+* **Cảnh báo thời gian thực về SOC:** Tự động gửi cảnh báo qua `/api/security/screenshot-alert`, ghi nhận vào `ACCESS_LOG` (action `SCREENSHOT_ATTEMPT`) kèm đầy đủ Mã tệp (`file_id`), Số hiệu, Trích yếu, Độ mật và Đơn vị ban hành.
+* **Công tắc Dev Switch:** Cung cấp tùy chọn *"Dev: Cho phép chụp ảnh"* (`qk7_dev_allow_screenshot`) trong menu tài khoản giúp lập trình viên chụp màn hình khi làm việc mà không kích hoạt lá chắn an ninh.
+
+### 13. Hàng đợi phê duyệt tích hợp đa nhiệm & Luồng chuẩn hóa thông tin văn bản
+* **Tích hợp hàng đợi tập trung (`/portal?tab=approval-requests`):** Toàn bộ các yêu cầu khóa quyền tác chiến (`APPROVAL_REQUEST`) VÀ các đề xuất chỉnh sửa chuẩn hóa văn bản (`DOCUMENT_REVISION_PROPOSAL`) được hợp nhất vào chung một màn hình Hàng Đợi Phê Duyệt của Quản trị viên.
+* **Bảng đối chiếu thông tin 2 cột:** Cung cấp bảng đối chiếu trực quan 2 cột so sánh trực tiếp dữ liệu hiện tại và dữ liệu mới đề xuất (Số hiệu, Trích yếu, Đơn vị & Người ký, Cấp độ mật) cùng Lý do đề xuất của cán bộ.
+* **Phê duyệt 1-click & Đồng bộ tự động:** Phê duyệt / Từ chối trực tiếp tại Hàng đợi, tự động cập nhật CSDL, kho vector AI Boxchat và trừ badge đếm chờ duyệt.
+* **Theo dõi tiến độ người dùng:** Phân hệ *"Yêu Cầu Chỉnh Sửa Của Tôi"* (`/portal?tab=my-approvals`) hiển thị đầy đủ tiến độ: Đang chờ duyệt, Đã phê duyệt, Bị từ chối kèm lý do từ chối cụ thể.
+* **Mặc định lý do chuẩn hóa:** Modal gửi đề xuất chỉnh sửa văn bản có sẵn nội dung: `"Đề xuất chuẩn hóa thông tin văn bản"` giúp tiết kiệm thời gian thao tác.
+
+### 14. Chuẩn hóa thứ tự danh mục đơn vị ban hành quân sự & Bộ lọc sâu phòng ban
+* **Thứ tự ưu tiên danh mục chuẩn:** Cấu hình thứ tự hiển thị chuẩn xác trong bộ lọc đơn vị ban hành:
+  1. Tất cả đơn vị ban hành *(mặc định)*
+  2. Trường Quân sự Quân khu 7 (`TQS`)
+  3. Quân khu 7 (`QK7`)
+  4. Bộ Tổng Tham mưu (`BTTM`)
+  5. Tổng cục Chính trị (`TCCT`)
+  6. Bộ Quốc Phòng (`BQP`)
+  7. Chính Phủ (`CP`)
+  8. Sư đoàn 5 (`SD5`)
+  *(Các đơn vị thêm sau sẽ tự động xếp ở dưới dần dần)*
+* **Lọc sâu phòng ban trực thuộc TQS:** Khi chọn *"Trường Quân sự Quân khu 7"*, ô chọn phòng ban (*Ban Giám hiệu, Phòng Tham mưu - Hành chính, Phòng Chính trị, Phòng Đào tạo, Phòng Hậu cần - Kỹ thuật*) tự động hiển thị đối diện để lọc chi tiết.
+
+
+
+### 15. Phân hệ OCR Microservice & Trích xuất PDF Siêu tốc (PaddleOCR PP-OCRv4 + Smart PDF Router)
+* **Giải quyết dứt điểm nút thắt cổ chai PDF Scan 5MB (121 trang):** Thay thế pipeline cũ chạy đồng bộ (gây treo Event Loop và 121 lỗi `Jbig2Error`) bằng kiến trúc 3 tầng bất đồng bộ chuyên biệt.
+* **Tầng 1 - Bộ định tuyến PDF siêu tốc (`pdf-router.js`):** Phân loại tài liệu (`TextBased`, `Scanned`, `Mixed`) chỉ trong **7-11ms**. Xác định và chỉ quét trang trọng yếu chứa metadata hành chính (Trang 1).
+* **Tầng 2 - Microservice OCR độc lập (`ocr-service/`, cổng `:8002`):**
+  * Sử dụng **PaddleOCR 2.9.1 (PP-OCRv4)** với khả năng nhận diện tiếng Việt (`lang='vi'`), tự động xoay góc chữ (`use_angle_cls=True`) và phân tách bố cục 2 cột (Quốc hiệu / Đơn vị ban hành).
+  * Render ảnh trực tiếp bằng thư viện C **PyMuPDF** với độ phân giải tối ưu (150 DPI), không cần binary Poppler bên ngoài.
+  * Giảm thời gian trích xuất file scan phức tạp từ $> 300s$ (treo máy) xuống còn **4.35 giây**.
+* **Tầng 3 - Chuẩn hóa Metadata & Fallback an toàn:**
+  * Regex chuẩn hóa số hiệu có năm ban hành và ký tự OCR dung sai (ví dụ `224/2026/NĐ-CP`, `652/QĐ-TQS`).
+  * Có sẵn cơ chế phòng vệ theo chiều sâu (Defense-in-depth): Nếu cổng 8002 offline, Gateway tự động fallback về Tesseract với trần giới hạn trang chặt chẽ, không bao giờ đọc tràn lan toàn bộ file.
+
+### 16. Quy Trình Số Hóa Tài Liệu Chia Đôi Màn Hình & Xem Trước Tức Thì (Split-Pane Digitization & Local Preview)
+
+### 17. Phân Cấp Phê Duyệt Chỉ Huy & Giám Sát Tiến Độ Phòng Ban Nhà Trường (Hierarchical Approval & School Radar)
+* **Phân cấp phê duyệt thực tế (Hierarchical Approval):**
+  * Cán bộ nghiệp vụ chỉ được đề xuất chỉnh sửa văn bản thuộc đơn vị công tác của mình (`Local Edit Rule`).
+  * Đề xuất sửa đổi được chuyển thẳng về hàng đợi của Chỉ huy/Trưởng phòng tương ứng (`Thẩm quyền duyệt: Chỉ huy cấp Phòng`), giảm tải áp lực duyệt tập trung cho Admin tối cao.
+* **Modal Kiểm Duyệt Đối Chiếu Chuẩn Hóa (Visual Diff Viewer):**
+  * Loại bỏ bảng 2 cột đơn điệu, thay bằng giao diện đối chiếu thay đổi dữ liệu chuẩn quân sự (đánh dấu đỏ gạch ngang dữ liệu cũ, xanh lục cho dữ liệu mới, làm mờ các trường giữ nguyên).
+  * Bộ đôi nút hành động dứt khoát: `[ ✖ Từ chối ]` (mở ô nhập lý do gửi về cán bộ) và `[ ✓ Phê duyệt & Cập nhật ]`.
+* **Hệ thống Macro KPI & Bảng Radar Tiến Độ Nhà Trường:**
+  * **4 Thẻ KPI Vĩ Mô:** Tổng kho dữ liệu toàn trường, Tiến độ số hóa phòng ban, Quyền khai thác của bạn (theo cấp độ mật cá nhân + cảnh báo 2FA vân tay), Tình trạng chuẩn hóa phân bổ.
+  * **Bảng Tiến Độ Số Hóa Các Phòng Ban Nhà Trường:** Lọc sạch chỉ lấy 5 phòng ban trực thuộc Trường Quân sự Quân khu 7 (Ban Giám hiệu, Phòng Chính trị, Phòng Đào tạo, Phòng Tham mưu - Hành chính, Phòng Hậu cần - Kỹ thuật); tự động gộp văn bản cấp trường về Ban Giám hiệu; thiết kế 2 tầng phân cấp chuẩn Command Center chống rớt dòng; chuẩn hóa chú thích SLA (`Tối đa 3 Văn bản`, `Cần bổ sung`, `Chậm tiến độ`).
+
+---
+
+
+* **Giao diện Split-Pane Side-by-Side:** Nâng cấp toàn diện hộp thoại *"Tiếp Nhận & Lưu Trữ Văn Bản Mới"* và *"Hiệu Chỉnh Văn Bản"* từ dạng popup nhỏ giữa màn hình sang Modal toàn màn hình chia 2 khung làm việc song song độc lập:
+  * **Khung trái (35% - 40%):** Biểu mẫu nhập liệu (Số hiệu, trích yếu, người ký, độ mật, đơn vị...) có thanh cuộn dọc riêng biệt (`overflow-y-auto`).
+  * **Khung phải (60% - 65%):** Trình xem trước PDF toàn màn hình phục vụ đối chiếu dữ liệu văn bản theo thời gian thực.
+* **Xem trước cục bộ tức thì (Real-time Local Preview 0ms):** Sử dụng `URL.createObjectURL(file)` hiển thị ngay lập tức văn bản khi người dùng kéo/thả tệp PDF mà không cần đợi nạp lên máy chủ; tự động giải phóng URL (`URL.revokeObjectURL`) khi đóng form để ngăn ngừa rò rỉ bộ nhớ.
+* **Tự động đối chiếu văn bản máy chủ khi hiệu chỉnh:** Khung bên phải tự động nạp tệp PDF gốc của văn bản thông qua luồng bảo mật `/api/files/:id/view` khi mở chế độ hiệu chỉnh.
+* **Công nghệ chống nhấp nháy PDF Canvas (Flicker-Free Canvas Rendering):** Áp dụng kiến trúc memoization (`React.memo`, `useMemo`) phân tách độc lập vòng đời render của biểu mẫu nhập liệu và canvas PDF; cô lập layer vẽ điểm nhấn (highlight canvas) khỏi render pipeline của PDF, đảm bảo gõ phím mượt mà và không giật nháy hình ảnh tài liệu.
+* **Đồng bộ cơ chế an ninh Watermark & Công thái học:** Khung xem tài liệu luôn tự động phủ lớp Sparse Dynamic Watermark (Họ tên cán bộ, IP, Timestamp) bảo vệ dữ liệu kể cả trong quá trình nhập liệu; nút đóng được bố trí tinh tế ở góc trên bên phải khung tài liệu, tối ưu theo bản sắc quân đội.
+
+---
+
 ## 📁 Cấu Trúc Dự Án Toàn Diện
 
 ```text
@@ -146,6 +212,13 @@ qk7-datahub/
 │   ├── public/                             # Sản phẩm build tĩnh từ Frontend xuất sang
 │   ├── server.js                           # Entry point Express API Gateway & Biometrics
 │   └── setup-passwords.js                  # Script khởi tạo tài khoản Admin & mật khẩu bcrypt
+│
+├── ocr-service/                            # 🟡 MICROSERVICE OCR NHẬN DẠNG KÝ TỰ QUANG HỌC (:8002 - FastAPI)
+│   ├── main.py                             # Entry point FastAPI: /health, /api/ocr/extract
+│   ├── requirements.txt                    # Dependencies: paddleocr, paddlepaddle, pymupdf, fastapi...
+│   ├── start-ocr.bat                       # Script khởi động tự giải phóng cổng 8002 & kích hoạt venv
+│   ├── Dockerfile                          # Cấu hình container hóa độc lập
+│   └── README.md                           # Sổ tay kỹ thuật chi tiết phân hệ OCR
 │
 ├── boxchat/                                # 🟣 MICROSERVICE TRỢ LÝ AI TÁC CHIẾN (:8001 - FastAPI)
 │   ├── main.py                             # Entry point FastAPI: /api/ai/query, /api/ai/study-book...

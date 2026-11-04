@@ -46,6 +46,8 @@ const formatRequestAction = (method: string, path: string): string => {
   const docPurgeMatch = cleanPath.match(/^\/api\/documents\/([^/]+)\/purge$/);
   if (docPurgeMatch && m === 'DELETE') return `Xóa vĩnh viễn văn bản (${docPurgeMatch[1]})`;
 
+  const docEditMatch = cleanPath.match(/^\/api\/documents\/([^/]+)$/);
+  if (docEditMatch && m === 'PUT') return `Đề xuất chỉnh sửa thông tin văn bản (${docEditMatch[1]})`;
   const docMatch = cleanPath.match(/^\/api\/documents\/([^/]+)$/);
   if (docMatch && m === 'DELETE') return `Xóa tạm văn bản (${docMatch[1]})`;
 
@@ -62,6 +64,7 @@ const formatRequestAction = (method: string, path: string): string => {
 // Helper: Dịch Mã Quyền
 // ============================================================
 const PERMISSION_NAMES: Record<string, string> = {
+  DOC_EDIT: 'Sửa văn bản',
   USER_DELETE:            'Xóa tài khoản',
   USER_ROLE_ASSIGN:       'Gán vai trò',
   USER_PERMISSION_ASSIGN: 'Cấp quyền',
@@ -82,6 +85,7 @@ const formatPermissionName = (code: string): string => {
 // Meta hiển thị theo loại hành động
 // ============================================================
 const ACTION_META: Record<string, { icon: any; label: string; tone: string }> = {
+  edit_doc:     { icon: FileText,      label: 'SỬA ĐỔI VĂN BẢN', tone: 'emerald' },
   delete_user:  { icon: Trash2,        label: 'XÓA QUÂN NHÂN',  tone: 'rose'  },
   delete_role:  { icon: Trash2,        label: 'XÓA VAI TRÒ',    tone: 'rose'  },
   delete_doc:   { icon: AlertTriangle, label: 'XÓA TÀI LIỆU',   tone: 'rose'  },
@@ -90,7 +94,8 @@ const ACTION_META: Record<string, { icon: any; label: string; tone: string }> = 
   assign_role:  { icon: KeyRound,      label: 'GÁN VAI TRÒ',    tone: 'amber' },
 };
 
-function classify(method: string, path: string) {
+function classify(method: string, path: string, requestId?: string) {
+  if (requestId?.startsWith('PROP-') || (method === 'PUT' && path.includes('/documents/'))) return ACTION_META.edit_doc;
   if (path.includes('/purge')) return ACTION_META.purge_doc;
   if (method === 'DELETE' && path.includes('/users/') && !path.includes('/permissions')) return ACTION_META.delete_user;
   if (method === 'DELETE' && path.includes('/roles/'))   return ACTION_META.delete_role;
@@ -101,6 +106,7 @@ function classify(method: string, path: string) {
 }
 
 const TONE_STYLES: Record<string, string> = {
+  emerald: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
   rose:  'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30',
   amber: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
   slate: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30',
@@ -109,20 +115,47 @@ const TONE_STYLES: Record<string, string> = {
 // ============================================================
 // Component
 // ============================================================
+type FilterType = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
+const TABS: Array<{ k: FilterType; l: string }> = [
+  { k: 'ALL',      l: 'Tất cả' },
+  { k: 'PENDING',  l: 'Đang chờ' },
+  { k: 'APPROVED', l: 'Đã Duyệt' },
+  { k: 'REJECTED', l: 'Từ chối' },
+];
+
 export const MyApprovalsPage: React.FC = () => {
   const [items, setItems] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'PENDING_REJECTED' | 'ALL'>('PENDING_REJECTED');
+  const [filter, setFilter] = useState<FilterType>('ALL');
+  const [counts, setCounts] = useState<{ ALL?: number; PENDING?: number; APPROVED?: number; REJECTED?: number }>({});
 
-  const load = async () => {
-    setLoading(true);
+  const updateCountsFromList = (all: ApprovalRequest[]) => {
+    setCounts({
+      ALL: all.length,
+      PENDING: all.filter((i) => i.status === 'PENDING').length,
+      APPROVED: all.filter((i) => i.status === 'APPROVED' || i.status === 'EXECUTED').length,
+      REJECTED: all.filter((i) => i.status === 'REJECTED').length,
+    });
+  };
+
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await approvalService.listMine(filter);
       setItems(res.items || []);
+
+      if (filter === 'ALL') {
+        updateCountsFromList(res.items || []);
+      } else {
+        approvalService.listMine('ALL').then((allRes) => {
+          updateCountsFromList(allRes.items || []);
+        }).catch(() => {});
+      }
     } catch (err: any) {
       toast.error('Lỗi tải yêu cầu: ' + err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -130,7 +163,7 @@ export const MyApprovalsPage: React.FC = () => {
 
   // Auto-refresh mỗi 30s
   useEffect(() => {
-    const t = setInterval(load, 30000);
+    const t = setInterval(() => load(true), 30000);
     return () => clearInterval(t);
   }, [filter]);
 
@@ -151,7 +184,7 @@ export const MyApprovalsPage: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={load}
+            onClick={() => load()}
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
           >
             <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -159,24 +192,36 @@ export const MyApprovalsPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
-          {[
-            { k: 'PENDING_REJECTED', l: 'Đang chờ & Bị từ chối' },
-            { k: 'ALL',              l: 'Tất cả (kể cả đã duyệt)' },
-          ].map(({ k, l }) => (
-            <button
-              key={k}
-              onClick={() => setFilter(k as any)}
-              className={`px-3 py-2 text-xs font-semibold border-b-2 transition cursor-pointer ${
-                filter === k
-                  ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              {l}
-            </button>
-          ))}
+        {/* Filter Tabs (Tất cả, Đang chờ, Đã Duyệt, Từ chối) */}
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
+          {TABS.map(({ k, l }) => {
+            const isActive = filter === k;
+            const count = counts[k];
+            return (
+              <button
+                key={k}
+                onClick={() => setFilter(k)}
+                className={`relative pb-2.5 pt-1 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isActive
+                    ? 'border-b-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 font-bold'
+                    : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <span>{l}</span>
+                {count !== undefined && (
+                  <span
+                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                      isActive
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* List */}
@@ -189,15 +234,19 @@ export const MyApprovalsPage: React.FC = () => {
           <div className="p-12 text-center bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800">
             <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500 mb-3" />
             <p className="text-sm text-slate-500">
-              {filter === 'PENDING_REJECTED'
-                ? 'Không có yêu cầu nào đang chờ hoặc bị từ chối'
+              {filter === 'PENDING'
+                ? 'Không có yêu cầu nào đang chờ xét duyệt'
+                : filter === 'APPROVED'
+                ? 'Chưa có yêu cầu nào được phê duyệt'
+                : filter === 'REJECTED'
+                ? 'Không có yêu cầu nào bị từ chối'
                 : 'Bạn chưa gửi yêu cầu nào'}
             </p>
           </div>
         ) : (
           <div className="space-y-2">
             {items.map((req) => {
-              const meta = classify(req.http_method, req.http_path);
+              const meta = classify(req.http_method, req.http_path, req.request_id);
               const Icon = meta.icon;
               const isPending = req.status === 'PENDING';
               const isRejected = req.status === 'REJECTED';
@@ -239,6 +288,12 @@ export const MyApprovalsPage: React.FC = () => {
                         <Lock className="w-3 h-3" /> Quyền bị khóa:{' '}
                         <strong className="font-mono">{formatPermissionName(req.required_permission)}</strong>
                       </div>
+                      {req.request_reason && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/30 text-xs text-amber-900 dark:text-amber-300">
+                          <span className="font-bold">Lý do đề xuất: </span>
+                          <span className="italic font-sans">"{req.request_reason}"</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Trạng thái */}

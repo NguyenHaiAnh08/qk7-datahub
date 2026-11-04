@@ -14,9 +14,11 @@ export interface User {
   roles?: string[];
   role_names?: string[];
   has_fingerprint?: boolean;
+  has_pin?: boolean;
   permissions?: string[];       
   created_at?: string;
   updated_at?: string;
+  pin_requested?: boolean;  
 }
 
 export interface Unit {
@@ -24,6 +26,7 @@ export interface Unit {
   name: string;
   parent_id?: string;
   parent_name?: string;
+  unit_type?: string;
 }
 
 export interface Role {
@@ -51,7 +54,10 @@ export interface AccessLog {
   user_id?: string;
   full_name?: string;
   file_id?: string;
+  document_code?: string;
   doc_title?: string;
+  security_name?: string;
+  unit_name?: string;
   action: string;
   timestamp?: string;
   created_at?: string;
@@ -180,4 +186,13 @@ export interface PermissionRow extends Permission {
   pending_expires_at?: string | null;
   pending_note?: string;
   subgroup: SubGroupInfo;
+}
+
+
+export interface GeneratePinResult {
+  success: boolean;
+  user_id: string;
+  full_name: string;
+  pin: string;
+  message: string;
 }

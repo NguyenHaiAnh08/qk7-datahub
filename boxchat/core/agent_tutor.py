@@ -157,7 +157,8 @@ class AgentTutor:
         biometric_verified: bool = False,
         user_name: Optional[str] = None,
         user_position: Optional[str] = None,
-        user_rank: Optional[str] = None
+        user_rank: Optional[str] = None,
+        all_chunks: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Thực thi quy trình Agentic RAG có bảo vệ Sinh trắc học Vân tay ZK9500:
@@ -200,9 +201,7 @@ class AgentTutor:
             f"Tổng số đoạn trích hợp lệ thu nhận: {len(authorized_chunks)}."
         )
 
-        # NHẬN DIỆN SỐ HIỆU VĂN BẢN TRONG CÂU HỎI (Vd: 880/KH-TQS, 333/KH-TQS, 145/KH-TQS)
-        # Nếu câu hỏi có chứa số hiệu văn bản cụ thể NHƯNG authorized_chunks không chứa bất kỳ chunk nào thuộc văn bản đó
-        # (nghĩa là đã bị Pre-filtering bảo mật chặn lại hoặc không tồn tại trong kho cấp quyền) -> TỪ CHỐI NGAY LẬP TỨC
+        # NHẬN DIỆN SỐ HIỆU VĂN BẢN TRONG CÂU HỎI (Vd: 880/KH, 39-KH/ĐU, 145/KH-TQS)
         doc_code_matches = re.findall(r'(\d+[\/\-_][\w\/\-_]+)', query)
         if doc_code_matches:
             target_doc_code = doc_code_matches[0]
@@ -221,26 +220,91 @@ class AgentTutor:
                     break
 
             if not doc_chunk_found:
-                refusal_answer = (
-                    f"Báo cáo đồng chí, tài liệu {target_doc_code} không phù hợp với cấp bảo mật hiện tại của đồng chí "
-                    f"(Cấp {user_clearance} - {'Nội bộ' if user_clearance == 2 else clearance_name}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật."
-                )
-                return {
-                    "answer": refusal_answer,
-                    "citations": [],
-                    "reasoning": {
-                        "mem": mem_trace,
-                        "think": (
-                            f"[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản {target_doc_code}. "
-                            f"Văn bản này không thuộc phạm vi cấp quyền Cấp {user_clearance} ({clearance_name}). "
-                            f"Áp dụng nguyên tắc Fail Closed: Từ chối trích dẫn và không suy đoán bừa."
-                        ),
-                        "tool_call": f"[Security Refusal] Chặn trích dẫn văn bản {target_doc_code} do vượt cấp bảo mật."
-                    },
-                    "retrieval_mode": retrieval_mode,
-                    "synthesis_mode": "clearance_blocked",
-                    "requires_biometric": False
-                }
+                # Kiểm tra trong toàn bộ kho tài liệu (all_chunks) xem tài liệu có tồn tại không và cấp bảo mật thực tế
+                matching_all = []
+                effective_all_chunks = all_chunks if all_chunks is not None else getattr(self, "chunks_cache", None)
+                if effective_all_chunks:
+                    for c in effective_all_chunks:
+                        c_code = (c.get("document_code") or "").lower()
+                        c_title = (c.get("title") or "").lower()
+                        c_fid = (c.get("file_id") or "").lower()
+                        c_text = (c.get("text") or "").lower()
+                        for cm in doc_code_matches:
+                            cm_lower = cm.lower()
+                            if cm_lower in c_code or cm_lower in c_title or cm_lower in c_fid or cm_lower in c_text:
+                                matching_all.append(c)
+                                break
+
+                if matching_all:
+                    min_sec_level = min(int(c.get("security_level_id", 1)) for c in matching_all)
+                    if min_sec_level > user_clearance:
+                        refusal_answer = (
+                            f"Báo cáo đồng chí, tài liệu {target_doc_code} không phù hợp với cấp bảo mật hiện tại của đồng chí "
+                            f"(Cấp {user_clearance} - {'Nội bộ' if user_clearance == 2 else clearance_name}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật."
+                        )
+                        return {
+                            "answer": refusal_answer,
+                            "citations": [],
+                            "reasoning": {
+                                "mem": mem_trace,
+                                "think": (
+                                    f"[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản {target_doc_code}. "
+                                    f"Văn bản này thuộc Cấp {min_sec_level}, vượt quá cấp quyền Cấp {user_clearance} ({clearance_name}). "
+                                    f"Áp dụng nguyên tắc Fail Closed: Từ chối trích dẫn."
+                                ),
+                                "tool_call": f"[Security Refusal] Chặn trích dẫn văn bản {target_doc_code} do vượt cấp bảo mật."
+                            },
+                            "retrieval_mode": retrieval_mode,
+                            "synthesis_mode": "clearance_blocked",
+                            "requires_biometric": False
+                        }
+                    else:
+                        # Người dùng CÓ ĐỦ QUYỀN (min_sec_level <= user_clearance)!
+                        # Nạp các chunks hợp lệ của văn bản này vào authorized_chunks
+                        for c in matching_all:
+                            if int(c.get("security_level_id", 1)) <= user_clearance and c not in authorized_chunks:
+                                authorized_chunks.append(c)
+                else:
+                    if all_chunks is not None:
+                        not_found_answer = (
+                            f"Báo cáo đồng chí, không tìm thấy văn bản có số hiệu \"{target_doc_code}\" trong hệ thống dữ liệu số. "
+                            f"Xin đồng chí vui lòng kiểm tra lại số hiệu văn bản hoặc tra cứu tài liệu khác."
+                        )
+                        return {
+                            "answer": not_found_answer,
+                            "citations": [],
+                            "reasoning": {
+                                "mem": mem_trace,
+                                "think": (
+                                    f"[Lookup Guard] Tìm kiếm văn bản {target_doc_code} trong kho tài liệu nhưng không tìm thấy bản ghi nào khớp."
+                                ),
+                                "tool_call": f"[NotFound] Không tìm thấy văn bản {target_doc_code}."
+                            },
+                            "retrieval_mode": retrieval_mode,
+                            "synthesis_mode": "not_found",
+                            "requires_biometric": False
+                        }
+                    else:
+                        refusal_answer = (
+                            f"Báo cáo đồng chí, tài liệu {target_doc_code} không phù hợp với cấp bảo mật hiện tại của đồng chí "
+                            f"(Cấp {user_clearance} - {'Nội bộ' if user_clearance == 2 else clearance_name}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật."
+                        )
+                        return {
+                            "answer": refusal_answer,
+                            "citations": [],
+                            "reasoning": {
+                                "mem": mem_trace,
+                                "think": (
+                                    f"[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản {target_doc_code}. "
+                                    f"Văn bản này không thuộc phạm vi cấp quyền Cấp {user_clearance} ({clearance_name}). "
+                                    f"Áp dụng nguyên tắc Fail Closed: Từ chối trích dẫn và không suy đoán bừa."
+                                ),
+                                "tool_call": f"[Security Refusal] Chặn trích dẫn văn bản {target_doc_code} do vượt cấp bảo mật."
+                            },
+                            "retrieval_mode": retrieval_mode,
+                            "synthesis_mode": "clearance_blocked",
+                            "requires_biometric": False
+                        }
 
         # Kiểm tra ngưỡng bằng chứng & Cấp quyền
         if not authorized_chunks:

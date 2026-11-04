@@ -32,6 +32,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/protected-permissions$/,     'ROLE_VIEW'],
     [/^\/api\/documents\/trash$/,                 'DOC_TRASH_VIEW'],
     [/^\/api\/documents\/my-unit$/,               'DOC_VIEW'],
+    [/^\/api\/documents\/proposals\/pending$/,     'DOC_VIEW'],
   ],
 
   POST: [
@@ -49,6 +50,8 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/documents\/upload$/,                'DOC_UPLOAD'],
     [/^\/api\/documents\/parse$/,                 'DOC_PARSE'],
     [/^\/api\/documents\/[^/]+\/restore$/,        'DOC_RESTORE'],
+    [/^\/api\/documents\/proposals\/[^/]+\/approve$/, 'DOC_EDIT'],
+    [/^\/api\/documents\/proposals\/[^/]+\/reject$/,  'DOC_EDIT'],
     [/^\/api\/ai\/sync-all$/,                     'AI_SYNC'],
     [/^\/api\/ai\/chat$/,                         'AI_QUERY'],
 

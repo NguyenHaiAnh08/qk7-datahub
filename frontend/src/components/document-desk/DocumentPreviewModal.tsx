@@ -1,15 +1,17 @@
+import { PdfPagesViewer } from './PdfPagesViewer';
+import { HIGHLIGHTER_COLORS } from './DocumentHighlighter';
+import { Highlighter, Trash2, Undo2 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
   Download,
-  ExternalLink,
-  Maximize2,
-  Minimize2,
   FileText,
   Calendar,
   Building,
   Shield,
+  ShieldAlert,
+  ShieldCheck,
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -28,6 +30,8 @@ import {
   formatWatermarkDateTime,
 } from '../../hooks/useFloatingWatermark';
 import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
+import { useAntiScreenshot } from '../../hooks/useAntiScreenshot';
+import { SecurityScreenShield } from '../common/SecurityScreenShield';
 
 export interface DocumentPreviewModalProps {
   open: boolean;
@@ -46,50 +50,90 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   page = 1,
   onClose,
 }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const clearanceLevel = propClearanceLevel ?? (user?.clearance_level_id || 1);
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<boolean>(false);
+  const isDownloadingRef = React.useRef<boolean>(false);
 
   const [fingerprintToken, setFingerprintToken] = useState<string | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const modalContainerRef = React.useRef<HTMLDivElement>(null);
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
-        setIsFullscreen(false);
-      }
-    };
-    if (typeof window !== 'undefined') {
-      window.document.addEventListener('fullscreenchange', handleFullscreenChange);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      }
-    };
-  }, []);
+  // 🖊️ Bút dạ quang ghi chú (Hỗ trợ toàn diện từ Cấp 1 đến Cấp 5)
+  const [isHighlighterActive, setIsHighlighterActive] = useState<boolean>(false);
+  const [highlighterColor, setHighlighterColor] = useState<string>(HIGHLIGHTER_COLORS[0].value);
+  const [strokeCount, setStrokeCount] = useState<number>(0);
+  const highlighterRef = React.useRef<{ undo: () => void; clear: () => void; getStrokeCount: () => number } | null>(null);
+
+  // 🛡️ Chống chụp màn hình & cảnh báo an ninh (PrintScreen, Win+Shift+S, Quá 3 lần khóa tài khoản)
+  const { isShieldActive, violationInfo, violationCount, isAccountLocked, dismissShield } = useAntiScreenshot({
+    document,
+    enabled: open && Boolean(document),
+    iframeRef,
+  });
 
   const docLevel = document ? (document.security_level_id || 1) : 1;
   const canView = !document || docLevel <= clearanceLevel;
   const canDownload = !document || (docLevel <= 2 && docLevel <= clearanceLevel);
   const isSecretLevel = docLevel >= 3;
 
+  // 🔒 Khóa cuộn trang web cha (document-desk) để loại bỏ 100% thanh cuộn kép (double scrollbar)
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+    const prevBodyOverflow = window.document.body.style.overflow;
+    const prevHtmlOverflow = window.document.documentElement.style.overflow;
+    window.document.body.style.overflow = 'hidden';
+    window.document.documentElement.style.overflow = 'hidden';
+    return () => {
+      window.document.body.style.overflow = prevBodyOverflow;
+      window.document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, [open]);
+
+  // 🚪 Khi bấm phím Esc hoặc người dùng thoát Fullscreen -> TỰ ĐỘNG THOÁT TÀI LIỆU
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+    const winDoc = window.document;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        if (isDownloadingRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+        handleClose();
+      }
+    };
+
+    const handleFsChange = () => {
+      // 🛡️ Khi người dùng mở hộp thoại chọn ổ đĩa/thư mục lưu (showSaveFilePicker),
+      // Chromium tự động tạm thoát Fullscreen để hiển thị native OS dialog.
+      // Cờ isDownloadingRef chặn không cho unmount modal, bảo toàn luồng stream ghi tệp tránh lỗi 0 KB!
+      if (isDownloadingRef.current) return;
+      if (!winDoc.fullscreenElement && open) {
+        handleClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    winDoc.addEventListener('fullscreenchange', handleFsChange);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      winDoc.removeEventListener('fullscreenchange', handleFsChange);
+    };
+  }, [open]);
+
   const clearBiometricSession = () => {
     setFingerprintToken(null);
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && document?.file_id) {
       try {
+        sessionStorage.removeItem(`qk7_fp_token_${document.file_id}`);
+        // Xóa luôn key global nếu trước đó có sót lại
         sessionStorage.removeItem('qk7_fp_token');
-        Object.keys(sessionStorage).forEach((key) => {
-          if (key.startsWith('qk7_fp_token')) {
-            sessionStorage.removeItem(key);
-          }
-        });
       } catch (e) {}
     }
   };
@@ -101,9 +145,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       return;
     }
 
-    // Biometric Guard: Chỉ dùng token vừa xác thực trong phiên modal hiện hành (in-memory)
-    // Tuyệt đối không đọc lại token cũ từ sessionStorage để chống vượt rào khi mở lại hoặc đổi file
-    const effectiveToken = fpToken || fingerprintToken;
+    // Biometric Guard: Ưu tiên token truyền vào → state phiên hiện hành → sessionStorage per-file.
+    // Token được bind chặt với file_id ở server-side (JWT claim file_id) nên không thể dùng chéo file khác.
+    // ✅ SỬA: thêm fallback đọc từ sessionStorage cho đúng file này để đồng bộ với fileService
+    const sessionToken = typeof window !== 'undefined'
+      ? sessionStorage.getItem(`qk7_fp_token_${docId}`)
+      : null;
+
+    const effectiveToken = fpToken || fingerprintToken || sessionToken;
 
     if (docLevel >= 3 && !effectiveToken) {
       setShowScanModal(true);
@@ -159,9 +208,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   useEffect(() => {
     if (open && document) {
-      // Khi mở modal, chỉ dùng propInitialToken nếu có, tuyệt đối không lấy token cũ từ sessionStorage.
-      // Đối với tài liệu Cấp 3+, fingerprintToken ban đầu là null nên sẽ kích hoạt quét vân tay ngay lập tức.
-      const tokenToUse = propInitialToken || null;
+      // Khi mở modal: ưu tiên propInitialToken, sau đó fallback sang sessionStorage per-file (đồng bộ với fileService).
+      // Token được bind chặt với file_id ở server-side nên không thể dùng chéo file khác.
+      // Đối với tài liệu Cấp 3+ chưa có token hợp lệ, fingerprintToken ban đầu là null nên sẽ kích hoạt quét vân tay ngay lập tức.
+      const sessionToken = typeof window !== 'undefined'
+        ? sessionStorage.getItem(`qk7_fp_token_${document.file_id}`)
+        : null;
+      const tokenToUse = propInitialToken || sessionToken || null;
       setFingerprintToken(tokenToUse);
       loadPdfBlob(document.file_id, tokenToUse);
     } else {
@@ -189,12 +242,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const handleDownload = async (signal?: AbortSignal): Promise<() => void> => {
     if (!canDownload || !document) throw new Error('Không có quyền tải về');
+    isDownloadingRef.current = true;
     try {
       setDownloading(true);
       toast.info(`Đang truyền phát và chuẩn bị văn bản ${document.document_code}...`, {
         title: 'ĐANG XỬ LÝ TỆP',
         badge: 'STREAMING',
-        duration: 3200,
+        duration: 2500,
       });
 
       // Tải tệp gốc sạch sẽ từ server (không chứa watermark)
@@ -216,21 +270,62 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         };
       }
 
+      const sanitizedFilename = (document.original_name || `${document.document_code}.pdf`).replace(/[\/\\?%*:|"<>]/g, '_');
       const release = await fileService.prepareDownload(
         document.file_id,
-        document.original_name || `${document.document_code}.pdf`,
+        sanitizedFilename,
         fingerprintToken || undefined,
         signal
       );
 
-      return () => {
-        release();
-        toast.success(`Đã tải xuống thành công văn bản ${document.document_code}`, {
-          title: 'TẢI TỆP HOÀN TẤT',
-          badge: 'PDF-READY',
-        });
+      return async () => {
+        try {
+          await release();
+          toast.success(`Đã tải xuống thành công văn bản ${document.document_code}`, {
+            title: 'TẢI TỆP HOÀN TẤT',
+            badge: 'PDF-READY',
+          });
+        } catch (releaseErr: any) {
+          if (releaseErr?.name !== 'AbortError') {
+            throw releaseErr;
+          }
+        } finally {
+          // 🖥️ TỰ ĐỘNG BẬT LẠI FULLSCREEN:
+          // Sau khi hoàn tất lưu tệp (hoặc đóng hộp thoại Save As),
+          // tự động đưa tài liệu trở lại chế độ Toàn màn hình (Fullscreen) để cán bộ tiếp tục đọc tài liệu
+          try {
+            if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+              const targetElem = modalContainerRef.current || window.document.documentElement;
+              if (targetElem && targetElem.requestFullscreen) {
+                targetElem.requestFullscreen().catch(() => {
+                  window.document.documentElement.requestFullscreen().catch(() => {});
+                });
+              }
+            }
+          } catch (fsErr) {
+            console.warn('[handleDownload] Auto re-enter fullscreen error:', fsErr);
+          }
+
+          setTimeout(() => {
+            isDownloadingRef.current = false;
+          }, 1500);
+        }
       };
     } catch (err: any) {
+      setTimeout(() => {
+        isDownloadingRef.current = false;
+      }, 1000);
+      // Tự động khôi phục lại Fullscreen nếu người dùng bấm Hủy tải
+      try {
+        if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+          const targetElem = modalContainerRef.current || window.document.documentElement;
+          if (targetElem && targetElem.requestFullscreen) {
+            targetElem.requestFullscreen().catch(() => {
+              window.document.documentElement.requestFullscreen().catch(() => {});
+            });
+          }
+        }
+      } catch (_) {}
       if (err?.name !== 'AbortError') {
         setError(err.message || 'Lỗi khi tải tệp');
       }
@@ -240,176 +335,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     }
   };
 
-  const handleToggleFullscreen = () => {
-    if (!isFullscreen) {
-      setIsFullscreen(true);
-      try {
-        if (modalContainerRef.current?.requestFullscreen) {
-          modalContainerRef.current.requestFullscreen().catch(() => {});
-        }
-      } catch (e) {}
-    } else {
-      setIsFullscreen(false);
-      try {
-        if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
-          window.document.exitFullscreen().catch(() => {});
-        }
-      } catch (e) {}
-    }
-  };
-
   const handleClose = () => {
+    setShowScanModal(false);
     clearBiometricSession();
-    if (isFullscreen) {
-      try {
-        if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
-          window.document.exitFullscreen().catch(() => {});
-        }
-      } catch (e) {}
-      setIsFullscreen(false);
-    }
+    setIsHighlighterActive(false);
+    setBlobUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    try {
+      if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
+        window.document.exitFullscreen().catch(() => {});
+      }
+    } catch (_) {}
     onClose();
-  };
-
-  const handleOpenNewTab = () => {
-    if (!blobUrl || !document) return;
-
-    const titleEscaped = (document.title || 'Văn bản QK7 DataHub')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-    const codeEscaped = (document.document_code || 'VĂN BẢN')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-    const securityEscaped = (document.security_name || document.security_level_name || `Cấp ${document.security_level_id || 1}`)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-
-    const htmlContent = `<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${codeEscaped} - ${titleEscaped} | QK7 DataHub</title>
-  <link rel="icon" type="image/png" href="/favicon.png" />
-  <style>
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #0f172a;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    .hud-bar {
-      height: 46px;
-      background: linear-gradient(90deg, #092e20 0%, #064e3b 50%, #0f172a 100%);
-      border-bottom: 1px solid rgba(16, 185, 129, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      color: #f8fafc;
-      z-index: 10;
-      user-select: none;
-    }
-    .hud-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      overflow: hidden;
-    }
-    .code-badge {
-      background: rgba(245, 158, 11, 0.15);
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      color: #fbbf24;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 4px;
-      white-space: nowrap;
-    }
-    .sec-badge {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: #f87171;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 4px;
-      white-space: nowrap;
-    }
-    .doc-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #e2e8f0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 50vw;
-    }
-    .hud-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    .viewer-container {
-      position: relative;
-      width: 100%;
-      height: calc(100% - 46px);
-      background-color: #525659;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-    @media print {
-      .hud-bar { display: none !important; }
-      .viewer-container { height: 100% !important; background: transparent !important; }
-    }
-  </style>
-</head>
-<body>
-  <div class="hud-bar">
-    <div class="hud-left">
-      <span class="code-badge">${codeEscaped}</span>
-      <span class="doc-title">${titleEscaped}</span>
-      <span class="sec-badge">${securityEscaped}</span>
-    </div>
-    <div class="hud-right"></div>
-  </div>
-  <div class="viewer-container">
-    <iframe src="${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0"></iframe>
-  </div>
-</body>
-</html>`;
-
-    const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-    const htmlUrl = URL.createObjectURL(htmlBlob);
-    const newTab = window.open(htmlUrl, '_blank');
-    if (!newTab) {
-      const a = window.document.createElement('a');
-      a.href = htmlUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      window.document.body.appendChild(a);
-      a.click();
-      a.remove();
-    }
   };
 
   return (
@@ -417,19 +356,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       <div
         key="preview-backdrop"
         ref={modalContainerRef}
-        className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm transition-all duration-200 ${
-          isFullscreen ? 'p-0' : 'p-2 sm:p-4 md:p-6'
+        className={`fixed inset-0 z-50 flex flex-col w-screen h-screen bg-white dark:bg-slate-900 overflow-hidden ${
+          isSecretLevel ? 'select-none' : 'select-text'
         }`}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl flex flex-col mx-auto transition-all duration-200 ${
-            isFullscreen
-              ? 'w-full h-full max-w-none max-h-none rounded-none border-none'
-              : 'rounded-2xl w-full max-w-5xl h-[92vh] max-h-[calc(100dvh-2rem)]'
-          }`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="w-full h-full flex flex-col bg-white dark:bg-slate-900 overflow-hidden"
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-3 overflow-hidden min-w-0 flex-1 mr-3">
@@ -446,7 +381,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   </span>
                   <span className="text-slate-400 text-xs shrink-0 select-none">•</span>
                   <span
-                    className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-bold truncate min-w-0 flex-1"
+                    className="text-xs sm:text-sm text-slate-900 dark:text-white font-bold truncate min-w-0 flex-1"
                     title={document.title}
                   >
                     {document.title}
@@ -480,24 +415,73 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
-              {/* Nút mở PDF Toàn màn hình (Tích hợp DRM Watermark chuẩn hóa) */}
-              <button
-                onClick={handleOpenNewTab}
-                className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                title="Mở toàn màn hình xem PDF trong tab mới (Tích hợp Watermark bảo mật)"
-              >
-                <ExternalLink className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                <span className="hidden sm:inline">Toàn màn hình</span>
-              </button>
+              {/* 🖊️ Bút dạ quang ghi chú (Hỗ trợ toàn diện từ Cấp 1 đến Cấp 5) */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setIsHighlighterActive((prev) => !prev)}
+                  className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition cursor-pointer ${
+                    isHighlighterActive
+                      ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                  title={isHighlighterActive ? 'Đang bật bút dạ quang (Click để tắt và thao tác văn bản)' : 'Bật bút dạ quang ghi chú giáo trình'}
+                >
+                  <Highlighter className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">
+                    {isHighlighterActive ? 'Đang vẽ ghi chú' : 'Bút dạ quang'}
+                  </span>
+                </button>
+
+                {/* Bảng chọn màu bút dạ quang & nút Hoàn tác (Undo) */}
+                {isHighlighterActive && (
+                  <div className="flex items-center gap-1 pl-1.5 border-l border-slate-300 dark:border-slate-600">
+                    {HIGHLIGHTER_COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setHighlighterColor(c.value)}
+                        className={`w-5 h-5 rounded-full ${c.bgClass} border transition-all cursor-pointer ${
+                          highlighterColor === c.value
+                            ? 'scale-115 ring-2 ring-slate-800 dark:ring-white border-white shadow-xs'
+                            : 'opacity-70 hover:opacity-100 border-transparent'
+                        }`}
+                        title={c.name}
+                      />
+                    ))}
+                    {strokeCount > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => highlighterRef.current?.undo()}
+                          className="p-1 text-slate-500 hover:text-amber-500 dark:text-slate-300 dark:hover:text-amber-400 transition cursor-pointer ml-0.5"
+                          title="Hoàn tác nét vẽ vừa bôi (Ctrl + Z)"
+                        >
+                          <Undo2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => highlighterRef.current?.clear()}
+                          className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition cursor-pointer"
+                          title="Xóa tất cả nét ghi chú"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
               <CompactDownloadButton
                 onDownload={handleDownload}
-                onCancel={() =>
+                onCancel={() => {
+                  isDownloadingRef.current = false;
                   toast.info(`Đã hủy tải văn bản ${document.document_code}`, {
                     title: 'ĐÃ HỦY TẢI',
                     badge: 'CANCELLED',
                     duration: 2000,
-                  })
-                }
+                  });
+                }}
                 disabled={!canDownload}
                 disabledTitle={
                   isSecretLevel
@@ -507,15 +491,19 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 size="compact"
               />
               <button
-                onClick={handleToggleFullscreen}
+                onClick={() => {
+                  if (downloading || isDownloadingRef.current) {
+                    toast.warning('Tệp đang được tải xuống, vui lòng chờ trong giây lát...', {
+                      title: 'ĐANG TẢI TỆP',
+                      badge: 'DOWNLOADING',
+                    });
+                    return;
+                  }
+                  handleClose();
+                }}
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                title={isFullscreen ? 'Thu nhỏ hộp thoại' : 'Phóng to hộp thoại'}
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={handleClose}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                title="Thoát tài liệu (Esc)"
+                aria-label="Thoát tài liệu (Esc)"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -565,11 +553,34 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             )}
 
             {!loading && !error && blobUrl && (
-              <div className="relative overflow-hidden w-full h-full flex items-center justify-center">
-                <iframe
-                  src={`${blobUrl}#page=${page || 1}&toolbar=0&navpanes=0`}
-                  title={document.title}
-                  className="w-full h-full border-none"
+              <div className="relative overflow-hidden w-full h-full flex flex-col items-center">
+                {/* 📄 Bộ hiển thị trang PDF chuẩn + Bút dạ quang ĂN CỨNG THEO TÀI LIỆU (giống Watermark) */}
+                <PdfPagesViewer
+                  blobUrl={blobUrl}
+                  fileId={document.file_id}
+                  securityLevel={docLevel}
+                  isHighlighterActive={isHighlighterActive}
+                  highlighterColor={highlighterColor}
+                  onStrokeCountChange={(count) => setStrokeCount(count)}
+                  highlighterRef={highlighterRef}
+                />
+
+                {/* Lá chắn cảnh báo đỏ vi phạm an ninh (Liên tục & Quá 3 lần khóa tài khoản) */}
+                <SecurityScreenShield
+                  active={isShieldActive}
+                  document={document}
+                  violationInfo={violationInfo}
+                  violationCount={violationCount}
+                  isAccountLocked={isAccountLocked}
+                  onDismiss={dismissShield}
+                  onLockoutLogout={async () => {
+                    clearBiometricSession();
+                    onClose();
+                    try {
+                      await logout();
+                    } catch (_) {}
+                    window.location.href = '/login';
+                  }}
                 />
               </div>
             )}
@@ -585,16 +596,18 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           setShowScanModal(false);
           const validToken = token || "";
           setFingerprintToken(validToken || null);
+          // ✅ Lưu token vào sessionStorage per-file để đồng bộ 2 chiều với fileService
+          if (validToken && document?.file_id && typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem(`qk7_fp_token_${document.file_id}`, validToken);
+            } catch (e) {}
+          }
           if (document) {
             loadPdfBlob(document.file_id, validToken || null);
           }
         }}
         onCancel={() => {
-          setShowScanModal(false);
-          clearBiometricSession();
-          if (!blobUrl) {
-            onClose();
-          }
+          handleClose();
         }}
       />
     </AnimatePresence>

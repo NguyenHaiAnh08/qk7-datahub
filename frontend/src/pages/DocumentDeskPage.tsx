@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, RotateCw, FileCheck } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Plus, RotateCw, FileCheck, Clock } from 'lucide-react';
+import { PendingProposalsModal, PendingProposalItem } from '../components/document-desk/PendingProposalsModal';
 import { Header } from '../components/common/Header';
 import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { Toast, ToastState, toast } from '../components/common/Toast';
@@ -11,6 +12,8 @@ import { DocumentPreviewModal } from '../components/document-desk/DocumentPrevie
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
+import { isUserAdmin } from '../contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
 
@@ -25,7 +28,9 @@ const canUpload = hasPermission('DOC_UPLOAD');
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('');
+  const [searchParams] = useSearchParams();
+  const [selectedUnit, setSelectedUnit] = useState(searchParams.get('unit') || '');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedLevel, setSelectedLevel] = useState<number>(0);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -40,6 +45,32 @@ const canUpload = hasPermission('DOC_UPLOAD');
   const [editingDoc, setEditingDoc] = useState<DocumentItem | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<DocumentItem | null>(null);
+  const [proposalsModalOpen, setProposalsModalOpen] = useState(false);
+  const [pendingProposals, setPendingProposals] = useState<PendingProposalItem[]>([]);
+
+  const canApproveProposals = useMemo(() => {
+    if (!user) return false;
+
+    const isAdmin =
+      isUserAdmin(user) ||
+      user.user_id === 'USR-001' ||
+      (user.roles || []).includes('ROL-01');
+
+    const isCommander = (user.roles || []).includes('ROL-02');
+
+    // Admin HOẶC Chỉ huy được duyệt đề xuất chỉnh sửa văn bản
+    // (ROL-03 KHÔNG được duyệt — tránh mở rộng nhầm qua isUserManager)
+    return isAdmin || isCommander;
+  }, [user]);
+
+  const loadPendingProposals = useCallback(async () => {
+    try {
+      const res = await documentsApi.getPendingProposals();
+      setPendingProposals(res.items || []);
+    } catch (e) {
+      console.error('[loadPendingProposals]', e);
+    }
+  }, []);
 
   // Toast Dispatcher (Global AnimatedToast)
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -56,16 +87,36 @@ const canUpload = hasPermission('DOC_UPLOAD');
         setMeta(res);
       })
       .catch((err) => console.error('[loadMeta]', err));
+    loadPendingProposals();
   }, []);
 
   // Load Documents
   const loadDocuments = async () => {
     setLoading(true);
     try {
+      let queryUnit: string | undefined = undefined;
+      let includeChildren: boolean | undefined = undefined;
+
+      const isSchool = selectedUnit === 'TQS' || selectedUnit === 'U-TQS';
+
+      if (isSchool) {
+        if (selectedDepartment) {
+          queryUnit = selectedDepartment;
+          includeChildren = true;
+        } else {
+          queryUnit = 'TQS';
+          includeChildren = true;
+        }
+      } else if (selectedUnit) {
+        queryUnit = selectedUnit;
+        includeChildren = true;
+      }
+
       const res = await documentsApi.getDocuments({
         q: searchQuery || undefined,
         type: selectedType || undefined,
-        unit: selectedUnit || undefined,
+        unit: queryUnit,
+        include_children: includeChildren,
         lv: selectedLevel || undefined,
         from: dateFrom || undefined,
         to: dateTo || undefined,
@@ -85,13 +136,14 @@ const canUpload = hasPermission('DOC_UPLOAD');
       loadDocuments();
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedType, selectedUnit, selectedLevel, dateFrom, dateTo]);
+  }, [searchQuery, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
 
   // Reset Filters
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedType('');
     setSelectedUnit('');
+    setSelectedDepartment('');
     setSelectedLevel(0);
     setDateFrom('');
     setDateTo('');
@@ -100,12 +152,33 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
   // Save Document (Create or Edit)
   const handleSaveDocument = async (formData: FormData, isEdit: boolean) => {
+    let result: any = null;
     if (isEdit && editingDoc) {
-      await documentsApi.updateDocument(editingDoc.file_id, formData);
+      const res: any = await documentsApi.updateDocument(editingDoc.file_id, formData);
+      result = res;
+      if (res?.pending_approval) {
+        toast.info(res.message || 'Đề xuất chỉnh sửa đã được chuyển vào trạng thái treo chờ Chỉ huy / Admin duyệt.', {
+          title: 'ĐÃ GỬI ĐỀ XUẤT CHỈNH SỬA',
+          badge: 'PENDING-APPROVAL',
+          duration: 6000,
+        });
+      } else {
+        toast.success(`Đã cập nhật thành công văn bản ${editingDoc.document_code}`, {
+          title: 'HOÀN TẤT',
+          badge: 'UPDATED',
+        });
+      }
     } else {
-      await documentsApi.uploadDocument(formData);
+      const res = await documentsApi.uploadDocument(formData);
+      result = res;
+      toast.success('Đã tiếp nhận và lưu trữ văn bản mới thành công', {
+        title: 'TIẾP NHẬN THÀNH CÔNG',
+        badge: 'UPLOADED',
+      });
     }
     await loadDocuments();
+    await loadPendingProposals();
+    return result;
   };
 
   // Delete Document
@@ -124,6 +197,15 @@ const canUpload = hasPermission('DOC_UPLOAD');
   };
 
   // Download Handler
+  const handlePreviewDocument = (doc: DocumentItem) => {
+    try {
+      if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+        window.document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch (_) {}
+    setPreviewDoc(doc);
+  };
+
   const handleDownload = async (doc: DocumentItem, signal?: AbortSignal) => {
     const userClearance = user?.clearance_level_id || 1;
     const docLevel = doc.security_level_id || 1;
@@ -148,18 +230,19 @@ const canUpload = hasPermission('DOC_UPLOAD');
     toast.info(`Đang tải văn bản ${doc.document_code}...`, {
       title: 'ĐANG XỬ LÝ TỆP',
       badge: 'STREAMING',
-      duration: 3200,
+      duration: 2500,
     });
 
+    const sanitizedFilename = (doc.original_name || `${doc.document_code}.pdf`).replace(/[\/\\?%*:|"<>]/g, '_');
     const release = await documentsApi.prepareDownload(
       doc.file_id,
-      doc.original_name || `${doc.document_code}.pdf`,
+      sanitizedFilename,
       undefined,
       signal
     );
 
-    return () => {
-      release();
+    return async () => {
+      await release();
       toast.success(`Đã tải xuống thành công văn bản ${doc.document_code}`, {
         title: 'TẢI TỆP HOÀN TẤT',
         badge: 'PDF-READY',
@@ -223,18 +306,37 @@ const canUpload = hasPermission('DOC_UPLOAD');
             </p>
           </div>
 
-           {canUpload && (
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => {
-              setEditingDoc(null);
-              setUploadModalOpen(true);
+              loadPendingProposals();
+              setProposalsModalOpen(true);
             }}
-            className="px-4 py-2.5 bg-[#166534] hover:bg-[#15803d] text-white font-semibold rounded-lg text-xs flex items-center gap-2 border border-emerald-600/40 transition-colors cursor-pointer shrink-0 active:scale-[0.98]"
+            className="px-3.5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold rounded-lg text-xs flex items-center gap-2 border border-amber-500/30 transition-colors cursor-pointer shrink-0 active:scale-[0.98]"
+            title="Xem và xét duyệt các đề xuất chỉnh sửa văn bản"
           >
-            <Plus className="w-4 h-4" />
-            <span>Tiếp Nhận Văn Bản Mới</span>
+            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Đề Xuất Chờ Duyệt</span>
+            {pendingProposals.length > 0 && (
+              <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">
+                {pendingProposals.length}
+              </span>
+            )}
           </button>
+
+          {canUpload && (
+            <button
+              onClick={() => {
+                setEditingDoc(null);
+                setUploadModalOpen(true);
+              }}
+              className="px-4 py-2.5 bg-[#166534] hover:bg-[#15803d] text-white font-semibold rounded-lg text-xs flex items-center gap-2 border border-emerald-600/40 transition-colors cursor-pointer shrink-0 active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tiếp Nhận Văn Bản Mới</span>
+            </button>
           )}
+        </div>
         </div>
 
         {/* Filters */}
@@ -244,7 +346,12 @@ const canUpload = hasPermission('DOC_UPLOAD');
           selectedType={selectedType}
           onTypeChange={setSelectedType}
           selectedUnit={selectedUnit}
-          onUnitChange={setSelectedUnit}
+          onUnitChange={(u) => {
+            setSelectedUnit(u);
+            setSelectedDepartment('');
+          }}
+          selectedDepartment={selectedDepartment}
+          onDepartmentChange={setSelectedDepartment}
           selectedLevel={selectedLevel}
           onLevelChange={setSelectedLevel}
           dateFrom={dateFrom}
@@ -298,7 +405,26 @@ const canUpload = hasPermission('DOC_UPLOAD');
         open={Boolean(previewDoc)}
         document={previewDoc}
         userClearanceLevel={user?.clearance_level_id || 1}
-        onClose={() => setPreviewDoc(null)}
+        onClose={() => {
+          setPreviewDoc(null);
+          try {
+            if (typeof window !== 'undefined' && window.document.fullscreenElement && window.document.exitFullscreen) {
+              window.document.exitFullscreen().catch(() => {});
+            }
+          } catch (_) {}
+        }}
+      />
+
+      {/* Pending Proposals Modal */}
+      <PendingProposalsModal
+        open={proposalsModalOpen}
+        proposals={pendingProposals}
+        canApprove={canApproveProposals}
+        onClose={() => setProposalsModalOpen(false)}
+        onRefresh={async () => {
+          await loadPendingProposals();
+          await loadDocuments();
+        }}
       />
 
       {/* Delete Confirmation */}

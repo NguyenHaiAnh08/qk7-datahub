@@ -27,6 +27,7 @@ import {
   Archive,
   Clock,
   Calendar,
+  CameraOff,
 } from 'lucide-react';
 import { AccessLog } from '../../types/user';
 import { dashboardApi } from '../../services/dashboardApi';
@@ -45,6 +46,8 @@ export function getActionCategory(action: string = '', note: string = ''): 'ALER
     act.includes('DENIED') ||
     act.includes('BLOCK') ||   
     act.includes('ERROR') ||
+    act.includes('SCREENSHOT') ||
+    lowerNote.includes('chụp màn hình') ||
     lowerNote.includes('sai mật khẩu') ||
     lowerNote.includes('thất bại') ||
     lowerNote.includes('từ chối') ||
@@ -59,6 +62,7 @@ export function getActionCategory(action: string = '', note: string = ''): 'ALER
   if (
     act.includes('ROLE') ||
     act.includes('USER') ||
+    act.includes('UNLOCK') ||
     act.includes('FINGERPRINT') ||
     act.includes('CREDENTIAL') ||
     act.includes('PERMISSION') ||
@@ -93,9 +97,12 @@ export interface ExtractedTarget {
 export function extractTargets(log: AccessLog): ExtractedTarget[] {
   const targets: ExtractedTarget[] = [];
 
-  // 1. Nếu có tiêu đề hoặc file_id văn bản
-  if (log.doc_title) {
-    targets.push({ type: 'doc', id: log.file_id || 'DOC', name: log.doc_title });
+  // 1. Nếu có số hiệu, tiêu đề hoặc file_id văn bản
+  if (log.document_code || log.doc_title) {
+    const label = log.document_code
+      ? (log.doc_title ? `${log.document_code} - ${log.doc_title}` : log.document_code)
+      : log.doc_title!;
+    targets.push({ type: 'doc', id: log.file_id || log.document_code || 'DOC', name: label });
   } else if (log.file_id) {
     targets.push({ type: 'doc', id: log.file_id, name: log.file_id });
   }
@@ -103,6 +110,29 @@ export function extractTargets(log: AccessLog): ExtractedTarget[] {
   // 2. Trích xuất thông minh từ ghi chú
   const note = log.note || '';
   if (note) {
+    // Nếu chưa có doc target, trích xuất thông minh từ note
+    if (!targets.some((t) => t.type === 'doc')) {
+      const codeMatch = note.match(/Số\s*hiệu:\s*([^|\]]+)/i);
+      const titleMatch = note.match(/Trích\s*yếu:\s*([^|\]]+)/i);
+      if (codeMatch || titleMatch) {
+        const code = codeMatch ? codeMatch[1].trim() : '';
+        const title = titleMatch ? titleMatch[1].trim() : '';
+        targets.push({
+          type: 'doc',
+          id: code || log.file_id || 'DOC',
+          name: code ? (title ? `${code} - ${title}` : code) : title,
+        });
+      } else {
+        const bracketMatch = note.match(/trên\s+(?:văn\s+bản|tài\s+liệu)\s+\[([^\]]+)\]/i);
+        if (bracketMatch && bracketMatch[1]) {
+          targets.push({
+            type: 'doc',
+            id: log.file_id || 'DOC',
+            name: bracketMatch[1].trim(),
+          });
+        }
+      }
+    }
     // USR-xxx (người nhận/đối tượng được thao tác)
     const userMatches = note.match(/USR-\d+/gi);
     if (userMatches) {
@@ -153,9 +183,13 @@ export function extractTargets(log: AccessLog): ExtractedTarget[] {
 
 function getInitials(name?: string, fallback = 'QN'): string {
   if (!name || !name.trim()) return fallback;
-  const parts = name.trim().split(/\s+/);
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return fallback;
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  // Lấy 2 chữ cái đầu của 2 từ cuối cùng: Nguyễn Thị Ánh Tuyết -> ÁT, Nguyễn Hải Anh -> HA
+  const penult = parts[parts.length - 2];
+  const last = parts[parts.length - 1];
+  return (penult.charAt(0) + last.charAt(0)).toUpperCase();
 }
 
 interface SecurityAuditLogProps {
@@ -354,6 +388,25 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
     const act = (action || '').toUpperCase();
     const cat = getActionCategory(act, note);
 
+    if (act === 'SCREENSHOT_ATTEMPT' || act.includes('SCREENSHOT')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider font-mono uppercase bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-500/40 dark:shadow-[0_0_12px_rgba(244,63,94,0.25)]">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 animate-ping" />
+          <CameraOff className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+          CHỤP MÀN HÌNH
+        </span>
+      );
+    }
+
+    if (act === 'UNLOCK_USER' || act.includes('UNLOCK')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider font-mono uppercase bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-500/30 dark:shadow-[0_0_8px_rgba(16,185,129,0.15)]">
+          <KeyRound className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
+          MỞ KHÓA
+        </span>
+      );
+    }
+
     if (cat === 'ALERT') {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold tracking-wider font-mono uppercase bg-rose-50 text-rose-700 border border-rose-300 dark:bg-red-950/40 dark:text-red-400 dark:border-red-500/30 dark:shadow-[0_0_10px_rgba(239,68,68,0.15)]">
@@ -392,6 +445,107 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
         {act}
       </span>
     );
+  };
+
+  // Render đối tượng tác động chi tiết (đặc biệt là tài liệu/văn bản với đầy đủ thông số)
+  const renderDetailTargetSection = (log: AccessLog) => {
+    let docCode = log.document_code;
+    let docTitle = log.doc_title;
+    let secName = log.security_name;
+    let unitName = log.unit_name;
+    const fileId = log.file_id;
+
+    if (log.note) {
+      if (!docCode) {
+        const codeMatch = log.note.match(/Số\s*hiệu:\s*([^|\]]+)/i);
+        if (codeMatch) docCode = codeMatch[1].trim();
+      }
+      if (!docTitle) {
+        const titleMatch = log.note.match(/Trích\s*yếu:\s*([^|\]]+)/i);
+        if (titleMatch) docTitle = titleMatch[1].trim();
+      }
+      if (!secName) {
+        const secMatch = log.note.match(/Độ\s*mật:\s*([^|\]]+)/i);
+        if (secMatch) secName = secMatch[1].trim();
+      }
+      if (!unitName) {
+        const unitMatch = log.note.match(/Đơn\s*vị(?:\s*ban\s*hành)?:\s*([^|\]]+)/i);
+        if (unitMatch) unitName = unitMatch[1].trim();
+      }
+      if (!docCode && !docTitle) {
+        const bracketMatch = log.note.match(/trên\s+(?:văn\s+bản|tài\s+liệu)\s+\[([^\]]+)\]/i);
+        if (bracketMatch) docTitle = bracketMatch[1].trim();
+      }
+    }
+
+    const hasDoc = Boolean(docCode || docTitle || fileId);
+
+    if (hasDoc) {
+      const isScreenshot = (log.action || '').toUpperCase().includes('SCREENSHOT');
+      return (
+        <div className={`p-3 rounded-xl border ${
+          isScreenshot
+            ? 'bg-rose-50/70 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/50'
+            : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-800'
+        } space-y-2.5`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg ${
+                isScreenshot
+                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
+                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300'
+              }`}>
+                <FileText className="w-4 h-4 shrink-0" />
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono font-bold text-xs text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/30">
+                  {docCode || 'VĂN BẢN QUÂN SỰ'}
+                </span>
+                {secName && (
+                  <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                    secName.includes('Tuyệt') || secName.includes('Tối')
+                      ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-800'
+                      : secName.includes('Mật')
+                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800'
+                  }`}>
+                    {secName}
+                  </span>
+                )}
+              </div>
+            </div>
+            {fileId && (
+              <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                Mã tệp: {fileId}
+              </span>
+            )}
+          </div>
+
+          <div>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Trích yếu nội dung:</span>
+            <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 mt-0.5 leading-snug">
+              {docTitle || 'Tài liệu lưu trữ trong Thư viện số Quân khu 7'}
+            </p>
+          </div>
+
+          {unitName && (
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-200/70 dark:border-slate-800/80">
+              <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>Đơn vị ban hành: <strong className="text-slate-800 dark:text-slate-200 font-semibold">{unitName}</strong></span>
+            </div>
+          )}
+
+          {isScreenshot && (
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-700 dark:text-rose-400 bg-rose-100/60 dark:bg-rose-950/50 px-2.5 py-1 rounded-md border border-rose-300 dark:border-rose-900">
+              <CameraOff className="w-3.5 h-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
+              <span>HÀNH VI CHỤP MÀN HÌNH ĐÃ BỊ CHẶN &amp; TIÊU HỦY DỮ LIỆU BỘ NHỚ TẠM</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return renderTargetEntities(log);
   };
 
   // Render đối tượng / văn bản thông minh tránh trống trải
@@ -469,7 +623,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
     );
   };
 
-  // Highlight nội dung ghi chú
+  // Highlight nội dung ghi chú (dùng cho modal chi tiết đầy đủ 100%)
   const renderHighlightedNote = (note?: string, isAlert = false) => {
     if (!note) return <span className="text-slate-400 dark:text-slate-500">—</span>;
 
@@ -511,6 +665,68 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
         })}
       </span>
     );
+  };
+
+  // Rút gọn nội dung ghi chú hiển thị ở danh sách bảng (Table List)
+  const renderTableCellNote = (l: AccessLog) => {
+    const note = l.note || '';
+    const act = (l.action || '').toUpperCase();
+    const lowerNote = note.toLowerCase();
+    const isAlert = getActionCategory(l.action, l.note) === 'ALERT';
+
+    if (!note) return <span className="text-slate-400 dark:text-slate-500">—</span>;
+
+    // 1. Tự động khóa tài khoản (ACCOUNT_LOCKED / LOGIN_BLOCKED / vi phạm quá 3 lần) -> Rút gọn ngắn gọn
+    if (
+      act === 'ACCOUNT_LOCKED' ||
+      act === 'LOGIN_BLOCKED' ||
+      lowerNote.includes('tự động khóa') ||
+      lowerNote.includes('tu dong khoa') ||
+      lowerNote.includes('khóa tài khoản') ||
+      lowerNote.includes('khoa tai khoan') ||
+      lowerNote.includes('tài khoản đang bị khóa')
+    ) {
+      return (
+        <span
+          className="text-xs font-semibold text-rose-700 dark:text-rose-300 inline-flex items-center gap-1.5 whitespace-nowrap"
+          title={note}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0" />
+          <span>Tự động khóa tài khoản...</span>
+        </span>
+      );
+    }
+
+    // 2. Cảnh báo an ninh chụp màn hình (SCREENSHOT_ATTEMPT / SCREENSHOT_RESOLVED) -> Rút gọn ngắn gọn
+    if (
+      act.includes('SCREENSHOT') ||
+      lowerNote.includes('chụp màn hình') ||
+      lowerNote.includes('chup man hinh') ||
+      lowerNote.includes('screenshot')
+    ) {
+      return (
+        <span
+          className="text-xs font-medium text-rose-700 dark:text-rose-300 inline-flex items-center gap-1.5 whitespace-nowrap"
+          title={note}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0" />
+          <span>Cảnh báo an ninh: Phát hiện hành vi chụp màn hình...</span>
+        </span>
+      );
+    }
+
+    // 3. Mở khóa tài khoản (UNLOCK_USER)
+    if (act === 'UNLOCK_USER' || lowerNote.includes('mở khóa') || lowerNote.includes('mo khoa')) {
+      return (
+        <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300 inline-flex items-center gap-1.5" title={note}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0" />
+          <span>{renderHighlightedNote(note, false)}</span>
+        </span>
+      );
+    }
+
+    // Các ghi chú khác
+    return renderHighlightedNote(note, isAlert);
   };
 
   return (
@@ -794,6 +1010,9 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
               <option value="">Tất cả hành động</option>
               <option value="LOGIN">LOGIN (Đăng nhập)</option>
               <option value="LOGIN_FAIL">LOGIN_FAIL (Đăng nhập thất bại)</option>
+              <option value="UNLOCK_USER">UNLOCK_USER (Mở khóa tài khoản)</option>
+              <option value="ACCOUNT_LOCKED">ACCOUNT_LOCKED (Tự động khóa tài khoản)</option>
+              <option value="SCREENSHOT_ATTEMPT">SCREENSHOT_ATTEMPT (Chụp màn hình)</option>
               <option value="VIEW">VIEW (Xem tài liệu)</option>
               <option value="DOWNLOAD">DOWNLOAD (Tải tệp)</option>
               <option value="UPLOAD">UPLOAD (Tải lên)</option>
@@ -1022,7 +1241,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
 
                       {/* Cột GHI CHÚ */}
                       <td className="py-3 px-4 text-xs max-w-md">
-                        {renderHighlightedNote(l.note, isAlert)}
+                        {renderTableCellNote(l)}
                       </td>
 
                       {/* Nút Xem Chi Tiết */}
@@ -1259,7 +1478,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                   <span className="text-slate-500 text-[11px] block mb-1.5 font-semibold uppercase tracking-wider">
                     Văn bản / Đối tượng tác động
                   </span>
-                  <div>{renderTargetEntities(selectedLog)}</div>
+                  <div>{renderDetailTargetSection(selectedLog)}</div>
                 </div>
 
                 {/* 3. Chi tiết Ghi chú */}

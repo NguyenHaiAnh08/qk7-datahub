@@ -4,6 +4,7 @@ export interface ApprovalRequest {
   request_id: string;
   requester_id: string;
   requester_name?: string;
+  requester_rank?: string;
   required_permission: string;
   http_method: string;
   http_path: string;
@@ -16,13 +17,17 @@ export interface ApprovalRequest {
   review_note?: string;
   executed_at?: string;
   created_at: string;
+  request_reason?: string;
+  document_code?: string;
+  doc_title?: string;
+  proposal_data?: any;
 }
 
 export const approvalService = {
   listPending: () => http<{ total: number; items: ApprovalRequest[] }>(
     `/api/admin/approval-requests?status=PENDING`
   ),
-  listMine: (status: 'PENDING_REJECTED' | 'PENDING' | 'REJECTED' | 'ALL' = 'PENDING_REJECTED') =>
+  listMine: (status: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'PENDING_REJECTED' = 'ALL') =>
    http<{ total: number; items: ApprovalRequest[] }>(
      `/api/my-approval-requests?status=${status}`
    ),

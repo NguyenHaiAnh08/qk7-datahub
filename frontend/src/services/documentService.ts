@@ -34,6 +34,14 @@ export interface ParseDocumentResult {
     sha256?: string;
     error?: string;
     duplicate_check?: CheckDuplicateResult;
+    classification?: {
+        pdfType: 'TextBased' | 'Scanned' | 'Mixed';
+        totalPages: number;
+        pagesNeedingOcr: number[];
+        elapsedMs: number;
+    };
+    ocr_engine?: string;
+    total_duration_ms?: number;
 }
 
 /**
@@ -223,6 +231,42 @@ export const documentService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirm: fileId }),
     });
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // DOCUMENT REVISION PROPOSALS (Đề xuất sửa đổi chờ duyệt)
+  // ═══════════════════════════════════════════════════════════
+
+  getPendingProposals: async (): Promise<{ total: number; items: any[] }> => {
+    return http<{ total: number; items: any[] }>('/api/documents/proposals/pending');
+  },
+
+  approveProposal: async (
+    proposalId: string,
+    reviewNote?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    return http<{ success: boolean; message: string }>(
+      `/api/documents/proposals/${encodeURIComponent(proposalId)}/approve`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ review_note: reviewNote }),
+      }
+    );
+  },
+
+  rejectProposal: async (
+    proposalId: string,
+    reason?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    return http<{ success: boolean; message: string }>(
+      `/api/documents/proposals/${encodeURIComponent(proposalId)}/reject`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      }
+    );
   },
 
 

@@ -11,6 +11,7 @@ const EXCLUDED_PATHS = [
   /^\/api\/admin\/protected-permissions/,
   /^\/api\/auth\//,
   /^\/api\/admin\/creatable-roles$/,
+  /^\/api\/documents\/proposals\//,
 ];
 
 module.exports = function createApprovalWorkflow({ 
@@ -100,9 +101,18 @@ module.exports = function createApprovalWorkflow({
 
     try {
       const pool = await getPool();
+
+      // ✅ 1. Lấy đơn vị của người đang gửi yêu cầu
+      const userRes = await pool.request()
+        .input('uid', sql.VarChar(50), req.user.user_id)
+        .query(`SELECT unit_id FROM [USER] WHERE user_id = @uid`);
+      const requesterUnitId = userRes.recordset[0]?.unit_id || null;
+
+      // ✅ 2. Lưu vào APPROVAL_REQUEST (thêm cột requester_unit_id)
       await pool.request()
         .input('rid', sql.VarChar(50), requestId)
         .input('uid', sql.VarChar(50), req.user.user_id)
+        .input('req_unit', sql.VarChar(50), requesterUnitId) // <-- CỘT MỚI
         .input('perm', sql.VarChar(50), requiredPerm)
         .input('method', sql.VarChar(10), req.method)
         .input('path', sql.VarChar(500), req.originalUrl || req.url)
@@ -110,8 +120,8 @@ module.exports = function createApprovalWorkflow({
         .input('summary', sql.NVarChar(500), `${req.method} ${fullPath}`)
         .query(`
           INSERT INTO APPROVAL_REQUEST 
-          (request_id, requester_id, required_permission, http_method, http_path, http_body, target_summary)
-          VALUES (@rid, @uid, @perm, @method, @path, @body, @summary)
+          (request_id, requester_id, requester_unit_id, required_permission, http_method, http_path, http_body, target_summary)
+          VALUES (@rid, @uid, @req_unit, @perm, @method, @path, @body, @summary)
         `);
 
       await writeAccessLog({

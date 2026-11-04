@@ -27,6 +27,17 @@
 18. [Kiến Trúc Thùng Rác Tài Liệu Tác Chiến & Khôi Phục Dữ Liệu An Toàn 2 Bước (Tactical Trash Bin & Double-Safety Recovery Engine)](#18-kiến-trúc-thùng-rác-tài-liệu-tác-chiến--khôi-phục-dữ-liệu-an-toàn-2-bước-tactical-trash-bin--double-safety-recovery-engine)
 19. [Kiến Trúc Quản Lý Phân Quyền Nâng Cao & Kéo Thả Thứ Tự Trực Quan (Granular Permissions, Subgroups & Drag-and-Drop Order Engine)](#19-kiến-trúc-quản-lý-phân-quyền-nâng-cao--kéo-thả-thứ-tự-trực-quan-granular-permissions-subgroups--drag-and-drop-order-engine)
 20. [Kiến Trúc Header AI Slide-Over Drawer & Khám Phá Hệ Thống Tự Động (Header AI Drawer & Guided Tour Engine)](#20-kiến-trúc-header-ai-slide-over-drawer--khám-phá-hệ-thống-tự-động-header-ai-drawer--guided-tour-engine)
+21. [Kiến Trúc Đồng Bộ Thời Gian Thực & Cơ Chế Chốt Chặn Lệch Giờ Máy Trạm (Clock Authority Engine)](#21-kiến-trúc-đồng-bộ-thời-gian-thực--cơ-chế-chốt-chặn-lệch-giờ-máy-trạm-clock-authority-engine)
+22. [Kiến Trúc Xác Thực Sinh Trắc Học Vân Tay Quản Trị Viên 2FA (Admin 2FA ZK9500 Hardware Guard)](#22-kiến-trúc-xác-thực-sinh-trắc-học-vân-tay-quản-trị-viên-2fa-admin-2fa-zk9500-hardware-guard)
+23. [Kiến Trúc Đánh Dấu Bản Quyền Động Chống Chụp Màn Hình (Dynamic Military Watermark Engine)](#23-kiến-trúc-đánh-dấu-bản-quyền-động-chống-chụp-màn-hình-dynamic-military-watermark-engine)
+24. [Kiến Trúc Giới Hạn Truy Cập IP Quản Trị & Điều Tốc Lỗi 403 (Admin IP Whitelist & Toast Throttle Engine)](#24-kiến-trúc-giới-hạn-truy-cập-ip-quản-trị--điều-tốc-lỗi-403-admin-ip-whitelist--toast-throttle-engine)
+25. [Kiến Trúc Kiểm Tra Trùng Lặp & Bóc Tách Văn Kiện PDF (PDF Deduplication SHA-256 & Smart Ingestion Engine)](#25-kiến-trúc-kiểm-tra-trùng-lặp--bóc-tách-văn-kiện-pdf-pdf-deduplication-sha-256--smart-ingestion-engine)
+26. [Quy Chuẩn Vận Hành AI Agent & Sổ Tay Khắc Phục Sự Cố (Agent Guidelines & Troubleshooting Engine)](#26-quy-chuẩn-vận-hành-ai-agent--sổ-tay-khắc-phục-sự-cố-agent-guidelines--troubleshooting-engine)
+27. [Kiến Trúc Lá Chắn Chống Chụp Màn Hình & Cảnh Báo An Ninh Tác Chiến (Anti-Screenshot Security Shield & Real-Time SOC Alert Engine)](#27-kiến-trúc-lá-chắn-chống-chụp-màn-hình--cảnh-báo-an-ninh-tác-chiến-anti-screenshot-security-shield--real-time-soc-alert-engine)
+28. [Kiến Trúc Hàng Đợi Phê Duyệt Tích Hợp Đa Nhiệm & Luồng Đề Xuất Chuẩn Hóa Văn Bản (Unified Approval Queue & Document Revision Proposal Engine)](#28-kiến-trúc-hàng-đợi-phê-duyệt-tích-hợp-đa-nhiệm--luồng-đề-xuất-chuẩn-hóa-văn-bản-unified-approval-queue--document-revision-proposal-engine)
+29. [Chuẩn Hóa Phân Cấp & Thứ Tự Danh Mục Đơn Vị Ban Hành Quân Sự (Military Issuing Unit Hierarchy & Priority Order Engine)](#29-chuẩn-hóa-phân-cấp--thứ-tự-danh-mục-đơn-vị-ban-hành-quân-sự-military-issuing-unit-hierarchy--priority-order-engine)
+30. [Kiến Trúc Quy Trình Số Hóa Chia Đôi Màn Hình & Trình Xem Trước Cục Bộ (Split-Pane Digitization & Local Preview Engine)](#30-kiến-trúc-quy-trình-số-hóa-chia-đôi-màn-hình--trình-xem-trước-cục-bộ-split-pane-digitization--local-preview-engine)
+31. [Kiến Trúc Phân Cấp Phê Duyệt Chỉ Huy & Bảng Giám Sát Tiến Độ Phòng Ban Nhà Trường](#31-kiến-trúc-phân-cấp-phê-duyệt-chỉ-huy--bảng-giám-sát-tiến-độ-phòng-ban-nhà-trường)
 
 ---
 
@@ -1200,6 +1211,86 @@ Nhằm hỗ trợ thủ trưởng và cán bộ tác chiến tra cứu nhanh đi
 - **Tinh giản giao diện Header:** Loại bỏ nút hướng dẫn nhanh thừa thãi trên Header bar để nhường không gian cho các công cụ điều khiển trọng yếu (`DeviceModeSwitch`, `ThemeToggle`, `User Profile`), chuyển toàn bộ điểm nhấn khám phá về đúng ngữ cảnh của Banner tác chiến.
 
 ---
+---
+
+## 27. Kiến Trúc Lá Chắn Chống Chụp Màn Hình & Cảnh Báo An Ninh Tác Chiến (Anti-Screenshot Security Shield & Real-Time SOC Alert Engine)
+
+### 27.1. Đánh Chặn Phím Tắt Toàn Diện (Keyboard Interception Guard)
+* **Phạm vi bảo vệ:** Tự động kích hoạt khi quân nhân mở xem bất kỳ văn bản quân sự nào trong `DocumentPreviewModal` (`enabled: open && Boolean(document)`).
+* **Tổ hợp phím bị chặn:**
+  * `PrintScreen` (KeyCode 44, code `PrintScreen`) — phím chụp toàn màn hình truyền thống.
+  * `Win + Shift + S` (hoặc `Ctrl + Shift + S`) — công cụ Windows Snipping Tool.
+  * `Cmd + Shift + 3 / 4 / 5` — tổ hợp phím chụp màn hình trên máy Mac/iPadOS có kết nối bàn phím ngoài.
+* **Cơ chế kích hoạt:** Bắt chặn ở cấp độ capture phase (`e.preventDefault()`, `e.stopPropagation()`), ngăn chặn hoàn toàn trình duyệt và hệ điều hành tiếp nhận mã phím.
+
+### 27.2. Cơ Chế Che Mờ Tức Thời 0ms (Instant Blackout Engine) & Tiêu Hủy Clipboard Đa Nhịp
+* **Bảo vệ trước khi OS ghi hình:** Khi người dùng kích hoạt Snipping Tool (làm cửa sổ trình duyệt mất tiêu điểm `window.blur`), hàm `applyInstantBlackout(true)` áp dụng style che đen và mờ 100% (`backdrop-filter: blur(40px)`, `visibility: hidden`) lên vùng render PDF trong 0ms trước khi công cụ chụp kịp lưu khung hình.
+* **Tiêu hủy bộ nhớ tạm Clipboard (Wipe Clipboard):**
+  * Hàm `wipeClipboard()` ghi đè dữ liệu rỗng và văn bản cảnh báo: `"⚠️ [AN NINH TRƯỜNG QUÂN SỰ QUÂN KHU 7] Dữ liệu hình ảnh đã bị hủy tự động do vi phạm quy chế bảo vệ bí mật nhà nước. Nghiêm cấm mọi hành vi chụp và trích xuất tài liệu quân sự!"`.
+  * Kích hoạt liên tiếp 4 nhịp: **0ms, 200ms, 500ms, 1000ms** để đảm bảo triệt tiêu hoàn toàn độ trễ bất đồng bộ của luồng ghi Clipboard từ Windows Snipping Tool.
+* **Chặn dán hình ảnh (Paste Blocker):** Lắng nghe sự kiện `paste` toàn cục; nếu bộ nhớ tạm chứa dữ liệu hình ảnh (`image/*`), hệ thống lập tức hủy thao tác và phát cảnh báo vi phạm.
+
+### 27.3. Cảnh Báo Tác Chiến & Ghi Nhận SOC Thời Gian Thực
+* **Gửi tín hiệu vi phạm:** Hook `useAntiScreenshot` tự động gọi POST sang `/api/security/screenshot-alert` kèm payload chứa:
+  * Mã tệp (`file_id`), Số hiệu công văn (`document_code`), Trích yếu (`title`), Cấp mật (`security_name`), Đơn vị ban hành (`unit_name`), Loại phím tắt và Thời gian vi phạm.
+* **Mở rộng cột `ACCESS_LOG.note`:** CSDL SQL Server nâng cấp cột `note` lên `NVARCHAR(1000)` (thay vì 255), đảm bảo lưu đầy đủ trích yếu dài và toàn bộ metadata văn bản.
+* **Hiển thị trực quan tại SOC:** Component `SecurityAuditLog.tsx` nhận diện hành vi `SCREENSHOT_ATTEMPT`, render thẻ cảnh báo chuyên biệt màu đỏ tươi, hiển thị chính xác văn bản bị tác động thay vì báo `N/A`.
+* **Tùy chọn Dev Switch:** Menu người dùng cung cấp công tắc *"Dev: Cho phép chụp ảnh"* (`qk7_dev_allow_screenshot`) để kỹ sư phần mềm chụp ảnh màn hình trong quá trình lập trình/kiểm thử mà không bị lá chắn chặn.
+
+---
+
+## 28. Kiến Trúc Hàng Đợi Phê Duyệt Tích Hợp Đa Nhiệm & Luồng Đề Xuất Chuẩn Hóa Văn Bản (Unified Approval Queue & Document Revision Proposal Engine)
+
+### 28.1. Hợp Nhất Hàng Đợi Phê Duyệt Tập Trung (Unified Approval Queue Architecture)
+* **Vấn đề trước đây:** Hệ thống tồn tại 2 luồng phê duyệt riêng rẽ: `APPROVAL_REQUEST` (yêu cầu mở khóa bảo vệ quyền) và `DOCUMENT_REVISION_PROPOSAL` (đề xuất chỉnh sửa văn bản của trợ lý/văn thư). Điều này khiến Quản trị viên phải tìm kiếm ở nhiều màn hình khác nhau, gây rườm rà trong công tác quản lý.
+* **Kiến trúc Hợp nhất mới:**
+  * Endpoint `/api/admin/approval-requests` và `/api/my-approval-requests` thực hiện hợp nhất kết quả từ cả 2 bảng `APPROVAL_REQUEST` và `DOCUMENT_REVISION_PROPOSAL`.
+  * Đề xuất sửa văn bản có định danh tiền tố `PROP-*`, được gắn Badge chuyên biệt `ĐỀ XUẤT SỬA VĂN BẢN` màu ngọc bích.
+  * Quản trị viên chỉ cần vào duy nhất mục **Quản trị > Phê duyệt yêu cầu** (`ApprovalQueuePage.tsx`) để xử lý toàn bộ các nhiệm vụ.
+
+### 28.2. Bảng Đối Chiếu Thông Tin Chuẩn Hóa 2 Cột & Phê Duyệt 1-Click
+* **Giao diện đối chiếu trực quan:** Modal chi tiết hiển thị bảng 2 cột so sánh song song giữa dữ liệu hiện tại trong CSDL và dữ liệu đề xuất mới:
+  * Số hiệu văn bản (Hiện tại vs Đề xuất).
+  * Trích yếu nội dung (Hiện tại vs Đề xuất).
+  * Đơn vị ban hành & Người ký (Hiện tại vs Đề xuất).
+  * Cấp độ bảo mật (Hiện tại vs Đề xuất).
+  * Lý do đề xuất của cán bộ (mặc định: *"Đề xuất chuẩn hóa thông tin văn bản"*).
+* **Luồng xử lý nguyên tử (Atomic Approve/Reject):**
+  * Khi bấm **"Phê Duyệt Đề Xuất"**: Gateway cập nhật bảng `DOCUMENT`, cập nhật trạng thái đề xuất thành `APPROVED`, ghi nhật ký `ACCESS_LOG`, gửi webhook đồng bộ sang microservice AI Boxchat (`:8001`) và tự động làm mới badge đếm số lượng qua `ApprovalContext`.
+  * Khi bấm **"Từ Chối Đề Xuất"**: Admin nhập lý do từ chối; hệ thống cập nhật trạng thái `REJECTED` và lưu lý do giải trình.
+
+### 28.3. Phân Hệ Theo Dõi Dành Cho Cán Bộ ("Yêu Cầu Chỉnh Sửa Của Tôi")
+* Cán bộ, trợ lý, văn thư truy cập trang `MyApprovalsPage.tsx` để theo dõi trực tiếp các yêu cầu của mình:
+  * Trạng thái Đang chờ duyệt (🟡 `PENDING`).
+  * Trạng thái Đã phê duyệt (🟢 `APPROVED`).
+  * Trạng thái Bị từ chối (🔴 `REJECTED`) kèm lý do từ chối cụ thể của Thủ trưởng/Quản trị viên.
+
+---
+
+## 29. Chuẩn Hóa Phân Cấp & Thứ Tự Danh Mục Đơn Vị Ban Hành Quân Sự (Military Issuing Unit Hierarchy & Priority Order Engine)
+
+### 29.1. Quy Chuẩn Thứ Tự Ưu Tiên Hiển Thị Đơn Vị Ban Hành
+Nhằm phản ánh chính xác cấu trúc tổ chức và phân cấp quản lý quân sự trong toàn Quân khu 7, danh mục đơn vị ban hành trong toàn bộ hệ thống (`PortalPage.tsx`, `DocumentFilters.tsx`) được cấu hình thứ tự ưu tiên hiển thị đồng nhất qua hàm `getIssuingUnitPriority`:
+
+$	ext{Priority}(U) = egin{cases} 
+1 & 	ext{Trường Quân sự Quân khu 7 (TQS - Đơn vị chủ quản nền tảng)} \
+2 & 	ext{Quân khu 7 (QK7 - Cơ quan lãnh đạo cấp trên)} \
+3 & 	ext{Bộ Tổng Tham mưu (BTTM)} \
+4 & 	ext{Tổng cục Chính trị (TCCT)} \
+5 & 	ext{Bộ Quốc Phòng (BQP)} \
+6 & 	ext{Chính Phủ (CP)} \
+7 & 	ext{Sư đoàn 5 (SD5)} \
+999 & 	ext{Các cơ quan, đơn vị được bổ sung sau này (xếp ở dưới dần dần)}
+end{cases}$
+
+### 29.2. Cơ Chế Bộ Lọc Sâu Phòng Ban Trực Thuộc (Dynamic Sub-Department Filter)
+* **Kích hoạt theo ngữ cảnh:**
+  * Khi quân nhân chọn đơn vị ban hành là **"Trường Quân sự Quân khu 7"** (`selectedUnit === 'TQS'`), hệ thống tự động hiển thị dropdown phòng ban trực thuộc (*Ban Giám hiệu, Phòng Tham mưu - Hành chính, Phòng Chính trị, Phòng Đào tạo, Phòng Hậu cần - Kỹ thuật*) nằm ngay đối diện bên dưới để lọc sâu theo từng phòng ban.
+  * Khi chọn các đơn vị khác (Quân khu 7, Bộ Quốc phòng, Sư đoàn 5...), ô chọn phòng ban tự động ẩn đi để tối ưu diện tích và đơn giản hóa trải nghiệm người dùng.
+* **Đồng bộ đa nền tảng:** Áp dụng đồng nhất cho cả giao diện máy tính để bàn (PC Widescreen) và máy tính bảng iPad Air M4 Touch UI.
+
+---
+
 *Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*
 
 
@@ -1342,3 +1433,90 @@ Toàn bộ danh mục 13 sự cố kỹ thuật điển hình đã từng gặp 
 
 ---
 *Tài liệu kiến trúc hệ thống TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB được cập nhật và phê duyệt chính thức bởi Trường Quân sự Quân khu 7.*
+
+
+### 4.3. Phân Hệ OCR Microservice (:8002 - PaddleOCR & PyMuPDF)
+- **Vai trò:** Xử lý offload các tác vụ nhận dạng ký tự quang học nặng (OCR), tách biệt hoàn toàn khỏi luồng Event Loop của Gateway.
+- **Công nghệ lõi:**
+  - **PaddleOCR (PP-OCRv4):** Nhận diện tiếng Việt (`lang='vi'`), tự động xoay hướng văn bản (`use_angle_cls=True`), phân tích bố cục văn bản hành chính 2 cột.
+  - **PyMuPDF (fitz):** Render trang PDF trực tiếp ra bitmap bộ nhớ với hiệu năng C-speed và DPI tối ưu (150 DPI).
+- **Định tuyến thông minh (`pdf-router.js`):** Phân loại `TextBased`, `Scanned`, `Mixed` trong vòng 7ms, chỉ gửi các trang cần bóc tách metadata (Trang 1) sang microservice OCR, giảm tải 95% thời gian tính toán.
+- **Fallback an toàn:** Nếu tiến trình `:8002` không phản hồi hoặc timeout (15s), Gateway kích hoạt cơ chế dự phòng an toàn (local Tesseract) bị chặn trần tối đa trang để tránh nghẽn server.
+
+---
+
+## 30. Kiến Trúc Quy Trình Số Hóa Chia Đôi Màn Hình & Trình Xem Trước Cục Bộ (Split-Pane Digitization & Local Preview Engine)
+
+### 30.1. Đặt Vấn Đề Nghiệp Vụ & Nhu Cầu Số Hóa Hành Chính - Quân Sự
+Trong quy trình văn thư tác chiến, việc cán bộ phải liên tục chuyển tab trình duyệt hoặc đóng/mở popup modal để kiểm tra số hiệu, trích yếu, người ký dẫn tới nguy cơ sai lệch thông tin và giảm hiệu suất công việc. Kiến trúc **Split-Pane Side-by-Side** chuyển đổi hộp thoại tiếp nhận và hiệu chỉnh văn bản thành giao diện toàn màn hình trực quan với 2 không gian làm việc song song độc lập.
+
+```mermaid
+graph LR
+    subgraph SPLIT_PANE_WORKFLOW ["GIAO DIỆN SỐ HÓA CHIA ĐÔI MÀN HÌNH (SIDE-BY-SIDE)"]
+        direction LR
+        subgraph LEFT_PANE ["Khung Nhập Liệu Trái (35% - 40%)"]
+            Dropzone["Kéo / Thả Tệp PDF<br/>(Dropzone tương tác)"]
+            MetadataForm["Biểu Mẫu Nhập Liệu<br/>• Số hiệu / Ký hiệu<br/>• Trích yếu nội dung<br/>• Người ký / Đơn vị ban hành<br/>• Độ mật bảo quản (Cấp 1-5)<br/>• Ngày ban hành / Ghi chú"]
+            ActionButtons["Nút Hủy / Lưu Trữ Văn Bản"]
+            Dropzone --> MetadataForm --> ActionButtons
+        end
+
+        subgraph RIGHT_PANE ["Khung PDF Đối Chiếu Phải (60% - 65%)"]
+            HeaderBar["Thanh Tiêu Đề Văn Bản<br/>Badge Trạng Thái + Nút Đóng [X]"]
+            ViewerContainer["Trình Xem PDF Toàn Màn Hình<br/>(PdfPagesViewer)"]
+            WatermarkLayer["Sparse Dynamic Watermark<br/>(Họ tên, IP, Timestamp 45 độ)"]
+            EmptyState["Empty State Trực Quan<br/>(Khi chưa chọn tệp)"]
+            
+            HeaderBar --> ViewerContainer
+            ViewerContainer --- WatermarkLayer
+        end
+
+        Dropzone -->|URL.createObjectURL(file)<br/>0ms Real-time Local Preview| ViewerContainer
+    end
+```
+
+### 30.2. Cơ Chế Real-time Local Preview & Quản Lý Vòng Đời Bộ Nhớ
+1. **Local Preview Không Cần Upload:**
+   - Khi người dùng kéo thả hoặc chọn tệp PDF mới tại Dropzone, hệ thống lập tức khởi tạo `blobUrl = URL.createObjectURL(selectedFile)`.
+   - Trình xem `PdfPagesViewer` kết nối trực tiếp với luồng blob cục bộ, hiển thị trang tài liệu trong vòng **0ms**, không làm phát sinh request mạng tới server.
+2. **Ngăn Ngừa Rò Rỉ Bộ Nhớ (Memory Leak Prevention):**
+   - Sử dụng `useRef` lưu vết `previewUrlRef`.
+   - Khi component unmount hoặc khi người dùng thay thế bằng một tệp khác, hook tự động gọi `URL.revokeObjectURL(prevUrl)` để giải phóng bộ đệm nhị phân khỏi RAM trình duyệt.
+3. **Hiệu Chỉnh Văn Bản Với Bản Gốc Máy Chủ:**
+   - Khi mở modal ở chế độ *Hiệu Chỉnh Văn Bản* (`mode = 'edit'`), hệ thống tự động fetch stream từ `/api/files/:fileId/view` với token xác thực và chuyển thành `Blob` URL nội bộ, hiển thị song song ngay khi tải form.
+
+### 30.3. Giải Pháp Chống Nhấp Nháy PDF Canvas (Flicker-Free Canvas Rendering)
+- **Vấn đề kỹ thuật:** Mỗi khi người dùng gõ một ký tự vào ô số hiệu hoặc trích yếu, component cha re-render dẫn tới việc `PdfPagesViewer` bị mount lại, canvas bị reset kích thước và gọi lại `renderTask` của PDF.js gây ra hiện tượng giật/nháy trắng trang liên tục.
+- **Giải pháp tối ưu hóa hiệu năng 3 cấp:**
+  1. **Memoization cấp độ Component:** Bọc `SinglePdfPage` và `PdfPagesViewer` trong `React.memo` với bộ so sánh props tùy biến, loại bỏ hoàn toàn các re-render không mong muốn khi state của form thay đổi.
+  2. **Tách biệt Layer Vẽ và Layer PDF:** Phân tách canvas hiển thị nội dung PDF khỏi canvas bút vẽ/điểm nhấn (`highlighterCanvas`), đảm bảo thao tác người dùng không bao giờ can thiệp vào tiến trình render trang PDF gốc.
+  3. **Cô lập Reference tệp tin (`prevSelectedFileRef` & `initializedDocIdRef`):** Sử dụng `useMemo` và `useRef` khóa chặt instance PDF Viewer trong `DocumentUploadModal.tsx`, đảm bảo viewer chỉ reload khi đối tượng tệp thực sự bị thay đổi.
+
+### 30.4. Tuân Thủ An Ninh & Trải Nghiệm Người Dùng (UX/UI Defense)
+- **Sparse Dynamic Watermark:** Luôn tự động kích hoạt watermark mờ phân tán chéo 45 độ trên khung PDF xem trước cục bộ lẫn xem trước máy chủ, đảm bảo an toàn bí mật quân sự ngay trong bước nhập liệu sơ bộ.
+- **Bố cục chuẩn công thái học:** Thanh cuộn dọc của khung nhập liệu và khung tài liệu hoạt động hoàn toàn độc lập (`overflow-y-auto`); nút đóng Modal được tinh gọn thành nút `[X]` đặt tại góc trên bên phải thanh công cụ của khung tài liệu, tạo sự tập trung tối đa cho người thao tác.
+
+
+---
+
+## 31. Kiến Trúc Phân Cấp Phê Duyệt Chỉ Huy & Bảng Giám Sát Tiến Độ Phòng Ban Nhà Trường
+
+### 31.1. Phân Cấp Phê Duyệt Thực Tế (Hierarchical Approval Workflow)
+Trong cấu trúc tổ chức của Trường Quân sự Quân khu 7, các đề xuất chỉnh sửa văn bản nội bộ của từng Phòng, Ban không nhất thiết phải dồn toàn bộ lên Quản trị viên tối cao:
+- **Quyền Chỉnh Sửa Cục Bộ (`Local Edit Rule`):** Quân nhân chỉ được đề xuất chỉnh sửa các văn bản thuộc đơn vị công tác của mình.
+- **Hàng Đợi Phê Duyệt Phân Cấp:** Yêu cầu chỉnh sửa tài liệu của Phòng nào được đưa thẳng vào hàng đợi duyệt của Chỉ huy/Trưởng phòng đó (`Thẩm quyền duyệt: Chỉ huy cấp Phòng`). Quản trị viên hệ thống giữ vai trò giám sát vĩ mô và duyệt các văn bản cấp Trường.
+- **Modal Đối Chiếu Dữ Liệu Chuẩn Hóa (Visual Diff Viewer):** Đối chiếu trực quan dữ liệu hiện tại với dữ liệu đề xuất (gạch đỏ dữ liệu cũ, xanh lục dữ liệu mới, làm mờ các trường giữ nguyên). Bố trí cụm 2 nút hành động chỉ huy dứt khoát: `[ ✖ Từ chối ]` (kèm ô nhập lý do gửi về cán bộ) và `[ ✓ Phê duyệt & Cập nhật ]`.
+
+### 31.2. Hệ Thống Macro KPI & Radar Tiến Độ Phòng Ban Nhà Trường
+Tại phân hệ "Kho dữ liệu chung" (`PortalPage`), tích hợp hệ thống đo lường tiến độ số hóa toàn trường:
+1. **Nút Bật/Tắt Thống Kê Trên Banner:** Cho phép ẩn/hiện khung phân tích vĩ mô mượt mà theo nhu cầu tra cứu.
+2. **Lưới 4 Thẻ KPI Vĩ Mô Toàn Trường:**
+   - *Tổng kho dữ liệu:* Tổng số văn bản, dung lượng kho số hóa, số văn bản mới trong 30 ngày.
+   - *Tiến độ phòng ban:* Tỷ lệ phòng ban Nhà trường đã tham gia số hóa (4/5 đơn vị = 80%), cảnh báo đơn vị chậm tiến độ.
+   - *Quyền khai thác của bạn:* Tỷ lệ văn bản khả dụng theo cấp độ mật cá nhân (`15/15 khả dụng [100%]`), hiển thị số lượng tài liệu yêu cầu xác thực 2FA vân tay.
+   - *Chuẩn hóa phân bổ:* Tỷ lệ gán đủ đơn vị và thể loại văn bản.
+3. **Bảng Tiến Độ Số Hóa Các Phòng Ban Nhà Trường (Command Matrix):**
+   - Lọc duy nhất 5 phòng ban trực thuộc Trường Quân sự Quân khu 7: Ban Giám hiệu (7 Văn bản - Đúng tiến độ), Phòng Chính trị (2 Văn bản - Cần bổ sung), Phòng Đào tạo (1 Văn bản - Cần bổ sung), Phòng Tham mưu - Hành chính (1 Văn bản - Cần bổ sung), Phòng Hậu cần - Kỹ thuật (0 Văn bản - Chậm tiến độ).
+   - Tự động gộp toàn bộ văn bản do Ban Giám hiệu ký (`TQS` và `U-BGH`) về Ban Giám hiệu; loại bỏ 100% các cơ quan bên ngoài/cấp trên.
+   - Thiết kế Header 2 tầng phân cấp chuẩn Command Center, chống ngắt dòng chữ "Vị" và số "7".
+   - Tích hợp Click-to-filter tương tác hai chiều và đồng bộ Gateway `/api/documents`.

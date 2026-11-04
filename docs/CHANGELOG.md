@@ -4,6 +4,41 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.2.9-fix-school-filter-and-unit-classification] — 2026-11-04
+
+### 1. Khắc Phục Triệt Để Lọc Thẻ KPI "Trường QS & Trực Thuộc" (`UnitTreeTable`)
+- **Khắc phục lỗi 0 kết quả:**
+  - *Nguyên nhân:* Trước đó hàm phân loại tự động `getUnitCategory` kiểm tra từ khóa `'quân khu'` trước `'trường'`, khiến `Trường Quân sự Quân khu 7` (TQS) bị phân loại nhầm thành `'quan_khu'` (thay vì `'nha_truong'`). Đồng thời thẻ KPI "Trường QS & Trực thuộc" chỉ lọc strictly `'nha_truong'` trong khi 5 phòng ban trực thuộc mang phân loại `'phong_ban'`, dẫn đến bảng hiển thị "Không tìm thấy đơn vị nào (0 / 12 đơn vị)".
+  - *Giải pháp:*
+    - Bổ sung danh mục phân loại tổng hợp `school_and_depts` ("Trường QS & Trực thuộc") và `command_and_div` ("Quân khu & Sư đoàn").
+    - Cập nhật logic `isNodeMatching`: Khi chọn `school_and_depts`, hệ thống tự động khớp cả Nhà trường (`TQS`) và toàn bộ các phòng ban cấp con trực tiếp/gián tiếp của Nhà trường.
+    - Cơ chế **Auto-Expand Ancestors**: Khi kích hoạt lọc, hệ thống tự động mở rộng toàn bộ các nút cha cấp trên (`QK7`, `TQS`), giúp hiển thị đầy đủ cấu trúc phả hệ trực quan mà không cần người dùng nhấp mở rộng thủ công.
+    - Cập nhật số liệu thống kê chuẩn xác trên các thẻ KPI: `Toàn hệ thống (12)`, `Cấp Trung ương / Bộ (4)`, `Quân khu & Sư đoàn (2)`, `Trường QS & Trực thuộc (6)`.
+
+### 2. Cơ Chế Thiết Lập Cứng Phân Loại Đơn Vị (Explicit Unit Classification)
+- **Cơ sở dữ liệu (Database Migration):**
+  - Bổ sung trường `unit_type VARCHAR(50) NULL` vào bảng `UNIT` trong CSDL SQL Server `QK7_ThuVienSo`.
+  - Cập nhật và chuẩn hóa toàn bộ 12 đơn vị hiện có trong hệ thống: `BQP`, `BTTM`, `CP`, `TCCT` $\rightarrow$ `trung_uong`; `QK7` $\rightarrow$ `quan_khu`; `SD5` $\rightarrow$ `su_doan`; `TQS` $\rightarrow$ `nha_truong`; các phòng ban (`U-BGH`, `U-CT`, `U-DT`, `U-HC`, `U-TM`) $\rightarrow$ `phong_ban`.
+- **Backend API:**
+  - `backend/src/admin-routes.js`: Endpoint `GET /api/admin/units` trả về thuộc tính `u.unit_type`; `POST` và `PUT` lưu nhận và cập nhật trường `unit_type`.
+  - `backend/server.js`: Endpoint `/api/meta` bổ sung `u.unit_type` phục vụ khởi tạo metadata toàn hệ thống.
+- **Frontend Types & Services:**
+  - `frontend/src/types/user.ts`: Bổ sung `unit_type?: string` vào giao diện TypeScript `Unit`.
+  - `frontend/src/services/unitService.ts`: Cập nhật `createUnit` và `updateUnit` hỗ trợ truyền `unit_type`.
+- **Modal Thêm mới & Chỉnh sửa Đơn vị (`AdminDashboardPage.tsx`):**
+  - Bổ sung trường `<select>` "Phân Loại Đơn Vị *" với các tùy chọn chuẩn hóa:
+    - `Cấp Trung ương / Bộ` (Chính phủ, Bộ Quốc phòng, Đảng...)
+    - `Cấp Quân khu` (Bộ Tư lệnh Quân khu 7)
+    - `Sư đoàn`
+    - `Nhà trường / Viện` (Trường Quân sự QK7...)
+    - `Phòng / Ban / Cơ quan`
+    - `Trung đoàn / Lữ đoàn`
+    - `Tiểu đoàn / Đại đội`
+  - Tự động điền trước phân loại phù hợp theo ngữ cảnh khi nhấp thêm cấp con (`onAddChild`) hoặc chỉnh sửa (`onEdit`).
+  - Loại bỏ hoàn toàn tình trạng đặt tên đơn vị mới (như "Đảng bộ Cộng Sản") bị tự động đoán nhầm thành "Phòng / Ban / Cơ quan".
+
+---
+
 ## [v1.2.8-fix-download-0kb-and-central-units-kpi] — 2026-11-04
 
 ### 1. Chuẩn Hóa Quy Trình Tải Về 3 Bước & Khắc Phục Triệt Để File 0 KB

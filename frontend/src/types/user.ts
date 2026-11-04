@@ -26,6 +26,7 @@ export interface Unit {
   name: string;
   parent_id?: string;
   parent_name?: string;
+  unit_type?: string;
 }
 
 export interface Role {

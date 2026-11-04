@@ -45,7 +45,7 @@ import { Toast, ToastState } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { StatCard } from '../components/dashboard/StatCard';
 import { DistributionChart } from '../components/dashboard/DistributionChart';
-import { UnitTreeTable } from '../components/dashboard/UnitTreeTable';
+import { UnitTreeTable, getUnitCategory } from '../components/dashboard/UnitTreeTable';
 import { SecurityAuditLog } from '../components/dashboard/SecurityAuditLog';
 import { UserTable } from '../components/users/UserTable';
 import { UserFormModal } from '../components/users/UserFormModal';
@@ -1307,15 +1307,18 @@ const pinPendingCount = useMemo(
             <UnitTreeTable
               units={unitsList}
               onAddRoot={() => {
-                setGenericFormData({ unit_id: '', name: '', parent_id: '' });
+                setGenericFormData({ unit_id: '', name: '', parent_id: '', unit_type: 'trung_uong' });
                 setGenericModal({ open: true, type: 'units', item: null });
               }}
               onAddChild={(parentUnit) => {
-                setGenericFormData({ unit_id: '', name: '', parent_id: parentUnit.unit_id });
+                let defaultType = 'phong_ban';
+                if (parentUnit.unit_id === 'QK7') defaultType = 'su_doan';
+                else if (parentUnit.unit_id === 'TQS') defaultType = 'phong_ban';
+                setGenericFormData({ unit_id: '', name: '', parent_id: parentUnit.unit_id, unit_type: defaultType });
                 setGenericModal({ open: true, type: 'units', item: null });
               }}
               onEdit={(u) => {
-                setGenericFormData({ ...u });
+                setGenericFormData({ ...u, unit_type: u.unit_type || getUnitCategory(u) });
                 setGenericModal({ open: true, type: 'units', item: u });
               }}
               onDelete={(u) => handleGenericDelete('units', u.unit_id, u.name)}
@@ -1745,20 +1748,37 @@ const pinPendingCount = useMemo(
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Mã Đơn Vị *</label>
                         <input type="text" disabled={Boolean(genericModal.item)} value={genericFormData.unit_id || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, unit_id: e.target.value })} required
+                          placeholder="VD: QK7, TQS, BQP, U-CT..."
                           className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 text-sm font-mono font-medium" />
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Tên Đơn Vị *</label>
                         <input type="text" value={genericFormData.name || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })} required
+                          placeholder="VD: Đảng bộ Cộng Sản, Phòng Chính trị..."
                           className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-medium" />
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Phân Loại Đơn Vị *</label>
+                        <select value={genericFormData.unit_type || 'phong_ban'}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, unit_type: e.target.value })} required
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-medium text-sm cursor-pointer">
+                          <option value="trung_uong">Cấp Trung ương / Bộ (Chính phủ, Bộ Quốc phòng, Đảng...)</option>
+                          <option value="quan_khu">Cấp Quân khu (Bộ Tư lệnh Quân khu 7)</option>
+                          <option value="su_doan">Sư đoàn</option>
+                          <option value="nha_truong">Nhà trường / Viện (Trường Quân sự QK7...)</option>
+                          <option value="phong_ban">Phòng / Ban / Cơ quan</option>
+                          <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
+                          <option value="tieu_doan">Tiểu đoàn / Đại đội</option>
+                        </select>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Quy định cấp bậc hiển thị và thẩm quyền quản lý của đơn vị</p>
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Đơn Vị Cấp Trên</label>
                         <select value={genericFormData.parent_id || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, parent_id: e.target.value })}
                           className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 font-medium text-sm cursor-pointer">
-                          <option value="">Cấp cao nhất</option>
+                          <option value="">Cấp cao nhất (Không có cấp trên)</option>
                           {[...unitsList]
                             .filter((u) => !genericModal.item || u.unit_id !== genericModal.item.unit_id)
                             .sort((a, b) => a.name.localeCompare(b.name, 'vi'))

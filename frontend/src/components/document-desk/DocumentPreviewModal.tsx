@@ -248,7 +248,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       toast.info(`Đang truyền phát và chuẩn bị văn bản ${document.document_code}...`, {
         title: 'ĐANG XỬ LÝ TỆP',
         badge: 'STREAMING',
-        duration: 3200,
+        duration: 2500,
       });
 
       // Tải tệp gốc sạch sẽ từ server (không chứa watermark)

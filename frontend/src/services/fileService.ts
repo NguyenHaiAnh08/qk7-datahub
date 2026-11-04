@@ -152,9 +152,14 @@ export const fileService = {
     }
     const finalFilename = rawName.replace(/[\/\\?%*:|"<>]/g, '_');
 
-    let fileHandle: any = null;
-    let writable: any = null;
+    // 1. Tải toàn vẹn blob từ server trước
+    const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken);
+    if (!blob || blob.size === 0) {
+      throw new Error('Dữ liệu tài liệu tải về rỗng (0 KB). Vui lòng kiểm tra lại quyền truy cập hoặc liên hệ Quản trị viên.');
+    }
 
+    // 2. Kích hoạt hộp thoại chọn ổ đĩa / chỗ lưu
+    let fileHandle: any = null;
     if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
       try {
         fileHandle = await (window as any).showSaveFilePicker({
@@ -166,34 +171,29 @@ export const fileService = {
             },
           ],
         });
-        if (fileHandle) {
-          writable = await fileHandle.createWritable();
-        }
       } catch (err: any) {
         if (err?.name === 'AbortError') return;
         console.warn('[downloadFile] showSaveFilePicker fallback:', err);
       }
     }
 
-    try {
-      const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken);
-      if (!blob || blob.size === 0) {
-        if (writable) await writable.abort();
-        throw new Error('Dữ liệu tài liệu tải về rỗng (0 KB). Vui lòng kiểm tra lại quyền truy cập hoặc liên hệ Quản trị viên.');
-      }
-
-      if (writable) {
+    if (fileHandle) {
+      let writable: any = null;
+      try {
+        writable = await fileHandle.createWritable();
         await writable.write(blob);
         await writable.close();
-      } else {
-        fileService.saveBlobToFile(blob, finalFilename);
+        return;
+      } catch (err: any) {
+        if (writable) {
+          try { await writable.abort(); } catch (_) {}
+        }
+        if (err?.name === 'AbortError') return;
+        console.warn('[downloadFile] Ghi vào fileHandle thất bại, fallback:', err);
       }
-    } catch (err) {
-      if (writable) {
-        try { await writable.abort(); } catch (_) {}
-      }
-      throw err;
     }
+
+    fileService.saveBlobToFile(blob, finalFilename);
   },
 
   prepareDownload: async (
@@ -208,64 +208,60 @@ export const fileService = {
     }
     const finalFilename = rawName.replace(/[\/\\?%*:|"<>]/g, '_');
 
-    let fileHandle: any = null;
-    let writable: any = null;
+    // BƯỚC 1 & 2: Tải trước toàn bộ dữ liệu file từ server vào bộ nhớ (RAM Blob)
+    // trong lúc nút bấm đang chạy hiệu ứng % UX/UI (0% -> 100%)
+    const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken, signal);
 
-    // Kích hoạt ngay hộp thoại chọn ổ đĩa/thư mục lưu (User Gesture) mỗi khi bấm tải về
-    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
-      try {
-        fileHandle = await (window as any).showSaveFilePicker({
-          suggestedName: finalFilename,
-          types: [
-            {
-              description: 'Tài liệu PDF (*.pdf)',
-              accept: { 'application/pdf': ['.pdf'] },
-            },
-          ],
-        });
-        if (fileHandle) {
-          // Yêu cầu quyền ghi ngay lập tức trong user gesture để không bị timeout
+    if (!blob || blob.size === 0) {
+      throw new Error('Dữ liệu tài liệu tải về rỗng (0 KB). Vui lòng kiểm tra lại quyền truy cập hoặc liên hệ Quản trị viên.');
+    }
+
+    // BƯỚC 3: Trả về hàm release. Khi UI % chạy xong 100% thì mới MỞ HỘP THOẠI CHỌN Ổ ĐĨA / CHỖ LƯU
+    return async () => {
+      let fileHandle: any = null;
+
+      if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+        try {
+          fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: finalFilename,
+            types: [
+              {
+                description: 'Tài liệu PDF (*.pdf)',
+                accept: { 'application/pdf': ['.pdf'] },
+              },
+            ],
+          });
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            const abortErr = new Error('Người dùng đã hủy chọn nơi lưu tệp');
+            abortErr.name = 'AbortError';
+            throw abortErr;
+          }
+          console.warn('[prepareDownload release] showSaveFilePicker fallback:', err);
+        }
+      }
+
+      // Ghi trực tiếp dữ liệu sạch đã nạp sẵn trong RAM vào ổ đĩa người dùng vừa chọn
+      if (fileHandle) {
+        let writable: any = null;
+        try {
           writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          writable = null;
+          return;
+        } catch (writeErr: any) {
+          if (writable) {
+            try { await writable.abort(); } catch (_) {}
+          }
+          if (writeErr?.name === 'AbortError') throw writeErr;
+          console.warn('[prepareDownload release] Ghi vào fileHandle thất bại, fallback:', writeErr);
         }
-      } catch (err: any) {
-        if (err?.name === 'AbortError') {
-          const abortErr = new Error('Người dùng đã hủy chọn nơi lưu tệp');
-          abortErr.name = 'AbortError';
-          throw abortErr;
-        }
-        console.warn('[prepareDownload] showSaveFilePicker fallback:', err);
-      }
-    }
-
-    // 1. Tải toàn vẹn blob từ server
-    try {
-      const blob = await fileService.fetchFileBlob(fileId, '1', fingerprintToken, signal);
-
-      if (!blob || blob.size === 0) {
-        if (writable) await writable.abort();
-        throw new Error('Dữ liệu tài liệu tải về rỗng (0 KB). Vui lòng kiểm tra lại quyền truy cập hoặc liên hệ Quản trị viên.');
       }
 
-      // 2. GHI NGAY LẬP TỨC VÀO TỆP TRÊN Ổ ĐĨA ĐÃ CHỌN
-      if (writable) {
-        await writable.write(blob);
-        await writable.close();
-        writable = null;
-      } else {
-        // Fallback cho trình duyệt không hỗ trợ File System Access API
-        return async () => {
-          fileService.saveBlobToFile(blob, finalFilename);
-        };
-      }
-
-      // Đã ghi trọn vẹn dữ liệu vào ổ đĩa người dùng vừa chọn, trả về noop release
-      return async () => {};
-    } catch (err) {
-      if (writable) {
-        try { await writable.abort(); } catch (_) {}
-      }
-      throw err;
-    }
+      // Fallback an toàn cho trình duyệt không hỗ trợ File System Access API (Safari, iPad...)
+      fileService.saveBlobToFile(blob, finalFilename);
+    };
   },
 };
 

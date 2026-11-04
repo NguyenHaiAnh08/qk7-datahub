@@ -230,7 +230,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
     toast.info(`Đang tải văn bản ${doc.document_code}...`, {
       title: 'ĐANG XỬ LÝ TỆP',
       badge: 'STREAMING',
-      duration: 3200,
+      duration: 2500,
     });
 
     const sanitizedFilename = (doc.original_name || `${doc.document_code}.pdf`).replace(/[\/\\?%*:|"<>]/g, '_');

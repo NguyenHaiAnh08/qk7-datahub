@@ -43,7 +43,8 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
   const releaseActionRef = useRef<(() => Promise<void> | void) | null>(null);
   const isCancelledRef = useRef<boolean>(false);
 
-  const DURATION = 3200; // 3200ms motion duration as specified in prompt #004
+  // 2400ms: thời lượng chạy % tiến trình tải mượt mà, tối ưu an toàn tuyệt đối cho User Activation Window của showSaveFilePicker
+  const DURATION = 2400;
 
   const cancelDownload = useCallback(
     (triggerCallback = true) => {
@@ -134,31 +135,45 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
         setState('fold');
 
         const foldTimerPromise = new Promise((resolve) => {
-          foldTimerRef.current = setTimeout(resolve, 260);
+          foldTimerRef.current = setTimeout(resolve, 150);
         });
 
-        // Wait for both fold spinner (260ms) and background download task to finish
+        // Chờ fold spinner và tiến trình nạp dữ liệu blob hoàn tất
         Promise.all([downloadTask, foldTimerPromise])
-          .then(() => {
+          .then(async () => {
             if (isCancelledRef.current) return;
 
-            // Transition to 'done' state
-            setState('done');
-
-            // CRITICAL REQUIREMENT: Release the file to disk now that UI UX is done!
+            // BƯỚC 3: UX/UI chạy xong 100% thì MỚI NHẢ FILE MỞ HỘP THOẠI CHỌN Ổ ĐĨA
             if (releaseActionRef.current) {
-              try {
-                const res = releaseActionRef.current();
-                if (res && typeof (res as Promise<void>).then === 'function') {
-                  (res as Promise<void>).catch((e: any) => console.error('Error executing async file release:', e));
-                }
-              } catch (e) {
-                console.error('Error executing file release:', e);
-              }
+              const action = releaseActionRef.current;
               releaseActionRef.current = null;
+              try {
+                const res = action();
+                if (res instanceof Promise) {
+                  await res;
+                }
+              } catch (e: any) {
+                if (e?.name === 'AbortError') {
+                  // Người dùng bấm Hủy trong hộp thoại chọn nơi lưu tệp
+                  setState('idle');
+                  setProgress(0);
+                  startTimeRef.current = null;
+                  return;
+                }
+                console.error('Lỗi khi lưu tệp ra ổ đĩa:', e);
+                setState('idle');
+                setProgress(0);
+                startTimeRef.current = null;
+                return;
+              }
             }
 
-            // Reset to idle after 2000ms
+            if (isCancelledRef.current) return;
+
+            // Chuyển sang 'done' sau khi người dùng đã chọn ổ đĩa và tệp được ghi an toàn
+            setState('done');
+
+            // Reset về idle sau 2000ms hiển thị trạng thái done
             resetTimerRef.current = setTimeout(() => {
               if (isCancelledRef.current) return;
               setState('idle');

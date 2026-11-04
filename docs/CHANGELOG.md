@@ -4,6 +4,42 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.3.0-clean-unit-types-and-hierarchy-sorting] — 2026-11-04
+
+### 1. Tinh Gọn Modal Thêm Mới / Chỉnh Sửa Đơn Vị (`AdminDashboardPage.tsx`)
+- **Placeholder chuẩn hóa:** Đổi ô nhập "Tên Đơn Vị *" thành `VD: Trường Quân sự Quân khu 7` (thay vì ví dụ cũ dài dòng).
+- **Tinh gọn danh mục phân loại đơn vị:**
+  - `Cấp Trung ương / Bộ` (loại bỏ chú thích ngoặc đơn)
+  - `Cấp Quân khu` (loại bỏ chú thích ngoặc đơn)
+  - `Sư đoàn` (giữ nguyên)
+  - `Nhà trường / Viện` (loại bỏ chú thích ngoặc đơn)
+  - **Tách riêng Phòng / Ban / Cơ quan** thành 3 phân loại độc lập:
+    - `Cơ quan` (màu Chàm Indigo, icon `Building`)
+    - `Phòng` (màu Da trời Sky, icon `Building2`)
+    - `Ban` (màu Xanh mòng két Teal, icon `Users`)
+  - `Trung đoàn / Lữ đoàn` (giữ nguyên)
+  - **Loại bỏ hoàn toàn cấp:** `Tiểu đoàn / Đại đội`.
+
+### 2. Tái Cấu Trúc Thẻ KPI & Bộ Lọc "Cấp Quân Khu" (`UnitTreeTable.tsx`)
+- **Độc lập hóa Cấp Quân khu:**
+  - Đổi thẻ KPI 3 từ *"Quân khu & Sư đoàn"* thành **"Cấp Quân khu"** (icon `Award`), hiển thị riêng số lượng đầu mối thực tế: `1 đầu mối` (Quân khu 7).
+  - Khi người dùng nhấp vào thẻ KPI này, hệ thống chỉ lọc duy nhất các đơn vị thuộc Cấp Quân khu, không còn gộp lẫn Sư đoàn.
+  - Loại bỏ tùy chọn gộp `Quân khu & Sư đoàn` khỏi dropdown phân loại.
+
+### 3. Điều Chỉnh Thứ Tự Sắp Xếp Phân Cấp (Hierarchy Sorting)
+- **Di chuyển Sư đoàn 5 xuống dưới Trường Quân sự Quân khu 7:**
+  - Cập nhật hàm trọng số thứ tự quân sự `getSortWeight`:
+    - `nha_truong` (Nhà trường / Viện) gán trọng số ưu tiên `2`.
+    - `su_doan` (Sư đoàn) gán trọng số `3`.
+  - Kết quả hiển thị: Dưới nhánh gốc `Quân khu 7`, `Trường Quân sự Quân khu 7` cùng toàn bộ các phòng ban trực thuộc được ưu tiên hiển thị trước; `Sư đoàn 5` được xếp xuống bên dưới Trường Quân sự.
+
+### 4. Đồng Bộ Dữ Liệu CSDL SQL Server
+- Cập nhật trực tiếp `UNIT.unit_type`:
+  - `U-BGH` (Ban Giám hiệu) $\rightarrow$ `ban`
+  - `U-CT`, `U-DT`, `U-HC`, `U-TM` (Phòng Chính trị, Đào tạo, Hậu cần, Tham mưu) $\rightarrow$ `phong`.
+
+---
+
 ## [v1.2.9-fix-school-filter-and-unit-classification] — 2026-11-04
 
 ### 1. Khắc Phục Triệt Để Lọc Thẻ KPI "Trường QS & Trực Thuộc" (`UnitTreeTable`)

@@ -31,8 +31,10 @@ export type UnitCategory =
   | 'quan_khu'
   | 'su_doan'
   | 'trung_doan'
-  | 'tieu_doan'
   | 'nha_truong'
+  | 'co_quan'
+  | 'phong'
+  | 'ban'
   | 'phong_ban'
   | 'command_and_div'
   | 'school_and_depts';
@@ -72,8 +74,10 @@ export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
       t === 'quan_khu' ||
       t === 'su_doan' ||
       t === 'trung_doan' ||
-      t === 'tieu_doan' ||
       t === 'nha_truong' ||
+      t === 'co_quan' ||
+      t === 'phong' ||
+      t === 'ban' ||
       t === 'phong_ban'
     ) {
       return t as ConcreteUnitCategory;
@@ -114,16 +118,19 @@ export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
   if (id.startsWith('TD') || name.includes('trung đoàn') || name.includes('lữ đoàn')) {
     return 'trung_doan';
   }
-  // 6. Tiểu đoàn
-  if (
-    id.startsWith('TB') ||
-    id.startsWith('D') ||
-    name.includes('tiểu đoàn') ||
-    name.includes('đại đội')
-  ) {
-    return 'tieu_doan';
+  // 6. Ban
+  if (name.includes('ban') || id.startsWith('B-') || id === 'U-BGH') {
+    return 'ban';
   }
-  return 'phong_ban';
+  // 7. Phòng
+  if (name.includes('phòng') || id.startsWith('P-') || id.startsWith('U-')) {
+    return 'phong';
+  }
+  // 8. Cơ quan
+  if (name.includes('cơ quan')) {
+    return 'co_quan';
+  }
+  return 'phong';
 };
 
 // ── Cấu hình hiển thị theo loại đơn vị (Tương thích hoàn hảo Sáng & Tối) ──
@@ -168,14 +175,6 @@ export const CATEGORY_CONFIG: Record<
     iconBgClass:
       'bg-cyan-100 text-cyan-800 border border-cyan-300 dark:bg-cyan-500/15 dark:text-cyan-300 dark:border-cyan-500/30',
   },
-  tieu_doan: {
-    label: 'Tiểu đoàn / Đội',
-    icon: Flag,
-    badgeClass:
-      'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
-    iconBgClass:
-      'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30',
-  },
   nha_truong: {
     label: 'Nhà trường / Viện',
     icon: GraduationCap,
@@ -184,8 +183,32 @@ export const CATEGORY_CONFIG: Record<
     iconBgClass:
       'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
   },
+  co_quan: {
+    label: 'Cơ quan',
+    icon: Building,
+    badgeClass:
+      'bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/30',
+    iconBgClass:
+      'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/30',
+  },
+  phong: {
+    label: 'Phòng',
+    icon: Building2,
+    badgeClass:
+      'bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30',
+    iconBgClass:
+      'bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30',
+  },
+  ban: {
+    label: 'Ban',
+    icon: Users,
+    badgeClass:
+      'bg-teal-100 text-teal-900 border-teal-300 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+    iconBgClass:
+      'bg-teal-100 text-teal-800 border border-teal-300 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-500/30',
+  },
   phong_ban: {
-    label: 'Phòng / Ban / Cơ quan',
+    label: 'Phòng / Ban',
     icon: Building2,
     badgeClass:
       'bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30',
@@ -205,12 +228,16 @@ export const getCategoryFilterLabel = (cat: UnitCategory): string => {
       return 'Sư đoàn';
     case 'trung_doan':
       return 'Trung đoàn';
-    case 'tieu_doan':
-      return 'Tiểu đoàn / Đội';
     case 'nha_truong':
       return 'Nhà trường / Viện';
+    case 'co_quan':
+      return 'Cơ quan';
+    case 'phong':
+      return 'Phòng';
+    case 'ban':
+      return 'Ban';
     case 'phong_ban':
-      return 'Phòng / Ban / Cơ quan';
+      return 'Phòng / Ban';
     case 'command_and_div':
       return 'Quân khu & Sư đoàn';
     case 'school_and_depts':
@@ -268,15 +295,18 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
       }
     }
 
-    // Thứ tự ưu tiên sắp xếp quân sự
+    // Thứ tự ưu tiên sắp xếp quân sự: Trường Quân sự đứng trước, Sư đoàn 5 đứng dưới
     const getSortWeight = (u: Unit): number => {
       const cat = getUnitCategory(u);
+      if (cat === 'trung_uong') return 0;
       if (cat === 'quan_khu') return 1;
-      if (cat === 'su_doan') return 2;
-      if (cat === 'nha_truong') return 3;
-      if (cat === 'trung_doan') return 4;
-      if (cat === 'tieu_doan') return 5;
-      return 6;
+      if (cat === 'nha_truong') return 2;
+      if (cat === 'su_doan') return 3;
+      if (cat === 'co_quan') return 4;
+      if (cat === 'phong') return 5;
+      if (cat === 'ban') return 6;
+      if (cat === 'trung_doan') return 7;
+      return 8;
     };
 
     const sortUnits = (list: Unit[]) => {
@@ -349,23 +379,32 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
     let trungUong = 0;
     let quanKhu = 0;
     let suDoan = 0;
-    let phongBan = 0;
-    let nhaTruong = 0;
+    let schoolAndDepts = 0;
 
     for (const u of units) {
       const cat = getUnitCategory(u);
       if (cat === 'trung_uong') trungUong++;
       else if (cat === 'quan_khu') quanKhu++;
       else if (cat === 'su_doan') suDoan++;
-      else if (cat === 'nha_truong') nhaTruong++;
-      else phongBan++;
+
+      if (
+        cat === 'nha_truong' ||
+        cat === 'phong' ||
+        cat === 'ban' ||
+        cat === 'co_quan' ||
+        cat === 'phong_ban' ||
+        u.parent_id === 'TQS'
+      ) {
+        schoolAndDepts++;
+      }
     }
 
     return {
       total: units.length,
       trungUong,
-      commandAndDivision: quanKhu + suDoan,
-      schoolAndDepts: nhaTruong + phongBan,
+      quanKhu,
+      suDoan,
+      schoolAndDepts,
       orphan: orphanCount,
     };
   }, [units, orphanCount]);
@@ -379,14 +418,14 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
       if (selectedCategory === 'school_and_depts') {
         const isSchoolOrDept =
           node.category === 'nha_truong' ||
+          node.category === 'phong' ||
+          node.category === 'ban' ||
+          node.category === 'co_quan' ||
           node.category === 'phong_ban' ||
           node.unit.unit_id === 'TQS' ||
           node.unit.parent_id === 'TQS' ||
           node.parent?.unit_id === 'TQS';
         if (!isSchoolOrDept) return false;
-      } else if (selectedCategory === 'command_and_div') {
-        const isCmdOrDiv = node.category === 'quan_khu' || node.category === 'su_doan';
-        if (!isCmdOrDiv) return false;
       } else {
         if (node.category !== selectedCategory) return false;
       }
@@ -655,30 +694,30 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
           )}
         </div>
 
-        {/* Pill 3: Quân khu & Sư đoàn */}
+        {/* Pill 3: Cấp Quân khu */}
         <div
           onClick={() =>
-            setSelectedCategory((prev) => (prev === 'command_and_div' ? 'all' : 'command_and_div'))
+            setSelectedCategory((prev) => (prev === 'quan_khu' ? 'all' : 'quan_khu'))
           }
           className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
-            selectedCategory === 'command_and_div' || selectedCategory === 'quan_khu' || selectedCategory === 'su_doan'
+            selectedCategory === 'quan_khu'
               ? 'bg-amber-100/90 border-amber-400 text-amber-950 dark:bg-amber-950/50 dark:border-amber-500/50 dark:text-amber-300 shadow-xs'
               : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700'
           }`}
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:border-amber-500/30 dark:text-amber-300 flex items-center justify-center shrink-0">
-              <Shield className="w-5 h-5" />
+              <Award className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Quân khu & Sư đoàn</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Cấp Quân khu</p>
               <p className="text-xl font-bold text-amber-700 dark:text-amber-400 leading-tight">
-                {stats.commandAndDivision}{' '}
+                {stats.quanKhu}{' '}
                 <span className="text-xs font-normal text-slate-500">đầu mối</span>
               </p>
             </div>
           </div>
-          {(selectedCategory === 'command_and_div' || selectedCategory === 'quan_khu' || selectedCategory === 'su_doan') && (
+          {selectedCategory === 'quan_khu' && (
             <div className="w-2.5 h-2.5 rounded-full bg-amber-600 dark:bg-amber-400" />
           )}
         </div>
@@ -756,13 +795,15 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-all font-semibold cursor-pointer"
             >
               <option value="all">Tất cả các cấp đơn vị</option>
-              <option value="school_and_depts">Trường QS & Trực thuộc</option>
-              <option value="command_and_div">Quân khu & Sư đoàn</option>
               <option value="trung_uong">Cấp Trung ương / Bộ</option>
               <option value="quan_khu">Cấp Quân khu</option>
-              <option value="su_doan">Cấp Sư đoàn</option>
+              <option value="school_and_depts">Trường QS & Trực thuộc</option>
+              <option value="su_doan">Sư đoàn</option>
               <option value="nha_truong">Nhà trường / Viện</option>
-              <option value="phong_ban">Phòng / Ban / Cơ quan</option>
+              <option value="co_quan">Cơ quan</option>
+              <option value="phong">Phòng</option>
+              <option value="ban">Ban</option>
+              <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
             </select>
           </div>
         </div>

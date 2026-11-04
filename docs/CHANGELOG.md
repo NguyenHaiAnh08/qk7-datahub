@@ -27,11 +27,17 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
   - Loại bỏ tùy chọn gộp `Quân khu & Sư đoàn` khỏi dropdown phân loại.
 
 ### 3. Điều Chỉnh Thứ Tự Sắp Xếp Phân Cấp (Hierarchy Sorting)
-- **Di chuyển Sư đoàn 5 xuống dưới Trường Quân sự Quân khu 7:**
+- **Cấu trúc hiển thị toàn diện theo cấp bậc chỉ huy:**
   - Cập nhật hàm trọng số thứ tự quân sự `getSortWeight`:
-    - `nha_truong` (Nhà trường / Viện) gán trọng số ưu tiên `2`.
-    - `su_doan` (Sư đoàn) gán trọng số `3`.
-  - Kết quả hiển thị: Dưới nhánh gốc `Quân khu 7`, `Trường Quân sự Quân khu 7` cùng toàn bộ các phòng ban trực thuộc được ưu tiên hiển thị trước; `Sư đoàn 5` được xếp xuống bên dưới Trường Quân sự.
+    1. `Cấp Quân khu` (`Quân khu 7`): trọng số `1` (hiển thị trên cùng).
+    2. `Nhà trường / Viện` (`Trường Quân sự Quân khu 7` cùng 5 phòng ban trực thuộc): trọng số `2`.
+    3. `Sư đoàn` (`Sư đoàn 5`): trọng số `3` (xếp dưới Trường Quân sự).
+    4. `Cấp Trung ương / Bộ` xếp ở dưới Sư đoàn 5 với thứ tự chuẩn:
+       - `Bộ Quốc Phòng` (`BQP`, trọng số `10`)
+       - `Bộ Tổng Tham mưu` (`BTTM`, trọng số `11`)
+       - `Chính Phủ` (`CP`, trọng số `12`)
+       - `Tổng cục Chính trị` (`TCCT`, trọng số `13`)
+  - Kết quả hiển thị: Toàn bộ cấu trúc thực thể tác chiến và đào tạo trực thuộc Quân khu 7 hiển thị trang trọng ở phần trên; các cơ quan Cấp Trung ương / Bộ được xếp phía dưới Sư đoàn 5 đúng chuẩn định hướng nghiệp vụ.
 
 ### 4. Đồng Bộ Dữ Liệu CSDL SQL Server
 - Cập nhật trực tiếp `UNIT.unit_type`:

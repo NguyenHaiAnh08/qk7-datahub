@@ -1,5 +1,5 @@
 /* <!-- Lucian UX/UI Prompt #058 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#058 --> */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion'; // (giữ nguyên import, dùng cho tương lai)
 import { Popover, Tooltip } from 'antd';
@@ -50,10 +50,88 @@ interface HeaderProps {
 export function getAvatarInitial(name?: string, fallback = 'ĐB'): string {
   if (!name || !name.trim()) return fallback;
   const clean = name.trim();
-  if (clean.toLowerCase() === 'đại biểu' || clean.toLowerCase() === 'khách') return 'ĐB';
-  const parts = name.trim().split(/\s+/);
-  const lastName = parts[parts.length - 1];
-  return lastName ? lastName.charAt(0).toUpperCase() : fallback;
+  if (clean.toLowerCase() === 'đại biểu' || clean.toLowerCase() === 'khách' || clean.toLowerCase() === 'guest') return 'ĐB';
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return fallback;
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  // Lấy chữ cái đầu của 2 từ cuối cùng: Nguyễn Hải Anh -> HA, Nguyễn Thị Ánh Tuyết -> ÁT
+  const penult = parts[parts.length - 2];
+  const last = parts[parts.length - 1];
+  return (penult.charAt(0) + last.charAt(0)).toUpperCase();
+}
+
+// ======================================================================
+// KIỂM TRA QUYỀN TRUY CẬP DANH MỤC QUẢN TRỊ (ADMIN / IT / PHÂN BỔ MỤC QUẢN TRỊ)
+// ======================================================================
+export function checkUserCanAccessAdmin(
+  user: any,
+  isAdmin: boolean,
+  hasPermission: (perm: string) => boolean
+): boolean {
+  if (isAdmin) return true;
+  if (!user || user.user_id === 'GUEST') return false;
+
+  const roles = user.roles || [];
+  const roleNames = user.role_names || [];
+  const isITOrAdmin =
+    roles.some((r: any) => {
+      const lr = String(r).toLowerCase();
+      return (
+        lr.includes('admin') ||
+        lr.includes('it') ||
+        lr === 'rol-01' ||
+        lr === 'rol-06' ||
+        lr === 'rol-08'
+      );
+    }) ||
+    roleNames.some((n: any) => {
+      const ln = String(n).toLowerCase();
+      return (
+        ln.includes('admin') ||
+        ln.includes('quản trị') ||
+        ln.includes('it') ||
+        ln.includes('kỹ thuật') ||
+        ln.includes('công nghệ')
+      );
+    });
+
+  if (isITOrAdmin) return true;
+
+  const pos = String(user.position || '').toLowerCase();
+  if (
+    pos.includes('it') ||
+    pos.includes('kỹ thuật') ||
+    pos.includes('công nghệ') ||
+    pos.includes('quản trị')
+  ) {
+    return true;
+  }
+
+  const adminCategoryPermissions = [
+    'SYSTEM_STATS_VIEW',
+    'APPROVAL_VALIDATE',
+    'PERMISSION_VIEW',
+    'PERMISSION_MANAGE',
+    'USER_VIEW',
+    'USER_MANAGE',
+    'ROLE_VIEW',
+    'ROLE_MANAGE',
+    'UNIT_VIEW',
+    'UNIT_MANAGE',
+    'DOCTYPE_VIEW',
+    'DOCTYPE_MANAGE',
+    'SECLEVEL_VIEW',
+    'SECLEVEL_MANAGE',
+    'RANK_VIEW',
+    'RANK_MANAGE',
+    'POSITION_VIEW',
+    'POSITION_MANAGE',
+    'AUDIT_VIEW',
+    'SESSION_VIEW',
+    'DOC_TRASH_VIEW',
+  ];
+
+  return adminCategoryPermissions.some((perm) => hasPermission(perm));
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -62,7 +140,8 @@ export function getAvatarInitial(name?: string, fallback = 'ĐB'): string {
 const NavigationGlider: React.FC<{
   activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'materials' | 'library' | 'data';
 }> = ({ activeNav: explicitActiveNav }) => {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin, hasPermission } = useAuth();
+  const canAccessAdmin = useMemo(() => checkUserCanAccessAdmin(user, isAdmin, hasPermission), [user, isAdmin, hasPermission]);
   const { deviceMode, isTouch } = useDeviceMode();
   const location = useLocation();
 
@@ -138,8 +217,8 @@ const NavigationGlider: React.FC<{
       key: 'admin',
       to: ROUTE_PATHS.ADMIN,
       label: 'Quản trị',
-      icon: ShieldAlert,
-      visible: Boolean(isAdmin),
+      icon: Shield,
+      visible: Boolean(canAccessAdmin),
     },
   ];
 
@@ -253,13 +332,10 @@ export const Header: React.FC<HeaderProps> = ({
   const canAccessDesk =
     hasPermission('DOC_UPLOAD') || hasPermission('DOC_EDIT') || hasPermission('DOC_PARSE');
 
-  const canAccessAdmin =
-    hasPermission('SYSTEM_STATS_VIEW') ||
-    hasPermission('USER_VIEW') ||
-    hasPermission('ROLE_VIEW') ||
-    hasPermission('AUDIT_VIEW') ||
-    hasPermission('SESSION_VIEW') ||
-    isAdmin;
+  const canAccessAdmin = useMemo(
+    () => checkUserCanAccessAdmin(user, isAdmin, hasPermission),
+    [user, isAdmin, hasPermission]
+  );
 
   const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
   const canAccessSessions = hasPermission('SESSION_VIEW');

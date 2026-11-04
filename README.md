@@ -164,6 +164,21 @@ graph TD
   * Có sẵn cơ chế phòng vệ theo chiều sâu (Defense-in-depth): Nếu cổng 8002 offline, Gateway tự động fallback về Tesseract với trần giới hạn trang chặt chẽ, không bao giờ đọc tràn lan toàn bộ file.
 
 ### 16. Quy Trình Số Hóa Tài Liệu Chia Đôi Màn Hình & Xem Trước Tức Thì (Split-Pane Digitization & Local Preview)
+
+### 17. Phân Cấp Phê Duyệt Chỉ Huy & Giám Sát Tiến Độ Phòng Ban Nhà Trường (Hierarchical Approval & School Radar)
+* **Phân cấp phê duyệt thực tế (Hierarchical Approval):**
+  * Cán bộ nghiệp vụ chỉ được đề xuất chỉnh sửa văn bản thuộc đơn vị công tác của mình (`Local Edit Rule`).
+  * Đề xuất sửa đổi được chuyển thẳng về hàng đợi của Chỉ huy/Trưởng phòng tương ứng (`Thẩm quyền duyệt: Chỉ huy cấp Phòng`), giảm tải áp lực duyệt tập trung cho Admin tối cao.
+* **Modal Kiểm Duyệt Đối Chiếu Chuẩn Hóa (Visual Diff Viewer):**
+  * Loại bỏ bảng 2 cột đơn điệu, thay bằng giao diện đối chiếu thay đổi dữ liệu chuẩn quân sự (đánh dấu đỏ gạch ngang dữ liệu cũ, xanh lục cho dữ liệu mới, làm mờ các trường giữ nguyên).
+  * Bộ đôi nút hành động dứt khoát: `[ ✖ Từ chối ]` (mở ô nhập lý do gửi về cán bộ) và `[ ✓ Phê duyệt & Cập nhật ]`.
+* **Hệ thống Macro KPI & Bảng Radar Tiến Độ Nhà Trường:**
+  * **4 Thẻ KPI Vĩ Mô:** Tổng kho dữ liệu toàn trường, Tiến độ số hóa phòng ban, Quyền khai thác của bạn (theo cấp độ mật cá nhân + cảnh báo 2FA vân tay), Tình trạng chuẩn hóa phân bổ.
+  * **Bảng Tiến Độ Số Hóa Các Phòng Ban Nhà Trường:** Lọc sạch chỉ lấy 5 phòng ban trực thuộc Trường Quân sự Quân khu 7 (Ban Giám hiệu, Phòng Chính trị, Phòng Đào tạo, Phòng Tham mưu - Hành chính, Phòng Hậu cần - Kỹ thuật); tự động gộp văn bản cấp trường về Ban Giám hiệu; thiết kế 2 tầng phân cấp chuẩn Command Center chống rớt dòng; chuẩn hóa chú thích SLA (`Tối đa 3 Văn bản`, `Cần bổ sung`, `Chậm tiến độ`).
+
+---
+
+
 * **Giao diện Split-Pane Side-by-Side:** Nâng cấp toàn diện hộp thoại *"Tiếp Nhận & Lưu Trữ Văn Bản Mới"* và *"Hiệu Chỉnh Văn Bản"* từ dạng popup nhỏ giữa màn hình sang Modal toàn màn hình chia 2 khung làm việc song song độc lập:
   * **Khung trái (35% - 40%):** Biểu mẫu nhập liệu (Số hiệu, trích yếu, người ký, độ mật, đơn vị...) có thanh cuộn dọc riêng biệt (`overflow-y-auto`).
   * **Khung phải (60% - 65%):** Trình xem trước PDF toàn màn hình phục vụ đối chiếu dữ liệu văn bản theo thời gian thực.

@@ -4,6 +4,64 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.2.6-hierarchical-approval-diff-school-radar-kpi] — 2026-11-04
+
+### 1. Phân Cấp Phê Duyệt Chỉ Huy & Visual Diff Viewer (GitHub-style Diff)
+- **Chuẩn hóa đối chiếu dữ liệu:** Tiêu đề đổi thành **"Đối Chiếu Dữ Liệu Chuẩn Hóa"**, loại bỏ đuôi kỹ thuật thừa.
+- **Cụm nút hành động chiến thuật (Commander Action Hub):**
+  - `[ ✖ Từ chối ]`: Nút Ghost viền đỏ, mở ô nhập lý do từ chối để phản hồi về cán bộ đề xuất.
+  - `[ ✓ Phê duyệt & Cập nhật ]`: Nút Solid Xanh Lục Quân Đậm.
+  - Đã loại bỏ nút giải trình trung gian gây thừa thao tác cho chỉ huy.
+- **Badge thẩm quyền phê duyệt phân cấp:**
+  - `Thẩm quyền duyệt: Chỉ huy cấp Phòng` (Màu Vàng Kim quân hiệu) khi đối tượng đề xuất thuộc đơn vị phòng ban của Chỉ huy.
+  - `Thẩm quyền duyệt: Quản trị viên` (Màu Đỏ Quân Kỳ) khi xem xét trên phạm vi toàn trường.
+- **Quy tắc chỉnh sửa & duyệt cục bộ (`Local Edit & Hierarchical Approval Rule`):**
+  - Cán bộ thuộc đơn vị nào được phép tạo đề xuất chỉnh sửa văn bản của đơn vị đó.
+  - Đề xuất được đưa thẳng vào hàng đợi duyệt của Chỉ huy/Trưởng phòng tương ứng, giảm tải cho Admin tối cao.
+
+### 2. Chuẩn Hóa Avatar Quân Nhân Theo 2 Chữ Cái Cuối Họ Tên Tiếng Việt
+- **Quy chuẩn hiển thị:** Tự động lấy 2 chữ cái đầu của 2 từ cuối họ tên:
+  - `Nguyễn Thị Ánh Tuyết` $\rightarrow$ **ÁT**
+  - `Trần Thị Ánh Tuyết` $\rightarrow$ **ÁT**
+  - `Nguyễn Hải Anh` $\rightarrow$ **HA**
+  - `Lương Nhật Thăng` $\rightarrow$ **NT**
+  - `Mạc Lương Thanh Tình` $\rightarrow$ **TT**
+- **Đồng bộ toàn hệ thống:** Áp dụng trên Modal Kiểm duyệt, Dropdown User Profile, và Bảng Nhật Ký Hoạt Động & Kiểm Toán An Ninh (`SecurityAuditLog`).
+
+### 3. Điều Hướng "Quản Trị" Trên Topbar Dành Cho Nhân Viên IT
+- Trên thanh điều hướng trung tâm (`NavigationGlider`), tài khoản có vai trò/chức vụ IT hoặc được phân bổ quyền quản trị danh mục (như `USR-009` Mạc Lương Thanh Tình) sẽ hiển thị tab **"Quản trị"** (kèm icon Khiên `Shield`), cho phép truy cập trực tiếp Trung tâm Quản trị tương tự Admin.
+
+### 4. Tách 4 Tab Trạng Thái Độc Lập Tại "Yêu Cầu Chỉnh Sửa Của Tôi"
+- Tách biệt rõ ràng từ trái sang phải: `Tất cả` $\rightarrow$ `Đang chờ` $\rightarrow$ `Đã Duyệt` $\rightarrow$ `Từ chối`.
+- Tích hợp Badge đếm số lượng động trên từng tab theo thời gian thực.
+- Khắc phục lỗi lọc trạng thái `APPROVED` ở backend bằng cách gom cả đề xuất `APPROVED` và `EXECUTED`.
+
+### 5. Khắc Phục Lỗi Ngắt Dòng & Cắt Cụt Ký Tự Toast Thông Báo
+- Mở rộng chiều rộng Toast Container lên `min-w-[480px] md:min-w-[540px]`.
+- Loại bỏ thuộc tính `truncate` ở tiêu đề thông báo `ĐÃ GỬI ĐỀ XUẤT CHỈNH SỬA`, giữ nguyên dòng không bị cắt cụt ba chấm `S...`.
+
+### 6. Nâng Cấp UX/UI Kho Dữ Liệu Chung (`PortalPage`)
+- **Banner Phạm vi tra cứu tài liệu quân sự:**
+  - Nút bật/tắt thống kê toàn trường: `[ 📊 Ẩn thống kê toàn trường ^ ]` / `[ 📊 Hiện thống kê toàn trường v ]`.
+  - Tách nội dung thành 2 dòng rõ ràng:
+    + Dòng 1: `Toàn quyền tra cứu và truy xuất tài liệu tối mật của toàn Trường Quân sự Quân khu 7`
+    + Dòng 2: `Mọi thao tác đều được kiểm toán và ghi nhận nhật ký an ninh.`
+- **4 Thẻ KPI Vĩ Mô Toàn Trường:**
+  1. *Thẻ 1 - Tổng kho toàn trường:* Tổng số tài liệu, dung lượng kho số (`KB/MB`), số văn bản mới trong 30 ngày qua.
+  2. *Thẻ 2 - Tiến độ các phòng ban:* Tỷ lệ phòng ban Nhà trường đã nộp dữ liệu (4/5 đơn vị = 80%), cảnh báo phòng ban chậm tiến độ.
+  3. *Thẻ 3 - Quyền khai thác của bạn (Mới):* Số lượng văn bản khả dụng theo cấp độ mật cá nhân (`15/15 khả dụng [100%]`), kèm thông tin cấp độ và số lượng tài liệu yêu cầu xác thực 2FA vân tay.
+  4. *Thẻ 4 - Chuẩn hóa phân bổ:* Tỷ lệ `%` chuẩn hóa gán đúng đơn vị & thể loại, ngày cập nhật văn bản mới nhất.
+- **Bảng Tiến Độ Số Hóa & Phân Bổ Theo Đơn Vị:**
+  - Lọc duy nhất các phòng ban con trực thuộc Trường Quân sự Quân khu 7 (BGH: 7 Văn bản, Chính trị: 2, Đào tạo: 1, Tham mưu: 1, Hậu cần: 0 - Chậm tiến độ).
+  - Loại bỏ hoàn toàn các đơn vị bên ngoài / cấp trên (Quân khu 7, Chính phủ, Bộ Quốc phòng, Sư đoàn 5...).
+  - Thiết kế lại Header 2 tầng phân cấp chuẩn Command Center, chống ngắt dòng chữ "Vị" và số "7".
+  - Chuẩn hóa chú thích SLA: `Tối đa 3 Văn bản`, `Cần bổ sung (1-2 Văn bản)`, `Chậm tiến độ (0 Văn bản)`.
+  - Thay thế toàn bộ từ viết tắt `VB` thành chữ đầy đủ **`Văn bản`**.
+  - Tích hợp Click-to-filter tương tác hai chiều và đồng bộ Gateway `/api/documents` cho Ban Giám hiệu.
+- **Bảng Cơ Cấu Thể Loại & Mức Bảo Mật Toàn Trường:** Có Mini Segmented Switcher chuyển đổi mượt mà giữa Thể loại và Cấp độ bảo mật.
+
+---
+
 ## [v1.2.5-split-pane-digitization-workflow] — 2026-11-03
 
 ### 1. Quy Trình Số Hóa Tài Liệu Chia Đôi Màn Hình (Split-Pane Digitization Side-by-Side)

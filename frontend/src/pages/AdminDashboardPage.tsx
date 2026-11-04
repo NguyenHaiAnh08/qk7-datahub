@@ -32,6 +32,7 @@ import {
   GripVertical,
   Bell,
   AlertCircle,
+  Lock,
 } from 'lucide-react';
 
 import { TrashPage } from './TrashPage';
@@ -132,6 +133,7 @@ const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any; permission?:
   { id: 'sessions',    label: 'Phiên online',  icon: Monitor,         permission: 'SESSION_VIEW' },
   { id: 'trash',       label: 'Thùng rác',     icon: Trash2,          permission: 'DOC_TRASH_VIEW' },
   { id: 'approvals',   label: 'Phê duyệt yêu cầu', icon: Bell,        permission: 'APPROVAL_VALIDATE' },
+  { id: 'protection_config', label: 'Khóa bảo vệ', icon: Lock, permission: 'PERMISSION_VIEW' },
 ];
 
 const PERMISSION_GROUPS = [
@@ -1613,10 +1615,10 @@ const pinPendingCount = useMemo(
           {activeTab === 'sessions' && <SessionsPage embedded />}
           {activeTab === 'trash' && <TrashPage embedded />}
           {activeTab === 'approvals' && (
-            <div className="space-y-8">
-              <ApprovalQueuePage />
-              <ProtectedPermissionsConfigPage />
-            </div>
+            <ApprovalQueuePage />
+          )}
+          {activeTab === 'protection_config' && (
+            <ProtectedPermissionsConfigPage />
           )}
         </main>
       </div>

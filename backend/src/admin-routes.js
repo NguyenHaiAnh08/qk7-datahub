@@ -80,6 +80,8 @@ module.exports = (app, deps) => {
 
         if (status === 'PENDING_REJECTED') {
           query += ` AND ar.status IN ('PENDING', 'REJECTED')`;
+        } else if (status === 'APPROVED') {
+          query += ` AND ar.status IN ('APPROVED', 'EXECUTED')`;
         } else if (status !== 'ALL') {
           query += ` AND ar.status = @status`;
           request.input('status', sql.VarChar(20), status);
@@ -105,6 +107,8 @@ module.exports = (app, deps) => {
         `;
         if (status === 'PENDING_REJECTED') {
           propQuery += ` AND p.status IN ('PENDING', 'REJECTED')`;
+        } else if (status === 'APPROVED') {
+          propQuery += ` AND p.status IN ('APPROVED', 'EXECUTED')`;
         } else if (status !== 'ALL') {
           propQuery += ` AND p.status = @pstatus`;
           propReq.input('pstatus', sql.VarChar(20), status);
@@ -710,7 +714,19 @@ module.exports = (app, deps) => {
 
             // ═══ SECURITY CHECK ═══
             const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+            if (!force_revoke && role_id !== 'ROL-01') {
+            const adminCheck = await pool.request()
+                .input('uid', sql.VarChar(50), userId)
+                .query(`SELECT 1 FROM USER_ROLE WHERE user_id = @uid AND role_id = 'ROL-01'`);
+            const targetIsAdmin = adminCheck.recordset.length > 0;
 
+            if (targetIsAdmin) {
+                return res.status(403).json({
+                    error: 'Người dùng có vai trò Quản trị viên, không thể sửa',
+                    code: 'ADMIN_ROLE_LOCKED',
+                });
+            }
+        }
             // 1. Không cho gán ROL-01 nếu caller không phải Admin
             if (!callerIsAdmin && !force_revoke && role_id === 'ROL-01') {
                 return res.status(403).json({
@@ -1764,30 +1780,32 @@ module.exports = (app, deps) => {
 
             let query = `
                 SELECT ar.*, u.full_name AS requester_name, u.[rank] AS requester_rank,
+                       u.position AS requester_position,
                        u.unit_id AS requester_unit_id,
+                       req_unit.name AS requester_unit_name,
                        rv.full_name AS reviewer_name
                 FROM APPROVAL_REQUEST ar
                 LEFT JOIN [USER] u ON u.user_id = ar.requester_id
+                LEFT JOIN UNIT req_unit ON req_unit.unit_id = u.unit_id
                 LEFT JOIN [USER] rv ON rv.user_id = ar.reviewed_by
                 WHERE 1=1
             `;
 
-            // ✅ THÊM BỘ LỌC ĐƠN VỊ CHO ĐỀ XUẤT VĂN BẢN
+            // ✅ BỘ LỌC PHÂN CẤP ĐƠN VỊ CHO APPROVAL_REQUEST (Hierarchical Approval)
             if (!isProtected) {
                 if (isCommander) {
                     const userUnitId = await resolveUserUnitId(req.user);
                     const allowedUnits = userUnitId ? await getSubtreeUnits(userUnitId) : [];
                     if (allowedUnits.length > 0) {
-                        const params = allowedUnits.map((_, i) => `@pu_${i}`);
-                        // ✅ SỬA: Lọc theo u.unit_id (Đơn vị của người gửi)
-                        propQuery += ` AND u.unit_id IN (${params.join(', ')})`;
-                        allowedUnits.forEach((u, i) => propRequest.input(`pu_${i}`, sql.VarChar(50), u));
+                        const params = allowedUnits.map((_, i) => `@aru_${i}`);
+                        query += ` AND u.unit_id IN (${params.join(', ')})`;
+                        allowedUnits.forEach((u, i) => request.input(`aru_${i}`, sql.VarChar(50), u));
                     } else {
-                        propQuery += ` AND 1=0`;
+                        query += ` AND 1=0`;
                     }
                 } else {
-                    propQuery += ` AND p.requester_id = @pCurrentUserId`;
-                    propRequest.input('pCurrentUserId', sql.VarChar(50), currentUserId);
+                    query += ` AND ar.requester_id = @arCurrentUserId`;
+                    request.input('arCurrentUserId', sql.VarChar(50), currentUserId);
                 }
             }
 
@@ -1797,10 +1815,14 @@ module.exports = (app, deps) => {
             }
             query += ` ORDER BY ar.created_at DESC`;
             const r = await request.query(query);
-            const standardItems = r.recordset || [];
+            const standardItems = (r.recordset || []).map((ar) => ({
+                ...ar,
+                requester_position: ar.requester_position,
+                requester_unit_id: ar.requester_unit_id,
+                requester_unit_name: ar.requester_unit_name,
+            }));
 
             // 2. Lấy thêm đề xuất sửa đổi văn bản từ DOCUMENT_REVISION_PROPOSAL
-                        // 2. Lấy thêm đề xuất sửa đổi văn bản từ DOCUMENT_REVISION_PROPOSAL
             const propRequest = pool.request();
             let propQuery = `
                 SELECT 
@@ -1810,10 +1832,13 @@ module.exports = (app, deps) => {
                   p.signer, p.summary, p.security_level_id,
                   p.new_original_name, p.new_file_size,
                   u.full_name AS requester_name, u.[rank] AS requester_rank,
+                  u.position AS requester_position, u.unit_id AS requester_unit_id,
+                  req_unit.name AS requester_unit_name,
                   rv.full_name AS reviewer_name,
                   d.document_code AS current_document_code, d.title AS current_title,
                   d.signer AS current_signer, d.issued_date AS current_issued_date,
                   d.security_level_id AS current_security_level_id,
+                  d.issuing_unit_id AS document_issuing_unit_id,
                   cur_unit.name AS current_unit_name,
                   unit.name AS issuing_unit_name,
                   sl.name AS security_level_name,
@@ -1821,6 +1846,7 @@ module.exports = (app, deps) => {
                 FROM DOCUMENT_REVISION_PROPOSAL p
                 JOIN DOCUMENT d ON d.file_id = p.file_id
                 JOIN [USER] u ON u.user_id = p.requester_id
+                LEFT JOIN UNIT req_unit ON req_unit.unit_id = u.unit_id
                 LEFT JOIN [USER] rv ON rv.user_id = p.reviewed_by
                 LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
                 LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
@@ -1829,14 +1855,14 @@ module.exports = (app, deps) => {
                 WHERE 1=1
             `;
 
-            // ✅ THÊM BỘ LỌC ĐƠN VỊ CHO ĐỀ XUẤT VĂN BẢN
+            // ✅ BỘ LỌC PHÂN CẤP ĐƠN VỊ CHO ĐỀ XUẤT VĂN BẢN (Hierarchical Approval)
             if (!isProtected) {
                 if (isCommander) {
                     const userUnitId = await resolveUserUnitId(req.user);
                     const allowedUnits = userUnitId ? await getSubtreeUnits(userUnitId) : [];
                     if (allowedUnits.length > 0) {
                         const params = allowedUnits.map((_, i) => `@pu_${i}`);
-                        propQuery += ` AND (d.issuing_unit_id IN (${params.join(', ')}) OR p.issuing_unit_id IN (${params.join(', ')}))`;
+                        propQuery += ` AND (d.issuing_unit_id IN (${params.join(', ')}) OR p.issuing_unit_id IN (${params.join(', ')}) OR u.unit_id IN (${params.join(', ')}))`;
                         allowedUnits.forEach((u, i) => propRequest.input(`pu_${i}`, sql.VarChar(50), u));
                     } else {
                         propQuery += ` AND 1=0`;
@@ -1861,6 +1887,11 @@ module.exports = (app, deps) => {
                 requester_id: p.requester_id,
                 requester_name: p.requester_name,
                 requester_rank: p.requester_rank,
+                requester_position: p.requester_position,
+                requester_unit_id: p.requester_unit_id,
+                requester_unit_name: p.requester_unit_name,
+                document_issuing_unit_id: p.document_issuing_unit_id,
+                document_issuing_unit_name: p.current_unit_name,
                 required_permission: 'DOC_EDIT',
                 http_method: 'PUT',
                 http_path: `/api/documents/${p.file_id}`,
@@ -1904,6 +1935,14 @@ module.exports = (app, deps) => {
                   new_original_name: p.new_original_name,
                   new_file_size: p.new_file_size,
                   note: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+                  requester_id: p.requester_id,
+                  requester_name: p.requester_name,
+                  requester_rank: p.requester_rank,
+                  requester_position: p.requester_position,
+                  requester_unit_id: p.requester_unit_id,
+                  requester_unit_name: p.requester_unit_name,
+                  document_issuing_unit_id: p.document_issuing_unit_id,
+                  created_at: p.created_at,
                 }
               };
             });

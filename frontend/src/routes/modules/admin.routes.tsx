@@ -19,7 +19,7 @@ const adminRoutes: RouteModuleExport = {
           requiredAnyOf={[
             'SYSTEM_STATS_VIEW', 'USER_VIEW', 'ROLE_VIEW', 'PERMISSION_VIEW',
             'UNIT_VIEW', 'DOCTYPE_VIEW', 'SECLEVEL_VIEW', 'RANK_VIEW',
-            'POSITION_VIEW', 'AUDIT_VIEW', 'SESSION_VIEW',
+            'POSITION_VIEW', 'AUDIT_VIEW', 'SESSION_VIEW', 'APPROVAL_VALIDATE', 'DOC_TRASH_VIEW',
           ]}
         >
           <AdminDashboardPage />

@@ -746,6 +746,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                     node,
                     isExpanded,
                     hasChildren,
+                    isLastChild,
                     ancestorHasNextSibling,
                     isSelfMatched,
                   }) => {
@@ -763,12 +764,12 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                         }`}
                       >
                         {/* ── CỘT 1: CẤU TRÚC PHÂN CẤP & TÊN ĐƠN VỊ ── */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center min-w-0">
                             {/* Dãy đường kẻ dẫn hướng thụt lề (Tree Guide Lines) */}
                             {level > 0 && (
                               <div
-                                className="flex items-center shrink-0"
+                                className="flex items-center shrink-0 self-stretch"
                                 style={{ width: `${level * 28}px` }}
                               >
                                 {Array.from({ length: level }).map((_, idx) => {
@@ -776,15 +777,21 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                                   return (
                                     <div
                                       key={idx}
-                                      className="w-7 h-9 relative flex items-center justify-center shrink-0"
+                                      className="w-7 h-full min-h-[38px] relative flex items-center justify-center shrink-0"
                                     >
                                       {/* Đường kẻ dọc nếu nhánh trước đó còn node anh em */}
                                       {!isLastLevel && ancestorHasNextSibling[idx] && (
-                                        <div className="absolute top-0 bottom-0 left-3 w-px bg-slate-300 dark:bg-slate-700/60" />
+                                        <div className="absolute -top-3.5 -bottom-3.5 left-3 w-px bg-slate-300 dark:bg-slate-700/60" />
                                       )}
                                       {/* Đầu nối nhánh L cho cấp hiện tại */}
                                       {isLastLevel && (
-                                        <div className="absolute -top-4.5 bottom-4 left-3 w-4 border-l border-b border-slate-300 dark:border-slate-700/70 rounded-bl-sm" />
+                                        <>
+                                          <div className="absolute -top-3.5 top-1/2 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
+                                          <div className="absolute top-1/2 left-3 w-3.5 border-b border-slate-300 dark:border-slate-700/70" />
+                                          {!isLastChild && (
+                                            <div className="absolute top-1/2 -bottom-3.5 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
+                                          )}
+                                        </>
                                       )}
                                     </div>
                                   );
@@ -823,36 +830,34 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                               <IconComp className="w-4 h-4" />
                             </div>
 
-                            {/* Tên đơn vị */}
-                            <div className="flex flex-col min-w-0 pr-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span
-                                  className={`truncate ${
-                                    level === 0
-                                      ? 'text-base font-bold text-slate-900 dark:text-white tracking-wide'
-                                      : level === 1
-                                      ? 'text-sm font-semibold text-slate-900 dark:text-slate-100'
-                                      : 'text-sm font-medium text-slate-800 dark:text-slate-200'
-                                  }`}
-                                  title={unit.name}
-                                >
-                                  {renderHighlightedText(unit.name)}
-                                </span>
+                            {/* Tên đơn vị & Badge chống bung dòng */}
+                            <div className="flex items-center min-w-0 pr-2 gap-2 flex-nowrap">
+                              <span
+                                className={`truncate ${
+                                  level === 0
+                                    ? 'text-base font-bold text-slate-900 dark:text-white tracking-wide'
+                                    : level === 1
+                                    ? 'text-sm font-semibold text-slate-900 dark:text-slate-100'
+                                    : 'text-sm font-medium text-slate-800 dark:text-slate-200'
+                                }`}
+                                title={unit.name}
+                              >
+                                {renderHighlightedText(unit.name)}
+                              </span>
 
-                                {/* Nhãn loại đơn vị thu gọn */}
-                                <span
-                                  className={`text-xs px-2 py-0.5 rounded font-medium border ${catCfg.badgeClass}`}
-                                >
-                                  {catCfg.label}
-                                </span>
+                              {/* Nhãn loại đơn vị thu gọn (không wrap) */}
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded font-medium border shrink-0 whitespace-nowrap ${catCfg.badgeClass}`}
+                              >
+                                {catCfg.label}
+                              </span>
 
-                                {/* Nhãn cảnh báo nút mồ côi */}
-                                {isOrphan && (
-                                  <span className="text-xs px-2 py-0.5 rounded font-semibold bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30">
-                                    ⚠️ Chưa khớp cấp trên
-                                  </span>
-                                )}
-                              </div>
+                              {/* Nhãn cảnh báo nút mồ côi */}
+                              {isOrphan && (
+                                <span className="text-xs px-2 py-0.5 rounded font-semibold bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30 shrink-0 whitespace-nowrap">
+                                  ⚠️ Chưa khớp cấp trên
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>

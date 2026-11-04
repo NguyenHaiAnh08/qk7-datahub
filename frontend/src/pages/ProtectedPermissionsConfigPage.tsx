@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Lock, Unlock, ShieldCheck } from 'lucide-react';
+import { Lock, Unlock, ShieldCheck, Loader2 } from 'lucide-react';
 import { approvalService } from '../services/approvalService';
 import { permissionService } from '../services/permissionService';
 import { toast } from '../components/common/Toast';
@@ -8,9 +8,10 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
   const [perms, setPerms] = useState<any[]>([]);
   const [protectedIds, setProtectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [p, prot] = await Promise.all([
         permissionService.getPermissions(),
@@ -20,13 +21,29 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
       setProtectedIds(new Set((prot.items || []).map(x => x.permission_id)));
     } catch (err: any) {
       toast.error('Lỗi tải: ' + err.message);
-    } finally { setLoading(false); }
+    } finally {
+      if (!silent) setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
 
   const toggle = async (permId: string) => {
+    if (togglingId) return; // Tránh bấm liên tục khi đang xử lý
     const isProtected = protectedIds.has(permId);
+    setTogglingId(permId);
+
+    // ✅ Cập nhật Optimistic UI tức thì: không phá hủy DOM, giữ 100% vị trí thanh cuộn
+    setProtectedIds((prev) => {
+      const next = new Set(prev);
+      if (isProtected) {
+        next.delete(permId);
+      } else {
+        next.add(permId);
+      }
+      return next;
+    });
+
     try {
       if (isProtected) {
         await approvalService.unprotect(permId);
@@ -35,9 +52,22 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
         await approvalService.protect(permId);
         toast.success(`Đã bật bảo vệ ${permId}`);
       }
-      await load();
+      // Tải lại ngầm không unmount danh sách (silent refresh) -> thanh cuộn đứng yên tuyệt đối
+      await load(true);
     } catch (err: any) {
+      // Rollback nếu có lỗi từ server
+      setProtectedIds((prev) => {
+        const next = new Set(prev);
+        if (isProtected) {
+          next.add(permId);
+        } else {
+          next.delete(permId);
+        }
+        return next;
+      });
       toast.error('Lỗi: ' + err.message);
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -59,19 +89,24 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="p-8 text-center text-sm text-slate-500">Đang tải...</div>
+        <div className="p-8 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+          <span>Đang tải cấu hình khóa bảo vệ...</span>
+        </div>
       ) : (
         <div className="space-y-3">
           {Object.entries(grouped).map(([groupCode, list]: [string, any[]]) => (
-            <div key={groupCode} className="bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div key={groupCode} className="bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
               <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
                 <span className="font-bold text-xs text-slate-700 dark:text-slate-300 font-mono">{groupCode}</span>
               </div>
               <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {list.map((p) => {
                   const isProtected = protectedIds.has(p.permission_id);
+                  const isBusy = togglingId === p.permission_id;
+
                   return (
-                    <div key={p.permission_id} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                    <div key={p.permission_id} className="px-4 py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">{p.code || p.permission_id}</span>
@@ -84,14 +119,23 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{p.description || '—'}</div>
                       </div>
                       <button
+                        type="button"
+                        disabled={isBusy}
                         onClick={() => toggle(p.permission_id)}
-                        className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition ${
+                        className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition select-none disabled:opacity-60 ${
                           isProtected
-                            ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                            : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                            ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                         }`}
                       >
-                        {isProtected ? <><Lock className="w-3 h-3" /> Đang khóa</> : <><Unlock className="w-3 h-3" /> Bật khóa</>}
+                        {isBusy ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : isProtected ? (
+                          <Lock className="w-3 h-3" />
+                        ) : (
+                          <Unlock className="w-3 h-3" />
+                        )}
+                        <span>{isProtected ? 'Đang khóa' : 'Bật khóa'}</span>
                       </button>
                     </div>
                   );

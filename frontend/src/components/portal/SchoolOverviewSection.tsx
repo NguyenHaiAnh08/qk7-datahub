@@ -96,13 +96,18 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
       return (
         uId === 'TQS' ||
         uId === 'U-TQS' ||
-        tqsDepartments.some((dept) => dept.unit_id === uId)
+        tqsDepartments.some((dept) => dept.unit_id === uId) ||
+        (d.unit_name &&
+          (d.unit_name.toLowerCase().includes('ban giám hiệu') ||
+            d.unit_name.toLowerCase().includes('trường quân sự')))
       );
     });
     const totalSchoolDocs = tqsDocs.length > 0 ? tqsDocs.length : 1;
 
     return schoolUnitsList
       .map((unit) => {
+        const subUnitIds = meta.units.filter((u) => u.parent_id === unit.unit_id).map((u) => u.unit_id);
+
         const unitDocs = documents.filter((d) => {
           if (unit.unit_id === 'U-BGH') {
             // Ban Giám hiệu phụ trách các văn bản do Nhà trường / Ban Giám hiệu ký (TQS, U-TQS, U-BGH)
@@ -117,6 +122,8 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
           }
           if (d.issuing_unit_id === unit.unit_id) return true;
           if (d.unit_name && d.unit_name.toLowerCase() === unit.name.toLowerCase()) return true;
+          // Bao gồm cả tài liệu của các đơn vị con trực thuộc (ví dụ Bếp cơ quan con của Phòng Hậu cần - Kỹ thuật)
+          if (subUnitIds.includes(d.issuing_unit_id)) return true;
           return false;
         });
 

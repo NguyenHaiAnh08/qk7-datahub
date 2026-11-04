@@ -27,7 +27,7 @@ import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData, Unit } from '../types';
-import { getIssuingUnitPriority } from '../utils/unitTree';
+import { getMainIssuingUnits, getSchoolDepartmentsTree } from '../utils/unitTree';
 
 const ITEMS_PER_PAGE = 9;
 
@@ -114,32 +114,15 @@ export const PortalPage: React.FC = () => {
       .catch((err) => console.error('[loadMeta]', err));
   }, [user]);
 
-  // Sub-departments of Truong Quan su Quan khu 7 (TQS)
+  // Danh mục các phòng ban / đơn vị trực thuộc Trường Quân sự Quân khu 7
   const tqsDepartments = useMemo(() => {
-    const list = meta.units.filter((u) => u.parent_id === 'TQS' || u.parent_id === 'U-TQS');
-    if (list.length > 0) return list;
-    return [
-      { unit_id: 'U-BGH', name: 'Ban Giám hiệu' },
-      { unit_id: 'U-TM', name: 'Phòng Tham mưu - Hành chính' },
-      { unit_id: 'U-CT', name: 'Phòng Chính trị' },
-      { unit_id: 'U-DT', name: 'Phòng Đào tạo' },
-      { unit_id: 'U-HC', name: 'Phòng Hậu cần - Kỹ thuật' },
-    ];
+    return getSchoolDepartmentsTree(meta.units);
   }, [meta.units]);
 
-  // Main units excluding child departments of TQS
+  // Danh sách cơ quan ban hành chính (loại bỏ các đơn vị con của TQS để không bị bung)
   const mainUnits = useMemo(() => {
-    const tqsIds = new Set(tqsDepartments.map((d) => d.unit_id));
-    const nonDeptUnits = meta.units.filter(
-      (u) => !tqsIds.has(u.unit_id) && u.parent_id !== 'TQS' && u.parent_id !== 'U-TQS'
-    );
-    return [...nonDeptUnits].sort((a, b) => {
-      const pA = getIssuingUnitPriority(a);
-      const pB = getIssuingUnitPriority(b);
-      if (pA !== pB) return pA - pB;
-      return a.name.localeCompare(b.name, 'vi');
-    });
-  }, [meta.units, tqsDepartments]);
+    return getMainIssuingUnits(meta.units);
+  }, [meta.units]);
 
   // Load Documents
   const loadDocuments = async () => {
@@ -151,7 +134,7 @@ export const PortalPage: React.FC = () => {
       if (selectedUnit === 'TQS') {
         if (selectedDepartment) {
           queryUnit = selectedDepartment;
-          includeChildren = false;
+          includeChildren = true;
         } else {
           queryUnit = 'TQS';
           includeChildren = true;
@@ -472,9 +455,9 @@ export const PortalPage: React.FC = () => {
                       className="w-full px-3 py-2 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-400 dark:border-emerald-700/70 rounded-xl text-xs font-medium text-emerald-950 dark:text-emerald-200 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition shadow-sm cursor-pointer [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                     >
                       <option value="">Tất cả phòng ban</option>
-                      {tqsDepartments.map((d) => (
+                      {tqsDepartments.map((d: any) => (
                         <option key={d.unit_id} value={d.unit_id}>
-                          {d.name}
+                          {d.displayName || d.name}
                         </option>
                       ))}
                     </select>

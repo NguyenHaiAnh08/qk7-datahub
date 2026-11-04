@@ -30,6 +30,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
   const [selectedType, setSelectedType] = useState('');
   const [searchParams] = useSearchParams();
   const [selectedUnit, setSelectedUnit] = useState(searchParams.get('unit') || '');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedLevel, setSelectedLevel] = useState<number>(0);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -93,10 +94,29 @@ const canUpload = hasPermission('DOC_UPLOAD');
   const loadDocuments = async () => {
     setLoading(true);
     try {
+      let queryUnit: string | undefined = undefined;
+      let includeChildren: boolean | undefined = undefined;
+
+      const isSchool = selectedUnit === 'TQS' || selectedUnit === 'U-TQS';
+
+      if (isSchool) {
+        if (selectedDepartment) {
+          queryUnit = selectedDepartment;
+          includeChildren = true;
+        } else {
+          queryUnit = 'TQS';
+          includeChildren = true;
+        }
+      } else if (selectedUnit) {
+        queryUnit = selectedUnit;
+        includeChildren = true;
+      }
+
       const res = await documentsApi.getDocuments({
         q: searchQuery || undefined,
         type: selectedType || undefined,
-        unit: selectedUnit || undefined,
+        unit: queryUnit,
+        include_children: includeChildren,
         lv: selectedLevel || undefined,
         from: dateFrom || undefined,
         to: dateTo || undefined,
@@ -116,13 +136,14 @@ const canUpload = hasPermission('DOC_UPLOAD');
       loadDocuments();
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedType, selectedUnit, selectedLevel, dateFrom, dateTo]);
+  }, [searchQuery, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
 
   // Reset Filters
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedType('');
     setSelectedUnit('');
+    setSelectedDepartment('');
     setSelectedLevel(0);
     setDateFrom('');
     setDateTo('');
@@ -324,7 +345,12 @@ const canUpload = hasPermission('DOC_UPLOAD');
           selectedType={selectedType}
           onTypeChange={setSelectedType}
           selectedUnit={selectedUnit}
-          onUnitChange={setSelectedUnit}
+          onUnitChange={(u) => {
+            setSelectedUnit(u);
+            setSelectedDepartment('');
+          }}
+          selectedDepartment={selectedDepartment}
+          onDepartmentChange={setSelectedDepartment}
           selectedLevel={selectedLevel}
           onLevelChange={setSelectedLevel}
           dateFrom={dateFrom}

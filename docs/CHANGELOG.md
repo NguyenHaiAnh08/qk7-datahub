@@ -4,6 +4,30 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.2.7-unit-filters-and-scroll-preservation] — 2026-11-04
+
+### 1. Chuẩn Hóa Dropdown "Tất Cả Đơn Vị Ban Hành" (Clean Main Issuing Units Dropdown)
+- **Tách bạch cơ quan ban hành chính:** Dropdown "Tất cả đơn vị ban hành" giữ danh mục cơ quan ban hành lớn gọn gàng như cũ (Trường Quân sự Quân khu 7, Quân khu 7, Bộ Tổng Tham mưu, Tổng cục Chính trị, Bộ Quốc Phòng, Chính Phủ, Sư đoàn 5...).
+- **Ngăn ngừa bung dữ liệu con:** Tự động loại trừ 100% các phòng ban, đơn vị con cháu nội bộ của Nhà trường (`Ban Giám hiệu`, `Bếp cơ quan`, `Phòng Chính trị`, `Phòng Đào tạo`, `Phòng Hậu cần - Kỹ thuật`, `Phòng Tham mưu - Hành chính`) khỏi dropdown chính, loại bỏ hiện tượng bị bung ra thành các tùy chọn riêng lẻ.
+
+### 2. Bộ Lọc Phòng Ban Phụ Thuộc (Dependent School Department Filter)
+- **Kích hoạt động theo ngữ cảnh:** Khi người dùng chọn "Trường Quân sự Quân khu 7", hệ thống tự động hiển thị ô chọn filter chuyên biệt "Tất cả phòng ban trực thuộc" (ở hàng thứ 2, ngay dưới ô đơn vị ban hành).
+- **Cấu trúc cây đa cấp thụt lề chuẩn (`└─ `):** Đổ toàn bộ danh mục phòng ban con cháu trực thuộc Nhà trường với tiền tố thụt lề trực quan, hỗ trợ vô hạn cấp (`Phòng Hậu cần - Kỹ thuật` $\rightarrow$ `└─ Bếp cơ quan`).
+- **Truy vấn phân cấp (`include_children`):** Tự động truy vấn văn bản của cả đơn vị cha và các đơn vị con cháu trực thuộc khi lọc theo phòng ban.
+- **Đồng bộ toàn diện:** Áp dụng thống nhất trên cả `DocumentDeskPage` (Trung tâm văn bản) và `PortalPage` (Kho dữ liệu chung).
+
+### 3. Khắc Phục Triệt Để Hiện Tượng Giật/Nhảy Cuộn Trang (Scroll Jump Prevention)
+- **Trang Cấu hình Khóa bảo vệ (`ProtectedPermissionsConfigPage.tsx`):** Áp dụng cơ chế **Optimistic UI Update** và **Silent Refresh** (`load(silent=true)`).
+- Không unmount/sụp đổ chiều cao DOM khi click mở khóa/bật khóa, giữ nguyên 100% vị trí thanh cuộn (`scrollTop`) của người dùng tại điểm thao tác.
+- Bổ sung hiệu ứng xoay loading cục bộ (`togglingId`) ngay tại nút bấm được click.
+- Chuẩn hóa cơ chế Silent Refresh tương tự cho `ApprovalQueuePage` và `MyApprovalsPage`.
+
+### 4. Nâng Cấp Bảng Cây Đơn Vị & Khắc Phục Vỡ Layout (`UnitTreeTable`)
+- Bổ sung `flex-nowrap`, `truncate min-w-0` cho tên đơn vị và `shrink-0 whitespace-nowrap` cho nhãn loại đơn vị, loại bỏ hiện tượng xuống hàng làm vỡ bảng khi thêm đơn vị con.
+- Kéo dài đường kẻ định hướng phân cấp liên tục (`-top-3.5` đến `-bottom-3.5`), loại bỏ đứt gãy nét kẻ giữa các cấp cha - con.
+
+---
+
 ## [v1.2.6-hierarchical-approval-diff-school-radar-kpi] — 2026-11-04
 
 ### 1. Phân Cấp Phê Duyệt Chỉ Huy & Visual Diff Viewer (GitHub-style Diff)

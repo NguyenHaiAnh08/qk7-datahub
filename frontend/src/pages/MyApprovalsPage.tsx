@@ -139,8 +139,8 @@ export const MyApprovalsPage: React.FC = () => {
     });
   };
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await approvalService.listMine(filter);
       setItems(res.items || []);
@@ -155,7 +155,7 @@ export const MyApprovalsPage: React.FC = () => {
     } catch (err: any) {
       toast.error('Lỗi tải yêu cầu: ' + err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -163,7 +163,7 @@ export const MyApprovalsPage: React.FC = () => {
 
   // Auto-refresh mỗi 30s
   useEffect(() => {
-    const t = setInterval(load, 30000);
+    const t = setInterval(() => load(true), 30000);
     return () => clearInterval(t);
   }, [filter]);
 
@@ -184,7 +184,7 @@ export const MyApprovalsPage: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={load}
+            onClick={() => load()}
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
           >
             <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />

@@ -14,6 +14,8 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 - **Khắc phục lỗi file 0 KB khi tải từ trong modal xem trước (`DocumentPreviewModal`):**
   - *Nguyên nhân:* Khi xem PDF ở chế độ toàn màn hình (`Fullscreen`), hộp thoại Save As native của OS mở ra khiến Chromium tự động thoát Fullscreen $\rightarrow$ sự kiện `fullscreenchange` kích hoạt đóng modal $\rightarrow$ component unmount làm hủy (`abort()`) luồng fetch và stream ghi file, để lại file rác 0 KB trên đĩa.
   - *Giải pháp triệt để:* Thêm cờ bảo vệ `isDownloadingRef` trong `DocumentPreviewModal`. Khi đang trong tiến trình chọn nơi lưu hoặc ghi file, sự kiện `fullscreenchange` bị chặn không cho đóng modal, bảo đảm luồng ghi file hoàn tất 100% (đủ 168 KB+) và file mở xem bình thường.
+- **Tự động khôi phục chế độ Fullscreen sau khi tải xong (`Auto Re-enter Fullscreen`):**
+  - Ngay sau khi hộp thoại lưu tệp đóng lại và tệp đã lưu thành công (hoặc người dùng bấm Hủy), hệ thống tự động gọi `modalContainerRef.current.requestFullscreen()` để đưa tài liệu trở lại chế độ Toàn màn hình ngay lập tức, giúp cán bộ tiếp tục nghiên cứu và đọc tài liệu tập trung, không bị vướng các thanh công cụ/URL của trình duyệt.
 - **Bảo toàn dữ liệu an toàn & Chống lỗi:**
   - Dữ liệu file được fetch hoàn tất trước khi ghi nên không bị ảnh hưởng bởi độ trễ mạng trong lúc ghi ra đĩa. File lưu về máy đạt 100% dung lượng, mở xem chuẩn xác trên mọi trình đọc PDF.
   - **Hủy an toàn khi bấm Cancel:** Nếu người dùng bấm Hủy trên hộp thoại lưu, nút tải lập tức quay về trạng thái ban đầu, không tải file rác.

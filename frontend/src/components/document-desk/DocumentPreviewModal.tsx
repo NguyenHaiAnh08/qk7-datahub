@@ -285,7 +285,27 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             title: 'TẢI TỆP HOÀN TẤT',
             badge: 'PDF-READY',
           });
+        } catch (releaseErr: any) {
+          if (releaseErr?.name !== 'AbortError') {
+            throw releaseErr;
+          }
         } finally {
+          // 🖥️ TỰ ĐỘNG BẬT LẠI FULLSCREEN:
+          // Sau khi hoàn tất lưu tệp (hoặc đóng hộp thoại Save As),
+          // tự động đưa tài liệu trở lại chế độ Toàn màn hình (Fullscreen) để cán bộ tiếp tục đọc tài liệu
+          try {
+            if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+              const targetElem = modalContainerRef.current || window.document.documentElement;
+              if (targetElem && targetElem.requestFullscreen) {
+                targetElem.requestFullscreen().catch(() => {
+                  window.document.documentElement.requestFullscreen().catch(() => {});
+                });
+              }
+            }
+          } catch (fsErr) {
+            console.warn('[handleDownload] Auto re-enter fullscreen error:', fsErr);
+          }
+
           setTimeout(() => {
             isDownloadingRef.current = false;
           }, 1500);
@@ -295,6 +315,17 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       setTimeout(() => {
         isDownloadingRef.current = false;
       }, 1000);
+      // Tự động khôi phục lại Fullscreen nếu người dùng bấm Hủy tải
+      try {
+        if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+          const targetElem = modalContainerRef.current || window.document.documentElement;
+          if (targetElem && targetElem.requestFullscreen) {
+            targetElem.requestFullscreen().catch(() => {
+              window.document.documentElement.requestFullscreen().catch(() => {});
+            });
+          }
+        }
+      } catch (_) {}
       if (err?.name !== 'AbortError') {
         setError(err.message || 'Lỗi khi tải tệp');
       }

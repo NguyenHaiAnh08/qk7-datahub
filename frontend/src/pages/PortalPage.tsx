@@ -240,7 +240,7 @@ export const PortalPage: React.FC = () => {
     toast.info(`Đang truyền phát và chuẩn bị văn bản ${doc.document_code}...`, {
       title: 'ĐANG XỬ LÝ TỆP',
       badge: 'STREAMING',
-      duration: 3200,
+      duration: 2500,
     });
 
     // Chuẩn bị tệp tải về và giữ lại (hold) cho đến khi thanh tiến trình UI hoàn tất 100%

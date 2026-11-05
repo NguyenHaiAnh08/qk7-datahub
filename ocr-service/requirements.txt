@@ -1,10 +1,42 @@
+# ============================================================
+# QK7 DataHub - OCR Microservice v2.0
+# Engine chính: MonkeyOCRv2 (HuggingFace transformers / Qwen-VL)
+# Engine fallback: PaddleOCR PP-OCRv4
+# ============================================================
+
+# ─── 1. FastAPI Web Server ──────────────────────────────────
 fastapi>=0.110.0
 uvicorn>=0.28.0
 python-multipart>=0.0.9
-paddlepaddle==2.6.2
-paddleocr==2.9.1
+pydantic>=2.0.0
+
+# ─── 2. PDF & Image Processing ──────────────────────────────
 pymupdf>=1.24.0
+pypdfium2>=4.30.0
 pillow>=10.0.0
-opencv-python-headless>=4.8.0
+opencv-python>=4.8.0
 numpy<2.0.0
 
+# ─── 3. MonkeyOCRv2 / Vision-Language Model ─────────────────
+# LƯU Ý: Cài đặt PyTorch phù hợp trước:
+#   - GPU (CUDA 12.6): pip install torch==2.8.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+#   - CPU only:       pip install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+transformers==4.57.1
+accelerate==1.11.0
+qwen_vl_utils==0.0.14
+einops>=0.8.0
+sentencepiece>=0.2.0
+
+# ─── 4. Model Downloading & Hub Clients ─────────────────────
+huggingface_hub>=0.24.0
+modelscope>=1.15.0
+
+# ─── 5. UI & Testing Utilities (Tùy chọn) ───────────────────
+gradio>=4.0.0
+
+# ─── 6. PaddleOCR Engine (Fallback khi MonkeyOCR offline) ────
+# Cài đặt paddlepaddle trước:
+#   pip install paddlepaddle==2.6.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
+paddlepaddle==2.6.2
+paddleocr==2.9.1
+opencv-python-headless>=4.8.0

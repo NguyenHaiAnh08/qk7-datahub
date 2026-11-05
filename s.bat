@@ -18,7 +18,7 @@ echo.
 
 REM --- Kiem tra va giai phong port 8000, 8002 neu bi chiem ---
 echo [0/3] Kiem tra va giai phong port 8000, 8002...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort 8000,8002 -State Listen -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Phat hien port dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port thanh cong.' } else { Write-Host '[OK] Cac port dang san sang.' } } catch { Write-Host '[OK] Cac port dang san sang.' }; exit 0"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort 8000,8002 -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Phat hien port dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port thanh cong.' } else { Write-Host '[OK] Cac port dang san sang.' } } catch { Write-Host '[OK] Cac port dang san sang.' }; exit 0"
 echo.
 
 REM --- 1. Backend ---
@@ -38,7 +38,7 @@ REM --- 2. AI boxchat ---
 echo [2/3] Khoi dong AI boxchat (:8001)...
 start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && python main.py"
 
-REM --- 3. OCR Microservice (PaddleOCR) ---
+REM --- 3. OCR Microservice (MonkeyOCRv2 / PaddleOCR) ---
 echo [3/3] Khoi dong OCR Microservice (:8002)...
 if exist "%ROOT%ocr-service\start-ocr.bat" (
     start "QK7 OCR" cmd /k "cd /d "%ROOT%ocr-service" && start-ocr.bat"

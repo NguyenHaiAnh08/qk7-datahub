@@ -1,8 +1,10 @@
-import { RouteObject } from 'react-router-dom';
-import { MyApprovalsPage } from '../../pages/MyApprovalsPage';
+import React from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { ProtectedRoute } from '../../components/common/ProtectedRoute';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
+
+const MyApprovalsPage = lazyWithRetry(() => import('../../pages/MyApprovalsPage').then((m) => ({ default: m.MyApprovalsPage })));
 
 const myApprovalsRoutes: RouteModuleExport = {
   group: 'my-approvals',

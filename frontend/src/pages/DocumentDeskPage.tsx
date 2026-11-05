@@ -11,6 +11,7 @@ import { DocumentUploadModal } from '../components/document-desk/DocumentUploadM
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
+import { useDebounce } from '../hooks/useDebounce';
 import { useAuth } from '../hooks/useAuth';
 import { isUserAdmin } from '../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
@@ -27,6 +28,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [selectedType, setSelectedType] = useState('');
   const [searchParams] = useSearchParams();
   const [selectedUnit, setSelectedUnit] = useState(searchParams.get('unit') || '');
@@ -113,7 +115,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
       }
 
       const res = await documentsApi.getDocuments({
-        q: searchQuery || undefined,
+        q: debouncedSearch || undefined,
         type: selectedType || undefined,
         unit: queryUnit,
         include_children: includeChildren,
@@ -130,13 +132,10 @@ const canUpload = hasPermission('DOC_UPLOAD');
     }
   };
 
-  // Debounced search & filter reload
+  // Tự động tải lại danh sách khi bộ lọc hoặc từ khóa tìm kiếm (đã debounce 500ms) thay đổi
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadDocuments();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
+    loadDocuments();
+  }, [debouncedSearch, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
 
   // Reset Filters
   const handleResetFilters = () => {

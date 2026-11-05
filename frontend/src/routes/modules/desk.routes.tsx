@@ -1,9 +1,11 @@
 import React from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { Navigate } from 'react-router-dom';
-import { DocumentDeskPage } from '../../pages/DocumentDeskPage';
 import { ProtectedRoute } from '../../components/common/ProtectedRoute';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
+
+const DocumentDeskPage = lazyWithRetry(() => import('../../pages/DocumentDeskPage').then((m) => ({ default: m.DocumentDeskPage })));
 
 const deskRoutes: RouteModuleExport = {
   group: 'desk',

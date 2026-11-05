@@ -10,7 +10,7 @@ import {
   ChevronRight,
   HardDrive
 } from 'lucide-react';
-import { Tooltip } from 'antd';
+import { Tooltip, Skeleton } from 'antd';
 import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
@@ -86,11 +86,18 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
-              <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                  Đang tải danh sách tài liệu...
-                </td>
-              </tr>
+              Array.from({ length: 6 }).map((_, idx) => (
+                <tr key={`table-skeleton-${idx}`} className="border-b border-slate-100 dark:border-white/[0.04]">
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 80, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Input active size="small" style={{ width: '85%', minWidth: 160, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 90, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 100, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 75, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 65, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 55, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4 text-right"><Skeleton.Button active size="small" style={{ width: 70, height: 26, borderRadius: 6 }} /></td>
+                </tr>
+              ))
             ) : documents.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-6 text-center">

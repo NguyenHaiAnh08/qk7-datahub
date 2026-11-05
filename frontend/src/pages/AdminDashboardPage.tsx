@@ -875,10 +875,10 @@ const pinPendingCount = useMemo(
                     ? 'grid grid-cols-2 gap-3'
                     : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4'
               }>
-                <StatCard label="Quân nhân & Người dùng" value={stats?.users ?? '—'}      icon={<Users className="w-6 h-6" />}      color="blue"    subtext="Đã kích hoạt trên hệ thống" refreshKey={overviewRefreshKey} />
-                <StatCard label="Văn bản & Tài liệu"     value={stats?.documents ?? '—'}  icon={<FileCheck className="w-6 h-6" />}  color="emerald" subtext="Lưu trữ trong kho số"       delay={0.05} refreshKey={overviewRefreshKey} />
-                <StatCard label="Tổng dung lượng tệp"    value={stats ? formatFileSize(stats.totalSize) : '—'} icon={<HardDrive className="w-6 h-6" />} color="amber" subtext="Ổ đĩa dữ liệu an toàn"      delay={0.1}  refreshKey={overviewRefreshKey} />
-                <StatCard label="Truy cập nhật ký 24h"   value={stats?.logs24h ?? '—'}    icon={<History className="w-6 h-6" />}    color="red"     subtext="Bản ghi kiểm toán an ninh" delay={0.15} refreshKey={overviewRefreshKey} />
+                <StatCard label="Quân nhân & Người dùng" loading={!stats} value={stats?.users ?? "—"}      icon={<Users className="w-6 h-6" />}      color="blue"    subtext="Đã kích hoạt trên hệ thống" refreshKey={overviewRefreshKey} />
+                <StatCard label="Văn bản & Tài liệu" loading={!stats} value={stats?.documents ?? "—"}  icon={<FileCheck className="w-6 h-6" />}  color="emerald" subtext="Lưu trữ trong kho số"       delay={0.05} refreshKey={overviewRefreshKey} />
+                <StatCard label="Tổng dung lượng tệp" loading={!stats} value={stats ? formatFileSize(stats.totalSize) : "—"} icon={<HardDrive className="w-6 h-6" />} color="amber" subtext="Ổ đĩa dữ liệu an toàn"      delay={0.1}  refreshKey={overviewRefreshKey} />
+                <StatCard label="Truy cập nhật ký 24h" loading={!stats} value={stats?.logs24h ?? "—"}    icon={<History className="w-6 h-6" />}    color="red"     subtext="Bản ghi kiểm toán an ninh" delay={0.15} refreshKey={overviewRefreshKey} />
               </div>
 
               <div className={

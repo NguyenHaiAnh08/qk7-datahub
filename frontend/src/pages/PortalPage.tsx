@@ -28,6 +28,7 @@ import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData, Unit } from '../types';
 import { getMainIssuingUnits, getSchoolDepartmentsTree } from '../utils/unitTree';
+import { useDebounce } from '../hooks/useDebounce';
 
 const ITEMS_PER_PAGE = 9;
 
@@ -39,6 +40,7 @@ export const PortalPage: React.FC = () => {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [selectedType, setSelectedType] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
@@ -145,7 +147,7 @@ export const PortalPage: React.FC = () => {
       }
 
       const res = await documentsApi.getDocuments({
-        q: searchQuery || undefined,
+        q: debouncedSearch || undefined,
         type: selectedType || undefined,
         unit: queryUnit,
         include_children: includeChildren,
@@ -165,13 +167,10 @@ export const PortalPage: React.FC = () => {
     }
   };
 
-  // Debounced search
+  // Tự động tải lại danh sách khi các bộ lọc hoặc từ khóa tìm kiếm (đã debounce 500ms) thay đổi
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadDocuments();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
+    loadDocuments();
+  }, [debouncedSearch, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
 
   // Xử lý lọc dữ liệu tương tác từ Radar Tiến Độ Phòng Ban
   const handleSelectDepartmentFromRadar = (unitId: string, isDeptOfTqs: boolean) => {

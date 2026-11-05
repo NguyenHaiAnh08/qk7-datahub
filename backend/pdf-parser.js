@@ -324,6 +324,35 @@ async function matchUnitByName(getPool, sql, name) {
     return { unit_id: matches[0].unit_id, matched_by: 'name/alias' };
 }
 
+/**
+ * Trích xuất text từ file PDF số (Digital PDF) bằng pdfjs-dist.
+ * Chạy bất đồng bộ (async/await), không sử dụng OCR, không block Event Loop.
+ * @param {Buffer|Uint8Array} buffer - Buffer file PDF
+ * @returns {Promise<{ text: string, charCount: number, pageCount: number, pages: Array }>}
+ */
+async function extractTextFromDigitalPdf(buffer) {
+    try {
+        const extracted = await extractTextItems(buffer);
+        const fullText = (extracted && extracted.fullText) ? extracted.fullText.trim() : '';
+        const pages = (extracted && extracted.pages) ? extracted.pages : [];
+        return {
+            text: fullText,
+            charCount: fullText.replace(/\s+/g, '').length,
+            pageCount: pages.length,
+            pages,
+        };
+    } catch (err) {
+        console.warn('[extractTextFromDigitalPdf] Lỗi trích xuất digital text:', err.message);
+        return {
+            text: '',
+            charCount: 0,
+            pageCount: 0,
+            pages: [],
+            error: err.message,
+        };
+    }
+}
+
 // [PATCH 3 — 4.4] extractTextItems đọc tolerance từ config
 async function extractTextItems(buffer) {
     const pdfjsLib = await pdfjsLibPromise;
@@ -634,7 +663,14 @@ function findUnitsInText(text, catalog, opts = {}) {
 }
 
 // [PATCH 3 — 4.8] extractMetadata — dùng COMPILED thay toàn bộ regex hard-code
-function extractMetadata(rawText, catalog) {
+function extractMetadata(rawText, catalog = null) {
+    if (!catalog) {
+        catalog = {
+            docTypes: [], docTypeMap: {}, ranks: [], positions: [], units: [],
+            rankPattern: '', positionPattern: '',
+            rootUnits: [], childUnits: [], patterns: [],
+        };
+    }
     const text = sanitizeHiddenChars(rawText);
 
     const result = {
@@ -1263,6 +1299,9 @@ async function parseDocumentPdf(buffer, deps = {}, options = {}) {
 // [PATCH 3 — 4.9] Export thêm để test/script bên ngoài dùng
 module.exports = {
     parseDocumentPdf,
+    extractTextFromDigitalPdf,
+    extractMetadata,
+    loadCatalogs,
     invalidateCatalogCache,
     sanitizeHiddenChars,
     PARSER_THRESHOLDS,

@@ -15,7 +15,7 @@ const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
-const { parseDocumentPdf } = require('./pdf-parser');
+const { parseDocumentPdf, extractTextFromDigitalPdf, extractMetadata } = require('./pdf-parser');
 const { classifyPdf } = require('./src/pdf-router');
 const { getAuthoritativeServerTime, detectOsClockTamper } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
@@ -1783,54 +1783,91 @@ app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), up
     if (!req.file) return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
 
     const parseStartTime = Date.now();
+    const buffer = req.file.buffer;
 
-    // Tầng 1: Phân loại văn bản thông minh (TextBased vs Scanned/Mixed)
-    const classification = await classifyPdf(req.file.buffer, { forMetadataOnly: true });
+    // ─────────────────────────────────────────────────────────────
+    // 1 & 2. Trích xuất text thử nghiệm bằng pdfjs-dist
+    // Nếu số lượng ký tự > 100 (file có text layer) -> Chuyển thẳng text
+    // ─────────────────────────────────────────────────────────────
+    let digitalExtract = { text: '', charCount: 0, pages: [] };
+    try {
+      digitalExtract = await extractTextFromDigitalPdf(buffer);
+    } catch (digErr) {
+      console.warn('[parse] extractTextFromDigitalPdf lỗi:', digErr.message);
+    }
+
+    const hasTextLayer = digitalExtract.charCount > 100;
+    console.log(`[parse] File: "${req.file.originalname}" (${(req.file.size / 1024 / 1024).toFixed(2)} MB) - Ký tự text layer: ${digitalExtract.charCount} -> ${hasTextLayer ? 'Digital PDF' : 'Scan PDF'}`);
 
     let preExtractedText = null;
-    let usedEngine = 'none';
+    let usedEngine = 'digital-text';
+    let source = 'digital';
+    let isFallback = false;
 
-    // Tầng 2: Nếu có trang cần OCR, gọi Microservice PaddleOCR (:8002)
-    if (classification.pagesNeedingOcr.length > 0) {
+    if (hasTextLayer) {
+      // File có text layer (> 100 ký tự) -> Sử dụng trực tiếp text số hóa
+      preExtractedText = digitalExtract.text;
+      usedEngine = 'pdfjs-dist';
+      source = 'digital';
+    } else {
+      // ─────────────────────────────────────────────────────────────
+      // 3. File scan (text <= 100 ký tự): Gọi sang OCR Microservice (:8002)
+      // Set timeout 60 giây theo đúng quy chuẩn kiến trúc
+      // ─────────────────────────────────────────────────────────────
       const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://127.0.0.1:8002';
+      const OCR_TIMEOUT_MS = parseInt(process.env.OCR_SERVICE_TIMEOUT_MS || '60000', 10);
+
+      console.log(`[parse] Phát hiện file scan (ký tự: ${digitalExtract.charCount} <= 100). Gửi sang OCR Microservice (${OCR_SERVICE_URL}, timeout: ${OCR_TIMEOUT_MS}ms)...`);
+
       try {
         const ocrFormData = new FormData();
-        const pdfBlob = new Blob([req.file.buffer], { type: 'application/pdf' });
-        ocrFormData.append('file', pdfBlob, req.file.originalname || 'document.pdf');
-        ocrFormData.append('pages', JSON.stringify(classification.pagesNeedingOcr));
+        const pdfBlob = new Blob([buffer], { type: 'application/pdf' });
+        ocrFormData.append('file', pdfBlob, req.file.originalname || 'scan_document.pdf');
+        ocrFormData.append('pages', '[1]');
         ocrFormData.append('dpi', '150');
 
-        console.log(`[parse] Gửi ${classification.pagesNeedingOcr.length} trang sang OCR Service (:8002)...`);
         const ocrResponse = await fetch(`${OCR_SERVICE_URL}/api/ocr/extract`, {
           method: 'POST',
           body: ocrFormData,
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(OCR_TIMEOUT_MS),
         });
 
         if (ocrResponse.ok) {
           const ocrData = await ocrResponse.json();
           if (ocrData.success && ocrData.combined_text) {
             preExtractedText = ocrData.combined_text;
-            usedEngine = 'paddleocr';
-            console.log(`[parse] ✅ PaddleOCR trích xuất thành công (${ocrData.elapsed_seconds}s)`);
+            usedEngine = ocrData.engine_used || 'monkey-ocr';
+            source = 'ocr';
+            console.log(`[parse] ✅ OCR Microservice thành công (${ocrData.elapsed_seconds}s, engine: ${usedEngine}, ${preExtractedText.length} ký tự)`);
+          } else {
+            throw new Error(ocrData.error || 'OCR service trả về success=false');
           }
         } else {
-          console.warn(`[parse] OCR Service trả về status: ${ocrResponse.status}`);
+          throw new Error(`OCR service trả về mã HTTP ${ocrResponse.status}`);
         }
       } catch (ocrErr) {
-        console.warn(`[parse] ⚠️ OCR_SERVICE_OFFLINE hoặc timeout (${ocrErr.message}). Chuyển sang local fallback...`);
+        // ───────────────────────────────────────────────────────────
+        // 5. Cơ chế Fallback an toàn: ECONNREFUSED hoặc Timeout
+        // Tự động gọi lại parseDocumentPdf cũ (Tesseract) để không sập hệ thống
+        // ───────────────────────────────────────────────────────────
+        isFallback = true;
+        console.warn(`[OCR_SERVICE_OFFLINE] Fallback to Tesseract: ${ocrErr.message}`);
+        preExtractedText = null;
+        usedEngine = 'tesseract-fallback';
+        source = 'ocr-fallback';
       }
     }
 
-    // Tầng 3: Trích xuất Metadata & Điền form
-    const result = await parseDocumentPdf(req.file.buffer, { sql, getPool }, {
+    // ─────────────────────────────────────────────────────────────
+    // 4. Nhận text sạch (từ Digital hoặc OCR), bóc tách Metadata
+    // ─────────────────────────────────────────────────────────────
+    const result = await parseDocumentPdf(buffer, { sql, getPool }, {
       preExtractedText,
-      source: preExtractedText ? 'ocr' : (classification.pdfType === 'TextBased' ? 'digital' : 'ocr-fallback'),
-      classification,
+      source,
       engine: usedEngine,
     });
 
-    const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+    const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
     const documentCode = (req.body.document_code || result?.parsed?.document_code || '').trim() || null;
 
     let shaMatches = [], codeMatches = [];
@@ -1870,6 +1907,8 @@ app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), up
       original_name: req.file.originalname,
       file_size: req.file.size,
       sha256,
+      engine: usedEngine,
+      is_fallback: isFallback,
       duplicate_check: {
         sha256,
         is_duplicate: shaDuplicate || codeDuplicate,

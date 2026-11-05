@@ -26,6 +26,8 @@
 18. [Sự cố 18: Hàng đợi phê duyệt không hiển thị đề xuất chỉnh sửa văn bản do lệch cấu trúc cột DB & Lỗi cú pháp scope async](#sự-cố-18-hàng-đợi-phê-duyệt-không-hiển-thị-đề-xuất-chỉnh-sửa-văn-bản-do-lệch-cấu-trúc-cột-db-proposal_data-vs-cột-độc-lập--lỗi-cú-pháp-scope-async)
 19. [Sự cố 19: Báo động giả chụp màn hình khi click/di chuột, lệch độ tương phản tên quân nhân chế độ ngày/đêm, và các kỹ thuật lách chống chụp màn hình (Đa màn hình, Zalo Snipping, Clipboard dán vào Paint)](#sự-cố-19-báo-động-giả-chụp-màn-hình-khi-clickdi-chuột-lệch-độ-tương-phản-tên-quân-nhân-chế-độ-ngàyđêm-và-các-kỹ-thuật-lách-chống-chụp-màn-hình-đa-màn-hình-zalo-snipping-clipboard-dán-vào-paint)
 20. [Sự cố 20: Hiện tượng nhấp nháy (Flickering) PDF Canvas khi nhập liệu trong Split-Pane Modal do re-render chuỗi dependencies](#sự-cố-20-hiện-tượng-nhấp-nháy-flickering-pdf-canvas-khi-nhập-liệu-trong-split-pane-modal-do-re-render-chuỗi-dependencies)
+21. [Sự cố 21: Lỗi ERR-500 "Không thể tạo yêu cầu phê duyệt" khi cán bộ gửi đề xuất hiệu chỉnh văn bản do xung đột Middleware 4 mắt và thiếu cột CSDL](#sự-cố-21-lỗi-err-500-không-thể-tạo-yêu-cầu-phê-duyệt-khi-cán-bộ-gửi-đề-xuất-hiệu-chỉnh-văn-bản-do-xung-đột-middleware-4-mắt-và-thiếu-cột-csdl)
+22. [Sự cố 22: Đăng nhập chậm, giật lag trang và nghẽn hàng đợi mạng do Waterfall Requests, Bundle khổng lồ và thiếu Debounce/Virtual Scroll](#sự-cố-22-đăng-nhập-chậm-giật-lag-trang-và-nghẽn-hàng-đợi-mạng-do-waterfall-requests-bundle-khổng-lồ-và-thiếu-debouncevirtual-scroll)
 
 ---
 
@@ -466,3 +468,45 @@
      - Bọc toàn bộ JSX của PDF Viewer trong `useMemo(() => ..., [previewUrl, isPreviewLoading, isEditMode, ...])` hoàn toàn độc lập với các state của input form (`formData`).
 * **Kết quả:**
   Gõ phím nhập liệu siêu mượt, 0ms lag, trang PDF bên phải giữ nguyên trạng thái hiển thị 100% ổn định, không còn bất kỳ hiện tượng nhấp nháy nào.
+
+
+---
+
+### Sự cố 21: Lỗi ERR-500 "Không thể tạo yêu cầu phê duyệt" khi cán bộ gửi đề xuất hiệu chỉnh văn bản do xung đột Middleware 4 mắt và thiếu cột CSDL
+
+* **Triệu chứng:**
+  Khi cán bộ (vai trò Trợ lý, Văn thư — không phải Admin hoặc người tải văn bản ban đầu) mở modal "Hiệu chỉnh văn bản", nhập trích yếu chuẩn hóa và bấm "Cập nhật văn bản", hệ thống báo lỗi đỏ:
+  `Sự Cố Máy Chủ ERR-500: Không thể tạo yêu cầu phê duyệt`.
+
+* **Nguyên nhân gốc rễ:**
+  1. *Xung đột luồng nghiệp vụ:* Nghiệp vụ sửa đổi văn bản có luồng phê duyệt chuyên dụng `DOCUMENT_REVISION_PROPOSAL` (`PROP-xxx`) xử lý lưu trữ tệp đính kèm và kiểm tra quyền đơn vị cục bộ. Tuy nhiên, middleware Maker-Checker quản trị toàn cục (`approvalInterceptor` trong `approval-workflow.js`) bắt nhầm đường dẫn `PUT /api/documents/:fileId`.
+  2. *Lỗi Schema CSDL:* Bảng `APPROVAL_REQUEST` trong SQL Server thiếu cột `requester_unit_id`, gây lỗi `Invalid column name 'requester_unit_id'`.
+  3. *Lỗi Khóa Ngoại:* Middleware truyền mã quyền chuỗi `DOC_EDIT` vào cột `required_permission`, vi phạm ràng buộc khóa ngoại `FK_Approval_Permission` (yêu cầu `permission_id` dạng `PERM-DOC-04`).
+
+* **Cách khắc phục triệt để:**
+  1. **Nâng cấp CSDL:** Chạy DDL bổ sung cột:
+     ```sql
+     ALTER TABLE APPROVAL_REQUEST ADD requester_unit_id VARCHAR(50) NULL;
+     ```
+  2. **Tách luồng Middleware:** Thêm `/^\/api\/documents(\/|$)/`/ vào danh sách `EXCLUDED_PATHS` trong `backend/src/approval-workflow.js`, để yêu cầu cập nhật văn bản đi thẳng vào luồng `DOCUMENT_REVISION_PROPOSAL`.
+  3. **Đồng bộ hóa mã quyền:** Xây dựng bảng ánh xạ `code <-> permission_id` để khi có yêu cầu quản trị hệ thống phát sinh, dữ liệu ghi vào `APPROVAL_REQUEST` luôn thỏa mãn khóa ngoại.
+
+---
+
+### Sự cố 22: Đăng nhập chậm, giật lag trang và nghẽn hàng đợi mạng do Waterfall Requests, Bundle khổng lồ và thiếu Debounce/Virtual Scroll
+
+* **Triệu chứng:**
+  Thời gian đăng nhập vào hệ thống kéo dài, chuyển trang có độ trễ lớn; khi gõ tìm kiếm văn bản thì mạng bị chậm giật do gọi API liên tục theo từng ký tự; khi tải danh sách dài (nhật ký SOC) trang bị tụt FPS và tiêu tốn nhiều RAM.
+
+* **Nguyên nhân gốc rễ:**
+  1. Toàn bộ mã nguồn trang và thư viện lớn (`xlsx`, `pdfjs`, `framer-motion`, `antd`) bị gộp vào một bundle duy nhất > 3.5MB.
+  2. Sau khi API `/api/auth/login` trả về dữ liệu, code gọi thêm request `authService.getMe()` dư thừa kèm `setTimeout(500)` nhân tạo.
+  3. Ô tìm kiếm kích hoạt API ở mỗi sự kiện `onChange`, gây spam mạng và race condition.
+  4. Bảng danh sách dài render toàn bộ DOM node cùng lúc mà không có virtualization.
+
+* **Cách khắc phục triệt để:**
+  1. **Rollup Manual Chunks & Lazy Loading:** Tách các vendor chunks (`vendor-react`, `vendor-antd`, `vendor-excel`, `vendor-pdfjs`...) và áp dụng `React.lazy` kết hợp `lazyWithRetry` cho toàn bộ các route.
+  2. **Triệt tiêu Waterfall Requests:** Bỏ `authService.getMe()` dư thừa, bỏ `setTimeout(500)`, mirror profile sang `localStorage`, điều hướng tức thì 0ms.
+  3. **Debounce 500ms:** Áp dụng hook `useDebounce` cho toàn bộ ô tìm kiếm tại Portal, DocumentDesk, MyUnit, SecurityAuditLog.
+  4. **Skeleton Loading:** Thay thế vòng xoay `<Spin>` toàn màn hình bằng khung xương Ant Design Skeleton chống giật layout (CLS).
+  5. **Virtual Scrolling:** Áp dụng hook `useVirtualScroll` cho bảng `SecurityAuditLog.tsx`, chỉ vẽ ~12–15 dòng DOM trong khung nhìn, đạt 60 FPS khi cuộn chuột.

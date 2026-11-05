@@ -177,7 +177,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       }
 
       // Nếu login bình thường, lấy thông tin user
-      const loggedInUser = await authService.getMe();
+      const loggedInUser = res?.user || (await authService.getMe());
 
       saveUserSession(loggedInUser); 
 
@@ -187,13 +187,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       if (onSuccess) {
         onSuccess(loggedInUser);
       } else {
-        setTimeout(() => {
-          if (isUserAdmin(loggedInUser)) {
-            navigate(ROUTE_PATHS.ADMIN, { replace: true });
-          } else {
-            navigate(getDestinationByRole(loggedInUser), { replace: true });
-          }
-        }, 500);
+        if (isUserAdmin(loggedInUser)) {
+          navigate(ROUTE_PATHS.ADMIN, { replace: true });
+        } else {
+          navigate(getDestinationByRole(loggedInUser), { replace: true });
+        }
       }
     } catch (err: any) {
       console.error('[Đăng nhập thất bại]:', err?.message || err);
@@ -287,13 +285,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       if (onSuccess) {
         onSuccess(me);
       } else {
-        setTimeout(() => {
-          if (isUserAdmin(me)) {
-            navigate(ROUTE_PATHS.ADMIN, { replace: true });
-          } else {
-            navigate(getDestinationByRole(me), { replace: true });
-          }
-        }, 500);
+        if (isUserAdmin(me)) {
+          navigate(ROUTE_PATHS.ADMIN, { replace: true });
+        } else {
+          navigate(getDestinationByRole(me), { replace: true });
+        }
       }
     } catch (err: any) {
       if (onToast) onToast('Lỗi khi lấy thông tin người dùng sau khi xác thực: ' + err.message, 'error');

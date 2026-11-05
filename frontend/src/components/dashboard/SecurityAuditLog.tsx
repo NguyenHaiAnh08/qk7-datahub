@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useDebounce } from '../../hooks/useDebounce';
+import { useVirtualScroll } from '../../hooks/useVirtualScroll';
+import { Skeleton } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
@@ -204,6 +207,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
 
   // Bộ lọc & Tìm kiếm
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [severityFilter, setSeverityFilter] = useState<SeverityGroup>('ALL');
   const [actionFilter, setActionFilter] = useState('');
 
@@ -272,7 +276,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
   // Reset trang 1 khi lọc hoặc tìm kiếm
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, severityFilter, actionFilter, pageSize]);
+  }, [debouncedSearch, severityFilter, actionFilter, pageSize]);
 
   // Tính toán KPI Thống kê
   const kpiStats = useMemo(() => {
@@ -306,8 +310,8 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
     }
 
     // 3. Lọc theo chuỗi tìm kiếm (IP, User, Tiêu đề, Ghi chú)
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
       result = result.filter((l) => {
         const uId = (l.user_id || '').toLowerCase();
         const fName = (l.full_name || '').toLowerCase();
@@ -327,7 +331,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
     }
 
     return result;
-  }, [logs, severityFilter, actionFilter, searchQuery]);
+  }, [logs, severityFilter, actionFilter, debouncedSearch]);
 
   // Phân trang
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
@@ -335,6 +339,16 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
     const start = (currentPage - 1) * pageSize;
     return filteredLogs.slice(start, start + pageSize);
   }, [filteredLogs, currentPage, pageSize]);
+
+  // Áp dụng Virtual Scroll để chỉ render các hàng trong viewport khi cuộn bảng dài
+  const isVirtualEnabled = paginatedLogs.length > 10;
+  const { containerRef, onScroll, startIndex, endIndex, topSpacer, bottomSpacer } = useVirtualScroll({
+    itemCount: paginatedLogs.length,
+    itemHeight: 64,
+    overscan: 4,
+  });
+
+  const visibleLogs = isVirtualEnabled ? paginatedLogs.slice(startIndex, endIndex) : paginatedLogs;
 
   // Xuất file Báo cáo Excel chuẩn định dạng Quân đội (Xuất báo cáo mẫu.xlsx)
   // Cơ chế Hold & Release: Giữ file trong suốt quá trình chạy thanh tiến trình và chỉ thả file về máy khi UI đạt 'done'
@@ -1100,7 +1114,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
 
       {/* 4. TABLE SECTION (CHUẨN CẢ LIGHT & DARK NIGHT MODE) */}
       <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm dark:bg-[#111827]/80 dark:backdrop-blur-md dark:border-slate-800 dark:shadow-xl">
-        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div ref={containerRef} onScroll={onScroll} className="overflow-x-auto overflow-y-auto max-h-[640px]" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full text-left text-xs min-w-[980px]">
             <thead className="bg-slate-50 text-slate-600 uppercase text-[11px] border-b border-slate-200 font-semibold tracking-wider dark:bg-slate-900/90 dark:text-slate-400 dark:border-slate-800">
               <tr>

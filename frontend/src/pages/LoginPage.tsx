@@ -71,9 +71,7 @@ export const LoginPage: React.FC = () => {
 
     // Khi đăng nhập Admin thì vô thẳng admin-dashboard luôn
     if (isUserAdmin(loggedInUser)) {
-      setTimeout(() => {
-        navigate(ROUTE_PATHS.ADMIN, { replace: true });
-      }, 500);
+      navigate(ROUTE_PATHS.ADMIN, { replace: true });
       return;
     }
 

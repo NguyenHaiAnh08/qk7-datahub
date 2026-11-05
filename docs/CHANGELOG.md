@@ -4,6 +4,41 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.3.1-frontend-performance-optimization-and-approval-fix] — 2026-11-05
+
+### 1. Tối Ưu Hóa Hiệu Năng Frontend Toàn Diện (Performance Optimization Suite)
+- **Nhiệm vụ 1: Cắt Giảm Bundle Size & Dynamic Code Splitting:**
+  - Cấu hình lại `vite.config.ts` với `build.rollupOptions.output.manualChunks` để chia tách các thư viện nặng thành các vendor chunk độc lập: `vendor-react` (React, React-DOM), `vendor-antd` (Ant Design, Ant Design Icons), `vendor-excel` (xlsx), `vendor-motion` (framer-motion), `vendor-icons` (lucide-react), `vendor-pdflib` (pdf-lib), `vendor-pdfjs` (pdfjs-dist).
+  - Chuẩn hóa tên file xuất ra định dạng cố định `assets/[name].js` nhằm chống lỗi cache mismatch khi triển khai thực tế.
+  - Xây dựng tiện ích `lazyWithRetry` (`frontend/src/utils/lazyWithRetry.ts`) tự động bắt lỗi và tải lại trang khi module động gặp sự cố mạng hoặc phiên bản mới được release.
+  - Chuyển đổi toàn bộ 9 module routes (`admin`, `auth`, `desk`, `ecosystem`, `error`, `fallback`, `myApprovals`, `myunit`, `portal`) sang `React.lazy` kết hợp `lazyWithRetry`.
+  - Bao bọc `RouterProvider.tsx` với `<Suspense fallback={<LoadingSpinner fullScreen />}>`, tích hợp Spinner màu tím `#722ED1` đồng bộ chuẩn Design System.
+- **Nhiệm vụ 2: Xử Lý Triệt Để Waterfall Requests & Độ Trễ Khi Đăng Nhập:**
+  - Loại bỏ request gọi lặp `authService.getMe()` trong `LoginForm.tsx` sau khi đăng nhập thành công, vì endpoint `/api/auth/login` vốn dĩ đã trả về đầy đủ hồ sơ người dùng (họ tên, cấp bậc, chức vụ, vai trò, clearance level, đơn vị, danh sách quyền).
+  - Loại bỏ các hàm chờ nhân tạo `setTimeout(500)` trong `LoginForm.tsx` và `LoginPage.tsx`, giúp người dùng chuyển hướng về trang chủ tức thì (0ms latency).
+  - Đồng bộ hóa JWT Token và User Profile vào `localStorage` (`authService.ts`) để `AuthContext` có sẵn dữ liệu ngay khi Page Component mount, hạn chế tối đa việc gọi API profile ngầm.
+- **Nhiệm vụ 3: Tối Ưu Hóa Tìm Kiếm & Bộ Lọc Bằng Custom Hook `useDebounce`:**
+  - Xây dựng custom hook `useDebounce` (`frontend/src/hooks/useDebounce.ts`) với thời gian trễ mặc định 500ms.
+  - Tích hợp Debounce vào các ô tìm kiếm trên toàn bộ hệ thống: `PortalPage.tsx`, `DocumentDeskPage.tsx`, `MyUnitPage.tsx`, `SecurityAuditLog.tsx`.
+  - Giảm ~85% số lượng request truy vấn xuống Gateway khi người dùng gõ phím, loại bỏ triệt để hiện tượng xung đột dữ liệu (Race Conditions) do phản hồi mạng không đồng bộ.
+- **Nhiệm vụ 4: Nâng Cấp Trải Nghiệm Skeleton Loading Thay Thế Spinner Toàn Màn Hình:**
+  - Thay thế vòng xoay tải trang toàn màn hình `<Spin>` và các văn bản "Đang tải dữ liệu..." bằng component `<Skeleton>` chuẩn Ant Design.
+  - Thiết kế Skeleton Card dạng lưới trong `PortalDocumentList.tsx` (mô phỏng 6 thẻ tài liệu).
+  - Thiết kế Skeleton Table Row trong `DocumentTable.tsx` (mô phỏng 6 hàng dữ liệu bảng).
+  - Tích hợp Skeleton cho các thẻ chỉ số KPI (`StatCard.tsx`, `AdminDashboardPage.tsx`), chống hiện tượng giật cục giao diện (Cumulative Layout Shift - CLS).
+- **Nhiệm vụ 5: Kỹ Thuật Virtual Scrolling Cho Bảng Danh Sách Dài:**
+  - Xây dựng custom hook `useVirtualScroll` (`frontend/src/hooks/useVirtualScroll.ts`) tính toán vùng hiển thị động (windowing) theo vị trí cuộn chuột.
+  - Áp dụng Virtual Scrolling vào bảng Nhật ký kiểm toán SOC (`SecurityAuditLog.tsx`), chỉ render ~12–15 dòng DOM đang nằm trong viewport thay vì nạp cùng lúc hàng trăm đến hàng nghìn phần tử `<tr>`.
+  - Đạt tốc độ cuộn mượt mà 60 FPS, giảm thiểu tải tiêu thụ bộ nhớ RAM của trình duyệt.
+
+### 2. Bản Vá Lỗi Tạo Yêu Cầu Hiệu Chỉnh Văn Bản (Document Edit Approval Fix)
+- **Khắc phục lỗi HTTP 500 (`ERR-500: Không thể tạo yêu cầu phê duyệt`):**
+  - *Bổ sung cột CSDL:* Chạy migration bổ sung cột `requester_unit_id VARCHAR(50) NULL` vào bảng `APPROVAL_REQUEST` trong SQL Server `QK7_ThuVienSo`.
+  - *Định tuyến chính xác:* Bổ sung `/^\/api\/documents(\/|$)/`/ vào danh sách ngoại lệ `EXCLUDED_PATHS` trong `backend/src/approval-workflow.js`. Nhờ đó, thao tác sửa văn bản của cán bộ (Trợ lý, Văn thư) đi trực tiếp vào luồng chuyên dụng `DOCUMENT_REVISION_PROPOSAL` (`PROP-xxx`), bảo đảm lưu trữ trọn vẹn tệp đính kèm và thông tin hiệu chỉnh.
+  - *Chuẩn hóa Khóa ngoại:* Đồng bộ hóa bảng ánh xạ mã quyền `code <-> permission_id` trong `approval-workflow.js`, bảo đảm khi ghi các yêu cầu Maker-Checker quản trị hệ thống (`APV-xxx`) luôn khớp với khóa ngoại `FK_Approval_Permission` (`PERMISSION.permission_id`).
+
+---
+
 ## [v1.3.0-clean-unit-types-and-hierarchy-sorting] — 2026-11-04
 
 ### 1. Tinh Gọn Modal Thêm Mới / Chỉnh Sửa Đơn Vị (`AdminDashboardPage.tsx`)

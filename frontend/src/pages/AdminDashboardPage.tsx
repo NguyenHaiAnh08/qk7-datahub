@@ -1312,8 +1312,12 @@ const pinPendingCount = useMemo(
               }}
               onAddChild={(parentUnit) => {
                 let defaultType = 'phong';
+                const parentCat = parentUnit.unit_type || getUnitCategory(parentUnit);
                 if (parentUnit.unit_id === 'QK7') defaultType = 'su_doan';
-                else if (parentUnit.unit_id === 'TQS') defaultType = 'phong';
+                else if (parentUnit.unit_id === 'TQS') defaultType = 'khoa';
+                else if (parentCat === 'khoa') defaultType = 'bo_mon';
+                else if (parentCat === 'bo_mon') defaultType = 'to';
+                else if (parentCat === 'phong' || parentCat === 'ban') defaultType = 'to';
                 setGenericFormData({ unit_id: '', name: '', parent_id: parentUnit.unit_id, unit_type: defaultType });
                 setGenericModal({ open: true, type: 'units', item: null });
               }}
@@ -1768,8 +1772,12 @@ const pinPendingCount = useMemo(
                           <option value="su_doan">Sư đoàn</option>
                           <option value="nha_truong">Nhà trường / Viện</option>
                           <option value="co_quan">Cơ quan</option>
+                          <option value="khoa">Khoa</option>
+                          <option value="bo_mon">Bộ môn</option>
                           <option value="phong">Phòng</option>
                           <option value="ban">Ban</option>
+                          <option value="to">Tổ</option>
+                          <option value="lop">Lớp</option>
                           <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
                         </select>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Quy định cấp bậc hiển thị và thẩm quyền quản lý của đơn vị</p>

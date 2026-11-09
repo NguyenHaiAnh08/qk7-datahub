@@ -86,7 +86,7 @@ export default {
 
 ### 4. Lớp gác cổng theo Cấp Độ Mật — `routeAccess.ts` (ĐẶC THÙ QK7)
 
-Khác với POS-coffee (chỉ có Login Guard), TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB cần thêm một ma trận phân quyền áp dụng **trước
+TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB cần thêm một ma trận phân quyền áp dụng **trước
 khi** route được render:
 
 ```ts

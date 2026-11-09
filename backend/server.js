@@ -44,7 +44,7 @@ const {
 } = require('./src/audit-log-cleaner');
 
 const app = express();
-app.set('trust proxy', 'loopback');
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 
 const PORT = process.env.PORT || 8000;
 const ROOT_DIR = __dirname;
@@ -86,15 +86,58 @@ if (!FP_ENC_KEY) console.warn('[SECURITY] ⚠️  FP_ENC_KEY chưa set');
 // ═══════════════════════════════════════════════════════════════
 // SECURITY MIDDLEWARE
 // ═══════════════════════════════════════════════════════════════
+// [FIX CWE-1021 / CWE-79] Cau hinh Helmet CSP an toan cho React SPA
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", 'ws:', 'wss:', 'http:', 'https:'],
+      fontSrc: ["'self'", 'data:'],
+      objectSrc: ["'none'"],
+      frameSrc: ["'self'", 'blob:'],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' && process.env.USE_HTTPS === 'true' ? [] : null,
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
-  originAgentCluster: false,
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  hsts: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
+  hsts: process.env.NODE_ENV === 'production' && process.env.USE_HTTPS === 'true',
 }));
+// [FIX CWE-942] Whitelist Origin CORS - Khong dung wildcard cho API van ban quan su
+const defaultCorsOrigins = [
+  'http://localhost:5173',
+  'http://localhost:8000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:8000',
+];
+if (process.env.SERVER_IP) {
+  defaultCorsOrigins.push(`http://${process.env.SERVER_IP}:5173`);
+  defaultCorsOrigins.push(`http://${process.env.SERVER_IP}:8000`);
+  defaultCorsOrigins.push(`https://${process.env.SERVER_IP}`);
+}
+if (process.env.SERVER_DOMAIN) {
+  defaultCorsOrigins.push(`https://${process.env.SERVER_DOMAIN}`);
+  defaultCorsOrigins.push(`http://${process.env.SERVER_DOMAIN}`);
+}
+const envCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+const allowedCorsOrigins = Array.from(new Set([...defaultCorsOrigins, ...envCorsOrigins]));
+
 app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedCorsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
   exposedHeaders: ['X-Server-Time', 'X-Trace-Id', 'X-Clock-Timestamp', 'Content-Disposition'],
 }));
 app.use(express.json({ limit: '2mb' }));
@@ -158,7 +201,8 @@ app.use(express.static(publicDir, {
   }
 }));
 
-const ENABLE_SWAGGER = (process.env.ENABLE_SWAGGER || 'true').toLowerCase() === 'true';
+// [FIX CWE-200] Swagger mac dinh tat o production tru khi duoc bat ro rang
+const ENABLE_SWAGGER = (process.env.ENABLE_SWAGGER || (process.env.NODE_ENV === 'production' ? 'false' : 'true')).toLowerCase() === 'true';
 if (ENABLE_SWAGGER) {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customCss: '.swagger-ui .topbar { display: none }',
@@ -193,10 +237,29 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
+    // [FIX CWE-434] Kiem tra duoi mo rong va chong path traversal tren ten file
+    const origName = file.originalname || '';
+    if (origName.includes('\0') || origName.includes('..') || !origName.toLowerCase().endsWith('.pdf')) {
+      return cb(new Error('Tên tệp không hợp lệ hoặc chứa ký tự nguy hiểm'));
+    }
     if (file.mimetype === 'application/pdf') cb(null, true);
     else cb(new Error('Chỉ chấp nhận file PDF'));
   },
 });
+
+// [FIX CWE-434] Middleware xac thuc Magic Bytes (%PDF-) chong gia mao MIME type
+function validateUploadedPdf(req, res, next) {
+  if (!req.file) return next();
+  const buf = req.file.buffer;
+  if (!buf || buf.length < 5) {
+    return res.status(400).json({ error: 'Tệp tải lên không hợp lệ hoặc rỗng' });
+  }
+  const header = buf.slice(0, Math.min(buf.length, 1024)).toString('latin1');
+  if (!header.includes('%PDF-')) {
+    return res.status(400).json({ error: 'Định dạng tệp không hợp lệ: nội dung không phải PDF chuẩn (Magic Bytes mismatch).' });
+  }
+  next();
+}
 
 function safePathJoin(baseDir, userPath) {
   if (!baseDir || !userPath) return null;
@@ -248,23 +311,13 @@ function findPdfBySha8(rootDir, sha8, maxDepth = 5) {
 }
 
 function getClientIpInfo(req) {
+  // [FIX CWE-290] Uu tien req.ip duoc Express xac thuc qua 'trust proxy'.
+  // Khong doc truc tiep req.headers['x-forwarded-for'] chua qua kiem tra.
+  const candidate = req.ip || req.socket?.remoteAddress || '';
   const raw = {
     socket: req.socket?.remoteAddress || null,
     reqIp: req.ip || null,
-    xForwardedFor: req.headers['x-forwarded-for'] || null,
-    xRealIp: req.headers['x-real-ip'] || null,
-    xClientIp: req.headers['x-client-ip'] || null,
-    cfConnectingIp: req.headers['cf-connecting-ip'] || null,
   };
-  let candidate = '';
-  if (raw.xForwardedFor) {
-    const parts = String(raw.xForwardedFor).split(',').map((s) => s.trim()).filter(Boolean);
-    if (parts.length > 0) candidate = parts[0];
-  }
-  if (!candidate && raw.xRealIp) candidate = String(raw.xRealIp).trim();
-  if (!candidate && raw.xClientIp) candidate = String(raw.xClientIp).trim();
-  if (!candidate && raw.cfConnectingIp) candidate = String(raw.cfConnectingIp).trim();
-  if (!candidate) candidate = raw.reqIp || raw.socket || '';
 
   let ip = String(candidate).trim();
   if (/^\d{1,3}(\.\d{1,3}){3}:\d+$/.test(ip)) ip = ip.split(':')[0];
@@ -456,7 +509,7 @@ function decryptTemplate(encoded, context = {}) {
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const enc = buf.subarray(28);
-    const d = crypto.createDecipheriv('aes-256-gcm', FP_ENC_KEY, iv);
+    const d = crypto.createDecipheriv('aes-256-gcm', FP_ENC_KEY, iv, { authTagLength: 16 });
     d.setAuthTag(tag);
     return Buffer.concat([d.update(enc), d.final()]);
   } catch (err) {
@@ -1778,7 +1831,7 @@ app.get('/api/documents/:fileId', requireAuth, requirePermission('DOC_VIEW'), as
 // ═══════════════════════════════════════════════════════════════
 // DOCUMENT PARSE / UPLOAD / UPDATE / DELETE / RESTORE / PURGE
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), async (req, res) => {
+app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), validateUploadedPdf, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
 
@@ -1952,7 +2005,7 @@ const syncToAI = async (action, doc) => {
   }
 };
 
-app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), upload.single('file'), async (req, res) => {
+app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), upload.single('file'), validateUploadedPdf, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
 
@@ -2038,7 +2091,7 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
   }
 });
 
-app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), upload.single('file'), async (req, res) => {
+app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), upload.single('file'), validateUploadedPdf, async (req, res) => {
   const fileId = req.params.fileId;
   try {
     const pool = await getPool();

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/web/pdf_viewer.css';
 import { Loader2 } from 'lucide-react';
 
@@ -126,7 +126,7 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
       try {
         const loadingTask = pdfjsLib.getDocument({
           url: blobUrl,
-          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.3.136/cmaps/',
           cMapPacked: true,
         });
         const doc = await loadingTask.promise;
@@ -362,12 +362,12 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
           textContainer.style.setProperty('--scale-factor', `${viewport.scale}`);
 
           const textContent = await page.getTextContent();
-          await pdfjsLib.renderTextLayer({
+          const textLayer = new (pdfjsLib as any).TextLayer({
             textContentSource: textContent,
             container: textContainer,
             viewport: viewport,
-            textDivs: [],
-          }).promise;
+          });
+          await textLayer.render();
         }
 
         // 3. Chuẩn bị Canvas Highlight

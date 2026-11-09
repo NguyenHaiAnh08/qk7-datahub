@@ -48,7 +48,8 @@ if not exist "config" mkdir config
     echo MATCH_SCORE_THRESHOLD=%MATCH_SCORE_THRESHOLD%
 ) > "config\client.info"
 
-copy /Y "config\client.info" "config\client.info.example" >nul 2>&1
+REM Giu nguyen config\client.info.example la file mau voi placeholder (tranh lo secret qua git)
+REM copy /Y "config\client.info" "config\client.info.example" >nul 2>&1
 
 echo [OK] Da sinh: %~dp0config\client.info
 echo.

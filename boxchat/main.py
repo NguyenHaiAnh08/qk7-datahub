@@ -94,12 +94,27 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Middleware
+# CORS Middleware [FIX CWE-942: Chi chap nhan internal gateway va local origins]
+allowed_origins_boxchat = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+]
+server_ip = os.getenv("SERVER_IP")
+if server_ip:
+    allowed_origins_boxchat.append(f"http://{server_ip}:8000")
+    allowed_origins_boxchat.append(f"http://{server_ip}:5173")
+
+env_cors = os.getenv("CORS_ALLOWED_ORIGINS", "")
+if env_cors:
+    allowed_origins_boxchat.extend([o.strip() for o in env_cors.split(",") if o.strip()])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(set(allowed_origins_boxchat)),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 

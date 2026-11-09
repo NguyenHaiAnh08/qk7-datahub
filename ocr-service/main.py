@@ -206,11 +206,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS Middleware [FIX CWE-942: Chi chap nhan internal gateway va local origins]
+allowed_origins_ocr = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+]
+server_ip = os.environ.get("SERVER_IP")
+if server_ip:
+    allowed_origins_ocr.append(f"http://{server_ip}:8000")
+    allowed_origins_ocr.append(f"http://{server_ip}:5173")
+
+env_cors = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+if env_cors:
+    allowed_origins_ocr.extend([o.strip() for o in env_cors.split(",") if o.strip()])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(set(allowed_origins_ocr)),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 

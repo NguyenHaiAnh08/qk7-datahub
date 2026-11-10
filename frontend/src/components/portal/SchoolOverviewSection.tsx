@@ -298,7 +298,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: 0 }}
           onClick={onResetFilters}
-          className="group relative bg-white dark:bg-[#111827] p-4 sm:p-4.5 rounded-xl border border-slate-200 dark:border-white/[0.08] border-l-4 border-l-emerald-600 dark:border-l-emerald-500 hover:border-slate-300 dark:hover:border-white/20 transition-all cursor-pointer flex flex-col justify-between shadow-xs"
+          className="group relative bg-white dark:bg-[#111827] p-4 sm:p-4.5 rounded-xl border-y border-r border-slate-200 dark:border-white/[0.08] border-l-4 border-l-emerald-600 dark:border-l-emerald-500 hover:border-slate-300 dark:hover:border-white/20 transition-all cursor-pointer flex flex-col justify-between shadow-xs"
           title="Nhấn để đặt lại bộ lọc và hiển thị tất cả văn bản toàn trường"
         >
           <div>
@@ -332,7 +332,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: 0.04 }}
-          className={`group relative bg-white dark:bg-[#111827] p-4 sm:p-4.5 rounded-xl border border-slate-200 dark:border-white/[0.08] border-l-4 transition-all flex flex-col justify-between shadow-xs ${
+          className={`group relative bg-white dark:bg-[#111827] p-4 sm:p-4.5 rounded-xl border-y border-r border-slate-200 dark:border-white/[0.08] border-l-4 transition-all flex flex-col justify-between shadow-xs ${
             zeroDocUnitsCount > 0
               ? 'border-l-rose-500 dark:border-l-rose-500'
               : 'border-l-amber-500 dark:border-l-amber-500'
@@ -399,7 +399,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
               onSelectLevel(userClearanceLevel);
             }
           }}
-          className={`group relative bg-white dark:bg-[#111827] p-4 sm:p-4.5 rounded-xl border border-slate-200 dark:border-white/[0.08] border-l-4 border-l-blue-500 dark:border-l-blue-400 hover:border-slate-300 dark:hover:border-white/20 transition-all cursor-pointer flex flex-col justify-between shadow-xs ${
+          className={`group relative bg-white dark:bg-[#111827] p-4 sm:p-4.5 rounded-xl border-y border-r border-slate-200 dark:border-white/[0.08] border-l-4 border-l-blue-500 dark:border-l-blue-400 hover:border-slate-300 dark:hover:border-white/20 transition-all cursor-pointer flex flex-col justify-between shadow-xs ${
             selectedLevel === userClearanceLevel
               ? 'ring-1 ring-blue-500/50 bg-blue-500/[0.03] dark:bg-blue-500/[0.05]'
               : ''
@@ -450,7 +450,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: 0.12 }}
-          className="group relative bg-white dark:bg-[#111827] p-4 sm:p-4.5 rounded-xl border border-slate-200 dark:border-white/[0.08] border-l-4 border-l-cyan-500 dark:border-l-cyan-400 hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col justify-between shadow-xs"
+          className="group relative bg-white dark:bg-[#111827] p-4 sm:p-4.5 rounded-xl border-y border-r border-slate-200 dark:border-white/[0.08] border-l-4 border-l-cyan-500 dark:border-l-cyan-400 hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col justify-between shadow-xs"
         >
           <div>
             <div className="flex items-center justify-between gap-2">

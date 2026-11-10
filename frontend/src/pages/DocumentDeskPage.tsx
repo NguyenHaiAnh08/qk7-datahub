@@ -18,7 +18,7 @@ import { useSearchParams } from 'react-router-dom';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
 
-const ITEMS_PER_PAGE = 8;
+const ITEMS_PER_PAGE = 30;
 
 export const DocumentDeskPage: React.FC = () => {
 const { user, hasPermission } = useAuth(); 

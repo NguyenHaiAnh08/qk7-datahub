@@ -126,8 +126,9 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
       try {
         const loadingTask = pdfjsLib.getDocument({
           url: blobUrl,
-          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.3.136/cmaps/',
+          cMapUrl: '/cmaps/',
           cMapPacked: true,
+          standardFontDataUrl: '/standard_fonts/',
         });
         const doc = await loadingTask.promise;
         if (isCancelled) return;

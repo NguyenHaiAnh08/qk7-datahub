@@ -71,6 +71,7 @@ export interface AdminStats {
   documents: number;
   totalSize: number;
   logs24h: number;
+  trashCount?: number;
   byLevel: Array<{ lv: number; lvName: string; n: number }>;
   byType: Array<{ id: string; name: string; n: number }>;
   byUnit: Array<{ id: string; name: string; n: number }>;

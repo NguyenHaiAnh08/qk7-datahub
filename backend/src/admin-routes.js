@@ -302,13 +302,14 @@ module.exports = (app, deps) => {
     app.get('/api/admin/stats', async (req, res) => {
         try {
             const pool = await getPool();
-            const [u, d, byLv, byType, byUnit, logs24] = await Promise.all([
+            const [u, d, byLv, byType, byUnit, logs24, trash] = await Promise.all([
                 pool.request().query(`SELECT COUNT(*) AS n FROM [USER]`),
-                pool.request().query(`SELECT COUNT(*) AS n, ISNULL(SUM(file_size),0) AS size FROM DOCUMENT`),
-                pool.request().query(`SELECT sl.level_id AS lv, sl.name AS lvName, COUNT(d.file_id) AS n FROM SECURITY_LEVEL sl LEFT JOIN DOCUMENT d ON d.security_level_id = sl.level_id GROUP BY sl.level_id, sl.name ORDER BY sl.level_id`),
-                pool.request().query(`SELECT dt.type_id AS id, dt.name, COUNT(d.file_id) AS n FROM DOCUMENT_TYPE dt LEFT JOIN DOCUMENT d ON d.doc_type_id = dt.type_id GROUP BY dt.type_id, dt.name ORDER BY n DESC`),
-                pool.request().query(`SELECT u.unit_id AS id, u.name, COUNT(d.file_id) AS n FROM UNIT u LEFT JOIN DOCUMENT d ON d.issuing_unit_id = u.unit_id GROUP BY u.unit_id, u.name ORDER BY n DESC`),
+                pool.request().query(`SELECT COUNT(*) AS n, ISNULL(SUM(file_size),0) AS size FROM DOCUMENT WHERE deleted_at IS NULL`),
+                pool.request().query(`SELECT sl.level_id AS lv, sl.name AS lvName, COUNT(d.file_id) AS n FROM SECURITY_LEVEL sl LEFT JOIN DOCUMENT d ON d.security_level_id = sl.level_id AND d.deleted_at IS NULL GROUP BY sl.level_id, sl.name ORDER BY sl.level_id`),
+                pool.request().query(`SELECT dt.type_id AS id, dt.name, COUNT(d.file_id) AS n FROM DOCUMENT_TYPE dt LEFT JOIN DOCUMENT d ON d.doc_type_id = dt.type_id AND d.deleted_at IS NULL GROUP BY dt.type_id, dt.name ORDER BY n DESC`),
+                pool.request().query(`SELECT u.unit_id AS id, u.name, COUNT(d.file_id) AS n FROM UNIT u LEFT JOIN DOCUMENT d ON d.issuing_unit_id = u.unit_id AND d.deleted_at IS NULL GROUP BY u.unit_id, u.name ORDER BY n DESC`),
                 pool.request().query(`SELECT COUNT(*) AS n FROM ACCESS_LOG WHERE [timestamp] >= DATEADD(day,-1,GETDATE())`),
+                pool.request().query(`SELECT COUNT(*) AS n FROM DOCUMENT WHERE deleted_at IS NOT NULL`),
             ]);
             res.json({
                 users: u.recordset[0].n,
@@ -318,6 +319,7 @@ module.exports = (app, deps) => {
                 byType: byType.recordset,
                 byUnit: byUnit.recordset,
                 logs24h: logs24.recordset[0].n,
+                trashCount: trash.recordset[0].n,
             });
         } catch (e) {
             console.error('[GET /api/admin/stats]', e);

@@ -1,3 +1,23 @@
+
+// ============================================================
+// CONFIG — KHÔNG HARDCODE
+// ============================================================
+const API_VERSION = process.env.API_VERSION || '3.1.0';
+const API_TITLE   = 'QK7 DataHub API';
+const API_CONTACT = 'Phòng CNTT QK7';
+
+const TAG_AUTH      = 'Auth';
+const TAG_SYSTEM    = 'System';
+const TAG_DOCS      = 'Documents';
+const TAG_FILES     = 'Files';
+const TAG_LOGS      = 'Logs';
+const TAG_SECURITY  = 'Security';
+const TAG_APPROVAL  = 'Approval';
+const TAG_ADMIN     = 'Admin';
+const TAG_AI        = 'AI Assistant';
+const TAG_LECTURES  = 'Lectures';
+
+
 // ============================================================
 // backend/swagger.js — QK7 DataHub OpenAPI 3.0
 // Version: 3.0.0 — 2026-11-03
@@ -5,6 +25,10 @@
 //   approval-workflow.js, sessions.js, route-permissions.js,
 //   permissions.js, fingerprint-ws.js, audit-log-cleaner.js
 // ============================================================
+
+
+
+
 
 const swaggerSpec = {
   openapi: '3.0.0',
@@ -46,6 +70,7 @@ const swaggerSpec = {
     { name: 'Approval',  description: 'Maker-Checker — Phê duyệt yêu cầu thao tác nguy hiểm' },
     { name: 'Admin',     description: 'Quản trị hệ thống (Users, Roles, Units, Cấu hình)' },
     { name: 'AI Assistant', description: 'Trợ Lý AI Tác Chiến & Văn Thư (Citation-Grounded)' },
+    { name: 'Lectures', description: 'Bài giảng số — CRUD, duyệt 2 tầng, ca giảng dạy, SCORM, Quiz, Live Monitor' },
   ],
 
   security: [{ BearerAuth: [] }],
@@ -2590,6 +2615,670 @@ const swaggerSpec = {
         },
       },
     },
+    // ═══════════════════════════════════════════════════════════
+// LECTURES — Catalogs
+// ═══════════════════════════════════════════════════════════
+'/api/lectures/catalogs/subjects': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Danh mục môn học đang hoạt động',
+    description: 'Chỉ cần đăng nhập, không yêu cầu permission riêng.',
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        items: { type: 'array', items: { $ref: '#/components/schemas/Subject' } },
+      } } } } },
+    },
+  },
+},
+
+'/api/lectures/catalogs/classes': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Danh mục lớp học đang hoạt động',
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        items: { type: 'array', items: { $ref: '#/components/schemas/TrainingClass' } },
+      } } } } },
+    },
+  },
+},
+
+'/api/lectures/catalogs/venues': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Gợi ý giảng đường từ lịch sử ca giảng dạy (không có bảng HALL)',
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        items: { type: 'array', items: { type: 'object', properties: {
+          venue_name:  { type: 'string' },
+          usage_count: { type: 'integer' },
+        } } },
+      } } } } },
+    },
+  },
+},
+
+// ═══════════════════════════════════════════════════════════
+// LECTURES — CRUD + Duyệt 2 tầng
+// ═══════════════════════════════════════════════════════════
+'/api/lectures': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Danh sách bài giảng (tự lọc theo scope + clearance + role)',
+    description:
+      '**Yêu cầu permission:** `LECTURE_VIEW`.\n\n' +
+      '**Scope theo role:**\n' +
+      '- Admin (`ROL-01`) / BGH (`ROL-02`): thấy tất cả\n' +
+      '- Trưởng bộ môn (`ROL-06`): chỉ bài giảng thuộc khoa/bộ môn mình + bài tự soạn\n' +
+      '- Còn lại: chỉ thấy bài `PUBLISHED` hoặc bài của chính mình / cùng đơn vị',
+    parameters: [
+      { in: 'query', name: 'status',          schema: { type: 'string', enum: ['DRAFT', 'PENDING_FACULTY', 'PENDING_TRAINING', 'PUBLISHED', 'REJECTED', 'ARCHIVED'] } },
+      { in: 'query', name: 'subject_id',      schema: { type: 'string' } },
+      { in: 'query', name: 'faculty_unit_id', schema: { type: 'string' } },
+      { in: 'query', name: 'q',               schema: { type: 'string' }, description: 'Tìm trong lecture_code hoặc title' },
+    ],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        total: { type: 'integer' },
+        items: { type: 'array', items: { $ref: '#/components/schemas/Lecture' } },
+      } } } } },
+      403: { description: 'Thiếu quyền LECTURE_VIEW' },
+    },
+  },
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Tạo bài giảng mới (trạng thái mặc định DRAFT)',
+    description:
+      '**Yêu cầu permission:** `LECTURE_CREATE`.\n\n' +
+      '- `content_type = SCORM` bắt buộc phải có `scorm_entry_point`\n' +
+      '- Tự động gán `author_id = current user`, `faculty_unit_id = đơn vị user`',
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: {
+        type: 'object', required: ['title', 'subject_id'],
+        properties: {
+          title:             { type: 'string', example: 'Bài 1: Chiến thuật tiến công' },
+          subject_id:        { type: 'string', example: 'SUBJ-01' },
+          lecture_code:      { type: 'string', example: 'BG-CTBB-01' },
+          security_level_id: { type: 'integer', minimum: 1, maximum: 5, default: 2 },
+          content_type:      { type: 'string', enum: ['PDF', 'HTML5', 'SCORM'], default: 'PDF' },
+          scorm_entry_point: { type: 'string', nullable: true },
+          document_id:       { type: 'string', nullable: true },
+        },
+      } } },
+    },
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        success:    { type: 'boolean' },
+        lecture_id: { type: 'string' },
+      } } } } },
+      400: { description: 'Thiếu tiêu đề / môn học / content_type không hợp lệ / chưa gán đơn vị' },
+      409: { description: 'Trùng `lecture_code`' },
+    },
+  },
+},
+
+'/api/lectures/{id}': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Chi tiết 1 bài giảng',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' }, example: 'LEC-1760000000000' }],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/Lecture' } } } },
+      403: { description: 'Không đủ cấp bảo mật' },
+      404: { $ref: '#/components/responses/NotFound' },
+    },
+  },
+  put: {
+    tags: [TAG_LECTURES],
+    summary: 'Sửa bài giảng — chỉ tác giả (hoặc Admin), chỉ khi DRAFT/REJECTED',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: {
+        type: 'object',
+        properties: {
+          title:             { type: 'string' },
+          subject_id:        { type: 'string' },
+          security_level_id: { type: 'integer' },
+          content_type:      { type: 'string', enum: ['PDF', 'HTML5', 'SCORM'] },
+          scorm_entry_point: { type: 'string', nullable: true },
+          document_id:       { type: 'string', nullable: true },
+        },
+      } } },
+    },
+    responses: {
+      200: { description: 'OK' },
+      400: { description: 'Trạng thái không cho phép sửa' },
+      403: { description: 'Không phải tác giả / không phải Admin' },
+      404: { $ref: '#/components/responses/NotFound' },
+    },
+  },
+  delete: {
+    tags: [TAG_LECTURES],
+    summary: 'Lưu trữ bài giảng (soft delete → status=ARCHIVED)',
+    description: '**Yêu cầu permission:** `LECTURE_DELETE`.',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'OK' },
+      404: { $ref: '#/components/responses/NotFound' },
+    },
+  },
+},
+
+'/api/lectures/{id}/submit': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Gửi duyệt — DRAFT/REJECTED → PENDING_FACULTY',
+    description: '**Yêu cầu permission:** `LECTURE_CREATE` + phải là tác giả.',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'OK' },
+      400: { description: 'Trạng thái không hợp lệ' },
+      403: { description: 'Không phải tác giả' },
+    },
+  },
+},
+
+'/api/lectures/{id}/approve': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Duyệt 2 tầng — PENDING_FACULTY→PENDING_TRAINING, PENDING_TRAINING→PUBLISHED',
+    description:
+      '**Yêu cầu permission:** `LECTURE_APPROVE`.\n\n' +
+      '**Tầng 1 (PENDING_FACULTY → PENDING_TRAINING):** Trưởng bộ môn (`ROL-06`) hoặc BGH/Admin — nếu là Trưởng BM chỉ được duyệt bài thuộc đơn vị mình.\n\n' +
+      '**Tầng 2 (PENDING_TRAINING → PUBLISHED):** Chỉ BGH (`ROL-02`) hoặc Admin (`ROL-01`).',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        success:    { type: 'boolean' },
+        new_status: { type: 'string' },
+      } } } } },
+      400: { description: 'Trạng thái không hợp lệ để duyệt' },
+      403: { description: 'Không đủ thẩm quyền / khác đơn vị' },
+    },
+  },
+},
+
+'/api/lectures/{id}/reject': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Từ chối bài giảng (bắt buộc lý do)',
+    description: '**Yêu cầu permission:** `LECTURE_APPROVE`.',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: {
+        type: 'object', required: ['reason'],
+        properties: { reason: { type: 'string', maxLength: 500 } },
+      } } },
+    },
+    responses: {
+      200: { description: 'OK' },
+      400: { description: 'Thiếu lý do / trạng thái không hợp lệ' },
+    },
+  },
+},
+
+// ═══════════════════════════════════════════════════════════
+// LECTURES — Teaching Schedule (Ca giảng dạy)
+// ═══════════════════════════════════════════════════════════
+'/api/lectures/schedules/start': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Mở ca giảng dạy — kiểm tra bài giảng PUBLISHED + giảng đường trống',
+    description:
+      '**Yêu cầu permission:** `SCHEDULE_START`.\n\n' +
+      'Tự động phát hiện schema cũ/mới (cột `session_type`, `current_page`, `note` có thể NULL nếu chưa chạy migration v2).',
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: {
+        type: 'object', required: ['lecture_id', 'class_id', 'venue_name'],
+        properties: {
+          lecture_id:    { type: 'string' },
+          class_id:      { type: 'string' },
+          venue_name:    { type: 'string' },
+          student_count: { type: 'integer', minimum: 0 },
+          session_type:  { type: 'string', enum: ['TEACHER_LED', 'SELF_STUDY'], default: 'TEACHER_LED' },
+          note:          { type: 'string', nullable: true },
+        },
+      } } },
+    },
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        success:      { type: 'boolean' },
+        schedule_id:  { type: 'string' },
+        session_type: { type: 'string' },
+        start_time:   { type: 'string', format: 'date-time' },
+      } } } } },
+      400: { description: 'Thiếu dữ liệu / sĩ số không hợp lệ / bài giảng chưa PUBLISHED' },
+      404: { description: 'Không tìm thấy bài giảng' },
+      409: { description: 'Giảng đường đang có ca khác chưa kết thúc', content: { 'application/json': { schema: { type: 'object', properties: {
+        error: { type: 'string' }, ongoing_schedule_id: { type: 'string' },
+      } } } } },
+    },
+  },
+},
+
+'/api/lectures/schedules/{id}/progress': {
+  put: {
+    tags: [TAG_LECTURES],
+    summary: 'Cập nhật tiến độ trang (current_page)',
+    description:
+      '**Yêu cầu permission:** `SCHEDULE_START` + phải là người mở ca (hoặc Admin).\n\n' +
+      'Trả **501** nếu cột `current_page` chưa được thêm (migration v2 chưa chạy).',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: { type: 'object', properties: {
+        current_page: { type: 'integer', minimum: 1 },
+      } } } },
+    },
+    responses: {
+      200: { description: 'OK' },
+      400: { description: 'current_page không hợp lệ / ca không ONGOING' },
+      403: { description: 'Không phải người mở ca' },
+      404: { $ref: '#/components/responses/NotFound' },
+      501: { description: 'Chưa chạy migration v2' },
+    },
+  },
+},
+
+'/api/lectures/schedules/{id}/end': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Kết thúc ca giảng dạy — ONGOING → COMPLETED',
+    description: '**Yêu cầu permission:** `SCHEDULE_START` + phải là người mở ca (hoặc Admin).',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        success:          { type: 'boolean' },
+        schedule_id:      { type: 'string' },
+        duration_minutes: { type: 'integer' },
+        lecture_title:    { type: 'string' },
+      } } } } },
+      400: { description: 'Ca không ở trạng thái ONGOING' },
+      403: { description: 'Không phải người mở ca' },
+      404: { description: 'Không tìm thấy ca' },
+    },
+  },
+},
+
+'/api/lectures/schedules/{id}/force-end': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: '⚠️ Admin kết thúc cưỡng bức ca treo (hanging session)',
+    description: '**Yêu cầu:** role `ROL-01` (inline check).',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'OK' },
+      400: { description: 'Ca không ở trạng thái ONGOING' },
+      403: { description: 'Không phải Admin' },
+      404: { description: 'Không tìm thấy ca' },
+    },
+  },
+},
+
+'/api/lectures/schedules/live': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Giám sát giảng đường — danh sách ca đang ONGOING',
+    description:
+      '**Yêu cầu permission:** `LECTURE_VIEW` + role (Admin / BGH / Trưởng bộ môn).\n\n' +
+      'Trưởng bộ môn chỉ thấy ca thuộc đơn vị mình. Có cảnh báo `is_hanging` khi ca chạy quá 4 giờ.',
+    parameters: [
+      { in: 'query', name: 'venue_name',   schema: { type: 'string' } },
+      { in: 'query', name: 'class_id',     schema: { type: 'string' } },
+      { in: 'query', name: 'session_type', schema: { type: 'string', enum: ['TEACHER_LED', 'SELF_STUDY'] } },
+    ],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        total:                     { type: 'integer' },
+        items:                     { type: 'array', items: { $ref: '#/components/schemas/TeachingSchedule' } },
+        hanging_threshold_minutes: { type: 'integer', example: 240 },
+        server_time:               { type: 'string', format: 'date-time' },
+      } } } } },
+      403: { description: 'Không đủ vai trò giám sát' },
+    },
+  },
+},
+
+'/api/lectures/schedules/history': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Lịch sử ca giảng dạy (COMPLETED/CANCELLED) + KPI tổng hợp',
+    description:
+      '**Yêu cầu permission:** `LECTURE_VIEW`.\n\n' +
+      '**Scope:** Admin/BGH xem tất cả; Trưởng BM xem theo đơn vị; user thường chỉ xem ca mình dạy.',
+    parameters: [
+      { in: 'query', name: 'presenter_id', schema: { type: 'string' } },
+      { in: 'query', name: 'lecture_id',   schema: { type: 'string' } },
+      { in: 'query', name: 'venue_name',   schema: { type: 'string' } },
+      { in: 'query', name: 'from',         schema: { type: 'string', format: 'date' } },
+      { in: 'query', name: 'to',           schema: { type: 'string', format: 'date' } },
+    ],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        total: { type: 'integer' },
+        items: { type: 'array', items: { $ref: '#/components/schemas/TeachingSchedule' } },
+        kpi: { type: 'object', properties: {
+          total_sessions:       { type: 'integer' },
+          total_minutes:        { type: 'integer' },
+          total_hours:          { type: 'number' },
+          total_students:       { type: 'integer' },
+          self_study_sessions:  { type: 'integer' },
+          teacher_led_sessions: { type: 'integer' },
+        } },
+      } } } } },
+    },
+  },
+},
+
+// ═══════════════════════════════════════════════════════════
+// LECTURES — SCORM Tracking
+// ═══════════════════════════════════════════════════════════
+'/api/lectures/schedules/{id}/scorm/commit': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Lưu tiến độ SCORM (LMSCommit từ SCORM RTE)',
+    description:
+      '**Yêu cầu permission:** `SCHEDULE_START` + người mở ca.\n\n' +
+      'MERGE theo `(session_id, lecture_id)`. `suspend_data` tối đa 1 MB.',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: { type: 'object', properties: {
+        lesson_status: { type: 'string', enum: ['not attempted', 'passed', 'completed', 'failed', 'incomplete'] },
+        score_raw:     { type: 'number', nullable: true },
+        suspend_data:  { type: 'string', nullable: true, maxLength: 1000000 },
+      } } } },
+    },
+    responses: {
+      200: { description: 'OK' },
+      400: { description: 'Ca không SCORM / không ONGOING' },
+      403: { description: 'Không phải người mở ca' },
+      404: { description: 'Không tìm thấy ca' },
+    },
+  },
+},
+
+'/api/lectures/schedules/{id}/scorm/tracking': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Lấy dữ liệu SCORM đã lưu (để FE resume suspend_data)',
+    description: '**Yêu cầu permission:** `LECTURE_VIEW`.',
+    parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        items: { type: 'array', items: { $ref: '#/components/schemas/ScormTracking' } },
+      } } } } },
+    },
+  },
+},
+
+// ═══════════════════════════════════════════════════════════
+// LECTURES — Quiz (extended-routes)
+// ═══════════════════════════════════════════════════════════
+'/api/lectures/{lectureId}/quiz': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Danh sách câu hỏi Quiz của bài giảng',
+    description: '**Yêu cầu permission:** `LECTURE_VIEW` + đủ cấp bảo mật của bài giảng.',
+    parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        total: { type: 'integer' },
+        items: { type: 'array', items: { $ref: '#/components/schemas/LectureQuiz' } },
+      } } } } },
+      403: { description: 'Không đủ cấp bảo mật' },
+      404: { description: 'Không tìm thấy bài giảng' },
+    },
+  },
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Tạo câu hỏi Quiz — chỉ tác giả bài giảng',
+    description: '**Yêu cầu permission:** `LECTURE_CREATE` (extended dùng `LECTURE_QUIZ_MANAGE`).',
+    parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: {
+        type: 'object', required: ['question_text', 'option_a', 'option_b', 'correct_answer'],
+        properties: {
+          question_text:  { type: 'string' },
+          option_a:       { type: 'string' },
+          option_b:       { type: 'string' },
+          option_c:       { type: 'string', nullable: true },
+          option_d:       { type: 'string', nullable: true },
+          correct_answer: { type: 'string', enum: ['A', 'B', 'C', 'D'] },
+          explanation:    { type: 'string', nullable: true },
+          slide_index:    { type: 'integer', nullable: true },
+          points:         { type: 'integer', default: 1 },
+          question_order: { type: 'integer', default: 1 },
+        },
+      } } },
+    },
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        success:     { type: 'boolean' },
+        question_id: { type: 'string' },
+      } } } } },
+      403: { description: 'Không phải tác giả' },
+    },
+  },
+},
+
+'/api/lectures/{lectureId}/quiz/{questionId}': {
+  put: {
+    tags: [TAG_LECTURES],
+    summary: 'Sửa câu hỏi Quiz',
+    description: '**Yêu cầu permission:** `LECTURE_CREATE` (hoặc `LECTURE_QUIZ_MANAGE`).',
+    parameters: [
+      { in: 'path', name: 'lectureId',  required: true, schema: { type: 'string' } },
+      { in: 'path', name: 'questionId', required: true, schema: { type: 'string' } },
+    ],
+    requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LectureQuiz' } } } },
+    responses: {
+      200: { description: 'OK' },
+      403: { description: 'Không có quyền' },
+    },
+  },
+  delete: {
+    tags: [TAG_LECTURES],
+    summary: 'Xóa câu hỏi Quiz (soft delete)',
+    parameters: [
+      { in: 'path', name: 'lectureId',  required: true, schema: { type: 'string' } },
+      { in: 'path', name: 'questionId', required: true, schema: { type: 'string' } },
+    ],
+    responses: { 200: { description: 'OK' }, 403: { description: 'Không có quyền' } },
+  },
+},
+
+'/api/lectures/schedules/{scheduleId}/quiz/{questionId}/activate': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'GV kích hoạt Quiz khi đang trình chiếu',
+    description: '**Yêu cầu permission:** `SCHEDULE_START`.',
+    parameters: [
+      { in: 'path', name: 'scheduleId', required: true, schema: { type: 'string' } },
+      { in: 'path', name: 'questionId', required: true, schema: { type: 'string' } },
+    ],
+    requestBody: {
+      content: { 'application/json': { schema: { type: 'object', properties: {
+        student_count_yes: { type: 'integer', default: 0 },
+        student_count_no:  { type: 'integer', default: 0 },
+      } } } },
+    },
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        success:    { type: 'boolean' },
+        attempt_id: { type: 'integer' },
+      } } } } },
+    },
+  },
+},
+
+// ═══════════════════════════════════════════════════════════
+// LECTURES — Faculty view / Monitor / Slide
+// ═══════════════════════════════════════════════════════════
+'/api/lectures/faculty/{facultyUnitId}': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Xem bài giảng PUBLISHED của 1 khoa/bộ môn (GV đồng nghiệp)',
+    description:
+      '**Yêu cầu permission:** `LECTURE_VIEW`.\n\n' +
+      'Chỉ được xem bài của khoa mình (trừ khi có quyền `SCHEDULE_MONITOR_ALL`).',
+    parameters: [{ in: 'path', name: 'facultyUnitId', required: true, schema: { type: 'string' }, example: 'TQS' }],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        total: { type: 'integer' },
+        items: { type: 'array', items: { $ref: '#/components/schemas/Lecture' } },
+      } } } } },
+      403: { description: 'Khác khoa và không có quyền SCHEDULE_MONITOR_ALL' },
+    },
+  },
+},
+
+'/api/lectures/schedules/monitor': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Live Monitor nâng cao — tiến độ slide, SCORM %, quiz đã kích hoạt',
+    description:
+      '**Yêu cầu permission:** `SCHEDULE_MONITOR_ALL` (BGH/Admin/Trưởng BM toàn quyền).\n\n' +
+      'Khác với `/api/lectures/schedules/live` ở chỗ trả thêm `slide_index`, `slide_total`, `scorm_progress`, `quiz_activated_count`, `quiz_total_count`.',
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        total:       { type: 'integer' },
+        server_time: { type: 'string', format: 'date-time' },
+        items:       { type: 'array', items: { type: 'object', properties: {
+          schedule_id:          { type: 'string' },
+          lecture_title:        { type: 'string' },
+          subject_name:         { type: 'string' },
+          presenter_name:       { type: 'string' },
+          venue_name:           { type: 'string' },
+          class_name:           { type: 'string' },
+          slide_index:          { type: 'integer', nullable: true },
+          slide_total:          { type: 'integer', nullable: true },
+          scorm_progress:       { type: 'number', nullable: true },
+          duration_minutes:     { type: 'integer' },
+          is_hanging:           { type: 'boolean' },
+          quiz_activated_count: { type: 'integer' },
+          quiz_total_count:     { type: 'integer' },
+        } } },
+      } } } } },
+      403: { description: 'Thiếu quyền SCHEDULE_MONITOR_ALL' },
+    },
+  },
+},
+
+'/api/lectures/schedules/{scheduleId}/slide': {
+  put: {
+    tags: [TAG_LECTURES],
+    summary: 'GV cập nhật slide hiện tại khi trình chiếu',
+    description: '**Yêu cầu permission:** `SCHEDULE_START` + phải là presenter của ca.',
+    parameters: [{ in: 'path', name: 'scheduleId', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: { type: 'object', properties: {
+        slide_index:    { type: 'integer' },
+        slide_total:    { type: 'integer', nullable: true },
+        scorm_progress: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
+      } } } },
+    },
+    responses: {
+      200: { description: 'OK' },
+      400: { description: 'Ca không ONGOING hoặc không phải presenter' },
+    },
+  },
+},
+
+// ═══════════════════════════════════════════════════════════
+// LECTURES — SCORM Package upload (extended)
+// ═══════════════════════════════════════════════════════════
+'/api/lectures/{lectureId}/scorm/upload': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Upload gói ZIP SCORM → extract → parse imsmanifest → lưu SCORM_PACKAGE',
+    description:
+      '**Yêu cầu permission:** `LECTURE_CREATE` + phải là tác giả bài giảng.\n\n' +
+      '- Dung lượng tối đa 200 MB, chỉ chấp nhận `.zip`\n' +
+      '- Bắt buộc có `imsmanifest.xml`\n' +
+      '- Tự động phát hiện `entry_point` từ `<resource href="...">` hoặc `index.html`',
+    parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'multipart/form-data': { schema: {
+        type: 'object', required: ['file'],
+        properties: { file: { type: 'string', format: 'binary' } },
+      } } },
+    },
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        success:     { type: 'boolean' },
+        package_id:  { type: 'string', example: 'PKG-1760000000000' },
+        entry_point: { type: 'string', example: 'index.html' },
+      } } } } },
+      400: { description: 'File không phải .zip / thiếu imsmanifest.xml' },
+      403: { description: 'Không phải tác giả' },
+    },
+  },
+},
+
+'/api/lectures/scorm/{packageId}/{path}': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Serve file tĩnh trong gói SCORM đã extract (cho iframe RTE)',
+    description:
+      '**Yêu cầu:** đăng nhập.\n\n' +
+      'Chặn path traversal — mọi `..` hoặc đường dẫn ngoài thư mục gói đều trả 403.',
+    parameters: [
+      { in: 'path', name: 'packageId', required: true, schema: { type: 'string' } },
+      { in: 'path', name: 'path',      required: true, schema: { type: 'string' } },
+    ],
+    responses: {
+      200: { description: 'Trả file tĩnh (HTML/CSS/JS/ảnh/media...)' },
+      403: { description: 'Path traversal bị chặn' },
+      404: { description: 'Không tìm thấy file trong gói' },
+    },
+  },
+},
+
+'/api/lectures/{lectureId}/scorm/info': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Lấy entry_point + metadata gói SCORM để FE dựng iframe',
+    description: '**Yêu cầu permission:** `LECTURE_VIEW`.',
+    parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        package_id:     { type: 'string' },
+        entry_point:    { type: 'string' },
+        schema_version: { type: 'string', example: '1.2' },
+        file_size:      { type: 'integer' },
+      } } } } },
+      404: { description: 'Bài giảng chưa có gói SCORM' },
+    },
+  },
+},
+
+// ═══════════════════════════════════════════════════════════
+// SECURITY — Bổ sung endpoint còn thiếu
+// ═══════════════════════════════════════════════════════════
+'/api/security/violation-status': {
+  get: {
+    tags: [TAG_SECURITY],
+    summary: 'Kiểm tra số lần vi phạm chụp màn hình trong 24h + trạng thái khóa tài khoản',
+    description:
+      'Endpoint **không bắt buộc JWT** — nếu không có Bearer hoặc là GUEST thì trả `violation_count=0`.\n\n' +
+      'Dùng bởi FE để hiển thị banner cảnh báo và ẩn preview khi tài khoản bị khóa.',
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+        ok:              { type: 'boolean' },
+        violation_count: { type: 'integer', example: 2 },
+        is_locked:       { type: 'boolean' },
+      } } } } },
+    },
+  },
+},
   },
 
   // ============================================================
@@ -2863,23 +3552,142 @@ const swaggerSpec = {
           created_at:  { type: 'string', format: 'date-time', nullable: true },
         },
       },
+
+
+      // ═══════════════════════════════════════════════════════════════
+// LECTURES — Schemas
+// ═══════════════════════════════════════════════════════════════
+Lecture: {
+  type: 'object',
+  properties: {
+    lecture_id:        { type: 'string', example: 'LEC-1760000000000' },
+    lecture_code:      { type: 'string', example: 'BG-CTBB-01' },
+    title:             { type: 'string', example: 'Bài 1: Chiến thuật tiến công' },
+    subject_id:        { type: 'string', example: 'SUBJ-01' },
+    subject_name:      { type: 'string', nullable: true },
+    author_id:         { type: 'string', example: 'USR-007' },
+    author_name:       { type: 'string', nullable: true },
+    author_rank:       { type: 'string', nullable: true },
+    faculty_unit_id:   { type: 'string', example: 'TQS' },
+    faculty_name:      { type: 'string', nullable: true },
+    security_level_id: { type: 'integer', example: 2 },
+    security_name:     { type: 'string', nullable: true },
+    content_type:      { type: 'string', enum: ['PDF', 'HTML5', 'SCORM'] },
+    scorm_entry_point: { type: 'string', nullable: true },
+    document_id:       { type: 'string', nullable: true },
+    quiz_count:        { type: 'integer', example: 5 },
+    status:            { type: 'string', enum: ['DRAFT', 'PENDING_FACULTY', 'PENDING_TRAINING', 'PUBLISHED', 'REJECTED', 'ARCHIVED'] },
+    reject_reason:     { type: 'string', nullable: true },
+    created_at:        { type: 'string', format: 'date-time' },
+    updated_at:        { type: 'string', format: 'date-time' },
+  },
+},
+
+TeachingSchedule: {
+  type: 'object',
+  properties: {
+    schedule_id:        { type: 'string', example: 'SCH-1760000000000-A1B2' },
+    lecture_id:         { type: 'string' },
+    lecture_title:      { type: 'string', nullable: true },
+    subject_name:       { type: 'string', nullable: true },
+    presenter_id:       { type: 'string' },
+    presenter_name:     { type: 'string', nullable: true },
+    presenter_rank:     { type: 'string', nullable: true },
+    presenter_position: { type: 'string', nullable: true },
+    class_id:           { type: 'string', example: 'CLS-2026-01' },
+    class_name:         { type: 'string', nullable: true },
+    venue_name:         { type: 'string', example: 'Giảng đường A1' },
+    student_count:      { type: 'integer', example: 42 },
+    session_type:       { type: 'string', enum: ['TEACHER_LED', 'SELF_STUDY'] },
+    current_page:       { type: 'integer', nullable: true },
+    slide_index:        { type: 'integer', nullable: true },
+    slide_total:        { type: 'integer', nullable: true },
+    scorm_progress:     { type: 'number', nullable: true, description: '0.0 – 1.0' },
+    note:               { type: 'string', nullable: true },
+    start_time:         { type: 'string', format: 'date-time' },
+    end_time:           { type: 'string', format: 'date-time', nullable: true },
+    duration_minutes:   { type: 'integer', nullable: true },
+    status:             { type: 'string', enum: ['ONGOING', 'COMPLETED', 'CANCELLED'] },
+    is_hanging:         { type: 'boolean', description: 'true nếu ca chạy > 4 giờ' },
+  },
+},
+
+LectureQuiz: {
+  type: 'object',
+  properties: {
+    question_id:    { type: 'string', example: 'QZ-1760000000000-A1B2' },
+    quiz_id:        { type: 'string', description: 'Alias — schema cũ dùng `quiz_id`' },
+    lecture_id:     { type: 'string' },
+    question_order: { type: 'integer' },
+    question_text:  { type: 'string' },
+    option_a:       { type: 'string' },
+    option_b:       { type: 'string' },
+    option_c:       { type: 'string', nullable: true },
+    option_d:       { type: 'string', nullable: true },
+    correct_answer: { type: 'string', enum: ['A', 'B', 'C', 'D'] },
+    explanation:    { type: 'string', nullable: true },
+    slide_index:    { type: 'integer', nullable: true },
+    slide_ref:      { type: 'string', nullable: true },
+    points:         { type: 'integer', example: 1 },
+    active:         { type: 'boolean' },
+    created_at:     { type: 'string', format: 'date-time' },
+    updated_at:     { type: 'string', format: 'date-time' },
+  },
+},
+
+Subject: {
+  type: 'object',
+  properties: {
+    subject_id:        { type: 'string', example: 'SUBJ-01' },
+    subject_code:      { type: 'string', nullable: true, example: 'CTBB' },
+    name:              { type: 'string', example: 'Chiến thuật Bộ binh' },
+    faculty_unit_id:   { type: 'string', example: 'TQS' },
+    faculty_name:      { type: 'string', nullable: true },
+    security_level_id: { type: 'integer', nullable: true },
+    active:            { type: 'boolean' },
+  },
+},
+
+TrainingClass: {
+  type: 'object',
+  properties: {
+    class_id:      { type: 'string', example: 'CLS-2026-01' },
+    class_name:    { type: 'string', example: 'Lớp Sĩ quan Chỉ huy - Khóa 12' },
+    unit_id:       { type: 'string', example: 'TQS' },
+    unit_name:     { type: 'string', nullable: true },
+    course_year:   { type: 'integer', nullable: true, example: 2026 },
+    student_total: { type: 'integer', nullable: true, example: 45 },
+    active:        { type: 'boolean' },
+  },
+},
+
+ScormTracking: {
+  type: 'object',
+  properties: {
+    session_id:    { type: 'string' },
+    lecture_id:    { type: 'string' },
+    lesson_status: { type: 'string', enum: ['not attempted', 'passed', 'completed', 'failed', 'incomplete'] },
+    score_raw:     { type: 'number', nullable: true },
+    suspend_data:  { type: 'string', nullable: true },
+    last_accessed: { type: 'string', format: 'date-time', nullable: true },
+  },
+},
     },
   },
 };
 
-// ─── Debug log ───
-const paths = Object.keys(swaggerSpec.paths);
-let opCount = 0;
-for (const p of Object.values(swaggerSpec.paths)) {
-  for (const op of Object.values(p)) {
-    if (op && op.tags) opCount++;
-  }
-}
+// ─── Debug log — DYNAMIC, KHÔNG HARDCODE ───
+const swaggerPaths  = Object.keys(swaggerSpec.paths);
+const swaggerOps    = Object.values(swaggerSpec.paths)
+  .flatMap(p => Object.values(p))
+  .filter(op => op && Array.isArray(op.tags) && op.tags.length > 0);
+const swaggerTags   = (swaggerSpec.tags || []).map(t => t.name);
+
 console.log('════════════════════════════════════════');
-console.log('[SWAGGER] QK7 DataHub API Spec v3.0.0');
-console.log('[SWAGGER] Paths     :', paths.length);
-console.log('[SWAGGER] Operations:', opCount);
-console.log('[SWAGGER] Tags      : Auth, System, Documents, Files, Logs, Security, Approval, Admin, AI Assistant');
+console.log(`[SWAGGER] ${API_TITLE} Spec v${API_VERSION}`);
+console.log('[SWAGGER] Paths     :', swaggerPaths.length);
+console.log('[SWAGGER] Operations:', swaggerOps.length);
+console.log('[SWAGGER] Tags      :', swaggerTags.join(', '));
 console.log('════════════════════════════════════════');
 
 module.exports = swaggerSpec;

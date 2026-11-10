@@ -149,9 +149,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const guest: User = {
       user_id: 'GUEST',
       full_name: 'Đại biểu',
-      clearance_level_id: 1,
-      clearance_name: 'Công khai',
-      permissions: [],
+      clearance_level_id: 2,
+      clearance_name: 'Nội bộ',
+      roles: ['DELEGATE'],
+      role_names: ['Đại biểu'],
+      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
     };
     setUser(guest);
     navigate(ROUTE_PATHS.PORTAL);

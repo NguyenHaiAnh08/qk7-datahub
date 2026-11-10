@@ -3,7 +3,7 @@
  * Cache 5 phút, admin ROL-01 bypass tự động.
  */
 
-const CACHE_TTL_MS = 5 * 1000;   // ← đổi thành 5 * 1000
+const CACHE_TTL_MS = 5 * 60 * 1000;   // ← đổi thành 5 * 60 * 1000 
 const cache = new Map(); // userId → { codes, loadedAt }
 
 module.exports = function createPermissionsModule({

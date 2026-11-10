@@ -30,7 +30,7 @@ import { DocumentItem, MetaData, Unit } from '../types';
 import { getMainIssuingUnits, getSchoolDepartmentsTree } from '../utils/unitTree';
 import { useDebounce } from '../hooks/useDebounce';
 
-const ITEMS_PER_PAGE = 9;
+const ITEMS_PER_PAGE = 30;
 
 export const PortalPage: React.FC = () => {
   const { user } = useAuth();

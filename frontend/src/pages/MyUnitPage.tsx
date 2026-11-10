@@ -22,7 +22,7 @@ import { documentService, MyUnitDocumentResponse } from '../services/documentSer
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData } from '../types';
 
-const ITEMS_PER_PAGE = 9;
+const ITEMS_PER_PAGE = 30;
 
 export const MyUnitPage: React.FC = () => {
   const { user } = useAuth();

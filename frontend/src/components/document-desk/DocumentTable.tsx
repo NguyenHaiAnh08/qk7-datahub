@@ -10,11 +10,13 @@ import {
   ChevronRight,
   HardDrive
 } from 'lucide-react';
+import { Tooltip, Skeleton } from 'antd';
 import { DocumentItem } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
 import { CompactDownloadButton } from '../common/CompactDownloadButton';
+import { useAuth } from '../../hooks/useAuth';
 
 export interface DocumentTableProps {
   documents: DocumentItem[];
@@ -49,6 +51,8 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { user, hasPermission } = useAuth();
+  const isAdminUser = (user?.roles || []).includes('ROL-01');
   const getLevelBadgeClass = (lv: number) => {
     switch (lv) {
       case 5:
@@ -82,11 +86,18 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
-              <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                  Đang tải danh sách tài liệu...
-                </td>
-              </tr>
+              Array.from({ length: 6 }).map((_, idx) => (
+                <tr key={`table-skeleton-${idx}`} className="border-b border-slate-100 dark:border-white/[0.04]">
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 80, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Input active size="small" style={{ width: '85%', minWidth: 160, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 90, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 100, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 75, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 65, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4"><Skeleton.Button active size="small" style={{ width: 55, height: 20, borderRadius: 4 }} /></td>
+                  <td className="py-3 px-4 text-right"><Skeleton.Button active size="small" style={{ width: 70, height: 26, borderRadius: 6 }} /></td>
+                </tr>
+              ))
             ) : documents.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-6 text-center">
@@ -161,7 +172,14 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                       ) : (
                         <div className="inline-flex items-center space-x-1">
                           <button
-                            onClick={() => onPreview(doc)}
+                            onClick={() => {
+                            try {
+                              if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+                                window.document.documentElement.requestFullscreen().catch(() => {});
+                              }
+                            } catch (_) {}
+                            onPreview(doc);
+                          }}
                             className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg transition cursor-pointer"
                             title="Xem trước tài liệu"
                           >
@@ -186,24 +204,69 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                               />
                             );
                           })()}
-                          {onEdit && (
-                            <button
-                              onClick={() => onEdit(doc)}
-                              className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 dark:text-blue-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                              title="Chỉnh sửa văn bản"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {onDelete && (
-                            <button
-                              onClick={() => onDelete(doc)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer"
-                              title="Xóa văn bản"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          {onEdit && (() => {
+                            const docUnit = doc.issuing_unit_id || doc.unit_id;
+                            const isOwner = Boolean(doc.uploaded_by && doc.uploaded_by === user?.user_id);
+                            const isSameUnit = Boolean(!docUnit || !user?.unit_id || docUnit === user.unit_id || user.unit_id === 'TQS');
+                            const canLocalEdit = isAdminUser || isOwner || isSameUnit;
+
+                            if (!canLocalEdit) {
+                              return (
+                                <Tooltip
+                                  title={`Chỉ cán bộ thuộc đơn vị ban hành (${doc.unit_name || docUnit}) mới có quyền đề xuất chỉnh sửa văn bản này`}
+                                  placement="top"
+                                  arrow
+                                >
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="p-1.5 opacity-35 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-lg cursor-not-allowed border border-transparent"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                </Tooltip>
+                              );
+                            }
+
+                            return (
+                              <button
+                                onClick={() => onEdit(doc)}
+                                className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 dark:text-blue-400 dark:border-transparent rounded-lg transition cursor-pointer"
+                                title="Chỉnh sửa văn bản"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            );
+                          })()}
+                          {onDelete && (() => {
+                            const canDelete = hasPermission('DOC_DELETE');
+                            // Nếu user hoàn toàn không có quyền xóa → không hiện nút
+                            if (!canDelete) return null;
+
+                            // Non-admin (IT/Văn thư): icon xám + tooltip yêu cầu duyệt
+                            // Admin tối cao: icon đỏ + tooltip xóa bình thường
+                            const needsApproval = !isAdminUser;
+                            const tooltip = needsApproval
+                              ? '⚠️ Yêu cầu quyền Admin để xóa vĩnh viễn — bấm để gửi yêu cầu phê duyệt'
+                              : 'Xóa văn bản (đưa vào thùng rác)';
+
+                            return (
+                              <Tooltip title={tooltip} placement="top" arrow>
+                                <button
+                                  type="button"
+                                  onClick={() => onDelete(doc)}
+                                  aria-label={needsApproval ? 'Yêu cầu phê duyệt xóa văn bản' : 'Xóa văn bản'}
+                                  className={`p-1.5 rounded-lg transition-all duration-200 ease-[cubic-bezier(.34,1.45,.64,1)] cursor-pointer active:scale-95 btn-tactile ${
+                                    needsApproval
+                                      ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 hover:text-amber-600 dark:hover:text-amber-400'
+                                      : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 dark:text-rose-400 dark:border-transparent'
+                                  }`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </Tooltip>
+                            );
+                          })()}
                         </div>
                       )}
                     </td>

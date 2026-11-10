@@ -236,3 +236,21 @@ Sau khi thiết lập hoàn tất, mở trình duyệt từ máy Client hoặc S
 - Chạm vào nút **Chuyển chế độ thiết bị** trên thanh Header (icon Máy tính / Tablet) để chuyển sang chế độ **iPad Touch UI** tối ưu thao tác ngón tay (Touch Target ≥ 44×44px, thanh điều hướng dạng viên thuốc căn giữa).
 - Hỗ trợ hoàn hảo cả **Chế độ để ngang (Landscape - 1210×802px)** và **Chế độ để dọc (Portrait - 834×1178px)** mà không bị vỡ layout, tràn chữ hay lệch khung hình.
 - Khi cần xem trên màn hình máy tính bàn, chạm chuyển sang chế độ **PC Widescreen** để sử dụng cụm nút bấm chuyển trang màu sắc chuyên biệt (`Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`) ổn định, không bị nhảy vị trí khi chuyển trang.
+
+
+### 4. Khởi tạo & Cấu hình OCR Microservice (:8002 - PaddleOCR)
+Microservice OCR chuyên biệt xử lý bóc tách văn bản scan và tự động điền form, độc lập với Gateway Node.js:
+```powershell
+# Bước 1: Di chuyển vào thư mục ocr-service
+cd d:\QK7_DataHub\qk7-datahub\ocr-service
+
+# Bước 2: Tạo môi trường ảo Virtualenv
+python -m venv venv
+
+# Bước 3: Cài đặt dependencies (PaddleOCR 2.9.1 + PaddlePaddle 2.6.2 ổn định)
+.\venv\Scripts\pip install -r requirements.txt
+
+# Bước 4: Khởi động thử nghiệm
+.\start-ocr.bat
+```
+*Dịch vụ sẽ tự động mở trên cổng `8002` khi bạn chạy `s.bat` từ thư mục gốc của hệ thống.*

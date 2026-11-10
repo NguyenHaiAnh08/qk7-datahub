@@ -84,15 +84,15 @@ export const NetworkStatusProvider: React.FC<{ children: React.ReactNode }> = ({
     window.addEventListener('offline', handleBrowserOffline);
 
     // Kiểm tra định kỳ mỗi 15 giây khi online, hoặc mỗi 5 giây khi offline
-    const intervalTime = isOnline ? 15000 : 5000;
-    const interval = setInterval(() => {
+    const intervalTime = !isOnline ? 8000 : 0;
+    const interval = intervalTime > 0 ? setInterval(() => {
       checkConnection();
-    }, intervalTime);
+    }, intervalTime) : null;
 
     return () => {
       window.removeEventListener('online', handleBrowserOnline);
       window.removeEventListener('offline', handleBrowserOffline);
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
   }, [isOnline, checkConnection]);
 

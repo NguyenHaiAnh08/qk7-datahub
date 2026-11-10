@@ -10,7 +10,7 @@ export const unitService = {
     return http<{ total: number; items: Unit[] }>(API_ENDPOINTS.ADMIN.UNITS);
   },
 
-  createUnit: async (data: { unit_id: string; name: string; parent_id?: string }): Promise<{ success: boolean }> => {
+  createUnit: async (data: { unit_id: string; name: string; parent_id?: string; unit_type?: string }): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.UNITS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -18,7 +18,7 @@ export const unitService = {
     });
   },
 
-  updateUnit: async (unitId: string, data: { name: string; parent_id?: string }): Promise<{ success: boolean }> => {
+  updateUnit: async (unitId: string, data: { name: string; parent_id?: string; unit_type?: string }): Promise<{ success: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.UNIT_DETAIL(unitId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

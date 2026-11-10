@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Download, Check, X, Loader2 } from 'lucide-react';
 
 export interface CompactDownloadButtonProps {
-  onDownload: (signal?: AbortSignal) => Promise<(() => void) | void> | (() => void) | void;
+  onDownload: (signal?: AbortSignal) => Promise<(() => Promise<void> | void) | void> | (() => Promise<void> | void) | void;
   onCancel?: () => void;
   disabled?: boolean;
   disabledTitle?: string;
@@ -40,10 +40,11 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
   const resetTimerRef = useRef<NodeJS.Timeout | null>(null);
   const foldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const releaseActionRef = useRef<(() => void) | null>(null);
+  const releaseActionRef = useRef<(() => Promise<void> | void) | null>(null);
   const isCancelledRef = useRef<boolean>(false);
 
-  const DURATION = 3200; // 3200ms motion duration as specified in prompt #004
+  // 2400ms: thời lượng chạy % tiến trình tải mượt mà, tối ưu an toàn tuyệt đối cho User Activation Window của showSaveFilePicker
+  const DURATION = 2400;
 
   const cancelDownload = useCallback(
     (triggerCallback = true) => {
@@ -102,11 +103,11 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
             return releaseFn;
           })
           .catch((err) => {
+            cancelDownload(false);
             if (controller.signal.aborted || err?.name === 'AbortError') {
               return;
             }
             console.error('Download error:', err);
-            cancelDownload(false);
             throw err;
           });
       } else {
@@ -134,28 +135,45 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
         setState('fold');
 
         const foldTimerPromise = new Promise((resolve) => {
-          foldTimerRef.current = setTimeout(resolve, 260);
+          foldTimerRef.current = setTimeout(resolve, 150);
         });
 
-        // Wait for both fold spinner (260ms) and background download task to finish
+        // Chờ fold spinner và tiến trình nạp dữ liệu blob hoàn tất
         Promise.all([downloadTask, foldTimerPromise])
-          .then(() => {
+          .then(async () => {
             if (isCancelledRef.current) return;
 
-            // Transition to 'done' state
-            setState('done');
-
-            // CRITICAL REQUIREMENT: Release the file to disk now that UI UX is done!
+            // BƯỚC 3: UX/UI chạy xong 100% thì MỚI NHẢ FILE MỞ HỘP THOẠI CHỌN Ổ ĐĨA
             if (releaseActionRef.current) {
-              try {
-                releaseActionRef.current();
-              } catch (e) {
-                console.error('Error executing file release:', e);
-              }
+              const action = releaseActionRef.current;
               releaseActionRef.current = null;
+              try {
+                const res = action();
+                if (res instanceof Promise) {
+                  await res;
+                }
+              } catch (e: any) {
+                if (e?.name === 'AbortError') {
+                  // Người dùng bấm Hủy trong hộp thoại chọn nơi lưu tệp
+                  setState('idle');
+                  setProgress(0);
+                  startTimeRef.current = null;
+                  return;
+                }
+                console.error('Lỗi khi lưu tệp ra ổ đĩa:', e);
+                setState('idle');
+                setProgress(0);
+                startTimeRef.current = null;
+                return;
+              }
             }
 
-            // Reset to idle after 2000ms
+            if (isCancelledRef.current) return;
+
+            // Chuyển sang 'done' sau khi người dùng đã chọn ổ đĩa và tệp được ghi an toàn
+            setState('done');
+
+            // Reset về idle sau 2000ms hiển thị trạng thái done
             resetTimerRef.current = setTimeout(() => {
               if (isCancelledRef.current) return;
               setState('idle');
@@ -261,7 +279,7 @@ export const CompactDownloadButton: React.FC<CompactDownloadButtonProps> = ({
       aria-valuemin={state === 'run' ? 0 : undefined}
       aria-valuemax={state === 'run' ? 100 : undefined}
       aria-live="polite"
-      title={state === 'run' ? 'Bấm để hủy' : disabledTitle || idleLabel}
+      title={state === 'run' ? 'Bấm để hủy' : disabled ? (disabledTitle || 'Không thể tải về') : idleLabel}
       style={
         {
           '--p': `${progress}%`,

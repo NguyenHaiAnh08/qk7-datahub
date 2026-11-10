@@ -1,8 +1,9 @@
 import React from 'react';
-import { RouteObject } from 'react-router-dom';
-import { HttpErrorPage } from '../../pages/HttpErrorPage';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
+
+const HttpErrorPage = lazyWithRetry(() => import('../../pages/HttpErrorPage').then((m) => ({ default: m.HttpErrorPage })));
 
 const fallbackRoutes: RouteModuleExport = {
   group: 'fallback',

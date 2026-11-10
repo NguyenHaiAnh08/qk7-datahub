@@ -6,8 +6,10 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { UserTable } from '../components/users/UserTable';
 import { UserFormModal } from '../components/users/UserFormModal';
 import { UserCredentialsModal } from '../components/users/UserCredentialsModal';
+import { PinManageModal } from '../components/users/PinManageModal'; // ✅ sửa path cho khớp
 import { usersApi } from '../services/usersApi';
 import { dashboardApi } from '../services/dashboardApi';
+import { isApprovalRequired } from '../utils/approvalUtils';
 import {
   User,
   Unit,
@@ -26,6 +28,9 @@ export const UsersPage: React.FC = () => {
   const [positionsList, setPositionsList] = useState<MilitaryPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [userSearch, setUserSearch] = useState('');
+
+  // ✅ Pin manage state (đã có trong file gốc)
+  const [pinManageUser, setPinManageUser] = useState<User | null>(null);
 
   // Modals
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -54,13 +59,12 @@ export const UsersPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [uRes, unitRes, lvlRes, roleRes, metaRes] = await Promise.all([
+      const [uRes, metaRes, rolesRes] = await Promise.all([
         usersApi.getUsers(),
-        dashboardApi.getUnits(),
-        dashboardApi.getSecurityLevels(),
-        dashboardApi.getRoles(),
         dashboardApi.getMeta(),
+        dashboardApi.getCreatableRoles().catch(() => ({ items: [] })),
       ]);
+
       const sortedUsers = [...(uRes.items || [])].sort((a, b) => {
         const parseNum = (id?: string) => {
           const m = (id || '').match(/USR-(\d+)/i);
@@ -68,12 +72,13 @@ export const UsersPage: React.FC = () => {
         };
         return parseNum(a.user_id) - parseNum(b.user_id);
       });
+
       setUsersList(sortedUsers);
-      setUnitsList(unitRes.items || []);
-      setLevelsList(lvlRes.items || []);
-      setRolesList(roleRes.items || []);
+      setUnitsList(metaRes.units || []);
+      setLevelsList(metaRes.levels || []);
       setRanksList((metaRes as any).ranks || []);
       setPositionsList((metaRes as any).positions || []);
+      setRolesList(rolesRes.items || []);
     } catch (err: any) {
       showToast('Lỗi tải dữ liệu quân nhân: ' + err.message, 'error');
     } finally {
@@ -85,7 +90,7 @@ export const UsersPage: React.FC = () => {
     loadData();
   }, []);
 
-    const handleSaveUser = async (userData: Partial<User>) => {
+  const handleSaveUser = async (userData: Partial<User>) => {
     if (selectedUser?.user_id) {
       await usersApi.updateUser(selectedUser.user_id, userData);
       await loadData();
@@ -103,14 +108,35 @@ export const UsersPage: React.FC = () => {
     }
   };
 
+  const handleUnlockUser = async (u: User) => {
+    try {
+      await usersApi.unlockUser(u.user_id);
+      await loadData();
+      toast.success(`Đã mở khóa tài khoản và đặt lại số lần vi phạm an ninh về 0 cho ${u.full_name} (${u.user_id})`, {
+        title: 'MỞ KHÓA THÀNH CÔNG',
+        badge: u.user_id,
+      });
+    } catch (err: any) {
+      toast.error('Lỗi khi mở khóa tài khoản: ' + err.message, {
+        title: 'LỖI THAO TÁC',
+        badge: 'USER-ERR',
+      });
+    }
+  };
+
   const handleDeleteUser = async () => {
     if (!deleteConfirm.user) return;
     try {
-      await usersApi.deleteUser(deleteConfirm.user.user_id);
+      const res: any = await usersApi.deleteUser(deleteConfirm.user.user_id);
       const deletedName = deleteConfirm.user.full_name;
       const deletedId = deleteConfirm.user.user_id;
       setDeleteConfirm({ open: false, user: null });
       await loadData();
+
+      if (isApprovalRequired(res)) {
+        return;
+      }
+
       toast.success(`Đã xóa quân nhân ${deletedName} khỏi danh bạ đơn vị.`, {
         title: 'XÓA QUÂN NHÂN',
         badge: deletedId,
@@ -196,6 +222,7 @@ export const UsersPage: React.FC = () => {
             setSelectedUser(u);
             setUserModalOpen(true);
           }}
+          onUnlock={handleUnlockUser}
           onUpdateCredentials={(u) => {
             setCredModal({
               open: true,
@@ -204,6 +231,7 @@ export const UsersPage: React.FC = () => {
             });
           }}
           onDelete={(u) => setDeleteConfirm({ open: true, user: u })}
+          onManagePin={(u) => setPinManageUser(u)} // ✅ THÊM
         />
       </main>
 
@@ -230,6 +258,15 @@ export const UsersPage: React.FC = () => {
         onClose={() => setCredModal({ open: false, userId: '', username: '' })}
         onSuccess={loadData}
         onToast={showToast}
+      />
+
+      {/* ✅ THÊM: Modal quản lý PIN */}
+      <PinManageModal
+        open={Boolean(pinManageUser)}
+        user={pinManageUser}
+        onClose={() => setPinManageUser(null)}
+        onChanged={() => loadData()}        // ✅ dùng loadData, không phải loadUsers
+        onToast={showToast}                 // ✅ dùng showToast, không phải onToast
       />
 
       <ConfirmDialog

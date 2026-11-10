@@ -14,8 +14,10 @@ import {
   FileCheck,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
+import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { toast } from '../components/common/Toast';
 import { SecurityBanner } from '../components/portal/SecurityBanner';
+import { SchoolOverviewSection } from '../components/portal/SchoolOverviewSection';
 import { PortalDocumentList } from '../components/portal/PortalDocumentList';
 import { DocumentTable } from '../components/document-desk/DocumentTable';
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
@@ -24,9 +26,11 @@ import { SpotlightTour } from '../components/common/SpotlightTour';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
-import { DocumentItem, MetaData } from '../types';
+import { DocumentItem, MetaData, Unit } from '../types';
+import { getMainIssuingUnits, getSchoolDepartmentsTree } from '../utils/unitTree';
+import { useDebounce } from '../hooks/useDebounce';
 
-const ITEMS_PER_PAGE = 9;
+const ITEMS_PER_PAGE = 30;
 
 export const PortalPage: React.FC = () => {
   const { user } = useAuth();
@@ -36,6 +40,7 @@ export const PortalPage: React.FC = () => {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [selectedType, setSelectedType] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
@@ -45,6 +50,8 @@ export const PortalPage: React.FC = () => {
 
   // Documents
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [allSchoolDocuments, setAllSchoolDocuments] = useState<DocumentItem[]>([]);
+  const [showStats, setShowStats] = useState(true);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -85,6 +92,20 @@ export const PortalPage: React.FC = () => {
     setCurrentPage(1);
   };
 
+  // Load toàn bộ dữ liệu văn bản vĩ mô toàn trường phục vụ 4 thẻ KPI và Radar Tiến Độ Phòng Ban
+  useEffect(() => {
+    documentsApi
+      .getDocuments({})
+      .then((res) => {
+        setAllSchoolDocuments(res.items || []);
+      })
+      .catch((err) => {
+        if (import.meta.env.DEV) {
+          console.warn('[loadAllSchoolDocuments] Lỗi tải tổng kho toàn trường:', err?.message);
+        }
+      });
+  }, [user]);
+
   // Load Metadata
   useEffect(() => {
     dashboardApi
@@ -95,21 +116,18 @@ export const PortalPage: React.FC = () => {
       .catch((err) => console.error('[loadMeta]', err));
   }, [user]);
 
-  // Sub-departments of Truong Quan su Quan khu 7 (TQS)
+  // Danh mục các phòng ban / đơn vị trực thuộc Trường Quân sự Quân khu 7
   const tqsDepartments = useMemo(() => {
-    const list = meta.units.filter((u) => u.parent_id === 'TQS' || u.parent_id === 'U-TQS');
-    if (list.length > 0) return list;
-    return [
-      { unit_id: 'U-BGH', name: 'Ban Giám hiệu' },
-      { unit_id: 'U-TM', name: 'Phòng Tham mưu - Hành chính' },
-      { unit_id: 'U-CT', name: 'Phòng Chính trị' },
-      { unit_id: 'U-HC', name: 'Phòng Hậu cần - Kỹ thuật' },
-    ];
+    return getSchoolDepartmentsTree(meta.units);
+  }, [meta.units]);
+
+  // Danh sách cơ quan ban hành chính (loại bỏ các đơn vị con của TQS để không bị bung)
+  const mainUnits = useMemo(() => {
+    return getMainIssuingUnits(meta.units);
   }, [meta.units]);
 
   // Load Documents
   const loadDocuments = async () => {
-    
     setLoading(true);
     try {
       let queryUnit: string | undefined = undefined;
@@ -118,18 +136,18 @@ export const PortalPage: React.FC = () => {
       if (selectedUnit === 'TQS') {
         if (selectedDepartment) {
           queryUnit = selectedDepartment;
-          includeChildren = false;
+          includeChildren = true;
         } else {
           queryUnit = 'TQS';
           includeChildren = true;
         }
       } else if (selectedUnit) {
         queryUnit = selectedUnit;
-        includeChildren = false;
+        includeChildren = true;
       }
 
       const res = await documentsApi.getDocuments({
-        q: searchQuery || undefined,
+        q: debouncedSearch || undefined,
         type: selectedType || undefined,
         unit: queryUnit,
         include_children: includeChildren,
@@ -141,7 +159,6 @@ export const PortalPage: React.FC = () => {
       setCurrentPage(1);
     } catch (err: any) {
       if (err?.status === 401) {
-        // Đã xử lý global bởi HttpErrorListener, bỏ qua local toast
         return;
       }
       showToast('Lỗi tải tài liệu: ' + err.message, 'error');
@@ -150,13 +167,41 @@ export const PortalPage: React.FC = () => {
     }
   };
 
-  // Debounced search
+  // Tự động tải lại danh sách khi các bộ lọc hoặc từ khóa tìm kiếm (đã debounce 500ms) thay đổi
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadDocuments();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
+    loadDocuments();
+  }, [debouncedSearch, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
+
+  // Xử lý lọc dữ liệu tương tác từ Radar Tiến Độ Phòng Ban
+  const handleSelectDepartmentFromRadar = (unitId: string, isDeptOfTqs: boolean) => {
+    if (isDeptOfTqs) {
+      if (selectedDepartment === unitId && selectedUnit === 'TQS') {
+        setSelectedDepartment('');
+        setSelectedUnit('');
+      } else {
+        setSelectedUnit('TQS');
+        setSelectedDepartment(unitId);
+      }
+    } else {
+      if (selectedUnit === unitId && !selectedDepartment) {
+        setSelectedUnit('');
+      } else {
+        setSelectedUnit(unitId);
+        setSelectedDepartment('');
+      }
+    }
+    setCurrentPage(1);
+  };
+
+  const handleSelectTypeFromRadar = (typeId: string) => {
+    setSelectedType((prev) => (prev === typeId ? '' : typeId));
+    setCurrentPage(1);
+  };
+
+  const handleSelectLevelFromRadar = (levelId: number | '') => {
+    setSelectedLevel((prev) => (prev === levelId ? '' : levelId));
+    setCurrentPage(1);
+  };
 
   // Reset Filters
   const handleResetFilters = () => {
@@ -194,20 +239,21 @@ export const PortalPage: React.FC = () => {
     toast.info(`Đang truyền phát và chuẩn bị văn bản ${doc.document_code}...`, {
       title: 'ĐANG XỬ LÝ TỆP',
       badge: 'STREAMING',
-      duration: 3200,
+      duration: 2500,
     });
 
     // Chuẩn bị tệp tải về và giữ lại (hold) cho đến khi thanh tiến trình UI hoàn tất 100%
+    const sanitizedFilename = (doc.original_name || `${doc.document_code}.pdf`).replace(/[\/\\?%*:|"<>]/g, '_');
     const release = await documentsApi.prepareDownload(
       doc.file_id,
-      doc.original_name || `${doc.document_code}.pdf`,
+      sanitizedFilename,
       undefined,
       signal
     );
 
     // Trả về hàm release để CompactDownloadButton chỉ kích hoạt tải file về máy khi UI đã 'done'
-    return () => {
-      release();
+    return async () => {
+      await release();
       toast.success(`Đã tải xuống thành công văn bản ${doc.document_code}`, {
         title: 'TẢI TỆP HOÀN TẤT',
         badge: 'PDF-READY',
@@ -257,12 +303,47 @@ export const PortalPage: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
+        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
+        <DataHubSubNav activeTab="portal" />
         {/* Security Banner */}
         <SecurityBanner
           user={user}
           onOpenPolicy={() => setShowSecurityPolicy(true)}
           onStartTour={() => setIsTourOpen(true)}
+          showStats={showStats}
+          onToggleStats={() => setShowStats((prev) => !prev)}
         />
+
+        {/* Hệ Thống KPI Toàn Trường & Radar Tiến Độ Phòng Ban */}
+        <AnimatePresence initial={false}>
+          {showStats && (
+            <motion.div
+              key="school-overview-section"
+              initial={{ opacity: 0, height: 0, y: -8 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <SchoolOverviewSection
+                documents={allSchoolDocuments.length > 0 ? allSchoolDocuments : documents}
+                meta={meta}
+                tqsDepartments={tqsDepartments}
+                mainUnits={mainUnits}
+                selectedUnit={selectedUnit}
+                selectedDepartment={selectedDepartment}
+                selectedType={selectedType}
+                selectedLevel={selectedLevel}
+                onSelectDepartment={handleSelectDepartmentFromRadar}
+                onSelectType={handleSelectTypeFromRadar}
+                onSelectLevel={handleSelectLevelFromRadar}
+                onResetFilters={handleResetFilters}
+                user={user}
+                userClearanceLevel={user?.clearance_level_id || 1}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Filter & View Mode Controls */}
         <div
@@ -274,9 +355,12 @@ export const PortalPage: React.FC = () => {
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
               <input
+                id="portal-search-input"
+                name="portal_search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                autoComplete="off"
                 placeholder="Tìm kiếm số hiệu, trích yếu..."
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition"
               />
@@ -285,6 +369,8 @@ export const PortalPage: React.FC = () => {
             {/* Document Type Dropdown */}
             <div>
               <select
+                id="portal-doc-type-select"
+                name="portal_doc_type"
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
@@ -301,6 +387,8 @@ export const PortalPage: React.FC = () => {
             {/* Issuing Unit Dropdown */}
             <div>
               <select
+                id="portal-unit-select"
+                name="portal_unit"
                 value={selectedUnit}
                 onChange={(e) => {
                   setSelectedUnit(e.target.value);
@@ -309,17 +397,19 @@ export const PortalPage: React.FC = () => {
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition cursor-pointer [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
               >
                 <option value="">Tất cả đơn vị ban hành</option>
-                <option value="TQS">Trường Quân sự Quân khu 7</option>
-                <option value="QK7">Quân khu 7</option>
-                <option value="BTTM">Bộ Tổng Tham mưu</option>
-                <option value="TCCT">Tổng cục Chính trị</option>
-                <option value="BQP">Bộ Quốc phòng</option>
+                {mainUnits.map((u) => (
+                  <option key={u.unit_id} value={u.unit_id}>
+                    {u.name}
+                  </option>
+                ))}
               </select>
             </div>
 
             {/* Security Level Dropdown */}
             <div>
               <select
+                id="portal-level-select"
+                name="portal_level"
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value ? Number(e.target.value) : '')}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
@@ -358,14 +448,16 @@ export const PortalPage: React.FC = () => {
                 {selectedUnit === 'TQS' ? (
                   <div className="animate-in fade-in duration-200">
                     <select
+                      id="portal-department-select"
+                      name="portal_department"
                       value={selectedDepartment}
                       onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="w-full px-3 py-2 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-400 dark:border-emerald-700/70 rounded-xl text-xs font-medium text-emerald-950 dark:text-emerald-200 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition shadow-sm cursor-pointer"
+                      className="w-full px-3 py-2 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-400 dark:border-emerald-700/70 rounded-xl text-xs font-medium text-emerald-950 dark:text-emerald-200 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition shadow-sm cursor-pointer [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                     >
                       <option value="">Tất cả phòng ban</option>
-                      {tqsDepartments.map((d) => (
+                      {tqsDepartments.map((d: any) => (
                         <option key={d.unit_id} value={d.unit_id}>
-                          {d.name}
+                          {d.displayName || d.name}
                         </option>
                       ))}
                     </select>
@@ -414,7 +506,7 @@ export const PortalPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={loadDocuments}
+                  onClick={() => loadDocuments()}
                   className="px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-600/20 hover:bg-emerald-100 dark:hover:bg-emerald-600/30 border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium flex items-center gap-1 transition cursor-pointer shrink-0 whitespace-nowrap"
                 >
                   <RotateCw className="w-3.5 h-3.5" />
@@ -425,7 +517,7 @@ export const PortalPage: React.FC = () => {
           </div>
 
           {/* Active Filter Chips (Shopify Polaris Pattern) */}
-          {(searchQuery || selectedType || selectedUnit || selectedLevel !== '' || dateFrom || dateTo) && (
+          {(searchQuery || selectedType || selectedUnit || selectedDepartment || selectedLevel !== '' || dateFrom || dateTo) && (
             <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100 dark:border-white/[0.04]">
               <span className="text-xs text-slate-500 dark:text-slate-400 font-medium mr-1">Đang lọc theo:</span>
               {searchQuery && (
@@ -442,14 +534,29 @@ export const PortalPage: React.FC = () => {
               )}
               {selectedUnit && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-slate-100 dark:bg-white/[0.05] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10">
-                  <span>Đơn vị: {selectedUnit}</span>
-                  <button type="button" onClick={() => { setSelectedUnit(''); setSelectedDepartment(''); }} className="hover:text-rose-500 cursor-pointer font-bold">×</button>
+                  <span>Đơn vị: {meta.units.find((u) => u.unit_id === selectedUnit)?.name || selectedUnit}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnit('');
+                      setSelectedDepartment('');
+                    }}
+                    className="hover:text-rose-500 cursor-pointer font-bold"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {selectedDepartment && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-slate-100 dark:bg-white/[0.05] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10">
                   <span>Phòng ban: {tqsDepartments.find((d) => String(d.unit_id) === String(selectedDepartment))?.name || selectedDepartment}</span>
-                  <button type="button" onClick={() => setSelectedDepartment('')} className="hover:text-rose-500 cursor-pointer font-bold">×</button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDepartment('')}
+                    className="hover:text-rose-500 cursor-pointer font-bold"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {selectedLevel !== '' && (

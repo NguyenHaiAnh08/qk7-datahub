@@ -1,0 +1,28 @@
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# Build / Distribution
+build/
+dist/
+*.egg-info/
+
+# Logs & temp
+*.log
+.pytest_cache/
+.coverage
+
+# Model cache (PaddleOCR downloads models to ~/.paddleocr/ by default, but ignore if local)
+.paddleocr/
+models/
+model_weight/
+

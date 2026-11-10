@@ -33,6 +33,23 @@ export const ROUTE_ACCESS: Record<string, RouteAccessConfig> = {
     description: 'Cổng tra cứu tài liệu quân sự',
   },
 
+  // Ecosystem Macro Modules (Giai đoạn phát triển Blueprint)
+  [ROUTE_PATHS.LECTURES]: {
+    path: ROUTE_PATHS.LECTURES,
+    requiresAuth: false,
+    description: 'Phân hệ Bài giảng số',
+  },
+  [ROUTE_PATHS.MATERIALS]: {
+    path: ROUTE_PATHS.MATERIALS,
+    requiresAuth: false,
+    description: 'Phân hệ Học liệu số',
+  },
+  [ROUTE_PATHS.LIBRARY]: {
+    path: ROUTE_PATHS.LIBRARY,
+    requiresAuth: false,
+    description: 'Phân hệ Thư viện số',
+  },
+
   // Protected - Trung tâm văn bản
   [ROUTE_PATHS.DESK]: {
     path: ROUTE_PATHS.DESK,
@@ -40,12 +57,11 @@ export const ROUTE_ACCESS: Record<string, RouteAccessConfig> = {
     description: 'Trung tâm văn bản và số hóa tài liệu',
   },
 
-  // Protected - Quản trị trung tâm (BẮT BUỘC ROLE ADMIN)
+  // Protected - Quản trị trung tâm
   [ROUTE_PATHS.ADMIN]: {
     path: ROUTE_PATHS.ADMIN,
     requiresAuth: true,
-    requiredRole: 'admin',
-    description: 'Bảng điều khiển quản trị trung tâm (Chỉ dành cho Quản trị viên)',
+    description: 'Bảng điều khiển quản trị trung tâm',
   },
 
   // Protected - Quản trị tài khoản & phân quyền (BẮT BUỘC ROLE ADMIN)

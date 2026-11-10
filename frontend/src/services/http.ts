@@ -41,7 +41,12 @@ export class HttpError extends Error {
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  const token = sessionStorage.getItem('qk7_token');
+  let token: string | null = null;
+  if (typeof window !== 'undefined') {
+    try {
+      token = sessionStorage.getItem('qk7_token') || localStorage.getItem('qk7_token');
+    } catch (_) {}
+  }
   if (token) {
     return { 'Authorization': `Bearer ${token}` };
   }

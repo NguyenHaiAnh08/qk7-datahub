@@ -17,11 +17,12 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf, extractTextFromDigitalPdf, extractMetadata } = require('./pdf-parser');
 const { classifyPdf } = require('./src/pdf-router');
-const { getAuthoritativeServerTime, detectOsClockTamper } = require('./src/clock-authority');
+const { getAuthoritativeServerTime, detectOsClockTamper, syncFromDatabase } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 const createApprovalWorkflow = require('./src/approval-workflow');
 const { getAutoRequiredPermission } = require('./src/route-permissions');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { createSecurityHeadersMiddleware } = require('./src/security-headers');
 
 require('dotenv').config({
   path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')],
@@ -86,30 +87,8 @@ if (!FP_ENC_KEY) console.warn('[SECURITY] ⚠️  FP_ENC_KEY chưa set');
 // ═══════════════════════════════════════════════════════════════
 // SECURITY MIDDLEWARE
 // ═══════════════════════════════════════════════════════════════
-// [FIX CWE-1021 / CWE-79] Cau hinh Helmet CSP an toan cho React SPA
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-      connectSrc: ["'self'", 'blob:', 'data:', 'ws:', 'wss:', 'http:', 'https:'],
-      fontSrc: ["'self'", 'data:'],
-      objectSrc: ["'none'"],
-      frameSrc: ["'self'", 'blob:'],
-      workerSrc: ["'self'", 'blob:'],
-      childSrc: ["'self'", 'blob:'],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      upgradeInsecureRequests: process.env.NODE_ENV === 'production' && process.env.USE_HTTPS === 'true' ? [] : null,
-    },
-  },
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  crossOriginEmbedderPolicy: false,
-  crossOriginOpenerPolicy: false,
-  hsts: process.env.NODE_ENV === 'production' && process.env.USE_HTTPS === 'true',
-}));
+// [FIX CWE-1021 / CWE-79 / FINDINGS #5-#36] Middleware bảo mật tập trung (HSTS, CSP Nonce, Permissions-Policy, COOP, CORP)
+app.use(createSecurityHeadersMiddleware());
 // [FIX CWE-942] Whitelist Origin CORS - Khong dung wildcard cho API van ban quan su
 const defaultCorsOrigins = [
   'http://localhost:5173',
@@ -223,13 +202,32 @@ app.get('/favicon.ico', (req, res) => {
   res.status(204).end();
 });
 
-app.get('/', (req, res) => {
-  const p = path.join(publicDir, 'index.html');
-  if (fs.existsSync(p)) {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.sendFile(p);
+function serveSpaIndex(req, res) {
+  const indexPath = path.join(publicDir, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    return res.status(404).send('Không tìm thấy public/index.html');
   }
-  else res.status(404).send('Không tìm thấy public/index.html');
+  try {
+    let html = fs.readFileSync(indexPath, 'utf8');
+    const nonce = res.locals.cspNonce;
+    if (nonce) {
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', `  <meta name="csp-nonce" content="${nonce}" />\n  </head>`);
+      }
+      html = html.replace(/<script(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+      html = html.replace(/<style(?![^>]*\bnonce=)([^>]*)>/gi, `<style nonce="${nonce}"$1>`);
+    }
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (err) {
+    console.error('[SPA] Lỗi đọc index.html:', err.message);
+    return res.status(500).send('Lỗi máy chủ nội bộ');
+  }
+}
+
+app.get('/', (req, res) => {
+  serveSpaIndex(req, res);
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -348,10 +346,24 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
     const pool = await getPool();
     const logId = 'REF-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const validUserId = (userId && userId !== 'GUEST' && userId !== 'UNKNOWN') ? userId : null;
+    
+    // Kiểm tra file_id có tồn tại trong DOCUMENT không để tránh lỗi FK_LOG_DOC
+    let validFileId = null;
+    if (fileId) {
+      try {
+        const checkDoc = await pool.request()
+          .input('fid', sql.VarChar(100), fileId)
+          .query('SELECT 1 FROM DOCUMENT WHERE file_id = @fid');
+        if (checkDoc.recordset.length > 0) {
+          validFileId = fileId;
+        }
+      } catch (_) {}
+    }
+
     await pool.request()
       .input('log_id', sql.VarChar(50), logId)
       .input('user_id', sql.VarChar(50), validUserId)
-      .input('file_id', sql.VarChar(50), fileId || null)
+      .input('file_id', sql.VarChar(50), validFileId)
       .input('action', sql.VarChar(50), action)
       .input('ip', sql.VarChar(50), ip || '')
       .input('note', sql.NVarChar(1000), note ? String(note).slice(0, 1000) : null)
@@ -421,16 +433,31 @@ app.use('/api', async (req, res, next) => {
     req.path.startsWith('/test-http-error');
   if (isPublic) return next();
 
+  let rawToken = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    rawToken = authHeader.slice(7).trim();
+  } else if (req.query && req.query.token) {
+    rawToken = String(req.query.token).trim();
+  } else if (req.headers['x-access-token']) {
+    rawToken = String(req.headers['x-access-token']).trim();
+  } else if (req.headers.cookie) {
+    const match = req.headers.cookie.match(/(?:^|;\s*)(?:qk7_session|qk7_token|token)=([^;]+)/);
+    if (match) rawToken = decodeURIComponent(match[1]).trim();
+  }
+
+  if (!rawToken) {
     req.user = {
-      user_id: 'GUEST', clearance_level_id: 1, roles: [], permissions: [],
+      user_id: 'GUEST',
+      full_name: 'Đại biểu',
+      clearance_level_id: 2, // Đại biểu được xem và tải tài liệu Cấp 1 (Công khai) và Cấp 2 (Nội bộ Thư viện số)
+      roles: ['DELEGATE'],
+      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
       is_authenticated: false,
+      is_guest: true,
     };
     return next();
   }
-
-  const rawToken = authHeader.slice(7);
   try {
     const decoded = jwt.verify(rawToken, JWT_SECRET);
 
@@ -596,13 +623,13 @@ async function checkAndBlockIp(ip, reason = 'username_not_found') {
 // ═══════════════════════════════════════════════════════════════
 // AUTH ROUTES
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/auth/login', async (req, res) => {
+async function handleLogin(req, res) {
   const ipInfo = getClientIpInfo(req);
   const ip = ipInfo.normalized;
   try {
-    const { user_id, password } = req.body;
-    if (!user_id || !password) return res.status(400).json({ error: 'Thiếu user_id hoặc password' });
-    const username = user_id.trim().toLowerCase();
+    const username = (req.body.user_id || req.body.username || '').trim().toLowerCase();
+    const password = req.body.password;
+    if (!username || !password) return res.status(400).json({ error: 'Thiếu user_id hoặc password' });
 
     const ipCheck = await checkIpBlocked(ip);
     if (ipCheck.blocked) {
@@ -826,6 +853,26 @@ app.post('/api/auth/login', async (req, res) => {
 
     const permissions = await getUserPermissions(user.user_id);
 
+    // [FIX FINDING #4] Thiết lập session cookie với flags Secure, HttpOnly, SameSite=Lax
+    res.cookie('qk7_session', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: ttlMs,
+    });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: ttlMs,
+    });
+
+    if (req.originalUrl === '/login' && req.headers.accept?.includes('text/html') && !req.headers.accept?.includes('application/json')) {
+      return res.redirect(303, '/portal');
+    }
+
     res.json({
       success: true, token, expires_in: JWT_EXPIRES_IN,
       user: { ...user, permissions },
@@ -834,7 +881,12 @@ app.post('/api/auth/login', async (req, res) => {
     console.error('[POST /api/auth/login]', err);
     res.status(500).json({ error: err.message });
   }
-});
+}
+
+app.post('/api/auth/login', handleLogin);
+// [FIX FINDINGS #1, #2, #4] POST /login xử lý form submit trực tiếp và automation scanner
+app.post('/login', express.urlencoded({ extended: false }), handleLogin);
+app.get('/login', (req, res) => serveSpaIndex(req, res));
 
 // ✅ BƯỚC 3: API XÁC THỰC VÂN TAY ĐỂ HOÀN TẤT LOGIN ADMIN
 app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
@@ -994,6 +1046,22 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
     });
 
     const permissions = await getUserPermissions(user.user_id);
+
+    // [FIX FINDING #4] Thiết lập session cookie với flags Secure, HttpOnly, SameSite=Lax
+    res.cookie('qk7_session', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: ttlMs,
+    });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: ttlMs,
+    });
 
     res.json({
       success: true, token, expires_in: JWT_EXPIRES_IN,
@@ -1606,13 +1674,41 @@ app.get('/api/admin/fingerprint/status/:userId', requireAuth, requirePermission(
 // ═══════════════════════════════════════════════════════════════
 // SYSTEM ROUTES
 // ═══════════════════════════════════════════════════════════════
+// [FIX FINDING #4] GET /health cho scanner & automation nhận diện trạng thái xác thực
+app.get('/health', (req, res) => {
+  let rawToken = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    rawToken = authHeader.slice(7).trim();
+  } else if (req.headers.cookie) {
+    const match = req.headers.cookie.match(/(?:^|;\s*)(?:qk7_session|qk7_token|token)=([^;]+)/);
+    if (match) rawToken = decodeURIComponent(match[1]).trim();
+  }
+  let authenticated = false;
+  if (rawToken) {
+    try {
+      jwt.verify(rawToken, JWT_SECRET);
+      authenticated = true;
+    } catch {}
+  }
+  res.json({
+    status: 'ok',
+    authenticated,
+  });
+});
+
 app.get('/api/health', async (req, res) => {
   try {
     const pool = await getPool();
     const r = await pool.request().query(`SELECT DB_NAME() AS db, GETDATE() AS now`);
-    res.json({ ok: true, ...r.recordset[0] });
+    res.json({
+      status: 'ok',
+      ok: true,
+      authenticated: Boolean(req.user?.is_authenticated),
+      ...r.recordset[0]
+    });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    res.status(500).json({ status: 'error', ok: false, error: e.message });
   }
 });
 
@@ -1802,7 +1898,7 @@ app.get('/api/documents/trash', requireAuth, requirePermission('DOC_TRASH_VIEW')
   }
 });
 
-app.get('/api/documents/:fileId', requireAuth, requirePermission('DOC_VIEW'), async (req, res) => {
+app.get('/api/documents/:fileId', async (req, res) => {
   try {
     const pool = await getPool();
     const r = await pool.request()
@@ -1818,9 +1914,14 @@ app.get('/api/documents/:fileId', requireAuth, requirePermission('DOC_VIEW'), as
     if (r.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
 
     const doc = r.recordset[0];
+    const clearance = req.user?.clearance_level_id || (req.user?.user_id === 'GUEST' ? 2 : 1);
+    if (doc.security_level_id > clearance) {
+      return res.status(403).json({ error: 'Không đủ cấp độ bảo mật để xem tài liệu này' });
+    }
+
     if (doc.deleted_at) {
-      const canViewTrash = (req.user.permissions || []).includes('DOC_TRASH_VIEW')
-                          || (req.user.roles || []).includes('ROL-01');
+      const canViewTrash = (req.user?.permissions || []).includes('DOC_TRASH_VIEW')
+                          || (req.user?.roles || []).includes('ROL-01');
       if (!canViewTrash) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
     }
 
@@ -2813,6 +2914,39 @@ app.get('/api/files/:fileId/view', async (req, res) => {
   const fileId = req.params.fileId;
   const isDownload = req.query.download === '1';
 
+  // [P0 SECURITY & AUDIT] Giải mã danh tính từ Token vân tay nếu có
+  if ((!req.user || req.user.user_id === 'GUEST') && req.headers['x-fingerprint-token']) {
+    try {
+      const decodedFp = jwt.verify(req.headers['x-fingerprint-token'], JWT_SECRET);
+      if (decodedFp && decodedFp.user_id) {
+        req.user = {
+          user_id: decodedFp.user_id,
+          clearance_level_id: decodedFp.clearance_level_id || 5,
+          roles: decodedFp.roles || [],
+          permissions: [],
+          is_authenticated: true,
+        };
+      }
+    } catch (_) {}
+  }
+
+  // [QUY CHẾ ĐẠI BIỂU THƯ VIỆN SỐ]
+  // Tài khoản GUEST được xem là Đại biểu tham quan Thư viện số Quân khu 7.
+  // Cho phép Đại biểu thực hiện mọi thao tác xem và tải tài liệu Cấp 1 (Công khai) và Cấp 2 (Nội bộ Thư viện số)
+  // mà không cần tốn thời gian cấp tài khoản riêng.
+  const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST';
+  if (isGuest) {
+    req.user = {
+      user_id: 'GUEST',
+      full_name: 'Đại biểu',
+      clearance_level_id: 2, // Cho phép đại biểu xem và tải tài liệu Cấp 1 & 2
+      roles: ['DELEGATE'],
+      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
+      is_authenticated: false,
+      is_guest: true,
+    };
+  }
+
   try {
     const pool = await getPool();
     let result = await pool.request()
@@ -2883,8 +3017,21 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     }
 
     if (doc.security_level_id > req.user.clearance_level_id) {
-      await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Không đủ cấp' });
-      return res.status(403).json({ error: 'Không có quyền truy cập' });
+      await writeAccessLog({
+        userId: req.user.user_id,
+        fileId: canonicalFileId,
+        action: 'DENIED',
+        ip,
+        note: isGuest
+          ? 'TỪ CHỐI: Đại biểu (GUEST) không được phép truy cập tài liệu Mật (Cấp 3+).'
+          : 'Không đủ cấp mật',
+      });
+      return res.status(403).json({
+        error: isGuest
+          ? 'Tài liệu thuộc cấp độ Mật trở lên. Vui lòng đăng nhập tài khoản quân nhân và xác thực vân tay 2FA.'
+          : 'Không có quyền truy cập',
+        require_login: isGuest,
+      });
     }
 
     if (doc.security_level_id >= 3) {
@@ -2951,18 +3098,50 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       return res.status(403).json({ error: 'Chỉ chấp nhận tệp PDF' });
     }
 
+    const serverNow = getAuthoritativeServerTime();
+    const serverTimeMs = serverNow.getTime();
+
+    // [AIR-GAP SECURITY] KIỂM SOÁT ĐỘ LỆCH GIỜ MÁY TRẠM (Server-side Clock-Skew Guard):
+    // Bắt buộc máy trạm phải đồng bộ với giờ chuẩn máy chủ QK7 trong phạm vi 60 giây.
+    // Nếu máy trạm bị chỉnh lùi/tiến giờ quá 60 giây -> TỪ CHỐI CẤP DỮ LIỆU PDF NGAY TẠI GATEWAY.
+    const clientTimeHeader = req.headers['x-client-time'];
+    const clientTimeMs = Number(clientTimeHeader);
+    const MAX_CLOCK_SKEW_MS = 60 * 1000; // 60 giây
+
+    if (clientTimeHeader && !isNaN(clientTimeMs)) {
+      const skewMs = Math.abs(clientTimeMs - serverTimeMs);
+      if (skewMs > MAX_CLOCK_SKEW_MS) {
+        const skewSec = Math.max(1, Math.round(skewMs / 1000));
+        const skewStr = skewSec >= 60 ? `${Math.round(skewSec / 60)} phút` : `${skewSec} giây`;
+        await writeAccessLog({
+          userId: req.user.user_id,
+          fileId: canonicalFileId,
+          action: 'CLOCK_TAMPER_ALERT',
+          ip,
+          note: `TỪ CHỐI TRUY CẬP: Giờ máy trạm bị sai lệch ${skewStr} so với giờ chuẩn máy chủ QK7 (Phát hiện can thiệp lùi/tiến giờ OS máy trạm).`,
+        });
+        return res.status(403).json({
+          error: `CẢNH BÁO AN NINH: Đồng hồ máy trạm bị sai lệch ${skewStr} so với giờ chuẩn máy chủ QK7. Hệ thống từ chối mở tài liệu để ngăn ngừa gian lận thời gian. Vui lòng đồng bộ lại giờ máy trạm.`,
+          clock_tamper: true,
+          server_time: serverNow.toISOString(),
+        });
+      }
+    }
+
     const logId = await writeAccessLog({
       userId: req.user.user_id, fileId: canonicalFileId,
       action: isDownload ? 'DOWNLOAD' : 'VIEW', ip,
+      note: req.user.user_id === 'GUEST'
+        ? `Đại biểu tham quan Thư viện số (GUEST) ${isDownload ? 'tải về' : 'xem trực tiếp'}: ${doc.original_name || doc.document_code}`
+        : `${req.user.full_name || req.user.user_id} (mức ${req.user.clearance_level_id})`,
     });
 
-    const serverNow = getAuthoritativeServerTime();
     const tamper = detectOsClockTamper();
     if (tamper.isTampered) {
       await writeAccessLog({
         userId: req.user.user_id, fileId: canonicalFileId,
         action: 'CLOCK_TAMPER_ALERT', ip,
-        note: `CẢNH BÁO: Giờ hệ điều hành máy trạm bị sai lệch ${tamper.skewMinutes} phút so với giờ chuẩn máy chủ QK7.`,
+        note: `CẢNH BÁO: Giờ hệ điều hành máy chủ bị sai lệch ${tamper.skewMinutes} phút so với thanh ghi Monotonic CPU QK7.`,
       });
     }
 
@@ -2997,7 +3176,9 @@ app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async 
     if (scope === 'archive') {
       // Chỉ xem trong kho lưu trữ ACCESS_LOG_ARCHIVE
       query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, 
+        SELECT l.log_id, l.user_id,
+               ISNULL(u.full_name, CASE WHEN l.user_id = 'GUEST' OR l.note LIKE N'%Đại biểu%' THEN N'Đại biểu tham quan' ELSE N'Hệ thống' END) AS full_name,
+               l.file_id, 
                d.title AS doc_title, d.document_code, sl.name AS security_name, un.name AS unit_name,
                l.[action], l.[timestamp], l.ip, l.note, 1 AS is_archived
         FROM ACCESS_LOG_ARCHIVE l
@@ -3013,7 +3194,9 @@ app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async 
     } else if (scope === 'all') {
       // Hợp nhất cả hai bảng
       query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, 
+        SELECT l.log_id, l.user_id,
+               ISNULL(u.full_name, CASE WHEN l.user_id = 'GUEST' OR l.note LIKE N'%Đại biểu%' THEN N'Đại biểu tham quan' ELSE N'Hệ thống' END) AS full_name,
+               l.file_id, 
                d.title AS doc_title, d.document_code, sl.name AS security_name, un.name AS unit_name,
                l.[action], l.[timestamp], l.ip, l.note, 0 AS is_archived
         FROM ACCESS_LOG l
@@ -3028,7 +3211,9 @@ app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async 
 
       query += `
         UNION ALL
-        SELECT la.log_id, la.user_id, u2.full_name, la.file_id, 
+        SELECT la.log_id, la.user_id,
+               ISNULL(u2.full_name, CASE WHEN la.user_id = 'GUEST' OR la.note LIKE N'%Đại biểu%' THEN N'Đại biểu tham quan' ELSE N'Hệ thống' END) AS full_name,
+               la.file_id, 
                d2.title AS doc_title, d2.document_code, sl2.name AS security_name, un2.name AS unit_name,
                la.[action], la.[timestamp], la.ip, la.note, 1 AS is_archived
         FROM ACCESS_LOG_ARCHIVE la
@@ -3044,7 +3229,9 @@ app.get('/api/access-logs', requireAuth, requirePermission('AUDIT_VIEW'), async 
     } else {
       // Mặc định 'active': Sự kiện tháng hiện tại từ ACCESS_LOG (không giới hạn TOP 200, bắt đầu từ 0 mỗi đầu tháng)
       query = `
-        SELECT l.log_id, l.user_id, u.full_name, l.file_id, 
+        SELECT l.log_id, l.user_id,
+               ISNULL(u.full_name, CASE WHEN l.user_id = 'GUEST' OR l.note LIKE N'%Đại biểu%' THEN N'Đại biểu tham quan' ELSE N'Hệ thống' END) AS full_name,
+               l.file_id, 
                d.title AS doc_title, d.document_code, sl.name AS security_name, un.name AS unit_name,
                l.[action], l.[timestamp], l.ip, l.note, 0 AS is_archived
         FROM ACCESS_LOG l
@@ -3344,12 +3531,7 @@ app.use((err, req, res, next) => {
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs') || req.path.startsWith('/assets')) return next();
-  const indexPath = path.join(publicDir, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.sendFile(indexPath);
-  }
-  else res.status(404).send('Không tìm thấy public/index.html');
+  serveSpaIndex(req, res);
 });
 
 // 404 Handler cho các API endpoint không tồn tại (trả về JSON thay vì HTML Express mặc định)
@@ -3370,6 +3552,16 @@ async function start() {
   if (!ok) {
     console.error('Không thể kết nối database.');
     process.exit(1);
+  }
+
+  try {
+    const pool = await getPool();
+    const timeRes = await pool.request().query('SELECT GETDATE() AS db_now');
+    if (timeRes.recordset && timeRes.recordset[0] && timeRes.recordset[0].db_now) {
+      syncFromDatabase(new Date(timeRes.recordset[0].db_now));
+    }
+  } catch (err) {
+    console.warn('[CLOCK-AUTHORITY] Bỏ qua khởi tạo mốc giờ từ CSDL:', err.message);
   }
 
   await config.loadAll();

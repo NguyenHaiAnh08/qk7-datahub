@@ -137,25 +137,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
+          const count = counts?.[item.id];
+          const hasCount = typeof count === 'number' && count > 0;
+          const displayCount = hasCount ? (count > 99 ? '99+' : String(count)) : null;
+
           const buttonElement = (
             <button
               key={item.id}
               onClick={() => handleSelect(item.id)}
               className={`w-full flex items-center ${
-                collapsed ? 'justify-center p-2.5' : 'justify-start space-x-3 px-3 py-2.5'
-              } rounded-xl text-xs transition cursor-pointer ${
+                collapsed ? 'justify-center p-2.5 relative' : 'justify-start space-x-3 px-3 py-2.5'
+              } rounded-xl text-xs transition cursor-pointer group ${
                 isActive
                   ? 'bg-emerald-500/15 border-l-4 border-emerald-500 text-emerald-700 dark:text-emerald-400 border-t border-b border-r border-emerald-500/25 font-semibold shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium border border-transparent'
               }`}
             >
-              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
-              {counts?.[item.id] ? (
-                <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0">
-                  {counts[item.id]! > 99 ? '99+' : counts[item.id]}
-                </span>
-              ) : null}
+              {/* Vùng Icon căn giữa hoàn hảo khi thu gọn (Zero-Misalignment) */}
+              <div className="relative inline-flex items-center justify-center shrink-0">
+                <Icon
+                  className={`w-4 h-4 flex-shrink-0 ${
+                    isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+                  }`}
+                />
+                {/* Chỉ số thông báo dạng số mũ bình phương (a²) góc trên bên phải khi Sidebar thu gọn */}
+                {collapsed && hasCount && (
+                  <span
+                    className="absolute -top-2 -right-2.5 inline-flex items-center justify-center min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold shadow-xs leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none select-none tabular-nums animate-in fade-in zoom-in duration-200"
+                    title={`${count} chờ xử lý`}
+                  >
+                    {displayCount}
+                  </span>
+                )}
+              </div>
+
+              {/* Nhãn và Badge khi mở rộng Sidebar */}
+              {!collapsed && (
+                <>
+                  <span className="truncate flex-1 text-left">{item.label}</span>
+                  {hasCount && (
+                    <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0 shadow-xs tabular-nums">
+                      {displayCount}
+                    </span>
+                  )}
+                </>
+              )}
             </button>
           );
 

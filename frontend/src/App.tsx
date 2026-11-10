@@ -22,12 +22,19 @@ import './index.css';
  * - Locale: Tiếng Việt (vi_VN)
  * - AntApp cung cấp static context cho message, notification, modal
  */
+const getCspNonce = () => {
+  if (typeof document === 'undefined') return undefined;
+  return document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') || undefined;
+};
+
 const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isDark } = useTheme();
+  const cspNonce = React.useMemo(() => getCspNonce(), []);
 
   return (
     <ConfigProvider
       locale={viVN}
+      csp={cspNonce ? { nonce: cspNonce } : undefined}
       theme={{
         algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         token: {

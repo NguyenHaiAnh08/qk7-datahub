@@ -54,6 +54,8 @@ export interface PendingProposalItem {
   new_stored_path?: string;
   new_original_name?: string;
   new_file_size?: number;
+  deleted_reason?: string;
+  is_new_upload?: boolean;
   note?: string;
   created_at: string;
 }
@@ -197,61 +199,73 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
   // ─────────────────────────────────────────────────────────────
   // DANH SÁCH DIFF FIELDS ĐỐI CHIẾU
   // ─────────────────────────────────────────────────────────────
+  const isNewUpload = Boolean(
+    activeItem?.deleted_reason === 'PENDING_APPROVAL' ||
+    activeItem?.is_new_upload ||
+    activeItem?.note?.includes('Đăng tải')
+  );
+
   const diffFields = activeItem
     ? [
         {
           label: 'Số hiệu / Ký hiệu văn bản',
-          oldValue: activeItem.current_document_code || '—',
+          oldValue: isNewUpload ? '(Văn bản mới)' : (activeItem.current_document_code || '—'),
           newValue: activeItem.document_code || activeItem.current_document_code || '—',
-          hasChanged:
+          hasChanged: isNewUpload || (
             Boolean(activeItem.document_code) &&
-            activeItem.document_code !== activeItem.current_document_code,
+            activeItem.document_code !== activeItem.current_document_code
+          ),
           isMono: true,
         },
         {
           label: 'Trích yếu nội dung văn bản',
-          oldValue: activeItem.current_title,
+          oldValue: isNewUpload ? '(Văn bản mới)' : activeItem.current_title,
           newValue: activeItem.title,
-          hasChanged: activeItem.title.trim() !== activeItem.current_title.trim(),
+          hasChanged: isNewUpload || (activeItem.title.trim() !== activeItem.current_title.trim()),
         },
         {
           label: 'Đơn vị ban hành',
-          oldValue: activeItem.current_unit_name || '—',
+          oldValue: isNewUpload ? '(Chưa có)' : (activeItem.current_unit_name || '—'),
           newValue: activeItem.issuing_unit_name || activeItem.current_unit_name || '—',
-          hasChanged:
+          hasChanged: isNewUpload || (
             Boolean(activeItem.issuing_unit_name) &&
-            activeItem.issuing_unit_name !== activeItem.current_unit_name,
+            activeItem.issuing_unit_name !== activeItem.current_unit_name
+          ),
         },
         {
           label: 'Người ký ban hành',
-          oldValue: activeItem.current_signer || '—',
+          oldValue: isNewUpload ? '(Chưa có)' : (activeItem.current_signer || '—'),
           newValue: activeItem.signer || activeItem.current_signer || '—',
-          hasChanged:
-            Boolean(activeItem.signer) && activeItem.signer !== activeItem.current_signer,
+          hasChanged: isNewUpload || (
+            Boolean(activeItem.signer) && activeItem.signer !== activeItem.current_signer
+          ),
         },
         {
           label: 'Cấp độ bảo mật (Độ mật)',
-          oldValue:
+          oldValue: isNewUpload ? '(Chưa có)' : (
             activeItem.current_security_name ||
-            `Cấp ${activeItem.current_security_level_id}`,
+            `Cấp ${activeItem.current_security_level_id}`
+          ),
           newValue:
             activeItem.security_level_name || `Cấp ${activeItem.security_level_id}`,
-          hasChanged:
-            activeItem.security_level_id !== activeItem.current_security_level_id,
+          hasChanged: isNewUpload || (
+            activeItem.security_level_id !== activeItem.current_security_level_id
+          ),
         },
         {
           label: 'Ngày ban hành',
-          oldValue: activeItem.current_issued_date
+          oldValue: isNewUpload ? '(Chưa có)' : (activeItem.current_issued_date
             ? new Date(activeItem.current_issued_date).toLocaleDateString('vi-VN')
-            : '—',
+            : '—'),
           newValue: activeItem.issued_date
             ? new Date(activeItem.issued_date).toLocaleDateString('vi-VN')
             : activeItem.current_issued_date
             ? new Date(activeItem.current_issued_date).toLocaleDateString('vi-VN')
             : '—',
-          hasChanged:
+          hasChanged: isNewUpload || (
             Boolean(activeItem.issued_date) &&
-            activeItem.issued_date !== activeItem.current_issued_date,
+            activeItem.issued_date !== activeItem.current_issued_date
+          ),
         },
       ]
     : [];
@@ -366,6 +380,11 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-2 flex-wrap">
                       <User className="w-3 h-3 shrink-0" />
                       <span className="truncate">{item.requester_name}</span>
+                      {(item.deleted_reason === 'PENDING_APPROVAL' || item.is_new_upload || item.note?.includes('Đăng tải')) && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 shrink-0">
+                          TẢI MỚI
+                        </span>
+                      )}
                       {isOwnProposal && (
                         <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
                           CỦA BẠN
@@ -494,7 +513,7 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="text-xs font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
                               <FileText className="w-3.5 h-3.5" />
-                              Tệp PDF Đính Kèm Thay Thế
+                              {isNewUpload ? 'Tệp PDF Văn Bản Mới Đăng Tải' : 'Tệp PDF Đính Kèm Thay Thế'}
                             </span>
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-400 border border-blue-500/30">
                               FILE MỚI
@@ -640,7 +659,7 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
                               ) : (
                                 <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               )}
-                              <span>Phê duyệt & Cập nhật</span>
+                              <span>{isNewUpload ? 'Phê duyệt & Tiếp nhận văn bản' : 'Phê duyệt & Cập nhật'}</span>
                             </button>
                           </>
                         )}

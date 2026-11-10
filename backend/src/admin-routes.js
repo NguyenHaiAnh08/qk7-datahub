@@ -1841,6 +1841,7 @@ module.exports = (app, deps) => {
                   d.signer AS current_signer, d.issued_date AS current_issued_date,
                   d.security_level_id AS current_security_level_id,
                   d.issuing_unit_id AS document_issuing_unit_id,
+                  d.deleted_reason,
                   cur_unit.name AS current_unit_name,
                   unit.name AS issuing_unit_name,
                   sl.name AS security_level_name,
@@ -1884,6 +1885,7 @@ module.exports = (app, deps) => {
 
             const proposalItems = (propRes.recordset || []).map((p) => {
               const docCodeDisplay = p.document_code || p.current_document_code || p.file_id;
+              const isNewUpload = (p.deleted_reason === 'PENDING_APPROVAL' || (p.note && p.note.includes('Đăng tải')));
               return {
                 request_id: p.proposal_id,
                 requester_id: p.requester_id,
@@ -1894,9 +1896,9 @@ module.exports = (app, deps) => {
                 requester_unit_name: p.requester_unit_name,
                 document_issuing_unit_id: p.document_issuing_unit_id,
                 document_issuing_unit_name: p.current_unit_name,
-                required_permission: 'DOC_EDIT',
-                http_method: 'PUT',
-                http_path: `/api/documents/${p.file_id}`,
+                required_permission: isNewUpload ? 'DOC_UPLOAD' : 'DOC_EDIT',
+                http_method: isNewUpload ? 'POST' : 'PUT',
+                http_path: isNewUpload ? `/api/documents/upload` : `/api/documents/${p.file_id}`,
                 http_body: JSON.stringify({
                   file_id: p.file_id,
                   document_code: p.document_code,
@@ -1906,14 +1908,16 @@ module.exports = (app, deps) => {
                   security_level_name: p.security_level_name,
                   note: p.note,
                 }),
-                target_summary: `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
+                target_summary: isNewUpload
+                  ? `Đăng tải văn bản mới [${docCodeDisplay}]: ${p.title}`
+                  : `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
                 status: p.status,
                 reviewed_by: p.reviewed_by,
                 reviewer_name: p.reviewer_name,
                 reviewed_at: p.reviewed_at,
                 review_note: p.review_note,
                 created_at: p.created_at,
-                request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+                request_reason: p.note || (isNewUpload ? 'Đăng tải văn bản mới chờ Chỉ huy duyệt' : 'Đề xuất chuẩn hóa thông tin văn bản'),
                 proposal_data: {
                   proposal_id: p.proposal_id,
                   file_id: p.file_id,
@@ -1936,7 +1940,9 @@ module.exports = (app, deps) => {
                   current_issued_date: p.current_issued_date,
                   new_original_name: p.new_original_name,
                   new_file_size: p.new_file_size,
-                  note: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+                  deleted_reason: p.deleted_reason,
+                  is_new_upload: isNewUpload,
+                  note: p.note || (isNewUpload ? 'Đăng tải văn bản mới chờ Chỉ huy duyệt' : 'Đề xuất chuẩn hóa thông tin văn bản'),
                   requester_id: p.requester_id,
                   requester_name: p.requester_name,
                   requester_rank: p.requester_rank,

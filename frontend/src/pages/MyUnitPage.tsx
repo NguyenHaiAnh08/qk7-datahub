@@ -17,6 +17,7 @@ import { isUserAdmin, isUserManager } from '../contexts/AuthContext';
 import { DateRangePicker } from '../components/common/DateRangePicker';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
+import { useDebounce } from '../hooks/useDebounce';
 import { documentService, MyUnitDocumentResponse } from '../services/documentService';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData } from '../types';
@@ -29,6 +30,7 @@ export const MyUnitPage: React.FC = () => {
   const [meta, setMeta] = useState<MetaData>({ types: [], units: [], levels: [] });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [selectedType, setSelectedType] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<number | ''>('');
   const [dateFrom, setDateFrom] = useState('');
@@ -149,7 +151,7 @@ export const MyUnitPage: React.FC = () => {
       const res: MyUnitDocumentResponse = await documentService.getMyUnitDocuments({
         unit_id: unitToQuery || undefined,
         // code: searchQuery || undefined,
-        q: searchQuery || undefined,
+        q: debouncedSearch || undefined,
         type: selectedType || undefined,
         lv: selectedLevel !== '' ? Number(selectedLevel) : undefined,
         from: dateFrom || undefined,
@@ -189,7 +191,7 @@ export const MyUnitPage: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => { loadDocuments(); }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedType, selectedLevel, selectedUnitId, dateFrom, dateTo]);
+  }, [debouncedSearch, selectedType, selectedLevel, selectedUnitId, dateFrom, dateTo]);
 
   const handleResetFilters = () => {
     setSearchQuery('');

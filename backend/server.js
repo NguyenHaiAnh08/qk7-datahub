@@ -15,7 +15,7 @@ const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
-const { parseDocumentPdf } = require('./pdf-parser');
+const { parseDocumentPdf, extractTextFromDigitalPdf, extractMetadata } = require('./pdf-parser');
 const { classifyPdf } = require('./src/pdf-router');
 const { getAuthoritativeServerTime, detectOsClockTamper } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
@@ -44,7 +44,7 @@ const {
 } = require('./src/audit-log-cleaner');
 
 const app = express();
-app.set('trust proxy', 'loopback');
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 
 const PORT = process.env.PORT || 8000;
 const ROOT_DIR = __dirname;
@@ -86,15 +86,60 @@ if (!FP_ENC_KEY) console.warn('[SECURITY] ⚠️  FP_ENC_KEY chưa set');
 // ═══════════════════════════════════════════════════════════════
 // SECURITY MIDDLEWARE
 // ═══════════════════════════════════════════════════════════════
+// [FIX CWE-1021 / CWE-79] Cau hinh Helmet CSP an toan cho React SPA
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", 'blob:', 'data:', 'ws:', 'wss:', 'http:', 'https:'],
+      fontSrc: ["'self'", 'data:'],
+      objectSrc: ["'none'"],
+      frameSrc: ["'self'", 'blob:'],
+      workerSrc: ["'self'", 'blob:'],
+      childSrc: ["'self'", 'blob:'],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' && process.env.USE_HTTPS === 'true' ? [] : null,
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
-  originAgentCluster: false,
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  hsts: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
+  hsts: process.env.NODE_ENV === 'production' && process.env.USE_HTTPS === 'true',
 }));
+// [FIX CWE-942] Whitelist Origin CORS - Khong dung wildcard cho API van ban quan su
+const defaultCorsOrigins = [
+  'http://localhost:5173',
+  'http://localhost:8000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:8000',
+];
+if (process.env.SERVER_IP) {
+  defaultCorsOrigins.push(`http://${process.env.SERVER_IP}:5173`);
+  defaultCorsOrigins.push(`http://${process.env.SERVER_IP}:8000`);
+  defaultCorsOrigins.push(`https://${process.env.SERVER_IP}`);
+}
+if (process.env.SERVER_DOMAIN) {
+  defaultCorsOrigins.push(`https://${process.env.SERVER_DOMAIN}`);
+  defaultCorsOrigins.push(`http://${process.env.SERVER_DOMAIN}`);
+}
+const envCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+const allowedCorsOrigins = Array.from(new Set([...defaultCorsOrigins, ...envCorsOrigins]));
+
 app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedCorsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
   exposedHeaders: ['X-Server-Time', 'X-Trace-Id', 'X-Clock-Timestamp', 'Content-Disposition'],
 }));
 app.use(express.json({ limit: '2mb' }));
@@ -150,7 +195,7 @@ app.use('/api/fingerprint/enroll', fingerprintLimiter);
 app.use(express.static(publicDir, {
   setHeaders: (res, filePath) => {
     // Không cache file HTML để client luôn cập nhật phiên bản mới nhất ngay lập tức
-    if (filePath.endsWith('.html')) {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
@@ -158,7 +203,8 @@ app.use(express.static(publicDir, {
   }
 }));
 
-const ENABLE_SWAGGER = (process.env.ENABLE_SWAGGER || 'true').toLowerCase() === 'true';
+// [FIX CWE-200] Swagger mac dinh tat o production tru khi duoc bat ro rang
+const ENABLE_SWAGGER = (process.env.ENABLE_SWAGGER || (process.env.NODE_ENV === 'production' ? 'false' : 'true')).toLowerCase() === 'true';
 if (ENABLE_SWAGGER) {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customCss: '.swagger-ui .topbar { display: none }',
@@ -193,10 +239,29 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
+    // [FIX CWE-434] Kiem tra duoi mo rong va chong path traversal tren ten file
+    const origName = file.originalname || '';
+    if (origName.includes('\0') || origName.includes('..') || !origName.toLowerCase().endsWith('.pdf')) {
+      return cb(new Error('Tên tệp không hợp lệ hoặc chứa ký tự nguy hiểm'));
+    }
     if (file.mimetype === 'application/pdf') cb(null, true);
     else cb(new Error('Chỉ chấp nhận file PDF'));
   },
 });
+
+// [FIX CWE-434] Middleware xac thuc Magic Bytes (%PDF-) chong gia mao MIME type
+function validateUploadedPdf(req, res, next) {
+  if (!req.file) return next();
+  const buf = req.file.buffer;
+  if (!buf || buf.length < 5) {
+    return res.status(400).json({ error: 'Tệp tải lên không hợp lệ hoặc rỗng' });
+  }
+  const header = buf.slice(0, Math.min(buf.length, 1024)).toString('latin1');
+  if (!header.includes('%PDF-')) {
+    return res.status(400).json({ error: 'Định dạng tệp không hợp lệ: nội dung không phải PDF chuẩn (Magic Bytes mismatch).' });
+  }
+  next();
+}
 
 function safePathJoin(baseDir, userPath) {
   if (!baseDir || !userPath) return null;
@@ -248,23 +313,13 @@ function findPdfBySha8(rootDir, sha8, maxDepth = 5) {
 }
 
 function getClientIpInfo(req) {
+  // [FIX CWE-290] Uu tien req.ip duoc Express xac thuc qua 'trust proxy'.
+  // Khong doc truc tiep req.headers['x-forwarded-for'] chua qua kiem tra.
+  const candidate = req.ip || req.socket?.remoteAddress || '';
   const raw = {
     socket: req.socket?.remoteAddress || null,
     reqIp: req.ip || null,
-    xForwardedFor: req.headers['x-forwarded-for'] || null,
-    xRealIp: req.headers['x-real-ip'] || null,
-    xClientIp: req.headers['x-client-ip'] || null,
-    cfConnectingIp: req.headers['cf-connecting-ip'] || null,
   };
-  let candidate = '';
-  if (raw.xForwardedFor) {
-    const parts = String(raw.xForwardedFor).split(',').map((s) => s.trim()).filter(Boolean);
-    if (parts.length > 0) candidate = parts[0];
-  }
-  if (!candidate && raw.xRealIp) candidate = String(raw.xRealIp).trim();
-  if (!candidate && raw.xClientIp) candidate = String(raw.xClientIp).trim();
-  if (!candidate && raw.cfConnectingIp) candidate = String(raw.cfConnectingIp).trim();
-  if (!candidate) candidate = raw.reqIp || raw.socket || '';
 
   let ip = String(candidate).trim();
   if (/^\d{1,3}(\.\d{1,3}){3}:\d+$/.test(ip)) ip = ip.split(':')[0];
@@ -456,7 +511,7 @@ function decryptTemplate(encoded, context = {}) {
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const enc = buf.subarray(28);
-    const d = crypto.createDecipheriv('aes-256-gcm', FP_ENC_KEY, iv);
+    const d = crypto.createDecipheriv('aes-256-gcm', FP_ENC_KEY, iv, { authTagLength: 16 });
     d.setAuthTag(tag);
     return Buffer.concat([d.update(enc), d.final()]);
   } catch (err) {
@@ -1778,59 +1833,96 @@ app.get('/api/documents/:fileId', requireAuth, requirePermission('DOC_VIEW'), as
 // ═══════════════════════════════════════════════════════════════
 // DOCUMENT PARSE / UPLOAD / UPDATE / DELETE / RESTORE / PURGE
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), async (req, res) => {
+app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), validateUploadedPdf, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
 
     const parseStartTime = Date.now();
+    const buffer = req.file.buffer;
 
-    // Tầng 1: Phân loại văn bản thông minh (TextBased vs Scanned/Mixed)
-    const classification = await classifyPdf(req.file.buffer, { forMetadataOnly: true });
+    // ─────────────────────────────────────────────────────────────
+    // 1 & 2. Trích xuất text thử nghiệm bằng pdfjs-dist
+    // Nếu số lượng ký tự > 100 (file có text layer) -> Chuyển thẳng text
+    // ─────────────────────────────────────────────────────────────
+    let digitalExtract = { text: '', charCount: 0, pages: [] };
+    try {
+      digitalExtract = await extractTextFromDigitalPdf(buffer);
+    } catch (digErr) {
+      console.warn('[parse] extractTextFromDigitalPdf lỗi:', digErr.message);
+    }
+
+    const hasTextLayer = digitalExtract.charCount > 100;
+    console.log(`[parse] File: "${req.file.originalname}" (${(req.file.size / 1024 / 1024).toFixed(2)} MB) - Ký tự text layer: ${digitalExtract.charCount} -> ${hasTextLayer ? 'Digital PDF' : 'Scan PDF'}`);
 
     let preExtractedText = null;
-    let usedEngine = 'none';
+    let usedEngine = 'digital-text';
+    let source = 'digital';
+    let isFallback = false;
 
-    // Tầng 2: Nếu có trang cần OCR, gọi Microservice PaddleOCR (:8002)
-    if (classification.pagesNeedingOcr.length > 0) {
+    if (hasTextLayer) {
+      // File có text layer (> 100 ký tự) -> Sử dụng trực tiếp text số hóa
+      preExtractedText = digitalExtract.text;
+      usedEngine = 'pdfjs-dist';
+      source = 'digital';
+    } else {
+      // ─────────────────────────────────────────────────────────────
+      // 3. File scan (text <= 100 ký tự): Gọi sang OCR Microservice (:8002)
+      // Set timeout 60 giây theo đúng quy chuẩn kiến trúc
+      // ─────────────────────────────────────────────────────────────
       const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://127.0.0.1:8002';
+      const OCR_TIMEOUT_MS = parseInt(process.env.OCR_SERVICE_TIMEOUT_MS || '60000', 10);
+
+      console.log(`[parse] Phát hiện file scan (ký tự: ${digitalExtract.charCount} <= 100). Gửi sang OCR Microservice (${OCR_SERVICE_URL}, timeout: ${OCR_TIMEOUT_MS}ms)...`);
+
       try {
         const ocrFormData = new FormData();
-        const pdfBlob = new Blob([req.file.buffer], { type: 'application/pdf' });
-        ocrFormData.append('file', pdfBlob, req.file.originalname || 'document.pdf');
-        ocrFormData.append('pages', JSON.stringify(classification.pagesNeedingOcr));
+        const pdfBlob = new Blob([buffer], { type: 'application/pdf' });
+        ocrFormData.append('file', pdfBlob, req.file.originalname || 'scan_document.pdf');
+        ocrFormData.append('pages', '[1]');
         ocrFormData.append('dpi', '150');
 
-        console.log(`[parse] Gửi ${classification.pagesNeedingOcr.length} trang sang OCR Service (:8002)...`);
         const ocrResponse = await fetch(`${OCR_SERVICE_URL}/api/ocr/extract`, {
           method: 'POST',
           body: ocrFormData,
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(OCR_TIMEOUT_MS),
         });
 
         if (ocrResponse.ok) {
           const ocrData = await ocrResponse.json();
           if (ocrData.success && ocrData.combined_text) {
             preExtractedText = ocrData.combined_text;
-            usedEngine = 'paddleocr';
-            console.log(`[parse] ✅ PaddleOCR trích xuất thành công (${ocrData.elapsed_seconds}s)`);
+            usedEngine = ocrData.engine_used || 'monkey-ocr';
+            source = 'ocr';
+            console.log(`[parse] ✅ OCR Microservice thành công (${ocrData.elapsed_seconds}s, engine: ${usedEngine}, ${preExtractedText.length} ký tự)`);
+          } else {
+            throw new Error(ocrData.error || 'OCR service trả về success=false');
           }
         } else {
-          console.warn(`[parse] OCR Service trả về status: ${ocrResponse.status}`);
+          throw new Error(`OCR service trả về mã HTTP ${ocrResponse.status}`);
         }
       } catch (ocrErr) {
-        console.warn(`[parse] ⚠️ OCR_SERVICE_OFFLINE hoặc timeout (${ocrErr.message}). Chuyển sang local fallback...`);
+        // ───────────────────────────────────────────────────────────
+        // 5. Cơ chế Fallback an toàn: ECONNREFUSED hoặc Timeout
+        // Tự động gọi lại parseDocumentPdf cũ (Tesseract) để không sập hệ thống
+        // ───────────────────────────────────────────────────────────
+        isFallback = true;
+        console.warn(`[OCR_SERVICE_OFFLINE] Fallback to Tesseract: ${ocrErr.message}`);
+        preExtractedText = null;
+        usedEngine = 'tesseract-fallback';
+        source = 'ocr-fallback';
       }
     }
 
-    // Tầng 3: Trích xuất Metadata & Điền form
-    const result = await parseDocumentPdf(req.file.buffer, { sql, getPool }, {
+    // ─────────────────────────────────────────────────────────────
+    // 4. Nhận text sạch (từ Digital hoặc OCR), bóc tách Metadata
+    // ─────────────────────────────────────────────────────────────
+    const result = await parseDocumentPdf(buffer, { sql, getPool }, {
       preExtractedText,
-      source: preExtractedText ? 'ocr' : (classification.pdfType === 'TextBased' ? 'digital' : 'ocr-fallback'),
-      classification,
+      source,
       engine: usedEngine,
     });
 
-    const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+    const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
     const documentCode = (req.body.document_code || result?.parsed?.document_code || '').trim() || null;
 
     let shaMatches = [], codeMatches = [];
@@ -1870,6 +1962,8 @@ app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), up
       original_name: req.file.originalname,
       file_size: req.file.size,
       sha256,
+      engine: usedEngine,
+      is_fallback: isFallback,
       duplicate_check: {
         sha256,
         is_duplicate: shaDuplicate || codeDuplicate,
@@ -1913,7 +2007,7 @@ const syncToAI = async (action, doc) => {
   }
 };
 
-app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), upload.single('file'), async (req, res) => {
+app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), upload.single('file'), validateUploadedPdf, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
 
@@ -1940,6 +2034,33 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       }
     }
 
+    const userRoles = await resolveUserRoles(req.user);
+    const isAdmin =
+      userRoles.includes('ROL-01') ||
+      (req.user?.roles || []).includes('ROL-01') ||
+      req.user?.user_id === 'USR-001' ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
+
+    const pos = (req.user?.position || '').toLowerCase();
+    const isCommander =
+      userRoles.includes('ROL-02') ||
+      (req.user?.roles || []).includes('ROL-02') ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
+      (req.user?.role_names || []).some((r) => {
+        const s = String(r).toLowerCase();
+        return (
+          s.includes('chỉ huy') ||
+          s.includes('trưởng phòng') ||
+          s.includes('thủ trưởng') ||
+          s.includes('chủ nhiệm')
+        );
+      }) ||
+      pos.includes('chỉ huy') ||
+      pos.includes('trưởng phòng') ||
+      pos.includes('thủ trưởng') ||
+      pos.includes('chủ nhiệm');
+
     const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
       docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
     });
@@ -1954,6 +2075,87 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
     fs.writeFileSync(absPath, req.file.buffer);
 
     const pool = await getPool();
+
+    // 🎖️ NGUYÊN TẮC PHÊ DUYỆT ĐĂNG TẢI (Maker-Checker Approval Flow):
+    // Cán bộ nghiệp vụ (Trợ lý, Văn thư, Cơ yếu, IT...) đăng tải văn bản mới -> Chuyển vào hàng đợi chờ Chỉ huy / Admin duyệt
+    if (!isAdmin && !isCommander) {
+      await pool.request()
+        .input('file_id', sql.VarChar(50), fileId)
+        .input('document_code', sql.NVarChar(100), document_code || null)
+        .input('title', sql.NVarChar(500), title.trim())
+        .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
+        .input('issued_date', sql.Date, issued_date || null)
+        .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+        .input('signer', sql.NVarChar(100), signer || null)
+        .input('summary', sql.NVarChar(sql.MAX), summary || null)
+        .input('security_level_id', sql.Int, parseInt(security_level_id, 10))
+        .input('original_name', sql.NVarChar(255), req.file.originalname)
+        .input('stored_path', sql.NVarChar(500), relPath)
+        .input('mime_type', sql.VarChar(100), req.file.mimetype)
+        .input('file_size', sql.BigInt, req.file.size)
+        .input('sha256', sql.Char(64), sha256)
+        .input('uploaded_by', sql.VarChar(50), req.user.user_id)
+        .query(`
+          INSERT INTO DOCUMENT (file_id, document_code, title, doc_type_id, issued_date, issuing_unit_id, signer, summary,
+            security_level_id, original_name, stored_path, mime_type, file_size, sha256, uploaded_by, deleted_at, deleted_reason)
+          VALUES (@file_id, @document_code, @title, @doc_type_id, @issued_date, @issuing_unit_id,
+            @signer, @summary, @security_level_id, @original_name, @stored_path, @mime_type,
+            @file_size, @sha256, @uploaded_by, GETDATE(), 'PENDING_APPROVAL')
+        `);
+
+      const proposalId = 'PROP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+      const proposalNote = req.body.proposal_note || req.body.note || 'Đăng tải văn bản mới chờ Chỉ huy duyệt';
+
+      await pool.request()
+        .input('pid', sql.VarChar(50), proposalId)
+        .input('fid', sql.VarChar(50), fileId)
+        .input('req_id', sql.VarChar(50), req.user.user_id)
+        .input('doc_code', sql.NVarChar(100), document_code || null)
+        .input('title', sql.NVarChar(500), title.trim())
+        .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
+        .input('issued_date', sql.Date, issued_date || null)
+        .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+        .input('signer', sql.NVarChar(100), signer || null)
+        .input('summary', sql.NVarChar(sql.MAX), summary || null)
+        .input('sec_id', sql.Int, parseInt(security_level_id, 10))
+        .input('new_path', sql.NVarChar(500), relPath)
+        .input('new_name', sql.NVarChar(255), req.file.originalname)
+        .input('new_mime', sql.VarChar(100), req.file.mimetype)
+        .input('new_size', sql.BigInt, req.file.size)
+        .input('new_sha', sql.Char(64), sha256)
+        .input('note', sql.NVarChar(500), proposalNote)
+        .query(`
+          INSERT INTO DOCUMENT_REVISION_PROPOSAL (
+            proposal_id, file_id, requester_id,
+            document_code, title, doc_type_id, issued_date, issuing_unit_id,
+            signer, summary, security_level_id,
+            new_stored_path, new_original_name, new_mime_type, new_file_size, new_sha256,
+            status, note, created_at, updated_at
+          ) VALUES (
+            @pid, @fid, @req_id,
+            @doc_code, @title, @doc_type_id, @issued_date, @issuing_unit_id,
+            @signer, @summary, @sec_id,
+            @new_path, @new_name, @new_mime, @new_size, @new_sha,
+            'PENDING', @note, GETDATE(), GETDATE()
+          )
+        `);
+
+      await writeAccessLog({
+        userId: req.user.user_id, fileId, action: 'UPLOAD_PROPOSAL_CREATED',
+        ip: getClientIp(req),
+        note: `Đăng tải văn bản mới chờ Chỉ huy duyệt: ${title.trim()}`,
+      });
+
+      return res.json({
+        success: true,
+        pending_approval: true,
+        proposal_id: proposalId,
+        file_id: fileId,
+        message: 'Văn bản mới đã được tiếp nhận và chuyển vào hàng đợi chờ Chỉ huy đơn vị / Quản trị viên phê duyệt.',
+      });
+    }
+
+    await pool.request()
     await pool.request()
       .input('file_id', sql.VarChar(50), fileId)
       .input('document_code', sql.NVarChar(100), document_code || null)
@@ -1999,7 +2201,7 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
   }
 });
 
-app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), upload.single('file'), async (req, res) => {
+app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), upload.single('file'), validateUploadedPdf, async (req, res) => {
   const fileId = req.params.fileId;
   try {
     const pool = await getPool();
@@ -2049,9 +2251,11 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       if (req.file) {
         newSha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
         const sha8 = newSha256.slice(0, 8);
-        const yyyy = new Date().getFullYear();
-        const mm = String(new Date().getMonth() + 1).padStart(2, '0');
-        const relPath = `uploads/proposals/${yyyy}/${mm}/prop_${fileId}_${sha8}.pdf`;
+        const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+          docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
+        });
+        const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
+        const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
         const absPath = safePathJoin(ROOT_DIR, relPath);
         if (absPath) {
           fs.mkdirSync(path.dirname(absPath), { recursive: true });
@@ -2226,6 +2430,8 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
              d.doc_type_id AS current_doc_type_id,
              d.issued_date AS current_issued_date,
              d.issuing_unit_id AS current_issuing_unit_id,
+             d.deleted_reason,
+             d.uploaded_by AS document_uploaded_by,
              u.full_name AS requester_name,
              u.rank AS requester_rank,
              u.position AS requester_position,
@@ -2301,8 +2507,18 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
     const propAbs = safePathJoin(ROOT_DIR, prop.new_stored_path);
 
     if (absPath && propAbs && fs.existsSync(propAbs)) {
-      fs.mkdirSync(path.dirname(absPath), { recursive: true });
-      fs.copyFileSync(propAbs, absPath);
+      if (absPath !== propAbs) {
+        fs.mkdirSync(path.dirname(absPath), { recursive: true });
+        fs.copyFileSync(propAbs, absPath);
+        try { fs.unlinkSync(propAbs); } catch (_) {}
+      }
+      finalStoredPath = relPath;
+      finalOriginalName = prop.new_original_name;
+      finalMimeType = prop.new_mime_type;
+      finalFileSize = prop.new_file_size;
+      finalSha256 = prop.new_sha256;
+      replacedFile = true;
+    } else if (absPath && fs.existsSync(absPath)) {
       finalStoredPath = relPath;
       finalOriginalName = prop.new_original_name;
       finalMimeType = prop.new_mime_type;
@@ -2329,7 +2545,8 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
       document_code = @code, title = @title, doc_type_id = @type,
       issued_date = @issued, issuing_unit_id = @unit,
       signer = @signer, summary = @summary, security_level_id = @level,
-      stored_path = @path, updated_at = GETDATE()
+      stored_path = @path, updated_at = GETDATE(),
+      deleted_at = NULL, deleted_reason = NULL, deleted_by = NULL
   `;
   if (replacedFile) {
     sqlUpdate += `, original_name = @orig, mime_type = @mime, file_size = @size, sha256 = @sha`;
@@ -2427,13 +2644,18 @@ async function rejectProposalCore({ proposalId, reviewerUser, reviewNote, client
 
   await pool.request()
     .input('pid', sql.VarChar(50), proposalId)
+    .input('fid', sql.VarChar(50), prop.file_id)
     .input('reviewer', sql.VarChar(50), reviewerUser.user_id)
     .input('note', sql.NVarChar(500), reviewNote || 'Không chấp thuận đề xuất')
     .query(`
       UPDATE DOCUMENT_REVISION_PROPOSAL SET
         status = 'REJECTED', reviewed_by = @reviewer, reviewed_at = GETDATE(),
         review_note = @note, updated_at = GETDATE()
-      WHERE proposal_id = @pid
+      WHERE proposal_id = @pid;
+
+      UPDATE DOCUMENT SET
+        deleted_reason = 'REJECTED_BY_COMMANDER', updated_at = GETDATE()
+      WHERE file_id = @fid AND deleted_reason = 'PENDING_APPROVAL';
     `);
 
   await writeAccessLog({
@@ -2595,21 +2817,21 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     const pool = await getPool();
     let result = await pool.request()
       .input('file_id', sql.VarChar(100), fileId)
-      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE file_id = @file_id`);
+      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, deleted_reason, uploaded_by, file_id, document_code FROM DOCUMENT WHERE file_id = @file_id`);
 
     // Smart Document Resolver Fallback: Nếu không tìm thấy theo file_id
     if (result.recordset.length === 0) {
       // 1. Thử tìm theo document_code
       result = await pool.request()
         .input('file_id', sql.NVarChar(100), fileId)
-        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE document_code = @file_id`);
+        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, deleted_reason, uploaded_by, file_id, document_code FROM DOCUMENT WHERE document_code = @file_id`);
     }
 
     if (result.recordset.length === 0) {
       // 2. Thử tìm theo stored_path hoặc original_name chứa fileId
       result = await pool.request()
         .input('file_id_pattern', sql.NVarChar(200), `%${fileId}%`)
-        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE stored_path LIKE @file_id_pattern OR original_name LIKE @file_id_pattern`);
+        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, deleted_reason, uploaded_by, file_id, document_code FROM DOCUMENT WHERE stored_path LIKE @file_id_pattern OR original_name LIKE @file_id_pattern`);
     }
 
     if (result.recordset.length === 0 && fileId.startsWith('PDF-')) {
@@ -2617,7 +2839,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       const cleanStem = fileId.replace(/^PDF-/, '').replace(/[^a-zA-Z0-9]/g, '');
       if (cleanStem.length >= 6) {
         const allDocs = await pool.request().query(`
-          SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code 
+          SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, deleted_reason, uploaded_by, file_id, document_code 
           FROM DOCUMENT WHERE deleted_at IS NULL
         `);
         const matched = allDocs.recordset.find((d) => {
@@ -2642,10 +2864,20 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     const canonicalFileId = doc.file_id || fileId;
 
     if (doc.deleted_at) {
+      const isPendingApproval = (doc.deleted_reason === 'PENDING_APPROVAL');
+      const userRoles = await resolveUserRoles(req.user);
+      const isApprover =
+        userRoles.includes('ROL-01') ||
+        userRoles.includes('ROL-02') ||
+        req.user?.user_id === 'USR-001' ||
+        (req.user?.roles || []).includes('ROL-01') ||
+        (req.user?.roles || []).includes('ROL-02') ||
+        (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy') || String(r).toLowerCase().includes('admin'));
+      const isOwner = (doc.uploaded_by && doc.uploaded_by === req.user.user_id);
       const canViewTrash = (req.user.permissions || []).includes('DOC_TRASH_VIEW')
                           || (req.user.roles || []).includes('ROL-01');
-      if (!canViewTrash) {
-        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa' });
+      if (!canViewTrash && !(isPendingApproval && (isApprover || isOwner))) {
+        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa hoặc chưa được duyệt' });
         return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
       }
     }
@@ -3111,7 +3343,7 @@ app.use((err, req, res, next) => {
 
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-  if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs')) return next();
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs') || req.path.startsWith('/assets')) return next();
   const indexPath = path.join(publicDir, 'index.html');
   if (fs.existsSync(indexPath)) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

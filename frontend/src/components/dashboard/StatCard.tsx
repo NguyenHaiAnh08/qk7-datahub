@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react';
+import { Skeleton } from 'antd';
 import { motion } from 'framer-motion';
 import { RollingNumber } from '../common/RollingNumber';
 
@@ -10,6 +11,7 @@ export interface StatCardProps {
   subtext?: string;
   delay?: number;
   refreshKey?: number | string;
+  loading?: boolean;
 }
 
 const colorMap = {
@@ -48,6 +50,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   subtext,
   delay = 0,
   refreshKey,
+  loading = false,
 }) => {
   const scheme = colorMap[color] || colorMap.blue;
 
@@ -70,16 +73,25 @@ export const StatCard: React.FC<StatCardProps> = ({
             {icon}
           </div>
         </div>
-        <h3 className={`text-2xl font-bold font-mono tabular-nums mt-1.5 tracking-tight leading-none truncate ${scheme.valueText}`}>
-          <RollingNumber value={value} refreshKey={refreshKey} />
-        </h3>
-        {subtext && (
-          <p
-            className="text-xs text-slate-500 dark:text-slate-400 mt-2.5 pt-2 border-t border-slate-100 dark:border-white/[0.04] leading-tight truncate font-medium"
-            title={subtext}
-          >
-            {subtext}
-          </p>
+        {loading || value === '—' ? (
+          <div className="mt-2 space-y-2">
+            <Skeleton.Input active size="small" style={{ width: '55%', height: 26, borderRadius: 6 }} />
+            {subtext && <Skeleton.Input active size="small" style={{ width: '85%', height: 14, borderRadius: 4 }} />}
+          </div>
+        ) : (
+          <>
+            <h3 className={`text-2xl font-bold font-mono tabular-nums mt-1.5 tracking-tight leading-none truncate ${scheme.valueText}`}>
+              <RollingNumber value={value} refreshKey={refreshKey} />
+            </h3>
+            {subtext && (
+              <p
+                className="text-xs text-slate-500 dark:text-slate-400 mt-2.5 pt-2 border-t border-slate-100 dark:border-white/[0.04] leading-tight truncate font-medium"
+                title={subtext}
+              >
+                {subtext}
+              </p>
+            )}
+          </>
         )}
       </div>
     </motion.div>

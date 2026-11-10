@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock,
@@ -402,13 +402,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     setDuplicateInfo(null);
     setAllowOverride(false);
 
+    // Trước khi gọi API: trạng thái 'classifying'
+    setParseStatus('classifying');
+
+    // Sau 1.2s nếu server đang phân tích/scan -> chuyển sang 'ocr_processing'
     const stageTimer = setTimeout(() => {
       setParseStatus((prev) => (prev === 'classifying' ? 'ocr_processing' : prev));
     }, 1200);
 
+    // Cảnh báo nếu thời gian chờ vượt quá 30 giây (văn bản scan phức tạp)
     const timeoutTimer = setTimeout(() => {
       setParseTimeoutWarning(true);
-    }, 25000);
+    }, 30000);
 
     documentService
       .parseDocument(selectedFile)
@@ -862,9 +867,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 dark:bg-blue-500/10 dark:border-blue-500/30 rounded-xl text-blue-800 dark:text-blue-300 text-xs shadow-2xs">
                     <Loader2 className="w-4 h-4 animate-spin shrink-0 text-blue-600 dark:text-blue-400" />
                     <span className="font-medium">
-                      {parseStatus === 'classifying' && 'Đang phân tích cấu trúc văn bản...'}
-                      {parseStatus === 'ocr_processing' && 'Đang nhận dạng ký tự quang học (PaddleOCR / Xử lý mộc đỏ)...'}
-                      {parseStatus === 'extracting' && 'Đang trích xuất siêu dữ liệu và điền biểu mẫu...'}
+                      {parseStatus === 'classifying' && 'Đang phân tích cấu trúc PDF...'}
+                      {parseStatus === 'ocr_processing' && 'Đang nhận dạng ký tự quang học (có thể mất vài giây)...'}
+                      {parseStatus === 'extracting' && 'Đang trích xuất dữ liệu văn bản...'}
                       {!['classifying', 'ocr_processing', 'extracting'].includes(parseStatus) &&
                         'Đang đọc nội dung PDF và điền form...'}
                     </span>
@@ -874,9 +879,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-300 text-xs shadow-2xs">
                       <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
                       <div>
-                        <span className="font-semibold">Quá trình xử lý kéo dài: </span>
-                        <span>
-                          Tệp scan dung lượng lớn đang được phân tích qua OCR Microservice. Bạn có thể đối chiếu PDF bên phải và nhập thông tin thủ công.
+                        <span className="italic text-[11px] text-amber-700 dark:text-amber-300">
+                          Hệ thống đang xử lý văn bản scan phức tạp, vui lòng đợi trong giây lát...
                         </span>
                       </div>
                     </div>

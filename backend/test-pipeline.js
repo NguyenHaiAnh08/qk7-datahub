@@ -10,8 +10,8 @@ const path = require('path');
 const { classifyPdf } = require('./src/pdf-router');
 const { parseDocumentPdf } = require('./pdf-parser');
 
-const QD_FILE = path.resolve(__dirname, '../document/20261030_QD_652-Q-TQS_b1f5a712.pdf');
-const NQ_FILE = path.resolve(__dirname, '../document/20261030_NQ_224-2026-N-CP_3e7d8dee.pdf');
+const QD_FILE = path.resolve(__dirname, 'uploads/2026/10/20261030_QD_652-Q-TQS_b1f5a712.pdf');
+const NQ_FILE = path.resolve(__dirname, 'uploads/2026/10/20261030_NQ_224-2026-N-CP_3e7d8dee.pdf');
 
 describe('PDF Routing & OCR Pipeline Test Suite', () => {
     test('1. Routing Layer: Phân loại đúng TextBased và Scanned', async () => {

@@ -22,6 +22,10 @@ import {
   Layers,
   HelpCircle,
   Filter,
+  BookOpen,
+  BookMarked,
+  Users2,
+  UserCheck,
 } from 'lucide-react';
 import { Unit } from '../../types';
 
@@ -33,8 +37,12 @@ export type UnitCategory =
   | 'trung_doan'
   | 'nha_truong'
   | 'co_quan'
+  | 'khoa'
+  | 'bo_mon'
   | 'phong'
   | 'ban'
+  | 'to'
+  | 'lop'
   | 'phong_ban'
   | 'command_and_div'
   | 'school_and_depts';
@@ -76,8 +84,12 @@ export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
       t === 'trung_doan' ||
       t === 'nha_truong' ||
       t === 'co_quan' ||
+      t === 'khoa' ||
+      t === 'bo_mon' ||
       t === 'phong' ||
       t === 'ban' ||
+      t === 'to' ||
+      t === 'lop' ||
       t === 'phong_ban'
     ) {
       return t as ConcreteUnitCategory;
@@ -118,15 +130,31 @@ export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
   if (id.startsWith('TD') || name.includes('trung đoàn') || name.includes('lữ đoàn')) {
     return 'trung_doan';
   }
-  // 6. Ban
+  // 6. Khoa
+  if (name.includes('khoa') || id.startsWith('K-') || id.startsWith('K_')) {
+    return 'khoa';
+  }
+  // 7. Bộ môn
+  if (name.includes('bộ môn') || id.startsWith('BM-') || id.startsWith('BM_')) {
+    return 'bo_mon';
+  }
+  // 8. Ban
   if (name.includes('ban') || id.startsWith('B-') || id === 'U-BGH') {
     return 'ban';
   }
-  // 7. Phòng
+  // 9. Phòng
   if (name.includes('phòng') || id.startsWith('P-') || id.startsWith('U-')) {
     return 'phong';
   }
-  // 8. Cơ quan
+  // 10. Tổ
+  if (name.includes('tổ ') || name.startsWith('tổ') || id.startsWith('TO-') || id.startsWith('TO_')) {
+    return 'to';
+  }
+  // 11. Lớp
+  if (name.includes('lớp') || id.startsWith('L-') || id.startsWith('L_')) {
+    return 'lop';
+  }
+  // 12. Cơ quan
   if (name.includes('cơ quan')) {
     return 'co_quan';
   }
@@ -191,6 +219,22 @@ export const CATEGORY_CONFIG: Record<
     iconBgClass:
       'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/30',
   },
+  khoa: {
+    label: 'Khoa',
+    icon: BookOpen,
+    badgeClass:
+      'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30',
+    iconBgClass:
+      'bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30',
+  },
+  bo_mon: {
+    label: 'Bộ môn',
+    icon: BookMarked,
+    badgeClass:
+      'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-300 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:border-fuchsia-500/30',
+    iconBgClass:
+      'bg-fuchsia-100 text-fuchsia-800 border border-fuchsia-300 dark:bg-fuchsia-500/15 dark:text-fuchsia-300 dark:border-fuchsia-500/30',
+  },
   phong: {
     label: 'Phòng',
     icon: Building2,
@@ -206,6 +250,22 @@ export const CATEGORY_CONFIG: Record<
       'bg-teal-100 text-teal-900 border-teal-300 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
     iconBgClass:
       'bg-teal-100 text-teal-800 border border-teal-300 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-500/30',
+  },
+  to: {
+    label: 'Tổ',
+    icon: Users2,
+    badgeClass:
+      'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30',
+    iconBgClass:
+      'bg-orange-100 text-orange-800 border border-orange-300 dark:bg-orange-500/15 dark:text-orange-300 dark:border-orange-500/30',
+  },
+  lop: {
+    label: 'Lớp',
+    icon: UserCheck,
+    badgeClass:
+      'bg-lime-100 text-lime-900 border-lime-300 dark:bg-lime-500/10 dark:text-lime-300 dark:border-lime-500/30',
+    iconBgClass:
+      'bg-lime-100 text-lime-800 border border-lime-300 dark:bg-lime-500/15 dark:text-lime-300 dark:border-lime-500/30',
   },
   phong_ban: {
     label: 'Phòng / Ban',
@@ -232,10 +292,18 @@ export const getCategoryFilterLabel = (cat: UnitCategory): string => {
       return 'Nhà trường / Viện';
     case 'co_quan':
       return 'Cơ quan';
+    case 'khoa':
+      return 'Khoa';
+    case 'bo_mon':
+      return 'Bộ môn';
     case 'phong':
       return 'Phòng';
     case 'ban':
       return 'Ban';
+    case 'to':
+      return 'Tổ';
+    case 'lop':
+      return 'Lớp';
     case 'phong_ban':
       return 'Phòng / Ban';
     case 'command_and_div':
@@ -308,19 +376,23 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
       if (cat === 'nha_truong') return 2;
       if (cat === 'su_doan') return 3;
       if (cat === 'co_quan') return 4;
-      if (cat === 'phong') return 5;
-      if (cat === 'ban') return 6;
-      if (cat === 'trung_doan') return 7;
+      if (cat === 'khoa') return 5;
+      if (cat === 'bo_mon') return 6;
+      if (cat === 'phong') return 7;
+      if (cat === 'ban') return 8;
+      if (cat === 'to') return 9;
+      if (cat === 'lop') return 10;
+      if (cat === 'trung_doan') return 11;
 
       // Cấp Trung ương / Bộ nằm ở dưới Sư đoàn 5
       if (cat === 'trung_uong') {
-        if (id === 'BQP') return 10;
-        if (id === 'BTTM') return 11;
-        if (id === 'CP') return 12;
-        if (id === 'TCCT') return 13;
-        return 14;
+        if (id === 'BQP') return 15;
+        if (id === 'BTTM') return 16;
+        if (id === 'CP') return 17;
+        if (id === 'TCCT') return 18;
+        return 19;
       }
-      return 20;
+      return 30;
     };
 
     const sortUnits = (list: Unit[]) => {
@@ -406,6 +478,10 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
         cat === 'phong' ||
         cat === 'ban' ||
         cat === 'co_quan' ||
+        cat === 'khoa' ||
+        cat === 'bo_mon' ||
+        cat === 'to' ||
+        cat === 'lop' ||
         cat === 'phong_ban' ||
         u.parent_id === 'TQS'
       ) {
@@ -435,6 +511,10 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
           node.category === 'phong' ||
           node.category === 'ban' ||
           node.category === 'co_quan' ||
+          node.category === 'khoa' ||
+          node.category === 'bo_mon' ||
+          node.category === 'to' ||
+          node.category === 'lop' ||
           node.category === 'phong_ban' ||
           node.unit.unit_id === 'TQS' ||
           node.unit.parent_id === 'TQS' ||
@@ -815,8 +895,12 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               <option value="su_doan">Sư đoàn</option>
               <option value="nha_truong">Nhà trường / Viện</option>
               <option value="co_quan">Cơ quan</option>
+              <option value="khoa">Khoa</option>
+              <option value="bo_mon">Bộ môn</option>
               <option value="phong">Phòng</option>
               <option value="ban">Ban</option>
+              <option value="to">Tổ</option>
+              <option value="lop">Lớp</option>
               <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
             </select>
           </div>
@@ -927,7 +1011,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                                       {/* Đầu nối nhánh L cho cấp hiện tại */}
                                       {isLastLevel && (
                                         <>
-                                          <div className="absolute -top-3.5 top-1/2 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
+                                          <div className="absolute -top-3.5 bottom-1/2 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
                                           <div className="absolute top-1/2 left-3 w-3.5 border-b border-slate-300 dark:border-slate-700/70" />
                                           {!isLastChild && (
                                             <div className="absolute top-1/2 -bottom-3.5 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />

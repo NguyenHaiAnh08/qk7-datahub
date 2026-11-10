@@ -1,9 +1,11 @@
 import React from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { RouteObject, Navigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../routePaths';
-import { LecturesPage } from '../../pages/LecturesPage';
-import { MaterialsPage } from '../../pages/MaterialsPage';
-import { LibraryPage } from '../../pages/LibraryPage';
+
+const LecturesPage = lazyWithRetry(() => import('../../pages/LecturesPage').then((m) => ({ default: m.LecturesPage })));
+const MaterialsPage = lazyWithRetry(() => import('../../pages/MaterialsPage').then((m) => ({ default: m.MaterialsPage })));
+const LibraryPage = lazyWithRetry(() => import('../../pages/LibraryPage').then((m) => ({ default: m.LibraryPage })));
 
 export interface RouteModuleExport {
   group?: string;
@@ -44,4 +46,3 @@ const ecosystemRoutes: RouteModuleExport = {
 };
 
 export default ecosystemRoutes;
-

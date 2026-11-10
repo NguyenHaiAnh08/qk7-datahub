@@ -161,6 +161,7 @@ export const authService = {
     // ─── 2. Lưu token — THROW nếu thất bại ───
     try {
       sessionStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
+      try { localStorage.setItem(STORAGE_KEYS.TOKEN, res.token); } catch (_) {}
 
       const ttlMs = parseExpiresIn(res.expires_in);
       if (ttlMs > 0) {
@@ -274,6 +275,7 @@ export const authService = {
     // ─── Primary: full user JSON ───
     try {
       sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      try { localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)); } catch (_) {}
     } catch (e) {
       console.warn('[authService] Failed to serialize user to sessionStorage', e);
     }
@@ -299,6 +301,10 @@ export const authService = {
 
   /** Xoá toàn bộ session — logout / token hết hạn. */
   clearSession: () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.USER);
+    } catch (_) {}
     Object.values(STORAGE_KEYS).forEach((key) => {
       sessionStorage.removeItem(key);
     });

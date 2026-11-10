@@ -1,0 +1,12 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore documentation sample secrets and local env files"
+paths = [
+    '''SETUP_SERVER\.md''',
+    '''SYSTEM_ARCHITECTURE\.md''',
+    '''\.env\.example''',
+    '''config/client\.info\.example'''
+]
+

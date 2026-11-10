@@ -98,7 +98,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const session = authService.getCurrentSession();
     setUser(session);
-    if (session && session.user_id !== 'GUEST') {
+    if (session && session.user_id !== 'GUEST' && (!session.permissions || session.permissions.length === 0)) {
       refreshProfile().catch(() => {});
     }
   }, [refreshProfile]);

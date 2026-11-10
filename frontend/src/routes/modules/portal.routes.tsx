@@ -1,10 +1,12 @@
 import React from 'react';
-import { Navigate, RouteObject } from 'react-router-dom';
-import { PortalPage } from '../../pages/PortalPage';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { Navigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
 import { useAuth } from '../../hooks/useAuth';
 import { getDestinationByRole } from '../../contexts/AuthContext';
+
+const PortalPage = lazyWithRetry(() => import('../../pages/PortalPage').then((m) => ({ default: m.PortalPage })));
 
 const RootIndexRoute: React.FC = () => {
   const { user, isAuthenticated } = useAuth();

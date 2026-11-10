@@ -1,24 +1,28 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, RotateCw, Eraser, Calendar, Building,
-  LayoutGrid, List, BarChart2, ChevronDown, Shield, FileText,
+  LayoutGrid, List, BarChart2, ChevronDown, Shield, FileText, Clock,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
+import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { toast } from '../components/common/Toast';
 import { UnitOverviewStrip } from '../components/portal/UnitOverviewStrip';
 import { DistributionChart } from '../components/dashboard/DistributionChart';
 import { PortalDocumentList } from '../components/portal/PortalDocumentList';
 import { DocumentTable } from '../components/document-desk/DocumentTable';
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
+import { PendingProposalsModal, PendingProposalItem } from '../components/document-desk/PendingProposalsModal';
+import { isUserAdmin, isUserManager } from '../contexts/AuthContext';
 import { DateRangePicker } from '../components/common/DateRangePicker';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
+import { useDebounce } from '../hooks/useDebounce';
 import { documentService, MyUnitDocumentResponse } from '../services/documentService';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData } from '../types';
 
-const ITEMS_PER_PAGE = 9;
+const ITEMS_PER_PAGE = 30;
 
 export const MyUnitPage: React.FC = () => {
   const { user } = useAuth();
@@ -26,17 +30,78 @@ export const MyUnitPage: React.FC = () => {
   const [meta, setMeta] = useState<MetaData>({ types: [], units: [], levels: [] });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [selectedType, setSelectedType] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<number | ''>('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+  const [selectedUnitId, setSelectedUnitId] = useState<string>(() => user?.unit_id || '');
   const [canSelectUnit, setCanSelectUnit] = useState(false);
-  const [currentUnit, setCurrentUnit] = useState<{ unit_id: string; name: string } | null>(null);
+  const [currentUnit, setCurrentUnit] = useState<{ unit_id: string; name: string } | null>(() => {
+    if (user?.unit_id && user?.unit_name) {
+      return { unit_id: user.unit_id, name: user.unit_name };
+    }
+    return null;
+  });
 
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [allUnitDocuments, setAllUnitDocuments] = useState<DocumentItem[]>([]);
+  const [proposalsModalOpen, setProposalsModalOpen] = useState(false);
+  const [pendingProposals, setPendingProposals] = useState<PendingProposalItem[]>([]);
+
+  // Quyền duyệt dành cho Chỉ huy đơn vị (hoặc Quản trị viên)
+  const canApproveProposals = useMemo(() => {
+    if (!user || user.user_id === 'GUEST') return false;
+
+    // 1. Quản trị viên
+    const isAdmin =
+      isUserAdmin(user) ||
+      user.user_id === 'USR-001' ||
+      (user.roles || []).some(
+        (r) => String(r).toUpperCase() === 'ROL-01' || String(r).toLowerCase() === 'admin'
+      );
+
+    // 2. Chỉ huy đơn vị: ROL-02, hoặc role/position có từ khóa chỉ huy, trưởng phòng, thủ trưởng
+    const pos = (user.position || '').toLowerCase();
+    const isCommander =
+      (user.roles || []).some((r) => String(r).toUpperCase() === 'ROL-02') ||
+      (user.role_names || []).some((r) => {
+        const s = String(r).toLowerCase();
+        return (
+          s.includes('chỉ huy') ||
+          s.includes('trưởng phòng') ||
+          s.includes('thủ trưởng') ||
+          s.includes('chủ nhiệm')
+        );
+      }) ||
+      pos.includes('chỉ huy') ||
+      pos.includes('trưởng phòng') ||
+      pos.includes('thủ trưởng') ||
+      pos.includes('chủ nhiệm') ||
+      pos.includes('phó trưởng phòng') ||
+      isUserManager(user) ||
+      (user.permissions || []).includes('APPROVAL_VALIDATE') ||
+      (user.permissions || []).includes('DOC_EDIT_APPROVE');
+
+    return isAdmin || isCommander;
+  }, [user]);
+
+  const loadPendingProposals = useCallback(async () => {
+    if (!canApproveProposals) return;
+    try {
+      const res = await documentService.getPendingProposals();
+      setPendingProposals(res.items || []);
+    } catch (e) {
+      console.error('[loadPendingProposals]', e);
+    }
+  }, [canApproveProposals]);
+
+  useEffect(() => {
+    if (canApproveProposals) {
+      loadPendingProposals();
+    }
+  }, [canApproveProposals, loadPendingProposals]);
   const [showStats, setShowStats] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -64,6 +129,16 @@ export const MyUnitPage: React.FC = () => {
     else toast.success(message);
   };
 
+  // Đồng bộ tức thời thông tin đơn vị từ user phiên đăng nhập để tránh hiện tượng giật hiển thị
+  useEffect(() => {
+    if (user?.unit_id && !selectedUnitId) {
+      setSelectedUnitId(user.unit_id);
+    }
+    if (user?.unit_name && (!currentUnit || currentUnit.name !== user.unit_name)) {
+      setCurrentUnit({ unit_id: user.unit_id || '', name: user.unit_name });
+    }
+  }, [user?.unit_id, user?.unit_name]);
+
   useEffect(() => {
     dashboardApi.getMeta().then(setMeta).catch((err) => console.error('[meta]', err));
   }, []);
@@ -72,10 +147,11 @@ export const MyUnitPage: React.FC = () => {
   const loadDocuments = async () => {
     setLoading(true);
     try {
+      const unitToQuery = selectedUnitId || user?.unit_id;
       const res: MyUnitDocumentResponse = await documentService.getMyUnitDocuments({
-        unit_id: selectedUnitId || undefined,
+        unit_id: unitToQuery || undefined,
         // code: searchQuery || undefined,
-        q: searchQuery || undefined,
+        q: debouncedSearch || undefined,
         type: selectedType || undefined,
         lv: selectedLevel !== '' ? Number(selectedLevel) : undefined,
         from: dateFrom || undefined,
@@ -115,7 +191,7 @@ export const MyUnitPage: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => { loadDocuments(); }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedType, selectedLevel, selectedUnitId, dateFrom, dateTo]);
+  }, [debouncedSearch, selectedType, selectedLevel, selectedUnitId, dateFrom, dateTo]);
 
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -149,20 +225,21 @@ export const MyUnitPage: React.FC = () => {
     toast.info(`Đang truyền phát và chuẩn bị văn bản ${doc.document_code}...`, {
       title: 'ĐANG XỬ LÝ TỆP',
       badge: 'STREAMING',
-      duration: 3200,
+      duration: 2500,
     });
 
     // Chuẩn bị tệp tải về và giữ lại (hold) cho đến khi thanh tiến trình UI hoàn tất 100%
+    const sanitizedFilename = (doc.original_name || `${doc.document_code}.pdf`).replace(/[\/\\?%*:|"<>]/g, '_');
     const release = await documentsApi.prepareDownload(
       doc.file_id,
-      doc.original_name || `${doc.document_code}.pdf`,
+      sanitizedFilename,
       undefined,
       signal
     );
 
     // Trả về hàm release để CompactDownloadButton chỉ kích hoạt tải file về máy khi UI đã 'done'
-    return () => {
-      release();
+    return async () => {
+      await release();
       toast.success(`Đã tải xuống thành công văn bản ${doc.document_code}`, {
         title: 'TẢI TỆP HOÀN TẤT',
         badge: 'PDF-READY',
@@ -284,6 +361,8 @@ export const MyUnitPage: React.FC = () => {
       />
 
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
+        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
+        <DataHubSubNav activeTab="myunit" />
         {/* Banner */}
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -297,7 +376,7 @@ export const MyUnitPage: React.FC = () => {
                 <span className="text-slate-600 dark:text-slate-300">Đơn vị trực thuộc</span>
               </div>
               <h1 className="text-lg font-bold text-slate-900 dark:text-white truncate mt-0.5">
-                {currentUnit?.name || 'Trường Quân sự Quân khu 7'}
+                {currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Hệ thống hiển thị theo đơn vị của bạn.
@@ -305,17 +384,49 @@ export const MyUnitPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Toggle Thống kê Đơn vị */}
-          <button
-            type="button"
-            onClick={() => setShowStats((prev) => !prev)}
-            className="btn-tactile px-3.5 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer shrink-0 self-start sm:self-auto group"
-            title={showStats ? 'Thu gọn khung thông số tổng quan' : 'Mở rộng khung thông số tổng quan'}
-          >
-            <BarChart2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
-            <span>{showStats ? 'Ẩn thống kê' : 'Hiện thống kê'}</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showStats ? 'rotate-180' : ''}`} />
-          </button>
+          {/* Cụm Nút Tác Vụ Đơn Vị (Dành cho Chỉ huy & Khai thác) */}
+          <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto flex-wrap">
+            {canApproveProposals && (
+              <button
+                type="button"
+                id="btn-unit-commander-approval"
+                onClick={() => {
+                  loadPendingProposals();
+                  setProposalsModalOpen(true);
+                }}
+                className={`btn-tactile px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md active:scale-95 group ${
+                  pendingProposals.length > 0
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/30 ring-2 ring-amber-400/50'
+                    : 'bg-emerald-700 hover:bg-emerald-600 text-white shadow-emerald-950/30'
+                }`}
+                title="Xét duyệt các đề xuất chỉnh sửa văn bản của đơn vị"
+              >
+                <Clock className="w-4 h-4 text-white group-hover:rotate-12 transition-transform" />
+                <span>Duyệt Yêu Cầu</span>
+                {pendingProposals.length > 0 ? (
+                  <span className="px-2 py-0.5 bg-white text-amber-800 rounded-full text-[10px] font-black animate-pulse shadow-xs">
+                    {pendingProposals.length} chờ duyệt
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-white/20 text-white rounded-full text-[10px] font-semibold">
+                    0
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* Toggle Thống kê Đơn vị */}
+            <button
+              type="button"
+              onClick={() => setShowStats((prev) => !prev)}
+              className="btn-tactile px-3.5 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer shrink-0 group"
+              title={showStats ? 'Thu gọn khung thông số tổng quan' : 'Mở rộng khung thông số tổng quan'}
+            >
+              <BarChart2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span>{showStats ? 'Ẩn thống kê' : 'Hiện thống kê'}</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showStats ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* Khung Thông Số Tổng Quan & Phân Bố Đơn Vị */}
@@ -389,6 +500,8 @@ export const MyUnitPage: React.FC = () => {
                 Đơn vị
               </label>
               <input
+                id="myunit-unit-input"
+                name="myunit_unit"
                 type="text"
                 readOnly
                 value={currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
@@ -404,6 +517,8 @@ export const MyUnitPage: React.FC = () => {
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
+                  id="myunit-search-input"
+                  name="myunit_search"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -418,6 +533,8 @@ export const MyUnitPage: React.FC = () => {
                 Loại văn bản
               </label>
               <select
+                id="myunit-type-select"
+                name="myunit_type"
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
@@ -434,6 +551,8 @@ export const MyUnitPage: React.FC = () => {
                 Mức bảo mật
               </label>
               <select
+                id="myunit-level-select"
+                name="myunit_level"
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value ? Number(e.target.value) : '')}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
@@ -580,6 +699,18 @@ export const MyUnitPage: React.FC = () => {
         document={previewDoc}
         userClearanceLevel={user?.clearance_level_id || 1}
         onClose={() => setPreviewDoc(null)}
+      />
+
+      {/* Modal Phê Duyệt Đề Xuất Của Đơn Vị (Dành cho Chỉ huy) */}
+      <PendingProposalsModal
+        open={proposalsModalOpen}
+        proposals={pendingProposals}
+        canApprove={canApproveProposals}
+        onClose={() => setProposalsModalOpen(false)}
+        onRefresh={() => {
+          loadPendingProposals();
+          loadDocuments();
+        }}
       />
     </div>
   );

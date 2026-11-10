@@ -1,7 +1,9 @@
+// usertable.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { Pagination } from 'antd';
+import { Pagination, Tooltip } from 'antd';
 import { User } from '../../types/user';
-import { Pencil, KeyRound, Trash2, Fingerprint, Shield } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { Pencil, KeyRound, Trash2, Fingerprint, Shield, KeySquare } from 'lucide-react';
 
 export interface UserTableProps {
   users: User[];
@@ -9,10 +11,13 @@ export interface UserTableProps {
   onUpdateCredentials: (user: User) => void;
   onDelete: (user: User) => void;
   onEnrollFingerprint?: (user: User) => void;
-  onGrantPermission?: (user: User) => void; // ⭐ MỚI
-  onViewPermissions?: (user: User) => void; // ⭐ MỚI
+  onGrantPermission?: (user: User) => void;
+  onViewPermissions?: (user: User) => void;
+  onUnlock?: (user: User) => void;
   loading?: boolean;
   pageSize?: number;
+  // ✅ Đã thêm prop quản lý PIN
+  onManagePin?: (user: User) => void; 
 }
 
 export const UserTable: React.FC<UserTableProps> = ({
@@ -23,9 +28,16 @@ export const UserTable: React.FC<UserTableProps> = ({
   onEnrollFingerprint,
   onGrantPermission,
   onViewPermissions,
+  onUnlock,
   loading = false,
   pageSize = 5,
+  onManagePin,
 }) => {
+  // Lấy trạng thái quyền của user đang đăng nhập
+  const { user, hasPermission } = useAuth();
+  const isAdminUser = (user?.roles || []).includes('ROL-01');
+  const canDeleteUser = hasPermission('USER_DELETE');
+
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Tự động reset trang về 1 khi số lượng users thay đổi (do search/filter)
@@ -84,7 +96,17 @@ export const UserTable: React.FC<UserTableProps> = ({
                     </span>
                   </td>
                   <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
-                    {u.full_name}
+                    <div className="flex items-center gap-2">
+                      <span>{u.full_name}</span>
+
+                      {/* ✅ BADGE CẢNH BÁO USER ĐANG XIN CẤP PIN */}
+                      {u.pin_requested && !u.has_pin && (
+                        <span className="inline-flex items-center gap-1 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse shadow-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                          Chờ cấp PIN
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
                     {u.rank_name || '—'}
@@ -139,7 +161,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                       {u.clearance_name || `Mức ${u.clearance_level_id}`}
                     </span>
                   </td>
-                  {/* ⭐ Cột Quyền — click để xem chi tiết (nếu có onViewPermissions) */}
+                  {/* Cột Quyền — click để xem chi tiết (nếu có onViewPermissions) */}
                   <td className="py-3 px-4">
                     <div
                       className={`flex items-center gap-1.5 ${
@@ -162,17 +184,30 @@ export const UserTable: React.FC<UserTableProps> = ({
                     </div>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
-                    <span
-                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
-                        u.status === 'active' || !u.status
-                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
-                          : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30'
-                      }`}
-                    >
-                      {u.status === 'active' || !u.status ? 'Hoạt động' : 'Khóa'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
+                          u.status === 'active' || !u.status
+                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+                            : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30'
+                        }`}
+                      >
+                        {u.status === 'active' || !u.status ? 'Hoạt động' : 'Khóa'}
+                      </span>
+                      {u.status === 'locked' && onUnlock && (
+                        <button
+                          onClick={() => onUnlock(u)}
+                          className="px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 transition cursor-pointer text-[10px] font-bold flex items-center gap-1 shadow-2xs"
+                          title="Mở khóa tài khoản ngay"
+                        >
+                          <KeyRound className="w-2.5 h-2.5" />
+                          <span>Mở</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-right whitespace-nowrap">
+                    {/* 1. Nút Đăng ký / Cập nhật Vân tay */}
                     {onEnrollFingerprint && (
                       <button
                         onClick={() => onEnrollFingerprint(u)}
@@ -191,7 +226,32 @@ export const UserTable: React.FC<UserTableProps> = ({
                       </button>
                     )}
 
-                    {/* ⭐ MỚI — Nút Gán quyền trực tiếp */}
+                    {/* 2. Nút Quản lý PIN — chỉ hiện cho quân nhân Cấp ≥ 4 */}
+                    {onManagePin && (u.clearance_level_id || 1) >= 4 && (
+                      <Tooltip
+                        title={
+                          u.has_pin
+                            ? '🔑 Quản lý PIN (Đã cấp) — click để random lại'
+                            : '🔑 Quản lý PIN (Chưa cấp) — click để random PIN 6 số'
+                        }
+                        placement="top"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onManagePin(u)}
+                          className={`p-1.5 rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95 ${
+                            u.has_pin
+                              ? 'bg-cyan-50 hover:bg-cyan-100 border border-cyan-300 text-cyan-700 dark:bg-cyan-950/40 dark:hover:bg-cyan-900/60 dark:text-cyan-300 dark:border-cyan-800/50'
+                              : 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700'
+                          }`}
+                          aria-label={u.has_pin ? 'Quản lý PIN (đã cấp)' : 'Quản lý PIN (chưa cấp)'}
+                        >
+                          <KeySquare className="w-3.5 h-3.5" />
+                        </button>
+                      </Tooltip>
+                    )}
+
+                    {/* 3. Nút Gán quyền trực tiếp */}
                     {onGrantPermission && (
                       <button
                         onClick={() => onGrantPermission(u)}
@@ -202,6 +262,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                       </button>
                     )}
 
+                    {/* 4. Nút Sửa thông tin */}
                     <button
                       onClick={() => onEdit(u)}
                       className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
@@ -209,6 +270,8 @@ export const UserTable: React.FC<UserTableProps> = ({
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
+
+                    {/* 5. Nút Cập nhật tài khoản & mật khẩu */}
                     <button
                       onClick={() => onUpdateCredentials(u)}
                       className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-900/40 dark:hover:bg-amber-900/70 dark:text-amber-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
@@ -216,13 +279,35 @@ export const UserTable: React.FC<UserTableProps> = ({
                     >
                       <KeyRound className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={() => onDelete(u)}
-                      className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
-                      title="Xóa người dùng"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                    {/* 6. Nút Xóa */}
+                    {canDeleteUser && (() => {
+                      const needsApproval = !isAdminUser;
+                      const tooltip = needsApproval
+                        ? '⚠️ Yêu cầu quyền Admin để xóa — bấm để gửi yêu cầu phê duyệt'
+                        : 'Xóa người dùng (đưa vào thùng rác)';
+
+                      return (
+                        <Tooltip title={tooltip} placement="top" arrow>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(u)}
+                            aria-label={needsApproval ? 'Yêu cầu duyệt xóa người dùng' : 'Xóa người dùng'}
+                            className={`
+                              p-1.5 rounded-lg transition-all duration-200 cursor-pointer
+                              btn-tactile active:scale-95
+                              ${
+                                needsApproval
+                                  ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 hover:text-amber-600 dark:hover:text-amber-400'
+                                  : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent'
+                              }
+                            `}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </Tooltip>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))
@@ -231,7 +316,7 @@ export const UserTable: React.FC<UserTableProps> = ({
         </table>
       </div>
 
-      {/* Phân trang 5 quân nhân / trang */}
+      {/* Phân trang */}
       {!loading && users.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-200 dark:border-slate-800 text-xs bg-slate-50/60 dark:bg-slate-900/60">
           <div className="text-slate-500 dark:text-slate-400">

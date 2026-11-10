@@ -56,7 +56,7 @@ export const isUserManager = (user: User | null): boolean => {
   const roles = user.roles || [];
   const roleNames = user.role_names || [];
   return (
-    roles.includes('ROL-02') || roles.includes('ROL-03') ||
+    roles.includes('ROL-02') ||
     roleNames.some((n) => {
       const l = n.toLowerCase();
       return l.includes('chỉ huy') || l.includes('thủ trưởng') || l.includes('trưởng phòng');
@@ -98,7 +98,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const session = authService.getCurrentSession();
     setUser(session);
-    if (session && session.user_id !== 'GUEST') {
+    if (session && session.user_id !== 'GUEST' && (!session.permissions || session.permissions.length === 0)) {
       refreshProfile().catch(() => {});
     }
   }, [refreshProfile]);
@@ -117,6 +117,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const res = await authService.login(userId, password);
     if (res.success && res.user) {
       saveUserSession(res.user);
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('qk7_screenshot_violation_count');
+          sessionStorage.removeItem('qk7_account_locked_screenshot');
+        } catch (_) {}
+      }
       return res.user;
     }
     throw new Error('Đăng nhập thất bại');
@@ -126,16 +132,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await authService.logout();
     setUser(null);
     navigate(ROUTE_PATHS.LOGIN);
+
+    if (typeof window !== 'undefined') {
+      try {
+        Object.keys(sessionStorage)
+          .filter(k => k.startsWith('qk7_fp_token'))
+          .forEach(k => sessionStorage.removeItem(k));
+        sessionStorage.removeItem('qk7_screenshot_violation_count');
+        sessionStorage.removeItem('qk7_account_locked_screenshot');
+      } catch (e) {}
+    }
   }, [navigate]);
 
   const continueAsGuest = useCallback(() => {
     authService.clearSession();
     const guest: User = {
       user_id: 'GUEST',
-      full_name: 'Khách',
-      clearance_level_id: 1,
-      clearance_name: 'Công khai',
-      permissions: [],
+      full_name: 'Đại biểu',
+      clearance_level_id: 2,
+      clearance_name: 'Nội bộ',
+      roles: ['DELEGATE'],
+      role_names: ['Đại biểu'],
+      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
     };
     setUser(guest);
     navigate(ROUTE_PATHS.PORTAL);

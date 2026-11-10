@@ -70,33 +70,50 @@ class ZK9500Service:
 
     def open_device(self) -> Tuple[bool, str]:
         """Mở thiết bị (Lazy Open). Nếu lần đóng trước đã Terminate → Init lại."""
-        # ★ Lazy Init: sau full reset, cần Init lại SDK trước khi OpenDevice
-        if self.zk and not self.sdk_loaded:
+        with self._lock:
+            # ★ Lazy Init: sau full reset, cần Init lại SDK trước khi OpenDevice
+            if self.zk and not self.sdk_loaded:
+                try:
+                    self.zk.Init()
+                    self.sdk_loaded = True
+                    print("[ZK] ✅ Lazy Init OK")
+                except Exception as e:
+                    print(f"[ZK] ⚠️ Lazy Init lỗi: {e}")
+                    self.sdk_loaded = False
+
+            if not self.sdk_loaded:
+                ok, msg = self.load_sdk()
+                if not ok:
+                    return False, f"SDK chưa load: {msg}"
+
             try:
-                self.zk.Init()
-                self.sdk_loaded = True
-                print("[ZK] ✅ Lazy Init OK")
+                n = self.zk.GetDeviceCount() if (self.zk and self.sdk_loaded) else 0
+                if n <= 0:
+                    # Nếu n <= 0 sau thời gian dài không hoạt động, tự động reload SDK tươi để kích hoạt lại cổng USB
+                    print("[ZK] ⚠️ GetDeviceCount <= 0. Đang reload SDK để đánh thức thiết bị ZK9500...")
+                    ok, msg = self.load_sdk()
+                    if ok and self.zk:
+                        n = self.zk.GetDeviceCount()
+
+                if n <= 0:
+                    return False, "Không tìm thấy đầu đọc ZK9500 (Vui lòng cắm cáp USB)"
+
+                self.zk.OpenDevice(0)
+                raw_sn = getattr(self.zk, "dev_serial_number", "ZK9500")
+                if isinstance(raw_sn, str):
+                    self.device_serial = raw_sn.replace("\x00", "").strip() or "ZK9500"
+                else:
+                    self.device_serial = "ZK9500"
+                self.device_connected = True
+                return True, f"Đã mở {self.device_serial} ({self.width}x{self.height})"
             except Exception as e:
-                return False, f"Lazy Init lỗi: {e}"
-
-        if not self.sdk_loaded:
-            return False, "SDK chưa load"
-
-        try:
-            n = self.zk.GetDeviceCount()
-            if n <= 0:
-                return False, "Không tìm thấy đầu đọc ZK9500"
-            self.zk.OpenDevice(0)
-            raw_sn = getattr(self.zk, "dev_serial_number", "ZK9500")
-            if isinstance(raw_sn, str):
-                self.device_serial = raw_sn.replace("\x00", "").strip() or "ZK9500"
-            else:
-                self.device_serial = "ZK9500"
-            self.device_connected = True
-            return True, f"Đã mở {self.device_serial} ({self.width}x{self.height})"
-        except Exception as e:
-            self.device_connected = False
-            return False, f"OpenDevice lỗi: {e}"
+                self.device_connected = False
+                # Nếu OpenDevice ném ngoại lệ, tự động reload lại SDK instance
+                try:
+                    self.load_sdk()
+                except Exception:
+                    pass
+                return False, f"OpenDevice lỗi: {e}"
 
     def close_device(self, full_reset: Optional[bool] = None):
         """

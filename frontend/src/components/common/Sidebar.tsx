@@ -15,6 +15,8 @@ import {
   ChevronRight,
   Trash2,
   Monitor,
+  Bell,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -32,6 +34,7 @@ export type AdminTab =
   | 'logs'
   | 'sessions'
   | 'trash'
+  | 'protection_config'
   | string;
 
 export interface SidebarProps {
@@ -68,6 +71,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems: Array<{ id: string; label: string; icon: any; permission?: string }> = [
     { id: 'overview',    label: 'Tổng quan',    icon: LayoutDashboard, permission: 'SYSTEM_STATS_VIEW' },
+    { id: 'approvals',   label: 'Phê duyệt yêu cầu', icon: Bell, permission: 'APPROVAL_VALIDATE' },
+    { id: 'protection_config', label: 'Khóa bảo vệ', icon: Lock, permission: 'PERMISSION_VIEW' },
     { id: 'users',       label: 'Người dùng',   icon: Users,           permission: 'USER_VIEW' },
     { id: 'roles',       label: 'Vai trò',      icon: KeyRound,        permission: 'ROLE_VIEW' },
     { id: 'permissions', label: 'Quyền',        icon: ShieldAlert,     permission: 'PERMISSION_VIEW' },
@@ -81,10 +86,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'trash',       label: 'Thùng rác',    icon: Trash2,          permission: 'DOC_TRASH_VIEW' },
   ];
 
-  // Ẩn item nếu user không có quyền tương ứng (item không khai báo permission → luôn hiện)
+  // Lọc các item mà user có quyền xem
   const visibleItems = navItems.filter(
     (item) => !item.permission || hasPermission(item.permission)
   );
+
+  // ✅ FIX TẠI ĐÂY: Nếu không có bất kỳ mục nào được phép hiển thị, ẩn toàn bộ Sidebar
+  // Bao gồm cả tiêu đề "DANH MỤC QUẢN TRỊ" và nút thu gọn
+  if (visibleItems.length === 0) {
+    return null;
+  }
 
   return (
     <div className="h-full flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 select-none overflow-x-hidden">
@@ -126,26 +137,61 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
+          const count = counts?.[item.id];
+          const hasCount = typeof count === 'number' && count > 0;
+          const displayCount = hasCount ? (count > 99 ? '99+' : String(count)) : null;
+
           const buttonElement = (
             <button
               key={item.id}
               onClick={() => handleSelect(item.id)}
               className={`w-full flex items-center ${
-                collapsed ? 'justify-center p-2.5' : 'justify-start space-x-3 px-3 py-2.5'
-              } rounded-xl text-xs transition cursor-pointer ${
+                collapsed ? 'justify-center p-2.5 relative' : 'justify-start space-x-3 px-3 py-2.5'
+              } rounded-xl text-xs transition cursor-pointer group ${
                 isActive
                   ? 'bg-emerald-500/15 border-l-4 border-emerald-500 text-emerald-700 dark:text-emerald-400 border-t border-b border-r border-emerald-500/25 font-semibold shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium border border-transparent'
               }`}
             >
-              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              {/* Vùng Icon căn giữa hoàn hảo khi thu gọn (Zero-Misalignment) */}
+              <div className="relative inline-flex items-center justify-center shrink-0">
+                <Icon
+                  className={`w-4 h-4 flex-shrink-0 ${
+                    isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+                  }`}
+                />
+                {/* Chỉ số thông báo dạng số mũ bình phương (a²) góc trên bên phải khi Sidebar thu gọn */}
+                {collapsed && hasCount && (
+                  <span
+                    className="absolute -top-2 -right-2.5 inline-flex items-center justify-center min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold shadow-xs leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none select-none tabular-nums animate-in fade-in zoom-in duration-200"
+                    title={`${count} chờ xử lý`}
+                  >
+                    {displayCount}
+                  </span>
+                )}
+              </div>
+
+              {/* Nhãn và Badge khi mở rộng Sidebar */}
+              {!collapsed && (
+                <>
+                  <span className="truncate flex-1 text-left">{item.label}</span>
+                  {hasCount && (
+                    <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0 shadow-xs tabular-nums">
+                      {displayCount}
+                    </span>
+                  )}
+                </>
+              )}
             </button>
           );
 
           if (collapsed) {
             return (
-              <Tooltip key={item.id} title={item.label} placement="right" mouseEnterDelay={0.15}>
+              <Tooltip key={item.id} title={
+                counts?.[item.id]
+                  ? `${item.label} (${counts[item.id]} chờ duyệt)`
+                  : item.label
+              } placement="right" mouseEnterDelay={0.15}>
                 {buttonElement}
               </Tooltip>
             );

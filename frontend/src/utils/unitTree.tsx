@@ -198,3 +198,171 @@ export function filterSchoolUnits(units: Unit[], currentUnitId?: string): Unit[]
 
   return units.filter((u) => allowedUnitIds.has(u.unit_id));
 }
+
+/**
+ * Thứ tự ưu tiên hiển thị đơn vị ban hành theo chuẩn quân sự:
+ * 1. Trường quân sự Quân khu 7
+ * 2. Quân khu 7
+ * 3. Bộ Tổng Tham mưu
+ * 4. Tổng cục Chính trị
+ * 5. Bộ Quốc Phòng
+ * 6. Chính Phủ
+ * 7. Sư đoàn 5
+ * (các đơn vị được thêm sau sẽ thêm ở dưới dần dần)
+ */
+export function getIssuingUnitPriority(u: { unit_id?: string; name?: string }): number {
+  const id = (u.unit_id || '').toUpperCase().trim();
+  const name = (u.name || '').toLowerCase().trim();
+
+  // 1. Trường quân sự Quân khu 7
+  if (id === 'TQS' || (name.includes('trường quân sự') && name.includes('quân khu 7')) || name.startsWith('trường quân sự')) {
+    return 1;
+  }
+  // 2. Quân khu 7
+  if (id === 'QK7' || name === 'quân khu 7' || (name.includes('quân khu 7') && !name.includes('trường'))) {
+    return 2;
+  }
+  // 3. Bộ Tổng Tham mưu
+  if (id === 'BTTM' || name.includes('tổng tham mưu')) {
+    return 3;
+  }
+  // 4. Tổng cục Chính trị
+  if (id === 'TCCT' || name.includes('tổng cục chính trị')) {
+    return 4;
+  }
+  // 5. Bộ Quốc Phòng
+  if (id === 'BQP' || name.includes('bộ quốc phòng')) {
+    return 5;
+  }
+  // 6. Chính Phủ
+  if (id === 'CP' || name.includes('chính phủ')) {
+    return 6;
+  }
+  // 7. Sư đoàn 5
+  if (id === 'SD5' || name.includes('sư đoàn 5') || name.includes('f5')) {
+    return 7;
+  }
+
+  // Các đơn vị được thêm sau sẽ thêm ở dưới dần dần
+  return 999;
+}
+
+/**
+ * Thu thập toàn bộ ID các phòng ban và đơn vị con cháu trực thuộc Trường Quân sự Quân khu 7
+ */
+export function getSchoolDescendantUnitIds(units: Unit[]): Set<string> {
+  const ids = new Set<string>();
+  if (!units || units.length === 0) return ids;
+
+  let added = true;
+  while (added) {
+    added = false;
+    for (const u of units) {
+      if (!ids.has(u.unit_id)) {
+        if (
+          u.parent_id === 'TQS' ||
+          u.parent_id === 'U-TQS' ||
+          (u.parent_id && ids.has(u.parent_id))
+        ) {
+          ids.add(u.unit_id);
+          added = true;
+        }
+      }
+    }
+  }
+  return ids;
+}
+
+/**
+ * Lấy danh sách các cơ quan ban hành chính (loại trừ các phòng ban / đơn vị con cháu nội bộ của Trường Quân sự)
+ * Chuẩn hóa danh sách: TQS, QK7, BTTM, TCCT, BQP, CP, SD5...
+ */
+export function getMainIssuingUnits(units: Unit[]): Unit[] {
+  if (!units || units.length === 0) return [];
+  const tqsDescendantIds = getSchoolDescendantUnitIds(units);
+
+  const mainList = units.filter(
+    (u) =>
+      !tqsDescendantIds.has(u.unit_id) &&
+      u.parent_id !== 'TQS' &&
+      u.parent_id !== 'U-TQS'
+  );
+
+  return mainList.sort((a, b) => {
+    const pA = getIssuingUnitPriority(a);
+    const pB = getIssuingUnitPriority(b);
+    if (pA !== pB) return pA - pB;
+    return a.name.localeCompare(b.name, 'vi');
+  });
+}
+
+/**
+ * Xây dựng cây phân cấp các phòng ban và đơn vị con cháu trực thuộc Trường Quân sự
+ * Có tiền tố thụt lề chuẩn xác:
+ * - Ban Giám hiệu
+ * - Phòng Chính trị
+ * - Phòng Đào tạo
+ * - Phòng Hậu cần - Kỹ thuật
+ *   └─ Bếp cơ quan
+ * - Phòng Tham mưu - Hành chính
+ */
+export function getSchoolDepartmentsTree(
+  units: Unit[]
+): (Unit & { displayName: string; level: number })[] {
+  if (!units || units.length === 0) return [];
+  const tqsDescendantIds = getSchoolDescendantUnitIds(units);
+
+  if (tqsDescendantIds.size === 0) {
+    return [
+      { unit_id: 'U-BGH', name: 'Ban Giám hiệu', displayName: 'Ban Giám hiệu', level: 0 },
+      { unit_id: 'U-TM', name: 'Phòng Tham mưu - Hành chính', displayName: 'Phòng Tham mưu - Hành chính', level: 0 },
+      { unit_id: 'U-CT', name: 'Phòng Chính trị', displayName: 'Phòng Chính trị', level: 0 },
+      { unit_id: 'U-DT', name: 'Phòng Đào tạo', displayName: 'Phòng Đào tạo', level: 0 },
+      { unit_id: 'U-HC', name: 'Phòng Hậu cần - Kỹ thuật', displayName: 'Phòng Hậu cần - Kỹ thuật', level: 0 },
+    ] as (Unit & { displayName: string; level: number })[];
+  }
+
+  const map = new Map<string, Unit>();
+  const childrenMap = new Map<string, Unit[]>();
+  for (const u of units) {
+    if (tqsDescendantIds.has(u.unit_id)) {
+      map.set(u.unit_id, u);
+      childrenMap.set(u.unit_id, []);
+    }
+  }
+
+  const roots: Unit[] = [];
+  for (const u of units) {
+    if (tqsDescendantIds.has(u.unit_id)) {
+      if (u.parent_id === 'TQS' || u.parent_id === 'U-TQS' || !map.has(u.parent_id || '')) {
+        roots.push(u);
+      } else if (u.parent_id && childrenMap.has(u.parent_id)) {
+        childrenMap.get(u.parent_id)!.push(u);
+      }
+    }
+  }
+
+  roots.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  for (const children of childrenMap.values()) {
+    children.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  }
+
+  const flatList: (Unit & { displayName: string; level: number })[] = [];
+  const traverse = (u: Unit, level: number) => {
+    flatList.push({
+      ...u,
+      displayName: u.name,
+      level,
+    });
+    const children = childrenMap.get(u.unit_id) || [];
+    for (const child of children) {
+      traverse(child, level + 1);
+    }
+  };
+
+  for (const r of roots) {
+    traverse(r, 0);
+  }
+
+  return flatList;
+}

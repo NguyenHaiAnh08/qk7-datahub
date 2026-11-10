@@ -136,7 +136,7 @@ export const UnitOverviewStrip: React.FC<UnitOverviewStripProps> = ({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 380, damping: 26, delay: 0 }}
         onClick={onResetFilters}
-        className="group relative bg-white dark:bg-[#111827] p-4 rounded-xl border border-slate-200 dark:border-white/[0.08] border-l-2 border-l-emerald-600 dark:border-l-emerald-500 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-150 cursor-pointer flex flex-col justify-between"
+        className="group relative bg-white dark:bg-[#111827] p-4 rounded-xl border-y border-r border-slate-200 dark:border-white/[0.08] border-l-2 border-l-emerald-600 dark:border-l-emerald-500 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-150 cursor-pointer flex flex-col justify-between"
         title="Nhấn để đặt lại bộ lọc và hiển thị tất cả văn bản đơn vị"
       >
         <div>
@@ -176,7 +176,7 @@ export const UnitOverviewStrip: React.FC<UnitOverviewStripProps> = ({
             onSelectLevel(3);
           }
         }}
-        className={`group relative bg-white dark:bg-[#111827] p-4 rounded-xl border border-l-2 border-l-amber-500 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-150 cursor-pointer flex flex-col justify-between ${
+        className={`group relative bg-white dark:bg-[#111827] p-4 rounded-xl border-y border-r border-l-2 border-l-amber-500 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-150 cursor-pointer flex flex-col justify-between ${
           isSecretFilterActive
             ? 'ring-1 ring-amber-500/50 border-amber-500/80 bg-amber-500/[0.03] dark:bg-amber-500/[0.05]'
             : 'border-slate-200 dark:border-white/[0.08]'
@@ -251,7 +251,7 @@ export const UnitOverviewStrip: React.FC<UnitOverviewStripProps> = ({
             );
           }
         }}
-        className="group relative bg-white dark:bg-[#111827] p-4 rounded-xl border border-slate-200 dark:border-white/[0.08] border-l-2 border-l-sky-500 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-150 cursor-pointer flex flex-col justify-between"
+        className="group relative bg-white dark:bg-[#111827] p-4 rounded-xl border-y border-r border-slate-200 dark:border-white/[0.08] border-l-2 border-l-sky-500 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-150 cursor-pointer flex flex-col justify-between"
         title="Thẩm quyền truy cập được cấp cho tài khoản hiện tại"
       >
         <div>
@@ -279,7 +279,7 @@ export const UnitOverviewStrip: React.FC<UnitOverviewStripProps> = ({
             {userLevelName}
           </span>
           {userName && (
-            <span className="text-slate-400 dark:text-slate-500 truncate">
+            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
               ({userName})
             </span>
           )}
@@ -298,7 +298,7 @@ export const UnitOverviewStrip: React.FC<UnitOverviewStripProps> = ({
             );
           }
         }}
-        className="group relative bg-white dark:bg-[#111827] p-4 rounded-xl border border-slate-200 dark:border-white/[0.08] border-l-2 border-l-amber-600 dark:border-l-amber-500 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-150 cursor-pointer flex flex-col justify-between"
+        className="group relative bg-white dark:bg-[#111827] p-4 rounded-xl border-y border-r border-slate-200 dark:border-white/[0.08] border-l-2 border-l-amber-600 dark:border-l-amber-500 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-150 cursor-pointer flex flex-col justify-between"
         title="Tổng dung lượng lưu trữ tệp PDF và ngày phát hành mới nhất"
       >
         <div>

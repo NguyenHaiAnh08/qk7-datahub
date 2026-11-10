@@ -10,6 +10,10 @@ frontend/.env
 *.env.local
 **/.env
 !**/.env.example
+*.legacy
+**/*.legacy
+config/client.info
+SETUP_client/client.info
 
 # Build output
 dist/
@@ -47,3 +51,19 @@ env/
 # AI Vector Storage Lock & Cache
 boxchat/local_storage/qdrant_data/.lock
 *.lock
+
+# Certificates and Private Keys (Security)
+*.pem
+*.key
+*.crt
+*.pfx
+backend/certs/*
+!backend/certs/.gitkeep
+
+# Security Scan Reports & Artifacts
+semgrep-*.json
+gitleaks-*.json
+*-report*.json
+*.sarif
+
+

@@ -224,7 +224,7 @@ const SingleToastCard: React.FC<SingleToastCardProps> = ({ item, onDismiss }) =>
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`group pointer-events-auto relative w-full overflow-hidden rounded-2xl border bg-white/95 dark:bg-[#0c1420]/95 backdrop-blur-xl shadow-xl transition-all duration-200 select-none ${theme.borderHighlight}`}
+      className={`group pointer-events-auto relative w-full sm:w-auto min-w-[320px] sm:min-w-[480px] md:min-w-[540px] max-w-full overflow-hidden rounded-2xl border bg-white/95 dark:bg-[#0c1420]/95 backdrop-blur-xl shadow-xl transition-all duration-200 select-none ${theme.borderHighlight}`}
       style={{
         boxShadow: isHovered
           ? '0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1)'
@@ -244,14 +244,14 @@ const SingleToastCard: React.FC<SingleToastCardProps> = ({ item, onDismiss }) =>
 
         {/* Content Body */}
         <div className="flex-1 min-w-0 pr-1">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap shrink-0 tracking-tight">
                 {item.title || theme.defaultTitle}
               </span>
               {item.badge && (
                 <span
-                  className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded font-bold border ${theme.badgeBg}`}
+                  className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-md font-bold border tracking-wider shrink-0 ${theme.badgeBg}`}
                 >
                   {item.badge}
                 </span>
@@ -259,13 +259,19 @@ const SingleToastCard: React.FC<SingleToastCardProps> = ({ item, onDismiss }) =>
             </div>
 
             {timeFormatted && (
-              <span className="text-[10px] font-mono tabular-nums text-slate-400 dark:text-slate-500 shrink-0">
+              <span className="text-[10.5px] font-mono tabular-nums text-slate-400 dark:text-slate-500 shrink-0 ml-2">
                 {timeFormatted}
               </span>
             )}
           </div>
 
-          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed break-words font-medium">
+          <p
+            className={`text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 font-medium ${
+              item.message.length <= 110
+                ? 'whitespace-normal sm:whitespace-nowrap leading-normal'
+                : 'leading-relaxed break-words'
+            }`}
+          >
             {item.message}
           </p>
         </div>
@@ -351,7 +357,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       {/* Container xếp chồng các Animated Toasts tại góc dưới bên phải */}
       <div
-        className="fixed bottom-5 right-5 z-[99999] pointer-events-none flex flex-col items-end gap-2.5 max-w-sm sm:max-w-md w-full px-3 sm:px-0"
+        className="fixed bottom-5 right-5 z-[99999] pointer-events-none flex flex-col items-end gap-2.5 max-w-[94vw] sm:max-w-xl md:max-w-2xl w-fit px-3 sm:px-0"
         aria-live="polite"
         role="region"
       >
@@ -385,7 +391,7 @@ export const Toast: React.FC<LegacyToastProps> = ({ toast: state, onClose }) => 
   return (
     <AnimatePresence>
       {state.show && (
-        <div className="fixed bottom-5 right-5 z-[99999] pointer-events-none max-w-sm sm:max-w-md w-full px-3 sm:px-0">
+        <div className="fixed bottom-5 right-5 z-[99999] pointer-events-none flex flex-col items-end max-w-[94vw] sm:max-w-xl md:max-w-2xl w-fit px-3 sm:px-0">
           <SingleToastCard
             item={{
               id: 'legacy-single-toast',

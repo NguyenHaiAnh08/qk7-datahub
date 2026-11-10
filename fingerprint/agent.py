@@ -10,7 +10,7 @@ import signal
 import ssl
 import sys
 import threading
-import time          # ★ MỚI: cho idle watchdog
+import time          # ★ cho idle watchdog
 import uuid
 from typing import Optional
 
@@ -21,7 +21,6 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 import websockets
 from dotenv import load_dotenv
-
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(_HERE, ".env"))
@@ -44,7 +43,6 @@ if not BRIDGE_TOKEN or len(BRIDGE_TOKEN) < 16:
 from zk_service import ZK9500Service
 
 DEVICE_ID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "device_id.txt")
-
 
 def build_ssl_context():
     if not USE_TLS:
@@ -69,7 +67,6 @@ def build_ssl_context():
 
     return ctx
 
-
 def get_or_create_device_id() -> str:
     if os.path.exists(DEVICE_ID_FILE):
         with open(DEVICE_ID_FILE, "r", encoding="utf-8") as f:
@@ -81,23 +78,24 @@ def get_or_create_device_id() -> str:
         f.write(did)
     return did
 
-
 def free_port(port: int):
     try:
         import subprocess
         res = subprocess.run(["netstat", "-ano"], capture_output=True, text=True)
         my_pid = str(os.getpid())
+        killed_any = False
         for line in res.stdout.splitlines():
             if f":{port}" in line and "LISTENING" in line:
                 parts = line.strip().split()
                 pid = parts[-1]
                 if pid != my_pid and pid != "0":
-                    print(f"[Agent] 🔄 Đóng tiến trình cũ (PID {pid}) đang chiếm cổng {port}...")
+                    print(f"[Agent] 🔄 Phát hiện PID {pid} đang chiếm cổng {port}. Đang kill để giải phóng...")
                     subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
-                    time.sleep(1)
-    except Exception:
-        pass
-
+                    killed_any = True
+        if killed_any:
+            time.sleep(1.2)
+    except Exception as e:
+        print(f"[Agent] ⚠️ Lỗi kiểm tra cổng {port}: {e}")
 
 def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None):
     free_port(port)
@@ -151,16 +149,23 @@ def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None)
         def log_message(self, *args):
             pass
 
-    try:
-        server = http.server.HTTPServer((host, port), Handler)
-        t = threading.Thread(target=server.serve_forever, daemon=True)
-        t.start()
-        print(f"[Agent] Device-id server: http://{host}:{port}/device-id")
-        return server
-    except OSError as e:
-        print(f"[Agent] ⚠️  Không mở được {host}:{port}: {e}.")
-        return None
-
+    server = None
+    for attempt in range(3):
+        try:
+            free_port(port)
+            server = http.server.HTTPServer((host, port), Handler)
+            t = threading.Thread(target=server.serve_forever, daemon=True)
+            t.start()
+            print(f"[Agent] Device-id server: http://{host}:{port}/device-id")
+            return server
+        except OSError as e:
+            if attempt < 2:
+                print(f"[Agent] ⚠️ Cổng {port} chưa sẵn sàng ({e}), đang thử kill và mở lại lần {attempt + 2}...")
+                free_port(port)
+                time.sleep(1.5)
+            else:
+                print(f"[Agent] ❌ Không mở được {host}:{port}: {e}.")
+                return None
 
 class FingerprintAgent:
     def __init__(self, device_id: str, ssl_context=None):
@@ -179,7 +184,7 @@ class FingerprintAgent:
         self.active_jobs = 0
         self.device_lock = threading.Lock()
 
-        # ★ MỚI — idle timeout
+        # ★ Idle timeout
         self._last_activity_ts = time.monotonic()
         self._idle_timeout = DEVICE_IDLE_TIMEOUT
         self._idle_task: Optional[asyncio.Task] = None
@@ -200,17 +205,28 @@ class FingerprintAgent:
             return ok
 
     def _release_device(self):
+        """
+        ★ Gia cố: close_device() có thể raise (USB rút giữa chừng).
+        Không được để exception lan ra — chỉ log và tiếp tục.
+        """
         with self.device_lock:
             self._last_activity_ts = time.monotonic()
             self.active_jobs -= 1
             if self.active_jobs <= 0:
                 self.active_jobs = 0
                 if self.svc.device_connected:
-                    self.svc.close_device()
-                    print("[Agent] 🔌 Đã nhả thiết bị ZK9500 (Tránh nóng)")
+                    try:
+                        self.svc.close_device()
+                        print("[Agent] 🔌 Đã nhả thiết bị ZK9500 (Tránh nóng)")
+                    except Exception as e:
+                        print(f"[Agent] ⚠️ close_device() lỗi: {e} — đánh dấu disconnected")
+                        try:
+                            self.svc.device_connected = False
+                        except Exception:
+                            pass
 
     async def _idle_watchdog(self):
-        """★ MỚI — Tự đóng thiết bị khi idle quá lâu (không có job nào)."""
+        """★ Tự đóng thiết bị khi idle quá lâu (không có job nào)."""
         while self.running:
             await asyncio.sleep(3)
             try:
@@ -220,7 +236,10 @@ class FingerprintAgent:
                         if idle >= self._idle_timeout:
                             print(f"[Agent] 😴 Idle {idle:.0f}s ≥ "
                                   f"{self._idle_timeout}s — tự đóng thiết bị")
-                            self.svc.close_device()
+                            try:
+                                self.svc.close_device()
+                            except Exception as e:
+                                print(f"[Agent] idle watchdog close lỗi: {e}")
             except Exception as e:
                 print(f"[Agent] idle watchdog: {e}")
 
@@ -243,7 +262,7 @@ class FingerprintAgent:
             print("❌ Không load được SDK.")
             return
 
-        # ★ MỚI: khởi động idle watchdog
+        # ★ Khởi động idle watchdog
         self._idle_task = asyncio.create_task(self._idle_watchdog())
 
         print(f"[Agent] Device ID: {self.device_id}")
@@ -289,7 +308,10 @@ class FingerprintAgent:
                     continue
                 t = msg.get("type")
                 if t == "ping":
-                    await ws.send(json.dumps({"type": "pong"}))
+                    try:
+                        await ws.send(json.dumps({"type": "pong"}))
+                    except Exception:
+                        pass
                 elif t == "scan_request":
                     self._cancel_event.set()
                     new_event = threading.Event()
@@ -304,22 +326,49 @@ class FingerprintAgent:
     # ─────────────────────────── Handlers ───────────────────────────
 
     async def _handle_scan(self, ws, job, cancel_event: threading.Event):
+        """
+        ★ Gia cố: BẮT BUỘC gửi scan_result (match=False) trong MỌI nhánh lỗi.
+        - Outer try bao trùm cả _ensure_device_open và validate input
+        - finally bọc try/except để close_device() throw không giết task
+        """
         job_id = job.get("job_id")
-        template_b64 = job.get("template_plain_b64")
-        timeout = int(job.get("timeout_seconds", 30))
-
-        print(f"\n[Agent] 📥 scan {job_id} | timeout={timeout}s")
-
-        if not self._ensure_device_open():
-            await ws.send(json.dumps({
-                "type": "scan_result", "job_id": job_id,
-                "match": False, "score": 0, "error": "DEVICE_OFFLINE",
-            }))
-            return
-
-        print(f"[Agent] 👉 Đặt tay lên máy quét...")
+        device_acquired = False  # ★ Theo dõi để balance active_jobs chính xác
 
         try:
+            template_b64 = job.get("template_plain_b64")
+            timeout = int(job.get("timeout_seconds", 30) or 30)
+
+            print(f"\n[Agent] 📥 scan {job_id} | timeout={timeout}s")
+
+            # ★ BƯỚC 1 — Validate input SỚM (trước khi chạm phần cứng)
+            if not job_id:
+                print("[Agent] ❌ scan: thiếu job_id — bỏ qua")
+                return
+            if not template_b64:
+                await ws.send(json.dumps({
+                    "type": "scan_result", "job_id": job_id,
+                    "match": False, "score": 0,
+                    "error": "INVALID_TEMPLATE",
+                }))
+                return
+
+            # ★ BƯỚC 2 — Mở thiết bị trong try (bắt mọi lỗi USB/SDK)
+            try:
+                device_acquired = self._ensure_device_open()
+            except Exception as open_err:
+                print(f"[Agent] ❌ open_device() raise: {open_err}")
+                device_acquired = False
+
+            if not device_acquired:
+                await ws.send(json.dumps({
+                    "type": "scan_result", "job_id": job_id,
+                    "match": False, "score": 0, "error": "DEVICE_OFFLINE",
+                }))
+                return
+
+            print(f"[Agent] 👉 Đặt tay lên máy quét...")
+
+            # ★ BƯỚC 3 — Quét + so khớp
             stored = base64.b64decode(template_b64)
             scanned = await asyncio.to_thread(
                 self.svc.wait_for_finger, timeout, cancel_event
@@ -327,13 +376,10 @@ class FingerprintAgent:
 
             if cancel_event.is_set():
                 print(f"[Agent] ⏹️ Scan {job_id} bị hủy bởi job mới.")
-                try:
-                    await ws.send(json.dumps({
-                        "type": "scan_result", "job_id": job_id,
-                        "match": False, "score": 0, "error": "CANCELLED",
-                    }))
-                except Exception:
-                    pass
+                await ws.send(json.dumps({
+                    "type": "scan_result", "job_id": job_id,
+                    "match": False, "score": 0, "error": "CANCELLED",
+                }))
                 return
 
             if scanned is None:
@@ -351,38 +397,70 @@ class FingerprintAgent:
                 "type": "scan_result", "job_id": job_id,
                 "match": matched, "score": score,
             }))
+
         except Exception as e:
-            print(f"[Agent] ❌ scan error: {e}")
+            # ★ LƯỚI AN TOÀN CUỐI — mọi exception chưa được bắt ở trên đều rơi vào đây
+            print(f"[Agent] ❌ scan exception: {type(e).__name__}: {e}")
             try:
                 await ws.send(json.dumps({
                     "type": "scan_result", "job_id": job_id,
-                    "match": False, "score": 0, "error": str(e)[:200],
+                    "match": False, "score": 0,
+                    "error": f"{type(e).__name__}: {str(e)[:180]}",
                 }))
-            except Exception:
-                pass
+            except Exception as send_err:
+                # WS đã đóng — không còn cách nào báo frontend, chỉ log
+                print(f"[Agent] ⚠️ Không gửi được scan_result lỗi: {send_err}")
+
         finally:
-            self._release_device()
+            # ★ Bọc release_device trong try riêng — close_device() lỗi không được
+            #   ghi đè exception gốc hoặc làm task crash
+            if device_acquired:
+                try:
+                    self._release_device()
+                except Exception as rel_err:
+                    print(f"[Agent] ⚠️ release_device error: {rel_err}")
 
     async def _handle_enroll(self, ws, job, cancel_event: threading.Event):
+        """
+        ★ Gia cố cùng pattern với _handle_scan:
+        - Outer try bao trùm _ensure_device_open
+        - device_acquired flag balance active_jobs
+        - finally luôn reset busy + enroll_state, bọc release_device an toàn
+        - Mọi nhánh lỗi đều gửi enroll_result (success=False)
+        """
         job_id = job.get("job_id")
         user_id = job.get("user_id")
-        step_timeout = max(10, int(job.get("timeout_seconds", 60)) // 3)
-
-        print(f"\n[Agent] 📥 enroll {job_id} | user={user_id} | {step_timeout}s/lần")
-
-        if not self._ensure_device_open():
-            await ws.send(json.dumps({
-                "type": "enroll_result", "job_id": job_id,
-                "success": False, "error": "DEVICE_OFFLINE",
-            }))
-            return
-
-        self.busy = True
-        self.enroll_step = 0
-        self.enroll_total = 3
-        self.enroll_state = "waiting_touch_1"
+        device_acquired = False
 
         try:
+            step_timeout = max(10, int(job.get("timeout_seconds", 60) or 60) // 3)
+
+            print(f"\n[Agent] 📥 enroll {job_id} | user={user_id} | {step_timeout}s/lần")
+
+            # ★ Validate job_id
+            if not job_id:
+                print("[Agent] ❌ enroll: thiếu job_id — bỏ qua")
+                return
+
+            # ★ Mở thiết bị trong try
+            try:
+                device_acquired = self._ensure_device_open()
+            except Exception as open_err:
+                print(f"[Agent] ❌ enroll open_device() raise: {open_err}")
+                device_acquired = False
+
+            if not device_acquired:
+                await ws.send(json.dumps({
+                    "type": "enroll_result", "job_id": job_id,
+                    "success": False, "error": "DEVICE_OFFLINE",
+                }))
+                return
+
+            self.busy = True
+            self.enroll_step = 0
+            self.enroll_total = 3
+            self.enroll_state = "waiting_touch_1"
+
             templates = []
             for i in range(3):
                 self.enroll_step = i
@@ -419,11 +497,14 @@ class FingerprintAgent:
 
                 if t is None:
                     self.enroll_state = "timeout"
-                    await ws.send(json.dumps({
-                        "type": "enroll_result", "job_id": job_id,
-                        "success": False,
-                        "error": f"Lần {i+1} quét không thành công sau {step_timeout}s. Vui lòng thử lại.",
-                    }))
+                    try:
+                        await ws.send(json.dumps({
+                            "type": "enroll_result", "job_id": job_id,
+                            "success": False,
+                            "error": f"Lần {i+1} quét không thành công sau {step_timeout}s. Vui lòng thử lại.",
+                        }))
+                    except Exception:
+                        pass
                     return
 
                 if i > 0:
@@ -432,11 +513,14 @@ class FingerprintAgent:
                     )
                     if not matched:
                         self.enroll_state = "mismatch"
-                        await ws.send(json.dumps({
-                            "type": "enroll_result", "job_id": job_id,
-                            "success": False,
-                            "error": f"Lần {i+1} không khớp ngón ban đầu. Vui lòng thử lại.",
-                        }))
+                        try:
+                            await ws.send(json.dumps({
+                                "type": "enroll_result", "job_id": job_id,
+                                "success": False,
+                                "error": f"Lần {i+1} không khớp ngón ban đầu. Vui lòng thử lại.",
+                            }))
+                        except Exception:
+                            pass
                         return
 
                 templates.append(t)
@@ -455,6 +539,13 @@ class FingerprintAgent:
             if cancel_event.is_set():
                 print(f"[Agent] ⏹️ Enroll {job_id} bị hủy trước khi merge.")
                 self.enroll_state = "cancelled"
+                try:
+                    await ws.send(json.dumps({
+                        "type": "enroll_result", "job_id": job_id,
+                        "success": False, "error": "CANCELLED",
+                    }))
+                except Exception:
+                    pass
                 return
 
             from zk_service import to_csharp_byte_array
@@ -472,20 +563,31 @@ class FingerprintAgent:
                 "success": True,
                 "template_b64": base64.b64encode(merged_bytes).decode(),
             }))
+
         except Exception as e:
+            # ★ LƯỚI AN TOÀN CUỐI
             self.enroll_state = "error"
-            print(f"[Agent] ❌ enroll error: {e}")
+            print(f"[Agent] ❌ enroll exception: {type(e).__name__}: {e}")
             try:
                 await ws.send(json.dumps({
                     "type": "enroll_result", "job_id": job_id,
-                    "success": False, "error": str(e)[:200],
+                    "success": False,
+                    "error": f"{type(e).__name__}: {str(e)[:180]}",
                 }))
-            except Exception:
-                pass
-        finally:
-            self.busy = False
-            self._release_device()
+            except Exception as send_err:
+                print(f"[Agent] ⚠️ Không gửi được enroll_result lỗi: {send_err}")
 
+        finally:
+            # ★ Luôn reset state, không phụ thuộc vào nhánh điều khiển nào ở trên
+            self.busy = False
+            if self.enroll_state not in ("completed", "cancelled", "error", "timeout", "mismatch"):
+                self.enroll_state = "idle"
+
+            if device_acquired:
+                try:
+                    self._release_device()
+                except Exception as rel_err:
+                    print(f"[Agent] ⚠️ enroll release_device error: {rel_err}")
 
 def main():
     device_id = get_or_create_device_id()
@@ -504,7 +606,6 @@ def main():
         asyncio.run(agent.run())
     finally:
         agent.svc.close()
-
 
 if __name__ == "__main__":
     main()

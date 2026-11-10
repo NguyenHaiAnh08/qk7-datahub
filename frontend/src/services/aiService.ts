@@ -12,6 +12,8 @@ export interface AICitation {
   page: number;
   security_level_name: string;
   snippet: string;
+  requires_biometric?: boolean;
+  security_level_id?: number;
 }
 
 export interface AIReasoning {
@@ -24,7 +26,8 @@ export interface AIChatResponse {
   answer: string;
   citations: AICitation[];
   reasoning?: AIReasoning;
-  think?: string; 
+  think?: string;
+  requires_biometric?: boolean;
 }
 
 export interface AIQuizQuestion {
@@ -85,15 +88,32 @@ export interface AIHealthStatus {
 
 export const aiService = {
   /**
-   * Gửi câu hỏi tác chiến tới Trợ lý AI (Pre-filtering bảo mật theo X-Clearance)
+   * Gửi câu hỏi tác chiến tới Trợ lý AI (Pre-filtering bảo mật theo X-Clearance & Khóa Biometric Cấp 3-5)
    */
-  async chat(params: { query: string; file_id?: string }): Promise<AIChatResponse> {
+  async chat(params: {
+    query: string;
+    file_id?: string;
+    history?: Array<{ role: string; content: string }>;
+    fingerprint_token?: string;
+  }): Promise<AIChatResponse> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    // P0 SECURITY: CHỈ gửi X-Fingerprint-Token khi được truyền tường minh (explicit auto-retry sau khi quét vân tay)
+    // TUYỆT ĐỐI KHÔNG tự động lấy từ sessionStorage gửi kèm câu hỏi mới
+    const effectiveToken = params.fingerprint_token;
+    if (effectiveToken) {
+      headers['X-Fingerprint-Token'] = effectiveToken;
+    }
     return http<AIChatResponse>('/api/ai/chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
+      headers,
+      body: JSON.stringify({
+        query: params.query,
+        file_id: params.file_id,
+        history: params.history,
+        fingerprint_token: effectiveToken,
+      }),
       skipErrorNotification: false,
     });
   },

@@ -1,9 +1,17 @@
 // src/admin-routes.js
 const bcrypt = require('bcryptjs');
+const { AUTO_PERMISSIONS, getAutoRequiredPermission } = require('./route-permissions');
+let invalidateCatalogCache;
+try {
+    invalidateCatalogCache = require('../pdf-parser').invalidateCatalogCache;
+} catch (e) {}
 
 module.exports = (app, deps) => {
     const {
         sql, getPool, writeAccessLog,
+        requireAuth,
+        requirePermission,
+        requireAnyPermission,
         getUserPermissions,
         invalidateCache,
         listActiveSessions,
@@ -11,6 +19,137 @@ module.exports = (app, deps) => {
         revokeAllUserSessions,
         sessionIdleTimeoutMinutes = 30,
     } = deps;
+
+
+    const getClientIp = (req) => {
+        const raw = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || '';
+        let ip = String(Array.isArray(raw) ? raw[0] : raw).split(',')[0].trim();
+        if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+        if (ip === '::1') ip = '127.0.0.1';
+        return ip;
+    };
+
+    
+    
+
+
+    // ═══════════════════════════════════════════════════════════════
+    // [v4.3] Approval Workflow
+    // ═══════════════════════════════════════════════════════════════
+    
+
+    
+
+    const approvalModule = require('./approval-workflow')({
+        sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission,
+    });
+    const { approvalInterceptor, loadProtectedPermissions, isProtectedAdmin } = approvalModule;
+
+
+    // ═══════════════════════════════════════════════════════════════
+    // [v4.3.2] Route xem yêu cầu của chính mình — dành cho IT
+    // KHÔNG nằm dưới /api/admin → không cần permission đặc biệt,
+    // chỉ cần authenticated (đã được middleware chung xử lý).
+    // ═══════════════════════════════════════════════════════════════
+    app.get('/api/my-approval-requests', requireAuth, async (req, res) => {
+      try {
+        const userId = req.user.user_id;
+        const status = String(req.query.status || 'PENDING_REJECTED').toUpperCase();
+
+        const validStatuses = [
+          'PENDING', 'APPROVED', 'EXECUTING', 'EXECUTED', 'REJECTED', 'FAILED',
+          'PENDING_REJECTED', 'ALL',
+        ];
+        if (!validStatuses.includes(status)) {
+          return res.status(400).json({ error: 'Status không hợp lệ' });
+        }
+
+        const pool = await getPool();
+        const request = pool.request().input('uid', sql.VarChar(50), userId);
+
+        let query = `
+          SELECT 
+            ar.request_id, ar.requester_id, ar.required_permission, ar.http_method, ar.http_path,
+            ar.target_summary, ar.status, ar.reviewed_by, ar.reviewed_at, ar.review_note,
+            ar.executed_at, ar.execution_error, ar.created_at,
+            u.full_name AS requester_name
+          FROM APPROVAL_REQUEST ar
+          LEFT JOIN [USER] u ON u.user_id = ar.requester_id
+          WHERE ar.requester_id = @uid
+        `;
+
+        if (status === 'PENDING_REJECTED') {
+          query += ` AND ar.status IN ('PENDING', 'REJECTED')`;
+        } else if (status === 'APPROVED') {
+          query += ` AND ar.status IN ('APPROVED', 'EXECUTED')`;
+        } else if (status !== 'ALL') {
+          query += ` AND ar.status = @status`;
+          request.input('status', sql.VarChar(20), status);
+        }
+
+        query += ` ORDER BY ar.created_at DESC`;
+        const result = await request.query(query);
+        const standardMine = result.recordset || [];
+
+        // Lấy thêm các đề xuất chỉnh sửa văn bản của user
+        const propReq = pool.request().input('uid', sql.VarChar(50), userId);
+        let propQuery = `
+          SELECT 
+            p.proposal_id, p.file_id, p.requester_id, p.status, p.note, p.review_note,
+            p.reviewed_by, p.reviewed_at, p.created_at, p.updated_at,
+            p.document_code, p.title,
+            u.full_name AS requester_name,
+            d.document_code AS current_document_code, d.title AS current_title
+          FROM DOCUMENT_REVISION_PROPOSAL p
+          JOIN DOCUMENT d ON d.file_id = p.file_id
+          JOIN [USER] u ON u.user_id = p.requester_id
+          WHERE p.requester_id = @uid
+        `;
+        if (status === 'PENDING_REJECTED') {
+          propQuery += ` AND p.status IN ('PENDING', 'REJECTED')`;
+        } else if (status === 'APPROVED') {
+          propQuery += ` AND p.status IN ('APPROVED', 'EXECUTED')`;
+        } else if (status !== 'ALL') {
+          propQuery += ` AND p.status = @pstatus`;
+          propReq.input('pstatus', sql.VarChar(20), status);
+        }
+        propQuery += ` ORDER BY p.created_at DESC`;
+        const propResult = await propReq.query(propQuery);
+
+        const proposalMine = (propResult.recordset || []).map((p) => {
+          const docCodeDisplay = p.document_code || p.current_document_code || p.file_id;
+          return {
+            request_id: p.proposal_id,
+            requester_id: p.requester_id,
+            requester_name: p.requester_name,
+            required_permission: 'DOC_EDIT',
+            http_method: 'PUT',
+            http_path: `/api/documents/${p.file_id}`,
+            target_summary: `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
+            status: p.status,
+            reviewed_by: p.reviewed_by,
+            reviewed_at: p.reviewed_at,
+            review_note: p.review_note,
+            created_at: p.created_at,
+            request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+            document_code: docCodeDisplay,
+            doc_title: p.title,
+          };
+        });
+
+        const allMine = [...standardMine, ...proposalMine].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        res.json({
+          total: allMine.length,
+          items: allMine,
+        });
+      } catch (err) {
+        console.error('[GET /api/my-approval-requests]', err);
+        res.status(500).json({ error: err.message });
+      }
+    });
 
     // ═══ Cache invalidation helpers ═══
     const _invalidateUser = (uid) => {
@@ -26,89 +165,15 @@ module.exports = (app, deps) => {
         }
     };
 
-    const getClientIp = (req) => {
-        const raw = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || '';
-        let ip = String(Array.isArray(raw) ? raw[0] : raw).split(',')[0].trim();
-        if (ip.startsWith('::ffff:')) ip = ip.slice(7);
-        if (ip === '::1') ip = '127.0.0.1';
-        return ip;
-    };
-
-    // ═══════════════════════════════════════════════════════════════
-    // RBAC GATE — Pure permission-based, KHÔNG dùng clearance_level_id
-    // Admin role (ROL-01) luôn bypass
-    // ═══════════════════════════════════════════════════════════════
-    const AUTO_PERMISSIONS = {
-        GET: [
-            [/^\/api\/admin\/stats$/,                     'SYSTEM_STATS_VIEW'],
-            [/^\/api\/admin\/users$/,                     'USER_VIEW'],
-            [/^\/api\/admin\/users\/[^/]+\/roles$/,       'USER_VIEW'],
-            [/^\/api\/admin\/users\/[^/]+\/permissions$/, 'USER_VIEW'],
-            [/^\/api\/admin\/roles$/,                     'ROLE_VIEW'],
-            [/^\/api\/admin\/roles\/[^/]+\/permissions$/, 'ROLE_VIEW'],
-            [/^\/api\/admin\/permissions$/,               'PERMISSION_VIEW'],
-            [/^\/api\/admin\/units$/,                     'UNIT_VIEW'],
-            [/^\/api\/admin\/document-types$/,            'DOCTYPE_VIEW'],
-            [/^\/api\/admin\/security-levels$/,           'SECLEVEL_VIEW'],
-            [/^\/api\/admin\/ranks$/,                     'RANK_VIEW'],
-            [/^\/api\/admin\/positions$/,                 'POSITION_VIEW'],
-            [/^\/api\/admin\/unit-aliases$/,              'UNIT_ALIAS_VIEW'],
-            [/^\/api\/admin\/ip-blocklist$/,              'AUDIT_VIEW'],
-            [/^\/api\/admin\/login-attempts$/,            'AUDIT_VIEW'],
-            [/^\/api\/admin\/sessions$/,                  'SESSION_VIEW'],
-            [/^\/api\/admin\/sessions\/[^/]+$/,           'SESSION_VIEW'],
-            [/^\/api\/admin\/sessions\/user\/[^/]+$/,     'SESSION_VIEW'],
-        ],
-        POST: [
-            [/^\/api\/admin\/users$/,                     'USER_CREATE'],
-            [/^\/api\/admin\/users\/[^/]+\/roles$/,       'USER_ROLE_ASSIGN'],
-            [/^\/api\/admin\/users\/[^/]+\/permissions$/, 'USER_PERMISSION_ASSIGN'],
-            [/^\/api\/admin\/users\/[^/]+\/unlock$/,      'USER_EDIT'],
-            [/^\/api\/admin\/roles$/,                     'ROLE_CREATE'],
-            [/^\/api\/admin\/roles\/[^/]+\/permissions$/, 'ROLE_PERMISSION_ASSIGN'],
-            [/^\/api\/admin\/permissions$/,               'PERMISSION_CREATE'],
-            [/^\/api\/admin\/units$/,                     'UNIT_MANAGE'],
-            [/^\/api\/admin\/document-types$/,            'DOCTYPE_MANAGE'],
-            [/^\/api\/admin\/security-levels$/,           'SECLEVEL_MANAGE'],
-            [/^\/api\/admin\/ranks$/,                     'RANK_MANAGE'],
-            [/^\/api\/admin\/positions$/,                 'POSITION_MANAGE'],
-            [/^\/api\/admin\/unit-aliases$/,              'UNIT_ALIAS_MANAGE'],
-        ],
-        PUT: [
-            [/^\/api\/admin\/users\/[^/]+$/,              'USER_EDIT'],
-            [/^\/api\/admin\/users\/[^/]+\/credentials$/, 'USER_CREDENTIALS'],
-            [/^\/api\/admin\/roles\/[^/]+$/,              'ROLE_EDIT'],
-            [/^\/api\/admin\/permissions\/[^/]+$/,        'PERMISSION_EDIT'],
-            [/^\/api\/admin\/units\/[^/]+$/,              'UNIT_MANAGE'],
-            [/^\/api\/admin\/document-types\/[^/]+$/,     'DOCTYPE_MANAGE'],
-            [/^\/api\/admin\/security-levels\/[^/]+$/,    'SECLEVEL_MANAGE'],
-            [/^\/api\/admin\/ranks\/[^/]+$/,              'RANK_MANAGE'],
-            [/^\/api\/admin\/positions\/[^/]+$/,          'POSITION_MANAGE'],
-            [/^\/api\/admin\/unit-aliases\/[^/]+$/,       'UNIT_ALIAS_MANAGE'],
-        ],
-        DELETE: [
-            [/^\/api\/admin\/users\/[^/]+$/,                     'USER_DELETE'],
-            [/^\/api\/admin\/users\/[^/]+\/roles\/[^/]+$/,       'USER_ROLE_ASSIGN'],
-            [/^\/api\/admin\/users\/[^/]+\/permissions\/[^/]+$/, 'USER_PERMISSION_ASSIGN'],
-            [/^\/api\/admin\/roles\/[^/]+$/,                     'ROLE_DELETE'],
-            [/^\/api\/admin\/roles\/[^/]+\/permissions\/[^/]+$/, 'ROLE_PERMISSION_ASSIGN'],
-            [/^\/api\/admin\/permissions\/[^/]+$/,               'PERMISSION_DELETE'],
-            [/^\/api\/admin\/units\/[^/]+$/,                     'UNIT_MANAGE'],
-            [/^\/api\/admin\/document-types\/[^/]+$/,            'DOCTYPE_MANAGE'],
-            [/^\/api\/admin\/security-levels\/[^/]+$/,           'SECLEVEL_MANAGE'],
-            [/^\/api\/admin\/ranks\/[^/]+$/,                     'RANK_MANAGE'],
-            [/^\/api\/admin\/positions\/[^/]+$/,                 'POSITION_MANAGE'],
-            [/^\/api\/admin\/unit-aliases\/[^/]+$/,              'UNIT_ALIAS_MANAGE'],
-            [/^\/api\/admin\/ip-blocklist\/[^/]+$/,              'AUDIT_VIEW'],
-            [/^\/api\/admin\/sessions\/user\/[^/]+$/,            'SESSION_KILL'],
-            [/^\/api\/admin\/sessions\/[^/]+$/,                  'SESSION_KILL'],
-        ],
-    };
+    
 
     const requireAdminPanelAccess = async (req, res, next) => {
+        if (!req.user || !req.user.is_authenticated) {
+            return res.status(401).json({ error: 'Cần đăng nhập để truy cập trang quản trị', code: 'UNAUTHORIZED' });
+        }
         if ((req.user?.roles || []).includes('ROL-01')) return next();
 
-        const fullPath = (req.originalUrl || '').split('?')[0];
+        const fullPath = (req.originalUrl || '').split('?')[0].replace(/\/+$/, '') || '/';
 
         const rules = AUTO_PERMISSIONS[req.method] || [];
         const matched = rules.find(([regex]) => regex.test(fullPath));
@@ -144,19 +209,107 @@ module.exports = (app, deps) => {
         action, ip: req.ip || '', note,
     });
 
+
+    // ═══════════════════════════════════════════════════════════════
+    // [v5.2] Helper: Unit-based approval
+    // ═══════════════════════════════════════════════════════════════
+
+    const resolveUserRoles = async (user) => {
+        if (!user || !user.user_id) return [];
+        try {
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('u', sql.VarChar(50), user.user_id)
+                .query(`SELECT role_id FROM USER_ROLE
+                        WHERE user_id = @u AND (expires_at IS NULL OR expires_at > GETDATE())`);
+            return r.recordset.map(x => x.role_id);
+        } catch (e) {
+            console.warn('[resolveUserRoles]', e.message);
+            return user.roles || [];
+        }
+    };
+
+    const resolveUserUnitId = async (user) => {
+        if (!user || !user.user_id) return null;
+        if (user.unit_id) return user.unit_id;
+        try {
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('u', sql.VarChar(50), user.user_id)
+                .query(`SELECT unit_id FROM [USER] WHERE user_id = @u`);
+            return r.recordset[0]?.unit_id || null;
+        } catch { return null; }
+    };
+
+    const getSubtreeUnits = async (unitId) => {
+        if (!unitId) return [];
+        try {
+            const pool = await getPool();
+            const r = await pool.request()
+                .input('uid', sql.VarChar(50), unitId)
+                .query(`
+                    WITH unit_tree AS (
+                        SELECT unit_id FROM UNIT WHERE unit_id = @uid
+                        UNION ALL
+                        SELECT u.unit_id FROM UNIT u
+                        INNER JOIN unit_tree t ON u.parent_id = t.unit_id
+                    )
+                    SELECT unit_id FROM unit_tree OPTION (MAXRECURSION 100)
+                `);
+            return r.recordset.map(x => x.unit_id);
+        } catch (e) {
+            console.error('[getSubtreeUnits]', e.message);
+            return [];
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // [v5.3] Cấu hình chế độ phạm vi đơn vị được duyệt:
+    //   • 'subtree' (mặc định) → duyệt được đơn vị mình + toàn bộ đơn vị con
+    //   • 'strict'             → chỉ duyệt đúng đơn vị mình
+    // Điều khiển qua biến môi trường UNIT_APPROVAL_MODE.
+    // ═══════════════════════════════════════════════════════════════
+    const APPROVAL_MODE = (process.env.UNIT_APPROVAL_MODE || 'subtree').toLowerCase();
+
+    const canUserApproveRequest = async (req, requestUnitId) => {
+        // 1. Protected Admin duyệt mọi yêu cầu
+        if (req.user.user_id === 'USR-001') return true;
+
+        // 2. Phải có vai trò Chỉ huy (ROL-02) hoặc Admin (ROL-01)
+        const roles = await resolveUserRoles(req.user);
+        if (!roles.includes('ROL-02') && !roles.includes('ROL-01')) return false;
+
+        // 3. Phải có đơn vị công tác
+        const userUnitId = await resolveUserUnitId(req.user);
+        if (!userUnitId) return false;
+
+        // 4. So khớp đơn vị
+        if (APPROVAL_MODE === 'strict') {
+            // Chế độ Strict: Chỉ duyệt đúng đơn vị mình
+            return userUnitId === requestUnitId;
+        }
+
+        // Chế độ Subtree (mặc định): duyệt được cho đơn vị mình + toàn bộ đơn vị con
+        // VD: CH Phòng Chính trị (U-CT) duyệt được cho Ban tuyên huấn, Cơ quan hành chính
+        const subtree = await getSubtreeUnits(userUnitId);
+        return subtree.includes(requestUnitId);
+    };
+
+
     // ═══════════════════════════════════════════════════════════
     // 0. THỐNG KÊ DASHBOARD
     // ═══════════════════════════════════════════════════════════
     app.get('/api/admin/stats', async (req, res) => {
         try {
             const pool = await getPool();
-            const [u, d, byLv, byType, byUnit, logs24] = await Promise.all([
+            const [u, d, byLv, byType, byUnit, logs24, trash] = await Promise.all([
                 pool.request().query(`SELECT COUNT(*) AS n FROM [USER]`),
-                pool.request().query(`SELECT COUNT(*) AS n, ISNULL(SUM(file_size),0) AS size FROM DOCUMENT`),
-                pool.request().query(`SELECT sl.level_id AS lv, sl.name AS lvName, COUNT(d.file_id) AS n FROM SECURITY_LEVEL sl LEFT JOIN DOCUMENT d ON d.security_level_id = sl.level_id GROUP BY sl.level_id, sl.name ORDER BY sl.level_id`),
-                pool.request().query(`SELECT dt.type_id AS id, dt.name, COUNT(d.file_id) AS n FROM DOCUMENT_TYPE dt LEFT JOIN DOCUMENT d ON d.doc_type_id = dt.type_id GROUP BY dt.type_id, dt.name ORDER BY n DESC`),
-                pool.request().query(`SELECT u.unit_id AS id, u.name, COUNT(d.file_id) AS n FROM UNIT u LEFT JOIN DOCUMENT d ON d.issuing_unit_id = u.unit_id GROUP BY u.unit_id, u.name ORDER BY n DESC`),
+                pool.request().query(`SELECT COUNT(*) AS n, ISNULL(SUM(file_size),0) AS size FROM DOCUMENT WHERE deleted_at IS NULL`),
+                pool.request().query(`SELECT sl.level_id AS lv, sl.name AS lvName, COUNT(d.file_id) AS n FROM SECURITY_LEVEL sl LEFT JOIN DOCUMENT d ON d.security_level_id = sl.level_id AND d.deleted_at IS NULL GROUP BY sl.level_id, sl.name ORDER BY sl.level_id`),
+                pool.request().query(`SELECT dt.type_id AS id, dt.name, COUNT(d.file_id) AS n FROM DOCUMENT_TYPE dt LEFT JOIN DOCUMENT d ON d.doc_type_id = dt.type_id AND d.deleted_at IS NULL GROUP BY dt.type_id, dt.name ORDER BY n DESC`),
+                pool.request().query(`SELECT u.unit_id AS id, u.name, COUNT(d.file_id) AS n FROM UNIT u LEFT JOIN DOCUMENT d ON d.issuing_unit_id = u.unit_id AND d.deleted_at IS NULL GROUP BY u.unit_id, u.name ORDER BY n DESC`),
                 pool.request().query(`SELECT COUNT(*) AS n FROM ACCESS_LOG WHERE [timestamp] >= DATEADD(day,-1,GETDATE())`),
+                pool.request().query(`SELECT COUNT(*) AS n FROM DOCUMENT WHERE deleted_at IS NOT NULL`),
             ]);
             res.json({
                 users: u.recordset[0].n,
@@ -166,6 +319,7 @@ module.exports = (app, deps) => {
                 byType: byType.recordset,
                 byUnit: byUnit.recordset,
                 logs24h: logs24.recordset[0].n,
+                trashCount: trash.recordset[0].n,
             });
         } catch (e) {
             console.error('[GET /api/admin/stats]', e);
@@ -176,14 +330,24 @@ module.exports = (app, deps) => {
     // ═══════════════════════════════════════════════════════════
     // 1. USER CRUD
     // ═══════════════════════════════════════════════════════════
-    app.get('/api/admin/users', async (req, res) => {
+        app.get('/api/admin/users', async (req, res) => {
         try {
             const pool = await getPool();
             const r = await pool.request().query(`
                 SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name, u.[position],
                        u.unit_id, un.name AS unit_name, u.status, u.clearance_level_id,
                        sl.name AS clearance_name, sl.code AS clearance_code,
-                       CASE WHEN EXISTS (SELECT 1 FROM USER_FINGERPRINT uf WHERE uf.user_id = u.user_id AND uf.active = 1) THEN 1 ELSE 0 END AS has_fingerprint
+                       CASE WHEN EXISTS (SELECT 1 FROM USER_FINGERPRINT uf WHERE uf.user_id = u.user_id AND uf.active = 1) THEN 1 ELSE 0 END AS has_fingerprint,
+                       CASE WHEN u.pin_hash IS NOT NULL AND LEN(u.pin_hash) > 0 THEN 1 ELSE 0 END AS has_pin,
+                       
+                       -- ✅ THÊM ĐOẠN NÀY: Kiểm tra xem user có yêu cầu cấp PIN nào đang chờ không
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM APPROVAL_REQUEST ar 
+                           WHERE ar.requester_id = u.user_id 
+                             AND ar.status = 'PENDING' 
+                             AND ar.required_permission = 'PERM-USR-08'
+                       ) THEN 1 ELSE 0 END AS pin_requested
+
                 FROM [USER] u
                 LEFT JOIN UNIT un ON un.unit_id = u.unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = u.clearance_level_id
@@ -201,6 +365,8 @@ module.exports = (app, deps) => {
             const items = r.recordset.map(u => ({
                 ...u,
                 has_fingerprint: u.has_fingerprint === 1,
+                has_pin: u.has_pin === 1,
+                pin_requested: u.pin_requested === 1, // ✅ THÊM DÒNG NÀY ĐỂ MAP SANG BOOLEAN
                 roles: rolesByUser[u.user_id] || [],
                 role_names: roleNamesByUser[u.user_id] || [],
             }));
@@ -218,22 +384,43 @@ module.exports = (app, deps) => {
                 return res.status(400).json({ error: 'Thiếu mức bảo mật' });
             }
 
+            // ═══════════════════════════════════════════════════════════
+            // [NEW] PHÂN QUYỀN TẠO USER: Admin → toàn quyền | IT → giới hạn
+            // ═══════════════════════════════════════════════════════════
+            const { NON_ADMIN_CREATABLE_ROLES } = require('./user-roles');
+            
             const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
             const callerClearance = req.user?.clearance_level_id || 1;
             const targetClearance = parseInt(clearance_level_id, 10);
             const targetRoles = role_id ? [role_id] : (Array.isArray(roles) ? roles : []);
 
             if (!callerIsAdmin) {
+                // 1. Không được tạo user cấp bảo mật cao hơn mình
                 if (targetClearance > callerClearance) {
                     return res.status(403).json({
                         error: `Không thể tạo user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
                         code: 'PERMISSION_DENIED',
                     });
                 }
-                if (targetRoles.includes('ROL-01')) {
+
+                // 2. [NEW] Chỉ được gán role trong whitelist (Trợ lý + Chỉ huy)
+                const invalidRoles = targetRoles.filter(
+                    (r) => r && !NON_ADMIN_CREATABLE_ROLES.includes(r)
+                );
+                if (invalidRoles.length > 0) {
                     return res.status(403).json({
-                        error: 'Chỉ Admin mới có thể tạo user có vai trò Admin',
-                        code: 'PERMISSION_DENIED',
+                        error: `Bạn chỉ được tạo tài khoản với vai trò "Trợ lý" hoặc "Chỉ huy". Vai trò không hợp lệ: ${invalidRoles.join(', ')}`,
+                        code: 'ROLE_NOT_ALLOWED',
+                        allowed_roles: NON_ADMIN_CREATABLE_ROLES,
+                    });
+                }
+
+                // 3. [NEW] Bắt buộc phải chọn 1 role (không được để trống)
+                if (targetRoles.length === 0) {
+                    return res.status(400).json({
+                        error: 'Vui lòng chọn vai trò cho tài khoản mới (Trợ lý hoặc Chỉ huy).',
+                        code: 'ROLE_REQUIRED',
+                        allowed_roles: NON_ADMIN_CREATABLE_ROLES,
                     });
                 }
             }
@@ -290,76 +477,129 @@ module.exports = (app, deps) => {
     });
 
     app.put('/api/admin/users/:id', async (req, res) => {
-        try {
-            const userId = req.params.id;
-            // SECURITY: KHÔNG nhận role_id/roles — dùng POST /users/:id/roles
-            const { full_name, rank_name, position, unit_id, status, clearance_level_id } = req.body;
+    try {
+        const userId = req.params.id;
+        // SECURITY: KHÔNG nhận role_id/roles — dùng POST /users/:id/roles
+        const { full_name, rank_name, position, unit_id, status, clearance_level_id } = req.body;
 
-            const pool = await getPool();
+        const pool = await getPool();
 
-            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
-            const callerPerms = callerIsAdmin ? [] : await getUserPermissions(req.user.user_id);
-            const canChangeClearance = callerIsAdmin || callerPerms.includes('USER_ROLE_ASSIGN');
+        const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+        const callerPerms = callerIsAdmin ? [] : await getUserPermissions(req.user.user_id);
+        const canChangeClearance = callerIsAdmin || callerPerms.includes('USER_ROLE_ASSIGN');
 
-            const targetUserRes = await pool.request()
-                .input('u', sql.VarChar(50), userId)
-                .query(`SELECT clearance_level_id, status FROM [USER] WHERE user_id = @u`);
-            if (targetUserRes.recordset.length === 0) {
-                return res.status(404).json({ error: 'Không tìm thấy user' });
-            }
-            const targetUser = targetUserRes.recordset[0];
-
-            if (!canChangeClearance && clearance_level_id !== undefined &&
-                parseInt(clearance_level_id, 10) !== targetUser.clearance_level_id) {
-                return res.status(403).json({
-                    error: 'Chỉ người có quyền USER_ROLE_ASSIGN mới được đổi cấp độ bảo mật',
-                    code: 'PERMISSION_DENIED',
-                    required_permission: 'USER_ROLE_ASSIGN',
-                });
-            }
-
-            const callerClearance = req.user?.clearance_level_id || 1;
-            if (!callerIsAdmin && targetUser.clearance_level_id > callerClearance) {
-                return res.status(403).json({
-                    error: `Không thể sửa user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
-                });
-            }
-
-            if (!callerIsAdmin && status !== undefined && status !== targetUser.status) {
-                const targetIsAdmin = await pool.request()
-                    .input('u', sql.VarChar(50), userId)
-                    .query(`SELECT 1 FROM USER_ROLE WHERE user_id = @u AND role_id = 'ROL-01'`);
-                if (targetIsAdmin.recordset.length > 0) {
-                    return res.status(403).json({
-                        error: 'Chỉ Admin mới có thể đổi trạng thái tài khoản Admin khác',
-                    });
-                }
-            }
-
-            const r = await pool.request()
-                .input('user_id', sql.VarChar(50), userId)
-                .input('full_name', sql.NVarChar(100), full_name)
-                .input('rank', sql.NVarChar(50), rank_name || null)
-                .input('position', sql.NVarChar(100), position || null)
-                .input('unit_id', sql.VarChar(50), unit_id || null)
-                .input('status', sql.VarChar(20), status || targetUser.status || 'active')
-                .input('clearance_level_id', sql.Int,
-                    canChangeClearance && clearance_level_id !== undefined
-                        ? parseInt(clearance_level_id, 10)
-                        : targetUser.clearance_level_id)
-                .query(`UPDATE [USER] SET full_name=@full_name, [rank]=@rank, [position]=@position,
-                        unit_id=@unit_id, status=@status, clearance_level_id=@clearance_level_id
-                        WHERE user_id=@user_id`);
-            if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
-
-            await log(req, 'UPDATE_USER', `Sửa user ${userId}`);
-            _invalidateUser(userId);
-            res.json({ success: true });
-        } catch (e) {
-            console.error('[PUT /api/admin/users/:id]', e);
-            res.status(500).json({ error: e.message });
+        const targetUserRes = await pool.request()
+            .input('u', sql.VarChar(50), userId)
+            .query(`SELECT clearance_level_id, status FROM [USER] WHERE user_id = @u`);
+        if (targetUserRes.recordset.length === 0) {
+            return res.status(404).json({ error: 'Không tìm thấy user' });
         }
-    });
+        const targetUser = targetUserRes.recordset[0];
+
+        if (!canChangeClearance && clearance_level_id !== undefined &&
+            parseInt(clearance_level_id, 10) !== targetUser.clearance_level_id) {
+            return res.status(403).json({
+                error: 'Chỉ người có quyền USER_ROLE_ASSIGN mới được đổi cấp độ bảo mật',
+                code: 'PERMISSION_DENIED',
+                required_permission: 'USER_ROLE_ASSIGN',
+            });
+        }
+
+        const callerClearance = req.user?.clearance_level_id || 1;
+        if (!callerIsAdmin && targetUser.clearance_level_id > callerClearance) {
+            return res.status(403).json({
+                error: `Không thể sửa user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // [SECURITY FIX v4.3.1] Chặn leo thang đặc quyền qua PUT
+        // Kiểm tra GIÁ TRỊ MỚI của clearance_level_id không được vượt cấp
+        // của người thực hiện (trừ Admin).
+        // ═══════════════════════════════════════════════════════════════
+        const newClearance =
+            clearance_level_id !== undefined
+                ? parseInt(clearance_level_id, 10)
+                : targetUser.clearance_level_id;
+
+        if (!callerIsAdmin && newClearance > callerClearance) {
+            return res.status(403).json({
+                error: `Không thể gán cấp bảo mật (Cấp ${newClearance}) cao hơn cấp của bạn (Cấp ${callerClearance})`,
+                code: 'CLEARANCE_ESCALATION_DENIED',
+                caller_clearance: callerClearance,
+                requested_clearance: newClearance,
+            });
+        }
+
+        // [SECURITY FIX v4.3.1] Bổ sung: Admin chỉ được đổi clearance
+        // nếu có quyền USER_ROLE_ASSIGN — nếu Admin tối cao ROL-01 thì bypass.
+
+        if (!callerIsAdmin && status !== undefined && status !== targetUser.status) {
+            const targetIsAdmin = await pool.request()
+                .input('u', sql.VarChar(50), userId)
+                .query(`SELECT 1 FROM USER_ROLE WHERE user_id = @u AND role_id = 'ROL-01'`);
+            if (targetIsAdmin.recordset.length > 0) {
+                return res.status(403).json({
+                    error: 'Chỉ Admin mới có thể đổi trạng thái tài khoản Admin khác',
+                });
+            }
+        }
+
+        const r = await pool.request()
+            .input('user_id', sql.VarChar(50), userId)
+            .input('full_name', sql.NVarChar(100), full_name)
+            .input('rank', sql.NVarChar(50), rank_name || null)
+            .input('position', sql.NVarChar(100), position || null)
+            .input('unit_id', sql.VarChar(50), unit_id || null)
+            .input('status', sql.VarChar(20), status || targetUser.status || 'active')
+            .input('clearance_level_id', sql.Int,
+                canChangeClearance && clearance_level_id !== undefined
+                    ? parseInt(clearance_level_id, 10)
+                    : targetUser.clearance_level_id)
+            .query(`UPDATE [USER] SET full_name=@full_name, [rank]=@rank, [position]=@position,
+                    unit_id=@unit_id, status=@status, clearance_level_id=@clearance_level_id
+                    WHERE user_id=@user_id`);
+        if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+        // Nếu chuyển trạng thái từ 'locked'/'blocked' sang 'active' (Mở khóa qua form sửa):
+        const oldStatus = (targetUser.status || '').trim().toLowerCase();
+        const newStatus = (status || '').trim().toLowerCase();
+        const isUnlocking = (oldStatus === 'locked' || oldStatus === 'blocked') && newStatus === 'active';
+
+        if (isUnlocking) {
+            // Xóa sạch trạng thái khóa và số lần nhập sai trong bảng USER
+            await pool.request()
+                .input('uid', sql.VarChar(50), userId)
+                .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL, last_failed_at = NULL WHERE user_id = @uid`);
+
+            // 🔄 RESET TOÀN BỘ VI PHẠM CHỤP MÀN HÌNH VÀ KHÓA TÀI KHOẢN VỀ 0 LẦN
+            await pool.request()
+                .input('uid', sql.VarChar(50), userId)
+                .query(`
+                    UPDATE ACCESS_LOG 
+                    SET [action] = 'SCREENSHOT_RESOLVED',
+                        note = ISNULL(note, '') + ' [ĐÃ ĐƯỢC ADMIN MỞ KHÓA & RESET VI PHẠM]'
+                    WHERE user_id = @uid AND [action] IN ('SCREENSHOT_ATTEMPT', 'ACCOUNT_LOCKED')
+                `);
+
+            const adminUserRes = await pool.request()
+                .input('aid', sql.VarChar(50), req.user?.user_id || '')
+                .query(`SELECT user_id, full_name FROM [USER] WHERE user_id = @aid`);
+            const adminUser = adminUserRes.recordset[0];
+            const adminDesc = adminUser?.full_name ? `${adminUser.full_name} (${req.user?.user_id})` : (req.user?.user_id || 'Quản trị viên');
+            const targetDesc = full_name ? `${full_name} (${userId})` : userId;
+
+            await log(req, 'UNLOCK_USER', `Quản trị viên ${adminDesc} đã mở khóa tài khoản cho ${targetDesc}`);
+        } else {
+            await log(req, 'UPDATE_USER', `Sửa user ${userId}`);
+        }
+        _invalidateUser(userId);
+        res.json({ success: true, reset_violations: isUnlocking });
+    } catch (e) {
+        console.error('[PUT /api/admin/users/:id]', e);
+        res.status(500).json({ error: e.message });
+    }
+});
 
     app.delete('/api/admin/users/:id', async (req, res) => {
         try {
@@ -384,6 +624,7 @@ module.exports = (app, deps) => {
 
             await pool.request().input('u', sql.VarChar(50), uid).query(`DELETE FROM USER_FINGERPRINT WHERE user_id = @u`);
             await pool.request().input('u', sql.VarChar(50), uid).query(`DELETE FROM USER_ROLE WHERE user_id = @u`);
+            await pool.request().input('u', sql.VarChar(50), uid).query(`DELETE FROM USER_PERMISSION WHERE user_id = @u`);
             await pool.request().input('u', sql.VarChar(50), uid).query(`DELETE FROM USER_SESSION WHERE user_id = @u`);
             await pool.request().input('u', sql.VarChar(50), uid).query(`UPDATE ACCESS_LOG SET user_id = NULL WHERE user_id = @u`);
             await pool.request().input('u', sql.VarChar(50), uid).query(`UPDATE DOCUMENT SET uploaded_by = NULL WHERE uploaded_by = @u`);
@@ -396,50 +637,63 @@ module.exports = (app, deps) => {
     });
 
     app.put('/api/admin/users/:id/credentials', async (req, res) => {
-        try {
-            const userId = req.params.id;
-            const { username, password } = req.body;
-            if (!username || !username.trim()) return res.status(400).json({ error: 'Thiếu username' });
-
-            const pool = await getPool();
-            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
-            const callerClearance = req.user?.clearance_level_id || 1;
-
-            const chk = await pool.request()
-                .input('u', sql.VarChar(50), userId)
-                .query(`SELECT user_id, clearance_level_id FROM [USER] WHERE user_id = @u`);
-            if (chk.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
-
-            // SECURITY: Không đổi password user cấp cao hơn mình
-            if (!callerIsAdmin && chk.recordset[0].clearance_level_id > callerClearance) {
-                return res.status(403).json({
-                    error: `Không thể đổi tài khoản user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
-                    code: 'PERMISSION_DENIED',
-                });
-            }
-
-            const reqUpdate = pool.request()
-                .input('u', sql.VarChar(50), userId)
-                .input('un', sql.VarChar(50), username.trim().toLowerCase());
-            let query = `UPDATE [USER] SET username = @un`;
-
-            if (password && password.trim()) {
-                if (password.length < 8) return res.status(400).json({ error: 'Mật khẩu cần ít nhất 8 ký tự' });
-                const hash = await bcrypt.hash(password, 10);
-                reqUpdate.input('ph', sql.VarChar(255), hash);
-                query += `, password_hash = @ph`;
-            }
-            query += ` WHERE user_id = @u`;
-            await reqUpdate.query(query);
-
-            await log(req, 'UPDATE_CREDENTIALS', `Cập nhật tài khoản ${userId} (username: ${username})`);
-            res.json({ success: true, user_id: userId, username: username.trim().toLowerCase() });
-        } catch (e) {
-            if (e.message.includes('UQ_USER_USERNAME') || e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Username đã tồn tại' });
-            console.error('[PUT /api/admin/users/:id/credentials]', e);
-            res.status(500).json({ error: e.message });
+    try {
+        const userId = req.params.id;
+        const { username, password } = req.body;
+        const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+        if (!callerIsAdmin) {
+            return res.status(403).json({
+                error: 'Chỉ Quản trị viên tối cao được đổi mật khẩu quân nhân. ' +
+                       'Cán bộ IT vui lòng liên hệ Admin để thực hiện.',
+                code: 'CREDENTIALS_ADMIN_ONLY',
+            });
         }
-    });
+
+        if (!username || !username.trim()) {
+            return res.status(400).json({ error: 'Thiếu username' });
+        }
+
+        const pool = await getPool();
+        // ⚠️ KHÔNG khai báo lại callerIsAdmin — đã có ở trên
+        const callerClearance = req.user?.clearance_level_id || 1;
+
+        const chk = await pool.request()
+            .input('u', sql.VarChar(50), userId)
+            .query(`SELECT user_id, clearance_level_id FROM [USER] WHERE user_id = @u`);
+        if (chk.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+        // [defense-in-depth] Không đổi password user cấp cao hơn mình
+        // Sau guard trên, callerIsAdmin luôn === true → block này thực tế
+        // không trigger, nhưng giữ để phòng trường hợp logic ROL-01 thay đổi.
+        if (!callerIsAdmin && chk.recordset[0].clearance_level_id > callerClearance) {
+            return res.status(403).json({
+                error: `Không thể đổi tài khoản user có cấp bảo mật cao hơn bạn (Cấp ${callerClearance})`,
+                code: 'PERMISSION_DENIED',
+            });
+        }
+
+        const reqUpdate = pool.request()
+            .input('u', sql.VarChar(50), userId)
+            .input('un', sql.VarChar(50), username.trim().toLowerCase());
+        let query = `UPDATE [USER] SET username = @un`;
+
+        if (password && password.trim()) {
+            if (password.length < 8) return res.status(400).json({ error: 'Mật khẩu cần ít nhất 8 ký tự' });
+            const hash = await bcrypt.hash(password, 10);
+            reqUpdate.input('ph', sql.VarChar(255), hash);
+            query += `, password_hash = @ph`;
+        }
+        query += ` WHERE user_id = @u`;
+        await reqUpdate.query(query);
+
+        await log(req, 'UPDATE_CREDENTIALS', `Cập nhật tài khoản ${userId} (username: ${username})`);
+        res.json({ success: true, user_id: userId, username: username.trim().toLowerCase() });
+    } catch (e) {
+        if (e.message.includes('UQ_USER_USERNAME') || e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Username đã tồn tại' });
+        console.error('[PUT /api/admin/users/:id/credentials]', e);
+        res.status(500).json({ error: e.message });
+    }
+});
 
     // ═══════════════════════════════════════════════════════════
     // 2. USER_ROLE — assign / revoke
@@ -462,7 +716,19 @@ module.exports = (app, deps) => {
 
             // ═══ SECURITY CHECK ═══
             const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+            if (!force_revoke && role_id !== 'ROL-01') {
+            const adminCheck = await pool.request()
+                .input('uid', sql.VarChar(50), userId)
+                .query(`SELECT 1 FROM USER_ROLE WHERE user_id = @uid AND role_id = 'ROL-01'`);
+            const targetIsAdmin = adminCheck.recordset.length > 0;
 
+            if (targetIsAdmin) {
+                return res.status(403).json({
+                    error: 'Người dùng có vai trò Quản trị viên, không thể sửa',
+                    code: 'ADMIN_ROLE_LOCKED',
+                });
+            }
+        }
             // 1. Không cho gán ROL-01 nếu caller không phải Admin
             if (!callerIsAdmin && !force_revoke && role_id === 'ROL-01') {
                 return res.status(403).json({
@@ -543,7 +809,7 @@ module.exports = (app, deps) => {
         }
     });
 
-    app.delete('/api/admin/users/:id/roles/:roleId', async (req, res) => {
+        app.delete('/api/admin/users/:id/roles/:roleId', async (req, res) => {
         try {
             const userId = req.params.id;
             const roleId = req.params.roleId;
@@ -558,10 +824,23 @@ module.exports = (app, deps) => {
             }
 
             const pool = await getPool();
-            await pool.request()
-                .input('u', sql.VarChar(50), userId)
-                .input('r', sql.VarChar(50), roleId)
-                .query(`DELETE FROM USER_ROLE WHERE user_id=@u AND role_id=@r`);
+            
+            // ✅ FIX: Bọc try/catch để bắt lỗi Trigger từ SQL Server
+            try {
+                await pool.request()
+                    .input('u', sql.VarChar(50), userId)
+                    .input('r', sql.VarChar(50), roleId)
+                    .query(`DELETE FROM USER_ROLE WHERE user_id=@u AND role_id=@r`);
+            } catch (dbErr) {
+                if (dbErr.message.includes('The transaction ended in the trigger') || dbErr.message.includes('Không thể gỡ vai trò Admin')) {
+                    return res.status(403).json({ 
+                        error: 'Hệ thống từ chối gỡ vai trò này. Tài khoản này đang giữ vai trò Quản trị viên cuối cùng hoặc bị khóa bởi quy tắc bảo vệ.', 
+                        code: 'TRIGGER_BLOCKED' 
+                    });
+                }
+                throw dbErr; // Nếu là lỗi DB khác thì ném ra ngoài
+            }
+
             await log(req, 'REVOKE_ROLE', `Bỏ role ${roleId} của user ${userId}`);
             _invalidateUser(userId);
             res.json({ success: true });
@@ -704,6 +983,47 @@ module.exports = (app, deps) => {
             const r = await pool.request().query(`SELECT role_id, name FROM [ROLE] ORDER BY role_id`);
             res.json({ items: r.recordset });
         } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // [NEW] Trả về role mà user hiện tại ĐƯỢC PHÉP gán khi tạo user
+    // Admin (ROL-01): trả về TẤT CẢ roles
+    // IT (non-admin): chỉ trả về Trợ lý + Chỉ huy
+    // ═══════════════════════════════════════════════════════════
+    app.get('/api/admin/creatable-roles', async (req, res) => {
+        try {
+            const { NON_ADMIN_CREATABLE_ROLES } = require('./user-roles');
+            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+            
+            const pool = await getPool();
+            const allRolesRes = await pool.request().query(
+                `SELECT role_id, name FROM [ROLE] ORDER BY role_id`
+            );
+            const allRoles = allRolesRes.recordset;
+
+            // Admin → tất cả roles
+            if (callerIsAdmin) {
+                return res.json({
+                    items: allRoles,
+                    is_admin: true,
+                    note: 'Toàn quyền chọn mọi vai trò',
+                });
+            }
+
+            // IT → chỉ Trợ lý + Chỉ huy
+            const filtered = allRoles.filter((r) =>
+                NON_ADMIN_CREATABLE_ROLES.includes(r.role_id)
+            );
+
+            return res.json({
+                items: filtered,
+                is_admin: false,
+                note: 'Chỉ được gán vai trò Trợ lý hoặc Chỉ huy',
+            });
+        } catch (e) {
+            console.error('[GET /api/admin/creatable-roles]', e);
+            res.status(500).json({ error: e.message });
+        }
     });
 
     app.post('/api/admin/roles', async (req, res) => {
@@ -937,21 +1257,22 @@ module.exports = (app, deps) => {
     app.get('/api/admin/units', async (req, res) => {
         try {
             const pool = await getPool();
-            const r = await pool.request().query(`SELECT u.unit_id, u.name, u.parent_id, p.name AS parent_name FROM UNIT u LEFT JOIN UNIT p ON p.unit_id = u.parent_id ORDER BY u.name`);
+            const r = await pool.request().query(`SELECT u.unit_id, u.name, u.parent_id, u.unit_type, p.name AS parent_name FROM UNIT u LEFT JOIN UNIT p ON p.unit_id = u.parent_id ORDER BY u.name`);
             res.json({ items: r.recordset });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.post('/api/admin/units', async (req, res) => {
         try {
-            const { unit_id, name, parent_id } = req.body;
+            const { unit_id, name, parent_id, unit_type } = req.body;
             if (!unit_id || !name) return res.status(400).json({ error: 'Thiếu unit_id/name' });
             const pool = await getPool();
             await pool.request()
                 .input('id', sql.VarChar(50), unit_id)
                 .input('n', sql.NVarChar(200), name)
                 .input('p', sql.VarChar(50), parent_id || null)
-                .query(`INSERT INTO UNIT (unit_id, name, parent_id) VALUES (@id, @n, @p)`);
+                .input('t', sql.VarChar(50), unit_type || null)
+                .query(`INSERT INTO UNIT (unit_id, name, parent_id, unit_type) VALUES (@id, @n, @p, @t)`);
             res.json({ success: true });
         } catch (e) {
             if (e.message.includes('PRIMARY KEY') || e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Trùng unit_id hoặc tên' });
@@ -961,13 +1282,14 @@ module.exports = (app, deps) => {
 
     app.put('/api/admin/units/:id', async (req, res) => {
         try {
-            const { name, parent_id } = req.body;
+            const { name, parent_id, unit_type } = req.body;
             const pool = await getPool();
             const r = await pool.request()
                 .input('id', sql.VarChar(50), req.params.id)
                 .input('n', sql.NVarChar(200), name)
                 .input('p', sql.VarChar(50), parent_id || null)
-                .query(`UPDATE UNIT SET name=@n, parent_id=@p WHERE unit_id=@id`);
+                .input('t', sql.VarChar(50), unit_type || null)
+                .query(`UPDATE UNIT SET name=@n, parent_id=@p, unit_type=@t WHERE unit_id=@id`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy' });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1253,12 +1575,37 @@ module.exports = (app, deps) => {
     app.post('/api/admin/users/:id/unlock', async (req, res) => {
         try {
             const pool = await getPool();
+            const targetId = req.params.id;
             const r = await pool.request()
-                .input('uid', sql.VarChar(50), req.params.id)
+                .input('uid', sql.VarChar(50), targetId)
                 .query(`UPDATE [USER] SET status = 'active', failed_attempts = 0, locked_at = NULL, last_failed_at = NULL WHERE user_id = @uid`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy user' });
-            await log(req, 'UNLOCK_USER', `Mở khóa tài khoản ${req.params.id}`);
-            res.json({ success: true, user_id: req.params.id });
+
+            // 🔄 RESET TOÀN BỘ VI PHẠM CHỤP MÀN HÌNH VỀ 0 LẦN:
+            await pool.request()
+                .input('uid', sql.VarChar(50), targetId)
+                .query(`
+                    UPDATE ACCESS_LOG 
+                    SET [action] = 'SCREENSHOT_RESOLVED',
+                        note = ISNULL(note, '') + ' [ĐÃ ĐƯỢC ADMIN MỞ KHÓA & RESET VI PHẠM]'
+                    WHERE user_id = @uid AND [action] IN ('SCREENSHOT_ATTEMPT', 'ACCOUNT_LOCKED')
+                `);
+
+            // Tra cứu tên hiển thị đầy đủ của Admin và User để ghi nhật ký SOC rõ ràng
+            const [targetUserRes, adminUserRes] = await Promise.all([
+                pool.request().input('uid', sql.VarChar(50), targetId).query(`SELECT user_id, full_name FROM [USER] WHERE user_id = @uid`),
+                pool.request().input('aid', sql.VarChar(50), req.user?.user_id || '').query(`SELECT user_id, full_name FROM [USER] WHERE user_id = @aid`),
+            ]);
+
+            const targetUser = targetUserRes.recordset[0];
+            const adminUser = adminUserRes.recordset[0];
+
+            const targetDesc = targetUser?.full_name ? `${targetUser.full_name} (${targetId})` : targetId;
+            const adminDesc = adminUser?.full_name ? `${adminUser.full_name} (${req.user?.user_id})` : (req.user?.user_id || 'Quản trị viên');
+
+            await log(req, 'UNLOCK_USER', `Quản trị viên ${adminDesc} đã mở khóa tài khoản cho ${targetDesc}`);
+            _invalidateUser(targetId);
+            res.json({ success: true, user_id: targetId, reset_violations: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
@@ -1331,7 +1678,7 @@ module.exports = (app, deps) => {
                 .input('a', sql.NVarChar(200), alias_text.trim())
                 .input('p', sql.Int, priority || 0)
                 .query(`INSERT INTO UNIT_ALIAS (unit_id, alias_text, priority) OUTPUT INSERTED.alias_id VALUES (@uid, @a, @p)`);
-            await log(req, 'CREATE_UNIT_ALIAS', `Thêm alias "${alias_text}" cho ${unit_id}`);
+            await log(req, 'CREATE_UNIT_ALIAS', `Thêm alias "${alias_text}" cho ${unit_id}`); if (invalidateCatalogCache) invalidateCatalogCache();
             res.json({ success: true, alias_id: r.recordset[0].alias_id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -1357,7 +1704,7 @@ module.exports = (app, deps) => {
             const pool = await getPool();
             const r = await pool.request().input('id', sql.Int, parseInt(req.params.id, 10)).query(`DELETE FROM UNIT_ALIAS WHERE alias_id = @id`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy alias' });
-            await log(req, 'DELETE_UNIT_ALIAS', `Xóa alias #${req.params.id}`);
+            await log(req, 'DELETE_UNIT_ALIAS', `Xóa alias #${req.params.id}`); if (invalidateCatalogCache) invalidateCatalogCache();
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -1410,5 +1757,500 @@ module.exports = (app, deps) => {
             res.status(500).json({ error: e.message });
         }
     });
+
+        // ═══════════════════════════════════════════════════════════
+    // APPROVAL WORKFLOW — Endpoints
+    // ═══════════════════════════════════════════════════════════
+    const requireProtectedAdmin = (req, res, next) => {
+        if (!isProtectedAdmin(req.user)) {
+            return res.status(403).json({
+                error: 'Chỉ Quản trị viên tối cao mới được phê duyệt',
+                code: 'PROTECTED_ADMIN_ONLY',
+            });
+        }
+        next();
+    };
+
+    app.get('/api/admin/approval-requests', async (req, res) => {
+        try {
+            const status = (req.query.status || 'PENDING').toUpperCase();
+            const pool = await getPool();
+            const request = pool.request();
+
+            const currentUserId = req.user.user_id;
+            const isProtected = isProtectedAdmin(req.user);
+            const userRoles = await resolveUserRoles(req.user);
+            const isCommander = userRoles.includes('ROL-02');
+
+            let query = `
+                SELECT ar.*, u.full_name AS requester_name, u.[rank] AS requester_rank,
+                       u.position AS requester_position,
+                       u.unit_id AS requester_unit_id,
+                       req_unit.name AS requester_unit_name,
+                       rv.full_name AS reviewer_name
+                FROM APPROVAL_REQUEST ar
+                LEFT JOIN [USER] u ON u.user_id = ar.requester_id
+                LEFT JOIN UNIT req_unit ON req_unit.unit_id = u.unit_id
+                LEFT JOIN [USER] rv ON rv.user_id = ar.reviewed_by
+                WHERE 1=1
+            `;
+
+            // ✅ BỘ LỌC PHÂN CẤP ĐƠN VỊ CHO APPROVAL_REQUEST (Hierarchical Approval)
+            if (!isProtected) {
+                if (isCommander) {
+                    const userUnitId = await resolveUserUnitId(req.user);
+                    const allowedUnits = userUnitId ? await getSubtreeUnits(userUnitId) : [];
+                    if (allowedUnits.length > 0) {
+                        const params = allowedUnits.map((_, i) => `@aru_${i}`);
+                        query += ` AND u.unit_id IN (${params.join(', ')})`;
+                        allowedUnits.forEach((u, i) => request.input(`aru_${i}`, sql.VarChar(50), u));
+                    } else {
+                        query += ` AND 1=0`;
+                    }
+                } else {
+                    query += ` AND ar.requester_id = @arCurrentUserId`;
+                    request.input('arCurrentUserId', sql.VarChar(50), currentUserId);
+                }
+            }
+
+            if (status !== 'ALL') {
+                request.input('s', sql.VarChar(20), status);
+                query += ` AND ar.status = @s`;
+            }
+            query += ` ORDER BY ar.created_at DESC`;
+            const r = await request.query(query);
+            const standardItems = (r.recordset || []).map((ar) => ({
+                ...ar,
+                requester_position: ar.requester_position,
+                requester_unit_id: ar.requester_unit_id,
+                requester_unit_name: ar.requester_unit_name,
+            }));
+
+            // 2. Lấy thêm đề xuất sửa đổi văn bản từ DOCUMENT_REVISION_PROPOSAL
+            const propRequest = pool.request();
+            let propQuery = `
+                SELECT 
+                  p.proposal_id, p.file_id, p.requester_id, p.status, p.note, p.review_note,
+                  p.reviewed_by, p.reviewed_at, p.created_at, p.updated_at,
+                  p.document_code, p.title, p.doc_type_id, p.issued_date, p.issuing_unit_id,
+                  p.signer, p.summary, p.security_level_id,
+                  p.new_original_name, p.new_file_size,
+                  u.full_name AS requester_name, u.[rank] AS requester_rank,
+                  u.position AS requester_position, u.unit_id AS requester_unit_id,
+                  req_unit.name AS requester_unit_name,
+                  rv.full_name AS reviewer_name,
+                  d.document_code AS current_document_code, d.title AS current_title,
+                  d.signer AS current_signer, d.issued_date AS current_issued_date,
+                  d.security_level_id AS current_security_level_id,
+                  d.issuing_unit_id AS document_issuing_unit_id,
+                  d.deleted_reason,
+                  cur_unit.name AS current_unit_name,
+                  unit.name AS issuing_unit_name,
+                  sl.name AS security_level_name,
+                  cur_sl.name AS current_security_name
+                FROM DOCUMENT_REVISION_PROPOSAL p
+                JOIN DOCUMENT d ON d.file_id = p.file_id
+                JOIN [USER] u ON u.user_id = p.requester_id
+                LEFT JOIN UNIT req_unit ON req_unit.unit_id = u.unit_id
+                LEFT JOIN [USER] rv ON rv.user_id = p.reviewed_by
+                LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
+                LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
+                LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = p.security_level_id
+                LEFT JOIN SECURITY_LEVEL cur_sl ON cur_sl.level_id = d.security_level_id
+                WHERE 1=1
+            `;
+
+            // ✅ BỘ LỌC PHÂN CẤP ĐƠN VỊ CHO ĐỀ XUẤT VĂN BẢN (Hierarchical Approval)
+            if (!isProtected) {
+                if (isCommander) {
+                    const userUnitId = await resolveUserUnitId(req.user);
+                    const allowedUnits = userUnitId ? await getSubtreeUnits(userUnitId) : [];
+                    if (allowedUnits.length > 0) {
+                        const params = allowedUnits.map((_, i) => `@pu_${i}`);
+                        propQuery += ` AND (d.issuing_unit_id IN (${params.join(', ')}) OR p.issuing_unit_id IN (${params.join(', ')}) OR u.unit_id IN (${params.join(', ')}))`;
+                        allowedUnits.forEach((u, i) => propRequest.input(`pu_${i}`, sql.VarChar(50), u));
+                    } else {
+                        propQuery += ` AND 1=0`;
+                    }
+                } else {
+                    propQuery += ` AND p.requester_id = @pCurrentUserId`;
+                    propRequest.input('pCurrentUserId', sql.VarChar(50), currentUserId);
+                }
+            }
+
+            if (status !== 'ALL') {
+                propRequest.input('ps', sql.VarChar(20), status);
+                propQuery += ` AND p.status = @ps`;
+            }
+            propQuery += ` ORDER BY p.created_at DESC`;
+            const propRes = await propRequest.query(propQuery);
+
+            const proposalItems = (propRes.recordset || []).map((p) => {
+              const docCodeDisplay = p.document_code || p.current_document_code || p.file_id;
+              const isNewUpload = (p.deleted_reason === 'PENDING_APPROVAL' || (p.note && p.note.includes('Đăng tải')));
+              return {
+                request_id: p.proposal_id,
+                requester_id: p.requester_id,
+                requester_name: p.requester_name,
+                requester_rank: p.requester_rank,
+                requester_position: p.requester_position,
+                requester_unit_id: p.requester_unit_id,
+                requester_unit_name: p.requester_unit_name,
+                document_issuing_unit_id: p.document_issuing_unit_id,
+                document_issuing_unit_name: p.current_unit_name,
+                required_permission: isNewUpload ? 'DOC_UPLOAD' : 'DOC_EDIT',
+                http_method: isNewUpload ? 'POST' : 'PUT',
+                http_path: isNewUpload ? `/api/documents/upload` : `/api/documents/${p.file_id}`,
+                http_body: JSON.stringify({
+                  file_id: p.file_id,
+                  document_code: p.document_code,
+                  title: p.title,
+                  signer: p.signer,
+                  issuing_unit_name: p.issuing_unit_name,
+                  security_level_name: p.security_level_name,
+                  note: p.note,
+                }),
+                target_summary: isNewUpload
+                  ? `Đăng tải văn bản mới [${docCodeDisplay}]: ${p.title}`
+                  : `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
+                status: p.status,
+                reviewed_by: p.reviewed_by,
+                reviewer_name: p.reviewer_name,
+                reviewed_at: p.reviewed_at,
+                review_note: p.review_note,
+                created_at: p.created_at,
+                request_reason: p.note || (isNewUpload ? 'Đăng tải văn bản mới chờ Chỉ huy duyệt' : 'Đề xuất chuẩn hóa thông tin văn bản'),
+                proposal_data: {
+                  proposal_id: p.proposal_id,
+                  file_id: p.file_id,
+                  document_code: p.document_code || p.current_document_code,
+                  title: p.title,
+                  doc_type_id: p.doc_type_id,
+                  issued_date: p.issued_date,
+                  issuing_unit_id: p.issuing_unit_id,
+                  issuing_unit_name: p.issuing_unit_name,
+                  signer: p.signer,
+                  summary: p.summary,
+                  security_level_id: p.security_level_id,
+                  security_level_name: p.security_level_name,
+                  current_document_code: p.current_document_code,
+                  current_title: p.current_title,
+                  current_signer: p.current_signer,
+                  current_security_level_id: p.current_security_level_id,
+                  current_security_name: p.current_security_name,
+                  current_unit_name: p.current_unit_name,
+                  current_issued_date: p.current_issued_date,
+                  new_original_name: p.new_original_name,
+                  new_file_size: p.new_file_size,
+                  deleted_reason: p.deleted_reason,
+                  is_new_upload: isNewUpload,
+                  note: p.note || (isNewUpload ? 'Đăng tải văn bản mới chờ Chỉ huy duyệt' : 'Đề xuất chuẩn hóa thông tin văn bản'),
+                  requester_id: p.requester_id,
+                  requester_name: p.requester_name,
+                  requester_rank: p.requester_rank,
+                  requester_position: p.requester_position,
+                  requester_unit_id: p.requester_unit_id,
+                  requester_unit_name: p.requester_unit_name,
+                  document_issuing_unit_id: p.document_issuing_unit_id,
+                  created_at: p.created_at,
+                }
+              };
+            });
+
+            const allItems = [...standardItems, ...proposalItems].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+
+            res.json({ total: allItems.length, items: allItems });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.get('/api/admin/approval-requests/:id', async (req, res) => {
+        try {
+            const id = req.params.id;
+            const pool = await getPool();
+            if (id.startsWith('PROP-')) {
+              const propRes = await pool.request()
+                .input('pid', sql.VarChar(50), id)
+                .query(`
+                  SELECT 
+                    p.*, u.full_name AS requester_name, u.[rank] AS requester_rank,
+                    d.document_code AS current_document_code, d.title AS current_title,
+                    d.signer AS current_signer, d.issued_date AS current_issued_date,
+                    d.security_level_id AS current_security_level_id,
+                    cur_unit.name AS current_unit_name, unit.name AS issuing_unit_name,
+                    sl.name AS security_level_name, cur_sl.name AS current_security_name
+                  FROM DOCUMENT_REVISION_PROPOSAL p
+                  JOIN DOCUMENT d ON d.file_id = p.file_id
+                  JOIN [USER] u ON u.user_id = p.requester_id
+                  LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
+                  LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
+                  LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = p.security_level_id
+                  LEFT JOIN SECURITY_LEVEL cur_sl ON cur_sl.level_id = d.security_level_id
+                  WHERE p.proposal_id = @pid
+                `);
+              if (propRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
+              const p = propRes.recordset[0];
+              return res.json({
+                request_id: p.proposal_id,
+                requester_id: p.requester_id,
+                requester_name: p.requester_name,
+                requester_rank: p.requester_rank,
+                required_permission: 'DOC_EDIT',
+                http_method: 'PUT',
+                http_path: `/api/documents/${p.file_id}`,
+                target_summary: `Đề xuất chỉnh sửa: ${p.document_code || p.file_id} - ${p.title}`,
+                status: p.status,
+                created_at: p.created_at,
+                request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+                proposal_data: p,
+              });
+            }
+            const r = await pool.request()
+                .input('rid', sql.VarChar(50), id)
+                .query(`SELECT ar.*, u.full_name AS requester_name FROM APPROVAL_REQUEST ar
+                        LEFT JOIN [USER] u ON u.user_id = ar.requester_id
+                        WHERE ar.request_id = @rid`);
+            if (r.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
+            res.json(r.recordset[0]);
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/admin/approval-requests/:id/approve', async (req, res) => {
+        try {
+            const id = req.params.id;
+            const pool = await getPool();
+
+            // ─── [PROPOSAL] Kiểm tra đơn vị người đề xuất ───
+            if (id.startsWith('PROP-')) {
+                const checkProp = await pool.request()
+                    .input('pid', sql.VarChar(50), id)
+                    .query(`SELECT u.unit_id
+                            FROM DOCUMENT_REVISION_PROPOSAL p
+                            JOIN [USER] u ON u.user_id = p.requester_id
+                            WHERE p.proposal_id = @pid AND p.status = 'PENDING'`);
+                if (checkProp.recordset.length === 0) {
+                    return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
+                }
+                const hasPermission = await canUserApproveRequest(req, checkProp.recordset[0].unit_id);
+                if (!hasPermission) {
+                    return res.status(403).json({ error: 'Bạn không có thẩm quyền duyệt đề xuất của đơn vị này' });
+                }
+                if (deps.approveProposalCore) {
+                    const result = await deps.approveProposalCore({
+                        proposalId: id,
+                        reviewerUser: req.user,
+                        reviewNote: req.body?.review_note,
+                        clientIp: getClientIp(req),
+                    });
+                    return res.json(result);
+                }
+                return res.status(500).json({ error: 'approveProposalCore chưa được wire' });
+            }
+
+            // ─── [STANDARD] Kiểm tra đơn vị người yêu cầu ───
+            const checkReq = await pool.request()
+                .input('rid', sql.VarChar(50), id)
+                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id
+                        FROM APPROVAL_REQUEST ar
+                        LEFT JOIN [USER] u ON u.user_id = ar.requester_id
+                        WHERE ar.request_id = @rid AND ar.status = 'PENDING'`);
+            if (checkReq.recordset.length === 0) {
+                return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
+            }
+            const hasPermission = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
+            if (!hasPermission) {
+                return res.status(403).json({ error: 'Bạn không có thẩm quyền duyệt yêu cầu của đơn vị này' });
+            }
+
+            const r = await pool.request()
+                .input('rid', sql.VarChar(50), id)
+                .input('by', sql.VarChar(50), req.user.user_id)
+                .input('note', sql.NVarChar(500), req.body?.review_note || null)
+                .query(`UPDATE APPROVAL_REQUEST SET status='APPROVED', reviewed_by=@by,
+                        reviewed_at=GETDATE(), review_note=@note
+                        WHERE request_id=@rid AND status='PENDING';
+                        SELECT @@ROWCOUNT AS n;`);
+            if (r.recordset[0].n === 0) return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
+            await log(req, 'APPROVAL_APPROVED', `Duyệt yêu cầu ${id}`);
+            res.json({ success: true, request_id: id });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/admin/approval-requests/:id/reject', async (req, res) => {
+        try {
+            const id = req.params.id;
+            const note = req.body?.review_note;
+            if (!note || !note.trim()) return res.status(400).json({ error: 'Cần ghi lý do từ chối' });
+            const pool = await getPool();
+
+            // ─── [PROPOSAL] ───
+            if (id.startsWith('PROP-')) {
+                const checkProp = await pool.request()
+                    .input('pid', sql.VarChar(50), id)
+                    .query(`SELECT u.unit_id
+                            FROM DOCUMENT_REVISION_PROPOSAL p
+                            JOIN [USER] u ON u.user_id = p.requester_id
+                            WHERE p.proposal_id = @pid AND p.status = 'PENDING'`);
+                if (checkProp.recordset.length === 0) {
+                    return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
+                }
+                const hasPermission = await canUserApproveRequest(req, checkProp.recordset[0].unit_id);
+                if (!hasPermission) {
+                    return res.status(403).json({ error: 'Bạn không có thẩm quyền từ chối đề xuất của đơn vị này' });
+                }
+                if (deps.rejectProposalCore) {
+                    const result = await deps.rejectProposalCore({
+                        proposalId: id,
+                        reviewerUser: req.user,
+                        reviewNote: note.trim(),
+                        clientIp: getClientIp(req),
+                    });
+                    return res.json(result);
+                }
+                return res.status(500).json({ error: 'rejectProposalCore chưa được wire' });
+            }
+
+            // ─── [STANDARD] ───
+            const checkReq = await pool.request()
+                .input('rid', sql.VarChar(50), id)
+                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id
+                        FROM APPROVAL_REQUEST ar
+                        LEFT JOIN [USER] u ON u.user_id = ar.requester_id
+                        WHERE ar.request_id = @rid AND ar.status = 'PENDING'`);
+            if (checkReq.recordset.length === 0) {
+                return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
+            }
+            const hasPermission = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
+            if (!hasPermission) {
+                return res.status(403).json({ error: 'Bạn không có thẩm quyền từ chối yêu cầu của đơn vị này' });
+            }
+
+            const r = await pool.request()
+                .input('rid', sql.VarChar(50), id)
+                .input('by', sql.VarChar(50), req.user.user_id)
+                .input('note', sql.NVarChar(500), note.trim())
+                .query(`UPDATE APPROVAL_REQUEST SET status='REJECTED', reviewed_by=@by,
+                        reviewed_at=GETDATE(), review_note=@note
+                        WHERE request_id=@rid AND status='PENDING';
+                        SELECT @@ROWCOUNT AS n;`);
+            if (r.recordset[0].n === 0) return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
+            await log(req, 'APPROVAL_REJECTED', `Từ chối ${id} — ${note}`);
+            res.json({ success: true, request_id: id });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/admin/approval-requests/:id/mark-executed', requireProtectedAdmin, async (req, res) => {
+        try {
+            const id = req.params.id;
+            if (id.startsWith('PROP-')) return res.json({ success: true });
+            const pool = await getPool();
+            await pool.request()
+                .input('rid', sql.VarChar(50), id)
+                .query(`UPDATE APPROVAL_REQUEST SET status='EXECUTED' 
+                        WHERE request_id=@rid AND status IN ('EXECUTING','APPROVED')`);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // ─── Cấu hình PROTECTED_PERMISSION ───
+    app.get('/api/admin/protected-permissions', async (req, res) => {
+        try {
+            const pool = await getPool();
+            const r = await pool.request().query(`SELECT permission_id, protected_by, protected_at, note FROM PROTECTED_PERMISSION`);
+            res.json({ items: r.recordset });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/admin/protected-permissions/:permissionId', requireProtectedAdmin, async (req, res) => {
+        try {
+            const pool = await getPool();
+            await pool.request()
+                .input('pid', sql.VarChar(50), req.params.permissionId)
+                .input('by', sql.VarChar(50), req.user.user_id)
+                .input('note', sql.NVarChar(255), req.body?.note || null)
+                .query(`
+                    MERGE PROTECTED_PERMISSION AS t
+                    USING (SELECT @pid AS permission_id) AS s ON t.permission_id = s.permission_id
+                    WHEN MATCHED THEN UPDATE SET protected_by=@by, protected_at=GETDATE(), note=@note
+                    WHEN NOT MATCHED THEN INSERT (permission_id, protected_by, note) VALUES (@pid, @by, @note);
+                `);
+            await loadProtectedPermissions(true);
+            await log(req, 'PROTECT_PERMISSION', `Bật bảo vệ ${req.params.permissionId}`);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.delete('/api/admin/protected-permissions/:permissionId', requireProtectedAdmin, async (req, res) => {
+        try {
+            const pool = await getPool();
+            await pool.request()
+                .input('pid', sql.VarChar(50), req.params.permissionId)
+                .query(`DELETE FROM PROTECTED_PERMISSION WHERE permission_id=@pid`);
+            await loadProtectedPermissions(true);
+            await log(req, 'UNPROTECT_PERMISSION', `Tắt bảo vệ ${req.params.permissionId}`);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+
+    // ═══════════════════════════════════════════════════════════════
+    // [v5.1] ADMIN XEM YÊU CẦU CẤP PIN ĐANG CHỜ
+    // ═══════════════════════════════════════════════════════════════
+    app.get('/api/admin/pin-requests', requireAuth, async (req, res) => {
+    try {
+        if (!(req.user?.roles || []).includes('ROL-01')) {
+        return res.status(403).json({ error: 'Chỉ Quản trị viên tối cao được xem yêu cầu PIN.' });
+        }
+        const pool = await getPool();
+        const r = await pool.request().query(`
+        SELECT l.log_id, l.user_id, u.full_name, u.[rank] AS rank_name,
+                l.file_id, l.[timestamp], l.ip, l.note,
+                CASE WHEN u.pin_hash IS NOT NULL AND LEN(u.pin_hash) > 0 THEN 1 ELSE 0 END AS has_pin
+        FROM ACCESS_LOG l
+        LEFT JOIN [USER] u ON u.user_id = l.user_id
+        WHERE l.[action] = 'PIN_REQUEST'
+            AND l.[timestamp] >= DATEADD(DAY, -7, GETDATE())
+        ORDER BY l.[timestamp] DESC
+        `);
+        res.json({ total: r.recordset.length, items: r.recordset });
+    } catch (e) {
+        console.error('[GET /api/admin/pin-requests]', e);
+        res.status(500).json({ error: e.message });
+    }
+    });
+
+
+            // Thêm API này vào file admin-routes.js hoặc file routes dành cho user
+        app.post('/api/pin/request', requireAuth, async (req, res) => {
+            try {
+                const pool = await getPool();
+                const userId = req.user.user_id;
+                const requestId = 'REQ-PIN-' + Date.now(); // Tạo ID ngẫu nhiên
+
+                // Kiểm tra xem đã có yêu cầu PENDING nào chưa để tránh spam
+                const check = await pool.request()
+                    .input('uid', sql.VarChar(50), userId)
+                    .query(`SELECT 1 FROM APPROVAL_REQUEST WHERE requester_id = @uid AND status = 'PENDING' AND required_permission = 'PERM-USR-08'`);
+                
+                if (check.recordset.length > 0) {
+                    return res.status(400).json({ error: 'Bạn đã gửi yêu cầu rồi. Vui lòng chờ Admin duyệt.' });
+                }
+
+                // Insert vào bảng APPROVAL_REQUEST
+                await pool.request()
+                    .input('rid', sql.VarChar(50), requestId)
+                    .input('uid', sql.VarChar(50), userId)
+                    .input('path', sql.VarChar(500), `/api/admin/users/${userId}/pin/generate`)
+                    .query(`
+                        INSERT INTO APPROVAL_REQUEST (request_id, requester_id, required_permission, http_method, http_path, target_summary, status)
+                        VALUES (@rid, @uid, 'PERM-USR-08', 'POST', @path, N'Yêu cầu cấp mã PIN bảo mật', 'PENDING')
+                    `);
+
+                res.json({ success: true, message: 'Đã gửi yêu cầu cấp PIN' });
+            } catch (e) {
+                res.status(500).json({ error: e.message });
+            }
+        });
 
 };

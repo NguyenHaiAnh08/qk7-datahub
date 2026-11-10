@@ -41,6 +41,8 @@ export interface DiffProposalData {
   new_stored_path?: string;
   new_original_name?: string;
   new_file_size?: number;
+  deleted_reason?: string;
+  is_new_upload?: boolean;
   note?: string;
   requester_id: string;
   requester_name: string;
@@ -148,60 +150,72 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
   // ─────────────────────────────────────────────────────────────
   // SO SÁNH DỮ LIỆU ĐỐI CHIẾU
   // ─────────────────────────────────────────────────────────────
+  const isNewUpload = Boolean(
+    proposal.is_new_upload ||
+    proposal.deleted_reason === 'PENDING_APPROVAL' ||
+    proposal.note?.includes('Đăng tải')
+  );
+
   const diffFields = [
     {
       label: 'Số hiệu / Ký hiệu văn bản',
-      oldValue: proposal.current_document_code || '—',
+      oldValue: isNewUpload ? '(Văn bản mới)' : (proposal.current_document_code || '—'),
       newValue: proposal.document_code || proposal.current_document_code || '—',
-      hasChanged:
+      hasChanged: isNewUpload || (
         Boolean(proposal.document_code) &&
-        proposal.document_code !== proposal.current_document_code,
+        proposal.document_code !== proposal.current_document_code
+      ),
       isMono: true,
     },
     {
       label: 'Trích yếu nội dung văn bản',
-      oldValue: proposal.current_title,
+      oldValue: isNewUpload ? '(Văn bản mới)' : proposal.current_title,
       newValue: proposal.title,
-      hasChanged: proposal.title.trim() !== proposal.current_title.trim(),
+      hasChanged: isNewUpload || (proposal.title.trim() !== proposal.current_title.trim()),
     },
     {
       label: 'Đơn vị ban hành',
-      oldValue: proposal.current_unit_name || '—',
+      oldValue: isNewUpload ? '(Chưa có)' : (proposal.current_unit_name || '—'),
       newValue: proposal.issuing_unit_name || proposal.current_unit_name || '—',
-      hasChanged:
+      hasChanged: isNewUpload || (
         Boolean(proposal.issuing_unit_name) &&
-        proposal.issuing_unit_name !== proposal.current_unit_name,
+        proposal.issuing_unit_name !== proposal.current_unit_name
+      ),
     },
     {
       label: 'Người ký ban hành',
-      oldValue: proposal.current_signer || '—',
+      oldValue: isNewUpload ? '(Chưa có)' : (proposal.current_signer || '—'),
       newValue: proposal.signer || proposal.current_signer || '—',
-      hasChanged:
-        Boolean(proposal.signer) && proposal.signer !== proposal.current_signer,
+      hasChanged: isNewUpload || (
+        Boolean(proposal.signer) && proposal.signer !== proposal.current_signer
+      ),
     },
     {
       label: 'Cấp độ bảo mật (Độ mật)',
-      oldValue:
+      oldValue: isNewUpload ? '(Chưa có)' : (
         proposal.current_security_name ||
-        `Cấp ${proposal.current_security_level_id}`,
+        `Cấp ${proposal.current_security_level_id}`
+      ),
       newValue:
         proposal.security_level_name || `Cấp ${proposal.security_level_id}`,
-      hasChanged:
-        proposal.security_level_id !== proposal.current_security_level_id,
+      hasChanged: isNewUpload || (
+        proposal.security_level_id !== proposal.current_security_level_id
+      ),
     },
     {
       label: 'Ngày ban hành',
-      oldValue: proposal.current_issued_date
+      oldValue: isNewUpload ? '(Chưa có)' : (proposal.current_issued_date
         ? new Date(proposal.current_issued_date).toLocaleDateString('vi-VN')
-        : '—',
+        : '—'),
       newValue: proposal.issued_date
         ? new Date(proposal.issued_date).toLocaleDateString('vi-VN')
         : proposal.current_issued_date
         ? new Date(proposal.current_issued_date).toLocaleDateString('vi-VN')
         : '—',
-      hasChanged:
+      hasChanged: isNewUpload || (
         Boolean(proposal.issued_date) &&
-        proposal.issued_date !== proposal.current_issued_date,
+        proposal.issued_date !== proposal.current_issued_date
+      ),
     },
   ];
 
@@ -219,7 +233,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
-                  Kiểm Duyệt Yêu Cầu Chỉnh Sửa
+                  {isNewUpload ? 'Phê Duyệt Đăng Tải Văn Bản Mới' : 'Kiểm Duyệt Yêu Cầu Chỉnh Sửa'}
                 </h2>
                 <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
                   {proposal.proposal_id}
@@ -536,7 +550,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
                       ) : (
                         <Check className="w-4 h-4 stroke-[2.5]" />
                       )}
-                      <span>Phê duyệt & Cập nhật</span>
+                      <span>{isNewUpload ? 'Phê duyệt & Tiếp nhận văn bản' : 'Phê duyệt & Cập nhật'}</span>
                     </button>
                   </>
                 ) : (

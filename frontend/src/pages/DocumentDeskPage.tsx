@@ -168,12 +168,20 @@ const canUpload = hasPermission('DOC_UPLOAD');
         });
       }
     } else {
-      const res = await documentsApi.uploadDocument(formData);
+      const res: any = await documentsApi.uploadDocument(formData);
       result = res;
-      toast.success('Đã tiếp nhận và lưu trữ văn bản mới thành công', {
-        title: 'TIẾP NHẬN THÀNH CÔNG',
-        badge: 'UPLOADED',
-      });
+      if (res?.pending_approval) {
+        toast.info(res.message || 'Văn bản đã được tiếp nhận và chuyển vào hàng đợi chờ Chỉ huy / Admin duyệt.', {
+          title: 'ĐÃ CHUYỂN CHỈ HUY DUYỆT',
+          badge: 'PENDING-APPROVAL',
+          duration: 6000,
+        });
+      } else {
+        toast.success('Đã tiếp nhận và lưu trữ văn bản mới thành công', {
+          title: 'TIẾP NHẬN THÀNH CÔNG',
+          badge: 'UPLOADED',
+        });
+      }
     }
     await loadDocuments();
     await loadPendingProposals();

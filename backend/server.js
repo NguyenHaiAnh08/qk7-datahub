@@ -94,10 +94,12 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'blob:'],
-      connectSrc: ["'self'", 'ws:', 'wss:', 'http:', 'https:'],
+      connectSrc: ["'self'", 'blob:', 'data:', 'ws:', 'wss:', 'http:', 'https:'],
       fontSrc: ["'self'", 'data:'],
       objectSrc: ["'none'"],
       frameSrc: ["'self'", 'blob:'],
+      workerSrc: ["'self'", 'blob:'],
+      childSrc: ["'self'", 'blob:'],
       baseUri: ["'self'"],
       formAction: ["'self'"],
       upgradeInsecureRequests: process.env.NODE_ENV === 'production' && process.env.USE_HTTPS === 'true' ? [] : null,
@@ -2032,6 +2034,123 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       }
     }
 
+    const userRoles = await resolveUserRoles(req.user);
+    const isAdmin =
+      userRoles.includes('ROL-01') ||
+      (req.user?.roles || []).includes('ROL-01') ||
+      req.user?.user_id === 'USR-001' ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
+      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
+
+    const pos = (req.user?.position || '').toLowerCase();
+    const isCommander =
+      userRoles.includes('ROL-02') ||
+      (req.user?.roles || []).includes('ROL-02') ||
+      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
+      (req.user?.role_names || []).some((r) => {
+        const s = String(r).toLowerCase();
+        return (
+          s.includes('chỉ huy') ||
+          s.includes('trưởng phòng') ||
+          s.includes('thủ trưởng') ||
+          s.includes('chủ nhiệm')
+        );
+      }) ||
+      pos.includes('chỉ huy') ||
+      pos.includes('trưởng phòng') ||
+      pos.includes('thủ trưởng') ||
+      pos.includes('chủ nhiệm');
+
+    // 🎖️ NGUYÊN TẮC PHÊ DUYỆT ĐĂNG TẢI (Maker-Checker Approval Flow):
+    // Cán bộ nghiệp vụ (Trợ lý, Văn thư, Cơ yếu, IT...) đăng tải văn bản mới -> Chuyển vào hàng đợi chờ Chỉ huy / Admin duyệt
+    if (!isAdmin && !isCommander) {
+      const sha8 = sha256.slice(0, 8);
+      const yyyy = new Date().getFullYear();
+      const mm = String(new Date().getMonth() + 1).padStart(2, '0');
+      const propRelPath = `uploads/proposals/${yyyy}/${mm}/prop_${fileId}_${sha8}.pdf`;
+      const propAbsPath = safePathJoin(ROOT_DIR, propRelPath);
+      if (!propAbsPath) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
+
+      fs.mkdirSync(path.dirname(propAbsPath), { recursive: true });
+      fs.writeFileSync(propAbsPath, req.file.buffer);
+
+      const pool = await getPool();
+      await pool.request()
+        .input('file_id', sql.VarChar(50), fileId)
+        .input('document_code', sql.NVarChar(100), document_code || null)
+        .input('title', sql.NVarChar(500), title.trim())
+        .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
+        .input('issued_date', sql.Date, issued_date || null)
+        .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+        .input('signer', sql.NVarChar(100), signer || null)
+        .input('summary', sql.NVarChar(sql.MAX), summary || null)
+        .input('security_level_id', sql.Int, parseInt(security_level_id, 10))
+        .input('original_name', sql.NVarChar(255), req.file.originalname)
+        .input('stored_path', sql.NVarChar(500), propRelPath)
+        .input('mime_type', sql.VarChar(100), req.file.mimetype)
+        .input('file_size', sql.BigInt, req.file.size)
+        .input('sha256', sql.Char(64), sha256)
+        .input('uploaded_by', sql.VarChar(50), req.user.user_id)
+        .query(`
+          INSERT INTO DOCUMENT (file_id, document_code, title, doc_type_id, issued_date, issuing_unit_id, signer, summary,
+            security_level_id, original_name, stored_path, mime_type, file_size, sha256, uploaded_by, deleted_at, deleted_reason)
+          VALUES (@file_id, @document_code, @title, @doc_type_id, @issued_date, @issuing_unit_id,
+            @signer, @summary, @security_level_id, @original_name, @stored_path, @mime_type,
+            @file_size, @sha256, @uploaded_by, GETDATE(), 'PENDING_APPROVAL')
+        `);
+
+      const proposalId = 'PROP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+      const proposalNote = req.body.proposal_note || req.body.note || 'Đăng tải văn bản mới chờ Chỉ huy duyệt';
+
+      await pool.request()
+        .input('pid', sql.VarChar(50), proposalId)
+        .input('fid', sql.VarChar(50), fileId)
+        .input('req_id', sql.VarChar(50), req.user.user_id)
+        .input('doc_code', sql.NVarChar(100), document_code || null)
+        .input('title', sql.NVarChar(500), title.trim())
+        .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
+        .input('issued_date', sql.Date, issued_date || null)
+        .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+        .input('signer', sql.NVarChar(100), signer || null)
+        .input('summary', sql.NVarChar(sql.MAX), summary || null)
+        .input('sec_id', sql.Int, parseInt(security_level_id, 10))
+        .input('new_path', sql.NVarChar(500), propRelPath)
+        .input('new_name', sql.NVarChar(255), req.file.originalname)
+        .input('new_mime', sql.VarChar(100), req.file.mimetype)
+        .input('new_size', sql.BigInt, req.file.size)
+        .input('new_sha', sql.Char(64), sha256)
+        .input('note', sql.NVarChar(500), proposalNote)
+        .query(`
+          INSERT INTO DOCUMENT_REVISION_PROPOSAL (
+            proposal_id, file_id, requester_id,
+            document_code, title, doc_type_id, issued_date, issuing_unit_id,
+            signer, summary, security_level_id,
+            new_stored_path, new_original_name, new_mime_type, new_file_size, new_sha256,
+            status, note, created_at, updated_at
+          ) VALUES (
+            @pid, @fid, @req_id,
+            @doc_code, @title, @doc_type_id, @issued_date, @issuing_unit_id,
+            @signer, @summary, @sec_id,
+            @new_path, @new_name, @new_mime, @new_size, @new_sha,
+            'PENDING', @note, GETDATE(), GETDATE()
+          )
+        `);
+
+      await writeAccessLog({
+        userId: req.user.user_id, fileId, action: 'UPLOAD_PROPOSAL_CREATED',
+        ip: getClientIp(req),
+        note: `Đăng tải văn bản mới chờ Chỉ huy duyệt: ${title.trim()}`,
+      });
+
+      return res.json({
+        success: true,
+        pending_approval: true,
+        proposal_id: proposalId,
+        file_id: fileId,
+        message: 'Văn bản mới đã được tiếp nhận và chuyển vào hàng đợi chờ Chỉ huy đơn vị / Quản trị viên phê duyệt.',
+      });
+    }
+
     const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
       docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
     });
@@ -2318,6 +2437,8 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
              d.doc_type_id AS current_doc_type_id,
              d.issued_date AS current_issued_date,
              d.issuing_unit_id AS current_issuing_unit_id,
+             d.deleted_reason,
+             d.uploaded_by AS document_uploaded_by,
              u.full_name AS requester_name,
              u.rank AS requester_rank,
              u.position AS requester_position,
@@ -2421,7 +2542,8 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
       document_code = @code, title = @title, doc_type_id = @type,
       issued_date = @issued, issuing_unit_id = @unit,
       signer = @signer, summary = @summary, security_level_id = @level,
-      stored_path = @path, updated_at = GETDATE()
+      stored_path = @path, updated_at = GETDATE(),
+      deleted_at = NULL, deleted_reason = NULL, deleted_by = NULL
   `;
   if (replacedFile) {
     sqlUpdate += `, original_name = @orig, mime_type = @mime, file_size = @size, sha256 = @sha`;
@@ -2519,13 +2641,18 @@ async function rejectProposalCore({ proposalId, reviewerUser, reviewNote, client
 
   await pool.request()
     .input('pid', sql.VarChar(50), proposalId)
+    .input('fid', sql.VarChar(50), prop.file_id)
     .input('reviewer', sql.VarChar(50), reviewerUser.user_id)
     .input('note', sql.NVarChar(500), reviewNote || 'Không chấp thuận đề xuất')
     .query(`
       UPDATE DOCUMENT_REVISION_PROPOSAL SET
         status = 'REJECTED', reviewed_by = @reviewer, reviewed_at = GETDATE(),
         review_note = @note, updated_at = GETDATE()
-      WHERE proposal_id = @pid
+      WHERE proposal_id = @pid;
+
+      UPDATE DOCUMENT SET
+        deleted_reason = 'REJECTED_BY_COMMANDER', updated_at = GETDATE()
+      WHERE file_id = @fid AND deleted_reason = 'PENDING_APPROVAL';
     `);
 
   await writeAccessLog({
@@ -2687,21 +2814,21 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     const pool = await getPool();
     let result = await pool.request()
       .input('file_id', sql.VarChar(100), fileId)
-      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE file_id = @file_id`);
+      .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, deleted_reason, uploaded_by, file_id, document_code FROM DOCUMENT WHERE file_id = @file_id`);
 
     // Smart Document Resolver Fallback: Nếu không tìm thấy theo file_id
     if (result.recordset.length === 0) {
       // 1. Thử tìm theo document_code
       result = await pool.request()
         .input('file_id', sql.NVarChar(100), fileId)
-        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE document_code = @file_id`);
+        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, deleted_reason, uploaded_by, file_id, document_code FROM DOCUMENT WHERE document_code = @file_id`);
     }
 
     if (result.recordset.length === 0) {
       // 2. Thử tìm theo stored_path hoặc original_name chứa fileId
       result = await pool.request()
         .input('file_id_pattern', sql.NVarChar(200), `%${fileId}%`)
-        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code FROM DOCUMENT WHERE stored_path LIKE @file_id_pattern OR original_name LIKE @file_id_pattern`);
+        .query(`SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, deleted_reason, uploaded_by, file_id, document_code FROM DOCUMENT WHERE stored_path LIKE @file_id_pattern OR original_name LIKE @file_id_pattern`);
     }
 
     if (result.recordset.length === 0 && fileId.startsWith('PDF-')) {
@@ -2709,7 +2836,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       const cleanStem = fileId.replace(/^PDF-/, '').replace(/[^a-zA-Z0-9]/g, '');
       if (cleanStem.length >= 6) {
         const allDocs = await pool.request().query(`
-          SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, file_id, document_code 
+          SELECT stored_path, original_name, mime_type, security_level_id, sha256, deleted_at, deleted_reason, uploaded_by, file_id, document_code 
           FROM DOCUMENT WHERE deleted_at IS NULL
         `);
         const matched = allDocs.recordset.find((d) => {
@@ -2734,10 +2861,20 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     const canonicalFileId = doc.file_id || fileId;
 
     if (doc.deleted_at) {
+      const isPendingApproval = (doc.deleted_reason === 'PENDING_APPROVAL');
+      const userRoles = await resolveUserRoles(req.user);
+      const isApprover =
+        userRoles.includes('ROL-01') ||
+        userRoles.includes('ROL-02') ||
+        req.user?.user_id === 'USR-001' ||
+        (req.user?.roles || []).includes('ROL-01') ||
+        (req.user?.roles || []).includes('ROL-02') ||
+        (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy') || String(r).toLowerCase().includes('admin'));
+      const isOwner = (doc.uploaded_by && doc.uploaded_by === req.user.user_id);
       const canViewTrash = (req.user.permissions || []).includes('DOC_TRASH_VIEW')
                           || (req.user.roles || []).includes('ROL-01');
-      if (!canViewTrash) {
-        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa' });
+      if (!canViewTrash && !(isPendingApproval && (isApprover || isOwner))) {
+        await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa hoặc chưa được duyệt' });
         return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
       }
     }

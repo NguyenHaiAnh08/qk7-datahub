@@ -2061,20 +2061,24 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       pos.includes('thủ trưởng') ||
       pos.includes('chủ nhiệm');
 
+    const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+      docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
+    });
+    const sha8 = sha256.slice(0, 8);
+    const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
+    const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
+    if (!validateStoredPath(relPath)) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
+    const absPath = safePathJoin(ROOT_DIR, relPath);
+    if (!absPath) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
+
+    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+    fs.writeFileSync(absPath, req.file.buffer);
+
+    const pool = await getPool();
+
     // 🎖️ NGUYÊN TẮC PHÊ DUYỆT ĐĂNG TẢI (Maker-Checker Approval Flow):
     // Cán bộ nghiệp vụ (Trợ lý, Văn thư, Cơ yếu, IT...) đăng tải văn bản mới -> Chuyển vào hàng đợi chờ Chỉ huy / Admin duyệt
     if (!isAdmin && !isCommander) {
-      const sha8 = sha256.slice(0, 8);
-      const yyyy = new Date().getFullYear();
-      const mm = String(new Date().getMonth() + 1).padStart(2, '0');
-      const propRelPath = `uploads/proposals/${yyyy}/${mm}/prop_${fileId}_${sha8}.pdf`;
-      const propAbsPath = safePathJoin(ROOT_DIR, propRelPath);
-      if (!propAbsPath) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
-
-      fs.mkdirSync(path.dirname(propAbsPath), { recursive: true });
-      fs.writeFileSync(propAbsPath, req.file.buffer);
-
-      const pool = await getPool();
       await pool.request()
         .input('file_id', sql.VarChar(50), fileId)
         .input('document_code', sql.NVarChar(100), document_code || null)
@@ -2086,7 +2090,7 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
         .input('summary', sql.NVarChar(sql.MAX), summary || null)
         .input('security_level_id', sql.Int, parseInt(security_level_id, 10))
         .input('original_name', sql.NVarChar(255), req.file.originalname)
-        .input('stored_path', sql.NVarChar(500), propRelPath)
+        .input('stored_path', sql.NVarChar(500), relPath)
         .input('mime_type', sql.VarChar(100), req.file.mimetype)
         .input('file_size', sql.BigInt, req.file.size)
         .input('sha256', sql.Char(64), sha256)
@@ -2114,7 +2118,7 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
         .input('signer', sql.NVarChar(100), signer || null)
         .input('summary', sql.NVarChar(sql.MAX), summary || null)
         .input('sec_id', sql.Int, parseInt(security_level_id, 10))
-        .input('new_path', sql.NVarChar(500), propRelPath)
+        .input('new_path', sql.NVarChar(500), relPath)
         .input('new_name', sql.NVarChar(255), req.file.originalname)
         .input('new_mime', sql.VarChar(100), req.file.mimetype)
         .input('new_size', sql.BigInt, req.file.size)
@@ -2151,20 +2155,7 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       });
     }
 
-    const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
-      docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
-    });
-    const sha8 = sha256.slice(0, 8);
-    const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
-    const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
-    if (!validateStoredPath(relPath)) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
-    const absPath = safePathJoin(ROOT_DIR, relPath);
-    if (!absPath) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
-
-    fs.mkdirSync(path.dirname(absPath), { recursive: true });
-    fs.writeFileSync(absPath, req.file.buffer);
-
-    const pool = await getPool();
+    await pool.request()
     await pool.request()
       .input('file_id', sql.VarChar(50), fileId)
       .input('document_code', sql.NVarChar(100), document_code || null)
@@ -2260,9 +2251,11 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       if (req.file) {
         newSha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
         const sha8 = newSha256.slice(0, 8);
-        const yyyy = new Date().getFullYear();
-        const mm = String(new Date().getMonth() + 1).padStart(2, '0');
-        const relPath = `uploads/proposals/${yyyy}/${mm}/prop_${fileId}_${sha8}.pdf`;
+        const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+          docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
+        });
+        const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
+        const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
         const absPath = safePathJoin(ROOT_DIR, relPath);
         if (absPath) {
           fs.mkdirSync(path.dirname(absPath), { recursive: true });
@@ -2514,8 +2507,18 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
     const propAbs = safePathJoin(ROOT_DIR, prop.new_stored_path);
 
     if (absPath && propAbs && fs.existsSync(propAbs)) {
-      fs.mkdirSync(path.dirname(absPath), { recursive: true });
-      fs.copyFileSync(propAbs, absPath);
+      if (absPath !== propAbs) {
+        fs.mkdirSync(path.dirname(absPath), { recursive: true });
+        fs.copyFileSync(propAbs, absPath);
+        try { fs.unlinkSync(propAbs); } catch (_) {}
+      }
+      finalStoredPath = relPath;
+      finalOriginalName = prop.new_original_name;
+      finalMimeType = prop.new_mime_type;
+      finalFileSize = prop.new_file_size;
+      finalSha256 = prop.new_sha256;
+      replacedFile = true;
+    } else if (absPath && fs.existsSync(absPath)) {
       finalStoredPath = relPath;
       finalOriginalName = prop.new_original_name;
       finalMimeType = prop.new_mime_type;

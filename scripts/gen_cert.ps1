@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # scripts/gen_cert.ps1 — Tạo chứng chỉ SSL/TLS chuẩn cho QK7 DataHub (PowerShell)
 # Hỗ trợ: mkcert (Dev/LAN) & certbot (Prod)
 # ==============================================================================
@@ -49,9 +49,9 @@ if ($Mode -eq "mkcert") {
     & certbot certonly --standalone -d $Domain --non-interactive --agree-tos -m "admin@$Domain"
     Copy-Item "C:\Certbot\live\$Domain\fullchain.pem" (Join-Path $CertsDir "cert.pem") -Force
     Copy-Item "C:\Certbot\live\$Domain\privkey.pem" (Join-Path $CertsDir "private-key.pem") -Force
-    Write-Host "✅ Cấp chứng chỉ Let's Encrypt thành công!" -ForegroundColor Green
+    Write-Host "✅ Cap chung chi Lets Encrypt thanh cong!" -ForegroundColor Green
 } else {
-    Write-Error "Chế độ không hợp lệ. Dùng 'mkcert' hoặc 'certbot'."
+    Write-Error "Che do khong hop le. Dung mkcert hoac certbot."
     exit 1
 }
 

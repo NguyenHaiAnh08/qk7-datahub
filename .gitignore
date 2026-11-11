@@ -32,6 +32,7 @@ yarn-debug.log*
 .DS_Store
 Thumbs.db
 .vscode/
+merged_code.txt
 
 # Python cache & artifacts
 __pycache__/

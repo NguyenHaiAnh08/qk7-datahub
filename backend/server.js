@@ -3498,6 +3498,7 @@ app.get('/api/security/alerts/recent', requireAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // MOUNT SUB-ROUTERS
 // ═══════════════════════════════════════════════════════════════
+
 require('./src/admin-routes')(app, {
   sql, getPool, writeAccessLog, getClientIp,
   requireAuth, requirePermission, requireAnyPermission,
@@ -3514,6 +3515,17 @@ app.use('/api/ai', requireAuth, aiLimiter, require('./src/ai-routes')({
   writeAccessLog,
   getClientIp,
   JWT_SECRET,
+}));
+
+app.use('/api/lectures', requireAuth, require('./src/lecture-routes')({
+  requireAuth, 
+  requirePermission, 
+  writeAccessLog, 
+  getClientIp
+}));
+
+app.use('/api/lectures', requireAuth, require('./src/lecture-extended-routes')({
+  requireAuth, requirePermission, writeAccessLog, getClientIp,
 }));
 
 // ═══════════════════════════════════════════════════════════════

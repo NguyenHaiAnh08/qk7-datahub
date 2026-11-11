@@ -1,6 +1,6 @@
 # 🛡️ SỔ TAY TỔNG HỢP SỰ CỐ & GIẢI PHÁP KỸ THUẬT (TROUBLESHOOTING HISTORY)
 > **Dự án:** TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB  
-> **Cập nhật lần cuối:** 02/11/2026  
+> **Cập nhật lần cuối:** 11/11/2026 (Bổ sung Sự cố 23–27 & Chuẩn hóa Bảo mật v4.1)  
 > **Mục đích:** Tài liệu tra cứu và khắc phục nhanh toàn bộ các lỗi kỹ thuật phát sinh từ trước đến nay trong quá trình phát triển, tích hợp phần cứng và vận hành hệ thống.
 
 ---
@@ -28,6 +28,11 @@
 20. [Sự cố 20: Hiện tượng nhấp nháy (Flickering) PDF Canvas khi nhập liệu trong Split-Pane Modal do re-render chuỗi dependencies](#sự-cố-20-hiện-tượng-nhấp-nháy-flickering-pdf-canvas-khi-nhập-liệu-trong-split-pane-modal-do-re-render-chuỗi-dependencies)
 21. [Sự cố 21: Lỗi ERR-500 "Không thể tạo yêu cầu phê duyệt" khi cán bộ gửi đề xuất hiệu chỉnh văn bản do xung đột Middleware 4 mắt và thiếu cột CSDL](#sự-cố-21-lỗi-err-500-không-thể-tạo-yêu-cầu-phê-duyệt-khi-cán-bộ-gửi-đề-xuất-hiệu-chỉnh-văn-bản-do-xung-đột-middleware-4-mắt-và-thiếu-cột-csdl)
 22. [Sự cố 22: Đăng nhập chậm, giật lag trang và nghẽn hàng đợi mạng do Waterfall Requests, Bundle khổng lồ và thiếu Debounce/Virtual Scroll](#sự-cố-22-đăng-nhập-chậm-giật-lag-trang-và-nghẽn-hàng-đợi-mạng-do-waterfall-requests-bundle-khổng-lồ-và-thiếu-debouncevirtual-scroll)
+23. [Sự cố 23: Lỗi khởi động Gateway `[HTTPS] ❌ Không tìm thấy file cert` và cơ chế bảo vệ Private Key trên Git](#sự-cố-23-lỗi-khởi-động-gateway-https--không-tìm-thấy-file-cert-và-cơ-chế-bảo-vệ-private-key-trên-git)
+24. [Sự cố 24: CSDL SQL Server rơi vào trạng thái `(Recovery Pending)` trong SSMS & Khôi phục chuẩn kết nối cổng 1433](#sự-cố-24-csdl-sql-server-rơi-vào-trạng-thái-recovery-pending-trong-ssms--khôi-phục-chuẩn-kết-nối-cổng-1433)
+25. [Sự cố 25: Lỗi Type Definition `mocha` và cờ `--ignoreDeprecations` trong `node_modules/tedious/tsconfig.json` trên tab Problems](#sự-cố-25-lỗi-type-definition-mocha-và-cờ---ignoredeprecations-trong-node_modulestedioustsconfigjson-trên-tab-problems)
+26. [Sự cố 26: Huy hiệu số lượng cảnh báo (Badge) trên Sidebar khi thu gọn (Collapsed) làm xô lệch icon điều hướng](#sự-cố-26-huy-hiệu-số-lượng-cảnh-báo-badge-trên-sidebar-khi-thu-gọn-collapsed-làm-xô-lệch-icon-điều-hướng)
+27. [Sự cố 27: Nhật ký kiểm toán an ninh SOC hiển thị tên người thực hiện là "Hệ thống" thay vì tên đích danh quân nhân khi phát hiện lệch giờ máy trạm (`CLOCK_TAMPER_ALERT`)](#sự-cố-27-nhật-ký-kiểm-toán-an-ninh-soc-hiển-thị-tên-người-thực-hiện-là-hệ-thống-thay-vì-tên-đích-danh-quân-nhân-khi-phát-hiện-lệch-giờ-máy-trạm-clock_tamper_alert)
 
 ---
 
@@ -510,3 +515,113 @@
   3. **Debounce 500ms:** Áp dụng hook `useDebounce` cho toàn bộ ô tìm kiếm tại Portal, DocumentDesk, MyUnit, SecurityAuditLog.
   4. **Skeleton Loading:** Thay thế vòng xoay `<Spin>` toàn màn hình bằng khung xương Ant Design Skeleton chống giật layout (CLS).
   5. **Virtual Scrolling:** Áp dụng hook `useVirtualScroll` cho bảng `SecurityAuditLog.tsx`, chỉ vẽ ~12–15 dòng DOM trong khung nhìn, đạt 60 FPS khi cuộn chuột.
+
+---
+
+### Sự cố 23: Lỗi khởi động Gateway `[HTTPS] ❌ Không tìm thấy file cert` và cơ chế bảo vệ Private Key trên Git
+
+* **Triệu chứng:**
+  Khi khởi động máy chủ Gateway bằng `npm start` hoặc `node server.js` trong thư mục `backend/`, màn hình dừng lại với thông báo lỗi:
+  ```text
+  [config] Loaded 16 keys from SYSTEM_CONFIG
+  [HTTPS] ❌ Không tìm thấy file cert
+  D:\QK7_DataHub\qk7-datahub\backend>
+  ```
+  Quá trình khởi động bị hủy với exit code 1. Lập trình viên thắc mắc vì sao file chứng chỉ không có sau khi pull code và tưởng là lỗi đẩy code lên GitHub.
+
+* **Nguyên nhân gốc rễ:**
+  1. File `backend/.env` bật cờ `USE_HTTPS=true` (yêu cầu chuẩn hóa bảo mật TLS 1.2+ theo khuyến cáo của báo cáo quét an ninh v4.0). Gateway yêu cầu hai tệp chứng chỉ:
+     - `SSL_KEY_PATH` (`backend/certs/private-key.pem`)
+     - `SSL_CERT_PATH` (`backend/certs/cert.pem`)
+  2. **Quy chuẩn Bảo mật (Defense-in-Depth & OWASP):** Các file khóa bí mật (`*.pem`, `*.key`) và thư mục `backend/certs/*` (ngoại trừ `.gitkeep`) **bắt buộc bị chặn trong `.gitignore`**. Tuyệt đối không bao giờ commit hoặc đẩy Private Key lên Git công khai để tránh nguy cơ lộ lọt khóa giải mã và giả mạo máy chủ.
+  3. Khi clone repo mới hoặc dọn dẹp các tệp untracked trước khi merge nhánh, thư mục `backend/certs/` chỉ còn tệp `.gitkeep` rỗng mà chưa có cặp chứng chỉ cục bộ.
+  4. Ngoài ra, script PowerShell `scripts/gen_cert.ps1` có lỗi cú pháp nháy đơn `Let's` trong chuỗi in ra màn hình khiến lệnh sinh chứng chỉ qua PowerShell bị ngắt với `TerminatorExpectedAtEndOfString`.
+
+* **Cách khắc phục triệt để:**
+  1. **Sửa lỗi cú pháp script:** Chuẩn hóa chuỗi trong `scripts/gen_cert.ps1`, loại bỏ ký tự nháy đơn unescaped.
+  2. **Sinh chứng chỉ SSL/TLS cục bộ (Dev/LAN):** Chạy lệnh sinh chứng chỉ tự động qua công cụ `mkcert` (Internal CA):
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File .\scripts\gen_cert.ps1 -Mode mkcert
+     ```
+     Script tự động cấp cặp chứng chỉ SAN đầy đủ (`localhost`, `127.0.0.1`, `192.168.1.229`, `trungtamdulieuso.tqs.com`) vào `backend/certs/cert.pem` và `backend/certs/private-key.pem`.
+  3. **Chạy kiểm thử máy chủ:** Khởi động `node server.js`, máy chủ báo `[HTTPS] 🔒 Server HTTPS (TLS 1.2+) - HTTPS: ENABLED ✅`.
+  4. **Tùy chọn chạy HTTP:** Nếu môi trường dev thuần túy không cần mã hóa SSL, đổi `USE_HTTPS=false` trong `backend/.env`.
+
+---
+
+### Sự cố 24: CSDL SQL Server rơi vào trạng thái `(Recovery Pending)` trong SSMS & Khôi phục chuẩn kết nối cổng 1433
+
+* **Triệu chứng:**
+  Backend Gateway không thể kết nối đến cơ sở dữ liệu, log báo lỗi: `Login failed for user 'sa'` hoặc timeout kết nối tới cổng 1433. Trong SQL Server Management Studio (SSMS), cơ sở dữ liệu `QK7_ThuVienSo` hiển thị trạng thái `QK7_ThuVienSo (Recovery Pending)`.
+
+* **Nguyên nhân gốc rễ:**
+  1. Quá trình tắt máy đột ngột hoặc service SQL Server khởi động lại khi các tệp dữ liệu MDF/LDF chưa được mount hoặc phục hồi giao dịch hoàn tất, khiến SQL Server đánh dấu database ở trạng thái chờ khôi phục (`Recovery Pending`).
+  2. Việc sửa code thử cổng phụ `56894` trong `backend/src/db.js` làm phát sinh logic fallback thử cổng phức tạp, không giải quyết được nguyên nhân gốc rễ ở tầng CSDL và làm sai lệch cổng chuẩn quân sự `1433`.
+
+* **Cách khắc phục triệt để:**
+  1. **Đưa Database về trạng thái ONLINE:** Trong SSMS, chạy script T-SQL đưa CSDL về hoạt động bình thường:
+     ```sql
+     ALTER DATABASE [QK7_ThuVienSo] SET ONLINE;
+     ```
+     Nếu bị lỗi file log, chạy lệnh kiểm tra tính toàn vẹn `DBCC CHECKDB ('QK7_ThuVienSo') WITH NO_INFOMSGS`.
+  2. **Chuẩn hóa cổng 1433 trong `backend/src/db.js`:** Loại bỏ hoàn toàn mã nguồn thử cổng 56894, khôi phục `backend/src/db.js` về chuẩn kết nối cổng duy nhất `1433` qua biến cấu hình `config.port = Number(process.env.DB_PORT) || 1433`.
+  3. **Kiểm tra kết nối:** Đã xác nhận kết nối thành công tới `127.0.0.1:1433/QK7_ThuVienSo` với đầy đủ 55 tài liệu hợp lệ.
+
+---
+
+### Sự cố 25: Lỗi Type Definition `mocha` và cờ `--ignoreDeprecations` trong `node_modules/tedious/tsconfig.json` trên tab Problems
+
+* **Triệu chứng:**
+  Trên tab Problems của Visual Studio Code xuất hiện 2 lỗi đỏ gây nhiễu:
+  - `Cannot find type definition file for 'mocha'. ts [Ln 1, Col 1]`
+  - `Invalid value for '--ignoreDeprecations'. ts [Ln 5, Col 27]`
+  tại tệp `node_modules/tedious/tsconfig.json`.
+
+* **Nguyên nhân gốc rễ:**
+  Thư viện driver kết nối SQL Server `tedious` (bản đóng gói npm) đính kèm tệp `tsconfig.json` của nhà phát triển thư viện vào thư mục phân phối. Trong file cấu hình đó chứa tham số `"ignoreDeprecations": "6.0"` (chỉ hỗ trợ trên TypeScript mới hơn) và danh sách `"types": ["node", "mocha"]` trong khi dự án không cài đặt gói `@types/mocha`. Trình biên dịch TypeScript của VS Code quét toàn bộ workspace và kích hoạt cảnh báo.
+
+* **Cách khắc phục triệt để:**
+  1. Hiệu chỉnh tệp cấu hình trong thư viện: loại bỏ thuộc tính `"ignoreDeprecations": "6.0"`, rút gọn mảng types thành `"types": ["node"]`.
+  2. Kiểm tra lại bằng lệnh TypeScript Compiler:
+     ```powershell
+     npx tsc --project node_modules/tedious/tsconfig.json --noEmit
+     ```
+     Xác nhận 0 errors, tab Problems trên IDE sạch sẽ hoàn toàn.
+
+---
+
+### Sự cố 26: Huy hiệu số lượng cảnh báo (Badge) trên Sidebar khi thu gọn (Collapsed) làm xô lệch icon điều hướng
+
+* **Triệu chứng:**
+  Khi người dùng bấm thu gọn thanh điều hướng (Sidebar Collapsed) để mở rộng không gian làm việc, huy hiệu số lượng cảnh báo đỏ (badge hiển thị số "1") nằm cùng hàng ngang với icon chuông thông báo, đẩy icon chuông lệch tâm sang trái, làm mất tính đồng trục và phá vỡ bố cục thẳng hàng với các icon khác (Khóa bảo mật, Đơn vị, Quản trị).
+
+* **Nguyên nhân gốc rễ:**
+  Trong component `Sidebar.tsx`, khi `collapsed = true`, thẻ chứa số lượng cảnh báo vẫn được render theo luồng bố cục flexbox kế tiếp icon mà không được tách lớp bằng `absolute positioning`.
+
+* **Cách khắc phục triệt để:**
+  1. **Cô lập vị trí Icon:** Bọc icon trong container `relative inline-flex items-center justify-center shrink-0` với kích thước cố định, đảm bảo icon luôn căn giữa tuyệt đối 100% trong cột thu gọn.
+  2. **Hiển thị Badge dạng số mũ ($a^2$):** Khi Sidebar ở trạng thái thu gọn, chuyển badge đỏ lên góc trên bên phải của icon:
+     ```tsx
+     <span className="absolute -top-2 -right-2.5 z-10 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full shadow-sm ring-2 ring-white dark:ring-slate-900 tabular-nums">
+       {item.badge}
+     </span>
+     ```
+  3. **Kết quả:** Icon luôn luôn căn giữa cột hoàn hảo; huy hiệu số lượng nằm gọn gàng dạng số mũ như bình phương trong toán học, không làm xô lệch bất kỳ pixel nào.
+
+---
+
+### Sự cố 27: Nhật ký kiểm toán an ninh SOC hiển thị tên người thực hiện là "Hệ thống" thay vì tên đích danh quân nhân khi phát hiện lệch giờ máy trạm (`CLOCK_TAMPER_ALERT`)
+
+* **Triệu chứng:**
+  Khi máy trạm bị lệch giờ (hoặc cố tình chỉnh lùi/tiến giờ quá 60 giây để gian lận thời gian truy cập tài liệu), hệ thống từ chối mở tài liệu và ghi nhật ký cảnh báo `CLOCK_TAMPER_ALERT` vào bảng `ACCESS_LOG`. Tuy nhiên, trên màn hình SOC "Chi Tiết Nhật Ký Kiểm Toán An Ninh", mục "Quân nhân thực hiện" hiển thị nhãn `QN - Hệ thống` thay vì hiển thị tên/tài khoản đích danh của quân nhân đang đăng nhập.
+
+* **Nguyên nhân gốc rễ:**
+  Tại route xem/tải tệp `/api/files/:fileId/view` trong `backend/server.js`:
+  1. Đối với tài liệu Cấp 1 & Cấp 2, hệ thống hỗ trợ cơ chế Đại biểu tham quan (GUEST) xem trực tiếp mà không bắt buộc đăng nhập tài khoản quân nhân. Nếu yêu cầu gửi lên không đính kèm header `Authorization` (hoặc cookie phiên), `req.user.user_id` mang giá trị `'GUEST'` hoặc `NULL`.
+  2. Hàm `writeAccessLog()` khi nhận `userId = null` hoặc `'GUEST'` (không tìm thấy ID trong bảng `USER`) sẽ ánh xạ tên hiển thị về nhãn mặc định là "Hệ thống" khi JOIN dữ liệu nhật ký.
+  3. Trường hợp quân nhân đã đăng nhập nhưng token mang định danh quân nhân (`req.user.user_id`) chưa được truyền đồng bộ vào nhánh kiểm tra lệch giờ `CLOCK_TAMPER_ALERT` trước khi xác thực đầy đủ.
+
+* **Cách khắc phục triệt để:**
+  1. **Trích xuất định danh quân nhân ưu tiên:** Kiểm tra và bóc tách token JWT từ header `Authorization: Bearer <token>` hoặc cookie `session_token` ngay từ đầu pipeline kiểm tra lệch giờ. Nếu có phiên quân nhân hợp lệ, truyền chính xác `req.user.user_id` (ví dụ `USR-001`, `NV_001`...) vào `writeAccessLog`.
+  2. **Phân biệt Đại biểu vs Hệ thống:** Nếu không có tài khoản quân nhân (truy cập Cấp 1–2 công khai), ghi rõ đối tượng thực hiện là `Đại biểu (GUEST)` kèm địa chỉ IP máy trạm, không gán chung vào nhãn "Hệ thống" để đảm bảo tính minh bạch kiểm toán SOC.
+  3. **Kiểm tra lệch giờ Air-Gap:** Giữ vững nguyên tắc đồng bộ giờ: máy trạm lệch > 60 giây so với giờ chuẩn máy chủ QK7 sẽ bị từ chối cấp dữ liệu PDF và ghi nhận nhật ký an ninh ngay lập tức.

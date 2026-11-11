@@ -62,6 +62,20 @@ Chạy script cấp chứng chỉ ACME chuẩn:
 bash scripts/gen_cert.sh certbot domain.truongquansu.qk7.vn
 ```
 
+### 2.3. Nguyên Tắc Quản Lý Chứng Chỉ Trên Git & Chống Rò Rỉ Khóa Bí Mật (Private Key)
+Nhằm tuân thủ tuyệt đối quy định an toàn thông tin quân sự và chuẩn OWASP:
+1. **Chặn commit Private Key (`.gitignore`):**
+   - Các file khóa bí mật (`*.pem`, `*.key`) và toàn bộ nội dung trong `backend/certs/*` (ngoại trừ `.gitkeep`) được cấu hình trong `.gitignore`.
+   - **Tuyệt đối không bao giờ commit hoặc đẩy Private Key lên GitHub** để tránh nguy cơ lộ mã hóa, giải mã gói tin lưu lượng và giả mạo máy chủ.
+2. **Quy trình thiết lập môi trường mới:**
+   - Sau khi `git clone` hoặc checkout nhánh mới, thư mục `backend/certs/` sẽ chỉ có tệp giữ chỗ `.gitkeep`.
+   - Chạy lệnh sinh chứng chỉ cục bộ:
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File scripts\gen_cert.ps1 -Mode mkcert
+     ```
+   - Cặp chứng chỉ `cert.pem` và `private-key.pem` sẽ được tự động tạo ngay trên máy trạm mà không cần tải qua Internet hay lưu trên Git.
+   - Nếu môi trường dev thuần túy không cần HTTPS, có thể cấu hình `USE_HTTPS=false` trong `backend/.env`.
+
 ---
 
 ## 3. Đánh Giá Trade-Off Khi Bật Header Bảo Mật (COOP / COEP / CORP)

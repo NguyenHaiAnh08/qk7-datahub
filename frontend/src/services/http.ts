@@ -44,7 +44,7 @@ export function getAuthHeaders(): Record<string, string> {
   let token: string | null = null;
   if (typeof window !== 'undefined') {
     try {
-      token = sessionStorage.getItem('qk7_token') || localStorage.getItem('qk7_token');
+      token = sessionStorage.getItem('qk7_token');
     } catch (_) {}
   }
   if (token) {

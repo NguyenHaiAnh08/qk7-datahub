@@ -163,10 +163,17 @@ const fingerprintLimiter = rateLimit({
   message: { error: 'Thao tác cảm biến vân tay quá dồn dập. Vui lòng thử lại sau giây lát.', code: 'FP_RATE_LIMITED' },
 });
 
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 30,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Thao tác hỏi đáp Trợ lý AI quá dồn dập. Vui lòng thử lại sau giây lát.', code: 'AI_RATE_LIMITED' },
+});
+
 app.use('/api', globalLimiter);
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/fingerprint/scan', fingerprintLimiter);
 app.use('/api/fingerprint/enroll', fingerprintLimiter);
+app.use('/api/auth/fingerprint/verify', fingerprintLimiter);
 
 // ═══════════════════════════════════════════════════════════════
 // STATIC & SWAGGER
@@ -853,18 +860,18 @@ async function handleLogin(req, res) {
 
     const permissions = await getUserPermissions(user.user_id);
 
-    // [FIX FINDING #4] Thiết lập session cookie với flags Secure, HttpOnly, SameSite=Lax
+    // Thiết lập session cookie với flags Secure, HttpOnly, SameSite=Strict (chống CSRF)
     res.cookie('qk7_session', token, {
       httpOnly: true,
       secure: true,
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/',
       maxAge: ttlMs,
     });
     res.cookie('token', token, {
       httpOnly: true,
       secure: true,
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/',
       maxAge: ttlMs,
     });
@@ -1047,18 +1054,18 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
 
     const permissions = await getUserPermissions(user.user_id);
 
-    // [FIX FINDING #4] Thiết lập session cookie với flags Secure, HttpOnly, SameSite=Lax
+    // Thiết lập session cookie với flags Secure, HttpOnly, SameSite=Strict (chống CSRF)
     res.cookie('qk7_session', token, {
       httpOnly: true,
       secure: true,
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/',
       maxAge: ttlMs,
     });
     res.cookie('token', token, {
       httpOnly: true,
       secure: true,
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/',
       maxAge: ttlMs,
     });
@@ -1175,7 +1182,7 @@ app.post('/api/auth/pin/verify', requireAuth, pinLimiter, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // [v5.1] USER GỬI YÊU CẦU CẤP PIN (khi chưa có pin_hash)
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/pin/request', requireAuth, async (req, res) => {
+app.post('/api/pin/request', requireAuth, pinLimiter, async (req, res) => {
     try {
         const pool = await getPool();
         const userId = req.user.user_id;
@@ -3502,7 +3509,7 @@ require('./src/admin-routes')(app, {
   rejectProposalCore,
 });
 
-app.use('/api/ai', requireAuth, require('./src/ai-routes')({
+app.use('/api/ai', requireAuth, aiLimiter, require('./src/ai-routes')({
   requirePermission,
   writeAccessLog,
   getClientIp,

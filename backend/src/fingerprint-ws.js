@@ -10,9 +10,21 @@ function setupFingerprintWS(httpServer, { BRIDGE_TOKEN }) {
   wss.on('connection', (ws, req) => {
     let deviceId;
     try {
+      // 1. Kiểm tra Origin header chống Cross-Site WebSocket Hijacking (CSWSH)
+      const origin = req.headers['origin'];
+      if (origin) {
+        const isAllowed = origin.includes('localhost') || origin.includes('127.0.0.1') ||
+                          (process.env.SERVER_IP && origin.includes(process.env.SERVER_IP)) ||
+                          (process.env.SERVER_DOMAIN && origin.includes(process.env.SERVER_DOMAIN));
+        if (!isAllowed) {
+          throw new Error('Forbidden WebSocket Origin: ' + origin);
+        }
+      }
+
+      // 2. Xác thực Bridge Token và Device ID
       const url = new URL(req.url, 'http://localhost');
-      const token = url.searchParams.get('bridge_token');
-      deviceId = url.searchParams.get('device_id');
+      const token = url.searchParams.get('bridge_token') || req.headers['x-bridge-token'];
+      deviceId = url.searchParams.get('device_id') || req.headers['x-device-id'];
       if (!token || token !== BRIDGE_TOKEN) throw new Error('Invalid bridge token');
       if (!deviceId) throw new Error('Missing device_id');
     } catch (err) {

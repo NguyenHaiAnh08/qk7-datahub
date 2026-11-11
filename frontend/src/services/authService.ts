@@ -158,10 +158,9 @@ export const authService = {
       );
     }
 
-    // ─── 2. Lưu token — THROW nếu thất bại ───
+    // ─── 2. Lưu token — THROW nếu thất bại (chỉ lưu sessionStorage trong bộ nhớ phiên) ───
     try {
       sessionStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
-      try { localStorage.setItem(STORAGE_KEYS.TOKEN, res.token); } catch (_) {}
 
       const ttlMs = parseExpiresIn(res.expires_in);
       if (ttlMs > 0) {

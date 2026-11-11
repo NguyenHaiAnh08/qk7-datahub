@@ -65,5 +65,8 @@ semgrep-*.json
 gitleaks-*.json
 *-report*.json
 *.sarif
+zap-report.html
+zap-report.json
+strix_runs/
 
 

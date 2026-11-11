@@ -226,3 +226,4 @@ Phân hệ **OCR Microservice v2.0** đã được đóng gói, cấu hình và 
 1. Đảm bảo an toàn thông tin tuyệt đối theo quy chuẩn kỹ thuật quân sự, sẵn sàng vận hành trong mạng Air-Gapped không Internet.
 2. Đáp ứng tiêu chuẩn kép: Tương thích hoàn toàn với kiến trúc VLM tiên tiến (MonkeyOCRv2) đồng thời duy trì hiệu năng cao với PP-OCRv4.
 3. Không làm thay đổi bất kỳ hợp đồng API nào của hệ thống, tương thích 100% với Gateway Express `:8000` và Frontend React 18.
+

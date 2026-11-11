@@ -62,6 +62,11 @@ JWT_EXPIRES_IN=8h
 # ─── Fingerprint ───
 FP_ENC_KEY=REDACTED_SECRET
 FINGERPRINT_BRIDGE_TOKEN=qk7_bridge_2026_secret_xyz9876543210abcdef
+
+# ─── HTTPS / SSL (Chuẩn hóa Bảo Mật TLS 1.2+ theo Báo Cáo An Ninh v4.1) ───
+USE_HTTPS=true
+SSL_KEY_PATH=./certs/private-key.pem
+SSL_CERT_PATH=./certs/cert.pem
 ```
 
 * **Sinh `JWT_SECRET` mới:** Chạy lệnh sau trong PowerShell, copy chuỗi sinh được và dán vào `JWT_SECRET` trong `.env`:
@@ -94,6 +99,15 @@ npm install
 cd /d D:\QK7_DataHub\qk7-datahub\boxchat
 pip install -r requirements.txt
 ```
+
+---
+
+### 5.1. Cấp chứng chỉ SSL/TLS cục bộ (Bắt buộc nếu USE_HTTPS=true)
+> **Lưu ý an ninh:** Do nguyên tắc bảo vệ Private Key, các tệp `*.pem` không được đưa lên GitHub. Trên mỗi máy chủ triển khai mới, cần chạy lệnh tạo chứng chỉ:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\gen_cert.ps1 -Mode mkcert -Domain 192.168.1.xxx
+```
+*(Cặp file `backend/certs/cert.pem` và `backend/certs/private-key.pem` sẽ được tự động khởi tạo chuẩn SAN cho cả IP LAN và localhost)*
 
 ---
 

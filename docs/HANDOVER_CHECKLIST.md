@@ -120,4 +120,4 @@ Khi có bất kỳ thay đổi cấu hình hạ tầng hoặc cập nhật dữ 
    - *Khuyến nghị:* Cài đặt Python 3.12 MSI chuẩn từ `python.org` vào `C:\Python312` khi có lịch bảo trì máy chủ định kỳ.
 2. **Mở rộng phần cứng VRAM:**
    - *Hiện trạng:* GPU GTX 1650 (4.0 GB VRAM) vận hành hoàn hảo với `qwen2.5:3b` (~3.3s/lượt).
-   - *Đề xuất:* Khi nâng cấp máy chủ lên GPU có $\ge 8\text{ GB}$ VRAM (như RTX 3060/4060 hoặc Quadro), có thể nâng cấp mô hình lên `qwen2.5:7b` theo phân tích tại [docs/MODEL_DECISION.md](file:///d:/QK7_DataHub/qk7-datahub/docs/MODEL_DECISION.md).
+   - *Đề xuất:* Khi nâng cấp máy chủ lên GPU có $\ge 8\text{ GB}$ VRAM (như RTX 3060/4060 hoặc Quadro), có thể nâng cấp mô hình lên `qwen2.5:7b` theo phân tích tại [MODEL_DECISION.md](./MODEL_DECISION.md).

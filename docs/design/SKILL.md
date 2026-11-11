@@ -14,7 +14,7 @@ description: >-
 ---
 
 # tasteskill v2 · TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB Edition
-> **TÀI LIỆU QUY CHUẨN ĐỒNG HÀNH: [DESIGN.md](file:///d:/QK7_DataHub/qk7-datahub/DESIGN.md)**  
+> **TÀI LIỆU QUY CHUẨN ĐỒNG HÀNH: [DESIGN.md](./DESIGN.md)**  
 > **Quy trình bắt buộc khi thiết kế/tối ưu UI tại TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB:**  
 > 1. Đọc kỹ file này (`SKILL.md`) và quy tắc app screen tại `references/app-screens.md`.  
 > 2. Tra cứu & đối chiếu chuẩn mực từ **[Awesome Design Systems](https://github.com/alexpate/awesome-design-systems)** (Carbon, Primer, Polaris, Atlassian, Geist, USWDS) cùng kho vi tương tác **[Lucian UX/UI Prompts](https://github.com/Seokwoooo/lucian-uxui-prompt)** (#098, #004, #025, #219, #058) và **[JolyUI Animated Toast](https://www.jolyui.dev/)**.  

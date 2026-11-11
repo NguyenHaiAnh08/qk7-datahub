@@ -38,7 +38,7 @@
 ### Chi tiết 3 bước thực hiện:
 
 #### Bước 1: Kích hoạt Taste-Skill v2 (`SKILL.md` / `.agents/skills/design-taste-frontend/`)
-- Mở và đọc ngay [SKILL.md](file:///d:/QK7_DataHub/qk7-datahub/SKILL.md) và tài liệu kèm theo tại `.agents/skills/design-taste-frontend/`.
+- Mở và đọc ngay [SKILL.md](./SKILL.md) và tài liệu kèm theo tại `../../.agents/skills/design-taste-frontend/`.
 - Xác định rõ loại màn hình đang làm việc:
   - **App Screen** (Dashboard tổng quan, bảng danh sách văn bản, bộ lọc đa năng, cây đơn vị, log kiểm toán SOC, trình xem văn bản PDF): Tuân thủ nghiêm ngặt các quy tắc trong `references/app-screens.md` (viền tĩnh mỏng `border-white/10`, nhãn nhỏ rõ ràng, phân lớp surface có chiều sâu, tuyệt đối tránh dùng gradient cầu vồng, card bo tròn lòe loẹt hay icon đặt trong ô vuông màu bóng bẩy kiểu AI-slop).
   - **Hero / Banner**: Giữ sự uy nghiêm, vững chãi, nhịp thở trang trọng của cơ quan quân sự.

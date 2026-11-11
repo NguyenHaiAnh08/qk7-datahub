@@ -146,7 +146,7 @@ New-NetFirewallRule -DisplayName "QK7 Backend 8000" -Direction Inbound -LocalPor
 ## PHẦN B — CHẠY SERVER (HÀNG NGÀY)
 
 1. **Khởi động hệ thống máy chủ (Backend + AI boxchat):**
-   - Click đúp vào tệp `s.bat` trong thư mục gốc `D:\QK7_DataHub\qk7-datahub\s.bat`.
+   - Click đúp vào tệp `s.bat` trong thư mục `scripts/s.bat` (hoặc chạy lệnh `scripts\s.bat` từ thư mục gốc dự án).
 2. **Khởi động trạm quét vân tay trên máy chủ (nếu server có cắm máy quét ZK9500):**
    ```cmd
    cd /d D:\QK7_DataHub\qk7-datahub\fingerprint

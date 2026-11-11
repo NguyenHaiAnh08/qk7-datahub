@@ -109,14 +109,14 @@
   - Gateway :8000 xác thực Bearer JWT (`USR-001`), proxy sang :8001 ở chế độ `active_microservice`.
   - Kiểm toán `ACCESS_LOG` tự động cho mọi hành vi hỏi AI.
 - **Kết quả tổng kết:** **15/15 kịch bản ĐẠT (100.0%)**, độ trễ trung bình **3,317 ms**.
-- **Tài liệu tạo mới:** [docs/E2E_TEST_RESULTS.md](file:///d:/QK7_DataHub/qk7-datahub/docs/E2E_TEST_RESULTS.md), [docs/e2e_results.json](file:///d:/QK7_DataHub/qk7-datahub/docs/e2e_results.json).
+- **Tài liệu tạo mới:** [E2E_TEST_RESULTS.md](./E2E_TEST_RESULTS.md), [e2e_results.json](./e2e_results.json).
 - **Trạng thái:** Gate 4 COMPLETED (Đã được USER xác nhận [YES]).
 
 ---
 
 ## Phase 5: Đánh Giá Chất Lượng RAGAS & Tối Ưu Tham Số Vận Hành (RAG Quality & Tuning)
 ### 5.1. Xây dựng công cụ đo lường RAGAS chuyên sâu (eval_ragas_quality.py)
-- Soạn thảo [boxchat/eval_ragas_quality.py](file:///d:/QK7_DataHub/qk7-datahub/boxchat/eval_ragas_quality.py) đo lường 6 chỉ số RAGAS tiêu chuẩn:
+- Soạn thảo [`boxchat/eval_ragas_quality.py`](../boxchat/eval_ragas_quality.py) đo lường 6 chỉ số RAGAS tiêu chuẩn:
   1. Faithfulness (Độ trung thực bám sát ngữ cảnh gốc)
   2. Answer Relevance (Độ phù hợp của câu trả lời với câu hỏi)
   3. Context Retrieval MRR & Precision (Độ chính xác thứ hạng tài liệu)
@@ -138,14 +138,14 @@
 - **Embedding:** `bge-m3` 1024-d trên Ollama `:11434`.
 - **Hybrid RRF Search:** $k=60$ cân bằng hoàn hảo giữa BM25 và Dense Search.
 - **Inference LLM:** `qwen2.5:3b` với Temperature = 0.1, Top-P = 0.9, keep_alive = 24h.
-- **Tài liệu tạo mới:** [docs/RAGAS_ANALYSIS.md](file:///d:/QK7_DataHub/qk7-datahub/docs/RAGAS_ANALYSIS.md), [docs/ragas_evaluation_results.json](file:///d:/QK7_DataHub/qk7-datahub/docs/ragas_evaluation_results.json).
+- **Tài liệu tạo mới:** [RAGAS_ANALYSIS.md](./RAGAS_ANALYSIS.md), [ragas_evaluation_results.json](./ragas_evaluation_results.json).
 - **Trạng thái:** Gate 5 COMPLETED (Đã được USER xác nhận [YES]).
 
 ---
 
 ## Phase 6: Chuẩn Bị Bàn Giao, Đóng Gói Tài Liệu & Phát Hành (Handover & Release)
 ### 6.1. Xây dựng Sổ tay Kiểm tra Bàn giao Vận hành (HANDOVER_CHECKLIST.md)
-- Soạn thảo [docs/HANDOVER_CHECKLIST.md](file:///d:/QK7_DataHub/qk7-datahub/docs/HANDOVER_CHECKLIST.md) bao quát:
+- Soạn thảo [HANDOVER_CHECKLIST.md](./HANDOVER_CHECKLIST.md) bao quát:
   - Bảng ánh xạ cổng dịch vụ (:8000 Express, :8001 Boxchat, :11434 Ollama, :9001 Fingerprint Agent, :1433 SQL Server).
   - Quy trình khởi động hàng ngày bằng `start-ai.bat`, quy trình tắt sạch bằng `boxchat/free-port.ps1`.
   - Danh mục an ninh bảo mật 5 cấp độ mật và bảo vệ sinh trắc học vân tay ZK9500 (2FA).
@@ -153,7 +153,7 @@
   - Ghi nhận nợ kỹ thuật và lộ trình mở rộng nâng cấp GPU dài hạn.
 
 ### 6.2. Cập nhật Changelog & Hoàn tất đóng gói
-- Cập nhật toàn diện [docs/CHANGELOG.md](file:///d:/QK7_DataHub/qk7-datahub/docs/CHANGELOG.md) phản ánh toàn bộ 9 nhóm hạng mục kỹ thuật từ Phase 0 đến Phase 6.
+- Cập nhật toàn diện [CHANGELOG.md](./CHANGELOG.md) phản ánh toàn bộ 9 nhóm hạng mục kỹ thuật từ Phase 0 đến Phase 6.
 - Đóng gói mã nguồn sạch trên nhánh `feature/complete-boxchat-v1`.
 - Gắn thẻ release tag `v1.1.0-boxchat-complete`.
 

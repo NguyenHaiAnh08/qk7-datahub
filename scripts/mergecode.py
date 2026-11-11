@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -38,7 +39,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Iterator
 
-__version__ = "4.0.0"
+__version__ = "4.1.0"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DANH SÁCH FILE CẦN GỘP — THỨ TỰ ĐỌC CHO AI
@@ -49,35 +50,41 @@ __version__ = "4.0.0"
 # • File MỚI (chưa có trong list) → tự động bắt bởi AUTO-SCAN.
 # ═══════════════════════════════════════════════════════════════════════════════
 EXPLICIT_FILES: list[str] = [
-    # ═══ 1. TÀI LIỆU KIẾN TRÚC (đọc trước để hiểu dự án) ═══
+    # ═══ 1. HIẾN PHÁP & TÀI LIỆU KIẾN TRÚC (đọc trước để hiểu dự án) ═══
+    "ANTIGRAVITY_MASTER_BRAIN.md",
     "README.md",
-    "AGENT_WORKFLOW.md",
-    "DESIGN.md",
-    "Routing convention .md",
-    "Senior Multi-Role.md",
-    "System Architect.md",
-    "SYSTEM_ARCHITECTURE.md",
-    "SETUP_SERVER.md",
-    "TROUBLESHOOTING_HISTORY.md",
-    "SECURITY_AUDIT_REPORT.md",
-    "SKILL.md",
-    "skills-lock.json",
+    "docs/architecture/SYSTEM_ARCHITECTURE.md",
+    "docs/security/SECURITY.md",
+    "docs/security/SECURITY_AUDIT_REPORT.md",
+    "docs/security/strix-pentest-instructions.md",
+    "docs/guides/SETUP_SERVER.md",
+    "docs/guides/TROUBLESHOOTING_HISTORY.md",
+    "docs/guides/ROUTING_CONVENTION.md",
+    "docs/guides/AGENT_WORKFLOW.md",
+    "docs/guides/Senior Multi-Role.md",
+    "docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md",
+    "docs/design/DESIGN.md",
+    "docs/design/SKILL.md",
+    "docs/design/System Architect.md",
 
-    # ═══ 2. PROJECT ROOT — CONFIG ═══
+    # ═══ 2. PROJECT ROOT & CONFIG ═══
     "package.json",
-    "package-lock.json",
+    "docker-compose.yml",
     ".env.example",
     ".gitleaks.toml",
-    "tsconfig.json",
-    "docker-compose.yml",
-    "mergecode.py",
+    ".semgrepignore",
+    "config/tsconfig.json",
+    "config/zap.yaml",
+    "config/skills-lock.json",
+    "config/package-lock.json",
 
-    # ═══ 3. PROJECT ROOT — SCRIPT KHỞI CHẠY ═══
-    "s.bat",
-    "s-dev.bat",
-    "start-ai.bat",
-    "load-env.bat",
-    "generate-client-config.bat",
+    # ═══ 3. SCRIPTS KHỞI CHẠY & TIỆN ÍCH ═══
+    "scripts/s.bat",
+    "scripts/s-dev.bat",
+    "scripts/start-ai.bat",
+    "scripts/load-env.bat",
+    "scripts/generate-client-config.bat",
+    "scripts/mergecode.py",
 
     # ═══ 4. BACKEND — ROOT (Express Gateway :8000) ═══
     "backend/s.bat",
@@ -161,17 +168,17 @@ EXPLICIT_FILES: list[str] = [
     "frontend/src/services/aiService.ts",
 
     # ═══ 11. FRONTEND — COMPONENTS (Admin modals) ═══
-    "frontend/src/components/AssignRoleModal.tsx",
-    "frontend/src/components/FingerprintEnrollModal.tsx",
-    "frontend/src/components/FingerprintScanModal.tsx",
-    "frontend/src/components/GrantPermissionModal.tsx",
-    "frontend/src/components/PinManageModal.tsx",
-    "frontend/src/components/PinVerifyModal.tsx",
-    "frontend/src/components/RolePermissionModal.tsx",
-    "frontend/src/components/UserCredentialsModal.tsx",
-    "frontend/src/components/UserFormModal.tsx",
-    "frontend/src/components/UserTable.tsx",
-    "frontend/src/components/UserViewPinModal.tsx",
+    "frontend/src/components/users/AssignRoleModal.tsx",
+    "frontend/src/components/users/FingerprintEnrollModal.tsx",
+    "frontend/src/components/users/FingerprintScanModal.tsx",
+    "frontend/src/components/users/GrantPermissionModal.tsx",
+    "frontend/src/components/users/PinManageModal.tsx",
+    "frontend/src/components/users/PinVerifyModal.tsx",
+    "frontend/src/components/users/RolePermissionModal.tsx",
+    "frontend/src/components/users/UserCredentialsModal.tsx",
+    "frontend/src/components/users/UserFormModal.tsx",
+    "frontend/src/components/users/UserTable.tsx",
+    "frontend/src/components/users/UserViewPinModal.tsx",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -314,6 +321,46 @@ def read_text_safe(path: Path) -> str:
         except (UnicodeDecodeError, LookupError):
             continue
     return raw.decode("latin-1", errors="replace")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BỘ LỌC TỰ ĐỘNG CHE MỜ BÍ MẬT (SECRET REDACTION FILTER)
+# ═══════════════════════════════════════════════════════════════════════════════
+SECRET_REDACT_RULES = [
+    # 1. API Keys, Tokens & Khóa mã hóa nhạy cảm
+    (
+        re.compile(r'(?i)\b(FP_ENC_KEY|JWT_SECRET|API_KEY|SECRET_KEY|BRIDGE_TOKEN|FINGERPRINT_BRIDGE_TOKEN|ENCRYPTION_KEY|TOKEN_SECRET)\s*[:=]\s*["\']?([A-Za-z0-9+/=_\-\.]{12,})["\']?'),
+        r'\1="[REDACTED_BY_SECURITY_POLICY]"'
+    ),
+    # 2. Mật khẩu kết nối DB hoặc tài khoản admin
+    (
+        re.compile(r'(?i)\b(password|pwd|db_password|admin_password)\s*[:=]\s*["\']([^"\'\n\r]{3,})["\']'),
+        r'\1="[REDACTED_PASSWORD]"'
+    ),
+    # 3. Private Keys (RSA, EC, OPENSSH)
+    (
+        re.compile(r'-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'),
+        '[REDACTED_PRIVATE_KEY]'
+    ),
+    # 4. Bearer tokens
+    (
+        re.compile(r'(?i)\bBearer\s+[A-Za-z0-9_\-\.]{20,}'),
+        'Bearer [REDACTED_BEARER_TOKEN]'
+    ),
+    # 5. Connection String Password
+    (
+        re.compile(r'(?i)(Server=[\w\.\-]+;.*Password=)([^;]+)(;)'),
+        r'\1[REDACTED_DB_PWD]\3'
+    ),
+]
+
+
+def redact_sensitive_content(text: str) -> str:
+    """Tự động phát hiện và che giấu các thông tin bí mật trước khi gộp vào tệp."""
+    redacted = text
+    for pattern, replacement in SECRET_REDACT_RULES:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
 
 
 def _file_allowed(
@@ -644,7 +691,9 @@ def write_merged(
 
     with open(output, "w", encoding="utf-8", newline="\n") as out:
         out.write("=" * 80 + "\n")
-        out.write("QK7 DATAHUB — MERGED SOURCE CODE\n")
+        out.write("QK7 DATAHUB — MERGED SOURCE CODE (MẬT QUÂN SỰ / LƯU HÀNH NỘI BỘ)\n")
+        out.write("CẢNH BÁO: Toàn bộ bí mật, API key và mật khẩu đã được tự động REDACTED.\n")
+        out.write("TUYỆT ĐỐI KHÔNG COMMIT TỆP NÀY LÊN HỆ THỐNG QUẢN LÝ PHIÊN BẢN (GIT)!\n")
         out.write(f"Generated : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         out.write(f"Root      : {root}\n")
         out.write(f"Mode      : {mode}\n")
@@ -681,7 +730,7 @@ def write_merged(
                 continue
 
             try:
-                text = read_text_safe(abs_path)
+                text = redact_sensitive_content(read_text_safe(abs_path))
             except OSError as e:
                 stats["errors"].append((rel.as_posix(), str(e)))
                 continue
@@ -743,7 +792,9 @@ def parse_args() -> argparse.Namespace:
             "  python mergecode.py --include-only backend/src frontend/src\n"
         ),
     )
-    parser.add_argument("-r", "--root", default=".", help="Thư mục gốc (mặc định: .)")
+    script_dir = Path(__file__).resolve().parent
+    default_root = ".." if Path.cwd().resolve() == script_dir else "."
+    parser.add_argument("-r", "--root", default=default_root, help=f"Thư mục gốc (mặc định: {default_root})")
     parser.add_argument("-o", "--output", default="merged_code.txt", help="File output (mặc định: merged_code.txt)")
     parser.add_argument("-m", "--max-size", type=float, default=10.0, metavar="MB",
                         help="Kích thước tối đa 1 file (mặc định: 10 MB)")

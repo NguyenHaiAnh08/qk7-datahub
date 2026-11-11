@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # QK7 DataHub — Bộ Kịch Bản Tự Động Quét & Kiểm Tra An Ninh Cục Bộ (DevSecOps)
 # Tiêu chuẩn: OWASP Top 10, CWE/SANS Top 25, HCL AppScan Cleanliness Baseline
 # ==============================================================================
@@ -131,15 +131,17 @@ Write-Host "`n[3/5] Đang quét rò rỉ khóa bí mật và thông tin nhạy c
 $gitleaksCmd = Get-Command gitleaks -ErrorAction SilentlyContinue
 
 if ($gitleaksCmd) {
+    $reportDir = "reports/security"
+    if (-not (Test-Path $reportDir)) { New-Item -ItemType Directory -Force -Path $reportDir | Out-Null }
     if ($FullHistory) {
         Write-Host "  * Quét toàn bộ lịch sử Git commit..." -NoNewline
-        & gitleaks detect --redact --report-format json --report-path gitleaks-history.json 2>&1 | Out-Null
-        $reportFile = "gitleaks-history.json"
+        $reportFile = "$reportDir/gitleaks-history.json"
+        & gitleaks detect --redact --report-format json --report-path $reportFile 2>&1 | Out-Null
     }
     else {
         Write-Host "  * Quét các tệp trong Git index và working tree..." -NoNewline
-        & gitleaks detect --no-git=false --redact --report-format json --report-path gitleaks-detect-local.json 2>&1 | Out-Null
-        $reportFile = "gitleaks-detect-local.json"
+        $reportFile = "$reportDir/gitleaks-detect-local.json"
+        & gitleaks detect --no-git=false --redact --report-format json --report-path $reportFile 2>&1 | Out-Null
     }
 
     if (Test-Path $reportFile) {
@@ -214,6 +216,25 @@ else {
     Write-Host "  [✗] Helmet CSP: Chưa bật" -ForegroundColor Red
 }
 
+# 5. Safe SCORM Zip Extraction & Path Traversal guard (CWE-22 / CWE-409)
+$lectureExtJs = if (Test-Path "backend/src/lecture-extended-routes.js") { Get-Content "backend/src/lecture-extended-routes.js" -Raw } else { "" }
+if ($lectureExtJs -match "extractZipSafely" -and $lectureExtJs -match "Zip Slip") {
+    Write-Host "  [✓] SCORM Safe Extraction (CWE-22 / CWE-409 Anti-ZipSlip): Kích hoạt" -ForegroundColor Green
+}
+else {
+    Write-Host "  [✗] SCORM Safe Extraction: Cần gia cố" -ForegroundColor Red
+}
+
+# 6. Anti-Secret Dump Protection
+$trackedMerged = git ls-files "merged_code*.txt" 2>$null
+if ($trackedMerged) {
+    Write-Host "  [✗] Phát hiện tệp merged_code*.txt bị track trong Git!" -ForegroundColor Red
+    $results["Secret Dump Leak"] = "FAILED (tracked merged_code.txt)"
+}
+else {
+    Write-Host "  [✓] Không có tệp code dump (merged_code*.txt) rò rỉ trong Git" -ForegroundColor Green
+}
+
 # ------------------------------------------------------------------------------
 # BƯỚC 5: KIỂM CHUẨN TRIVY TOÀN DIỆN (SCA DEPENDENCIES & IAC DOCKERFILE)
 # ------------------------------------------------------------------------------
@@ -221,9 +242,11 @@ Write-Host "`n[5/5] Đang kiểm tra chuyên sâu với Trivy (SCA & IaC Hardeni
 $trivyCmd = Get-Command trivy -ErrorAction SilentlyContinue
 
 if ($trivyCmd) {
+    $reportDir = "reports/security"
+    if (-not (Test-Path $reportDir)) { New-Item -ItemType Directory -Force -Path $reportDir | Out-Null }
     # 5.1. Trivy Filesystem SCA (Thay thế Dependency-Check)
     Write-Host "  * Quét toàn bộ phụ thuộc (SCA) đa nền tảng (Node.js, Python)..." -NoNewline
-    $trivyScaFile = "trivy-scan-local-sca.json"
+    $trivyScaFile = "$reportDir/trivy-scan-local-sca.json"
     & trivy fs --scanners vuln --severity HIGH,CRITICAL --format json --output $trivyScaFile . 2>&1 | Out-Null
     
     if (Test-Path $trivyScaFile) {
@@ -263,7 +286,7 @@ if ($trivyCmd) {
 
     # 5.2. Trivy IaC / Dockerfile Configuration Hardening
     Write-Host "  * Quét cấu hình Dockerfile & IaC (chống Container Escape)..." -NoNewline
-    $trivyIacFile = "trivy-scan-local-iac.json"
+    $trivyIacFile = "$reportDir/trivy-scan-local-iac.json"
     & trivy config --severity HIGH,CRITICAL --skip-dirs "node_modules,backend/node_modules" --format json --output $trivyIacFile . 2>&1 | Out-Null
 
     if (Test-Path $trivyIacFile) {

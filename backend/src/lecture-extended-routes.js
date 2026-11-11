@@ -277,6 +277,45 @@ module.exports = function createLectureExtendedRoutes({
   // NHÓM 4: SCORM PACKAGE UPLOAD + EXTRACT + RTE
   // ══════════════════════════════════════════════════════════
 
+  /**
+   * Giải nén an toàn: Chống Zip Slip (CWE-22) & Zip Bomb (CWE-409)
+   * @param {Buffer} zipBuffer - Dữ liệu buffer file zip
+   * @param {string} targetDir - Thư mục đích giải nén
+   * @param {number} maxTotalBytes - Kích thước tối đa sau giải nén (mặc định 300MB)
+   */
+  function extractZipSafely(zipBuffer, targetDir, maxTotalBytes = 300 * 1024 * 1024) {
+    const zip = new AdmZip(zipBuffer);
+    const entries = zip.getEntries();
+    const resolvedTarget = path.resolve(targetDir);
+    let totalUncompressedSize = 0;
+
+    // Duyệt qua tất cả entries để thẩm định trước khi ghi bất kỳ byte nào ra đĩa
+    for (const entry of entries) {
+      const entryName = entry.entryName;
+
+      // 1. Chống Zip Slip: Chặn đường dẫn trỏ ra ngoài targetDir
+      const destPath = path.resolve(resolvedTarget, entryName);
+      if (!destPath.startsWith(resolvedTarget + path.sep) && destPath !== resolvedTarget) {
+        throw new Error(`Phát hiện đường dẫn Zip Slip bất hợp pháp: "${entryName}"`);
+      }
+
+      // 2. Chống Zip Bomb: Tích lũy dung lượng uncompressed
+      totalUncompressedSize += entry.header.size;
+      if (totalUncompressedSize > maxTotalBytes) {
+        throw new Error(`Gói SCORM vượt quá giới hạn giải nén tối đa cho phép (${Math.round(maxTotalBytes / (1024 * 1024))}MB)`);
+      }
+
+      // 3. Ngăn chặn file thực thi nguy hiểm
+      const ext = path.extname(entryName).toLowerCase();
+      if (['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.py', '.php', '.jar', '.com'].includes(ext)) {
+        throw new Error(`Gói SCORM chứa định dạng file thực thi bị cấm: ${ext}`);
+      }
+    }
+
+    // Đạt toàn bộ kiểm tra an toàn -> giải nén
+    zip.extractAllTo(resolvedTarget, true);
+  }
+
   const scormUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 200 * 1024 * 1024 },  // 200MB
@@ -304,12 +343,11 @@ module.exports = function createLectureExtendedRoutes({
           .query(`SELECT 1 FROM DIGITAL_LECTURE WHERE lecture_id=@lid AND author_id=@uid`);
         if (own.recordset.length === 0) return res.status(403).json({ error: 'Không có quyền' });
 
-        // Giải nén ZIP
+        // Giải nén ZIP an toàn (chống Zip Slip & Zip Bomb)
         const packageId = 'PKG-' + Date.now();
         const extractDir = path.join(SCORM_ROOT, packageId);
         fs.mkdirSync(extractDir, { recursive: true });
-        const zip = new AdmZip(req.file.buffer);
-        zip.extractAllTo(extractDir, true);
+        extractZipSafely(req.file.buffer, extractDir);
 
         // Parse imsmanifest.xml
         const manifestPath = path.join(extractDir, 'imsmanifest.xml');
@@ -379,18 +417,39 @@ module.exports = function createLectureExtendedRoutes({
       }
     });
 
-  // Serve file tĩnh của SCORM package (cho RTE iframe load)
+  // Serve file tĩnh của SCORM package (cho RTE iframe load) - Gia cố chống Path Traversal (CWE-22)
   router.get('/scorm/:packageId/*splat', requireAuth, async (req, res) => {
     try {
       const packageId = req.params.packageId;
-      const subPath = req.params[0] || 'index.html';
-      const base = path.join(SCORM_ROOT, packageId);
-      const full = path.join(base, subPath);
-      // Chặn path traversal
-      if (!full.startsWith(base)) return res.status(403).end();
-      if (!fs.existsSync(full)) return res.status(404).end();
-      res.sendFile(full);
-    } catch (e) { res.status(500).end(); }
+      // 1. Validate packageId: chỉ chấp nhận alphanumeric, gạch dưới, gạch ngang
+      if (!packageId || !/^[A-Za-z0-9_-]+$/.test(packageId)) {
+        return res.status(400).json({ error: 'Mã gói SCORM không hợp lệ' });
+      }
+
+      const subPath = (req.params[0] || 'index.html').replace(/\\/g, '/');
+      // Chặn ký tự path traversal trực tiếp
+      if (subPath.includes('..') || subPath.startsWith('/')) {
+        return res.status(403).json({ error: 'Đường dẫn tệp bị từ chối' });
+      }
+
+      const resolvedBase = path.resolve(SCORM_ROOT, packageId);
+      const resolvedTarget = path.resolve(resolvedBase, subPath);
+
+      // 2. Chống Path Traversal: Đảm bảo resolvedTarget nằm trọn trong resolvedBase
+      if (!resolvedTarget.startsWith(resolvedBase + path.sep) && resolvedTarget !== resolvedBase) {
+        return res.status(403).json({ error: 'Truy cập ngoài phạm vi cho phép' });
+      }
+
+      if (!fs.existsSync(resolvedTarget) || fs.statSync(resolvedTarget).isDirectory()) {
+        return res.status(404).json({ error: 'Không tìm thấy tệp' });
+      }
+
+      // 3. Header an toàn
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.sendFile(resolvedTarget);
+    } catch (e) {
+      res.status(500).json({ error: 'Lỗi máy chủ khi tải tệp SCORM' });
+    }
   });
 
   // Lấy entry point để FE biết iframe URL

@@ -52,12 +52,16 @@ graph TD
 
 ## 📌 Danh Mục Tài Liệu Kỹ Thuật Dự Án
 
-* 👉 **[SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)**: Kiến trúc toàn diện 5 tầng, ERD, luồng dữ liệu, phân quyền bảo mật 3 lớp.
-* 👉 **[SETUP_SERVER.md](./SETUP_SERVER.md)**: Sổ tay hướng dẫn cài đặt Server, Client, ZKTeco SDK và kết nối phần cứng.
-* 👉 **[SECURITY.md](./SECURITY.md)**: Chính sách an ninh thông tin, danh mục Security Headers và **DevSecOps Pipeline (4 Chốt Chặn)**.
-* 👉 **[SECURITY_AUDIT_REPORT.md](./SECURITY_AUDIT_REPORT.md)**: Báo cáo khắc phục toàn diện kiểm toán an ninh v4.0.
-* 👉 **[AGENT_WORKFLOW.md](./AGENT_WORKFLOW.md)**: **Quy trình làm việc bắt buộc với AI Agent (3 bước: Khởi động $\rightarrow$ Thực hiện $\rightarrow$ Cập nhật tài liệu)**.
-* 👉 **[TROUBLESHOOTING_HISTORY.md](./TROUBLESHOOTING_HISTORY.md)**: **Sổ tay tổng hợp toàn bộ sự cố kỹ thuật từ trước đến nay và phương án khắc phục dứt điểm**.
+* 🧠 **[ANTIGRAVITY_MASTER_BRAIN.md](./ANTIGRAVITY_MASTER_BRAIN.md)**: **Hiến pháp tối cao của dự án — AI Agent bắt buộc phải đọc đầu tiên**.
+* 👉 **[SYSTEM_ARCHITECTURE.md](./docs/architecture/SYSTEM_ARCHITECTURE.md)**: Kiến trúc toàn diện 5 tầng, ERD, luồng dữ liệu, phân quyền bảo mật 3 lớp.
+* 👉 **[SETUP_SERVER.md](./docs/guides/SETUP_SERVER.md)**: Sổ tay hướng dẫn cài đặt Server, Client, ZKTeco SDK và kết nối phần cứng.
+* 👉 **[SECURITY.md](./docs/security/SECURITY.md)**: Chính sách an ninh thông tin, danh mục Security Headers và **DevSecOps Pipeline (4 Chốt Chặn)**.
+* 👉 **[SECURITY_AUDIT_REPORT.md](./docs/security/SECURITY_AUDIT_REPORT.md)**: Báo cáo khắc phục toàn diện kiểm toán an ninh v4.0.
+* 👉 **[AGENT_WORKFLOW.md](./docs/guides/AGENT_WORKFLOW.md)**: **Quy trình làm việc bắt buộc với AI Agent (3 bước: Khởi động $\rightarrow$ Thực hiện $\rightarrow$ Cập nhật tài liệu)**.
+* 👉 **[ROUTING_CONVENTION.md](./docs/guides/ROUTING_CONVENTION.md)**: Quy chuẩn định tuyến Frontend Auto-Discovery.
+* 👉 **[TROUBLESHOOTING_HISTORY.md](./docs/guides/TROUBLESHOOTING_HISTORY.md)**: **Sổ tay tổng hợp toàn bộ sự cố kỹ thuật từ trước đến nay và phương án khắc phục dứt điểm**.
+* 👉 **[ENTERPRISE_RESTRUCTURING_REPORT.md](./docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md)**: Báo cáo thực thi thiết lập Bộ Não Tổng & Tái cấu trúc mã nguồn.
+* 👉 **[DESIGN.md](./docs/design/DESIGN.md)** & **[SKILL.md](./docs/design/SKILL.md)**: Quy chuẩn thiết kế UI/UX Anti-AI-Slop và Design System Bản sắc Quân đội.
 * 👉 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**: Nhật ký thay đổi và các mốc phát hành phiên bản.
 
 ---
@@ -203,62 +207,89 @@ Hệ thống tích hợp quy trình kiểm toán tự động hóa hoàn toàn t
 
 ```text
 qk7-datahub/
-├── package.json                            # Điều phối kịch bản khởi chạy toàn bộ dự án
-├── README.md                               # Sổ tay hướng dẫn khởi động nhanh & hệ sinh thái
-├── AGENT_WORKFLOW.md                       # Quy trình làm việc bắt buộc với AI Agent (3 bước)
-├── TROUBLESHOOTING_HISTORY.md              # Sổ tay cứu hộ, tổng hợp toàn bộ sự cố & giải pháp
-├── SETUP_SERVER.md                         # Sổ tay hướng dẫn cài đặt Server & Client chi tiết
-├── SYSTEM_ARCHITECTURE.md                  # Tài liệu kiến trúc toàn diện 5 tầng hệ thống
-├── tools/                                  # Công cụ CLI quản trị & cứu hộ
-│   └── admin-fingerprint-tool.js           # Công cụ chẩn đoán, reset và xóa mẫu vân tay
+├── ANTIGRAVITY_MASTER_BRAIN.md                 # 🧠 Hiến pháp tối cao dự án (AI bắt buộc đọc đầu tiên)
+├── README.md                                   # Sổ tay hướng dẫn khởi động nhanh & hệ sinh thái
+├── docker-compose.yml                          # Điều phối container Docker cho toàn hệ thống
+├── package.json                                # Scripts điều phối monorepo
 │
-├── backend/                                # 🟢 MÁY CHỦ EXPRESS 5 & WEBSOCKET GATEWAY (:8000)
+├── docs/                                       # 📚 TOÀN BỘ TÀI LIỆU KỸ THUẬT & HỆ THỐNG
+│   ├── architecture/
+│   │   └── SYSTEM_ARCHITECTURE.md              # Tài liệu kiến trúc toàn diện 5 tầng hệ thống
+│   ├── security/
+│   │   ├── SECURITY.md                         # Chính sách an ninh thông tin & DevSecOps 4 Chốt Chặn
+│   │   ├── SECURITY_AUDIT_REPORT.md            # Báo cáo kiểm toán & khắc phục lỗ hổng an ninh
+│   │   └── strix-pentest-instructions.md       # Kịch bản kiểm thử thâm nhập tự động
+│   ├── guides/
+│   │   ├── SETUP_SERVER.md                     # Hướng dẫn cài đặt Server, Client & ZKTeco SDK
+│   │   ├── ROUTING_CONVENTION.md               # Quy chuẩn định tuyến Frontend Auto-Discovery
+│   │   ├── TROUBLESHOOTING_HISTORY.md          # Sổ tay cứu hộ, sự cố & giải pháp kỹ thuật
+│   │   ├── AGENT_WORKFLOW.md                   # Quy trình làm việc bắt buộc với AI Agent
+│   │   └── Senior Multi-Role.md                # Quy tắc vận hành kỹ sư senior đa vai trò
+│   └── design/
+│       ├── DESIGN.md                           # Chuẩn mực thiết kế UI/UX Anti-AI-Slop Bản sắc Quân đội
+│       ├── SKILL.md                            # Kỹ năng thiết kế giao diện chi tiết & tương tác vật lý
+│       └── System Architect.md                 # Chỉ dẫn kiến trúc sư hệ thống UI/UX
+│
+├── scripts/                                    # ⚙️ TOÀN BỘ SCRIPT TIỆN ÍCH, SCANNER & KHỞI CHẠY
+│   ├── s.bat                                   # Khởi động toàn bộ hệ thống (Backend, AI, OCR)
+│   ├── s-dev.bat                               # Khởi động chế độ Development (kèm Vite dev)
+│   ├── start-ai.bat                            # Khởi động AI Boxchat & Ollama
+│   ├── load-env.bat                            # Nạp biến môi trường từ .env
+│   ├── generate-client-config.bat              # Sinh cấu hình kết nối cho trạm quét vân tay
+│   ├── mergecode.py                            # Tiện ích gộp mã nguồn an toàn (có che giấu bí mật)
+│   └── security-scan.ps1                       # Script quét an ninh tổng hợp (Gitleaks, Trivy, CSP)
+│
+├── data/                                       # 📦 DỮ LIỆU TĨNH (Traineddata Tesseract / OCR)
+│   ├── eng.traineddata                         # Dữ liệu ngôn ngữ Tiếng Anh
+│   └── vie.traineddata                         # Dữ liệu ngôn ngữ Tiếng Việt
+│
+├── reports/                                    # 📊 BÁO CÁO QUÉT BẢO MẬT [GITIGNORE]
+│   └── security/                               # Kết quả quét Trivy, ZAP, Gitleaks, SBOM
+│
+├── config/                                     # 🔧 CẤU HÌNH PHỤ TRỢ (zap.yaml, tsconfig, client.info)
+│
+├── tools/                                      # 🛠️ CÔNG CỤ CLI QUẢN TRỊ & CỨU HỘ
+│   └── admin-fingerprint-tool.js               # Công cụ chẩn đoán, reset và xóa mẫu vân tay
+│
+├── backend/                                    # 🟢 MÁY CHỦ EXPRESS 5 & WEBSOCKET GATEWAY (:8000)
 │   ├── src/
-│   │   ├── db.js                           # Kết nối Microsoft SQL Server (QK7_ThuVienSo)
-│   │   ├── admin-routes.js                 # API quản trị CRUD (Users, Roles, Units, Permissions...)
-│   │   ├── ai-routes.js                    # Cổng giao tiếp AI boxchat (:8001) & Smart SQL Fallback
-│   │   └── fingerprint-ws.js               # WebSocket Server (/ws/fingerprint) quản lý ZK9500
-│   ├── uploads/                            # Kho lưu trữ tệp PDF thật (theo hash SHA-256)
-│   ├── public/                             # Sản phẩm build tĩnh từ Frontend xuất sang
-│   ├── server.js                           # Entry point Express API Gateway & Biometrics
-│   └── setup-passwords.js                  # Script khởi tạo tài khoản Admin & mật khẩu bcrypt
+│   │   ├── db.js                               # Kết nối Microsoft SQL Server (QK7_ThuVienSo)
+│   │   ├── admin-routes.js                     # API quản trị CRUD (Users, Roles, Units, Permissions...)
+│   │   ├── ai-routes.js                        # Cổng giao tiếp AI boxchat (:8001) & Smart SQL Fallback
+│   │   └── fingerprint-ws.js                   # WebSocket Server (/ws/fingerprint) quản lý ZK9500
+│   ├── uploads/                                # Kho lưu trữ tệp PDF thật (theo hash SHA-256)
+│   ├── public/                                 # Sản phẩm build tĩnh từ Frontend xuất sang
+│   └── server.js                               # Entry point Express API Gateway & Biometrics
 │
-├── ocr-service/                            # 🟡 MICROSERVICE OCR NHẬN DẠNG KÝ TỰ QUANG HỌC (:8002 - FastAPI)
-│   ├── main.py                             # Entry point FastAPI: /health, /api/ocr/extract
-│   ├── requirements.txt                    # Dependencies: paddleocr, paddlepaddle, pymupdf, fastapi...
-│   ├── start-ocr.bat                       # Script khởi động tự giải phóng cổng 8002 & kích hoạt venv
-│   ├── Dockerfile                          # Cấu hình container hóa độc lập
-│   └── README.md                           # Sổ tay kỹ thuật chi tiết phân hệ OCR
+├── ocr-service/                                # 🟡 MICROSERVICE OCR NHẬN DẠNG KÝ TỰ QUANG HỌC (:8002 - FastAPI)
+│   ├── main.py                                 # Entry point FastAPI: /health, /api/ocr/extract
+│   ├── requirements.txt                        # Dependencies: paddleocr, paddlepaddle, pymupdf...
+│   ├── start-ocr.bat                           # Script khởi động tự giải phóng cổng 8002
+│   └── README.md                               # Sổ tay kỹ thuật chi tiết phân hệ OCR
 │
-├── boxchat/                                # 🟣 MICROSERVICE TRỢ LÝ AI TÁC CHIẾN (:8001 - FastAPI)
-│   ├── main.py                             # Entry point FastAPI: /api/ai/query, /api/ai/study-book...
+├── boxchat/                                    # 🟣 MICROSERVICE TRỢ LÝ AI TÁC CHIẾN (:8001 - FastAPI)
+│   ├── main.py                                 # Entry point FastAPI: /api/ai/query, /api/ai/study-book...
 │   ├── core/
-│   │   ├── pdf_processor.py                # Bóc tách văn kiện PDF quân sự theo từng trang
-│   │   ├── vector_store.py                 # Hybrid Vector Store (Qdrant Local Engine)
-│   │   ├── agent_tutor.py                  # Agent RAG trả lời câu hỏi kèm trích dẫn số trang
-│   │   ├── study_book_gen.py               # Biên soạn giáo trình tác chiến & trắc nghiệm nhận thức
-│   │   └── media_timeline.py               # Quản lý dòng thời gian sự kiện quân sự
-│   ├── local_storage/                      # Kho lưu trữ vector embedding nội bộ bảo mật
-│   └── free-port.ps1                       # Script giải phóng cổng 8001 & stale lock an toàn
+│   │   ├── pdf_processor.py                    # Bóc tách văn kiện PDF quân sự theo từng trang
+│   │   ├── vector_store.py                     # Hybrid Vector Store (Qdrant Local Engine)
+│   │   ├── agent_tutor.py                      # Agent RAG trả lời câu hỏi kèm trích dẫn số trang
+│   │   ├── study_book_gen.py                   # Biên soạn giáo trình tác chiến & trắc nghiệm nhận thức
+│   │   └── media_timeline.py                   # Quản lý dòng thời gian sự kiện quân sự
+│   └── local_storage/                          # Kho lưu trữ vector embedding nội bộ bảo mật
 │
-├── fingerprint/                            # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001)
-│   ├── agent.py                            # Local HTTP Server (:9001) & WebSocket Client
-│   ├── zk_service.py                       # CTypes wrapper SDK ZKTeco ZK9500 (libzkfp.dll)
-│   ├── libzkfp.dll                         # Thư viện DLL 64-bit điều khiển cảm biến quang học
-│   ├── fpslib.dll                          # Thư viện thuật toán trích xuất đặc trưng vân tay
-│   ├── s-agent.bat                         # Script khởi động tự động kill cổng & copy DLL
-│   └── device_id.txt                       # Mã định danh máy quét trạm làm việc
+├── fingerprint/                                # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001)
+│   ├── agent.py                                # Local HTTP Server (:9001) & WebSocket Client
+│   ├── zk_service.py                           # CTypes wrapper SDK ZKTeco ZK9500 (libzkfp.dll)
+│   ├── libzkfp.dll                             # Thư viện DLL 64-bit điều khiển cảm biến quang học
+│   └── s-agent.bat                             # Script khởi động tự động kill cổng & copy DLL
 │
-└── frontend/                               # 🔵 GIAO DIỆN CLIENT REACT 18 + TS (DUAL-PLATFORM)
+└── frontend/                                   # 🔵 GIAO DIỆN CLIENT REACT 18 + TS (DUAL-PLATFORM)
     ├── src/
-    │   ├── components/
-    │   │   ├── auth/                       # LoginForm, NotchedInput
-    │   │   ├── users/                      # FingerprintScanModal (Portal), FingerprintEnrollModal
-    │   │   ├── dashboard/                  # SecurityAuditLog (Trung tâm SOC), UnitTreeTable
-    │   │   └── common/                     # Header, Sidebar, Dynamic Watermark
-    │   ├── pages/                          # PortalPage, MyUnitPage, AdminDashboardPage, UsersPage...
-    │   ├── routes/                         # Auto-Discovery Routing & ProtectedRoute theo Cấp mật
-    │   └── services/                       # http.ts, authService, documentService, userService...
+    │   ├── components/                         # common, users, dashboard, portal, document-desk, ai-chat
+    │   ├── pages/                              # PortalPage, MyUnitPage, AdminDashboardPage, UsersPage...
+    │   ├── routes/                             # Auto-Discovery Routing & ProtectedRoute theo Cấp mật
+    │   ├── contexts/                           # AuthContext, ThemeContext, DeviceModeContext
+    │   └── services/                           # http.ts, authService, documentService, userService...
 ```
 
 ---

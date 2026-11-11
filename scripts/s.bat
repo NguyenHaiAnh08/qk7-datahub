@@ -1,9 +1,8 @@
 @echo off
 chcp 65001 >nul
 title QK7 DataHub - Khoi dong Server
-cd /d "%~dp0"
-
-set "ROOT=%~dp0"
+cd /d "%~dp0.."
+set "ROOT=%CD%\"
 set "FRONTEND_BUILT=0"
 
 REM Kiem tra xem frontend da build chua

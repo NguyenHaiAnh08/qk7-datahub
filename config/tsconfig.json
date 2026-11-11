@@ -16,11 +16,11 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "typeRoots": [
-      "./frontend/node_modules/@types",
-      "./node_modules/@types"
+      "../frontend/node_modules/@types",
+      "../node_modules/@types"
     ]
   },
   "include": [
-    "frontend/src/**/*"
+    "../frontend/src/**/*"
   ]
 }

@@ -5,7 +5,13 @@ REM Cú pháp: call load-env.bat
 REM Sau khi call: %SERVER_IP%, %SERVER_DOMAIN%, %PORT_BACKEND%, ...
 REM ============================================================
 
-set "ENV_FILE=%~dp0.env"
+if exist "%~dp0..\.env" (
+    set "ENV_FILE=%~dp0..\.env"
+) else if exist "%~dp0.env" (
+    set "ENV_FILE=%~dp0.env"
+) else (
+    set "ENV_FILE=%CD%\.env"
+)
 
 if not exist "%ENV_FILE%" (
     echo [LOI] Khong tim thay .env tai %ENV_FILE%

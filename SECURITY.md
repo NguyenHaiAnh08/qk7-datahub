@@ -107,3 +107,26 @@ Trong quá trình siết chặt bảo mật, cần lưu ý các trade-off kỹ t
   proxy_pass https://127.0.0.1:8000;
   ```
 
+---
+
+## 5. Quy Trình DevSecOps Pipeline — 4 Chốt Chặn An Ninh Tự Động (GitHub Actions)
+
+Mỗi khi có commit hoặc pull request vào nhánh trọng yếu (`main`, `master`, `develop`), hệ thống tự động kích hoạt pipeline kiểm tra an ninh thông qua `.github/workflows/security.yml` gồm 4 chốt chặn bắt buộc:
+
+1. 🔒 **Secret Scanning (Gitleaks):**
+   - Tự động rà soát toàn bộ lịch sử commit xem có ai vô tình để lộ mật khẩu, Private Key (`*.pem`), `JWT_SECRET`, `FP_ENC_KEY` hay chuỗi kết nối Database hay không.
+   - Nếu phát hiện file cấu hình nhạy cảm (`.env`, `client.info`) bị commit, hệ thống sẽ cảnh báo đỏ ngay lập tức để kịp thời xoay vòng (rotate) và thu hồi trước khi bị khai thác.
+
+2. 🛡️ **SAST Scan (Semgrep):**
+   - Quét tĩnh toàn bộ mã nguồn theo bộ quy chuẩn an ninh chuyên sâu `p/security-audit` và `p/owasp-top-ten` (hơn 320 quy tắc).
+   - Phát hiện sớm các lỗ hổng mã nguồn: SQL Injection, Cross-Site Scripting (XSS), phân quyền lỏng lẻo, lỗ hổng Path Traversal và cấu hình sai header bảo mật.
+
+3. 📦 **Software Composition Analysis (SCA):**
+   - Quét các gói phụ thuộc bên thứ ba của cả Backend (`npm audit`), Frontend (`npm audit`), và AI microservice (`pip-audit` cho Python Boxchat).
+   - Phát hiện và ngăn chặn các thư viện bị dính mã độc hoặc lỗ hổng bảo mật đã công bố quốc tế (CVE).
+
+4. 🏗️ **Build Verification:**
+   - Đảm bảo mã nguồn trên nhánh `main` chắc chắn build được thành công (không bị lỗi TypeScript, thiếu file, hỏng bundle hay sai lệch cú pháp).
+   - Ngăn chặn triệt để tình trạng kéo code về máy chủ triển khai thì bị vỡ giao diện hoặc dừng tiến trình Gateway.
+
+

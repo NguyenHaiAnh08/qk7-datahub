@@ -54,6 +54,8 @@ graph TD
 
 * 👉 **[SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)**: Kiến trúc toàn diện 5 tầng, ERD, luồng dữ liệu, phân quyền bảo mật 3 lớp.
 * 👉 **[SETUP_SERVER.md](./SETUP_SERVER.md)**: Sổ tay hướng dẫn cài đặt Server, Client, ZKTeco SDK và kết nối phần cứng.
+* 👉 **[SECURITY.md](./SECURITY.md)**: Chính sách an ninh thông tin, danh mục Security Headers và **DevSecOps Pipeline (4 Chốt Chặn)**.
+* 👉 **[SECURITY_AUDIT_REPORT.md](./SECURITY_AUDIT_REPORT.md)**: Báo cáo khắc phục toàn diện kiểm toán an ninh v4.0.
 * 👉 **[AGENT_WORKFLOW.md](./AGENT_WORKFLOW.md)**: **Quy trình làm việc bắt buộc với AI Agent (3 bước: Khởi động $\rightarrow$ Thực hiện $\rightarrow$ Cập nhật tài liệu)**.
 * 👉 **[TROUBLESHOOTING_HISTORY.md](./TROUBLESHOOTING_HISTORY.md)**: **Sổ tay tổng hợp toàn bộ sự cố kỹ thuật từ trước đến nay và phương án khắc phục dứt điểm**.
 * 👉 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**: Nhật ký thay đổi và các mốc phát hành phiên bản.
@@ -186,6 +188,14 @@ graph TD
 * **Tự động đối chiếu văn bản máy chủ khi hiệu chỉnh:** Khung bên phải tự động nạp tệp PDF gốc của văn bản thông qua luồng bảo mật `/api/files/:id/view` khi mở chế độ hiệu chỉnh.
 * **Công nghệ chống nhấp nháy PDF Canvas (Flicker-Free Canvas Rendering):** Áp dụng kiến trúc memoization (`React.memo`, `useMemo`) phân tách độc lập vòng đời render của biểu mẫu nhập liệu và canvas PDF; cô lập layer vẽ điểm nhấn (highlight canvas) khỏi render pipeline của PDF, đảm bảo gõ phím mượt mà và không giật nháy hình ảnh tài liệu.
 * **Đồng bộ cơ chế an ninh Watermark & Công thái học:** Khung xem tài liệu luôn tự động phủ lớp Sparse Dynamic Watermark (Họ tên cán bộ, IP, Timestamp) bảo vệ dữ liệu kể cả trong quá trình nhập liệu; nút đóng được bố trí tinh tế ở góc trên bên phải khung tài liệu, tối ưu theo bản sắc quân đội.
+
+### 17. DevSecOps Security Pipeline (4 Chốt Chặn Kiểm Tra Tự Động Trên GitHub Actions)
+Hệ thống tích hợp quy trình kiểm toán tự động hóa hoàn toàn thông qua `.github/workflows/security.yml` bảo vệ nhánh `main`:
+* 🔒 **Secret Scanning (Gitleaks):** Tự động rà soát toàn bộ lịch sử commit xem có ai vô tình để lộ mật khẩu, Private Key (`*.pem`), `JWT_SECRET`, `FP_ENC_KEY` hay chuỗi kết nối Database hay không. Nếu có ai lỡ quên commit file `.env`, nó sẽ báo động ngay để kịp thời thu hồi trước khi bị khai thác.
+* 🛡️ **SAST Scan (Semgrep):** Quét tĩnh toàn bộ mã nguồn theo chuẩn OWASP Top 10 và CIS Benchmark để phát hiện sớm các lỗ hổng: SQL Injection, XSS, phân quyền lỏng lẻo, cấu hình sai header bảo mật.
+* 📦 **Software Composition Analysis (SCA):** Quét các thư viện `npm` và `pip` xem phiên bản đang dùng có dính mã độc hay lỗ hổng bảo mật đã công bố quốc tế (CVE) hay không.
+* 🏗️ **Build Verification:** Đảm bảo code trên `main` chắc chắn build được thành công (không bị lỗi TypeScript hay thiếu file), tránh tình trạng kéo code về máy chủ triển khai thì bị vỡ giao diện.
+
 
 ---
 

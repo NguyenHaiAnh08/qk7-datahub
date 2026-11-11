@@ -4,6 +4,8 @@
   "private": true,
   "description": "QK7 DataHub Monorepo — Paperless Meeting Gateway",
   "scripts": {
+    "start": "scripts\\s.bat",
+    "start:dev": "scripts\\s-dev.bat",
     "backend:install": "cd backend && npm install",
     "backend:start": "cd backend && npm start",
     "backend:dev": "cd backend && npm run dev",

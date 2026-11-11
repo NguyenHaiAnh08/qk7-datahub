@@ -2,13 +2,12 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 title QK7 DataHub - Khoi dong AI Boxchat 8001
-cd /d "%~dp0"
-
-set "ROOT=%~dp0"
+cd /d "%~dp0.."
+set "ROOT=%CD%\"
 
 REM --- Load .env goc neu ton tai ---
-if exist "%ROOT%load-env.bat" (
-    call "%ROOT%load-env.bat" >nul 2>&1
+if exist "%~dp0load-env.bat" (
+    call "%~dp0load-env.bat" >nul 2>&1
 )
 
 cd /d "%ROOT%boxchat"

@@ -1,12 +1,11 @@
 @echo off
 chcp 65001 >nul
 title QK7 DataHub - Development
-cd /d "%~dp0"
-
-set "ROOT=%~dp0"
+cd /d "%~dp0.."
+set "ROOT=%CD%\"
 
 REM ─── Đọc .env root ───
-call "%ROOT%load-env.bat"
+call "%~dp0load-env.bat"
 if errorlevel 1 (
     pause
     exit /b 1

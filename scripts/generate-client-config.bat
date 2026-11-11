@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 title QK7 - Sinh config cho client
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 call "%~dp0load-env.bat"
 if errorlevel 1 (
@@ -51,7 +51,7 @@ if not exist "config" mkdir config
 REM Giu nguyen config\client.info.example la file mau voi placeholder (tranh lo secret qua git)
 REM copy /Y "config\client.info" "config\client.info.example" >nul 2>&1
 
-echo [OK] Da sinh: %~dp0config\client.info
+echo [OK] Da sinh: %CD%\config\client.info
 echo.
 echo --- NOI DUNG ---
 type "config\client.info"

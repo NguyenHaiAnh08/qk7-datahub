@@ -134,7 +134,7 @@ graph TB
 
     subgraph STORAGE_TIER ["5. TẦNG LƯU TRỮ VẬT LÝ & DỮ LIỆU"]
         MSSQLDB[("SQL Server: QK7_ThuVienSo<br/>- USER, ROLE, PERMISSION<br/>- USER_FINGERPRINT (Mã hóa AES-256-GCM)<br/>- DOCUMENT, DOCUMENT_TYPE<br/>- UNIT, SECURITY_LEVEL<br/>- ACCESS_LOG")]
-        DiskStorage[("Kho Tệp PDF Vật Lý<br/>d:/QK7_DataHub/qk7-datahub/uploads/<br/>(Lưu theo YYYY/MM/ & SHA-256)")]
+        DiskStorage[("Kho Tệp PDF Vật Lý<br/>backend/uploads/<br/>(Lưu theo YYYY/MM/ & SHA-256)")]
         VectorStorage[("Kho Vector Embedding Qdrant<br/>boxchat/local_storage/qdrant_data/")]
 
         CoreAPIRouter -->|Truy vấn & Phân quyền| MSSQLDB
@@ -786,7 +786,7 @@ New-NetFirewallRule -DisplayName "QK7 Backend 8000" -Direction Inbound -LocalPor
 ### 10.2. Quy Trình Khởi Động Server Hàng Ngày
 
 1. **Khởi động hệ thống máy chủ (Backend + AI boxchat):**
-   - Click đúp vào tệp `s.bat` tại thư mục gốc `D:\QK7_DataHub\qk7-datahub\s.bat`.
+   - Click đúp vào tệp `s.bat` tại thư mục `scripts/s.bat` (hoặc chạy lệnh `scripts\s.bat` từ thư mục gốc dự án).
 2. **Khởi động trạm quét vân tay trên server (nếu máy server có gắn ZK9500):**
    ```cmd
    cd /d D:\QK7_DataHub\qk7-datahub\fingerprint

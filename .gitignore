@@ -32,7 +32,11 @@ yarn-debug.log*
 .DS_Store
 Thumbs.db
 .vscode/
-merged_code.txt
+merged_code*.txt
+merged_*.txt
+*_merged.txt
+backend/uploads/scorm/*
+!backend/uploads/scorm/.gitkeep
 
 # Python cache & artifacts
 __pycache__/
@@ -62,6 +66,7 @@ backend/certs/*
 !backend/certs/.gitkeep
 
 # Security Scan Reports & Artifacts
+reports/
 semgrep-*.json
 gitleaks-*.json
 *-report*.json

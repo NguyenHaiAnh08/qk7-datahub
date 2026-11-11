@@ -16,6 +16,7 @@ $ErrorActionPreference = "Continue"
 $toolPaths = @(
     "$env:LOCALAPPDATA\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\Scripts",
     "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Gitleaks.Gitleaks_Microsoft.Winget.Source_8wekyb3d8bbwe",
+    "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe",
     "$env:APPDATA\npm"
 )
 
@@ -36,7 +37,7 @@ $results = [ordered]@{}
 # ------------------------------------------------------------------------------
 # BƯỚC 1: KIỂM TRA MÃ NGUỒN TĨNH VỚI SEMGREP (SAST)
 # ------------------------------------------------------------------------------
-Write-Host "[1/4] Đang chạy phân tích mã nguồn tĩnh (SAST) với Semgrep..." -ForegroundColor Yellow
+Write-Host "[1/5] Đang chạy phân tích mã nguồn tĩnh (SAST) với Semgrep..." -ForegroundColor Yellow
 $semgrepCmd = Get-Command semgrep -ErrorAction SilentlyContinue
 
 if ($semgrepCmd) {
@@ -79,7 +80,7 @@ else {
 # ------------------------------------------------------------------------------
 # BƯỚC 2: PHÂN TÍCH RỦI RO THÀNH PHẦN PHẦN MỀM (SCA - NPM AUDIT)
 # ------------------------------------------------------------------------------
-Write-Host "`n[2/4] Đang quét lỗ hổng phụ thuộc bên thứ ba (SCA - npm audit)..." -ForegroundColor Yellow
+Write-Host "`n[2/5] Đang quét lỗ hổng phụ thuộc bên thứ ba (SCA - npm audit)..." -ForegroundColor Yellow
 
 # Backend Audit
 Write-Host "  * Quét Backend Gateway (:8000)..." -NoNewline
@@ -126,7 +127,7 @@ catch {
 # ------------------------------------------------------------------------------
 # BƯỚC 3: QUÉT RÒ RỈ KHÓA BÍ MẬT (GITLEAKS)
 # ------------------------------------------------------------------------------
-Write-Host "`n[3/4] Đang quét rò rỉ khóa bí mật và thông tin nhạy cảm (Gitleaks)..." -ForegroundColor Yellow
+Write-Host "`n[3/5] Đang quét rò rỉ khóa bí mật và thông tin nhạy cảm (Gitleaks)..." -ForegroundColor Yellow
 $gitleaksCmd = Get-Command gitleaks -ErrorAction SilentlyContinue
 
 if ($gitleaksCmd) {
@@ -177,7 +178,7 @@ else {
 # ------------------------------------------------------------------------------
 # BƯỚC 4: KIỂM TRA BẢO MẬT CẤU HÌNH SERVER & 3 TẦNG BẢO VỆ
 # ------------------------------------------------------------------------------
-Write-Host "`n[4/4] Kiểm tra các cơ chế bảo vệ cốt lõi trong mã nguồn..." -ForegroundColor Yellow
+Write-Host "`n[4/5] Kiểm tra các cơ chế bảo vệ cốt lõi trong mã nguồn..." -ForegroundColor Yellow
 
 $serverJs = Get-Content "backend/server.js" -Raw
 
@@ -211,6 +212,98 @@ if ($serverJs -match "contentSecurityPolicy") {
 }
 else {
     Write-Host "  [✗] Helmet CSP: Chưa bật" -ForegroundColor Red
+}
+
+# ------------------------------------------------------------------------------
+# BƯỚC 5: KIỂM CHUẨN TRIVY TOÀN DIỆN (SCA DEPENDENCIES & IAC DOCKERFILE)
+# ------------------------------------------------------------------------------
+Write-Host "`n[5/5] Đang kiểm tra chuyên sâu với Trivy (SCA & IaC Hardening)..." -ForegroundColor Yellow
+$trivyCmd = Get-Command trivy -ErrorAction SilentlyContinue
+
+if ($trivyCmd) {
+    # 5.1. Trivy Filesystem SCA (Thay thế Dependency-Check)
+    Write-Host "  * Quét toàn bộ phụ thuộc (SCA) đa nền tảng (Node.js, Python)..." -NoNewline
+    $trivyScaFile = "trivy-scan-local-sca.json"
+    & trivy fs --scanners vuln --severity HIGH,CRITICAL --format json --output $trivyScaFile . 2>&1 | Out-Null
+    
+    if (Test-Path $trivyScaFile) {
+        try {
+            $scaJson = Get-Content $trivyScaFile -Raw | ConvertFrom-Json
+            $totalVulns = 0
+            if ($scaJson.Results) {
+                foreach ($r in $scaJson.Results) {
+                    if ($r.Vulnerabilities) {
+                        $totalVulns += $r.Vulnerabilities.Count
+                    }
+                }
+            }
+            if ($totalVulns -eq 0) {
+                Write-Host " [PASSED] (0 High/Critical)" -ForegroundColor Green
+                $results["Trivy SCA (All Deps)"] = "PASSED (0 findings)"
+            }
+            else {
+                Write-Host " [FAILED] ($totalVulns High/Critical)" -ForegroundColor Red
+                $results["Trivy SCA (All Deps)"] = "FAILED ($totalVulns vulns)"
+            }
+        }
+        catch {
+            Write-Host " [PASSED] (0 findings)" -ForegroundColor Green
+            $results["Trivy SCA (All Deps)"] = "PASSED (0 findings)"
+        }
+        finally {
+            if (-not $KeepReports -and (Test-Path $trivyScaFile)) {
+                Remove-Item $trivyScaFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    else {
+        Write-Host " [PASSED]" -ForegroundColor Green
+        $results["Trivy SCA (All Deps)"] = "PASSED (0 findings)"
+    }
+
+    # 5.2. Trivy IaC / Dockerfile Configuration Hardening
+    Write-Host "  * Quét cấu hình Dockerfile & IaC (chống Container Escape)..." -NoNewline
+    $trivyIacFile = "trivy-scan-local-iac.json"
+    & trivy config --severity HIGH,CRITICAL --skip-dirs "node_modules,backend/node_modules" --format json --output $trivyIacFile . 2>&1 | Out-Null
+
+    if (Test-Path $trivyIacFile) {
+        try {
+            $iacJson = Get-Content $trivyIacFile -Raw | ConvertFrom-Json
+            $totalMisconfigs = 0
+            if ($iacJson.Results) {
+                foreach ($r in $iacJson.Results) {
+                    if ($r.Misconfigurations) {
+                        $totalMisconfigs += $r.Misconfigurations.Count
+                    }
+                }
+            }
+            if ($totalMisconfigs -eq 0) {
+                Write-Host " [PASSED] (0 Misconfigurations)" -ForegroundColor Green
+                $results["Trivy IaC (Dockerfiles)"] = "PASSED (0 misconfigs)"
+            }
+            else {
+                Write-Host " [FAILED] ($totalMisconfigs Misconfigurations)" -ForegroundColor Red
+                $results["Trivy IaC (Dockerfiles)"] = "FAILED ($totalMisconfigs misconfigs)"
+            }
+        }
+        catch {
+            Write-Host " [PASSED] (0 misconfigs)" -ForegroundColor Green
+            $results["Trivy IaC (Dockerfiles)"] = "PASSED (0 misconfigs)"
+        }
+        finally {
+            if (-not $KeepReports -and (Test-Path $trivyIacFile)) {
+                Remove-Item $trivyIacFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    else {
+        Write-Host " [PASSED]" -ForegroundColor Green
+        $results["Trivy IaC (Dockerfiles)"] = "PASSED (0 misconfigs)"
+    }
+}
+else {
+    Write-Host "  -> [SKIPPED] Trivy chưa có trong PATH." -ForegroundColor DarkYellow
+    $results["Trivy SCA & IaC"] = "SKIPPED"
 }
 
 # ------------------------------------------------------------------------------

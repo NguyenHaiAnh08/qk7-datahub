@@ -13,20 +13,24 @@
 
 ## 1. TÓM TẮT ĐIỀU HÀNH (EXECUTIVE SUMMARY)
 
-Dự án **QK7 DataHub** đã hoàn tất trọn vẹn **6 giai đoạn (Phases A $\rightarrow$ F)** trong quy trình kiểm định bảo mật chuyên sâu chuẩn DevSecOps nhằm chuẩn bị cho kỳ nghiệm thu chính thức bằng **HCL AppScan Standard / Enterprise**.
+Dự án **QK7 DataHub** đã hoàn tất trọn vẹn **7 giai đoạn (Phases A $\rightarrow$ G)** trong quy trình kiểm định bảo mật chuyên sâu chuẩn DevSecOps nhằm chuẩn bị cho kỳ nghiệm thu chính thức bằng **HCL AppScan Standard / Enterprise**.
 
 ### Kết quả kiểm định các lớp phòng thủ:
 1. **SAST (Static Application Security Testing — Semgrep 1.184.0):**
    * **0 FINDINGS** trên toàn bộ 299 tệp mã nguồn (TypeScript, JavaScript, Python, YAML, Dockerfile).
-2. **SCA (Software Composition Analysis — npm audit & pip):**
+2. **SCA & IaC Chuyên Sâu (Aqua Security Trivy 0.76.2 — Thay thế OWASP Dependency-Check):**
+   * **0 VULNERABILITIES (HIGH/CRITICAL)** trên toàn bộ 5 targets phụ thuộc đa nền tảng (`backend`, `frontend`, `boxchat`, `ocr-service`).
+   * **0 MISCONFIGURATIONS** trên 100% Dockerfile dự án (Hardening non-root user `qk7` & HEALTHCHECK).
+   * **100% CLEAN CYCLONEDX SBOM** (`qk7-sbom.json`) bảo vệ chuỗi cung ứng phần mềm.
+3. **SCA Baseline (npm audit & pip-audit):**
    * **0 VULNERABILITIES** (Vá dứt điểm RCE `pdfjs-dist` CVE-2024-4367, DoS `multer@2.5.0` CVE-2025-47271, `body-parser@2.4.0` CVE-2024-45590).
-3. **DAST Tiêu Chuẩn Công Nghiệp (OWASP ZAP 2.16.0 via Docker):**
+4. **DAST Tiêu Chuẩn Công Nghiệp (OWASP ZAP 2.16.0 via Docker):**
    * **0 HIGH, 0 CRITICAL, 62 RULES PASSED** trên toàn bộ hệ thống endpoint, cookie, CSP, và security headers.
-4. **Active Pentest Red Team (Strix AI Multi-Agent via Google Gemini):**
+5. **Active Pentest Red Team (Strix AI Multi-Agent via Google Gemini):**
    * **0 EXPLOITABLE VULNERABILITIES DETECTED** sau 6+ turns tấn công tự động các kịch bản IDOR, SQLi, Broken Access Control, Path Traversal, 2FA bypass, JWT manipulation.
-5. **Làm sạch Lịch sử Git (git-filter-repo & Gitleaks 8.30.1):**
+6. **Làm sạch Lịch sử Git (git-filter-repo & Gitleaks 8.30.1):**
    * Quét toàn bộ **147 commits** sau khi thanh lọc: **0 LEAKS FOUND (SẠCH TUYỆT ĐỐI)**.
-6. **Bảo toàn 100% Logic Nghiệp vụ Quân sự Đặc thù:**
+7. **Bảo toàn 100% Logic Nghiệp vụ Quân sự Đặc thù:**
    * 2FA vân tay ZKTeco ZK9500 + mã PIN 6 số cho Cấp 3–5.
    * Token ngắn hạn `X-Fingerprint-Token` (JWT 5 phút gắn định danh `(user_id, file_id)`).
    * Phân quyền 3 tầng: UI Guard $\rightarrow$ Gateway Middleware $\rightarrow$ SQL Server Constraint.
@@ -35,7 +39,7 @@ Dự án **QK7 DataHub** đã hoàn tất trọn vẹn **6 giai đoạn (Phases 
 
 ---
 
-## 2. BẢNG TỔNG HỢP TIẾN TRÌNH 6 GIAI ĐOẠN DEVSECOPS
+## 2. BẢNG TỔNG HỢP TIẾN TRÌNH 7 GIAI ĐOẠN DEVSECOPS
 
 | Giai Đoạn | Tên Giai Đoạn | Công Cụ & Phương Pháp | Trạng Thái Trước | Trạng Thái Sau | Kết Luận |
 |---|---|---|---|---|---|
@@ -45,6 +49,7 @@ Dự án **QK7 DataHub** đã hoàn tất trọn vẹn **6 giai đoạn (Phases 
 | **Phase D** | DAST Baseline & Active Pentest | OWASP ZAP (Docker) & Strix (Gemini AI) | Chưa quét động live server | **ZAP: 62 Rules Pass<br>Strix: 0 Exploitable** | **HOÀN TẤT** |
 | **Phase E** | Rotate Secrets & Làm sạch Lịch sử Git | `git-filter-repo`, `gitleaks detect` | 13 dấu vết secret trong commit cũ | **147 commits: 0 Leaks** | **HOÀN TẤT** |
 | **Phase F** | Chuẩn bị Hồ sơ Kiểm chuẩn HCL AppScan | Pre-flight Checklist, Audit Report | Chưa có tài liệu đối chiếu HCL AppScan | **Đầy đủ 8/8 tiêu chí** | **SẴN SÀNG** |
+| **Phase G** | Tích hợp Trivy (SCA, IaC, Container, SBOM) | Trivy v0.76.2 (Filesystem, Config, CycloneDX) | Chưa quét SCA đa nền tảng & IaC | **0 High/Critical Vulns<br>0 Misconfigs** | **HOÀN TẤT** |
 
 ---
 
@@ -124,15 +129,17 @@ node -e "console.log('qk7_fp_' + require('crypto').randomBytes(24).toString('hex
 
 ## 6. HƯỚNG DẪN & CHECKLIST CHUẨN BỊ CHO HCL APPSCAN (PHASE F)
 
-### 6.1. Pre-flight Checklist (8 Tiêu chí Đã Đạt)
+### 6.1. Pre-flight Checklist (10 Tiêu chí Toàn diện Đã Đạt)
 - [x] **1. Zero Secrets in Git:** Đạt 0 leaks qua Gitleaks trên 147 commit.
-- [x] **2. Zero SCA High/Critical:** Đạt 0 vulnerability qua `npm audit`.
+- [x] **2. Zero SCA High/Critical:** Đạt 0 vulnerability qua `npm audit` và `Trivy fs`.
 - [x] **3. Zero SAST High/Critical:** Đạt 0 findings qua Semgrep.
 - [x] **4. Zero DAST Baseline High/Critical:** Đạt 62 passed rules qua OWASP ZAP.
 - [x] **5. Active Pentest Passed:** Đạt 0 exploitable findings qua Strix Red Team.
-- [x] **6. Strict HTTPS & TLS:** Enforce TLS 1.2/1.3, HSTS header kích hoạt.
-- [x] **7. 3-Tier Access Control Invariants:** UI Guard + Middleware Gateway + SQL Constraint hoạt động chuẩn hóa.
-- [x] **8. Build & Regression Integrity:** `npm run build` thành công (0 TypeScript error), Smoke test API 8/8 PASS.
+- [x] **6. Zero IaC Misconfigurations:** Đạt 0 finding qua `Trivy config` trên 100% Dockerfiles.
+- [x] **7. Chuẩn hóa SBOM CycloneDX:** Xuất bản `qk7-sbom.json` đạt 0 security findings.
+- [x] **8. Strict HTTPS & TLS:** Enforce TLS 1.2/1.3, HSTS header kích hoạt.
+- [x] **9. 3-Tier Access Control Invariants:** UI Guard + Middleware Gateway + SQL Constraint hoạt động chuẩn hóa.
+- [x] **10. Build & Regression Integrity:** `npm run build` thành công (0 TypeScript error), Smoke test API 8/8 PASS.
 
 ### 6.2. Cấu hình Quét HCL AppScan Standard / Enterprise
 Khi triển khai quét bằng HCL AppScan trên môi trường Staging:
@@ -144,6 +151,42 @@ Khi triển khai quét bằng HCL AppScan trên môi trường Staging:
 4. **Exclusion URLs:**
    * Loại trừ URL quét lặp không cần thiết: `/api/health`, `/api/meta`.
    * Không cấu hình tự động scan các nút xóa dữ liệu `/api/admin/users/:id` với method `DELETE` để tránh làm xáo trộn dữ liệu kiểm thử.
+
+---
+
+## 7. TÍCH HỢP TOÀN DIỆN TRIVY — SCA, CONTAINER SECURITY, IAC & SBOM CYCLONEDX (PHASE G)
+
+### 7.1. Tổng quan Tích hợp
+Nhằm tăng cường năng lực phòng thủ đa lớp và củng cố hồ sơ kiểm định trước đợt quét chính thức của **HCL AppScan**, hệ thống **QK7 DataHub** đã hoàn tất tích hợp công cụ bảo mật đa năng **Trivy v0.76.2** (Aqua Security):
+- **Thay thế hoàn toàn OWASP Dependency-Check** cho tầng Software Composition Analysis (SCA) nhờ tốc độ quét vượt trội, dữ liệu CVE cập nhật thời gian thực, và khả năng quét đa ngôn ngữ (Node.js npm + Python pip).
+- **Bổ sung Container Image Scanning** rà soát lỗ hổng ở tầng hệ điều hành (OS packages) của các Docker container.
+- **Bổ sung IaC & Dockerfile Hardening** rà soát các rủi ro cấu hình sai (misconfigurations), ngăn chặn Container Escape.
+- **Tạo và chuẩn hóa SBOM CycloneDX** phục vụ quản trị chuỗi cung ứng phần mềm (Software Supply Chain Security).
+
+### 7.2. Kết quả Quét SCA Filesystem
+* **Lệnh thực thi:** `trivy fs --scanners vuln --severity HIGH,CRITICAL .`
+* **Phạm vi:** 5 target độc lập (`backend/package-lock.json`, `frontend/package-lock.json`, `boxchat/requirements.txt`, `ocr-service/requirements.txt`, `root`).
+* **Quá trình khắc phục:**
+  - Phát hiện 4 CVE High trên `transformers==4.57.1` tại `ocr-service/requirements.txt` (CVE-2026-4372, CVE-2026-5241, CVE-2026-80047, CVE-2026-9856).
+  - Đã nâng cấp lên `transformers>=5.22.2`.
+* **Kết quả nghiệm thu:** **0 HIGH / 0 CRITICAL VULNERABILITIES** (Sạch 100% trên toàn bộ các thành phần).
+
+### 7.3. Kết quả Quét Cấu hình IaC & Dockerfile Hardening
+* **Lệnh thực thi:** `trivy config --severity HIGH,CRITICAL --skip-dirs "node_modules,backend/node_modules" .`
+* **Phạm vi kiểm tra:** `backend/Dockerfile`, `boxchat/Dockerfile`, `ocr-service/Dockerfile`.
+* **Quá trình khắc phục:**
+  - Phát hiện `ocr-service/Dockerfile` thiếu chỉ thị non-root user (cảnh báo `DS-0002`).
+  - Đã bổ sung `RUN groupadd -r qk7 && useradd -r -g qk7 qk7`, cấp quyền thư mục `/app` và chuyển sang `USER qk7`, đồng thời bổ sung chỉ thị `HEALTHCHECK`.
+* **Kết quả nghiệm thu:** **0 MISCONFIGURATIONS** trên 100% Dockerfile dự án.
+
+### 7.4. Kết quả Tạo và Thẩm định SBOM (CycloneDX)
+* **Lệnh thực thi:** `trivy fs --format cyclonedx --output qk7-sbom.json .`
+* **Thẩm định lại bằng Trivy:** `trivy sbom qk7-sbom.json --severity HIGH,CRITICAL`
+* **Kết quả:** **0 Security Findings**, sẵn sàng bàn giao cho hội đồng thẩm định HCL AppScan.
+
+### 7.5. Tích hợp Tự động vào CI/CD & Kịch bản Quét Cục bộ
+* **CI/CD Pipeline (`.github/workflows/security.yml`):** Bổ sung job `trivy-scan` tự động kích hoạt mỗi khi mở Pull Request hoặc đẩy code vào nhánh `main`/`develop`, tự động chặn merge nếu phát hiện CVE High/Critical hoặc vi phạm Dockerfile.
+* **Kịch bản Quét Cục bộ (`scripts/security-scan.ps1`):** Bổ sung Bước 5 tự động phát hiện `trivy` trong PATH/WinGet và kiểm tra toàn diện cả SCA lẫn IaC Hardening.
 
 ---
 

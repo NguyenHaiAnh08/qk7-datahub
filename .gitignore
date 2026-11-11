@@ -64,6 +64,9 @@ backend/certs/*
 semgrep-*.json
 gitleaks-*.json
 *-report*.json
+trivy-*.json
+*.sbom.json
+qk7-sbom.json
 *.sarif
 zap-report.html
 zap-report.json

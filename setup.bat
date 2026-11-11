@@ -31,13 +31,13 @@ if !errorlevel! neq 0 (
 )
 for /f "tokens=*" %%v in ('node -v 2^>nul') do echo   [OK] Node.js da san sang: %%v
 
-REM Kiem tra Python
-where python >nul 2>&1
-if !errorlevel! neq 0 (
-    set "ERR_MSG=Thieu Python tren he thong. Yeu cau cai dat Python >= 3.10 truoc khi chay setup."
+REM Kiem tra Python thong minh (ho tro py launcher, fallback WindowsApps stub, tu dong cau hinh PATH)
+call :detect_python
+if "!PYTHON_CMD!"=="" (
+    set "ERR_MSG=Thieu Python tren he thong hoac bi vuong Microsoft Store execution alias. Yeu cau cai dat Python >= 3.10 va tick 'Add python.exe to PATH'."
     goto :error_handler
 )
-for /f "tokens=*" %%v in ('python --version 2^>nul') do echo   [OK] Python da san sang: %%v
+echo   [OK] Python da san sang: !PY_DETECTED_VER! (!PYTHON_CMD!)
 
 REM Kiem tra Git
 where git >nul 2>&1
@@ -47,16 +47,22 @@ if !errorlevel! neq 0 (
 )
 for /f "tokens=*" %%v in ('git --version 2^>nul') do echo   [OK] Git da san sang: %%v
 
-REM Kiem tra ket noi mang qua ping pypi.org
-echo   [INFO] Dang kiem tra ket noi mang qua pypi.org...
+REM Kiem tra ket noi mang qua ping pypi.org va curl
+echo   [INFO] Dang kiem tra ket noi mang toi pypi.org...
+set "HAS_INTERNET=0"
 ping -n 1 -w 2000 pypi.org >nul 2>&1
 if !errorlevel! equ 0 (
     set "HAS_INTERNET=1"
+) else (
+    curl.exe -s --head --connect-timeout 3 https://pypi.org >nul 2>&1
+    if !errorlevel! equ 0 set "HAS_INTERNET=1"
+)
+
+if "!HAS_INTERNET!"=="1" (
     echo   [OK] Phat hien ket noi Internet thanh cong.
     echo   [CHE DO] ONLINE - Cai dat truc tuyen va dong goi Air-Gap.
 ) else (
-    set "HAS_INTERNET=0"
-    echo   [CANH BAO] Khong the ket noi Internet qua ping pypi.org.
+    echo   [CANH BAO] Khong the ket noi Internet toi pypi.org.
     echo   [CHE DO] AIR-GAP OFFLINE - Su dung goi du phong tu offline_packages.
 )
 echo.
@@ -124,11 +130,16 @@ for %%S in (boxchat ocr-service fingerprint) do (
     echo   [INFO] pip download cho service: %%S...
     cd /d "%ROOT%%%S"
     if exist "requirements.txt" (
-        pip download -r requirements.txt -d "%ROOT%offline_packages\pip" --quiet
+        call %PYTHON_CMD% -m pip download -r requirements.txt -d "%ROOT%offline_packages\pip" --quiet >nul 2>&1
+        if !errorlevel! equ 0 (
+            echo   [OK] Da tai truoc wheels cho %%S.
+        ) else (
+            echo   [CANH BAO] Mot so package cua %%S khong the download offline wheel tu dong - se cai truc tiep tai Buoc 3.
+        )
     )
 )
 echo   [INFO] Tai truoc Semgrep wheel vao offline_packages\pip...
-pip download semgrep -d "%ROOT%offline_packages\pip" --quiet >nul 2>&1
+call %PYTHON_CMD% -m pip download semgrep -d "%ROOT%offline_packages\pip" --quiet >nul 2>&1
 
 REM 1.3 Tai Security Tools - Gitleaks Windows x64
 echo   [INFO] Kiem tra va tai Gitleaks Windows x64...
@@ -157,15 +168,15 @@ echo [2/8] Dang xu ly Node.js cho Backend va Frontend...
 
 REM Backend node_modules
 cd /d "%ROOT%backend"
-if not exist "node_modules" (
-    if "%HAS_INTERNET%"=="1" (
-        echo   [INFO] Cai dat backend dependencies truc tuyen...
-        call npm install
-        if !errorlevel! neq 0 (
-            set "ERR_MSG=npm install tai backend that bai"
-            goto :error_handler
-        )
-    ) else (
+if "%HAS_INTERNET%"=="1" (
+    echo   [INFO] Kiem tra va cap nhat backend dependencies...
+    call npm install
+    if !errorlevel! neq 0 (
+        set "ERR_MSG=npm install tai backend that bai"
+        goto :error_handler
+    )
+) else (
+    if not exist "node_modules" (
         echo   [INFO] Khoi phuc backend node_modules tu goi Offline...
         if exist "%ROOT%offline_packages\npm\backend_node_modules" (
             xcopy /E /I /Y /Q "%ROOT%offline_packages\npm\backend_node_modules" "%ROOT%backend\node_modules" >nul
@@ -174,9 +185,9 @@ if not exist "node_modules" (
             set "ERR_MSG=Khong tim thay offline_packages\npm\backend_node_modules trong che do Air-Gap"
             goto :error_handler
         )
+    ) else (
+        echo   [SKIP] Backend da co node_modules san.
     )
-) else (
-    echo   [SKIP] Backend da co node_modules san.
 )
 
 REM Frontend node_modules
@@ -219,7 +230,7 @@ for %%S in (boxchat ocr-service fingerprint) do (
     
     if not exist "venv" (
         echo   [INFO] Dang tao moi virtual environment venv cho %%S...
-        python -m venv venv
+        call %PYTHON_CMD% -m venv venv
         if !errorlevel! neq 0 (
             set "ERR_MSG=Tao virtual environment venv tai %%S that bai"
             goto :error_handler
@@ -242,7 +253,11 @@ for %%S in (boxchat ocr-service fingerprint) do (
             if exist "requirements.txt" (
                 pip install -r requirements.txt
                 if !errorlevel! neq 0 (
-                    echo   [CANH BAO] Cai dat requirements cho %%S co the can kiem tra them.
+                    echo   [CANH BAO] Cai dat requirements day du cho %%S co the can kiem tra them.
+                    if "%%S"=="ocr-service" (
+                        echo   [INFO] Cai dat cac goi OCR co ban (fastapi, uvicorn, pymupdf, opencv)...
+                        pip install fastapi uvicorn python-multipart pydantic pymupdf pypdfium2 pillow opencv-python >nul 2>&1
+                    )
                 ) else (
                     echo   [OK] Da cai dat requirements cho %%S thanh cong.
                 )
@@ -311,7 +326,7 @@ if !errorlevel! equ 0 (
         winget install --id Semgrep.Semgrep -e --silent --accept-package-agreements --accept-source-agreements >nul 2>&1
         where semgrep >nul 2>&1
         if !errorlevel! neq 0 (
-            pip install semgrep >nul 2>&1
+            call %PYTHON_CMD% -m pip install semgrep >nul 2>&1
         )
         where semgrep >nul 2>&1
         if !errorlevel! equ 0 (
@@ -321,7 +336,7 @@ if !errorlevel! equ 0 (
         )
     ) else (
         echo   [INFO] Dang thu cai dat Semgrep tu goi offline_packages\pip...
-        pip install --no-index --find-links="%ROOT%offline_packages\pip" semgrep >nul 2>&1
+        call %PYTHON_CMD% -m pip install --no-index --find-links="%ROOT%offline_packages\pip" semgrep >nul 2>&1
         where semgrep >nul 2>&1
         if !errorlevel! equ 0 (
             echo   [OK] Da cai dat Semgrep tu offline_packages.
@@ -486,3 +501,66 @@ echo ========================================================================
 echo.
 pause
 exit /b 1
+
+REM ========================================================================
+REM SUBROUTINE: TU DONG PHAT HIEN VA CAU HINH PYTHON HOP LE
+REM ========================================================================
+:detect_python
+set "PYTHON_CMD="
+set "PY_DETECTED_VER="
+set "PY_DIR="
+
+REM 1. Thu kiem tra python hien tai xem co phai ban that khong
+python -c "import sys; print(sys.version)" >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=*" %%v in ('python --version 2^>nul') do (
+        set "PYTHON_CMD=python"
+        set "PY_DETECTED_VER=%%v"
+        goto :python_found
+    )
+)
+
+REM 2. Thu dung py -3 (Python Launcher Windows)
+py -3 -c "import sys; print(sys.version)" >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=*" %%v in ('py -3 --version 2^>nul') do (
+        set "PYTHON_CMD=py -3"
+        set "PY_DETECTED_VER=%%v"
+        goto :python_found
+    )
+)
+
+REM 3. Quet LocalAppData Programs Python
+for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do (
+    if exist "%%D\python.exe" (
+        "%%D\python.exe" -c "import sys; print(sys.version)" >nul 2>&1
+        if not errorlevel 1 (
+            set "PYTHON_CMD="%%D\python.exe""
+            for /f "tokens=*" %%v in ('"%%D\python.exe" --version 2^>nul') do set "PY_DETECTED_VER=%%v"
+            goto :python_found
+        )
+    )
+)
+
+REM 4. Quet Program Files Python
+for /d %%D in ("%ProgramFiles%\Python3*") do (
+    if exist "%%D\python.exe" (
+        "%%D\python.exe" -c "import sys; print(sys.version)" >nul 2>&1
+        if not errorlevel 1 (
+            set "PYTHON_CMD="%%D\python.exe""
+            for /f "tokens=*" %%v in ('"%%D\python.exe" --version 2^>nul') do set "PY_DETECTED_VER=%%v"
+            goto :python_found
+        )
+    )
+)
+
+exit /b 0
+
+:python_found
+for /f "delims=" %%i in ('%PYTHON_CMD% -c "import sys; print(sys.executable)" 2^>nul') do (
+    set "PY_DIR=%%~dpi"
+)
+if defined PY_DIR (
+    set "PATH=%PY_DIR%;%PY_DIR%Scripts;%PATH%"
+)
+exit /b 0

@@ -81,7 +81,7 @@ echo    OCR_ENGINE   = %OCR_ENGINE%
 echo    MONKEY_DEVICE= %MONKEY_DEVICE%
 echo    MONKEY_MODEL = %MONKEY_MODEL_ID%
 echo    PORT         = 8002
-echo    HOST         = 0.0.0.0 (VLAN & Local)
+echo    HOST         = 0.0.0.0 (VLAN ^& Local)
 echo    OFFLINE_MODE = HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1
 set "HOST=0.0.0.0"
 

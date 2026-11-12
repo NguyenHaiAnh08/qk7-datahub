@@ -1,0 +1,429 @@
+{
+  "root": "signup-split-carousel",
+  "elements": {
+    "signup-split-carousel": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 0
+      },
+      "children": [
+        "form-panel",
+        "carousel-panel"
+      ]
+    },
+    "form-panel": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "nav-bar",
+        "form-container",
+        "form-footer"
+      ]
+    },
+    "nav-bar": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center",
+        "padding": [
+          3,
+          4
+        ]
+      },
+      "children": [
+        "nav-logo"
+      ]
+    },
+    "nav-logo": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "logo-icon",
+        "logo-text"
+      ]
+    },
+    "logo-icon": {
+      "type": "Icon",
+      "props": {
+        "name": "layers",
+        "size": "md"
+      }
+    },
+    "logo-text": {
+      "type": "Text",
+      "props": {
+        "tag": "h4",
+        "content": "Daub"
+      }
+    },
+    "form-container": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6,
+        "justify": "center",
+        "padding": [
+          4,
+          8
+        ]
+      },
+      "children": [
+        "form-header",
+        "form-fields",
+        "form-login"
+      ]
+    },
+    "form-header": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "form-title",
+        "form-subtitle"
+      ]
+    },
+    "form-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Sign up"
+      }
+    },
+    "form-subtitle": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Start your 30-day free trial.",
+        "variant": "secondary"
+      }
+    },
+    "form-fields": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "name-field",
+        "email-field",
+        "password-field",
+        "signup-btn",
+        "google-btn"
+      ]
+    },
+    "name-field": {
+      "type": "Field",
+      "props": {
+        "label": "Name*"
+      },
+      "children": [
+        "name-input"
+      ]
+    },
+    "name-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Enter your name",
+        "type": "text"
+      }
+    },
+    "email-field": {
+      "type": "Field",
+      "props": {
+        "label": "Email*"
+      },
+      "children": [
+        "email-input"
+      ]
+    },
+    "email-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Enter your email",
+        "type": "email"
+      }
+    },
+    "password-field": {
+      "type": "Field",
+      "props": {
+        "label": "Password*",
+        "hint": "Must be at least 8 characters."
+      },
+      "children": [
+        "password-input"
+      ]
+    },
+    "password-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Create a password",
+        "type": "password"
+      }
+    },
+    "signup-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg",
+        "fullWidth": true
+      }
+    },
+    "google-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Sign up with Google",
+        "variant": "outline",
+        "size": "lg",
+        "icon": "google",
+        "fullWidth": true
+      }
+    },
+    "form-login": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 1,
+        "align": "center"
+      },
+      "children": [
+        "login-text",
+        "login-link"
+      ]
+    },
+    "login-text": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Already have an account?",
+        "variant": "secondary"
+      }
+    },
+    "login-link": {
+      "type": "Link",
+      "props": {
+        "label": "Log in"
+      }
+    },
+    "form-footer": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "padding": [
+          2,
+          4
+        ]
+      },
+      "children": [
+        "footer-text"
+      ]
+    },
+    "footer-text": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "© Daub 2026",
+        "variant": "secondary"
+      }
+    },
+    "carousel-panel": {
+      "type": "Surface",
+      "props": {
+        "variant": "brand",
+        "padding": 6
+      },
+      "children": [
+        "carousel-inner"
+      ]
+    },
+    "carousel-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6,
+        "justify": "center",
+        "align": "center"
+      },
+      "children": [
+        "carousel-slide",
+        "carousel-caption",
+        "carousel-nav"
+      ]
+    },
+    "carousel-slide": {
+      "type": "Surface",
+      "props": {
+        "variant": "elevated",
+        "padding": 4
+      },
+      "children": [
+        "slide-image"
+      ]
+    },
+    "slide-image": {
+      "type": "Surface",
+      "props": {
+        "variant": "card",
+        "padding": 4
+      },
+      "children": ["si-content"]
+    },
+    "si-content": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 4 },
+      "children": ["si-title", "si-stats"]
+    },
+    "si-title": {
+      "type": "Text",
+      "props": { "tag": "h4", "content": "Users over time", "weight": "semibold" }
+    },
+    "si-stats": {
+      "type": "Grid",
+      "props": { "columns": 3, "gap": 3 },
+      "children": ["si-1", "si-2", "si-3"]
+    },
+    "si-1": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 1 },
+      "children": ["si-1-v", "si-1-l"]
+    },
+    "si-1-v": { "type": "Text", "props": { "tag": "h3", "content": "1,000" } },
+    "si-1-l": { "type": "Text", "props": { "tag": "span", "content": "Active", "variant": "secondary" } },
+    "si-2": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 1 },
+      "children": ["si-2-v", "si-2-l"]
+    },
+    "si-2-v": { "type": "Text", "props": { "tag": "h3", "content": "+24%" } },
+    "si-2-l": { "type": "Text", "props": { "tag": "span", "content": "Growth", "variant": "secondary" } },
+    "si-3": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 1 },
+      "children": ["si-3-v", "si-3-l"]
+    },
+    "si-3-v": { "type": "Text", "props": { "tag": "h3", "content": "98.5%" } },
+    "si-3-l": { "type": "Text", "props": { "tag": "span", "content": "Uptime", "variant": "secondary" } },
+    "carousel-caption": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "caption-title",
+        "caption-text"
+      ]
+    },
+    "caption-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Welcome to your new dashboard",
+        "align": "center",
+        "variant": "inverted"
+      }
+    },
+    "caption-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Sign in to explore changes since your last visit.",
+        "align": "center",
+        "variant": "inverted-secondary"
+      }
+    },
+    "carousel-nav": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 4,
+        "justify": "center",
+        "align": "center"
+      },
+      "children": [
+        "nav-arrow-left",
+        "carousel-dots",
+        "nav-arrow-right"
+      ]
+    },
+    "nav-arrow-left": {
+      "type": "Button",
+      "props": {
+        "icon": "arrow-left",
+        "variant": "ghost",
+        "size": "sm"
+      }
+    },
+    "carousel-dots": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "justify": "center",
+        "align": "center"
+      },
+      "children": [
+        "dot-1",
+        "dot-2",
+        "dot-3",
+        "dot-4",
+        "dot-5"
+      ]
+    },
+    "dot-1": {
+      "type": "Badge",
+      "props": {
+        "variant": "dot",
+        "active": false
+      }
+    },
+    "dot-2": {
+      "type": "Badge",
+      "props": {
+        "variant": "dot",
+        "active": false
+      }
+    },
+    "dot-3": {
+      "type": "Badge",
+      "props": {
+        "variant": "dot",
+        "active": true
+      }
+    },
+    "dot-4": {
+      "type": "Badge",
+      "props": {
+        "variant": "dot",
+        "active": false
+      }
+    },
+    "dot-5": {
+      "type": "Badge",
+      "props": {
+        "variant": "dot",
+        "active": false
+      }
+    },
+    "nav-arrow-right": {
+      "type": "Button",
+      "props": {
+        "icon": "arrow-right",
+        "variant": "ghost",
+        "size": "sm"
+      }
+    }
+  }
+}

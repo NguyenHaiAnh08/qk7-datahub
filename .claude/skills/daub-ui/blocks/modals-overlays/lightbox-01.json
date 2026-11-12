@@ -1,0 +1,151 @@
+{
+  "root": "image-lightbox",
+  "elements": {
+    "image-lightbox": {
+      "type": "Card",
+      "props": {
+        "title": "Product Screenshot"
+      },
+      "children": [
+        "lightbox-content",
+        "lightbox-footer"
+      ]
+    },
+    "lightbox-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "lightbox-image",
+        "lightbox-nav"
+      ]
+    },
+    "lightbox-image": {
+      "type": "AspectRatio",
+      "props": {
+        "ratio": "16-9"
+      },
+      "children": [
+        "main-image"
+      ]
+    },
+    "main-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/lightbox-analytics/1200/675",
+        "alt": "Dashboard analytics view showing revenue charts and user engagement metrics"
+      }
+    },
+    "lightbox-nav": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "btn-prev",
+        "image-counter",
+        "btn-next"
+      ]
+    },
+    "btn-prev": {
+      "type": "Button",
+      "props": {
+        "label": "Previous",
+        "variant": "outline",
+        "size": "sm",
+        "icon": "chevron-left"
+      }
+    },
+    "image-counter": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "3 of 12",
+        "variant": "muted"
+      }
+    },
+    "btn-next": {
+      "type": "Button",
+      "props": {
+        "label": "Next",
+        "variant": "outline",
+        "size": "sm",
+        "icon": "chevron-right"
+      }
+    },
+    "lightbox-footer": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3,
+        "justify": "space-between",
+        "align": "center"
+      },
+      "children": [
+        "caption-info",
+        "lightbox-actions"
+      ]
+    },
+    "caption-info": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "caption-title",
+        "caption-meta"
+      ]
+    },
+    "caption-title": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Analytics Dashboard - Revenue Overview",
+        "weight": "medium"
+      }
+    },
+    "caption-meta": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Uploaded by Sarah Mitchell on Mar 8, 2026 - 1920 x 1080 - 342 KB",
+        "variant": "muted"
+      }
+    },
+    "lightbox-actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2
+      },
+      "children": [
+        "btn-download",
+        "btn-share"
+      ]
+    },
+    "btn-download": {
+      "type": "Button",
+      "props": {
+        "label": "Download",
+        "variant": "outline",
+        "size": "sm",
+        "icon": "download"
+      }
+    },
+    "btn-share": {
+      "type": "Button",
+      "props": {
+        "label": "Share",
+        "variant": "outline",
+        "size": "sm",
+        "icon": "share-2"
+      }
+    }
+  }
+}

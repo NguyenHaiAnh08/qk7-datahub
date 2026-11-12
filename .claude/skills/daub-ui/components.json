@@ -1,0 +1,2131 @@
+{
+  "version": "3.20.6",
+  "prefix": "db-",
+  "cdn": {
+    "css": "https://daub.dev/daub.css",
+    "js": "https://daub.dev/daub.js"
+  },
+  "components": [
+    {
+      "name": "Button",
+      "class": "db-btn",
+      "category": "controls",
+      "element": "button",
+      "modifiers": [
+        "--primary",
+        "--secondary",
+        "--ghost",
+        "--sm",
+        "--lg",
+        "--icon",
+        "--loading",
+        "--disabled",
+        "--pressed",
+        "--icon-danger",
+        "--icon-success",
+        "--icon-accent"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<button class=\"db-btn db-btn--primary\" type=\"button\">Save changes</button>",
+      "notes": "Icon-only: add --icon. Loading: add --loading (disables pointer events). Ghost: transparent bg with hover fill."
+    },
+    {
+      "name": "Button Group",
+      "class": "db-btn-group",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-btn-group\">\n  <button type=\"button\" class=\"db-btn db-btn--secondary\">Copy</button>\n  <button type=\"button\" class=\"db-btn db-btn--secondary\">Paste</button>\n</div>",
+      "notes": "Groups buttons with connected borders. Children should be db-btn elements."
+    },
+    {
+      "name": "Text Field",
+      "class": "db-field",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [
+        "--error"
+      ],
+      "children": [
+        {
+          "class": "db-field__label",
+          "element": "label",
+          "required": false
+        },
+        {
+          "class": "db-field__input",
+          "element": "input",
+          "required": true
+        },
+        {
+          "class": "db-field__helper",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-field\">\n  <label class=\"db-field__label\" for=\"field-email\">Email</label>\n  <input class=\"db-field__input\" id=\"field-email\" type=\"email\" placeholder=\"you@example.com\">\n  <span class=\"db-field__helper\">We'll never share your email.</span>\n</div>",
+      "notes": "Error state: add db-field--error to wrapper."
+    },
+    {
+      "name": "Input",
+      "class": "db-input",
+      "category": "controls",
+      "element": "input",
+      "modifiers": [
+        "--sm",
+        "--lg",
+        "--error"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<input class=\"db-input\" type=\"text\" placeholder=\"Standalone input\" aria-label=\"Text input\">",
+      "notes": "Standalone text input. Use db-field for label+helper combos."
+    },
+    {
+      "name": "Input Group",
+      "class": "db-input-group",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-input-group__addon",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-input-group\">\n  <span class=\"db-input-group__addon\">https://</span>\n  <input class=\"db-input\" type=\"text\" placeholder=\"example.com\" aria-label=\"URL\">\n</div>",
+      "notes": "Combine addon spans and db-input/db-btn children."
+    },
+    {
+      "name": "Input with Icon",
+      "class": "db-input-icon",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [
+        "--right"
+      ],
+      "children": [
+        {
+          "class": "db-input-icon__icon",
+          "element": "span",
+          "required": true
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-input-icon\">\n  <i class=\"db-input-icon__icon\" data-lucide=\"search\" aria-hidden=\"true\"></i>\n  <input class=\"db-input\" type=\"search\" placeholder=\"Search projects...\" aria-label=\"Search projects\">\n</div>",
+      "notes": "Icon highlights on :focus-within. Use --right for trailing icon."
+    },
+    {
+      "name": "Search Input",
+      "class": "db-search",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-search__icon",
+          "element": "svg",
+          "required": false
+        },
+        {
+          "class": "db-search__clear",
+          "element": "button",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-search\">\n  <svg class=\"db-search__icon\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg>\n  <input class=\"db-input\" type=\"search\" placeholder=\"Search...\" aria-label=\"Search\">\n  <button type=\"button\" class=\"db-search__clear\" aria-label=\"Clear\">&times;</button>\n</div>",
+      "notes": "Clear button auto-shows when input has text."
+    },
+    {
+      "name": "Textarea",
+      "class": "db-textarea",
+      "category": "controls",
+      "element": "textarea",
+      "modifiers": [
+        "--error"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<textarea class=\"db-textarea\" placeholder=\"Write here...\" aria-label=\"Message\"></textarea>",
+      "notes": "Error state: add db-textarea--error."
+    },
+    {
+      "name": "Checkbox",
+      "class": "db-checkbox",
+      "category": "controls",
+      "element": "label",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-checkbox__input",
+          "element": "input",
+          "required": true
+        },
+        {
+          "class": "db-checkbox__box",
+          "element": "span",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<label class=\"db-checkbox\">\n  <input class=\"db-checkbox__input\" type=\"checkbox\">\n  <span class=\"db-checkbox__box\"><svg viewBox=\"0 0 24 24\"><polyline points=\"20 6 9 17 4 12\"/></svg></span>\n  Accept terms\n</label>",
+      "notes": "JS handles visual state sync. Indeterminate: set input.indeterminate = true \u2014 the box shows a dash (used by data-table select-all)."
+    },
+    {
+      "name": "Radio",
+      "class": "db-radio",
+      "category": "controls",
+      "element": "label",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-radio__input",
+          "element": "input",
+          "required": true
+        },
+        {
+          "class": "db-radio__circle",
+          "element": "span",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<label class=\"db-radio\">\n  <input class=\"db-radio__input\" type=\"radio\" name=\"plan\" value=\"free\">\n  <span class=\"db-radio__circle\"></span>\n  Free\n</label>",
+      "notes": "Wrap in db-radio-group for grouped radios."
+    },
+    {
+      "name": "Radio Group",
+      "class": "db-radio-group",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-radio-group\" role=\"group\" aria-label=\"Plan\">\n  <label class=\"db-radio\"><input class=\"db-radio__input\" type=\"radio\" name=\"catalog-plan\" value=\"free\" checked><span class=\"db-radio__circle\"></span>Free</label>\n  <label class=\"db-radio\"><input class=\"db-radio__input\" type=\"radio\" name=\"catalog-plan\" value=\"team\"><span class=\"db-radio__circle\"></span>Team</label>\n</div>",
+      "notes": "Groups db-radio children with consistent spacing."
+    },
+    {
+      "name": "Switch",
+      "class": "db-switch",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-switch__track",
+          "element": "span",
+          "required": true
+        },
+        {
+          "class": "db-switch__thumb",
+          "element": "span",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-switch\" role=\"switch\" tabindex=\"0\" aria-checked=\"false\">\n  <span class=\"db-switch__track\"><span class=\"db-switch__thumb\"></span></span>\n  Email notifications\n</div>",
+      "notes": "JS toggles aria-checked on click/keypress."
+    },
+    {
+      "name": "Slider",
+      "class": "db-slider",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-slider__label",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-slider__value",
+          "element": "span",
+          "required": false
+        },
+        {
+          "class": "db-slider__input",
+          "element": "input",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-slider\">\n  <div class=\"db-slider__label\"><span>Volume</span><span class=\"db-slider__value\">50</span></div>\n  <input class=\"db-slider__input\" type=\"range\" min=\"0\" max=\"100\" value=\"50\" aria-label=\"Volume\">\n</div>",
+      "notes": "JS syncs __value text with range input. Single-thumb only \u2014 for a dual-thumb range (e.g. price filter), compose two sliders for min/max."
+    },
+    {
+      "name": "Toggle",
+      "class": "db-toggle",
+      "category": "controls",
+      "element": "button",
+      "modifiers": [
+        "--active",
+        "--sm"
+      ],
+      "children": [],
+      "js": true,
+      "html": "<button type=\"button\" class=\"db-toggle\" aria-pressed=\"false\">Bold</button>",
+      "notes": "Active state via aria-pressed=\"true\" or db-toggle--active."
+    },
+    {
+      "name": "Toggle Group",
+      "class": "db-toggle-group",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [],
+      "js": true,
+      "html": "<div class=\"db-toggle-group\">\n  <button type=\"button\" class=\"db-toggle\" aria-pressed=\"true\">Left</button>\n  <button type=\"button\" class=\"db-toggle\" aria-pressed=\"false\">Center</button>\n  <button type=\"button\" class=\"db-toggle\" aria-pressed=\"false\">Right</button>\n</div>",
+      "notes": "Segmented control: inset track with raised active segment. Single select by default. Add data-multi for multi-select."
+    },
+    {
+      "name": "Native Select",
+      "class": "db-select",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-select__input",
+          "element": "select",
+          "required": true
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-select\">\n  <label class=\"db-label\" for=\"select-framework\">Framework</label>\n  <select class=\"db-select__input\" id=\"select-framework\">\n    <option value=\"\">Choose...</option>\n    <option value=\"react\">React</option>\n    <option value=\"vue\">Vue</option>\n    <option value=\"svelte\">Svelte</option>\n  </select>\n</div>",
+      "notes": "Styled native select element."
+    },
+    {
+      "name": "Custom Select",
+      "class": "db-custom-select",
+      "aliases": ["combobox", "autocomplete"],
+      "category": "controls",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-custom-select__trigger",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-custom-select__dropdown",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-custom-select__option",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-custom-select__search",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-custom-select\">\n  <button class=\"db-custom-select__trigger\" type=\"button\" aria-label=\"Select a framework\">\n    <span class=\"db-custom-select__placeholder\">Choose a framework...</span>\n    <svg class=\"db-custom-select__icon\" viewBox=\"0 0 24 24\"><path d=\"m6 9 6 6 6-6\"/></svg>\n  </button>\n  <div class=\"db-custom-select__dropdown\">\n    <div class=\"db-custom-select__option\" data-value=\"react\">React</div>\n    <div class=\"db-custom-select__option\" data-value=\"vue\">Vue</div>\n  </div>\n</div>",
+      "notes": "JS auto-initializes. Optional search filter via __search child turns it into a combobox / autocomplete."
+    },
+    {
+      "name": "Label",
+      "class": "db-label",
+      "category": "foundations",
+      "element": "label",
+      "modifiers": [
+        "--required",
+        "--optional"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-field\">\n  <label class=\"db-label db-label--required\" for=\"label-email\">Email</label>\n  <input class=\"db-input\" id=\"label-email\" type=\"email\" required placeholder=\"you@example.com\">\n</div>",
+      "notes": "--required appends *, --optional appends (optional)."
+    },
+    {
+      "name": "Kbd",
+      "class": "db-kbd",
+      "category": "foundations",
+      "element": "kbd",
+      "modifiers": [
+        "--sm"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<kbd class=\"db-kbd\">Ctrl</kbd> + <kbd class=\"db-kbd\">K</kbd>",
+      "notes": "Keyboard key display. Use --sm for smaller inline size."
+    },
+    {
+      "name": "Spinner",
+      "class": "db-spinner",
+      "category": "feedback",
+      "element": "span",
+      "modifiers": [
+        "--sm",
+        "--lg",
+        "--xl"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<span class=\"db-spinner\" role=\"status\" aria-label=\"Loading\"></span>",
+      "notes": "Animated loading spinner. Inherits current text color."
+    },
+    {
+      "name": "Input OTP",
+      "class": "db-otp",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-otp__input",
+          "element": "input",
+          "required": true
+        },
+        {
+          "class": "db-otp__separator",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-otp\" role=\"group\" aria-label=\"One-time code\">\n  <input class=\"db-otp__input\" type=\"text\" inputmode=\"numeric\" aria-label=\"Digit 1\" maxlength=\"1\">\n  <input class=\"db-otp__input\" type=\"text\" inputmode=\"numeric\" aria-label=\"Digit 2\" maxlength=\"1\">\n  <input class=\"db-otp__input\" type=\"text\" inputmode=\"numeric\" aria-label=\"Digit 3\" maxlength=\"1\">\n  <span class=\"db-otp__separator\" aria-hidden=\"true\">-</span>\n  <input class=\"db-otp__input\" type=\"text\" inputmode=\"numeric\" aria-label=\"Digit 4\" maxlength=\"1\">\n  <input class=\"db-otp__input\" type=\"text\" inputmode=\"numeric\" aria-label=\"Digit 5\" maxlength=\"1\">\n  <input class=\"db-otp__input\" type=\"text\" inputmode=\"numeric\" aria-label=\"Digit 6\" maxlength=\"1\">\n</div>",
+      "notes": "JS auto-focuses next input and handles paste."
+    },
+    {
+      "name": "Tabs",
+      "class": "db-tabs",
+      "category": "navigation",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-tabs__list",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-tabs__tab",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-tabs__panel",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-tabs\">\n  <div class=\"db-tabs__list\" role=\"tablist\" aria-label=\"Project details\">\n    <button type=\"button\" class=\"db-tabs__tab\" role=\"tab\" aria-selected=\"true\">Overview</button>\n    <button type=\"button\" class=\"db-tabs__tab\" role=\"tab\" aria-selected=\"false\">Activity</button>\n  </div>\n  <div class=\"db-tabs__panel\">3 tasks are ready for review.</div>\n  <div class=\"db-tabs__panel\" hidden>Ada updated the project today.</div>\n</div>",
+      "skeleton": "db-tabs > __list[role=tablist] > __tab + __panel",
+      "notes": "JS handles tab switching and panel visibility."
+    },
+    {
+      "name": "Card",
+      "class": "db-card",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [
+        "--clip",
+        "--media"
+      ],
+      "children": [
+        {
+          "class": "db-card__header",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-card__title",
+          "element": "h3",
+          "required": false
+        },
+        {
+          "class": "db-card__desc",
+          "element": "p",
+          "required": false
+        },
+        {
+          "class": "db-card__body",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-card__media",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-card__footer",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-card\">\n  <div class=\"db-card__header\">\n    <h3 class=\"db-card__title\">Project Aurora</h3>\n    <p class=\"db-card__desc\">Website redesign for the fall release.</p>\n  </div>\n  <div class=\"db-card__footer\">\n    <button type=\"button\" class=\"db-btn db-btn--primary db-btn--sm\">Open project</button>\n  </div>\n</div>",
+      "notes": "Default allows overflow (tooltips/dropdowns). Add --clip for overflow:hidden. --media for edge-to-edge images."
+    },
+    {
+      "name": "Modal",
+      "class": "db-modal",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-modal__header",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-modal__title",
+          "element": "h2",
+          "required": false
+        },
+        {
+          "class": "db-modal__close",
+          "element": "button",
+          "required": false
+        },
+        {
+          "class": "db-modal__body",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-modal__footer",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<button type=\"button\" class=\"db-btn db-btn--secondary\" data-db-modal-trigger=\"my-modal\">Open project details</button>\n<div class=\"db-modal-overlay\" id=\"my-modal\" aria-hidden=\"true\">\n  <div class=\"db-modal\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"my-modal-title\">\n    <div class=\"db-modal__header\"><h2 class=\"db-modal__title\" id=\"my-modal-title\">Project details</h2><button type=\"button\" class=\"db-modal__close\" aria-label=\"Close dialog\">&times;</button></div>\n    <div class=\"db-modal__body\">Project Aurora has 3 tasks ready for review.</div>\n    <div class=\"db-modal__footer\"><button type=\"button\" class=\"db-btn db-btn--secondary\" data-db-dismiss>Close</button></div>\n  </div>\n</div>",
+      "skeleton": "db-modal-overlay#id[aria-hidden] > db-modal > __header + __body + __footer",
+      "notes": "Wrap in db-modal-overlay with id. Open: DAUB.openModal('id'). Close: DAUB.closeModal('id'). The close button, the backdrop, Escape and any button with data-db-dismiss close it too."
+    },
+    {
+      "name": "Modal Overlay",
+      "class": "db-modal-overlay",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [],
+      "children": [],
+      "js": true,
+      "html": "<button type=\"button\" class=\"db-btn db-btn--secondary\" data-db-modal-trigger=\"overlay-example\">Open release notes</button>\n<div class=\"db-modal-overlay\" id=\"overlay-example\" aria-hidden=\"true\">\n  <div class=\"db-modal\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"overlay-example-title\">\n    <div class=\"db-modal__header\"><h2 class=\"db-modal__title\" id=\"overlay-example-title\">Release notes</h2><button type=\"button\" class=\"db-modal__close\" aria-label=\"Close dialog\">&times;</button></div>\n    <div class=\"db-modal__body\">The team completed the navigation and chat updates for this release.</div>\n    <div class=\"db-modal__footer\"><button type=\"button\" class=\"db-btn db-btn--secondary\" data-db-dismiss>Close</button></div>\n  </div>\n</div>",
+      "skeleton": "db-modal-overlay#id[aria-hidden] > db-modal > __header + __body + __footer",
+      "notes": "Backdrop container for db-modal. Keep the launcher outside the hidden overlay and match data-db-modal-trigger to its id. The close button, footer, backdrop, and Escape dismiss this example."
+    },
+    {
+      "name": "Alert Dialog",
+      "class": "db-alert-dialog",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-alert-dialog__overlay",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-alert-dialog__panel",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-alert-dialog__title",
+          "element": "h3",
+          "required": false
+        },
+        {
+          "class": "db-alert-dialog__desc",
+          "element": "p",
+          "required": false
+        },
+        {
+          "class": "db-alert-dialog__actions",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<button type=\"button\" class=\"db-btn db-btn--secondary\" data-db-trigger=\"confirm-delete\">Delete draft</button>\n<div class=\"db-alert-dialog\" id=\"confirm-delete\">\n  <div class=\"db-alert-dialog__overlay\"></div>\n  <div class=\"db-alert-dialog__panel\" role=\"alertdialog\" aria-modal=\"true\" aria-labelledby=\"confirm-delete-title\" aria-describedby=\"confirm-delete-desc\">\n    <h3 class=\"db-alert-dialog__title\" id=\"confirm-delete-title\">Delete this draft?</h3>\n    <p class=\"db-alert-dialog__desc\" id=\"confirm-delete-desc\">This action cannot be undone.</p>\n    <div class=\"db-alert-dialog__actions\">\n      <button type=\"button\" class=\"db-btn db-btn--secondary\" data-action=\"cancel\">Cancel</button>\n      <button type=\"button\" class=\"db-btn db-btn--primary\" data-db-dismiss onclick=\"DAUB.closeAlertDialog('confirm-delete')\">Delete draft</button>\n    </div>\n  </div>\n</div>",
+      "skeleton": "db-alert-dialog#id > __overlay + __panel > __title + __desc + __actions",
+      "notes": "Open: DAUB.openAlertDialog('id'). data-action=\"cancel\" auto-closes and takes focus on open. data-db-dismiss closes it from any button, a confirm action included; so do the backdrop and Escape."
+    },
+    {
+      "name": "Sheet",
+      "class": "db-sheet",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [
+        "--open",
+        "--right",
+        "--left",
+        "--top",
+        "--bottom"
+      ],
+      "children": [
+        {
+          "class": "db-sheet__overlay",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-sheet__panel",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-sheet__header",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-sheet__title",
+          "element": "span",
+          "required": false
+        },
+        {
+          "class": "db-sheet__close",
+          "element": "button",
+          "required": false
+        },
+        {
+          "class": "db-sheet__body",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<button type=\"button\" class=\"db-btn db-btn--secondary\" data-db-trigger=\"my-sheet\">Project settings</button>\n<div class=\"db-sheet db-sheet--right\" id=\"my-sheet\">\n  <div class=\"db-sheet__overlay\"></div>\n  <div class=\"db-sheet__panel\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"my-sheet-title\">\n    <div class=\"db-sheet__header\">\n      <span class=\"db-sheet__title\" id=\"my-sheet-title\">Project settings</span>\n      <button type=\"button\" class=\"db-sheet__close\" aria-label=\"Close\">&times;</button>\n    </div>\n    <div class=\"db-sheet__body\">Notifications are enabled for this project.</div>\n  </div>\n</div>",
+      "skeleton": "db-sheet.db-sheet--right#id > __overlay + __panel > __header + __body",
+      "notes": "Sides: --right (default), --left, --top, --bottom. Open: DAUB.openSheet('id'). The close button, the backdrop, Escape and any button with data-db-dismiss close it."
+    },
+    {
+      "name": "Drawer",
+      "class": "db-drawer",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-drawer__overlay",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-drawer__panel",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-drawer__handle",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-drawer__body",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<button type=\"button\" class=\"db-btn db-btn--secondary\" data-db-trigger=\"my-drawer\">View order</button>\n<div class=\"db-drawer\" id=\"my-drawer\">\n  <div class=\"db-drawer__overlay\"></div>\n  <div class=\"db-drawer__panel\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Order summary\">\n    <div class=\"db-drawer__handle\"></div>\n    <div class=\"db-drawer__body\"><h3 class=\"db-h3\">Order summary</h3><p>3 items. Total: $42.00.</p><button type=\"button\" class=\"db-btn db-btn--secondary\" data-action=\"cancel\">Close</button></div>\n  </div>\n</div>",
+      "skeleton": "db-drawer#id > __overlay + __panel > __handle + __body",
+      "notes": "Mobile-friendly bottom panel. Open: DAUB.openDrawer('id'). The backdrop, Escape and any button with data-db-dismiss close it."
+    },
+    {
+      "name": "Toast",
+      "class": "db-toast",
+      "category": "feedback",
+      "element": "div",
+      "modifiers": [
+        "--success",
+        "--error",
+        "--warning",
+        "--removing"
+      ],
+      "children": [
+        {
+          "class": "db-toast__icon",
+          "element": "span",
+          "required": false
+        },
+        {
+          "class": "db-toast__content",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-toast__title",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-toast__message",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-toast__close",
+          "element": "button",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-toast db-toast--success\" role=\"status\">\n  <i class=\"db-toast__icon\" data-lucide=\"circle-check\" aria-hidden=\"true\"></i>\n  <div class=\"db-toast__content\"><strong class=\"db-toast__title\">Saved</strong><p class=\"db-toast__message\">Your profile changes are ready.</p></div>\n</div>\n<button type=\"button\" class=\"db-btn db-btn--secondary db-btn--sm db-mt-4\" onclick=\"DAUB.toast({ type: 'success', title: 'Saved', message: 'Changes saved.', duration: 4000 })\">Show toast</button>",
+      "notes": "HTML shows toast anatomy. Create timed notifications with DAUB.toast('msg') or DAUB.toast({ type: 'success', title: 'Saved', message: 'Changes saved.', duration: 4000 }). Types: info, success, warning, error."
+    },
+    {
+      "name": "Toast Stack",
+      "class": "db-toast-stack",
+      "runtime_only": true,
+      "category": "feedback",
+      "element": "div",
+      "modifiers": [],
+      "children": [],
+      "js": true,
+      "html": "<div class=\"db-toast-stack\" role=\"region\" aria-live=\"polite\" aria-label=\"Notifications\">\n  <div class=\"db-toast db-toast--success\">\n    <div class=\"db-toast__content\">Profile saved.</div>\n  </div>\n  <div class=\"db-toast db-toast--warning\">\n    <div class=\"db-toast__content\">Your storage is almost full.</div>\n  </div>\n</div>",
+      "notes": "Container auto-created by JS when first toast fires. Fixed bottom-right."
+    },
+    {
+      "name": "Alert",
+      "class": "db-alert",
+      "category": "feedback",
+      "element": "div",
+      "modifiers": [
+        "--info",
+        "--warning",
+        "--error",
+        "--success"
+      ],
+      "children": [
+        {
+          "class": "db-alert__icon",
+          "element": "span",
+          "required": false
+        },
+        {
+          "class": "db-alert__content",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-alert__title",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-alert db-alert--warning\">\n  <span class=\"db-alert__icon\"><i data-lucide=\"triangle-alert\" aria-hidden=\"true\"></i></span>\n  <div class=\"db-alert__content\">\n    <div class=\"db-alert__title\">Storage almost full</div>\n    <p>You have used 90% of your workspace storage.</p>\n  </div>\n</div>",
+      "notes": "Static inline alert. Variants: --info, --warning, --error, --success."
+    },
+    {
+      "name": "Badge",
+      "class": "db-badge",
+      "category": "data-display",
+      "element": "span",
+      "modifiers": [
+        "--new",
+        "--updated",
+        "--success",
+        "--warning",
+        "--error",
+        "--danger",
+        "--info"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<span class=\"db-badge db-badge--new\">New</span>",
+      "notes": "Small status indicator. Color variants for different states."
+    },
+    {
+      "name": "Avatar",
+      "class": "db-avatar",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [
+        "--sm",
+        "--md",
+        "--lg"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-avatar db-avatar--md\" role=\"img\" aria-label=\"Ada Lovelace\">AL</div>",
+      "notes": "Sizes: --sm (32px), --md (40px), --lg (56px). Supports img or text initials."
+    },
+    {
+      "name": "Avatar Group",
+      "class": "db-avatar-group",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-avatar-group__overflow",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-avatar-group\" role=\"group\" aria-label=\"Project members\">\n  <div class=\"db-avatar db-avatar--md\" role=\"img\" aria-label=\"Ada Lovelace\">AL</div>\n  <div class=\"db-avatar db-avatar--md\" role=\"img\" aria-label=\"Grace Hopper\">GH</div>\n  <span class=\"db-avatar-group__overflow\" aria-label=\"5 more members\">+5</span>\n</div>",
+      "notes": "Overlapping avatar stack with optional overflow counter."
+    },
+    {
+      "name": "Table",
+      "class": "db-table",
+      "category": "data-display",
+      "element": "table",
+      "modifiers": [],
+      "children": [],
+      "js": false,
+      "html": "<table class=\"db-table\">\n  <thead><tr><th>Name</th><th>Role</th></tr></thead>\n  <tbody><tr><td>Alice</td><td>Engineer</td></tr></tbody>\n</table>",
+      "notes": "Sortable columns: add data-db-sort to th."
+    },
+    {
+      "name": "Data Table",
+      "class": "db-data-table",
+      "category": "data-display",
+      "element": "table",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-data-table__check",
+          "element": "input",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<table class=\"db-data-table\">\n  <thead><tr>\n    <th><input class=\"db-data-table__check\" type=\"checkbox\" aria-label=\"Select all rows\"></th>\n    <th data-sortable>Name</th>\n  </tr></thead>\n  <tbody><tr>\n    <td><input class=\"db-data-table__check\" type=\"checkbox\" aria-label=\"Select Project Aurora\"></td>\n    <td>Project Aurora</td>\n  </tr><tr><td><input class=\"db-data-table__check\" type=\"checkbox\" aria-label=\"Select Project Birch\"></td><td>Project Birch</td></tr></tbody>\n</table>",
+      "notes": "JS wires the thead checkbox to row checkboxes (select-all with indeterminate state) and click-to-sort on th[data-sortable] / th[data-db-sort] (toggles aria-sort, reorders tbody rows)."
+    },
+    {
+      "name": "List",
+      "class": "db-list",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-list__item",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-list__content",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-list__title",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-list__secondary",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-list\">\n  <div class=\"db-list__item\">\n    <div class=\"db-list__content\">\n      <div class=\"db-list__title\">Quarterly report</div>\n      <div class=\"db-list__secondary\">Updated today by Ada Lovelace</div>\n    </div>\n  </div>\n</div>",
+      "notes": "Vertical list of items with optional title and secondary text."
+    },
+    {
+      "name": "Chip",
+      "class": "db-chip",
+      "category": "data-display",
+      "element": "span",
+      "modifiers": [
+        "--red",
+        "--green",
+        "--blue",
+        "--purple",
+        "--amber",
+        "--pink",
+        "--active"
+      ],
+      "children": [
+        {
+          "class": "db-chip__close",
+          "element": "button",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<span class=\"db-chip db-chip--blue\">Design</span>",
+      "notes": "Color presets or custom via --db-chip-h/s/l. --active for selected state. Removable via __close button. Toggle group: wrap in container with data-db-chip-toggle."
+    },
+    {
+      "name": "Breadcrumbs",
+      "class": "db-breadcrumbs",
+      "category": "navigation",
+      "element": "nav",
+      "modifiers": [],
+      "children": [],
+      "js": false,
+      "html": "<nav class=\"db-breadcrumbs\" aria-label=\"Breadcrumb\">\n  <ol><li><a href=\"/\">Home</a></li><li aria-current=\"page\">Current</li></ol>\n</nav>",
+      "notes": "Use ol/li children. Mark current page with aria-current=\"page\"."
+    },
+    {
+      "name": "Pagination",
+      "class": "db-pagination",
+      "category": "navigation",
+      "element": "nav",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-pagination__btn",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-pagination__ellipsis",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<nav class=\"db-pagination\" aria-label=\"Pagination\">\n  <button type=\"button\" class=\"db-pagination__btn\" disabled aria-label=\"Previous page\">&laquo;</button>\n  <button type=\"button\" class=\"db-pagination__btn\" aria-current=\"page\">1</button>\n  <button type=\"button\" class=\"db-pagination__btn\">2</button>\n  <button type=\"button\" class=\"db-pagination__btn\" aria-label=\"Next page\">&raquo;</button>\n</nav>",
+      "notes": "Mark current page with aria-current=\"page\"."
+    },
+    {
+      "name": "Stepper",
+      "class": "db-stepper",
+      "category": "navigation",
+      "element": "div",
+      "modifiers": [
+        "--vertical"
+      ],
+      "children": [
+        {
+          "class": "db-stepper__step",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-stepper__indicator",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-stepper__label",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-stepper\">\n  <div class=\"db-stepper__step db-stepper__step--completed\">\n    <div class=\"db-stepper__indicator\">1</div>\n    <div class=\"db-stepper__label\">Done</div>\n  </div>\n  <div class=\"db-stepper__step db-stepper__step--active\">\n    <div class=\"db-stepper__indicator\">2</div>\n    <div class=\"db-stepper__label\">Current</div>\n  </div>\n</div>",
+      "notes": "Step states: --completed, --active. Use --vertical for vertical layout."
+    },
+    {
+      "name": "Nav Menu",
+      "class": "db-nav-menu",
+      "category": "navigation",
+      "element": "nav",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-nav-menu__item",
+          "element": "a",
+          "required": true
+        }
+      ],
+      "js": false,
+      "html": "<nav class=\"db-nav-menu\">\n  <a class=\"db-nav-menu__item db-nav-menu__item--active\" href=\"/\" aria-current=\"page\">Home</a>\n  <a class=\"db-nav-menu__item\" href=\"/docs.html\">Documentation</a>\n</nav>",
+      "notes": "Horizontal navigation links. Use --active for current item."
+    },
+    {
+      "name": "Navbar",
+      "class": "db-navbar",
+      "category": "navigation",
+      "element": "nav",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-navbar__brand",
+          "element": "a",
+          "required": false
+        },
+        {
+          "class": "db-navbar__nav",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-navbar__spacer",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-navbar__actions",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-navbar__toggle",
+          "element": "button",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<nav class=\"db-navbar\">\n  <a class=\"db-navbar__brand\" href=\"/\">AppName</a>\n  <div class=\"db-navbar__nav\">\n    <div class=\"db-nav-menu\">\n      <a class=\"db-nav-menu__item db-nav-menu__item--active\" href=\"/\">Home</a>\n    </div>\n  </div>\n  <div class=\"db-navbar__spacer\"></div>\n  <div class=\"db-navbar__actions\">\n    <button type=\"button\" class=\"db-btn db-btn--icon\" aria-label=\"Notifications\"><i data-lucide=\"bell\" aria-hidden=\"true\"></i></button>\n  </div>\n  <button type=\"button\" class=\"db-navbar__toggle\" aria-label=\"Menu\" aria-expanded=\"false\"><i data-lucide=\"menu\" aria-hidden=\"true\"></i></button>\n</nav>",
+      "notes": "Sticky top bar. At 640px and below db-navbar__nav collapses and db-navbar__toggle opens it; daub.js keeps the toggle's aria-expanded in step. JS: DAUB.toggleNavbar(el) or DAUB.toggleNavbar(el, open). The menu closes on outside click and Escape."
+    },
+    {
+      "name": "Menubar",
+      "class": "db-menubar",
+      "category": "navigation",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-menubar__item",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-menubar__dropdown",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-menubar\" role=\"menubar\" aria-label=\"Document\">\n  <div class=\"db-menubar__item\" role=\"menuitem\" tabindex=\"0\" aria-haspopup=\"menu\" aria-expanded=\"false\">File\n    <div class=\"db-menubar__dropdown\" role=\"menu\">\n      <button type=\"button\" class=\"db-dropdown__item\" role=\"menuitem\">New document</button>\n      <button type=\"button\" class=\"db-dropdown__item\" role=\"menuitem\">Open document</button>\n    </div>\n  </div>\n  <div class=\"db-menubar__item\" role=\"menuitem\" tabindex=\"0\" aria-haspopup=\"menu\" aria-expanded=\"false\">Edit\n    <div class=\"db-menubar__dropdown\" role=\"menu\"><button type=\"button\" class=\"db-dropdown__item\" role=\"menuitem\">Select all</button></div>\n  </div>\n</div>",
+      "notes": "Desktop menu bar. Dropdown items use db-dropdown__item class."
+    },
+    {
+      "name": "Sidebar",
+      "class": "db-sidebar",
+      "category": "navigation",
+      "element": "aside",
+      "modifiers": [
+        "--collapsed",
+        "--expanded"
+      ],
+      "children": [
+        {
+          "class": "db-sidebar__header",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-sidebar__section",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-sidebar__label",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-sidebar__item",
+          "element": "a",
+          "required": true
+        },
+        {
+          "class": "db-sidebar__footer",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-sidebar__toggle",
+          "element": "button",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<aside class=\"db-sidebar\">\n  <div class=\"db-sidebar__header\">\n    <h3>App Name</h3>\n    <button type=\"button\" class=\"db-sidebar__toggle\" aria-label=\"Toggle sidebar\"><i data-lucide=\"panel-left\" aria-hidden=\"true\"></i></button>\n  </div>\n  <div class=\"db-sidebar__section\">\n    <div class=\"db-sidebar__label\">Main</div>\n    <a class=\"db-sidebar__item db-sidebar__item--active\" data-tooltip=\"Dashboard\" href=\"/\" aria-current=\"page\" aria-label=\"Dashboard\"><i data-lucide=\"layout-dashboard\" aria-hidden=\"true\"></i><span>Dashboard</span></a>\n  </div>\n</aside>",
+      "notes": "Starts as an icon rail on phones. Toggle with DAUB.toggleSidebar(el), or use --collapsed / --expanded. data-tooltip supplies labels on hover and keyboard focus."
+    },
+    {
+      "name": "Bottom Navigation",
+      "class": "db-bottom-nav",
+      "category": "navigation",
+      "element": "nav",
+      "modifiers": [
+        "--always",
+        "--static"
+      ],
+      "children": [
+        {
+          "class": "db-bottom-nav__item",
+          "element": "a",
+          "required": true
+        },
+        {
+          "class": "db-bottom-nav__badge",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<nav class=\"db-bottom-nav db-bottom-nav--always db-bottom-nav--static\" aria-label=\"Mobile navigation\">\n  <a class=\"db-bottom-nav__item db-bottom-nav__item--active\" href=\"/\" aria-current=\"page\"><i data-lucide=\"house\" aria-hidden=\"true\"></i><span>Home</span></a>\n  <a class=\"db-bottom-nav__item\" href=\"/components.html\"><i data-lucide=\"blocks\" aria-hidden=\"true\"></i><span>Components</span><span class=\"db-bottom-nav__badge\">3</span></a>\n</nav>",
+      "notes": "Fixed mobile bottom bar. Hidden on desktop unless --always. Use --static for inline placement, as in this preview. Safe-area aware."
+    },
+    {
+      "name": "Tooltip",
+      "class": "db-tooltip",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-tooltip__content",
+          "element": "span",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-tooltip\">\n  <button type=\"button\" class=\"db-btn\">Hover me</button>\n  <span class=\"db-tooltip__content db-tooltip__content--top\">Tooltip text</span>\n</div>",
+      "notes": "Positions: __content--top, --bottom, --left, --right."
+    },
+    {
+      "name": "Popover",
+      "class": "db-popover",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-popover__trigger",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-popover__content",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-popover\">\n  <button type=\"button\" class=\"db-btn db-popover__trigger\">Click me</button>\n  <div class=\"db-popover__content db-popover__content--bottom\">\n    <p>Popover content here.</p>\n  </div>\n</div>",
+      "notes": "Positions: __content--top, --bottom, --left, --right."
+    },
+    {
+      "name": "Hover Card",
+      "class": "db-hover-card",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-hover-card__content",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-hover-card\">\n  <button class=\"db-btn db-btn--ghost\" type=\"button\">Ada Lovelace</button>\n  <div class=\"db-hover-card__content\"><strong>Workspace owner</strong><p>Ada manages the project and billing.</p></div>\n</div>",
+      "notes": "Content appears on hover or keyboard focus (:focus-within)."
+    },
+    {
+      "name": "Dropdown Menu",
+      "class": "db-dropdown",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-dropdown__trigger",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-dropdown__content",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-dropdown__item",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-dropdown__separator",
+          "element": "hr",
+          "required": false
+        },
+        {
+          "class": "db-dropdown__label",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-dropdown\">\n  <button type=\"button\" class=\"db-btn db-dropdown__trigger\">Options</button>\n  <div class=\"db-dropdown__content\">\n    <div class=\"db-dropdown__label\">Actions</div>\n    <button type=\"button\" class=\"db-dropdown__item\">Edit</button>\n    <hr class=\"db-dropdown__separator\">\n    <button type=\"button\" class=\"db-dropdown__item\">Delete</button>\n  </div>\n</div>",
+      "skeleton": "db-dropdown > __trigger + __content > __item + __separator + __label",
+      "notes": "JS auto-initializes toggle. Right-aligned: add db-dropdown__content--right. __menu is an alias for __content."
+    },
+    {
+      "name": "Context Menu",
+      "class": "db-context-menu",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-context-menu__label",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-context-menu__item",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-context-menu__separator",
+          "element": "hr",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div data-context-menu=\"my-ctx-menu\">Right-click here</div>\n<div class=\"db-context-menu\" id=\"my-ctx-menu\">\n  <div class=\"db-context-menu__label\">Actions</div>\n  <button type=\"button\" class=\"db-context-menu__item\">Copy</button>\n  <hr class=\"db-context-menu__separator\">\n  <button type=\"button\" class=\"db-context-menu__item\">Delete</button>\n</div>",
+      "skeleton": "data-context-menu='id' target + db-context-menu#id > __item + __separator + __label",
+      "notes": "Triggered by data-context-menu attribute on right-click target."
+    },
+    {
+      "name": "Command Palette",
+      "class": "db-command",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-command__overlay",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-command__panel",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-command__input-wrap",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-command__input",
+          "element": "input",
+          "required": true
+        },
+        {
+          "class": "db-command__list",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-command__group-label",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-command__item",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-command__shortcut",
+          "element": "span",
+          "required": false
+        },
+        {
+          "class": "db-command__empty",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<button type=\"button\" class=\"db-btn db-btn--secondary\" data-db-command-trigger=\"cmd\" onclick=\"DAUB.openCommand('cmd')\">Search commands</button>\n<div class=\"db-command\" id=\"cmd\">\n  <div class=\"db-command__overlay\"></div>\n  <div class=\"db-command__panel\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Command palette\">\n    <div class=\"db-command__input-wrap\">\n      <input class=\"db-command__input\" placeholder=\"Search...\" aria-label=\"Search commands\">\n    </div>\n    <div class=\"db-command__list\">\n      <div class=\"db-command__group-label\">Navigation</div>\n      <div class=\"db-command__item\">Home</div>\n    </div>\n  </div>\n</div>",
+      "skeleton": "db-command#id > __overlay + __panel > __input-wrap + __list",
+      "notes": "Opens with Ctrl+K / Cmd+K. JS: DAUB.openCommand('id'), DAUB.closeCommand('id')."
+    },
+    {
+      "name": "Accordion",
+      "class": "db-accordion",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-accordion__item",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-accordion__trigger",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-accordion__icon",
+          "element": "svg",
+          "required": false
+        },
+        {
+          "class": "db-accordion__content",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-accordion\">\n  <div class=\"db-accordion__item\">\n    <button type=\"button\" class=\"db-accordion__trigger\" aria-expanded=\"false\">\n      Can I invite teammates?\n      <svg class=\"db-accordion__icon\" viewBox=\"0 0 24 24\"><path d=\"m6 9 6 6 6-6\"/></svg>\n    </button>\n    <div class=\"db-accordion__content\">Invite teammates from Workspace settings. Team members can review and edit projects.</div>\n  </div>\n</div>",
+      "notes": "Single-open by default. Add data-multi for multi-open."
+    },
+    {
+      "name": "Collapsible",
+      "class": "db-collapsible",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [
+        "--open"
+      ],
+      "children": [
+        {
+          "class": "db-collapsible__trigger",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-collapsible__icon",
+          "element": "svg",
+          "required": false
+        },
+        {
+          "class": "db-collapsible__content",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-collapsible\">\n  <button type=\"button\" class=\"db-collapsible__trigger\" aria-expanded=\"false\">\n    <svg class=\"db-collapsible__icon\" viewBox=\"0 0 24 24\"><path d=\"m9 18 6-6-6-6\"/></svg>\n    Project history\n  </button>\n  <div class=\"db-collapsible__content\">Ada created this project on October 1. Grace reviewed the proposal on October 3.</div>\n</div>",
+      "notes": "JS toggles open state and aria-expanded."
+    },
+    {
+      "name": "Progress",
+      "class": "db-progress",
+      "category": "feedback",
+      "element": "div",
+      "modifiers": [
+        "--indeterminate"
+      ],
+      "children": [
+        {
+          "class": "db-progress__bar",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-progress\" role=\"progressbar\" aria-label=\"Progress\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-valuenow=\"65\"><div class=\"db-progress__bar\" style=\"--db-progress: 65%;\"></div></div>",
+      "notes": "Set progress via --db-progress custom property. Add --indeterminate for animated state."
+    },
+    {
+      "name": "Skeleton",
+      "class": "db-skeleton",
+      "category": "feedback",
+      "element": "div",
+      "modifiers": [
+        "--text",
+        "--heading",
+        "--avatar",
+        "--btn"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-skeleton db-skeleton--text\"></div>\n<div class=\"db-skeleton db-skeleton--heading\"></div>\n<div class=\"db-skeleton db-skeleton--avatar\"></div>",
+      "notes": "Placeholder loading shapes. Animated shimmer effect."
+    },
+    {
+      "name": "Empty State",
+      "class": "db-empty",
+      "category": "feedback",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-empty__icon",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-empty__title",
+          "element": "h3",
+          "required": false
+        },
+        {
+          "class": "db-empty__message",
+          "element": "p",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-empty\">\n  <div class=\"db-empty__icon\"><i data-lucide=\"folder-open\" aria-hidden=\"true\"></i></div>\n  <h3 class=\"db-empty__title\">No projects</h3>\n  <p class=\"db-empty__desc db-empty__message\">Get started by creating your first project.</p>\n  <button type=\"button\" class=\"db-btn db-btn--primary\">Create project</button>\n</div>",
+      "notes": "Centered empty state with icon, title, description, and optional CTA."
+    },
+    {
+      "name": "Calendar",
+      "class": "db-calendar",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-calendar__header",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-calendar__title",
+          "element": "span",
+          "required": true
+        },
+        {
+          "class": "db-calendar__nav",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-calendar__grid",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-calendar__day-label",
+          "element": "span",
+          "required": true
+        },
+        {
+          "class": "db-calendar__day",
+          "element": "button",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-calendar\">\n  <div class=\"db-calendar__header\"><button type=\"button\" class=\"db-calendar__nav\" aria-label=\"Previous month\">&lsaquo;</button><span class=\"db-calendar__title\">February 2026</span><button type=\"button\" class=\"db-calendar__nav\" aria-label=\"Next month\">&rsaquo;</button></div>\n  <div class=\"db-calendar__grid\"><span class=\"db-calendar__day-label\">Mo</span><span class=\"db-calendar__day-label\">Tu</span><span class=\"db-calendar__day-label\">We</span><span class=\"db-calendar__day-label\">Th</span><span class=\"db-calendar__day-label\">Fr</span><span class=\"db-calendar__day-label\">Sa</span><span class=\"db-calendar__day-label\">Su</span><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">26</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">27</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">28</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">29</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">30</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">31</button><button type=\"button\" class=\"db-calendar__day\">1</button><button type=\"button\" class=\"db-calendar__day\">2</button><button type=\"button\" class=\"db-calendar__day\">3</button><button type=\"button\" class=\"db-calendar__day\">4</button><button type=\"button\" class=\"db-calendar__day\">5</button><button type=\"button\" class=\"db-calendar__day\">6</button><button type=\"button\" class=\"db-calendar__day\">7</button><button type=\"button\" class=\"db-calendar__day\">8</button><button type=\"button\" class=\"db-calendar__day\">9</button><button type=\"button\" class=\"db-calendar__day\">10</button><button type=\"button\" class=\"db-calendar__day\">11</button><button type=\"button\" class=\"db-calendar__day\">12</button><button type=\"button\" class=\"db-calendar__day\">13</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--selected\">14</button><button type=\"button\" class=\"db-calendar__day\">15</button><button type=\"button\" class=\"db-calendar__day\">16</button><button type=\"button\" class=\"db-calendar__day\">17</button><button type=\"button\" class=\"db-calendar__day\">18</button><button type=\"button\" class=\"db-calendar__day\">19</button><button type=\"button\" class=\"db-calendar__day\">20</button><button type=\"button\" class=\"db-calendar__day\">21</button><button type=\"button\" class=\"db-calendar__day\">22</button><button type=\"button\" class=\"db-calendar__day\">23</button><button type=\"button\" class=\"db-calendar__day\">24</button><button type=\"button\" class=\"db-calendar__day\">25</button><button type=\"button\" class=\"db-calendar__day\">26</button><button type=\"button\" class=\"db-calendar__day\">27</button><button type=\"button\" class=\"db-calendar__day\">28</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">1</button></div>\n</div>",
+      "notes": "Day states: --today, --selected, --outside. JS handles month navigation."
+    },
+    {
+      "name": "Date Picker",
+      "class": "db-date-picker",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-date-picker__trigger",
+          "element": "button",
+          "required": true
+        },
+        {
+          "class": "db-date-picker__dropdown",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-date-picker\">\n  <label class=\"db-label\" for=\"catalog-date\">Due date</label>\n  <button class=\"db-date-picker__trigger db-input\" id=\"catalog-date\" type=\"button\">2026-02-14</button>\n  <div class=\"db-date-picker__dropdown\"><div class=\"db-calendar\">\n  <div class=\"db-calendar__header\"><button type=\"button\" class=\"db-calendar__nav\" aria-label=\"Previous month\">&lsaquo;</button><span class=\"db-calendar__title\">February 2026</span><button type=\"button\" class=\"db-calendar__nav\" aria-label=\"Next month\">&rsaquo;</button></div>\n  <div class=\"db-calendar__grid\"><span class=\"db-calendar__day-label\">Mo</span><span class=\"db-calendar__day-label\">Tu</span><span class=\"db-calendar__day-label\">We</span><span class=\"db-calendar__day-label\">Th</span><span class=\"db-calendar__day-label\">Fr</span><span class=\"db-calendar__day-label\">Sa</span><span class=\"db-calendar__day-label\">Su</span><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">26</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">27</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">28</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">29</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">30</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">31</button><button type=\"button\" class=\"db-calendar__day\">1</button><button type=\"button\" class=\"db-calendar__day\">2</button><button type=\"button\" class=\"db-calendar__day\">3</button><button type=\"button\" class=\"db-calendar__day\">4</button><button type=\"button\" class=\"db-calendar__day\">5</button><button type=\"button\" class=\"db-calendar__day\">6</button><button type=\"button\" class=\"db-calendar__day\">7</button><button type=\"button\" class=\"db-calendar__day\">8</button><button type=\"button\" class=\"db-calendar__day\">9</button><button type=\"button\" class=\"db-calendar__day\">10</button><button type=\"button\" class=\"db-calendar__day\">11</button><button type=\"button\" class=\"db-calendar__day\">12</button><button type=\"button\" class=\"db-calendar__day\">13</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--selected\">14</button><button type=\"button\" class=\"db-calendar__day\">15</button><button type=\"button\" class=\"db-calendar__day\">16</button><button type=\"button\" class=\"db-calendar__day\">17</button><button type=\"button\" class=\"db-calendar__day\">18</button><button type=\"button\" class=\"db-calendar__day\">19</button><button type=\"button\" class=\"db-calendar__day\">20</button><button type=\"button\" class=\"db-calendar__day\">21</button><button type=\"button\" class=\"db-calendar__day\">22</button><button type=\"button\" class=\"db-calendar__day\">23</button><button type=\"button\" class=\"db-calendar__day\">24</button><button type=\"button\" class=\"db-calendar__day\">25</button><button type=\"button\" class=\"db-calendar__day\">26</button><button type=\"button\" class=\"db-calendar__day\">27</button><button type=\"button\" class=\"db-calendar__day\">28</button><button type=\"button\" class=\"db-calendar__day db-calendar__day--outside\">1</button></div>\n</div></div>\n</div>",
+      "notes": "Wraps Calendar in a trigger/dropdown. Click trigger to open calendar."
+    },
+    {
+      "name": "Carousel",
+      "class": "db-carousel",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-carousel__track",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-carousel__slide",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-carousel__btn",
+          "element": "button",
+          "required": false
+        },
+        {
+          "class": "db-carousel__dots",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-carousel__dot",
+          "element": "button",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-carousel\" role=\"region\" aria-roledescription=\"carousel\" aria-label=\"Project updates\" style=\"width:100%;\">\n  <div class=\"db-carousel__track\">\n    <div class=\"db-carousel__slide\" role=\"group\" aria-roledescription=\"slide\" aria-label=\"1 of 2\" style=\"min-height:180px;padding:24px 60px;display:flex;flex-direction:column;justify-content:center;\"><h3 class=\"db-h3\">Project Aurora</h3><p class=\"db-body\">Design review is ready.</p></div>\n    <div class=\"db-carousel__slide\" role=\"group\" aria-roledescription=\"slide\" aria-label=\"2 of 2\" style=\"min-height:180px;padding:24px 60px;display:flex;flex-direction:column;justify-content:center;\"><h3 class=\"db-h3\">Project Birch</h3><p class=\"db-body\">The release is scheduled for Friday.</p></div>\n  </div>\n  <button type=\"button\" class=\"db-carousel__btn db-carousel__btn--prev\" aria-label=\"Previous slide\" style=\"top:calc(50% - var(--db-space-3) - 4px);\"><i data-lucide=\"chevron-left\" aria-hidden=\"true\"></i></button>\n  <button type=\"button\" class=\"db-carousel__btn db-carousel__btn--next\" aria-label=\"Next slide\" style=\"top:calc(50% - var(--db-space-3) - 4px);\"><i data-lucide=\"chevron-right\" aria-hidden=\"true\"></i></button>\n  <div class=\"db-carousel__dots\">\n    <button type=\"button\" class=\"db-carousel__dot db-carousel__dot--active\" aria-label=\"Go to slide 1\" aria-current=\"true\"></button>\n    <button type=\"button\" class=\"db-carousel__dot\" aria-label=\"Go to slide 2\"></button>\n  </div>\n</div>",
+      "notes": "JS handles slide navigation, dot sync, and swipe. Text slides in this example reserve space for the overlay arrows."
+    },
+    {
+      "name": "CSS Bar Chart",
+      "class": "db-chart",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-chart__bar",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-chart__labels",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-chart\" role=\"img\" aria-label=\"Monthly revenue: January $40k, February $60k, March $80k\"><div class=\"db-chart__bar\" style=\"height:40%;\" title=\"January: $40k\"></div><div class=\"db-chart__bar\" style=\"height:60%;\" title=\"February: $60k\"></div><div class=\"db-chart__bar\" style=\"height:80%;\" title=\"March: $80k\"></div></div>\n<div class=\"db-chart__labels\"><span>Jan</span><span>Feb</span><span>Mar</span></div>",
+      "notes": "Pure CSS bar chart. Set bar height via inline style. --secondary modifier for alt color."
+    },
+    {
+      "name": "Stat Card",
+      "class": "db-stat",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [
+        "--horizontal"
+      ],
+      "children": [
+        {
+          "class": "db-stat__label",
+          "element": "span",
+          "required": true
+        },
+        {
+          "class": "db-stat__value",
+          "element": "span",
+          "required": true
+        },
+        {
+          "class": "db-stat__change",
+          "element": "span",
+          "required": false
+        },
+        {
+          "class": "db-stat__icon",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-stat\">\n  <span class=\"db-stat__label\">Total Users</span>\n  <span class=\"db-stat__value\">12,847</span>\n  <span class=\"db-stat__change db-stat__change--up\">↑ 12.5%</span>\n</div>",
+      "notes": "KPI/metric card. --horizontal for row layout. __change--up (green) / --down (red). Optional __icon slot."
+    },
+    {
+      "name": "Chart Card",
+      "class": "db-chart-card",
+      "category": "data-display",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-chart-card__header",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-chart-card__title",
+          "element": "span",
+          "required": false
+        },
+        {
+          "class": "db-chart-card__actions",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-chart-card__body",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-chart-card\">\n  <div class=\"db-chart-card__header\">\n    <span class=\"db-chart-card__title\">Revenue</span>\n    <div class=\"db-chart-card__actions\"><button type=\"button\" class=\"db-btn db-btn--sm db-btn--secondary\">Export</button></div>\n  </div>\n  <div class=\"db-chart-card__body\">\n    <div class=\"db-chart\" role=\"img\" aria-label=\"Monthly revenue: January $40k, February $60k, March $80k\"><div class=\"db-chart__bar\" style=\"height:40%;\" title=\"January: $40k\"></div><div class=\"db-chart__bar\" style=\"height:60%;\" title=\"February: $60k\"></div><div class=\"db-chart__bar\" style=\"height:80%;\" title=\"March: $80k\"></div></div>\n<div class=\"db-chart__labels\"><span>Jan</span><span>Feb</span><span>Mar</span></div>\n  </div>\n</div>",
+      "notes": "Card wrapper for any chart. Example uses CSS bars without external chart dependencies. Header with title/actions. Body auto-sizes canvas to 100% width."
+    },
+    {
+      "name": "Resizable",
+      "class": "db-resizable",
+      "category": "layout-utility",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-resizable__handle",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-resizable\" style=\"width:320px;height:220px;min-width:min(240px,100%);max-width:min(480px,100%);min-height:180px;max-height:320px;padding:16px 24px 24px 16px;border:1px solid var(--db-sand);border-radius:var(--db-radius-2);background:var(--db-white);\">\n  <div class=\"db-scroll-area db-scroll-area--vertical\" tabindex=\"0\" role=\"region\" aria-label=\"Project notes\" style=\"height:100%;\">\n    <h3 class=\"db-h3\">Project notes</h3>\n    <p class=\"db-body db-body--sm\" style=\"margin-bottom:12px;\">Review the homepage draft before Friday. Ada owns the copy and Grace owns the illustrations.</p>\n    <p class=\"db-body db-body--sm\" style=\"margin-bottom:12px;\">Confirm the navigation labels with Lin and attach the mobile screenshots to the review.</p>\n    <p class=\"db-body db-body--sm\">Publish the approved draft on Monday after the team checks the signup flow.</p>\n  </div>\n  <div class=\"db-resizable__handle db-resizable__handle--right\" style=\"background:var(--db-sand);\"><span aria-hidden=\"true\" style=\"position:absolute;top:50%;left:2px;width:2px;height:24px;transform:translateY(-50%);background:var(--db-warm-gray);\"></span></div>\n  <div class=\"db-resizable__handle db-resizable__handle--bottom\" style=\"background:var(--db-sand);\"><span aria-hidden=\"true\" style=\"position:absolute;left:50%;top:2px;width:24px;height:2px;transform:translateX(-50%);background:var(--db-warm-gray);\"></span></div>\n</div>",
+      "notes": "Handle positions: --right, --bottom. JS enables pointer and arrow-key resizing. This example adds inline size bounds and visible grips; its notes scroll within the panel."
+    },
+    {
+      "name": "Separator",
+      "class": "db-separator",
+      "category": "layout-utility",
+      "element": "hr",
+      "modifiers": [
+        "--vertical",
+        "--dashed"
+      ],
+      "children": [
+        {
+          "class": "db-separator__label",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<hr class=\"db-separator\">\n<hr class=\"db-separator db-separator--dashed\">\n<div class=\"db-separator__label\">Or continue with</div>",
+      "notes": "Horizontal divider. --vertical for flex row separators. --dashed for dashed style."
+    },
+    {
+      "name": "Divider",
+      "class": "db-divider",
+      "category": "layout-utility",
+      "element": "hr",
+      "modifiers": [],
+      "children": [],
+      "js": false,
+      "html": "<hr class=\"db-divider\">",
+      "notes": "Simple horizontal divider line."
+    },
+    {
+      "name": "Scroll Area",
+      "class": "db-scroll-area",
+      "category": "layout-utility",
+      "element": "div",
+      "modifiers": [
+        "--horizontal",
+        "--vertical"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-scroll-area db-scroll-area--vertical\" tabindex=\"0\" role=\"region\" aria-label=\"Recent activity\" style=\"width:100%;max-width:360px;max-height:120px;border:1px solid var(--db-sand);border-radius:var(--db-radius-2);\">\n  <div class=\"db-list\">\n    <div class=\"db-list__item\"><div class=\"db-list__content\"><div class=\"db-list__title\">Ada updated the project</div><div class=\"db-list__secondary\">Today at 09:20</div></div></div>\n    <div class=\"db-list__item\"><div class=\"db-list__content\"><div class=\"db-list__title\">Grace uploaded the report</div><div class=\"db-list__secondary\">Today at 08:45</div></div></div>\n    <div class=\"db-list__item\"><div class=\"db-list__content\"><div class=\"db-list__title\">Lin reviewed the proposal</div><div class=\"db-list__secondary\">Yesterday at 16:10</div></div></div>\n    <div class=\"db-list__item\"><div class=\"db-list__content\"><div class=\"db-list__title\">Team completed onboarding</div><div class=\"db-list__secondary\">Yesterday at 14:30</div></div></div>\n  </div>\n</div>",
+      "notes": "Styled scrollbar container. --horizontal for horizontal scroll only."
+    },
+    {
+      "name": "Aspect Ratio",
+      "class": "db-aspect",
+      "category": "layout-utility",
+      "element": "div",
+      "modifiers": [
+        "--16-9",
+        "--4-3",
+        "--1-1",
+        "--21-9"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-aspect db-aspect--16-9\"><img src=\"/og-image.png\" alt=\"DAUB UI component library\" style=\"object-fit:contain;\"></div>",
+      "notes": "Aspect ratio container. Children fill the box."
+    },
+    {
+      "name": "Surface",
+      "class": "db-surface",
+      "category": "foundations",
+      "element": "div",
+      "modifiers": [
+        "--raised",
+        "--inset",
+        "--pressed"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-grid db-grid--2 db-gap-4\">\n  <div class=\"db-surface\" style=\"padding:var(--db-space-4);\">Base</div>\n  <div class=\"db-surface db-surface--raised\" style=\"padding:var(--db-space-4);\">Raised</div>\n  <div class=\"db-surface db-surface--inset\" style=\"padding:var(--db-space-4);\">Inset</div>\n  <div class=\"db-surface db-surface--pressed\" style=\"padding:var(--db-space-4);\">Pressed</div>\n</div>",
+      "notes": "Background, radius, and depth styles. Add padding and spacing when composing a panel."
+    },
+    {
+      "name": "Elevation",
+      "class": "db-elevation",
+      "category": "foundations",
+      "element": "div",
+      "modifiers": [
+        "-1",
+        "-2",
+        "-3"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-grid db-grid--3 db-gap-4\">\n  <div class=\"db-surface db-elevation-1\" style=\"padding:var(--db-space-4);\">Level 1</div>\n  <div class=\"db-surface db-elevation-2\" style=\"padding:var(--db-space-4);\">Level 2</div>\n  <div class=\"db-surface db-elevation-3\" style=\"padding:var(--db-space-4);\">Level 3</div>\n</div>",
+      "notes": "Shadow-only utility classes with three levels of elevation. This example composes padded surfaces."
+    },
+    {
+      "name": "Prose",
+      "class": "db-prose",
+      "category": "foundations",
+      "element": "article",
+      "modifiers": [
+        "--sm",
+        "--lg",
+        "--xl",
+        "--2xl"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-prose\">\n  <h2>Project release notes</h2>\n  <p>The team completed the navigation redesign and added keyboard access to the project menu.</p>\n  <blockquote>The next review covers billing and account settings.</blockquote>\n</div>",
+      "notes": "Typographic defaults for long-form content. Scale: --sm, --lg, --xl, --2xl."
+    },
+    {
+      "name": "Container",
+      "class": "db-container",
+      "category": "layout-utility",
+      "element": "div",
+      "modifiers": [
+        "--wide",
+        "--narrow"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div style=\"width:100%;padding:16px 0;border:1px dashed var(--db-sand);background:var(--db-cream);\">\n  <div class=\"db-container db-container--narrow\" style=\"padding-top:16px;padding-bottom:16px;border:1px solid var(--db-sand);background:var(--db-white);\">\n    <h3 class=\"db-h3\">Project brief</h3>\n    <p class=\"db-body\">The team will review the homepage copy, navigation and signup flow before Monday's release.</p>\n  </div>\n</div>",
+      "notes": "Centered max-width container. Default 960px, --wide 1200px, --narrow 640px."
+    },
+    {
+      "name": "Flex",
+      "class": "db-flex",
+      "category": "layout-utility",
+      "element": "div",
+      "modifiers": [
+        "--col",
+        "--wrap",
+        "--center"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-flex db-gap-4\">\n  <div>Design review</div>\n  <div>Release planning</div>\n</div>",
+      "notes": "Flexbox layout utility. Combine with db-gap-* for spacing."
+    },
+    {
+      "name": "Grid",
+      "class": "db-grid",
+      "category": "layout-utility",
+      "element": "div",
+      "modifiers": [
+        "--2",
+        "--3",
+        "--4",
+        "--5",
+        "--6"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-grid db-grid--3 db-gap-4\">\n  <div>Design</div>\n  <div>Engineering</div>\n  <div>Support</div>\n</div>",
+      "notes": "CSS grid utility. 2-6 columns. Auto-responsive: collapses at smaller screens."
+    },
+    {
+      "name": "Checkbox Group",
+      "class": "db-checkbox-group",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [
+        "--inline"
+      ],
+      "children": [
+        {
+          "class": "db-checkbox-group__label",
+          "element": "span",
+          "required": false
+        },
+        {
+          "class": "db-checkbox-group__helper",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-checkbox-group\" role=\"group\" aria-labelledby=\"topics-label\">\n  <span class=\"db-checkbox-group__label\" id=\"topics-label\">Topics</span>\n  <label class=\"db-checkbox\"><input class=\"db-checkbox__input\" type=\"checkbox\"><span class=\"db-checkbox__box\" aria-hidden=\"true\"><svg aria-hidden=\"true\" focusable=\"false\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"20 6 9 17 4 12\"/></svg></span><span>Design</span></label>\n  <label class=\"db-checkbox\"><input class=\"db-checkbox__input\" type=\"checkbox\"><span class=\"db-checkbox__box\" aria-hidden=\"true\"><svg aria-hidden=\"true\" focusable=\"false\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"20 6 9 17 4 12\"/></svg></span><span>Engineering</span></label>\n  <span class=\"db-checkbox-group__helper\">Choose all that apply.</span>\n</div>",
+      "notes": "Use --inline for horizontal checkbox sets."
+    },
+    {
+      "name": "Fieldset",
+      "class": "db-fieldset",
+      "category": "controls",
+      "element": "fieldset",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-fieldset__legend",
+          "element": "legend",
+          "required": false
+        },
+        {
+          "class": "db-fieldset__content",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-fieldset__helper",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<fieldset class=\"db-fieldset\">\n  <legend class=\"db-fieldset__legend\">Profile</legend>\n  <div class=\"db-fieldset__content\">\n    <label class=\"db-field\"><span class=\"db-field__label\">Name</span><input class=\"db-field__input\" type=\"text\"></label>\n  </div>\n  <span class=\"db-fieldset__helper\">Visible to your workspace.</span>\n</fieldset>",
+      "notes": "Groups related form fields with a legend and helper text."
+    },
+    {
+      "name": "Frame",
+      "class": "db-frame",
+      "category": "layout-utility",
+      "element": "div",
+      "modifiers": [
+        "--flush"
+      ],
+      "children": [
+        {
+          "class": "db-frame__header",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-frame__body",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-frame__footer",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-frame\">\n  <div class=\"db-frame__header\">Preview</div>\n  <div class=\"db-frame__body\">3 tasks are ready for review.</div>\n  <div class=\"db-frame__footer\">Updated today by Ada</div>\n</div>",
+      "notes": "Use for embedded previews, canvases, screenshots, and inspector panels."
+    },
+    {
+      "name": "Group",
+      "class": "db-group",
+      "category": "layout-utility",
+      "element": "div",
+      "modifiers": [
+        "--attached",
+        "--vertical"
+      ],
+      "children": [],
+      "js": false,
+      "html": "<div class=\"db-group db-group--attached\" role=\"group\" aria-label=\"Alignment\">\n  <button type=\"button\" class=\"db-btn db-btn--secondary\">Left</button>\n  <button type=\"button\" class=\"db-btn db-btn--secondary\">Center</button>\n  <button type=\"button\" class=\"db-btn db-btn--secondary\">Right</button>\n</div>",
+      "notes": "Generic control grouping. Use --attached for connected controls."
+    },
+    {
+      "name": "Meter",
+      "class": "db-meter",
+      "category": "feedback",
+      "element": "div",
+      "modifiers": [
+        "--warning",
+        "--error"
+      ],
+      "children": [
+        {
+          "class": "db-meter__bar",
+          "element": "div",
+          "required": true
+        }
+      ],
+      "js": false,
+      "html": "<div class=\"db-meter\" role=\"meter\" aria-label=\"Storage used\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-valuenow=\"72\" style=\"--db-meter:72%\"><div class=\"db-meter__bar\"></div></div>",
+      "notes": "Use for bounded measurements such as quota, health, or strength."
+    },
+    {
+      "name": "Number Field",
+      "class": "db-number-field",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-number-field__btn",
+          "element": "button",
+          "required": false
+        },
+        {
+          "class": "db-input",
+          "element": "input",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-number-field\" role=\"group\" aria-label=\"Quantity\">\n  <button class=\"db-btn db-btn--secondary db-number-field__btn\" type=\"button\" aria-label=\"Decrease quantity\" onclick=\"var input=this.parentElement.querySelector('input');input.stepDown();input.dispatchEvent(new Event('input',{bubbles:true}))\">-</button>\n  <input class=\"db-input\" type=\"number\" value=\"3\" min=\"0\" aria-label=\"Quantity\">\n  <button class=\"db-btn db-btn--secondary db-number-field__btn\" type=\"button\" aria-label=\"Increase quantity\" onclick=\"var input=this.parentElement.querySelector('input');input.stepUp();input.dispatchEvent(new Event('input',{bubbles:true}))\">+</button>\n</div>",
+      "notes": "Combines a numeric input with increment and decrement controls."
+    },
+    {
+      "name": "Preview Card",
+      "class": "db-preview-card",
+      "category": "overlays",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-preview-card__trigger",
+          "element": "span",
+          "required": true
+        },
+        {
+          "class": "db-preview-card__content",
+          "element": "div",
+          "required": true
+        },
+        {
+          "class": "db-preview-card__media",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-preview-card__title",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-preview-card__desc",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": false,
+      "html": "<span class=\"db-preview-card\"><button type=\"button\" class=\"db-btn db-btn--ghost db-preview-card__trigger\">Account</button><span class=\"db-preview-card__content\"><strong class=\"db-preview-card__title\">Ada Lovelace</strong><span class=\"db-preview-card__desc\">Workspace owner and billing contact.</span></span></span>",
+      "notes": "Hover and focus preview surface for rich inline references."
+    },
+    {
+      "name": "Toolbar",
+      "class": "db-toolbar",
+      "category": "navigation",
+      "element": "div",
+      "modifiers": [
+        "--vertical"
+      ],
+      "children": [
+        {
+          "class": "db-toolbar__group",
+          "element": "div",
+          "required": false
+        },
+        {
+          "class": "db-toolbar__separator",
+          "element": "span",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-toolbar\" role=\"toolbar\" aria-label=\"Editor tools\">\n  <div class=\"db-toolbar__group\"><button type=\"button\" class=\"db-toggle db-toggle--sm\" aria-pressed=\"false\" aria-label=\"Bold\"><i data-lucide=\"bold\" aria-hidden=\"true\"></i></button><button type=\"button\" class=\"db-toggle db-toggle--sm\" aria-pressed=\"false\" aria-label=\"Italic\"><i data-lucide=\"italic\" aria-hidden=\"true\"></i></button></div>\n  <span class=\"db-toolbar__separator\" aria-hidden=\"true\"></span>\n  <button type=\"button\" class=\"db-btn db-btn--secondary\">Save</button>\n</div>",
+      "notes": "Groups action buttons and segmented controls in editor or dashboard surfaces."
+    },
+    {
+      "name": "Message Scroller",
+      "class": "db-message-scroller",
+      "category": "conversation",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        { "class": "db-message-scroller__viewport", "element": "div", "required": true },
+        { "class": "db-message-scroller__content", "element": "div", "required": true },
+        { "class": "db-message-scroller__item", "element": "div", "required": true },
+        { "class": "db-message-scroller__button", "element": "button", "required": false }
+      ],
+      "js": true,
+      "html": "<div class=\"db-message-scroller\" data-db-auto-scroll=\"true\" data-db-scroll-position=\"end\">\n  <div class=\"db-message-scroller__viewport db-scroll-fade\" tabindex=\"0\" aria-label=\"Conversation\">\n    <div class=\"db-message-scroller__content\" role=\"log\" aria-live=\"polite\" aria-relevant=\"additions\">\n      <div class=\"db-message-scroller__item\" data-db-message-id=\"question\" data-db-scroll-anchor><div class=\"db-message db-message--end\"><div class=\"db-message__content\"><div class=\"db-bubble\"><div class=\"db-bubble__content\">Can we ship the updated chat interface?</div></div></div></div></div>\n      <div class=\"db-message-scroller__item\" data-db-message-id=\"answer\"><div class=\"db-message\"><div class=\"db-message__content\"><div class=\"db-message__header\">DAUB Assistant</div><div class=\"db-bubble db-bubble--secondary\"><div class=\"db-bubble__content\">The message rows, attachments, and scroll controls are ready for review. Check the mobile layout before publishing.</div></div><div class=\"db-message__footer\">09:42</div></div></div></div>\n      <div class=\"db-message-scroller__item\" data-db-message-id=\"status\"><div class=\"db-marker db-marker--separator\"><span class=\"db-marker__content\">Review complete</span></div></div>\n    </div>\n  </div>\n  <button class=\"db-message-scroller__button\" data-db-scroll-to=\"end\" type=\"button\" aria-label=\"Scroll to latest message\" title=\"Scroll to latest message\"><i data-lucide=\"arrow-down\" aria-hidden=\"true\"></i></button>\n</div>",
+      "notes": "Streaming-aware conversation viewport. Stable data-db-message-id rows preserve position when history is prepended. Follow pauses when you scroll away; the latest-message control resumes it. See chat-demo.html for a working conversation."
+    },
+    {
+      "name": "Message",
+      "class": "db-message",
+      "category": "conversation",
+      "element": "div",
+      "modifiers": ["--end"],
+      "children": [
+        { "class": "db-message__avatar", "element": "div", "required": false },
+        { "class": "db-message__content", "element": "div", "required": true },
+        { "class": "db-message__header", "element": "div", "required": false },
+        { "class": "db-message__footer", "element": "div", "required": false }
+      ],
+      "js": false,
+      "html": "<div class=\"db-message\">\n  <div class=\"db-message__avatar\"><span class=\"db-avatar\" aria-label=\"Alex\">A</span></div>\n  <div class=\"db-message__content\">\n    <div class=\"db-message__header\"><strong>Alex Morgan</strong><time datetime=\"2026-06-01T09:42\">09:42</time></div>\n    <div class=\"db-bubble db-bubble--secondary\"><div class=\"db-bubble__content\">The updated mockups are ready. I added the compact composer and attachment states.</div></div>\n    <div class=\"db-message__footer\">Delivered</div>\n  </div>\n</div>",
+      "notes": "Conversation row with avatar, sender metadata, content, and footer slots. Add --end for the sender side. Use db-message-group for consecutive messages from one participant."
+    },
+    {
+      "name": "Bubble",
+      "class": "db-bubble",
+      "category": "conversation",
+      "element": "div",
+      "modifiers": ["--primary", "--secondary", "--muted", "--tinted", "--outline", "--ghost", "--destructive", "--end"],
+      "children": [
+        { "class": "db-bubble__content", "element": "div", "required": true },
+        { "class": "db-bubble__reactions", "element": "div", "required": false }
+      ],
+      "js": false,
+      "html": "<div class=\"db-bubble\">\n  <div class=\"db-bubble__content\">The release candidate is ready for your review.</div>\n  <div class=\"db-bubble__reactions\"><button type=\"button\" aria-pressed=\"false\" aria-label=\"Mark response as helpful\">Helpful <span>2</span></button></div>\n</div>",
+      "notes": "Content-sized conversational surface with seven color variants and an optional reaction row. Ghost removes the frame for rich assistant content. Reaction state and events belong to your application."
+    },
+    {
+      "name": "Attachment",
+      "class": "db-attachment",
+      "category": "conversation",
+      "element": "div",
+      "modifiers": ["--vertical", "--sm", "--xs"],
+      "children": [
+        { "class": "db-attachment__media", "element": "div", "required": false },
+        { "class": "db-attachment__content", "element": "div", "required": true },
+        { "class": "db-attachment__title", "element": "span", "required": true },
+        { "class": "db-attachment__description", "element": "span", "required": false },
+        { "class": "db-attachment__actions", "element": "div", "required": false },
+        { "class": "db-attachment__trigger", "element": "a", "required": false }
+      ],
+      "js": false,
+      "html": "<div class=\"db-attachment\" data-state=\"done\">\n  <div class=\"db-attachment__media\"><i data-lucide=\"file-text\" aria-hidden=\"true\"></i></div>\n  <div class=\"db-attachment__content\"><span class=\"db-attachment__title\">CHANGELOG.md</span><span class=\"db-attachment__description\">Markdown &middot; Release notes</span></div>\n  <a class=\"db-attachment__trigger\" href=\"CHANGELOG.md\" aria-label=\"Open CHANGELOG.md\"></a>\n</div>",
+      "notes": "File or image attachment with metadata and sibling trigger/actions. Set data-state to idle, uploading, processing, error, or done. Use a native progress element for upload progress. Uploading, persistence, and actions belong to your app."
+    },
+    {
+      "name": "Marker",
+      "class": "db-marker",
+      "category": "conversation",
+      "element": "div",
+      "modifiers": ["--border", "--separator"],
+      "children": [
+        { "class": "db-marker__icon", "element": "span", "required": false },
+        { "class": "db-marker__content", "element": "span", "required": true }
+      ],
+      "js": false,
+      "html": "<div class=\"db-marker\" role=\"status\">\n  <span class=\"db-marker__icon\" aria-hidden=\"true\"><i data-lucide=\"circle-check\"></i></span>\n  <span class=\"db-marker__content\">Reviewed 4 files</span>\n</div>",
+      "notes": "Inline activity, bordered status row, or centered date separator. Use role=status for progress updates and db-shimmer for busy text; reduced motion disables the animation."
+    },
+    {
+      "name": "Change Summary",
+      "class": "db-change-summary",
+      "category": "conversation",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        { "class": "db-change-summary__header", "element": "div", "required": true },
+        { "class": "db-change-summary__icon", "element": "span", "required": false },
+        { "class": "db-change-summary__heading", "element": "div", "required": true },
+        { "class": "db-change-summary__title", "element": "div", "required": true },
+        { "class": "db-change-summary__description", "element": "p", "required": false },
+        { "class": "db-change-summary__totals", "element": "span", "required": true },
+        { "class": "db-change-summary__additions", "element": "span", "required": true },
+        { "class": "db-change-summary__deletions", "element": "span", "required": true },
+        { "class": "db-change-summary__actions", "element": "div", "required": false },
+        { "class": "db-change-summary__files", "element": "ul", "required": true },
+        { "class": "db-change-summary__file", "element": "li", "required": false },
+        { "class": "db-change-summary__path", "element": "span", "required": false },
+        { "class": "db-change-summary__counts", "element": "span", "required": false }
+      ],
+      "js": false,
+      "html": "<div class=\"db-change-summary\" role=\"group\" aria-label=\"Prepared 2 demo files\">\n  <div class=\"db-change-summary__header\">\n    <span class=\"db-change-summary__icon\" aria-hidden=\"true\"><i data-lucide=\"files\" style=\"width:16px;height:16px\"></i></span>\n    <div class=\"db-change-summary__heading\"><div class=\"db-change-summary__title\">Prepared 2 demo files</div><p class=\"db-change-summary__description\">Demo changes</p>\n      <span class=\"db-change-summary__totals\"><span class=\"db-change-summary__additions\" role=\"img\" aria-label=\"48 additions\">+48</span><span class=\"db-change-summary__deletions\" role=\"img\" aria-label=\"4 deletions\">-4</span></span>\n    </div>\n  </div>\n  <ul class=\"db-change-summary__files\">\n    <li class=\"db-change-summary__file\" data-status=\"modified\"><span class=\"db-change-summary__path\" title=\"src/app.ts\" aria-label=\"src/app.ts, modified\">src/app.ts</span><span class=\"db-change-summary__counts\"><span class=\"db-change-summary__additions\" role=\"img\" aria-label=\"6 additions\">+6</span><span class=\"db-change-summary__deletions\" role=\"img\" aria-label=\"4 deletions\">-4</span></span></li>\n    <li class=\"db-change-summary__file\" data-status=\"added\"><span class=\"db-change-summary__path\" title=\"src/summary.ts\" aria-label=\"src/summary.ts, added\">src/summary.ts</span><span class=\"db-change-summary__counts\"><span class=\"db-change-summary__additions\" role=\"img\" aria-label=\"42 additions\">+42</span><span class=\"db-change-summary__deletions\" role=\"img\" aria-label=\"0 deletions\">-0</span></span></li>\n  </ul>\n</div>",
+      "notes": "Static framed change summary; requires daub.css, not daub.js. Files and counts come from the host; this example uses demo data, not filesystem changes. Use a 14px or 16px Lucide files icon. Render paths as plain text, additions/deletions with accessible labels, and rows as a simple list. Spec/React counts floor finite numbers, clamp to 0..Number.MAX_SAFE_INTEGER, and clamp aggregate totals; other values become 0. Default title: Edited N file(s), or No files changed for an empty list. Add __actions only with host-wired controls. Spec children are explicit action IDs; renderers create no implicit Undo or View changes buttons. React onUndo/onViewChanges render buttons only when supplied; undoLabel and undoDisabled configure the callback-backed Undo button. The host owns file operations, undo, and diff views."
+    },
+    {
+      "name": "Chat Composer",
+      "class": "db-chat-composer",
+      "category": "conversation",
+      "element": "form",
+      "modifiers": [],
+      "children": [
+        { "class": "db-chat-composer__queue", "element": "div", "required": false },
+        { "class": "db-chat-composer__queued-item", "element": "div", "required": false },
+        { "class": "db-chat-composer__queued-text", "element": "div", "required": false },
+        { "class": "db-chat-composer__queued-actions", "element": "div", "required": false },
+        { "class": "db-chat-composer__panel", "element": "div", "required": false },
+        { "class": "db-chat-composer__attachments", "element": "div", "required": false },
+        { "class": "db-chat-composer__input", "element": "textarea", "required": false },
+        { "class": "db-chat-composer__toolbar", "element": "div", "required": false },
+        { "class": "db-chat-composer__status", "element": "div", "required": false },
+        { "class": "db-chat-composer__add", "element": "button", "required": false },
+        { "class": "db-chat-composer__add-menu", "element": "div", "required": false },
+        { "class": "db-chat-composer__file-input", "element": "input", "required": false },
+        { "class": "db-chat-composer__folder-input", "element": "input", "required": false },
+        { "class": "db-chat-composer__model", "element": "select", "required": false },
+        { "class": "db-chat-composer__effort", "element": "select", "required": false },
+        { "class": "db-chat-composer__approval", "element": "select", "required": false },
+        { "class": "db-chat-composer__mode", "element": "select", "required": false },
+        { "class": "db-chat-composer__goal", "element": "input", "required": false },
+        { "class": "db-chat-composer__dictation", "element": "button", "required": false },
+        { "class": "db-chat-composer__dictation-bar", "element": "div", "required": false },
+        { "class": "db-chat-composer__dictation-cancel", "element": "button", "required": false },
+        { "class": "db-chat-composer__send", "element": "button", "required": false },
+        { "class": "db-chat-composer__stop", "element": "button", "required": false },
+        { "class": "db-chat-composer__dropzone", "element": "div", "required": false }
+      ],
+      "js": true,
+      "html": "<form class=\"db-chat-composer\" data-db-chat-options=\"{&quot;models&quot;:[{&quot;id&quot;:&quot;demo&quot;,&quot;label&quot;:&quot;Demo model (simulated)&quot;,&quot;efforts&quot;:[&quot;low&quot;,&quot;high&quot;]}],&quot;model&quot;:&quot;demo&quot;,&quot;approval&quot;:&quot;ask&quot;,&quot;mode&quot;:&quot;chat&quot;}\"></form>",
+      "notes": "Requires daub.js and daub.css. DAUB.init() populates an empty native form from escaped data-db-chat-options JSON. Native API: DAUB.createChatComposer(root, options). Default models are demo-only (simulated). The host handles cancelable db:chat-send, db:chat-steer, db:chat-stop, and db:chat-action events and owns transport, uploads, approval enforcement, and persistence. Keep File objects local. Configuration describes intent, not access rights. React roots carry data-db-react and require an explicit controller call."
+    },
+    {
+      "name": "Theme Switcher",
+      "class": "db-theme-switcher",
+      "category": "navigation",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-theme-switcher__toggle",
+          "element": "button",
+          "required": false
+        },
+        {
+          "class": "db-theme-switcher__popover",
+          "element": "div",
+          "required": false
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-theme-switcher\" role=\"group\" aria-label=\"Theme switcher\"></div>",
+      "notes": "Auto-populates toggle + popover if empty. Popover shows 21 families in 4 categories + scheme buttons."
+    },
+    {
+      "name": "Accent Picker",
+      "class": "db-accent-picker",
+      "category": "controls",
+      "element": "div",
+      "modifiers": [],
+      "children": [
+        {
+          "class": "db-accent-picker__dot",
+          "element": "button",
+          "required": true
+        }
+      ],
+      "js": true,
+      "html": "<div class=\"db-accent-picker\">\n  <button type=\"button\" class=\"db-accent-picker__dot\" data-accent=\"#C67B5C\" style=\"background:#C67B5C\" aria-label=\"Terracotta\"></button>\n  <button type=\"button\" class=\"db-accent-picker__dot\" data-accent=\"#6B7C3E\" style=\"background:#6B7C3E\" aria-label=\"Olive\"></button>\n  <button type=\"button\" class=\"db-accent-picker__dot\" data-accent=\"#5A6D8E\" style=\"background:#5A6D8E\" aria-label=\"Slate\"></button>\n  <button type=\"button\" class=\"db-accent-picker__dot\" data-accent=\"#7B506F\" style=\"background:#7B506F\" aria-label=\"Plum\"></button>\n  <button type=\"button\" class=\"db-accent-picker__dot db-accent-picker__dot--reset\" data-accent=\"reset\" aria-label=\"Reset accent\">\n    <svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/></svg>\n  </button>\n</div>",
+      "notes": "Color dots for accent override. data-accent=\"reset\" restores theme default."
+    }
+  ]
+}

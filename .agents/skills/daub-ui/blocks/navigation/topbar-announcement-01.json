@@ -1,0 +1,48 @@
+{
+  "root": "topbar",
+  "elements": {
+    "topbar": {
+      "type": "Surface",
+      "props": {
+        "variant": "flat"
+      },
+      "children": [
+        "topbar-inner"
+      ]
+    },
+    "topbar-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center",
+        "justify": "center"
+      },
+      "children": [
+        "topbar-badge",
+        "topbar-text",
+        "topbar-link"
+      ]
+    },
+    "topbar-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "New",
+        "variant": "new"
+      }
+    },
+    "topbar-text": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "We just raised our Series B! Read about our plans for 2026."
+      }
+    },
+    "topbar-link": {
+      "type": "Link",
+      "props": {
+        "label": "Learn More"
+      }
+    }
+  }
+}

@@ -42,13 +42,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={ROUTE_PATHS.PORTAL} replace />;
   }
 
-  // ⭐ Permission checks
+    // ⭐ Permission checks
   if (requiredPermission && !hasPermission(requiredPermission)) {
-    return <Navigate to={getDestinationByRole(user)} replace />;
+    // Đẩy về Portal nếu không đủ quyền, tránh lặp vô hạn
+    return <Navigate to={ROUTE_PATHS.PORTAL} replace />;
   }
 
   if (requiredAnyOf && requiredAnyOf.length > 0 && !hasAnyPermission(requiredAnyOf)) {
-    return <Navigate to={getDestinationByRole(user)} replace />;
+    // Đẩy về Portal nếu không đủ quyền
+    return <Navigate to={ROUTE_PATHS.PORTAL} replace />;
   }
 
   return children ? <>{children}</> : <Outlet />;

@@ -35,6 +35,8 @@ Thumbs.db
 merged_code*.txt
 merged_*.txt
 *_merged.txt
+*FullSourceCode*.txt
+QK7_FullSourceCode.txt
 backend/uploads/scorm/*
 !backend/uploads/scorm/.gitkeep
 

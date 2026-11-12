@@ -4,7 +4,7 @@
 # ==============================================================================
 param(
     [string]$Mode = "mkcert",
-    [string]$Domain = "192.168.1.229"
+    [string]$Domain = "192.168.1.151"
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,8 +34,8 @@ if ($Mode -eq "mkcert") {
     $certFile = Join-Path $CertsDir "cert.pem"
     $keyFile = Join-Path $CertsDir "private-key.pem"
 
-    Write-Host "⚙️  Đang sinh chứng chỉ SAN cho $Domain, localhost, 127.0.0.1..." -ForegroundColor Gray
-    & mkcert -cert-file $certFile -key-file $keyFile $Domain "localhost" "127.0.0.1" "trungtamdulieuso.tqs.com" "::1"
+    Write-Host "⚙️  Đang sinh chứng chỉ SAN cho $Domain, localhost, 127.0.0.1, trungtamdulieuso.com..." -ForegroundColor Gray
+    & mkcert -cert-file $certFile -key-file $keyFile $Domain "localhost" "127.0.0.1" "trungtamdulieuso.com" "*.trungtamdulieuso.com" "trungtamdulieuso.tqs.com" "::1"
 
     $caRoot = & mkcert -CAROOT
     Write-Host ""

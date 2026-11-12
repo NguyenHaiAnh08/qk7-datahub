@@ -5,42 +5,47 @@
 const PROTECTED_ADMIN_USER_ID = process.env.PROTECTED_ADMIN_USER_ID || 'USR-001';
 const PROTECTED_ADMIN_ROLE_ID = process.env.PROTECTED_ADMIN_ROLE_ID || 'ROL-01';
 
-// Route KHÔNG áp dụng duyệt (auth, chính API approval)
+// Route KHÔNG áp dụng duyệt (auth, chính API approval, và tài liệu có luồng đề xuất riêng)
 const EXCLUDED_PATHS = [
   /^\/api\/admin\/approval-requests/,
   /^\/api\/admin\/protected-permissions/,
   /^\/api\/auth\//,
   /^\/api\/admin\/creatable-roles$/,
-  /^\/api\/documents\/proposals\//,
+  /^\/api\/documents(\/|$)/, // Luồng văn bản upload / edit / proposals có bảng DOCUMENT_REVISION_PROPOSAL riêng
 ];
 
 module.exports = function createApprovalWorkflow({ 
   sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission 
 }) {
   let protectedSet = new Set();
+  let codeToIdMap = new Map();
   let cacheLoadedAt = 0;
   const CACHE_TTL_MS = 30 * 1000;
 
-      async function loadProtectedPermissions(force = false) {
+  async function loadProtectedPermissions(force = false) {
     if (!force && Date.now() - cacheLoadedAt < CACHE_TTL_MS) return protectedSet;
     try {
       const pool = await getPool();
 
-      // ═══════════════════════════════════════════════════════════════
-      // [FIX v4.3.2] JOIN PERMISSION để lấy `code` thay vì `permission_id`
-      // ───────────────────────────────────────────────────────────────
-      // admin-routes.js#getAutoRequiredPermission() trả về CODE ('USER_DELETE')
-      // nhưng protectedSet cũ chứa ID ('PERM-USR-04') → luôn has() = false
-      // → KHÔNG có yêu cầu phê duyệt nào được tạo.
-      // ═══════════════════════════════════════════════════════════════
+      // [FIX v4.3.2] Map cả code và permission_id để đối chiếu & giữ đúng FK
       const r = await pool.request().query(`
-        SELECT p.code
+        SELECT pp.permission_id, p.code
         FROM PROTECTED_PERMISSION pp
         JOIN [PERMISSION] p ON p.permission_id = pp.permission_id
-        WHERE p.code IS NOT NULL
       `);
 
-      protectedSet = new Set(r.recordset.map(x => x.code));
+      protectedSet = new Set();
+      codeToIdMap = new Map();
+      for (const row of r.recordset) {
+        if (row.code) {
+          protectedSet.add(row.code);
+          codeToIdMap.set(row.code, row.permission_id);
+        }
+        if (row.permission_id) {
+          protectedSet.add(row.permission_id);
+          codeToIdMap.set(row.permission_id, row.permission_id);
+        }
+      }
       cacheLoadedAt = Date.now();
 
       if (protectedSet.size === 0) {
@@ -95,6 +100,9 @@ module.exports = function createApprovalWorkflow({
     const protectedList = await loadProtectedPermissions();
     if (!protectedList.has(requiredPerm)) return next();
 
+    // Chuẩn hóa sang permission_id để thỏa mãn Foreign Key trong APPROVAL_REQUEST
+    const permId = codeToIdMap.get(requiredPerm) || requiredPerm;
+
     // Tạo yêu cầu chờ duyệt
     const requestId = 'APV-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const bodyJson = (req.is('application/json') && req.body) ? JSON.stringify(req.body) : null;
@@ -108,20 +116,21 @@ module.exports = function createApprovalWorkflow({
         .query(`SELECT unit_id FROM [USER] WHERE user_id = @uid`);
       const requesterUnitId = userRes.recordset[0]?.unit_id || null;
 
-      // ✅ 2. Lưu vào APPROVAL_REQUEST (thêm cột requester_unit_id)
+      // ✅ 2. Lưu vào APPROVAL_REQUEST
       await pool.request()
         .input('rid', sql.VarChar(50), requestId)
         .input('uid', sql.VarChar(50), req.user.user_id)
-        .input('req_unit', sql.VarChar(50), requesterUnitId) // <-- CỘT MỚI
-        .input('perm', sql.VarChar(50), requiredPerm)
+        .input('req_unit', sql.VarChar(50), requesterUnitId)
+        .input('perm', sql.VarChar(50), permId)
         .input('method', sql.VarChar(10), req.method)
         .input('path', sql.VarChar(500), req.originalUrl || req.url)
         .input('body', sql.NVarChar(sql.MAX), bodyJson)
         .input('summary', sql.NVarChar(500), `${req.method} ${fullPath}`)
+        .input('status', sql.VarChar(20), 'PENDING')
         .query(`
           INSERT INTO APPROVAL_REQUEST 
-          (request_id, requester_id, requester_unit_id, required_permission, http_method, http_path, http_body, target_summary)
-          VALUES (@rid, @uid, @req_unit, @perm, @method, @path, @body, @summary)
+          (request_id, requester_id, requester_unit_id, required_permission, http_method, http_path, http_body, target_summary, status)
+          VALUES (@rid, @uid, @req_unit, @perm, @method, @path, @body, @summary, @status)
         `);
 
       await writeAccessLog({

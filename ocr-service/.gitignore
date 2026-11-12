@@ -24,4 +24,5 @@ dist/
 # Model cache (PaddleOCR downloads models to ~/.paddleocr/ by default, but ignore if local)
 .paddleocr/
 models/
+model_weight/
 

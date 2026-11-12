@@ -1,5 +1,6 @@
 import React from 'react';
-import { Loader2, Inbox, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Skeleton } from 'antd';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DocumentItem } from '../../types';
 import { DocumentCard } from './DocumentCard';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
@@ -35,11 +36,25 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
 }) => {
   if (loading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center space-y-3 bg-white/60 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800">
-        <Loader2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 animate-spin" />
-        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-          Đang tìm kiếm tài liệu...
-        </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, idx) => (
+          <div
+            key={`portal-doc-skeleton-${idx}`}
+            className="bg-white/90 dark:bg-[#111827] rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-white/[0.08] shadow-sm flex flex-col justify-between space-y-4"
+          >
+            <div className="space-y-3">
+              <div className="flex justify-between items-center gap-2">
+                <Skeleton.Button active size="small" style={{ width: 85, height: 22, borderRadius: 6 }} />
+                <Skeleton.Button active size="small" style={{ width: 70, height: 22, borderRadius: 6 }} />
+              </div>
+              <Skeleton active paragraph={{ rows: 2, width: ['100%', '75%'] }} title={{ width: '85%' }} />
+            </div>
+            <div className="pt-3 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between">
+              <Skeleton.Input active size="small" style={{ width: 110, height: 18, borderRadius: 4 }} />
+              <Skeleton.Button active size="small" style={{ width: 75, height: 28, borderRadius: 8 }} />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

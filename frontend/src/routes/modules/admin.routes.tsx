@@ -1,12 +1,14 @@
 import React from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { Navigate } from 'react-router-dom';
-import { AdminDashboardPage } from '../../pages/AdminDashboardPage';
-import { UsersPage } from '../../pages/UsersPage';
-import { TrashPage } from '../../pages/TrashPage';
-import { SessionsPage } from '../../pages/SessionsPage';
 import { ProtectedRoute } from '../../components/common/ProtectedRoute';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
+
+const AdminDashboardPage = lazyWithRetry(() => import('../../pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })));
+const UsersPage = lazyWithRetry(() => import('../../pages/UsersPage').then((m) => ({ default: m.UsersPage })));
+const TrashPage = lazyWithRetry(() => import('../../pages/TrashPage').then((m) => ({ default: m.TrashPage })));
+const SessionsPage = lazyWithRetry(() => import('../../pages/SessionsPage').then((m) => ({ default: m.SessionsPage })));
 
 const adminRoutes: RouteModuleExport = {
   group: 'admin',
@@ -35,7 +37,7 @@ const adminRoutes: RouteModuleExport = {
       ),
     },
     {
-      path: '/admin/trash',                          // ⭐ MỚI
+      path: '/admin/trash',
       element: (
         <ProtectedRoute requiredPermission="DOC_TRASH_VIEW">
           <TrashPage />
@@ -43,7 +45,7 @@ const adminRoutes: RouteModuleExport = {
       ),
     },
     {
-      path: '/admin/sessions',                       // ⭐ MỚI
+      path: '/admin/sessions',
       element: (
         <ProtectedRoute requiredPermission="SESSION_VIEW">
           <SessionsPage />

@@ -45,7 +45,7 @@ function testDecrypt(encoded) {
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const enc = buf.subarray(28);
-    const d = crypto.createDecipheriv('aes-256-gcm', FP_ENC_KEY, iv);
+    const d = crypto.createDecipheriv('aes-256-gcm', FP_ENC_KEY, iv, { authTagLength: 16 });
     d.setAuthTag(tag);
     const dec = Buffer.concat([d.update(enc), d.final()]);
     return { ok: true, length: dec.length };

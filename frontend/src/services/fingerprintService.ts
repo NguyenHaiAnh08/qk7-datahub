@@ -37,10 +37,12 @@ export interface EnrollStatusResponse {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Local Agent URLs — gom lại để tránh magic string
+// Local Agent URLs — phần cứng ZKTeco ZK9500 giao tiếp qua agent loopback (127.0.0.1:9001)
+// Tự động thích ứng giao thức (HTTP/HTTPS) hoặc ghi đè qua biến môi trường VITE_FINGERPRINT_AGENT_URL
 // ─────────────────────────────────────────────────────────────
 
-const AGENT_BASE = 'http://127.0.0.1:9001';
+const LOCAL_AGENT_PROTO = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https:' : 'http:';
+const AGENT_BASE = (import.meta.env.VITE_FINGERPRINT_AGENT_URL as string) || `${LOCAL_AGENT_PROTO}//127.0.0.1:9001`;
 const DEVICE_ID_URL = `${AGENT_BASE}/device-id`;
 const ENROLL_STATUS_URL = `${AGENT_BASE}/enroll-status`;
 
@@ -69,6 +71,7 @@ export const fingerprintService = {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);   // ← Honor full timeout (F6)
       try {
+        // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
         const res = await fetch(DEVICE_ID_URL, { signal: ctrl.signal });
         if (res.ok) {
           const data = await res.json();

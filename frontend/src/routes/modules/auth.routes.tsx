@@ -1,7 +1,9 @@
 import React from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { Navigate, RouteObject } from 'react-router-dom';
-import { LoginPage } from '../../pages/LoginPage';
 import { ROUTE_PATHS } from '../routePaths';
+
+const LoginPage = lazyWithRetry(() => import('../../pages/LoginPage').then(m => ({ default: m.LoginPage })));
 
 export interface RouteModuleExport {
   group: string;

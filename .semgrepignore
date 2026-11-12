@@ -1,0 +1,30 @@
+# Dependencies & Build artifacts
+node_modules/
+dist/
+build/
+backend/public/assets/
+*.min.js
+*.min.mjs
+pdf.worker.min.mjs
+
+# Python venvs
+.venv/
+venv/
+env/
+__pycache__/
+
+# Local uploads & vector DB storage
+uploads/
+local_storage/
+backend/uploads/
+
+# Certificates & secrets
+backend/certs/
+*.pem
+*.key
+*.crt
+
+# Test scripts (mock & pipeline test scripts)
+backend/test-*.js
+test-*.js
+

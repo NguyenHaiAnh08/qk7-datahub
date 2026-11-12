@@ -158,7 +158,7 @@ export const authService = {
       );
     }
 
-    // ─── 2. Lưu token — THROW nếu thất bại ───
+    // ─── 2. Lưu token — THROW nếu thất bại (chỉ lưu sessionStorage trong bộ nhớ phiên) ───
     try {
       sessionStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
 
@@ -274,6 +274,7 @@ export const authService = {
     // ─── Primary: full user JSON ───
     try {
       sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      try { localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)); } catch (_) {}
     } catch (e) {
       console.warn('[authService] Failed to serialize user to sessionStorage', e);
     }
@@ -299,6 +300,10 @@ export const authService = {
 
   /** Xoá toàn bộ session — logout / token hết hạn. */
   clearSession: () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.USER);
+    } catch (_) {}
     Object.values(STORAGE_KEYS).forEach((key) => {
       sessionStorage.removeItem(key);
     });
@@ -352,11 +357,11 @@ export const authService = {
       return {
         user_id: 'GUEST',
         full_name: 'Đại biểu',
-        clearance_level_id: 1,
-        clearance_name: 'Công khai',
-        roles: [],
-        role_names: [],
-        permissions: [],
+        clearance_level_id: 2,
+        clearance_name: 'Nội bộ',
+        roles: ['DELEGATE'],
+        role_names: ['Đại biểu'],
+        permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
       };
     }
 

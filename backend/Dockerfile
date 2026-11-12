@@ -35,7 +35,6 @@ COPY --from=backend-deps /build/backend/node_modules ./node_modules
 
 # Copy source backend (loại trừ .env, node_modules, uploads)
 COPY backend/server.js backend/swagger.js backend/pdf-parser.js ./
-COPY backend/setup-passwords.js ./
 COPY backend/src/ ./src/
 
 # Copy frontend build vào public/

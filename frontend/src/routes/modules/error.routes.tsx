@@ -1,8 +1,10 @@
 import React from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { Navigate } from 'react-router-dom';
-import { HttpErrorPage } from '../../pages/HttpErrorPage';
 import { ROUTE_PATHS } from '../routePaths';
 import { RouteModuleExport } from './auth.routes';
+
+const HttpErrorPage = lazyWithRetry(() => import('../../pages/HttpErrorPage').then((m) => ({ default: m.HttpErrorPage })));
 
 const errorRoutes: RouteModuleExport = {
   group: 'error',

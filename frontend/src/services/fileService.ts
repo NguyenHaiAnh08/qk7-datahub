@@ -28,7 +28,10 @@ export const fileService = {
   ): Promise<FileBlobResult> => {
     const url = fileService.getViewUrl(fileId, download);
 
-    const headers: Record<string, string> = { ...getAuthHeaders() };
+    const headers: Record<string, string> = {
+      ...getAuthHeaders(),
+      'X-Client-Time': Date.now().toString(),
+    };
 
     // ✅ FIX: CHỈ lấy token của chính file này (key có ${fileId}).
     // - Ưu tiên token được truyền trực tiếp từ modal xác thực vân tay hiện hành.

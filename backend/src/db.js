@@ -21,8 +21,8 @@ const config = {
     useUTC: false
   },
   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
-  connectionTimeout: 15000,
-  requestTimeout:    30000
+  connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000', 10),
+  requestTimeout:    parseInt(process.env.DB_REQUEST_TIMEOUT || '30000', 10)
 };
 
 let poolPromise = null;

@@ -177,7 +177,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       }
 
       // Nếu login bình thường, lấy thông tin user
-      const loggedInUser = await authService.getMe();
+      const loggedInUser = res?.user || (await authService.getMe());
 
       saveUserSession(loggedInUser); 
 
@@ -187,13 +187,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       if (onSuccess) {
         onSuccess(loggedInUser);
       } else {
-        setTimeout(() => {
-          if (isUserAdmin(loggedInUser)) {
-            navigate(ROUTE_PATHS.ADMIN, { replace: true });
-          } else {
-            navigate(getDestinationByRole(loggedInUser), { replace: true });
-          }
-        }, 500);
+        if (isUserAdmin(loggedInUser)) {
+          navigate(ROUTE_PATHS.ADMIN, { replace: true });
+        } else {
+          navigate(getDestinationByRole(loggedInUser), { replace: true });
+        }
       }
     } catch (err: any) {
       console.error('[Đăng nhập thất bại]:', err?.message || err);
@@ -287,13 +285,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
       if (onSuccess) {
         onSuccess(me);
       } else {
-        setTimeout(() => {
-          if (isUserAdmin(me)) {
-            navigate(ROUTE_PATHS.ADMIN, { replace: true });
-          } else {
-            navigate(getDestinationByRole(me), { replace: true });
-          }
-        }, 500);
+        if (isUserAdmin(me)) {
+          navigate(ROUTE_PATHS.ADMIN, { replace: true });
+        } else {
+          navigate(getDestinationByRole(me), { replace: true });
+        }
       }
     } catch (err: any) {
       if (onToast) onToast('Lỗi khi lấy thông tin người dùng sau khi xác thực: ' + err.message, 'error');
@@ -301,7 +297,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   };
 
   const handleContinueAsGuest = () => {
-    if (onToast) onToast('Đang chuyển hướng chế độ Đại biểu (Dữ liệu công khai)...', 'info');
+    if (onToast) onToast('Đang chuyển hướng chế độ Đại biểu Thư viện số...', 'info');
     authContinueAsGuest();
   };
 
@@ -312,7 +308,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   if (isSplitDeck) {
     return (
       <>
-        <form onSubmit={handleLoginSubmit} className="w-full">
+        <form onSubmit={handleLoginSubmit} method="POST" action="/login" className="w-full">
+          <input type="hidden" name="_csrf" value="qk7_csrf_token_protected" />
           <div className="grid grid-cols-12 gap-6 items-stretch">
             {/* CỘT TRÁI (col-span-7): Tiêu đề nhỏ + Form nhập + Nút đăng nhập + Khách */}
             <div className="col-span-7 flex flex-col justify-between space-y-3.5">
@@ -337,6 +334,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
               {/* Input Tài khoản quân nhân */}
               <NotchedInput
                 id="username-split"
+                name="username"
+                autoComplete="username"
                 label="Tài khoản quân nhân"
                 value={username}
                 onChange={handleUsernameChange}
@@ -350,6 +349,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
               {/* Input Mật khẩu */}
               <NotchedInput
                 id="password-split"
+                name="password"
+                autoComplete="current-password"
                 label="Mật khẩu"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
@@ -396,7 +397,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                 onClick={handleContinueAsGuest}
                 className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 font-medium text-xs border border-slate-200 dark:border-slate-700/60 transition cursor-pointer"
               >
-                Đại biểu (Dữ liệu công khai)
+                Đại biểu tham quan (Thư viện số QK7)
               </button>
             </div>
 
@@ -558,7 +559,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
   // ══════════════════════════════════════════════════════════════════════
   return (
     <>
-      <form onSubmit={handleLoginSubmit} className="space-y-4">
+      <form onSubmit={handleLoginSubmit} method="POST" action="/login" className="space-y-4">
+        <input type="hidden" name="_csrf" value="qk7_csrf_token_protected" />
         {/* Input Tài khoản quân nhân */}
         <NotchedInput
           id="username-vertical"
@@ -763,7 +765,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
           onClick={handleContinueAsGuest}
           className="w-full py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-white font-medium text-xs border border-slate-200 dark:border-slate-700/60 transition-colors cursor-pointer"
         >
-          Đại biểu (Dữ liệu công khai)
+          Đại biểu tham quan (Thư viện số QK7)
         </button>
       </form>
 

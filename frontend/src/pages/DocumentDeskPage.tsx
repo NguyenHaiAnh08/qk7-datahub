@@ -11,13 +11,14 @@ import { DocumentUploadModal } from '../components/document-desk/DocumentUploadM
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
+import { useDebounce } from '../hooks/useDebounce';
 import { useAuth } from '../hooks/useAuth';
 import { isUserAdmin } from '../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
 
-const ITEMS_PER_PAGE = 8;
+const ITEMS_PER_PAGE = 30;
 
 export const DocumentDeskPage: React.FC = () => {
 const { user, hasPermission } = useAuth(); 
@@ -27,6 +28,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [selectedType, setSelectedType] = useState('');
   const [searchParams] = useSearchParams();
   const [selectedUnit, setSelectedUnit] = useState(searchParams.get('unit') || '');
@@ -113,7 +115,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
       }
 
       const res = await documentsApi.getDocuments({
-        q: searchQuery || undefined,
+        q: debouncedSearch || undefined,
         type: selectedType || undefined,
         unit: queryUnit,
         include_children: includeChildren,
@@ -130,13 +132,10 @@ const canUpload = hasPermission('DOC_UPLOAD');
     }
   };
 
-  // Debounced search & filter reload
+  // Tự động tải lại danh sách khi bộ lọc hoặc từ khóa tìm kiếm (đã debounce 500ms) thay đổi
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadDocuments();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
+    loadDocuments();
+  }, [debouncedSearch, selectedType, selectedUnit, selectedDepartment, selectedLevel, dateFrom, dateTo]);
 
   // Reset Filters
   const handleResetFilters = () => {
@@ -169,12 +168,20 @@ const canUpload = hasPermission('DOC_UPLOAD');
         });
       }
     } else {
-      const res = await documentsApi.uploadDocument(formData);
+      const res: any = await documentsApi.uploadDocument(formData);
       result = res;
-      toast.success('Đã tiếp nhận và lưu trữ văn bản mới thành công', {
-        title: 'TIẾP NHẬN THÀNH CÔNG',
-        badge: 'UPLOADED',
-      });
+      if (res?.pending_approval) {
+        toast.info(res.message || 'Văn bản đã được tiếp nhận và chuyển vào hàng đợi chờ Chỉ huy / Admin duyệt.', {
+          title: 'ĐÃ CHUYỂN CHỈ HUY DUYỆT',
+          badge: 'PENDING-APPROVAL',
+          duration: 6000,
+        });
+      } else {
+        toast.success('Đã tiếp nhận và lưu trữ văn bản mới thành công', {
+          title: 'TIẾP NHẬN THÀNH CÔNG',
+          badge: 'UPLOADED',
+        });
+      }
     }
     await loadDocuments();
     await loadPendingProposals();

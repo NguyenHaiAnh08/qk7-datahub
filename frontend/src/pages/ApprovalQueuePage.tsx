@@ -137,6 +137,67 @@ export const ApprovalQueuePage: React.FC = () => {
   const isCommanderRole = (user?.roles || []).includes('ROL-02');
   const canSelfApprove = isAdminRole || isCommanderRole;
 
+  // Danh sách các đề xuất văn bản (PROP-) đang chờ duyệt để phục vụ duyệt liên hoàn
+  const pendingPropList: DiffProposalData[] = React.useMemo(() => {
+    return items
+      .filter((item) => item.request_id.startsWith('PROP-') && item.status === 'PENDING')
+      .map((item) => {
+        const base = item.proposal_data || {};
+        return {
+          proposal_id: item.request_id,
+          file_id: base.file_id || item.http_path?.replace('/api/documents/', '') || '',
+          document_code: base.document_code || item.document_code,
+          title: base.title || item.doc_title || item.target_summary || '',
+          doc_type_id: base.doc_type_id,
+          issued_date: base.issued_date,
+          issuing_unit_id: base.issuing_unit_id,
+          issuing_unit_name: base.issuing_unit_name,
+          signer: base.signer,
+          summary: base.summary,
+          security_level_id: base.security_level_id || 1,
+          security_level_name: base.security_level_name,
+          current_document_code: base.current_document_code,
+          current_title: base.current_title || '',
+          current_signer: base.current_signer,
+          current_security_level_id: base.current_security_level_id || 1,
+          current_security_name: base.current_security_name,
+          current_unit_name: base.current_unit_name,
+          current_issued_date: base.current_issued_date,
+          document_issuing_unit_id: base.document_issuing_unit_id || (item as any).document_issuing_unit_id,
+          new_stored_path: base.new_stored_path,
+          new_original_name: base.new_original_name,
+          new_file_size: base.new_file_size,
+          note: base.note || (item as any).request_reason || item.target_summary,
+          requester_id: base.requester_id || item.requester_id || '',
+          requester_name: base.requester_name || item.requester_name || item.requester_id || 'Cán bộ đề xuất',
+          requester_rank: base.requester_rank || (item as any).requester_rank || '',
+          requester_position: base.requester_position || (item as any).requester_position || 'Cán bộ nghiệp vụ',
+          requester_unit_id: base.requester_unit_id || (item as any).requester_unit_id || '',
+          requester_unit_name: base.requester_unit_name || (item as any).requester_unit_name || '',
+          created_at: base.created_at || item.created_at || new Date().toISOString(),
+          is_new_upload: Boolean(
+            base.is_new_upload ||
+            base.deleted_reason === 'PENDING_APPROVAL' ||
+            (item as any).request_type === 'UPLOAD_DOCUMENT' ||
+            item.target_summary?.includes('Đăng tải')
+          ),
+        };
+      });
+  }, [items]);
+
+  const currentPropIndex = React.useMemo(() => {
+    if (!selected) return -1;
+    return pendingPropList.findIndex((p) => p.proposal_id === selected.request_id);
+  }, [pendingPropList, selected]);
+
+  const handleNavigateProposal = (newIndex: number) => {
+    if (newIndex >= 0 && newIndex < pendingPropList.length) {
+      const target = pendingPropList[newIndex];
+      const matchItem = items.find((i) => i.request_id === target.proposal_id);
+      if (matchItem) setSelected(matchItem);
+    }
+  };
+
   // Xử lý Phê duyệt Đề Xuất Văn Bản (PROP-) qua ApprovalDiffModal
   const handleApproveProposal = async (proposalId: string, note?: string) => {
     setProcessing(true);
@@ -149,9 +210,21 @@ export const ApprovalQueuePage: React.FC = () => {
         title: 'PHÊ DUYỆT THÀNH CÔNG',
         badge: 'APPROVED',
       });
-      setSelected(null);
+      
+      const currentIdx = pendingPropList.findIndex((p) => p.proposal_id === proposalId);
+      const remaining = pendingPropList.filter((p) => p.proposal_id !== proposalId);
+
       await load(true);
       await refreshApprovalCount();
+
+      if (remaining.length > 0) {
+        const nextIdx = Math.min(currentIdx, remaining.length - 1);
+        const nextTarget = remaining[nextIdx];
+        const matchItem = items.find((i) => i.request_id === nextTarget.proposal_id);
+        setSelected(matchItem || null);
+      } else {
+        setSelected(null);
+      }
     } catch (err: any) {
       toast.error('Lỗi duyệt: ' + err.message);
     } finally {
@@ -168,9 +241,21 @@ export const ApprovalQueuePage: React.FC = () => {
         title: 'ĐÃ TỪ CHỐI',
         badge: 'REJECTED',
       });
-      setSelected(null);
+      
+      const currentIdx = pendingPropList.findIndex((p) => p.proposal_id === proposalId);
+      const remaining = pendingPropList.filter((p) => p.proposal_id !== proposalId);
+
       await load(true);
       await refreshApprovalCount();
+
+      if (remaining.length > 0) {
+        const nextIdx = Math.min(currentIdx, remaining.length - 1);
+        const nextTarget = remaining[nextIdx];
+        const matchItem = items.find((i) => i.request_id === nextTarget.proposal_id);
+        setSelected(matchItem || null);
+      } else {
+        setSelected(null);
+      }
     } catch (err: any) {
       toast.error('Lỗi từ chối: ' + err.message);
     } finally {
@@ -550,6 +635,9 @@ export const ApprovalQueuePage: React.FC = () => {
         <ApprovalDiffModal
           open={true}
           proposal={selectedProposalData}
+          proposals={pendingPropList}
+          currentIndex={currentPropIndex >= 0 ? currentPropIndex : 0}
+          onNavigate={handleNavigateProposal}
           onClose={() => setSelected(null)}
           onApprove={handleApproveProposal}
           onReject={handleRejectProposal}

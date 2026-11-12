@@ -1,0 +1,94 @@
+{
+  "root": "cta-split-image",
+  "elements": {
+    "cta-split-image": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 0
+      },
+      "children": [
+        "left-content",
+        "right-image"
+      ]
+    },
+    "left-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 8,
+        "padding": [
+          24,
+          8
+        ],
+        "justify": "end"
+      },
+      "children": [
+        "content-group",
+        "cta-buttons"
+      ]
+    },
+    "content-group": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 8
+      },
+      "children": [
+        "heading",
+        "check-list"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Join 4,000+ startups growing with Daub"
+      }
+    },
+    "check-list": {
+      "type": "List",
+      "props": {
+        "variant": "check",
+        "gap": 5,
+        "items": [
+          "30-day free trial",
+          "Pesonalized onboarding",
+          "Access to all features"
+        ]
+      }
+    },
+    "cta-buttons": {
+      "type": "ButtonGroup",
+      "children": [
+        "btn-learn",
+        "btn-start"
+      ]
+    },
+    "btn-learn": {
+      "type": "Button",
+      "props": {
+        "label": "Learn more",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "btn-start": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg"
+      }
+    },
+    "right-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cta-split-image-01-right-image/720/720",
+        "alt": "CTA hero image",
+        "objectFit": "cover",
+        "fullHeight": true
+      }
+    }
+  }
+}

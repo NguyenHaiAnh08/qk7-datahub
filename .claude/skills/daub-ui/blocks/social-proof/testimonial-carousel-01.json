@@ -1,0 +1,304 @@
+{
+  "root": "testimonial-carousel",
+  "elements": {
+    "testimonial-carousel": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5,
+        "align": "center",
+        "container": "wide"
+      },
+      "children": [
+        "carousel-header",
+        "featured-testimonial",
+        "testimonial-grid",
+        "carousel-nav"
+      ]
+    },
+    "carousel-header": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "What our customers say",
+        "align": "center"
+      }
+    },
+    "featured-testimonial": {
+      "type": "Card",
+      "children": [
+        "featured-inner"
+      ]
+    },
+    "featured-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "align": "center"
+      },
+      "children": [
+        "featured-stars",
+        "featured-quote",
+        "featured-author"
+      ]
+    },
+    "featured-stars": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "\u2605\u2605\u2605\u2605\u2605"
+      }
+    },
+    "featured-quote": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "We replaced four separate tools with this single platform. Our team onboarding went from two weeks to two days, and our monthly tooling costs dropped by $18,000.",
+        "align": "center"
+      }
+    },
+    "featured-author": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "featured-avatar",
+        "featured-info"
+      ]
+    },
+    "featured-avatar": {
+      "type": "Avatar",
+      "props": {
+        "initials": "AV",
+        "src": "https://i.pravatar.cc/96?u=anna-volkov"
+      }
+    },
+    "featured-info": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "featured-name",
+        "featured-role"
+      ]
+    },
+    "featured-name": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Anna Volkov",
+        "weight": "semibold"
+      }
+    },
+    "featured-role": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Director of Ops, Notion",
+        "variant": "muted"
+      }
+    },
+    "testimonial-grid": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 3
+      },
+      "children": [
+        "card-2",
+        "card-3"
+      ]
+    },
+    "card-2": {
+      "type": "Card",
+      "children": [
+        "card-2-inner"
+      ]
+    },
+    "card-2-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "card-2-stars",
+        "card-2-quote",
+        "card-2-author"
+      ]
+    },
+    "card-2-stars": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "\u2605\u2605\u2605\u2605\u2605"
+      }
+    },
+    "card-2-quote": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "After three years on the platform, our API response times are 40% faster and we've had zero unplanned outages.",
+        "align": "center",
+        "variant": "muted"
+      }
+    },
+    "card-2-author": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "card-2-avatar",
+        "card-2-info"
+      ]
+    },
+    "card-2-avatar": {
+      "type": "Avatar",
+      "props": {
+        "initials": "DM",
+        "src": "https://i.pravatar.cc/96?u=david-morales"
+      }
+    },
+    "card-2-info": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "card-2-name",
+        "card-2-role"
+      ]
+    },
+    "card-2-name": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "David Morales",
+        "weight": "semibold"
+      }
+    },
+    "card-2-role": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "SRE Manager, Stripe",
+        "variant": "muted"
+      }
+    },
+    "card-3": {
+      "type": "Card",
+      "children": [
+        "card-3-inner"
+      ]
+    },
+    "card-3-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "card-3-stars",
+        "card-3-quote",
+        "card-3-author"
+      ]
+    },
+    "card-3-stars": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "\u2605\u2605\u2605\u2605\u2605"
+      }
+    },
+    "card-3-quote": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "The collaboration features transformed how our distributed team works. We shipped our biggest product launch ever with half the coordination overhead.",
+        "align": "center",
+        "variant": "muted"
+      }
+    },
+    "card-3-author": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "card-3-avatar",
+        "card-3-info"
+      ]
+    },
+    "card-3-avatar": {
+      "type": "Avatar",
+      "props": {
+        "initials": "RN",
+        "src": "https://i.pravatar.cc/96?u=rachel-nguyen"
+      }
+    },
+    "card-3-info": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "card-3-name",
+        "card-3-role"
+      ]
+    },
+    "card-3-name": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Rachel Nguyen",
+        "weight": "semibold"
+      }
+    },
+    "card-3-role": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Product VP, Linear",
+        "variant": "muted"
+      }
+    },
+    "carousel-nav": {
+      "type": "ButtonGroup",
+      "children": [
+        "nav-prev",
+        "nav-next"
+      ]
+    },
+    "nav-prev": {
+      "type": "Button",
+      "props": {
+        "label": "Previous",
+        "variant": "outline",
+        "icon": "arrow-left"
+      }
+    },
+    "nav-next": {
+      "type": "Button",
+      "props": {
+        "label": "Next",
+        "variant": "outline",
+        "icon": "arrow-right"
+      }
+    }
+  }
+}

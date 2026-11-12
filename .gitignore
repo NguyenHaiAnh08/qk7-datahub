@@ -78,4 +78,8 @@ zap-report.html
 zap-report.json
 strix_runs/
 
+# Air-gap Offline Packages & Downloaded Tools
+offline_packages/
+tools/gitleaks/
+
 

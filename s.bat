@@ -15,3 +15,4 @@ echo.
 echo [2/2] Khoi dong Backend Gateway (:8000)...
 npm start
 
+call "%~dp0scripts\s.bat" %*

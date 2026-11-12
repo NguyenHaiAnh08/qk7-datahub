@@ -1,0 +1,109 @@
+{
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+  "skills": [
+    {
+      "name": "daub-ui",
+      "type": "skill-md",
+      "description": "Build, preview and verify UI with DAUB (daub.dev), a drop-in CSS + JS component library with 91 components and 21 theme families. Covers three paths: plain HTML with db-* classes, json-render or OpenUI Lang specs rendered by daub-render.js, and the hosted DAUB MCP server (generate_ui, validate_spec, render_spec, parse_openui, get_block_library). Includes the rules that prevent broken renders, 266 ready-made blocks, playground share links, a verify loop, and Jev recipes for picking components, blocks and themes. Use when the user mentions DAUB, daub.dev, daub-ui, db- classes, the DAUB playground or MCP, json-render or OpenUI specs, or asks for a themed dashboard, landing page, form or settings screen without a build step.",
+      "url": "https://daub.dev/SKILL.md",
+      "digest": "sha256:984d82b19bc61ed1959f76382e5adad6c2d5c975b0f29127dfc4e78b2598cfc3",
+      "sha256": "984d82b19bc61ed1959f76382e5adad6c2d5c975b0f29127dfc4e78b2598cfc3"
+    },
+    {
+      "name": "daub-llms-full",
+      "type": "documentation",
+      "description": "Full DAUB UI reference: all 91 components with classes, variants and HTML examples, 21 theme families, JS API.",
+      "url": "https://daub.dev/llms.txt",
+      "digest": "sha256:9313b1ba60eba7b5dd4fcf357eb9b7284f2aa4b2a532060548c41ecd31892619",
+      "sha256": "9313b1ba60eba7b5dd4fcf357eb9b7284f2aa4b2a532060548c41ecd31892619"
+    },
+    {
+      "name": "daub-llms-compact",
+      "type": "documentation",
+      "description": "Compact DAUB reference: quick start and the most used components, token-efficient for LLM context.",
+      "url": "https://daub.dev/llms-compact.txt",
+      "digest": "sha256:261c98e486c902ff58ba013bd94d1de852a8da1a61820066c1457763a0c03477",
+      "sha256": "261c98e486c902ff58ba013bd94d1de852a8da1a61820066c1457763a0c03477"
+    },
+    {
+      "name": "daub-components",
+      "type": "data",
+      "description": "Structured JSON catalog of all 91 DAUB components: classes, modifiers, parts, JS needs and HTML.",
+      "url": "https://daub.dev/components.json",
+      "digest": "sha256:94533dedb8e2c700456c5c88848997d8a73adedce7de08de5fb2e93c11440322",
+      "sha256": "94533dedb8e2c700456c5c88848997d8a73adedce7de08de5fb2e93c11440322"
+    },
+    {
+      "name": "daub-ui-ref-blocks",
+      "type": "documentation",
+      "description": "Index of the DAUB block library: composable json-render sections by category.",
+      "url": "https://daub.dev/references/blocks.md",
+      "digest": "sha256:5eb880ad941d5e85662a8e145413cc27eef90f3021f972e9b435991dbd878f75",
+      "sha256": "5eb880ad941d5e85662a8e145413cc27eef90f3021f972e9b435991dbd878f75"
+    },
+    {
+      "name": "daub-ui-ref-components",
+      "type": "documentation",
+      "description": "DAUB component catalog: spec types with purpose and props, plus every db-* HTML class with modifiers and parts.",
+      "url": "https://daub.dev/references/components.md",
+      "digest": "sha256:a652558fa4ace80ea755aa7cd812f42f89e6f12d62117589c8e5d71a30e20720",
+      "sha256": "a652558fa4ace80ea755aa7cd812f42f89e6f12d62117589c8e5d71a30e20720"
+    },
+    {
+      "name": "daub-ui-ref-design",
+      "type": "documentation",
+      "description": "Layout, density and hierarchy rules for DAUB pages.",
+      "url": "https://daub.dev/references/design.md",
+      "digest": "sha256:b55a1284871b7289aef938dc8501c059f73600a4ccc97e8a49f0b9490487b9fd",
+      "sha256": "b55a1284871b7289aef938dc8501c059f73600a4ccc97e8a49f0b9490487b9fd"
+    },
+    {
+      "name": "daub-ui-ref-jev",
+      "type": "documentation",
+      "description": "Recipes for Jev (TypeSafe decision model on OpenRouter) in DAUB flows: component, block and theme picking.",
+      "url": "https://daub.dev/references/jev.md",
+      "digest": "sha256:18b8dfe71c59fe41a27275add7b7915fc24a0576ac4c4ecf1f0bd2237993a74e",
+      "sha256": "18b8dfe71c59fe41a27275add7b7915fc24a0576ac4c4ecf1f0bd2237993a74e"
+    },
+    {
+      "name": "daub-ui-ref-json-render",
+      "type": "documentation",
+      "description": "DAUB json-render flat spec format: elements, children, state, actions, visibility, validation and renderer tolerance.",
+      "url": "https://daub.dev/references/json-render.md",
+      "digest": "sha256:db28ca564a64e673e6e5ff374b5b6ebb57b5ce5658c6ed245ce36063e933ec2d",
+      "sha256": "db28ca564a64e673e6e5ff374b5b6ebb57b5ce5658c6ed245ce36063e933ec2d"
+    },
+    {
+      "name": "daub-ui-ref-mcp",
+      "type": "documentation",
+      "description": "The hosted DAUB MCP server: tools, arguments, plain-HTTP calls and client setup.",
+      "url": "https://daub.dev/references/mcp.md",
+      "digest": "sha256:a2b14eaafc5c3d08c2cf5e6eb97021d77e1e52c088f556904086a4c538f02a86",
+      "sha256": "a2b14eaafc5c3d08c2cf5e6eb97021d77e1e52c088f556904086a4c538f02a86"
+    },
+    {
+      "name": "daub-ui-ref-openui",
+      "type": "documentation",
+      "description": "OpenUI Lang syntax for DAUB and every component signature in parser argument order.",
+      "url": "https://daub.dev/references/openui.md",
+      "digest": "sha256:4576ae6409af1fc9cc19985e0c6efc203ac4b241f9b5f4fabc940ef5dcf8a1db",
+      "sha256": "4576ae6409af1fc9cc19985e0c6efc203ac4b241f9b5f4fabc940ef5dcf8a1db"
+    },
+    {
+      "name": "daub-ui-ref-themes",
+      "type": "documentation",
+      "description": "DAUB theme families, exact theme names, the theme API and selection heuristics.",
+      "url": "https://daub.dev/references/themes.md",
+      "digest": "sha256:9439115213fa79d7606f0ad6993466c7cc3942f9dd5436257eb9526ee227b515",
+      "sha256": "9439115213fa79d7606f0ad6993466c7cc3942f9dd5436257eb9526ee227b515"
+    },
+    {
+      "name": "daub-ui-ref-verify",
+      "type": "documentation",
+      "description": "How to verify DAUB output: parse, lint, render and visual review.",
+      "url": "https://daub.dev/references/verify.md",
+      "digest": "sha256:25529c06d0eab8ec6565f7f7fce2598f909c9a02b71fdc02846f7c089e50753b",
+      "sha256": "25529c06d0eab8ec6565f7f7fce2598f909c9a02b71fdc02846f7c089e50753b"
+    }
+  ]
+}

@@ -97,24 +97,46 @@ def check_paddle_stack():
 
 
 def check_model_weights():
-    print_banner("5. KIỂM TRA THƯ MỤC TRỌNG SỐ MÔ HÌNH")
+    print_banner("5. KIỂM TRA THƯ MỤC TRỌNG SỐ MÔ HÌNH (AIR-GAPPED COMPATIBILITY)")
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    model_dir = os.path.join(base_dir, "model_weight", "MonkeyOCRv2-B-Parsing")
-    print(f"  • Thư mục kiểm tra: {model_dir}")
 
-    if not os.path.exists(model_dir):
-        print("  [CHƯA TẢI] Thư mục trọng số cục bộ chưa tồn tại.")
+    # 5.1 MonkeyOCRv2
+    monkey_dir = os.path.join(base_dir, "model_weight", "MonkeyOCRv2-B-Parsing")
+    print(f"  [MonkeyOCRv2] Thư mục kiểm tra: {monkey_dir}")
+    if not os.path.exists(monkey_dir):
+        print("  [CHƯA TẢI] Thư mục trọng số MonkeyOCRv2 cục bộ chưa tồn tại.")
         print("  👉 Gợi ý: Chạy lệnh: python download_model.py để tải trọng số.")
-        print("  👉 Ghi chú: Nếu không tải trước, Microservice có thể tự động tải khi khởi động lần đầu.")
-        return False
+        monkey_ok = False
+    else:
+        m_files = os.listdir(monkey_dir)
+        print(f"  [OK] Thư mục tồn tại ({len(m_files)} tệp/thư mục)")
+        has_weights = any(f.endswith(".safetensors") or f.endswith(".bin") for f in m_files)
+        has_config = "config.json" in m_files
+        print(f"  • Tệp cấu hình config.json  : {'Có [OK]' if has_config else 'Thiếu'}")
+        print(f"  • Tệp trọng số (.safetensors): {'Có [OK]' if has_weights else 'Thiếu'}")
+        monkey_ok = has_weights and has_config
 
-    files = os.listdir(model_dir)
-    print(f"  [OK] Thư mục tồn tại ({len(files)} tệp/thư mục)")
-    has_weights = any(f.endswith(".safetensors") or f.endswith(".bin") for f in files)
-    has_config = "config.json" in files
-    print(f"  • Tệp cấu hình config.json  : {'Có [OK]' if has_config else 'Thiếu'}")
-    print(f"  • Tệp trọng số (.safetensors): {'Có [OK]' if has_weights else 'Thiếu'}")
-    return has_weights and has_config
+    # 5.2 PaddleOCR
+    paddle_dir = os.path.join(base_dir, "model_weight", "paddleocr")
+    print(f"\n  [PaddleOCR] Thư mục kiểm tra: {paddle_dir}")
+    if not os.path.exists(paddle_dir):
+        print("  [CHƯA TẢI] Thư mục trọng số PaddleOCR cục bộ chưa tồn tại.")
+        paddle_ok = False
+    else:
+        det_dir = os.path.join(paddle_dir, "det", "en_PP-OCRv3_det_infer")
+        rec_dir = os.path.join(paddle_dir, "rec", "latin_PP-OCRv3_rec_infer")
+        cls_dir = os.path.join(paddle_dir, "cls", "ch_ppocr_mobile_v2.0_cls_infer")
+        det_ok = os.path.isdir(det_dir)
+        rec_ok = os.path.isdir(rec_dir)
+        cls_ok = os.path.isdir(cls_dir)
+        print(f"  • Detection model (det)     : {'Có [OK]' if det_ok else 'Thiếu'}")
+        print(f"  • Recognition model (rec_vi): {'Có [OK]' if rec_ok else 'Thiếu'}")
+        print(f"  • Classification model (cls): {'Có [OK]' if cls_ok else 'Thiếu'}")
+        paddle_ok = det_ok and rec_ok and cls_ok
+        if paddle_ok:
+            print("  [OK] Trọng số PaddleOCR đóng gói đầy đủ (Sẵn sàng Air-Gapped)")
+
+    return monkey_ok and paddle_ok
 
 
 def main():

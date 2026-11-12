@@ -1,0 +1,94 @@
+{
+  "root": "hero-video",
+  "elements": {
+    "hero-video": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5,
+        "align": "center",
+        "justify": "center"
+      },
+      "children": [
+        "hero-video-bg",
+        "hero-video-content"
+      ]
+    },
+    "hero-video-bg": {
+      "type": "CustomHTML",
+      "props": {
+        "html": "<div style=\"position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);opacity:0.3;z-index:0;\"></div>"
+      }
+    },
+    "hero-video-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "align": "center",
+        "container": "narrow"
+      },
+      "children": [
+        "hero-video-eyebrow",
+        "hero-video-heading",
+        "hero-video-sub",
+        "hero-video-actions"
+      ]
+    },
+    "hero-video-eyebrow": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "COMMERCIAL REAL ESTATE INTELLIGENCE",
+        "weight": "semibold",
+        "align": "center"
+      }
+    },
+    "hero-video-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h1",
+        "content": "See every opportunity before your competitors do",
+        "weight": "bold",
+        "align": "center"
+      }
+    },
+    "hero-video-sub": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Greystone aggregates lease expirations, zoning changes, and market signals across 200 metro areas. Institutional-grade data, accessible to every broker.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "hero-video-actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3,
+        "justify": "center"
+      },
+      "children": [
+        "hero-video-cta",
+        "hero-video-secondary"
+      ]
+    },
+    "hero-video-cta": {
+      "type": "Button",
+      "props": {
+        "label": "Request Access",
+        "variant": "primary",
+        "size": "lg"
+      }
+    },
+    "hero-video-secondary": {
+      "type": "Button",
+      "props": {
+        "label": "See a Market Report",
+        "variant": "outline",
+        "size": "lg"
+      }
+    }
+  }
+}

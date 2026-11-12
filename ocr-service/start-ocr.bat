@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title QK7 DataHub - OCR Service v2 (:8002)
+title QK7 DataHub - OCR Service (:8002)
 cd /d "%~dp0"
 
 echo ==========================================
-echo   QK7 DataHub - OCR MICROSERVICE v2.0
+echo   QK7 DataHub - OCR 
 echo   Engine: MonkeyOCRv2 / PaddleOCR
 echo   Port  : 8002
 echo ==========================================
@@ -45,6 +45,29 @@ REM --- 3. Cau hinh engine va tham so ---
 echo.
 echo [2/3] Cau hinh OCR Engine...
 
+REM Air-Gapped Offline Environment: Triet tieu moi request ra ngoai Internet
+set "HF_HUB_OFFLINE=1"
+set "TRANSFORMERS_OFFLINE=1"
+set "HF_DATASETS_OFFLINE=1"
+set "HF_HUB_VERBOSITY=debug"
+set "HF_HUB_DISABLE_TELEMETRY=1"
+set "DO_NOT_TRACK=1"
+set "DISABLE_TELEMETRY=1"
+set "SCARF_NO_ANALYTICS=1"
+set "ANONYMIZED_TELEMETRY=False"
+
+REM --- PaddleOCR offline hardening ---
+set "PADDLE_HOME=%~dp0model_weight\paddleocr"
+set "PADDLEOCR_HOME=%~dp0model_weight\paddleocr"
+set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True"
+set "DISABLE_PADDLE_UPDATE_CHECK=1"
+set "FLAGS_use_mkldnn=0"
+
+REM Uu tien model weight noi bo neu ton tai
+if exist "%~dp0model_weight\MonkeyOCRv2-B-Parsing" (
+    if not defined MONKEY_MODEL_ID set "MONKEY_MODEL_ID=%~dp0model_weight\MonkeyOCRv2-B-Parsing"
+)
+
 REM OCR_ENGINE: "auto"      = thu MonkeyOCRv2 truoc, fallback PaddleOCR
 REM             "monkey"    = chi MonkeyOCRv2
 REM             "paddleocr" = chi PaddleOCR (hieu nang nhanh hon)
@@ -56,7 +79,11 @@ if not defined MONKEY_DEVICE set "MONKEY_DEVICE=cpu"
 
 echo    OCR_ENGINE   = %OCR_ENGINE%
 echo    MONKEY_DEVICE= %MONKEY_DEVICE%
+echo    MONKEY_MODEL = %MONKEY_MODEL_ID%
 echo    PORT         = 8002
+echo    HOST         = 0.0.0.0 (VLAN ^& Local)
+echo    OFFLINE_MODE = HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1
+set "HOST=0.0.0.0"
 
 REM --- 4. Khoi dong Microservice ---
 echo.

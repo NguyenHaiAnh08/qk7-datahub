@@ -1,0 +1,174 @@
+{
+  "root": "multi-step-form",
+  "elements": {
+    "multi-step-form": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5
+      },
+      "children": [
+        "wizard-stepper",
+        "step-content",
+        "step-actions"
+      ]
+    },
+    "wizard-stepper": {
+      "type": "Stepper",
+      "props": {
+        "steps": [
+          {
+            "label": "Account Details"
+          },
+          {
+            "label": "Company Info"
+          },
+          {
+            "label": "Review & Confirm"
+          }
+        ],
+        "current": 0
+      }
+    },
+    "step-content": {
+      "type": "Surface",
+      "props": {
+        "variant": "bordered"
+      },
+      "children": [
+        "step-1-fields"
+      ]
+    },
+    "step-1-fields": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "step-1-heading",
+        "step-1-description",
+        "field-username",
+        "field-email",
+        "field-password",
+        "field-confirm-password",
+        "field-terms"
+      ]
+    },
+    "step-1-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Create Your Account",
+        "weight": "semibold"
+      }
+    },
+    "step-1-description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Enter your credentials to set up your new account. You can always change these later in settings.",
+        "variant": "muted"
+      }
+    },
+    "field-username": {
+      "type": "Field",
+      "props": {
+        "label": "Username"
+      },
+      "children": [
+        "input-username"
+      ]
+    },
+    "input-username": {
+      "type": "Input",
+      "props": {
+        "placeholder": "sarahmitchell",
+        "type_input": "text"
+      }
+    },
+    "field-email": {
+      "type": "Field",
+      "props": {
+        "label": "Email Address"
+      },
+      "children": [
+        "input-email"
+      ]
+    },
+    "input-email": {
+      "type": "Input",
+      "props": {
+        "placeholder": "sarah@acmecorp.com",
+        "type_input": "email"
+      }
+    },
+    "field-password": {
+      "type": "Field",
+      "props": {
+        "label": "Password"
+      },
+      "children": [
+        "input-password"
+      ]
+    },
+    "input-password": {
+      "type": "Input",
+      "props": {
+        "placeholder": "At least 8 characters",
+        "type_input": "password"
+      }
+    },
+    "field-confirm-password": {
+      "type": "Field",
+      "props": {
+        "label": "Confirm Password"
+      },
+      "children": [
+        "input-confirm-password"
+      ]
+    },
+    "input-confirm-password": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Re-enter your password",
+        "type_input": "password"
+      }
+    },
+    "field-terms": {
+      "type": "Checkbox",
+      "props": {
+        "label": "I agree to the Terms of Service and Privacy Policy",
+        "checked": false
+      }
+    },
+    "step-actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "justify": "space-between"
+      },
+      "children": [
+        "btn-back",
+        "btn-next"
+      ]
+    },
+    "btn-back": {
+      "type": "Button",
+      "props": {
+        "label": "Back",
+        "variant": "outline",
+        "icon": "arrow-left"
+      }
+    },
+    "btn-next": {
+      "type": "Button",
+      "props": {
+        "label": "Continue",
+        "variant": "default",
+        "icon": "arrow-right"
+      }
+    }
+  }
+}

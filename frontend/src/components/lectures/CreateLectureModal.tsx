@@ -1,152 +1,285 @@
-import React, { useState, useEffect } from 'react';
-import { X, UploadCloud, FileArchive, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Save, Loader2, FileText, Info, UploadCloud } from 'lucide-react';
 import { lectureService } from '../../services/lectureService';
-import { Subject, ContentType } from '../../types/lecture';
 import { toast } from '../common/Toast';
+import { Subject, ContentType, Lecture } from '../../types/lecture';
+
+// ─── Cấu hình tĩnh cho 2 dropdown ───
+const SECURITY_LEVELS: Array<{ value: number; label: string }> = [
+  { value: 1, label: 'Cấp 1 — Công khai' },
+  { value: 2, label: 'Cấp 2 — Nội bộ' },
+  { value: 3, label: 'Cấp 3 — Mật' },
+];
+
+const CONTENT_TYPES: Array<{ value: ContentType; label: string }> = [
+  { value: 'PDF',   label: 'Tệp PDF (Tài liệu tĩnh)' },
+  { value: 'HTML5', label: 'Gói HTML5 (Tương tác)' },
+  { value: 'SCORM', label: 'Gói SCORM (ActivePresenter .zip)' },
+];
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onCreated: () => void;
+  subjects: Subject[];
+  editLecture?: Lecture | null;
 }
 
-export const CreateLectureModal: React.FC<Props> = ({ open, onClose, onSuccess }) => {
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [formData, setFormData] = useState({
-    title: '',
-    lecture_code: '',
-    subject_id: '',
-    content_type: 'HTML5' as ContentType,
-    security_level_id: 1,
-  });
+export const CreateLectureModal: React.FC<Props> = ({
+  open,
+  onClose,
+  onCreated,
+  subjects,
+  editLecture,
+}) => {
+  const [title, setTitle] = useState('');
+  const [lectureCode, setLectureCode] = useState('');
+  const [subjectId, setSubjectId] = useState('');
+  const [contentType, setContentType] = useState<ContentType>('PDF');
+  const [securityLevel, setSecurityLevel] = useState(2);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  
+  // State cho file upload
   const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─────────────────────────────────────────────────────────────────
+  // Build dropdown level động
+  // ─────────────────────────────────────────────────────────────────
+  const effectiveSecurityLevels = useMemo(() => {
+    const base = SECURITY_LEVELS.map((x) => ({ ...x }));
+    const currentLevel = editLecture?.security_level_id;
+    if (
+      typeof currentLevel === 'number' &&
+      currentLevel > 3 &&
+      !base.some((x) => x.value === currentLevel)
+    ) {
+      const extraLabel = currentLevel === 4 ? 'Cấp 4 — Tối mật (giữ nguyên)' : 'Cấp 5 — Tuyệt mật (giữ nguyên)';
+      base.push({ value: currentLevel, label: extraLabel });
+    }
+    return base;
+  }, [editLecture]);
 
   useEffect(() => {
-    if (open) {
-      lectureService.getSubjects().then(res => setSubjects(res.items)).catch(console.error);
+    if (!open) return;
+    if (editLecture) {
+      setTitle(editLecture.title || '');
+      setLectureCode(editLecture.lecture_code || '');
+      setSubjectId(editLecture.subject_id || '');
+      setContentType(editLecture.content_type || 'PDF');
+      setSecurityLevel(editLecture.security_level_id || 2);
+    } else {
+      setTitle('');
+      setLectureCode('');
+      setSubjectId('');
+      setContentType('PDF');
+      setSecurityLevel(2);
     }
-  }, [open]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title || !formData.subject_id || !file) {
-      toast.error('Vui lòng điền đủ thông tin và chọn file .zip');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // 1. Tạo bài giảng (DRAFT)
-      const createRes = await lectureService.createLecture(formData);
-      const lectureId = createRes.lecture_id;
-
-      // 2. Upload file ZIP
-      await lectureService.uploadPackage(lectureId, file, formData.content_type === 'SCORM' ? 'SCORM' : 'HTML5');
-      
-      toast.success('Tạo bài giảng và tải gói học liệu thành công!');
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      toast.error(err.message || 'Có lỗi xảy ra khi tạo bài giảng');
-    } finally {
-      setLoading(false);
-    }
-  };
+    setFile(null); // Reset file khi mở modal
+    setError('');
+  }, [open, editLecture]);
 
   if (!open) return null;
 
+  const reset = () => {
+    setTitle(''); setLectureCode(''); setSubjectId('');
+    setContentType('PDF'); setSecurityLevel(2); setError(''); setFile(null);
+  };
+
+  const handleClose = () => {
+    if (submitting) return;
+    reset();
+    onClose();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (selected) {
+      if (!selected.name.toLowerCase().endsWith('.zip')) {
+        toast.error('Chỉ chấp nhận file .zip (Gói HTML5/SCORM)');
+        return;
+      }
+      setFile(selected);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!title.trim()) return setError('Vui lòng nhập tiêu đề bài giảng');
+    if (!subjectId)    return setError('Vui lòng chọn môn học');
+
+    if (!editLecture && securityLevel > 3) {
+      return setError('Cấp bảo mật tối đa cho bài giảng là Cấp 3 — Mật');
+    }
+
+    // Nếu tạo mới và là HTML5/SCORM, bắt buộc phải có file
+    if (!editLecture && contentType !== 'PDF' && !file) {
+      return setError('Vui lòng chọn tệp .zip chứa gói bài giảng');
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        title: title.trim(),
+        subject_id: subjectId,
+        lecture_code: lectureCode.trim() || undefined,
+        security_level_id: securityLevel,
+        content_type: contentType,
+        scorm_entry_point: undefined, // BE tự lấy từ imsmanifest.xml khi giải nén
+      };
+
+      let targetLectureId = editLecture?.lecture_id;
+
+      // BƯỚC 1: Tạo hoặc cập nhật bài giảng
+      if (editLecture) {
+        await lectureService.update(editLecture.lecture_id, payload);
+        toast.success('Đã cập nhật bài giảng thành công');
+      } else {
+        const res = await lectureService.create(payload);
+        targetLectureId = res.lecture_id;
+        toast.success('Đã tạo bài giảng mới');
+      }
+
+      // BƯỚC 2: Upload file .zip (nếu có)
+      if (file && targetLectureId && contentType !== 'PDF') {
+        toast.info('Đang tải lên gói bài giảng, vui lòng đợi...', { duration: 5000 });
+        await lectureService.uploadPackage(targetLectureId, file, contentType as 'HTML5' | 'SCORM');
+        toast.success('Đã tải lên gói bài giảng thành công');
+      }
+
+      reset();
+      onCreated();
+    } catch (err: any) {
+      setError(err?.message || 'Thao tác thất bại');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800">
-          <h3 className="font-bold text-lg flex items-center gap-2">
-            <FileArchive className="w-5 h-5 text-cyan-500" />
-            Soạn bài giảng mới
-          </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100"><X className="w-5 h-5" /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+              <FileText className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">
+              {editLecture ? 'Chỉnh sửa bài giảng' : 'Soạn bài giảng mới'}
+            </h3>
+          </div>
+          <button onClick={handleClose} disabled={submitting}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-sm">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
+          {error && (
+            <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-300 dark:border-rose-500/30 rounded-lg text-rose-700 dark:text-rose-300">
+              {error}
+            </div>
+          )}
+
           <div>
-            <label className="block font-medium mb-1">Tiêu đề bài giảng *</label>
-            <input
-              type="text" required
-              value={formData.title}
-              onChange={e => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-950"
-            />
+            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Tiêu đề bài giảng <span className="text-rose-500">*</span>
+            </label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="VD: Bài 1 — Chiến thuật tiến công" autoFocus
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600 text-slate-900 dark:text-slate-100" />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-medium mb-1">Mã bài giảng</label>
-              <input
-                type="text"
-                value={formData.lecture_code}
-                onChange={e => setFormData({ ...formData, lecture_code: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-950"
-              />
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Mã bài giảng</label>
+              <input type="text" value={lectureCode} onChange={e => setLectureCode(e.target.value)}
+                placeholder="BG-CTBB-01"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:border-cyan-600 font-mono text-slate-900 dark:text-slate-100" />
             </div>
             <div>
-              <label className="block font-medium mb-1">Môn học *</label>
-              <select
-                required
-                value={formData.subject_id}
-                onChange={e => setFormData({ ...formData, subject_id: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-950"
-              >
-                <option value="">Chọn môn học</option>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Môn học <span className="text-rose-500">*</span></label>
+              <select value={subjectId} onChange={e => setSubjectId(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:border-cyan-600 cursor-pointer text-slate-900 dark:text-slate-100">
+                <option value="">— Chọn môn —</option>
                 {subjects.map(s => <option key={s.subject_id} value={s.subject_id}>{s.name}</option>)}
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-medium mb-1">Loại nội dung</label>
-              <select
-                value={formData.content_type}
-                onChange={e => setFormData({ ...formData, content_type: e.target.value as ContentType })}
-                className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-950"
-              >
-                <option value="HTML5">Gói HTML5 (Tương tác)</option>
-                <option value="SCORM">Gói SCORM 1.2</option>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Loại nội dung</label>
+              <select value={contentType} onChange={e => setContentType(e.target.value as ContentType)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100">
+                {CONTENT_TYPES.map(ct => (
+                  <option key={ct.value} value={ct.value}>{ct.label}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="block font-medium mb-1">Cấp bảo mật</label>
-              <select
-                value={formData.security_level_id}
-                onChange={e => setFormData({ ...formData, security_level_id: Number(e.target.value) })}
-                className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-950"
-              >
-                <option value={1}>Cấp 1 - Công khai</option>
-                <option value={2}>Cấp 2 - Nội bộ</option>
-                <option value={3}>Cấp 3 - Mật</option>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Cấp bảo mật</label>
+              <select value={securityLevel} onChange={e => setSecurityLevel(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100">
+                {effectiveSecurityLevels.map(lv => (
+                  <option key={lv.value} value={lv.value}>{lv.label}</option>
+                ))}
               </select>
             </div>
           </div>
 
-          <div>
-            <label className="block font-medium mb-1">Tệp gói bài giảng (.zip) *</label>
-            <div className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:bg-slate-50 relative">
-              <input
-                type="file" accept=".zip" required
-                onChange={e => setFile(e.target.files?.[0] || null)}
-                className="absolute inset-0 opacity-0 cursor-pointer"
+          {/* ✅ INPUT UPLOAD FILE DÀNH CHO HTML5 / SCORM */}
+          {contentType !== 'PDF' && (
+            <div className="pt-2">
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Tệp gói bài giảng (.zip) <span className="text-rose-500">*</span>
+              </label>
+              
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
+              >
+                <UploadCloud className="w-8 h-8 text-cyan-500" />
+                <span className="font-semibold text-slate-700 dark:text-slate-300 text-center break-all px-2">
+                  {file ? file.name : 'Nhấn để chọn file .zip'}
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'Chứa file index.html và các thư mục con'}
+                </span>
+              </div>
+              
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept=".zip" 
+                className="hidden" 
               />
-              <UploadCloud className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-sm font-medium">{file ? file.name : 'Nhấn hoặc kéo thả file .zip vào đây'}</p>
-              {file && <p className="text-xs text-slate-500 mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>}
+              
+              <div className="flex items-start gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <Info className="w-3 h-3 shrink-0 mt-0.5" />
+                <span>
+                  Hệ thống sẽ tự động giải nén và lấy entry point từ gói khi <strong>duyệt xuất bản</strong>.
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 font-medium">Hủy</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium flex items-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {loading ? 'Đang xử lý...' : 'Tạo bài giảng'}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <button type="button" onClick={handleClose} disabled={submitting}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-semibold disabled:opacity-40">
+              Hủy
+            </button>
+            <button type="submit" disabled={submitting}
+              className="px-4 py-2 bg-gradient-to-r from-[#0e7490] via-[#0891b2] to-[#06b6d4] hover:from-[#0891b2] hover:to-[#22d3ee] text-white rounded-lg font-bold flex items-center gap-1.5 disabled:opacity-40">
+              {submitting ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Đang xử lý...</span></>
+              ) : (
+                <><Save className="w-3.5 h-3.5" /><span>{editLecture ? 'Lưu thay đổi' : 'Tạo bài giảng'}</span></>
+              )}
             </button>
           </div>
         </form>
@@ -154,3 +287,5 @@ export const CreateLectureModal: React.FC<Props> = ({ open, onClose, onSuccess }
     </div>
   );
 };
+
+export default CreateLectureModal;

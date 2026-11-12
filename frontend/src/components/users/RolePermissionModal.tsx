@@ -4,7 +4,7 @@ import {
   Shield, Search, CheckCircle2, ChevronDown, ChevronRight,
   X, Save, AlertTriangle,
   FileText, Users, KeyRound, ShieldAlert, BookOpen, Fingerprint,
-  Activity, Bot, Settings, Monitor,
+  Activity, Bot, Settings, Monitor, MonitorPlay,
 } from 'lucide-react';
 
 import { permissionService } from '../../services/permissionService';
@@ -26,6 +26,7 @@ const GROUP_CONFIG: Record<string, {
   border: string;
 }> = {
   DOCUMENT:    { label: 'Văn bản',    icon: FileText,    color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/30' },
+  LECTURE:     { label: 'Bài giảng',  icon: MonitorPlay, color: 'text-cyan-700 dark:text-cyan-400',       bg: 'bg-cyan-50 dark:bg-cyan-500/10',       border: 'border-cyan-200 dark:border-cyan-500/30' },
   USER:        { label: 'Người dùng', icon: Users,       color: 'text-sky-700 dark:text-sky-400',         bg: 'bg-sky-50 dark:bg-sky-500/10',         border: 'border-sky-200 dark:border-sky-500/30' },
   ROLE:        { label: 'Vai trò',    icon: KeyRound,    color: 'text-amber-700 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-500/10',     border: 'border-amber-200 dark:border-amber-500/30' },
   PERMISSION:  { label: 'Quyền',      icon: ShieldAlert, color: 'text-rose-700 dark:text-rose-400',       bg: 'bg-rose-50 dark:bg-rose-500/10',       border: 'border-rose-200 dark:border-rose-500/30' },

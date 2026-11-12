@@ -69,6 +69,16 @@ module.exports = function createLectureRoutes({
         || pos.includes('chủ nhiệm khoa') || pos.includes('trưởng phòng');
   }
 
+  // Hàm phụ kiểm tra quyền Chỉ huy (Chỉ Admin, BGH, Trưởng BM mới được Lưu trữ/Khôi phục)
+  async function requireCommander(pool, req, res) {
+    const roles = await resolveUserRoles(pool, req.user);
+    if (roles.includes('ROL-01') || roles.includes('ROL-02') || roles.includes('ROL-06')) {
+      return true;
+    }
+    res.status(403).json({ error: 'Chỉ Chỉ huy cấp trên mới có quyền lưu trữ/khôi phục bài giảng.' });
+    return false;
+  }
+
   // Check cột có tồn tại (dùng cho fallback nếu chưa chạy migration v2)
   async function hasColumn(pool, table, column) {
     const r = await pool.request()
@@ -89,7 +99,7 @@ module.exports = function createLectureRoutes({
       const result = await pool.request().query(`
         SELECT s.*, u.name AS faculty_name
         FROM SUBJECT s
-        JOIN UNIT u ON u.unit_id = s.faculty_unit_id
+        LEFT JOIN UNIT u ON u.unit_id = s.faculty_unit_id
         WHERE s.active = 1
         ORDER BY s.name
       `);
@@ -309,9 +319,13 @@ module.exports = function createLectureRoutes({
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  // 1. API Lưu trữ (Archive) — CHẶN Ở BACKEND: chỉ Chỉ huy cấp trên
   router.delete('/:id', requireAuth, requirePermission('LECTURE_DELETE'), async (req, res) => {
     try {
       const pool = await getPool();
+      // Kiểm tra quyền Chỉ huy
+      if (!(await requireCommander(pool, req, res))) return;
+
       const r = await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
         .query(`UPDATE DIGITAL_LECTURE SET status = 'ARCHIVED', updated_at = GETDATE() WHERE lecture_id = @id`);
@@ -343,6 +357,36 @@ module.exports = function createLectureRoutes({
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  // 2. API Khôi phục (Restore) — CHẶN Ở BACKEND: chỉ Chỉ huy cấp trên
+  //    (Đưa RA NGOÀI handler submit — bản gốc bị lồng trong submit nên không được đăng ký)
+  router.post('/:id/restore', requireAuth, requirePermission('LECTURE_DELETE'), async (req, res) => {
+    try {
+      const pool = await getPool();
+      // Kiểm tra quyền Chỉ huy
+      if (!(await requireCommander(pool, req, res))) return;
+
+      const lectureId = req.params.id;
+      const check = await pool.request()
+        .input('id', sql.VarChar(50), lectureId)
+        .query(`SELECT status FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+      if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
+
+      if (check.recordset[0].status !== 'ARCHIVED') {
+        return res.status(400).json({ error: 'Bài giảng không ở trạng thái lưu trữ' });
+      }
+
+      await pool.request()
+        .input('id', sql.VarChar(50), lectureId)
+        .query(`UPDATE DIGITAL_LECTURE SET status='DRAFT', updated_at=GETDATE() WHERE lecture_id=@id`);
+
+      await logAudit(req, 'LECTURE_RESTORE', `Khôi phục bài giảng ${lectureId}`, lectureId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error('[POST restore]', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Duyệt 2 tầng
   router.post('/:id/approve', requireAuth, requirePermission('LECTURE_APPROVE'), async (req, res) => {
     try {
@@ -350,7 +394,9 @@ module.exports = function createLectureRoutes({
       const lectureId = req.params.id;
       const check = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .query(`SELECT status, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT status, faculty_unit_id, content_type,
+                       pending_scorm_path, scorm_entry_point
+                FROM DIGITAL_LECTURE WHERE lecture_id = @id`);                 // [1]
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
 
       const lec = check.recordset[0];
@@ -378,6 +424,37 @@ module.exports = function createLectureRoutes({
         nextStatus = 'PUBLISHED';
       } else {
         return res.status(400).json({ error: 'Trạng thái không hợp lệ để duyệt' });
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // [2] GIẢI NÉN GÓI ZIP (SCORM/HTML5) TRƯỚC KHI SET PUBLISHED
+      // Chỉ chạy ở tầng 2 (PUBLISHED) — tầng 1 (PENDING_TRAINING) chưa
+      // cần extract vì còn phải chờ Chỉ huy cấp Trường duyệt.
+      // Fail → trả 500, giữ nguyên PENDING_TRAINING, KHÔNG publish nửa vời.
+      // ══════════════════════════════════════════════════════════════════
+      if (nextStatus === 'PUBLISHED') {
+        if (lec.pending_scorm_path) {
+          try {
+            const { extractAndParse } = require('./lecture-package-helper');
+            const out = await extractAndParse({
+              lectureId,
+              pendingPath: lec.pending_scorm_path,
+            });
+            console.log(`[lecture approve] Extracted ${lectureId} → ${out.entry_point} (${out.content_type})`);
+          } catch (ex) {
+            console.error(`[lecture approve] Extract failed ${lectureId}:`, ex);
+            return res.status(500).json({
+              error: 'Không giải nén được gói học liệu: ' + ex.message,
+              code: 'EXTRACT_FAILED',
+            });
+          }
+        } else if (!lec.scorm_entry_point) {
+          // [3] Không có ZIP pending và cũng chưa có entry point → không thể publish
+          return res.status(400).json({
+            error: 'Bài giảng chưa có gói học liệu (thiếu pending_scorm_path và scorm_entry_point)',
+            code: 'NO_PACKAGE',
+          });
+        }
       }
 
       await pool.request()
@@ -551,27 +628,26 @@ module.exports = function createLectureRoutes({
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  // Kết thúc ca (dùng SCHEDULE_START permission)
-  async function endScheduleInternal({ scheduleId, actorUser }) {
+  // Kết thúc ca — LÕI XỬ LÝ CHUNG
+  //   isForce = false → chỉ người mở ca (hoặc Admin) mới được kết thúc
+  //   isForce = true  → bỏ qua check presenter (dùng cho Force End bởi Chỉ huy/Admin)
+  async function endScheduleInternal({ scheduleId, actorUser, isForce = false }) {
     const pool = await getPool();
     const r = await pool.request()
       .input('id', sql.VarChar(50), scheduleId)
-      .query(`
-        SELECT s.*, l.title AS lecture_title, sub.name AS subject_name,
-               u.full_name AS presenter_name, u.[rank] AS presenter_rank,
-               c.class_name
-        FROM TEACHING_SCHEDULE s
-        JOIN DIGITAL_LECTURE l ON l.lecture_id = s.lecture_id
-        JOIN SUBJECT sub ON sub.subject_id = l.subject_id
-        JOIN [USER] u ON u.user_id = s.presenter_id
-        JOIN TRAINING_CLASS c ON c.class_id = s.class_id
-        WHERE s.schedule_id = @id
-      `);
+      .query(`SELECT s.*, l.title AS lecture_title
+              FROM TEACHING_SCHEDULE s
+              JOIN DIGITAL_LECTURE l ON l.lecture_id = s.lecture_id
+              WHERE s.schedule_id = @id`);
+
     if (r.recordset.length === 0) { const e = new Error('Không tìm thấy ca'); e.code = 'NOT_FOUND'; throw e; }
     const s = r.recordset[0];
     if (s.status !== 'ONGOING') { const e = new Error('Ca không ở trạng thái ONGOING'); e.code = 'BAD_STATE'; throw e; }
-    if (s.presenter_id !== actorUser.user_id && !(actorUser.roles || []).includes('ROL-01')) {
-      const e = new Error('Không có quyền kết thúc ca'); e.code = 'FORBIDDEN'; throw e;
+
+    // Nếu KHÔNG PHẢI là Force End, thì phải là người tạo ca (hoặc Admin)
+    const isAdmin = (actorUser.roles || []).includes('ROL-01');
+    if (!isForce && s.presenter_id !== actorUser.user_id && !isAdmin) {
+      const e = new Error('Không có quyền kết thúc ca này'); e.code = 'FORBIDDEN'; throw e;
     }
 
     const endTime = new Date();
@@ -580,17 +656,12 @@ module.exports = function createLectureRoutes({
     await pool.request()
       .input('id', sql.VarChar(50), scheduleId)
       .input('et', sql.DateTime, endTime)
-      .query(`UPDATE TEACHING_SCHEDULE
-              SET status='COMPLETED', end_time=@et
-              WHERE schedule_id=@id`);
+      .query(`UPDATE TEACHING_SCHEDULE SET status='COMPLETED', end_time=@et WHERE schedule_id=@id`);
 
-    return {
-      schedule_id: scheduleId,
-      duration_minutes: durationMinutes,
-      lecture_title: s.lecture_title,
-    };
+    return { schedule_id: scheduleId, duration_minutes: durationMinutes, lecture_title: s.lecture_title };
   }
 
+  // Người mở ca tự kết thúc ca của mình
   router.post('/schedules/:id/end', requireAuth, requirePermission('SCHEDULE_START'), async (req, res) => {
     try {
       const result = await endScheduleInternal({
@@ -612,24 +683,28 @@ module.exports = function createLectureRoutes({
     }
   });
 
-  // Admin force-end
+  // API Buộc kết thúc (Dành cho Chỉ huy/Admin xử lý ca treo của người khác)
   router.post('/schedules/:id/force-end', requireAuth, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
-      if (!roles.includes('ROL-01')) {
-        return res.status(403).json({ error: 'Chỉ Admin mới có quyền kết thúc cưỡng bức' });
+      if (!roles.includes('ROL-01') && !roles.includes('ROL-02') && !roles.includes('ROL-06')) {
+        return res.status(403).json({ error: 'Chỉ Chỉ huy/Admin mới có quyền buộc kết thúc ca của người khác.' });
       }
+
       const result = await endScheduleInternal({
         scheduleId: req.params.id,
-        actorUser: req.user,
+        actorUser: req.user, // Đã được check quyền ở trên
+        isForce: true,
       });
+
       await logAudit(req, 'SCHEDULE_FORCE_END',
-        `Admin kết thúc cưỡng bức ca ${result.schedule_id} (${result.duration_minutes} phút)`);
+        `Chỉ huy/Admin buộc kết thúc ca ${result.schedule_id} (${result.duration_minutes} phút)`);
       res.json({ success: true, ...result });
     } catch (err) {
       if (err.code === 'NOT_FOUND') return res.status(404).json({ error: err.message });
       if (err.code === 'BAD_STATE') return res.status(400).json({ error: err.message });
+      if (err.code === 'FORBIDDEN') return res.status(403).json({ error: err.message });
       console.error('[POST force-end]', err);
       res.status(500).json({ error: err.message });
     }

@@ -3528,6 +3528,10 @@ app.use('/api/lectures', requireAuth, require('./src/lecture-extended-routes')({
   requireAuth, requirePermission, writeAccessLog, getClientIp,
 }));
 
+app.use('/api/lectures', requireAuth, require('./src/scorm-package-routes')({
+  requireAuth, requirePermission
+}));
+
 // ═══════════════════════════════════════════════════════════════
 // ERROR HANDLER & SPA FALLBACK
 // ═══════════════════════════════════════════════════════════════

@@ -32,7 +32,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/protected-permissions$/,     'ROLE_VIEW'],
     [/^\/api\/documents\/trash$/,                 'DOC_TRASH_VIEW'],
     [/^\/api\/documents\/my-unit$/,               'DOC_VIEW'],
-    [/^\/api\/documents\/proposals\/pending$/,     'DOC_VIEW'],
+    [/^\/api\/documents\/proposals\/pending$/,    'DOC_VIEW'],
   ],
 
   POST: [
@@ -54,6 +54,9 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/documents\/proposals\/[^/]+\/reject$/,  'DOC_EDIT'],
     [/^\/api\/ai\/sync-all$/,                     'AI_SYNC'],
     [/^\/api\/ai\/chat$/,                         'AI_QUERY'],
+
+    // ─── LECTURES ───
+    [/^\/api\/lectures\/upload-scorm$/,           'LECTURE_CREATE'],
 
     // ─── NHÓM 2 (quan trọng — CREATE thì OK, EDIT/DELETE phải duyệt) ───
     [/^\/api\/admin\/units$/,                            'UNIT_CREATE'],           // ← TÁCH riêng

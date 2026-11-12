@@ -1,108 +1,142 @@
 import { http } from './http';
-import { Lecture, Subject, TrainingClass, TeachingSession } from '../types/lecture';
+import {
+  Lecture,
+  LectureListFilters,
+  CreateLecturePayload,
+  Subject,
+  TrainingClass,
+  TeachingSchedule,
+  StartSchedulePayload,
+  HistoryKpi,
+} from '../types/lecture';
 
-// Hàm phụ trợ chuyển đổi object params thành chuỗi query string (?key=value)
-const buildQueryString = (params?: Record<string, any>) => {
-  if (!params) return '';
-  const searchParams = new URLSearchParams();
-  Object.keys(params).forEach(key => {
-    if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
-      searchParams.append(key, String(params[key]));
-    }
-  });
-  const qs = searchParams.toString();
-  return qs ? `?${qs}` : '';
-};
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 export const lectureService = {
-  // ─── Lấy danh mục ───
-  getSubjects: async () => http<{ items: Subject[] }>('/api/lectures/catalogs/subjects'),
-  getClasses: async () => http<{ items: TrainingClass[] }>('/api/lectures/catalogs/classes'),
-  getVenues: async () => http<{ items: { venue_name: string }[] }>('/api/lectures/catalogs/venues'),
-
-  // ─── CRUD Bài giảng ───
-  getLectures: async (params?: any) => {
-    const query = buildQueryString(params);
-    return http<{ items: Lecture[] }>(`/api/lectures${query}`);
+  // ── Catalogs ──
+  async getSubjects(): Promise<Subject[]> {
+    const res: any = await http('/api/lectures/catalogs/subjects');
+    return res?.items || [];
   },
-  getLectureById: async (id: string) => http<Lecture>(`/api/lectures/${id}`),
-  
-  createLecture: async (data: Partial<Lecture>) => 
-    http<{ lecture_id: string }>('/api/lectures', {
+
+  async getClasses(): Promise<TrainingClass[]> {
+    const res: any = await http('/api/lectures/catalogs/classes');
+    return res?.items || [];
+  },
+
+  async getVenues(): Promise<{ venue_name: string; usage_count: number }[]> {
+    const res: any = await http('/api/lectures/catalogs/venues');
+    return res?.items || [];
+  },
+
+  // ── Lecture CRUD ──
+  async list(filters: LectureListFilters = {}): Promise<{ items: Lecture[]; total: number }> {
+    const p = new URLSearchParams();
+    if (filters.status) p.set('status', filters.status);
+    if (filters.subject_id) p.set('subject_id', filters.subject_id);
+    if (filters.faculty_unit_id) p.set('faculty_unit_id', filters.faculty_unit_id);
+    if (filters.q) p.set('q', filters.q);
+    const qs = p.toString();
+    return http(`/api/lectures${qs ? `?${qs}` : ''}`);
+  },
+
+  async getById(id: string): Promise<Lecture> {
+    return http(`/api/lectures/${encodeURIComponent(id)}`);
+  },
+
+  async create(payload: CreateLecturePayload): Promise<{ lecture_id: string }> {
+    return http('/api/lectures', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }),
-    
-  updateLecture: async (id: string, data: Partial<Lecture>) => 
-    http(`/api/lectures/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }),
-  
-  // ─── Upload gói học liệu ───
-  uploadPackage: async (lectureId: string, file: File, type: 'HTML5' | 'SCORM') => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const endpoint = type === 'SCORM' 
-      ? `/api/lectures/${lectureId}/scorm/upload` 
-      : `/api/lectures/${lectureId}/html5/upload`;
-      
-    // Tuyệt đối không set Content-Type khi dùng FormData
-    return http(endpoint, {
-      method: 'POST',
-      body: formData
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
     });
   },
 
-  // ─── Luồng phê duyệt ───
-  submitLecture: async (id: string) => 
-    http(`/api/lectures/${id}/submit`, { method: 'POST' }),
-    
-  approveLecture: async (id: string) => 
-    http(`/api/lectures/${id}/approve`, { method: 'POST' }),
-    
-  rejectLecture: async (id: string, reason: string) => 
-    http(`/api/lectures/${id}/reject`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason })
-    }),
-    
-  archiveLecture: async (id: string) => 
-    http(`/api/lectures/${id}`, { method: 'DELETE' }),
-
-  // ─── Ca giảng dạy ───
-  startSession: async (data: any) => 
-    http<{ schedule_id: string }>('/api/lectures/schedules/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }),
-    
-  endSession: async (id: string) => 
-    http(`/api/lectures/schedules/${id}/end`, { method: 'POST' }),
-    
-  forceEndSession: async (id: string) => 
-    http(`/api/lectures/schedules/${id}/force-end`, { method: 'POST' }),
-    
-  updateSlide: async (id: string, data: any) => 
-    http(`/api/lectures/schedules/${id}/slide`, {
+  async update(id: string, payload: Partial<CreateLecturePayload>): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }),
-
-  // ─── Giám sát & Lịch sử ───
-  getLiveSessions: async () => 
-    http<{ items: TeachingSession[] }>('/api/lectures/schedules/live'),
-  
-  getSessionHistory: async (params?: any) => {
-    const query = buildQueryString(params);
-    return http<{ items: TeachingSession[], kpi: any }>(`/api/lectures/schedules/history${query}`);
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
   },
-  
-  getMonitorSessions: async () => 
-    http<{ items: TeachingSession[] }>('/api/lectures/schedules/monitor'),
+
+  async archive(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async restore(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+  },
+
+  // ── Duyệt 2 tầng ──
+  async submit(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/submit`, { method: 'POST' });
+  },
+
+  async approve(id: string): Promise<{ new_status: string }> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/approve`, { method: 'POST' });
+  },
+
+  async reject(id: string, reason: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/reject`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  // ── Upload gói SCORM/HTML5 ──
+  async uploadPackage(
+    lectureId: string,
+    file: File,
+    type: 'HTML5' | 'SCORM'
+  ): Promise<{ success: boolean; status: string; pending_scorm_path: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = type === 'SCORM'
+      ? `/api/lectures/${encodeURIComponent(lectureId)}/scorm/upload`
+      : `/api/lectures/${encodeURIComponent(lectureId)}/html5/upload`;
+
+    // Không set Content-Type — browser sẽ tự thêm multipart boundary
+    return http(endpoint, {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  // ── Ca giảng dạy ──
+  async startSchedule(payload: StartSchedulePayload): Promise<{ schedule_id: string }> {
+    return http('/api/lectures/schedules/start', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async endSchedule(id: string): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(id)}/end`, { method: 'POST' });
+  },
+
+  async getLiveSchedules(): Promise<{ items: TeachingSchedule[]; total: number }> {
+    return http('/api/lectures/schedules/live');
+  },
+
+  async forceEndSchedule(id: string): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(id)}/force-end`, { method: 'POST' });
+  },
+
+  async getHistory(filters: { from?: string; to?: string } = {}): Promise<{
+    items: TeachingSchedule[];
+    total: number;
+    kpi: HistoryKpi;
+  }> {
+    const p = new URLSearchParams();
+    if (filters.from) p.set('from', filters.from);
+    if (filters.to) p.set('to', filters.to);
+    const qs = p.toString();
+    return http(`/api/lectures/schedules/history${qs ? `?${qs}` : ''}`);
+  },
 };
+
+export default lectureService;

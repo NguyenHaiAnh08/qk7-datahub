@@ -64,10 +64,35 @@ export const isUserManager = (user: User | null): boolean => {
   );
 };
 
-export const getDestinationByRole = (user: User | null): string => {
+export const getDestinationByRole = (user?: User | null): string => {
   if (!user || user.user_id === 'GUEST') return ROUTE_PATHS.PORTAL;
+  
+  // 1. Nếu là Admin -> Vào trang Quản trị
   if (isUserAdmin(user)) return ROUTE_PATHS.ADMIN;
-  if (isUserStaff(user)) return ROUTE_PATHS.DESK;
+
+  const roles = user.roles || [];
+  const roleNames = user.role_names || [];
+
+  // 2. Ưu tiên kiểm tra: Nếu là Giáo viên (ROL-07 hoặc tên chứa "Giáo viên") -> Vào Bài giảng số
+  const isTeacher = roles.includes('ROL-07') || roleNames.some(name => {
+    const lower = name.toLowerCase();
+    return lower.includes('giáo viên') || lower.includes('giảng viên');
+  });
+  
+  if (isTeacher) {
+    return ROUTE_PATHS.LECTURES; // Trả về đường dẫn /lectures
+  }
+
+  // 3. Kiểm tra quyền thực tế: Nếu có quyền thao tác văn bản -> Vào Bàn làm việc (Desk)
+  const hasDeskPermission = user.permissions?.some(p => 
+    ['DOC_UPLOAD', 'DOC_EDIT', 'DOC_DELETE', 'DOC_PARSE'].includes(p)
+  );
+  
+  if (hasDeskPermission) {
+    return ROUTE_PATHS.DESK; // Trả về /document-desk
+  }
+
+  // 4. Các trường hợp còn lại (Trợ lý, Chỉ huy, Cán bộ thường) -> Về Cổng thông tin
   return ROUTE_PATHS.PORTAL;
 };
 

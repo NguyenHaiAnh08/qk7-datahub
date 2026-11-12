@@ -10,7 +10,7 @@
   Tuyệt đối không bypass xác thực sinh trắc học vân tay 2FA (ZKTeco ZK9500), không hardcode secrets (`JWT_SECRET`, `FP_ENC_KEY`, `FINGERPRINT_BRIDGE_TOKEN`, mật khẩu DB/admin).
 - **KỶ LUẬT THƯ MỤC:** Chỉ được tạo file/thư mục theo đúng cấu trúc quy định tại Mục 3 dưới đây. Nghiêm cấm tạo file rác, file nháp, file dump ở thư mục gốc.
 - **DI CHUYỂN AN TOÀN:** Mọi thao tác di chuyển file phải dùng lệnh `git mv` để bảo toàn lịch sử mã nguồn (Git history). Tuyệt đối không copy/paste làm đứt gãy tracking.
-- **NGHIÊM CẤM TỰ ĐỘNG PUSH GITHUB (NO AUTO-PUSH):** Tuyệt đối **KHÔNG** tự ý thực thi `git push` lên bất kỳ nhánh nào trên GitHub sau khi hoàn thành task. Mọi thao tác code chỉ commit ở môi trường cục bộ (local). Chỉ khi nào có chỉ thị hoặc mệnh lệnh triển khai rõ ràng từ USER chỉ định cụ thể đẩy lên nhánh nào (ví dụ: *"đẩy lên nhánh ... github"*, *"push lên origin ..."*) thì mới được phép thực hiện `git push`.
+- **NGHIÊM CẤM TỰ ĐỘNG COMMIT VÀ PUSH (STRICT NO AUTO-COMMIT & NO AUTO-PUSH):** Tuyệt đối **KHÔNG** tự động thực thi `git commit` và **KHÔNG** tự ý thực thi `git push`. Khi hoàn thành bất kỳ tác vụ nào, mã nguồn chỉ được lưu giữ ở working tree để USER trực tiếp kiểm tra, đánh giá. Quy trình Commit và Push chỉ được kích hoạt (`git commit` và `git push origin <nhánh>`) khi nhận được câu lệnh cụ thể từ USER (ví dụ: *"đẩy lên nhánh haianh-dev github"*, *"triển khai đẩy lên nhánh main"*, *"commit và push lên nhánh..."*).
 
 ---
 
@@ -118,9 +118,9 @@ Khi xây dựng giao diện hoặc tích hợp API, BẮT BUỘC tuân thủ:
    - Backend: Chạy `cd backend && node -c server.js` (kiểm tra cú pháp Node.js sạch sẽ).
    - Scripts: Kiểm tra các đường dẫn tương đối trong `scripts/` bảo đảm hoạt động từ mọi thư mục.
 
-5. **NGHIÊM CẤM TỰ ĐỘNG PUSH GITHUB (STRICT NO AUTO-PUSH):**
-   - AI Agent chỉ được phép commit mã nguồn ở Git local tại nhánh làm việc hiện tại sau khi hoàn thành task và kiểm chuẩn chất lượng.
-   - **Tuyệt đối KHÔNG tự động thực thi `git push` lên GitHub repository.**
-   - Chỉ khi có mệnh lệnh/yêu cầu triển khai rõ ràng từ USER chỉ định cụ thể nhánh cần đẩy (ví dụ: *"đẩy lên nhánh ... github"*, *"triển khai đẩy lên nhánh ..."*, *"push origin ..."*), AI mới được phép thực hiện `git push` lên đúng nhánh được chỉ định.
-   - Trước khi push, bắt buộc kiểm tra quét rò rỉ bí mật (`gitleaks protect --staged`) và xác nhận không có file rác, file lỗi.
+5. **NGHIÊM CẤM TỰ ĐỘNG COMMIT VÀ PUSH (STRICT NO AUTO-COMMIT & NO AUTO-PUSH):**
+   - AI Agent tuyệt đối **KHÔNG tự động commit** (`git commit`) và **KHÔNG tự động push** (`git push`).
+   - Mọi kết quả code/sửa file sau khi hoàn thành chỉ lưu lại ở working tree để USER rà soát.
+   - **Quy trình Commit & Push:** Chỉ kích hoạt `git commit` và `git push origin <nhánh>` khi nhận được câu lệnh cụ thể từ USER (ví dụ: *"đẩy lên nhánh haianh-dev github"*, *"triển khai đẩy lên nhánh haianh-dev"*...).
+   - Khi có lệnh commit/push: Bắt buộc kiểm chuẩn chất lượng (build sạch) và an ninh (`gitleaks protect --staged`) trước khi tạo commit và push lên nhánh được chỉ định.
 

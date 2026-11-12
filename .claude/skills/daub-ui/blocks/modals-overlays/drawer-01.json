@@ -1,0 +1,192 @@
+{
+  "root": "add-member-drawer",
+  "elements": {
+    "add-member-drawer": {
+      "type": "Drawer",
+      "props": {
+        "title": "Add Team Member",
+        "side": "right"
+      },
+      "children": [
+        "drawer-body",
+        "drawer-footer"
+      ]
+    },
+    "drawer-body": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "drawer-description",
+        "field-member-email",
+        "field-member-name",
+        "field-role",
+        "field-team",
+        "field-permissions"
+      ]
+    },
+    "drawer-description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Invite a new member to your workspace. They will receive an email invitation with login instructions.",
+        "variant": "muted"
+      }
+    },
+    "field-member-email": {
+      "type": "Field",
+      "props": {
+        "label": "Email Address"
+      },
+      "children": [
+        "input-member-email"
+      ]
+    },
+    "input-member-email": {
+      "type": "Input",
+      "props": {
+        "placeholder": "colleague@company.com",
+        "type_input": "email"
+      }
+    },
+    "field-member-name": {
+      "type": "Field",
+      "props": {
+        "label": "Full Name"
+      },
+      "children": [
+        "input-member-name"
+      ]
+    },
+    "input-member-name": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Alex Thompson",
+        "type_input": "text"
+      }
+    },
+    "field-role": {
+      "type": "Select",
+      "props": {
+        "label": "Role",
+        "options": [
+          {
+            "label": "Viewer",
+            "value": "viewer"
+          },
+          {
+            "label": "Editor",
+            "value": "editor"
+          },
+          {
+            "label": "Admin",
+            "value": "admin"
+          },
+          {
+            "label": "Owner",
+            "value": "owner"
+          }
+        ]
+      }
+    },
+    "field-team": {
+      "type": "Select",
+      "props": {
+        "label": "Team",
+        "options": [
+          {
+            "label": "Engineering",
+            "value": "engineering"
+          },
+          {
+            "label": "Design",
+            "value": "design"
+          },
+          {
+            "label": "Marketing",
+            "value": "marketing"
+          },
+          {
+            "label": "Product",
+            "value": "product"
+          },
+          {
+            "label": "Operations",
+            "value": "operations"
+          }
+        ]
+      }
+    },
+    "field-permissions": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "permissions-label",
+        "perm-projects",
+        "perm-billing",
+        "perm-settings"
+      ]
+    },
+    "permissions-label": {
+      "type": "Text",
+      "props": {
+        "tag": "label",
+        "content": "Permissions",
+        "weight": "medium"
+      }
+    },
+    "perm-projects": {
+      "type": "Checkbox",
+      "props": {
+        "label": "Can create and manage projects",
+        "checked": true
+      }
+    },
+    "perm-billing": {
+      "type": "Checkbox",
+      "props": {
+        "label": "Can view billing and invoices",
+        "checked": false
+      }
+    },
+    "perm-settings": {
+      "type": "Checkbox",
+      "props": {
+        "label": "Can modify workspace settings",
+        "checked": false
+      }
+    },
+    "drawer-footer": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "justify": "flex-end"
+      },
+      "children": [
+        "btn-drawer-cancel",
+        "btn-send-invite"
+      ]
+    },
+    "btn-drawer-cancel": {
+      "type": "Button",
+      "props": {
+        "label": "Cancel",
+        "variant": "outline"
+      }
+    },
+    "btn-send-invite": {
+      "type": "Button",
+      "props": {
+        "label": "Send Invitation",
+        "variant": "default",
+        "icon": "send"
+      }
+    }
+  }
+}

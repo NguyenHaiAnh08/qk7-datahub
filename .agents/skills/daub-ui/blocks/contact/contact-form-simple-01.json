@@ -1,0 +1,166 @@
+{
+  "root": "contact-form-simple",
+  "elements": {
+    "contact-form-simple": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5,
+        "align": "center",
+        "container": "narrow"
+      },
+      "children": [
+        "heading-group",
+        "form-card"
+      ]
+    },
+    "heading-group": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "heading",
+        "subheading"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Get in Touch",
+        "weight": "bold",
+        "align": "center"
+      }
+    },
+    "subheading": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Have a question or want to work together? Fill out the form below and we'll get back to you within 24 hours.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "form-card": {
+      "type": "Surface",
+      "props": {
+        "variant": "bordered"
+      },
+      "children": [
+        "form-stack"
+      ]
+    },
+    "form-stack": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "name-row",
+        "email-field",
+        "subject-field",
+        "message-field",
+        "submit-btn"
+      ]
+    },
+    "name-row": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 4
+      },
+      "children": [
+        "first-name-field",
+        "last-name-field"
+      ]
+    },
+    "first-name-field": {
+      "type": "Field",
+      "props": {
+        "label": "First Name"
+      },
+      "children": [
+        "first-name-input"
+      ]
+    },
+    "first-name-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Jane"
+      }
+    },
+    "last-name-field": {
+      "type": "Field",
+      "props": {
+        "label": "Last Name"
+      },
+      "children": [
+        "last-name-input"
+      ]
+    },
+    "last-name-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Smith"
+      }
+    },
+    "email-field": {
+      "type": "Field",
+      "props": {
+        "label": "Email Address"
+      },
+      "children": [
+        "email-input"
+      ]
+    },
+    "email-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "jane@example.com",
+        "type": "email"
+      }
+    },
+    "subject-field": {
+      "type": "Field",
+      "props": {
+        "label": "Subject"
+      },
+      "children": [
+        "subject-input"
+      ]
+    },
+    "subject-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "How can we help?"
+      }
+    },
+    "message-field": {
+      "type": "Field",
+      "props": {
+        "label": "Message"
+      },
+      "children": [
+        "message-input"
+      ]
+    },
+    "message-input": {
+      "type": "Textarea",
+      "props": {
+        "placeholder": "Tell us more about your project, goals, or questions..."
+      }
+    },
+    "submit-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Send Message",
+        "variant": "primary",
+        "size": "lg"
+      }
+    }
+  }
+}

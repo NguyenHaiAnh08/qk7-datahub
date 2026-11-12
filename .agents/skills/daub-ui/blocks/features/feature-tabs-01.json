@@ -1,0 +1,294 @@
+{
+  "root": "feature-tabs-section",
+  "elements": {
+    "feature-tabs-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5,
+        "align": "center",
+        "container": "wide"
+      },
+      "children": [
+        "tabs-header",
+        "feature-tabs"
+      ]
+    },
+    "tabs-header": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "tabs-title",
+        "tabs-desc"
+      ]
+    },
+    "tabs-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "One platform, infinite possibilities",
+        "weight": "bold",
+        "align": "center"
+      }
+    },
+    "tabs-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "NimbusCloud gives you compute, storage, networking, and AI services under a single control plane.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "feature-tabs": {
+      "type": "Tabs",
+      "props": {
+        "tabs": [
+          { "id": "compute", "label": "Compute" },
+          { "id": "storage", "label": "Storage" },
+          { "id": "networking", "label": "Networking" },
+          { "id": "ai", "label": "AI / ML" }
+        ],
+        "active": "compute"
+      },
+      "children": [
+        "tab-compute",
+        "tab-storage",
+        "tab-networking",
+        "tab-ai"
+      ]
+    },
+    "tab-compute": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 5,
+        "align": "center"
+      },
+      "children": [
+        "compute-text",
+        "compute-image"
+      ]
+    },
+    "compute-text": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "compute-title",
+        "compute-desc",
+        "compute-list"
+      ]
+    },
+    "compute-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Elastic Compute Instances",
+        "weight": "bold"
+      }
+    },
+    "compute-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Spin up VMs in 38 regions with auto-scaling groups that respond to traffic in under 90 seconds.",
+        "variant": "muted"
+      }
+    },
+    "compute-list": {
+      "type": "List",
+      "props": {
+        "items": [
+          { "primary": "Up to 512 vCPUs per instance" },
+          { "primary": "Spot instances at 73% discount" },
+          { "primary": "Bare-metal options available" }
+        ]
+      }
+    },
+    "compute-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cloud-compute/480/320",
+        "alt": "Cloud compute dashboard showing instance metrics"
+      }
+    },
+    "tab-storage": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 5,
+        "align": "center"
+      },
+      "children": [
+        "storage-text",
+        "storage-image"
+      ]
+    },
+    "storage-text": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "storage-title",
+        "storage-desc",
+        "storage-list"
+      ]
+    },
+    "storage-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Unified Object Storage",
+        "weight": "bold"
+      }
+    },
+    "storage-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "S3-compatible storage with 11 nines of durability and intelligent tiering that reduces costs by up to 60%.",
+        "variant": "muted"
+      }
+    },
+    "storage-list": {
+      "type": "List",
+      "props": {
+        "items": [
+          { "primary": "Automatic lifecycle policies" },
+          { "primary": "Cross-region replication" },
+          { "primary": "Real-time versioning" }
+        ]
+      }
+    },
+    "storage-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cloud-storage/480/320",
+        "alt": "Storage usage visualization with tiering breakdown"
+      }
+    },
+    "tab-networking": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 5,
+        "align": "center"
+      },
+      "children": [
+        "networking-text",
+        "networking-image"
+      ]
+    },
+    "networking-text": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "networking-title",
+        "networking-desc",
+        "networking-list"
+      ]
+    },
+    "networking-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Global Edge Network",
+        "weight": "bold"
+      }
+    },
+    "networking-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "280+ points of presence deliver content in under 20ms to 98% of the world's internet users.",
+        "variant": "muted"
+      }
+    },
+    "networking-list": {
+      "type": "List",
+      "props": {
+        "items": [
+          { "primary": "Built-in DDoS protection" },
+          { "primary": "Private backbone connectivity" },
+          { "primary": "Zero-trust network access" }
+        ]
+      }
+    },
+    "networking-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cloud-network/480/320",
+        "alt": "Global network map with latency indicators"
+      }
+    },
+    "tab-ai": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 5,
+        "align": "center"
+      },
+      "children": [
+        "ai-text",
+        "ai-image"
+      ]
+    },
+    "ai-text": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "ai-title",
+        "ai-desc",
+        "ai-list"
+      ]
+    },
+    "ai-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Managed AI Platform",
+        "weight": "bold"
+      }
+    },
+    "ai-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Train, fine-tune, and deploy models on clusters with up to 4,096 H100 GPUs. Pay only for the seconds you use.",
+        "variant": "muted"
+      }
+    },
+    "ai-list": {
+      "type": "List",
+      "props": {
+        "items": [
+          { "primary": "One-click model deployment" },
+          { "primary": "Built-in experiment tracking" },
+          { "primary": "Pre-trained foundation models" }
+        ]
+      }
+    },
+    "ai-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cloud-ai/480/320",
+        "alt": "AI model training dashboard with GPU utilization"
+      }
+    }
+  }
+}

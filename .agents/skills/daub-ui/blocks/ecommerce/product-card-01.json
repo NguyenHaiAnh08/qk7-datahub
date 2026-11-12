@@ -1,0 +1,197 @@
+{
+  "root": "product-card",
+  "elements": {
+    "product-card": {
+      "type": "Card",
+      "props": {
+        "title": "Sony WH-1000XM5",
+        "description": "Industry-leading noise canceling headphones"
+      },
+      "children": [
+        "card-content"
+      ]
+    },
+    "card-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "product-image",
+        "product-badges",
+        "product-name",
+        "product-description",
+        "rating-row",
+        "price-row",
+        "color-options",
+        "action-buttons"
+      ]
+    },
+    "product-image": {
+      "type": "AspectRatio",
+      "children": [
+        "image"
+      ]
+    },
+    "image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/sonyxm5/400/400",
+        "alt": "Sony WH-1000XM5 wireless headphones in black"
+      }
+    },
+    "product-badges": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 1
+      },
+      "children": [
+        "badge-bestseller",
+        "badge-free-shipping"
+      ]
+    },
+    "badge-bestseller": {
+      "type": "Badge",
+      "props": {
+        "text": "Bestseller",
+        "variant": "success"
+      }
+    },
+    "badge-free-shipping": {
+      "type": "Badge",
+      "props": {
+        "text": "Free Shipping",
+        "variant": "info"
+      }
+    },
+    "product-name": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Sony WH-1000XM5 Wireless Headphones",
+        "weight": "bold"
+      }
+    },
+    "product-description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Exceptionally comfortable with auto NC optimizer, crystal-clear hands-free calling, and up to 30 hours battery life.",
+        "variant": "muted"
+      }
+    },
+    "rating-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "rating-stars",
+        "rating-count"
+      ]
+    },
+    "rating-stars": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "\u2605\u2605\u2605\u2605\u2605",
+        "weight": "bold"
+      }
+    },
+    "rating-count": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "(2,847 reviews)",
+        "variant": "muted"
+      }
+    },
+    "price-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "current-price",
+        "original-price",
+        "discount-badge"
+      ]
+    },
+    "current-price": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "$328.00",
+        "weight": "bold"
+      }
+    },
+    "original-price": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "$399.99",
+        "variant": "muted"
+      }
+    },
+    "discount-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "18% off",
+        "variant": "error"
+      }
+    },
+    "color-options": {
+      "type": "ToggleGroup",
+      "props": {
+        "selected": "black",
+        "options": [
+          {
+            "label": "Black",
+            "value": "black"
+          },
+          {
+            "label": "Silver",
+            "value": "silver"
+          },
+          {
+            "label": "Midnight Blue",
+            "value": "midnight-blue"
+          }
+        ]
+      }
+    },
+    "action-buttons": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2
+      },
+      "children": [
+        "add-to-cart",
+        "wishlist-button"
+      ]
+    },
+    "add-to-cart": {
+      "type": "Button",
+      "props": {
+        "label": "Add to Cart",
+        "variant": "primary",
+        "icon": "shopping-cart"
+      }
+    },
+    "wishlist-button": {
+      "type": "Button",
+      "props": {
+        "label": "",
+        "variant": "outline",
+        "icon": "heart"
+      }
+    }
+  }
+}

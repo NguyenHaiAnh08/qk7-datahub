@@ -1,0 +1,90 @@
+{
+  "root": "social-links-root",
+  "elements": {
+    "social-links-root": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "social-links-label",
+        "social-links-group"
+      ]
+    },
+    "social-links-label": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Follow us",
+        "variant": "muted"
+      }
+    },
+    "social-links-group": {
+      "type": "ButtonGroup",
+      "children": [
+        "social-twitter",
+        "social-github",
+        "social-linkedin",
+        "social-youtube",
+        "social-discord",
+        "social-mastodon"
+      ]
+    },
+    "social-twitter": {
+      "type": "Button",
+      "props": {
+        "label": "Twitter",
+        "variant": "ghost",
+        "size": "sm",
+        "icon": "twitter"
+      }
+    },
+    "social-github": {
+      "type": "Button",
+      "props": {
+        "label": "GitHub",
+        "variant": "ghost",
+        "size": "sm",
+        "icon": "github"
+      }
+    },
+    "social-linkedin": {
+      "type": "Button",
+      "props": {
+        "label": "LinkedIn",
+        "variant": "ghost",
+        "size": "sm",
+        "icon": "linkedin"
+      }
+    },
+    "social-youtube": {
+      "type": "Button",
+      "props": {
+        "label": "YouTube",
+        "variant": "ghost",
+        "size": "sm",
+        "icon": "youtube"
+      }
+    },
+    "social-discord": {
+      "type": "Button",
+      "props": {
+        "label": "Discord",
+        "variant": "ghost",
+        "size": "sm",
+        "icon": "message-circle"
+      }
+    },
+    "social-mastodon": {
+      "type": "Button",
+      "props": {
+        "label": "Mastodon",
+        "variant": "ghost",
+        "size": "sm",
+        "icon": "at-sign"
+      }
+    }
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "root": "signup-social",
+  "elements": {
+    "signup-social": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0,
+        "align": "center",
+        "justify": "center",
+        "container": "narrow"
+      },
+      "children": [
+        "main-content"
+      ]
+    },
+    "main-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 8,
+        "align": "center"
+      },
+      "children": [
+        "logo-icon",
+        "header",
+        "form-section",
+        "divider-row",
+        "or-text",
+        "social-section",
+        "footer-section"
+      ]
+    },
+    "logo-icon": {
+      "type": "Icon",
+      "props": {
+        "name": "layers"
+      }
+    },
+    "header": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "heading",
+        "subtitle"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Create an account",
+        "align": "center"
+      }
+    },
+    "subtitle": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Start your 30-day free trial.",
+        "variant": "secondary",
+        "align": "center"
+      }
+    },
+    "form-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "align": "stretch"
+      },
+      "children": [
+        "email-field",
+        "continue-email-btn"
+      ]
+    },
+    "email-field": {
+      "type": "Field",
+      "props": {
+        "label": "Email"
+      },
+      "children": [
+        "email-input"
+      ]
+    },
+    "email-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Enter your email",
+        "type": "email"
+      }
+    },
+    "continue-email-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Continue with email",
+        "variant": "primary",
+        "size": "lg",
+        "fullWidth": true
+      }
+    },
+    "divider-row": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "or-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "OR",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "social-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3,
+        "align": "stretch"
+      },
+      "children": [
+        "google-btn",
+        "facebook-btn",
+        "apple-btn"
+      ]
+    },
+    "google-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Sign up with Google",
+        "variant": "outline",
+        "size": "lg",
+        "icon": "google",
+        "fullWidth": true
+      }
+    },
+    "facebook-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Sign up with Facebook",
+        "variant": "outline",
+        "size": "lg",
+        "icon": "facebook",
+        "fullWidth": true
+      }
+    },
+    "apple-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Sign up with Apple",
+        "variant": "outline",
+        "size": "lg",
+        "icon": "apple",
+        "fullWidth": true
+      }
+    },
+    "footer-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 1,
+        "align": "center",
+        "justify": "center"
+      },
+      "children": [
+        "login-text",
+        "login-link"
+      ]
+    },
+    "login-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Already have an account?",
+        "variant": "secondary"
+      }
+    },
+    "login-link": {
+      "type": "Link",
+      "props": {
+        "label": "Log in"
+      }
+    }
+  }
+}

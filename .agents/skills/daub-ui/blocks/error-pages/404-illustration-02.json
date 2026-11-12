@@ -1,0 +1,100 @@
+{
+  "root": "not-found-illustration-02",
+  "elements": {
+    "not-found-illustration-02": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "align": "center",
+        "justify": "center",
+        "gap": 6,
+        "container": true,
+        "padding": [
+          8,
+          0
+        ]
+      },
+      "children": [
+        "text-section",
+        "illustration-section"
+      ]
+    },
+    "text-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6
+      },
+      "children": [
+        "heading-group",
+        "search-row"
+      ]
+    },
+    "heading-group": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "error-label",
+        "heading",
+        "description"
+      ]
+    },
+    "error-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "404 error",
+        "variant": "brand"
+      }
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h1",
+        "content": "Page not found..."
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Sorry, the page you are looking for doesn't exist or has been moved. Try searching our site.",
+        "variant": "secondary"
+      }
+    },
+    "search-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3
+      },
+      "children": [
+        "search-input",
+        "search-btn"
+      ]
+    },
+    "search-input": {
+      "type": "Search",
+      "props": {
+        "placeholder": "Search our site"
+      }
+    },
+    "search-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Search",
+        "variant": "primary"
+      }
+    },
+    "illustration-section": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/404-illustration-02-illustration-section/480/367",
+        "alt": "3D vault illustration"
+      }
+    }
+  }
+}

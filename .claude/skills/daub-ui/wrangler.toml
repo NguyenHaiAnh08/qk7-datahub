@@ -1,0 +1,27 @@
+name = "daub"
+compatibility_date = "2026-02-27"
+pages_build_output_dir = "."
+
+[vars]
+# Verified WAF rule 11f49e0921004fadadd390d497f5d789 covers /api/* (60 requests / 10 s).
+# The judge rejects other hosts, including Pages previews, without RL_GENERATE.
+REFINEMENT_WAF_HOST = "daub.dev"
+
+# Environment variables for MCP server (set via Cloudflare dashboard or wrangler secret)
+# OPENROUTER_API_KEY — required for generate_ui (LLM generation)
+# GEMINI_API_KEY — required for RAG (gemini-embedding-2-preview, Google-only)
+# OPENVERSE_CLIENT_ID / OPENVERSE_CLIENT_SECRET: optional; /api/photo works without them. A free registered
+#   Openverse app raises the limit from 20/min, 200/day per egress IP to 100/min, 10,000/day.
+#
+# SMART_QUOTA_SALT: optional secret salt for /api/smart quota keys. Set it once; changing it resets that day's counts.
+#
+# Rate limiting: Pages has no rate-limit binding type, so RL_WEBLOOK, RL_GENERATE, RL_MCP and RL_PHOTO
+# are unbound and the handlers skip those checks (they fail open). Before enabling Smart, verify WAF
+# protection for /api/* (60 requests / 10 s per IP, 10 s block) and restrict unprotected Pages hostnames.
+
+# Smart mode daily budget (/api/smart): 10 runs per IP per UTC day. Namespace title: DAUB_SMART_QUOTA.
+# /api/smart answers 503 without this binding; future callers must stay in normal mode.
+# This binding is shared by previews and production; isolate preview storage before Smart preview testing.
+[[kv_namespaces]]
+binding = "SMART_QUOTA"
+id = "1aeec0ea7a8b4a8d92f36574a432cc53"

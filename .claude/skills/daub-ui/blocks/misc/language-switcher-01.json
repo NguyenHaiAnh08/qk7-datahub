@@ -1,0 +1,52 @@
+{
+  "root": "language-switcher-root",
+  "elements": {
+    "language-switcher-root": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "language-icon-text",
+        "language-select"
+      ]
+    },
+    "language-icon-text": {
+      "type": "Icon",
+      "props": {
+        "name": "globe",
+        "size": "sm"
+      }
+    },
+    "language-select": {
+      "type": "Select",
+      "props": {
+        "label": "Language",
+        "options": [
+          {
+            "label": "English",
+            "value": "en"
+          },
+          {
+            "label": "Espanol",
+            "value": "es"
+          },
+          {
+            "label": "Francais",
+            "value": "fr"
+          },
+          {
+            "label": "Deutsch",
+            "value": "de"
+          },
+          {
+            "label": "Japanese",
+            "value": "ja"
+          }
+        ]
+      }
+    }
+  }
+}

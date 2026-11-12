@@ -1,0 +1,184 @@
+{
+  "root": "tab-nav-wrapper",
+  "elements": {
+    "tab-nav-wrapper": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "tab-nav-header",
+        "tab-nav-tabs"
+      ]
+    },
+    "tab-nav-header": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3,
+        "align": "center",
+        "justify": "between"
+      },
+      "children": [
+        "tab-nav-title",
+        "tab-nav-actions"
+      ]
+    },
+    "tab-nav-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Account Settings",
+        "weight": "bold"
+      }
+    },
+    "tab-nav-actions": {
+      "type": "Button",
+      "props": {
+        "label": "Save Changes",
+        "variant": "primary",
+        "size": "sm"
+      }
+    },
+    "tab-nav-tabs": {
+      "type": "Tabs",
+      "props": {
+        "tabs": [
+          { "id": "general", "label": "General" },
+          { "id": "security", "label": "Security" },
+          { "id": "notifications", "label": "Notifications" },
+          { "id": "integrations", "label": "Integrations" },
+          { "id": "api", "label": "API Keys" }
+        ],
+        "active": "general"
+      },
+      "children": [
+        "general-panel",
+        "security-panel",
+        "notifications-panel",
+        "integrations-panel",
+        "api-panel"
+      ]
+    },
+    "general-panel": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "general-name-field",
+        "general-email-field",
+        "general-timezone-field"
+      ]
+    },
+    "general-name-field": {
+      "type": "Field",
+      "props": {
+        "label": "Display Name",
+        "placeholder": "Enter your display name"
+      }
+    },
+    "general-email-field": {
+      "type": "Field",
+      "props": {
+        "label": "Email Address"
+      },
+      "children": [
+        "general-email-input"
+      ]
+    },
+    "general-email-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "you@company.com"
+      }
+    },
+    "general-timezone-field": {
+      "type": "Select",
+      "props": {
+        "label": "Timezone",
+        "placeholder": "Select timezone"
+      }
+    },
+    "security-panel": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "security-password-field",
+        "security-2fa-toggle"
+      ]
+    },
+    "security-password-field": {
+      "type": "Field",
+      "props": {
+        "label": "Current Password"
+      },
+      "children": [
+        "security-password-input"
+      ]
+    },
+    "security-password-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Enter current password"
+      }
+    },
+    "security-2fa-toggle": {
+      "type": "Switch",
+      "props": {
+        "label": "Enable Two-Factor Authentication"
+      }
+    },
+    "notifications-panel": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "notif-email-switch",
+        "notif-push-switch",
+        "notif-weekly-switch"
+      ]
+    },
+    "notif-email-switch": {
+      "type": "Switch",
+      "props": {
+        "label": "Email Notifications"
+      }
+    },
+    "notif-push-switch": {
+      "type": "Switch",
+      "props": {
+        "label": "Push Notifications"
+      }
+    },
+    "notif-weekly-switch": {
+      "type": "Switch",
+      "props": {
+        "label": "Weekly Digest"
+      }
+    },
+    "integrations-panel": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Connect your favorite tools to streamline your workflow.",
+        "variant": "muted"
+      }
+    },
+    "api-panel": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Manage your API keys and access tokens.",
+        "variant": "muted"
+      }
+    }
+  }
+}

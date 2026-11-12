@@ -1,0 +1,1860 @@
+# DAUB UI — Considered Component Library for AI Agents
+
+> Version: 3.20.6
+> URL: https://daub.dev
+> CSS: https://daub.dev/daub.css
+> JS: https://daub.dev/daub.js
+> Repo: https://github.com/sliday/daub
+> License: MIT
+> Components: 91
+> Browser/OpenUI/MCP renderer types: 89
+> Theme Families: 21 (42 variants total)
+> Components JSON: https://daub.dev/components.json
+> TypeScript: https://daub.dev/daub.d.ts
+> React: npm install daub-react daub-ui (typed JSX components and compound chat primitives)
+
+## Quick Start
+
+```html
+<link rel="stylesheet" href="https://daub.dev/daub.css">
+<script src="https://daub.dev/daub.js"></script>
+```
+
+Alternative CDNs (npm package: daub-ui):
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.css">
+<script src="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.js"></script>
+```
+
+Classless (zero-class drop-in styling for plain HTML):
+```html
+<link rel="stylesheet" href="https://daub.dev/daub-classless.css">
+```
+
+Progressive (classless defaults + class-based components):
+```html
+<link rel="stylesheet" href="https://daub.dev/daub-classless.css">
+<link rel="stylesheet" href="https://daub.dev/daub.css">
+<script src="https://daub.dev/daub.js"></script>
+```
+
+Fonts: System font stacks by default. Optional Google Fonts:
+```html
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300..900&family=Source+Serif+4:wght@300..900&family=Cabin:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --db-font-heading: 'Fraunces', Georgia, serif;
+    --db-font-body: 'Source Serif 4', Georgia, serif;
+    --db-font-ui: 'Cabin', system-ui, sans-serif;
+  }
+</style>
+```
+
+Icons (optional): `<script src="https://unpkg.com/lucide@0.576.0/dist/umd/lucide.min.js" integrity="sha384-b05ba3pt6xaC7F4r130arhf8cF18GH/gKu9JDz/NMf+BhLlBVwIWUdAZSpf1IWRZ" crossorigin="anonymous"></script>` (keep the 0.576.0 pin: Lucide 1.x drops brand icons such as github, twitter, linkedin)
+
+## Class Prefix
+
+All classes: `db-`. All CSS custom properties: `--db-`.
+
+## Themes
+
+21 theme families in 4 categories, each with light & dark modes (42 variants):
+
+**Originals**: default, grunge, solarized, ink, ember, bone
+**Classics**: dracula, nord, one-dark, monokai, gruvbox
+**Modern**: night-owl, github, catppuccin, tokyo-night, material, monospace
+**Trending**: synthwave, shades-of-purple, ayu, horizon
+
+| Family | Light | Dark | Character |
+|--------|-------|------|-----------|
+| Default | `light` | `dark` | Warm cream / deep charcoal |
+| Grunge | `grunge-light` | `grunge-dark` | Typewriter / ink-stained |
+| Solarized | `solarized` | `solarized-dark` | Aged paper / antiqued leather |
+| Ink | `ink-light` | `ink` | Cool editorial / navy silver |
+| Ember | `ember-light` | `ember` | Sunlit pottery / copper glow |
+| Bone | `bone` | `bone-dark` | Stark white / grayscale brutalism |
+| Dracula | `dracula-light` | `dracula` | Alucard warmth / vampire purple |
+| Nord | `nord-light` | `nord` | Snow storm / arctic frost |
+| One Dark | `one-dark-light` | `one-dark` | Soft atom / midnight code |
+| Monokai | `monokai-light` | `monokai` | Warm latte / neon noir |
+| Gruvbox | `gruvbox-light` | `gruvbox` | Retro cream / earthy dark |
+| Night Owl | `night-owl-light` | `night-owl` | Soft dawn / deep twilight |
+| GitHub | `github` | `github-dark` | Clean primer / dimmed slate |
+| Catppuccin | `catppuccin` | `catppuccin-dark` | Latte pastel / mocha warmth |
+| Tokyo Night | `tokyo-night-light` | `tokyo-night` | Storm light / city neon |
+| Material | `material-light` | `material` | Lighter paper / palenight haze |
+| Monospace | `monospace-light` | `monospace` | Terminal paper / phosphor console |
+| Synthwave | `synthwave-light` | `synthwave` | Warm retro / neon purple |
+| Shades of Purple | `shades-of-purple-light` | `shades-of-purple` | Soft lavender / deep violet |
+| Ayu | `ayu` | `ayu-dark` | Warm light / mirage dark |
+| Horizon | `horizon-light` | `horizon` | Soft rose / warm dusk |
+
+Set via attribute: `<html data-theme="dark">`
+Family API: `DAUB.setFamily('ink')`, `DAUB.setScheme('dark')`, `DAUB.getFamily()`
+Direct API: `DAUB.setTheme('ink')`, `DAUB.cycleTheme()`, `DAUB.getTheme()`
+Accent API: `DAUB.setAccent('#6B7C3E')`, `DAUB.resetAccent()`, `DAUB.getAccent()`
+Temperature API: `DAUB.setTemperature('auto')` (daylight-aware), `DAUB.setTemperature(0.5)` (manual -1 to +1), `DAUB.getTemperature()`
+Persisted in `localStorage` keys: `db-theme`, `db-scheme`, `db-accent`, `db-temperature`.
+
+## Quick Reference Skeletons
+
+Required HTML nesting for overlay and complex components. Use these as a starting template — each shows the minimum required structure.
+
+| Component | Skeleton | JS API |
+|-----------|----------|--------|
+| Modal | `db-modal-overlay#id[aria-hidden] > db-modal > __header + __body + __footer` | `DAUB.openModal('id')` / `closeModal('id')`. `data-db-dismiss` on a button closes it. Dynamic content: `DAUB.openModal('id', { title: 'New Title', body: '<p>Content</p>', footer: '<button class="db-btn db-btn--primary">OK</button>' })` |
+| Alert Dialog | `db-alert-dialog#id > __overlay + __panel > __title + __desc + __actions` | `DAUB.openAlertDialog('id')`. `data-db-dismiss` on a button closes it. |
+| Sheet | `db-sheet.--right#id > __overlay + __panel > __header + __body` | `DAUB.openSheet('id')`. `data-db-dismiss` on a button closes it. |
+| Drawer | `db-drawer#id > __overlay + __panel > __handle + __body` | `DAUB.openDrawer('id')`. `data-db-dismiss` on a button closes it. |
+| Command Palette | `db-command#id > __overlay + __panel > __input-wrap + __list` | `DAUB.openCommand('id')` |
+| Dropdown Menu | `db-dropdown > __trigger + __content > __item + __separator` | Auto-init on click |
+| Context Menu | `[data-context-menu='id'] + db-context-menu#id > __item + __separator` | Auto-init on right-click |
+| Tabs | `db-tabs > __list[role=tablist] > __tab + __panel` | Auto-init |
+| Accordion | `db-accordion > __item > __trigger + __content` | Auto-init |
+| Custom Select | `db-custom-select > __trigger + __dropdown > __option` | Auto-init |
+
+**Notes:**
+- `__` prefix means BEM child of the block (e.g., `__header` = `db-modal__header`)
+- Overlay wrappers (modal-overlay, alert-dialog, sheet, drawer, command) need an `id` for JS targeting
+- `db-modal-overlay` also needs `aria-hidden="true"` for accessibility
+- `db-field__input` goes on wrapper elements — not just `<input>` tags
+- Icons: DAUB pairs well with [Lucide](https://unpkg.com/lucide@0.576.0/dist/umd/lucide.min.js) — all demos use Lucide icons
+
+## Components (91)
+
+### 1. Button — `.db-btn`
+Variants: `db-btn--primary`, `db-btn--secondary`, `db-btn--ghost`
+States: `db-btn--loading`, `db-btn--disabled`, `db-btn--pressed`
+Sizes: `db-btn--sm`, `db-btn--lg`, `db-btn--icon`
+Icon colors: `db-btn--icon-danger`, `db-btn--icon-success`, `db-btn--icon-accent`
+```html
+<button class="db-btn db-btn--primary">Save</button>
+<button class="db-btn db-btn--secondary db-btn--sm">Cancel</button>
+<button class="db-btn db-btn--ghost">Ghost</button>
+<button class="db-btn db-btn--icon db-btn--icon-danger" aria-label="Delete">×</button>
+<button class="db-btn db-btn--primary db-btn--loading" disabled>Saving</button>
+```
+
+### 2. Button Group — `.db-btn-group`
+```html
+<div class="db-btn-group">
+  <button class="db-btn db-btn--secondary">Copy</button>
+  <button class="db-btn db-btn--secondary">Cut</button>
+  <button class="db-btn db-btn--secondary">Paste</button>
+</div>
+```
+
+### 3. Text Field — `.db-field`
+```html
+<div class="db-field">
+  <label class="db-field__label">Email</label>
+  <input class="db-field__input" type="email" placeholder="you@example.com">
+  <span class="db-field__helper">We'll never share your email.</span>
+</div>
+```
+Error state: add `db-field--error` to wrapper.
+
+### 4. Input (standalone) — `.db-input`
+Sizes: `db-input--sm`, `db-input--lg`. Error: `db-input--error`.
+```html
+<input class="db-input" type="text" placeholder="Standalone input">
+```
+
+### 5. Input Group — `.db-input-group`
+```html
+<div class="db-input-group">
+  <span class="db-input-group__addon">https://</span>
+  <input class="db-input" type="text" placeholder="example.com">
+</div>
+<div class="db-input-group">
+  <input class="db-input" type="email" placeholder="Email">
+  <button class="db-btn db-btn--primary">Subscribe</button>
+</div>
+```
+
+### 6. Textarea (standalone) — `.db-textarea`
+```html
+<textarea class="db-textarea" placeholder="Write here..."></textarea>
+```
+Error: `db-textarea--error`.
+
+### 7. Checkbox — `.db-checkbox`
+```html
+<label class="db-checkbox">
+  <input class="db-checkbox__input" type="checkbox">
+  <span class="db-checkbox__box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+  Accept terms
+</label>
+```
+
+### 8. Radio — `.db-radio`
+```html
+<div class="db-radio-group">
+  <label class="db-radio">
+    <input class="db-radio__input" type="radio" name="plan" value="free">
+    <span class="db-radio__circle"></span>
+    Free
+  </label>
+</div>
+```
+
+### 9. Switch — `.db-switch`
+```html
+<div class="db-switch" role="switch" tabindex="0" aria-checked="false">
+  <span class="db-switch__track"><span class="db-switch__thumb"></span></span>
+  Label
+</div>
+```
+
+### 10. Slider — `.db-slider`
+```html
+<div class="db-slider">
+  <div class="db-slider__label"><span>Volume</span><span class="db-slider__value">50</span></div>
+  <input class="db-slider__input" type="range" min="0" max="100" value="50">
+</div>
+```
+
+### 11. Toggle — `.db-toggle`
+Sizes: `db-toggle--sm`. Active: `aria-pressed="true"` or `db-toggle--active`.
+```html
+<button class="db-toggle" aria-pressed="false">Bold</button>
+```
+
+### 12. Toggle Group — `.db-toggle-group`
+Segmented control: inset track, raised active segment. Single select by default. Add `data-multi` for multi-select.
+```html
+<div class="db-toggle-group">
+  <button class="db-toggle" aria-pressed="true">Left</button>
+  <button class="db-toggle" aria-pressed="false">Center</button>
+  <button class="db-toggle" aria-pressed="false">Right</button>
+</div>
+```
+
+### 13. Native Select — `.db-select`
+```html
+<div class="db-select">
+  <label class="db-label">Framework</label>
+  <select class="db-select__input">
+    <option value="">Choose...</option>
+    <option>React</option>
+    <option>Vue</option>
+  </select>
+</div>
+```
+
+### 14. Custom Select — `.db-custom-select`
+With search/filter. JS auto-initializes.
+```html
+<div class="db-custom-select">
+  <button class="db-custom-select__trigger" type="button">
+    <span class="db-custom-select__placeholder">Select...</span>
+    <svg class="db-custom-select__icon" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+  <div class="db-custom-select__dropdown">
+    <div class="db-custom-select__search"><input type="text" placeholder="Search..."></div>
+    <div class="db-custom-select__option">Option A</div>
+    <div class="db-custom-select__option">Option B</div>
+  </div>
+</div>
+```
+
+### 15. Kbd — `.db-kbd`
+Sizes: `db-kbd--sm`.
+```html
+<kbd class="db-kbd">Ctrl</kbd> + <kbd class="db-kbd">K</kbd>
+```
+
+### 16. Label — `.db-label`
+Modifiers: `db-label--required` (adds *), `db-label--optional` (adds "(optional)").
+```html
+<label class="db-label db-label--required">Email</label>
+```
+
+### 17. Spinner — `.db-spinner`
+Sizes: `db-spinner--sm`, `db-spinner--lg`, `db-spinner--xl`.
+```html
+<span class="db-spinner"></span>
+```
+
+### 18. Input OTP — `.db-otp`
+```html
+<div class="db-otp">
+  <input class="db-otp__input" type="text" inputmode="numeric">
+  <input class="db-otp__input" type="text" inputmode="numeric">
+  <input class="db-otp__input" type="text" inputmode="numeric">
+  <span class="db-otp__separator">-</span>
+  <input class="db-otp__input" type="text" inputmode="numeric">
+  <input class="db-otp__input" type="text" inputmode="numeric">
+  <input class="db-otp__input" type="text" inputmode="numeric">
+</div>
+```
+
+### 19. Tabs — `.db-tabs`
+```html
+<div class="db-tabs">
+  <div class="db-tabs__list" role="tablist">
+    <button class="db-tabs__tab" aria-selected="true">Tab 1</button>
+    <button class="db-tabs__tab">Tab 2</button>
+  </div>
+  <div class="db-tabs__panel">Content 1</div>
+  <div class="db-tabs__panel" hidden>Content 2</div>
+</div>
+```
+CSS-only mode: add `db-tabs--static`. Uses radio inputs — no JS required.
+Ideal for React Server Components, Astro, or SSR contexts.
+```html
+<div class="db-tabs db-tabs--static">
+  <div class="db-tabs__list">
+    <input type="radio" name="tabs-1" id="t1" checked>
+    <label class="db-tabs__tab" for="t1">Tab 1</label>
+    <input type="radio" name="tabs-1" id="t2">
+    <label class="db-tabs__tab" for="t2">Tab 2</label>
+  </div>
+  <div class="db-tabs__panel">Content 1</div>
+  <div class="db-tabs__panel">Content 2</div>
+</div>
+```
+
+### 20. Card — `.db-card`
+Media variant: `db-card--media` removes padding for edge-to-edge images.
+```html
+<div class="db-card">
+  <div class="db-card__header">
+    <h3 class="db-card__title">Title</h3>
+    <p class="db-card__desc">Description</p>
+  </div>
+  <div class="db-card__footer">
+    <button class="db-btn db-btn--primary db-btn--sm">Action</button>
+  </div>
+</div>
+
+<!-- Media card (edge-to-edge image) -->
+<div class="db-card db-card--media">
+  <div class="db-card__media"><img src="photo.jpg" alt=""></div>
+  <div class="db-card__body">
+    <h3 class="db-card__title">Title</h3>
+    <p class="db-card__desc">Description</p>
+  </div>
+  <div class="db-card__footer">
+    <button class="db-btn db-btn--primary db-btn--sm">Action</button>
+  </div>
+</div>
+```
+Interactive: `db-card--interactive` adds cursor pointer + hover lift.
+
+### 21. Modal — `.db-modal`
+The launcher opens the hidden overlay. Keep it outside the overlay so users can reach it before opening the modal.
+```html
+<button type="button" class="db-btn db-btn--secondary" data-db-modal-trigger="my-modal">Open project details</button>
+<div class="db-modal-overlay" id="my-modal" aria-hidden="true">
+  <div class="db-modal" role="dialog" aria-modal="true" aria-labelledby="my-modal-title">
+    <div class="db-modal__header">
+      <h2 class="db-modal__title" id="my-modal-title">Project details</h2>
+      <button type="button" class="db-modal__close" aria-label="Close dialog">&times;</button>
+    </div>
+    <div class="db-modal__body">Project Aurora has 3 tasks ready for review.</div>
+    <div class="db-modal__footer">
+      <button type="button" class="db-btn db-btn--secondary" data-db-dismiss>Close</button>
+    </div>
+  </div>
+</div>
+```
+Open: `DAUB.openModal('my-modal')`. Close: `DAUB.closeModal('my-modal')` or `DAUB.closeModal(overlayEl)`. The close button, the backdrop, Escape and any button with `data-db-dismiss` close it too. A button's own click handler runs before `data-db-dismiss` closes the modal; a primary action that validates first can leave the attribute off and call `DAUB.closeModal('my-modal')` when it succeeds.
+
+### 22. Alert Dialog — `.db-alert-dialog`
+Keep the launcher outside the hidden dialog and match its data-db-trigger to the dialog id.
+```html
+<button type="button" class="db-btn db-btn--secondary" data-db-trigger="confirm-delete">Delete draft</button>
+<div class="db-alert-dialog" id="confirm-delete">
+  <div class="db-alert-dialog__overlay"></div>
+  <div class="db-alert-dialog__panel" role="alertdialog" aria-modal="true" aria-labelledby="confirm-delete-title" aria-describedby="confirm-delete-desc">
+    <h3 class="db-alert-dialog__title" id="confirm-delete-title">Delete this draft?</h3>
+    <p class="db-alert-dialog__desc" id="confirm-delete-desc">This action cannot be undone.</p>
+    <div class="db-alert-dialog__actions">
+      <button type="button" class="db-btn db-btn--secondary" data-action="cancel">Cancel</button>
+      <button type="button" class="db-btn db-btn--primary" data-db-dismiss>Delete draft</button>
+    </div>
+  </div>
+</div>
+```
+Open: `DAUB.openAlertDialog('confirm-delete')`. Close: `DAUB.closeAlertDialog('confirm-delete')`. `data-action="cancel"` closes it and takes focus when it opens; `data-db-dismiss` closes it from any other button. The backdrop and Escape close it too.
+
+### 23. Sheet — `.db-sheet`
+Sides: `db-sheet--right`, `db-sheet--left`, `db-sheet--top`, `db-sheet--bottom`.
+```html
+<div class="db-sheet db-sheet--right" id="my-sheet">
+  <div class="db-sheet__overlay"></div>
+  <div class="db-sheet__panel">
+    <div class="db-sheet__header">
+      <span class="db-sheet__title">Title</span>
+      <button class="db-sheet__close" aria-label="Close">&times;</button>
+    </div>
+    <div class="db-sheet__body">Content</div>
+  </div>
+</div>
+```
+Open: `DAUB.openSheet('my-sheet')`. Close: `DAUB.closeSheet('my-sheet')`. The close button, the backdrop, Escape and any button with `data-db-dismiss` close it too.
+
+### 24. Drawer — `.db-drawer`
+Mobile-friendly bottom panel.
+```html
+<div class="db-drawer" id="my-drawer">
+  <div class="db-drawer__overlay"></div>
+  <div class="db-drawer__panel">
+    <div class="db-drawer__handle"></div>
+    <div class="db-drawer__body">Content</div>
+  </div>
+</div>
+```
+Open: `DAUB.openDrawer('my-drawer')`. Close: `DAUB.closeDrawer('my-drawer')`. The backdrop, Escape and any button with `data-db-dismiss` close it too.
+
+### 25. Toast — `.db-toast` / `.db-toast-stack`
+Created via the JS API — `DAUB.toast()` auto-creates the fixed bottom-right `.db-toast-stack` container.
+```js
+DAUB.toast('Quick message');
+DAUB.toast({ type: 'success', title: 'Saved', message: 'Changes saved.', duration: 4000 });
+```
+Types: `success`, `error`, `warning`, `info`.
+Live trigger:
+```html
+<button type="button" class="db-btn db-btn--secondary db-btn--sm" onclick="DAUB.toast({ type: 'success', title: 'Saved', message: 'Changes saved.', duration: 4000 })">Show toast</button>
+```
+Rendered markup (for styling reference):
+```html
+<div class="db-toast-stack" role="region" aria-live="polite" aria-label="Notifications">
+  <div class="db-toast db-toast--success">
+    <span class="db-toast__icon"><!-- icon --></span>
+    <div class="db-toast__content">
+      <div class="db-toast__title">Saved</div>
+      <div class="db-toast__message">Changes saved.</div>
+    </div>
+    <button class="db-toast__close" aria-label="Dismiss">&times;</button>
+  </div>
+</div>
+```
+Toast modifiers: `--success` / `--error` / `--warning` / `--removing`.
+
+### 26. Alert — `.db-alert`
+```html
+<div class="db-alert db-alert--warning">
+  <span class="db-alert__icon"><i data-lucide="triangle-alert" aria-hidden="true"></i></span>
+  <div class="db-alert__content">
+    <div class="db-alert__title">Warning</div>
+    <p>Something needs attention.</p>
+  </div>
+</div>
+```
+Variants: `--info`, `--warning`, `--error`, `--success`.
+
+### 27. Badge — `.db-badge`
+```html
+<span class="db-badge db-badge--new">New</span>
+```
+Variants: `--new`, `--updated` / `--success`, `--warning`, `--error` / `--danger`.
+Colour variants: `db-badge--green`, `db-badge--blue` / `--info`, `db-badge--purple`, `db-badge--amber`, `db-badge--red`, `db-badge--gray`.
+
+> Badges = static status indicators. Chips = interactive/removable/filterable tags.
+
+### 28. Avatar — `.db-avatar`
+```html
+<div class="db-avatar db-avatar--md"><img src="photo.jpg" alt="User"></div>
+<div class="db-avatar db-avatar--sm">AB</div>
+```
+Sizes: `--sm` (32px), `--md` (40px), `--lg` (56px).
+
+Avatar Group: overlapping stack with overflow counter.
+```html
+<div class="db-avatar-group">
+  <div class="db-avatar db-avatar--md"><img src="user1.jpg" alt=""></div>
+  <div class="db-avatar db-avatar--md"><img src="user2.jpg" alt=""></div>
+  <div class="db-avatar db-avatar--md"><img src="user3.jpg" alt=""></div>
+  <span class="db-avatar-group__overflow">+5</span>
+</div>
+```
+
+### 29. Table — `.db-table`
+```html
+<table class="db-table">
+  <thead><tr><th>Name</th><th>Role</th></tr></thead>
+  <tbody><tr><td>Alice</td><td>Engineer</td></tr></tbody>
+</table>
+```
+Static styling only — for sortable columns use Data Table (`.db-data-table`) with `data-db-sort` on `<th>`.
+
+### 30. Data Table — `.db-data-table`
+Enhanced table with checkbox selection and sortable headers.
+```html
+<table class="db-data-table">
+  <thead><tr>
+    <th><input class="db-data-table__check" type="checkbox"></th>
+    <th data-sortable>Name</th>
+    <th data-sortable>Status</th>
+  </tr></thead>
+  <tbody><tr>
+    <td><input class="db-data-table__check" type="checkbox"></td>
+    <td>Item</td><td>Active</td>
+  </tr></tbody>
+</table>
+```
+Table utilities: `db-data-table--numeric` for tabular-nums on whole table. `db-numeric` class on `<td>`/`<th>` for right-aligned numbers. `db-truncate` for ellipsis overflow (max-width 200px).
+
+### 31. List — `.db-list`
+```html
+<div class="db-list">
+  <div class="db-list__item">
+    <div class="db-list__content">
+      <div class="db-list__title">Item</div>
+      <div class="db-list__secondary">Details</div>
+    </div>
+  </div>
+</div>
+```
+
+### 32. Breadcrumbs — `.db-breadcrumbs`
+```html
+<nav class="db-breadcrumbs" aria-label="Breadcrumb">
+  <ol><li><a href="/">Home</a></li><li aria-current="page">Current</li></ol>
+</nav>
+```
+
+### 33. Pagination — `.db-pagination`
+```html
+<nav class="db-pagination" aria-label="Pagination">
+  <button class="db-pagination__btn" disabled>&laquo;</button>
+  <button class="db-pagination__btn" aria-current="page">1</button>
+  <button class="db-pagination__btn">2</button>
+  <button class="db-pagination__btn">&raquo;</button>
+</nav>
+```
+
+### 34. Stepper — `.db-stepper`
+```html
+<div class="db-stepper">
+  <div class="db-stepper__step db-stepper__step--completed">
+    <div class="db-stepper__indicator">1</div>
+    <div class="db-stepper__label">Done</div>
+  </div>
+  <div class="db-stepper__step db-stepper__step--active">
+    <div class="db-stepper__indicator">2</div>
+    <div class="db-stepper__label">Current</div>
+  </div>
+</div>
+```
+
+### 35. Nav Menu — `.db-nav-menu`
+```html
+<nav class="db-nav-menu">
+  <a class="db-nav-menu__item db-nav-menu__item--active" href="#">Home</a>
+  <a class="db-nav-menu__item" href="#">About</a>
+  <a class="db-nav-menu__item" href="#">Contact</a>
+</nav>
+```
+
+### 36. Navbar — `.db-navbar`
+Sticky top app bar with brand, nav links, spacer, and action buttons. Mobile hamburger toggle.
+JS: `DAUB.toggleNavbar(el)` toggles, `DAUB.toggleNavbar(el, true|false)` sets. Mobile auto-close on outside click and Escape.
+```html
+<nav class="db-navbar">
+  <a class="db-navbar__brand" href="/"><img src="logo.svg" alt=""> AppName</a>
+  <div class="db-navbar__nav">
+    <div class="db-nav-menu">
+      <a class="db-nav-menu__item db-nav-menu__item--active" href="/">Home</a>
+      <a class="db-nav-menu__item" href="/explore">Explore</a>
+    </div>
+  </div>
+  <div class="db-navbar__spacer"></div>
+  <div class="db-navbar__actions">
+    <button class="db-btn db-btn--icon" aria-label="Notifications">🔔</button>
+    <div class="db-avatar db-avatar--sm"><img src="photo.jpg" alt="User"></div>
+  </div>
+  <button class="db-navbar__toggle" aria-label="Menu" aria-expanded="false">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+</nav>
+```
+**Responsive (built-in):** At ≤640px the `__toggle` button appears and `__nav` collapses.
+Clicking toggle adds `db-navbar--open` to show the mobile menu (vertical dropdown) and sets the toggle's `aria-expanded` (daub.js adds `aria-expanded="false"` when the markup lacks it).
+Auto-closes on outside click and Escape; Escape puts focus back on the toggle. No framework code needed — `daub.js` auto-initializes.
+React/Next.js: include `<script src="daub.js">` — no useState required for mobile nav.
+
+### 37. Menubar — `.db-menubar`
+```html
+<div class="db-menubar">
+  <button class="db-menubar__item">File
+    <div class="db-menubar__dropdown">
+      <button class="db-dropdown__item">New</button>
+      <button class="db-dropdown__item">Open</button>
+    </div>
+  </button>
+  <button class="db-menubar__item">Edit</button>
+</div>
+```
+
+### 38. Sidebar — `.db-sidebar`
+Collapsible: add `db-sidebar--collapsed` class. Toggle: `db-sidebar__toggle` button.
+Phones start with an icon rail. `db-sidebar--expanded` overrides this after expansion.
+Items need `data-tooltip="Label"` for collapsed hover and keyboard-focus labels.
+JS: `DAUB.toggleSidebar(el)` or click `db-sidebar__toggle`.
+```html
+<aside class="db-sidebar">
+  <div class="db-sidebar__header">
+    <h3>App Name</h3>
+    <button type="button" class="db-sidebar__toggle" aria-label="Toggle sidebar"><i data-lucide="panel-left" aria-hidden="true"></i></button>
+  </div>
+  <div class="db-sidebar__section">
+    <div class="db-sidebar__label">Main</div>
+    <a class="db-sidebar__item db-sidebar__item--active" data-tooltip="Dashboard" aria-label="Dashboard" aria-current="page" href="#"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
+    <a class="db-sidebar__item" data-tooltip="Settings" aria-label="Settings" href="#"><i data-lucide="settings" aria-hidden="true"></i><span>Settings</span></a>
+  </div>
+  <div class="db-sidebar__footer"><a class="db-sidebar__item" data-tooltip="Account" aria-label="Account" href="#"><i data-lucide="user" aria-hidden="true"></i><span>Account</span></a></div>
+</aside>
+```
+
+### 39. Tooltip — `.db-tooltip`
+Positions: `db-tooltip__content--top`, `--bottom`, `--left`, `--right`.
+```html
+<div class="db-tooltip">
+  <button class="db-btn">Hover me</button>
+  <span class="db-tooltip__content db-tooltip__content--top">Tooltip text</span>
+</div>
+```
+
+### 40. Popover — `.db-popover`
+Positions: `db-popover__content--top`, `--bottom`, `--left`, `--right`.
+```html
+<div class="db-popover">
+  <button class="db-btn db-popover__trigger">Click me</button>
+  <div class="db-popover__content db-popover__content--bottom">
+    <p>Popover content here.</p>
+  </div>
+</div>
+```
+
+### 41. Hover Card — `.db-hover-card`
+```html
+<div class="db-hover-card">
+  <a href="#">@username</a>
+  <div class="db-hover-card__content">
+    <p>User profile info shown on hover.</p>
+  </div>
+</div>
+```
+
+### 42. Dropdown Menu — `.db-dropdown`
+```html
+<div class="db-dropdown">
+  <button class="db-btn db-dropdown__trigger">Options</button>
+  <div class="db-dropdown__content">
+    <div class="db-dropdown__label">Actions</div>
+    <button class="db-dropdown__item">Edit</button>
+    <button class="db-dropdown__item">Duplicate</button>
+    <hr class="db-dropdown__separator">
+    <button class="db-dropdown__item" style="color:var(--db-error);">Delete</button>
+  </div>
+</div>
+```
+Right-aligned: add `db-dropdown__content--right`.
+
+### 43. Context Menu — `.db-context-menu`
+```html
+<div data-context-menu="my-ctx-menu">Right-click here</div>
+<div class="db-context-menu" id="my-ctx-menu">
+  <div class="db-context-menu__label">Actions</div>
+  <button class="db-context-menu__item">Copy</button>
+  <button class="db-context-menu__item">Paste</button>
+  <hr class="db-context-menu__separator">
+  <button class="db-context-menu__item db-context-menu__item--danger">Delete</button>
+</div>
+```
+
+### 44. Command Palette — `.db-command`
+Opens with Ctrl+K / Cmd+K globally.
+```html
+<div class="db-command" id="cmd">
+  <div class="db-command__overlay"></div>
+  <div class="db-command__panel">
+    <div class="db-command__input-wrap">
+      <svg><!-- search icon --></svg>
+      <input class="db-command__input" placeholder="Search...">
+    </div>
+    <div class="db-command__list">
+      <div class="db-command__group-label">Navigation</div>
+      <div class="db-command__item">Home
+        <span class="db-command__shortcut"><kbd class="db-kbd db-kbd--sm">H</kbd></span>
+      </div>
+      <div class="db-command__empty" style="display:none;">No results.</div>
+    </div>
+  </div>
+</div>
+```
+Open: `DAUB.openCommand('cmd')`. Close: `DAUB.closeCommand('cmd')`.
+
+### 45. Accordion — `.db-accordion`
+Single mode by default. Add `data-multi` for multi-open.
+```html
+<div class="db-accordion">
+  <div class="db-accordion__item db-accordion__item--open">
+    <button class="db-accordion__trigger" aria-expanded="true">
+      Question 1
+      <svg class="db-accordion__icon" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="db-accordion__content">Answer 1</div>
+  </div>
+  <div class="db-accordion__item">
+    <button class="db-accordion__trigger" aria-expanded="false">
+      Question 2
+      <svg class="db-accordion__icon" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="db-accordion__content">Answer 2</div>
+  </div>
+</div>
+```
+
+### 46. Collapsible — `.db-collapsible`
+```html
+<div class="db-collapsible">
+  <button class="db-collapsible__trigger" aria-expanded="false">
+    <svg class="db-collapsible__icon" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+    Show more
+  </button>
+  <div class="db-collapsible__content">Hidden content</div>
+</div>
+```
+
+### 47. Progress — `.db-progress`
+```html
+<div class="db-progress"><div class="db-progress__bar" style="--db-progress: 65%;"></div></div>
+```
+Indeterminate: add `db-progress--indeterminate`.
+
+### 48. Skeleton — `.db-skeleton`
+```html
+<div class="db-skeleton db-skeleton--text"></div>
+<div class="db-skeleton db-skeleton--heading"></div>
+<div class="db-skeleton db-skeleton--avatar"></div>
+```
+
+### 49. Empty State — `.db-empty`
+```html
+<div class="db-empty">
+  <div class="db-empty__icon"><!-- icon --></div>
+  <h3 class="db-empty__title">No items</h3>
+  <p class="db-empty__message">Get started by creating your first item.</p>
+  <button class="db-btn db-btn--primary">Create</button>
+</div>
+```
+
+### 50. Calendar — `.db-calendar`
+```html
+<div class="db-calendar">
+  <div class="db-calendar__header">
+    <button class="db-calendar__nav">&lsaquo;</button>
+    <span class="db-calendar__title">March 2026</span>
+    <button class="db-calendar__nav">&rsaquo;</button>
+  </div>
+  <div class="db-calendar__grid">
+    <span class="db-calendar__day-label">Mo</span><!-- ...7 labels... -->
+    <button class="db-calendar__day">1</button>
+    <button class="db-calendar__day db-calendar__day--today">27</button>
+    <button class="db-calendar__day db-calendar__day--selected">15</button>
+    <button class="db-calendar__day db-calendar__day--outside">1</button>
+  </div>
+</div>
+```
+
+### 51. Date Picker — `.db-date-picker`
+Wraps Calendar in a trigger/dropdown.
+```html
+<div class="db-date-picker">
+  <button class="db-date-picker__trigger db-input" type="button">Select date...</button>
+  <div class="db-date-picker__dropdown">
+    <div class="db-calendar"><!-- calendar markup --></div>
+  </div>
+</div>
+```
+
+### 52. Carousel — `.db-carousel`
+Text slides need padding to keep overlay arrows clear of the content. This example supplies a minimum height and arrow gutters.
+```html
+<div class="db-carousel" role="region" aria-roledescription="carousel" aria-label="Project updates" style="width:100%;">
+  <div class="db-carousel__track">
+    <div class="db-carousel__slide" role="group" aria-roledescription="slide" aria-label="1 of 2" style="min-height:180px;padding:24px 60px;display:flex;flex-direction:column;justify-content:center;"><h3 class="db-h3">Project Aurora</h3><p class="db-body">Design review is ready.</p></div>
+    <div class="db-carousel__slide" role="group" aria-roledescription="slide" aria-label="2 of 2" style="min-height:180px;padding:24px 60px;display:flex;flex-direction:column;justify-content:center;"><h3 class="db-h3">Project Birch</h3><p class="db-body">The release is scheduled for Friday.</p></div>
+  </div>
+  <button type="button" class="db-carousel__btn db-carousel__btn--prev" aria-label="Previous slide" style="top:calc(50% - var(--db-space-3) - 4px);"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+  <button type="button" class="db-carousel__btn db-carousel__btn--next" aria-label="Next slide" style="top:calc(50% - var(--db-space-3) - 4px);"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+  <div class="db-carousel__dots">
+    <button type="button" class="db-carousel__dot db-carousel__dot--active" aria-label="Go to slide 1" aria-current="true"></button>
+    <button type="button" class="db-carousel__dot" aria-label="Go to slide 2"></button>
+  </div>
+</div>
+```
+
+### 53. CSS Bar Chart — `.db-chart`
+```html
+<div class="db-chart">
+  <div class="db-chart__bar" style="height:40%;"></div>
+  <div class="db-chart__bar" style="height:80%;"></div>
+  <div class="db-chart__bar db-chart__bar--secondary" style="height:60%;"></div>
+</div>
+<div class="db-chart__labels"><span>Mon</span><span>Tue</span><span>Wed</span></div>
+```
+
+### 54. Stat Card — `.db-stat`
+KPI/metric card with label, value, and change indicator.
+Slots: `__label`, `__value`, `__change` (`--up` green / `--down` red), `__icon` (40px).
+Layout: `--horizontal` for row layout with icon.
+```html
+<div class="db-stat db-stat--horizontal">
+  <div class="db-stat__icon"><i data-lucide="trending-up"></i></div>
+  <div>
+    <span class="db-stat__label">Revenue</span>
+    <span class="db-stat__value">$48,290</span>
+    <span class="db-stat__change db-stat__change--up">↑ 12.5%</span>
+  </div>
+</div>
+```
+
+### 55. Chart Card — `.db-chart-card`
+Card wrapper for any chart with a title/actions header. This example uses CSS bars and requires no chart script. For a canvas chart, initialize your chart library with data (see the Chart.js Integration Recipe).
+```html
+<div class="db-chart-card">
+  <div class="db-chart-card__header">
+    <span class="db-chart-card__title">Revenue</span>
+    <div class="db-chart-card__actions">
+      <button class="db-btn db-btn--sm db-btn--secondary">Export</button>
+    </div>
+  </div>
+  <div class="db-chart-card__body">
+    <div class="db-chart" role="img" aria-label="Monthly revenue: January $40k, February $60k, March $80k">
+      <div class="db-chart__bar" style="height:40%;" title="January: $40k"></div>
+      <div class="db-chart__bar" style="height:60%;" title="February: $60k"></div>
+      <div class="db-chart__bar" style="height:80%;" title="March: $80k"></div>
+    </div>
+    <div class="db-chart__labels"><span>Jan</span><span>Feb</span><span>Mar</span></div>
+  </div>
+</div>
+```
+
+### 56. Resizable — `.db-resizable`
+```html
+<div class="db-resizable" style="width:300px;height:200px;border:1px solid var(--db-sand);">
+  Content
+  <div class="db-resizable__handle db-resizable__handle--right"></div>
+  <div class="db-resizable__handle db-resizable__handle--bottom"></div>
+</div>
+```
+
+### 57. Separator — `.db-separator`
+```html
+<hr class="db-separator">
+<hr class="db-separator db-separator--dashed">
+<hr class="db-separator db-separator--vertical">
+<div class="db-separator__label">Or continue with</div>
+```
+
+### 58. Scroll Area — `.db-scroll-area`
+```html
+<div class="db-scroll-area" style="max-height:200px;">
+  <!-- long content -->
+</div>
+```
+Variants: `db-scroll-area--horizontal`, `db-scroll-area--vertical`.
+
+### 59. Aspect Ratio — `.db-aspect`
+```html
+<div class="db-aspect db-aspect--16-9"><img src="photo.jpg" alt=""></div>
+```
+Ratios: `--16-9`, `--4-3`, `--1-1`, `--21-9`.
+
+### 60. Prose — `.db-prose`
+Typographic defaults for long-form content. Scale: `--sm`, `--lg`, `--xl`, `--2xl`.
+```html
+<div class="db-prose">
+  <h2>Heading</h2>
+  <p>Paragraph with 1.75 line-height and 65ch max-width.</p>
+  <blockquote>Blockquote with left border.</blockquote>
+  <pre><code>Code block</code></pre>
+</div>
+```
+
+### 61. Surface — `.db-surface`
+```html
+<div class="db-grid db-grid--2 db-gap-4">
+  <div class="db-surface" style="padding:var(--db-space-4);">Base</div>
+  <div class="db-surface db-surface--raised" style="padding:var(--db-space-4);">Raised</div>
+  <div class="db-surface db-surface--inset" style="padding:var(--db-space-4);">Inset</div>
+  <div class="db-surface db-surface--pressed" style="padding:var(--db-space-4);">Pressed</div>
+</div>
+```
+
+### 62. Typography — Heading/Body classes
+```html
+<h1 class="db-h1">Heading 1</h1>
+<h2 class="db-h2">Heading 2</h2>
+<p class="db-body">Body text</p>
+<p class="db-body--sm">Small body</p>
+<span class="db-caption">Caption</span>
+```
+
+### 63. Elevation — `.db-elevation-*`
+```html
+<div class="db-grid db-grid--3 db-gap-4">
+  <div class="db-surface db-elevation-1" style="padding:var(--db-space-4);">Level 1</div>
+  <div class="db-surface db-elevation-2" style="padding:var(--db-space-4);">Level 2</div>
+  <div class="db-surface db-elevation-3" style="padding:var(--db-space-4);">Level 3</div>
+</div>
+```
+
+### 64. Stack — flexbox layout
+Use Stack for all flex-based layouts (vertical stacking, horizontal rows, toolbars, headers).
+Props: `direction` ("vertical"|"horizontal"), `gap` (0-6), `justify` ("center"|"end"|"between"|"evenly"), `align` ("center"|"end"|"start"|"stretch"), `wrap` (bool, default true for horizontal), `container` ("wide"|"narrow"|true).
+```html
+<!-- Vertical stack -->
+<div style="display:flex;flex-direction:column;gap:var(--db-space-2)">...</div>
+<!-- Horizontal row with space-between -->
+<div style="display:flex;flex-direction:row;gap:var(--db-space-2);justify-content:space-between;flex-wrap:wrap">...</div>
+```
+
+### 65. Grid — CSS grid layout
+Use Grid for equal-width column arrangements.
+Props: `columns` (2-6), `gap` (0-6), `align` ("center"|"end"), `container` ("wide"|"narrow"|true).
+Grid: `db-grid--2` through `db-grid--6`. Auto-responsive: 4-6 cols → 2 cols at tablet, all → 1 col at mobile.
+Empty state: `.db-empty` inside `.db-grid` auto-spans all columns.
+```html
+<div class="db-container db-container--wide">
+  <div class="db-grid db-grid--4 db-gap-4">
+    <div>Col 1</div><div>Col 2</div><div>Col 3</div><div>Col 4</div>
+  </div>
+</div>
+```
+For grid layouts with 3+ columns, use `db-container--wide` (1200px) to prevent cramped cards.
+
+### 66. Container — `.db-container`
+Container: `db-container` (960px), `db-container--wide` (1200px), `db-container--narrow` (640px).
+Visibility: `db-hide-mobile`, `db-show-mobile`, `db-hide-tablet`, `db-show-tablet`, `db-hide-desktop`, `db-show-desktop`.
+
+### 67. Theme Switcher — `.db-theme-switcher`
+Toggle button + categorized popover with 21 families + scheme row.
+An empty container lets `daub.js` create the palette icon, toggle and picker. The default placement is fixed near the viewport's bottom corner; documentation previews keep it inline.
+```html
+<div class="db-theme-switcher" role="group" aria-label="Theme switcher"></div>
+```
+
+### 68. Accent Picker — `.db-accent-picker`
+Row of color dots that live-switch the theme accent. JS auto-initializes; `data-accent="reset"` restores the theme default.
+```html
+<div class="db-accent-picker">
+  <button class="db-accent-picker__dot" data-accent="#C67B5C" style="background:#C67B5C" aria-label="Terracotta"></button>
+  <button class="db-accent-picker__dot" data-accent="#6B7C3E" style="background:#6B7C3E" aria-label="Olive"></button>
+  <button class="db-accent-picker__dot" data-accent="#5A6D8E" style="background:#5A6D8E" aria-label="Slate"></button>
+  <button class="db-accent-picker__dot db-accent-picker__dot--reset" data-accent="reset" aria-label="Reset accent"></button>
+</div>
+```
+
+### 69. Utilities
+```html
+<span class="db-sr-only">Screen reader only</span>
+<span class="db-text-muted">Muted</span>
+<span class="db-text-accent">Accent</span>
+<span class="db-text-error">Error</span>
+<span class="db-text-success">Success</span>
+```
+Spacing: `db-mt-1` through `db-mt-6`, `db-mb-4`, `db-mb-5`.
+Rounding: `db-rounded-0` through `db-rounded-full`.
+
+### 70. Divider — `.db-divider`
+```html
+<hr class="db-divider">
+```
+
+### 71. Input with Icon — `.db-input-icon`
+Positions: left (default), `db-input-icon--right`
+Icon highlights on `:focus-within`.
+```html
+<div class="db-input-icon">
+  <span class="db-input-icon__icon">🔍</span>
+  <input class="db-input" placeholder="Search...">
+</div>
+<div class="db-input-icon db-input-icon--right">
+  <input class="db-input" type="email" placeholder="Email">
+  <span class="db-input-icon__icon">✉</span>
+</div>
+```
+
+### 72. Search Input — `.db-search`
+Search box with icon, clear button (auto-shows when input has text).
+```html
+<div class="db-search">
+  <svg class="db-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+  <input class="db-input" type="search" placeholder="Search...">
+  <button class="db-search__clear" aria-label="Clear">×</button>
+</div>
+```
+
+### 73. Bottom Navigation — `.db-bottom-nav`
+Fixed mobile bottom bar. Hidden on desktop unless `db-bottom-nav--always`.
+Use `db-bottom-nav--static` for inline placement. The example uses both modifiers so it remains visible in a preview.
+Badge: `db-bottom-nav__badge`. Safe-area aware via `env(safe-area-inset-bottom)`.
+```html
+<nav class="db-bottom-nav db-bottom-nav--always db-bottom-nav--static" aria-label="Mobile navigation">
+  <a class="db-bottom-nav__item db-bottom-nav__item--active" href="#" aria-current="page">
+    <i data-lucide="house" aria-hidden="true"></i>
+    <span>Home</span>
+  </a>
+  <a class="db-bottom-nav__item" href="#">
+    <i data-lucide="search" aria-hidden="true"></i>
+    <span>Search</span>
+    <span class="db-bottom-nav__badge">3</span>
+  </a>
+  <a class="db-bottom-nav__item" href="#">
+    <i data-lucide="user" aria-hidden="true"></i>
+    <span>Profile</span>
+  </a>
+</nav>
+```
+
+### 74. Chip / Tag — `.db-chip`
+Presets: `db-chip--red`, `--green`, `--blue`, `--purple`, `--amber`, `--pink`.
+Arbitrary color: `style="--db-chip-h:195; --db-chip-s:70%; --db-chip-l:42%"`.
+Active/selected: `db-chip--active` (deeper fill, stronger border, bold).
+Removable: add `db-chip__close` button (JS animated removal).
+Toggle group: wrap chips in a container with `data-db-chip-toggle` — clicks toggle `db-chip--active`.
+```html
+<span class="db-chip db-chip--blue">Design</span>
+<span class="db-chip db-chip--green db-chip--active">Selected</span>
+<span class="db-chip db-chip--green">
+  Active
+  <button class="db-chip__close">×</button>
+</span>
+
+<!-- Toggle group (click to select/deselect) -->
+<div data-db-chip-toggle>
+  <span class="db-chip db-chip--blue">Design</span>
+  <span class="db-chip db-chip--green">Dev</span>
+  <span class="db-chip db-chip--amber db-chip--active">Marketing</span>
+</div>
+```
+Toggle mode: wrap chips in `[data-db-chip-toggle]`. Add `data-db-chip-mode="single"` for radio-like behavior.
+Fires `db:chip:change` CustomEvent with `{ detail: { chip, value, active } }` — call `preventDefault()` to cancel.
+
+
+### 75. Checkbox Group — `.db-checkbox-group`
+```html
+<div class="db-checkbox-group" role="group" aria-labelledby="topics-label">
+  <span class="db-checkbox-group__label" id="topics-label">Topics</span>
+  <label class="db-checkbox"><input class="db-checkbox__input" type="checkbox"><span class="db-checkbox__box" aria-hidden="true"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span>Design</span></label>
+  <span class="db-checkbox-group__helper">Choose all that apply.</span>
+</div>
+```
+
+### 76. Fieldset — `.db-fieldset`
+```html
+<fieldset class="db-fieldset">
+  <legend class="db-fieldset__legend">Profile</legend>
+  <div class="db-fieldset__content">
+    <label class="db-field"><span class="db-field__label">Name</span><input class="db-field__input" type="text"></label>
+  </div>
+</fieldset>
+```
+
+### 77. Frame — `.db-frame`
+```html
+<div class="db-frame">
+  <div class="db-frame__header">Preview</div>
+  <div class="db-frame__body">Framed content</div>
+</div>
+```
+
+### 78. Group — `.db-group`
+```html
+<div class="db-group db-group--attached" role="group" aria-label="Alignment">
+  <button class="db-btn db-btn--secondary">Left</button>
+  <button class="db-btn db-btn--secondary">Right</button>
+</div>
+```
+
+### 79. Meter — `.db-meter`
+```html
+<div class="db-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="72" style="--db-meter:72%">
+  <div class="db-meter__bar"></div>
+</div>
+```
+
+### 80. Number Field — `.db-number-field`
+```html
+<div class="db-number-field" role="group" aria-label="Quantity">
+  <button class="db-btn db-btn--secondary db-number-field__btn" type="button" aria-label="Decrease">-</button>
+  <input class="db-input" type="number" value="3" min="0" aria-label="Quantity">
+  <button class="db-btn db-btn--secondary db-number-field__btn" type="button" aria-label="Increase">+</button>
+</div>
+```
+
+### 81. Preview Card — `.db-preview-card`
+```html
+<span class="db-preview-card">
+  <button class="db-btn db-btn--ghost db-preview-card__trigger">Account</button>
+  <span class="db-preview-card__content">
+    <strong class="db-preview-card__title">Ada Lovelace</strong>
+    <span class="db-preview-card__desc">Workspace owner and billing contact.</span>
+  </span>
+</span>
+```
+
+### 82. Toolbar — `.db-toolbar`
+```html
+<div class="db-toolbar" role="toolbar" aria-label="Editor tools">
+  <div class="db-toolbar__group">
+    <button class="db-btn db-btn--icon" aria-label="Bold">B</button>
+    <button class="db-btn db-btn--icon" aria-label="Italic">I</button>
+  </div>
+  <span class="db-toolbar__separator" aria-hidden="true"></span>
+  <button class="db-btn db-btn--secondary">Save</button>
+</div>
+```
+
+## Chat Components
+
+Compose the conversation primitives with ChatComposer for rich native input.
+Your app owns messages, reactions, upload state, AI transport, and persistence.
+The local example lives at `chat-demo.html`.
+
+The chat demo includes an expandable Thinking activity summary above assistant
+replies. It shows simulated request review, reply preparation, and response
+writing stages, then retains completed or stopped activity. For a model-backed
+chat, your app must supply public progress events or reasoning summaries from
+its provider. Display those summaries as text; do not expose hidden chain-of-thought
+or invent tool activity. Keep the stage history separate from the answer body.
+
+Each activity step has a type icon and expandable plain-text details. The demo
+also labels response attempts and offers Copy and stopped-response Retry controls.
+Retry keeps the original user turn and preserves unsent composer text and files.
+
+### Message Scroller - `.db-message-scroller`
+
+The root contains `__viewport` > `__content` > `__item` rows, plus sibling
+`__button` controls. Give each row a stable string `data-db-message-id`. Mark turn
+anchors with `data-db-scroll-anchor="true"`.
+
+Root options: `data-db-auto-scroll="true|false"` (default true),
+`data-db-scroll-position="start|end|last-anchor"` (default end),
+`data-db-scroll-peek="0"` (nonnegative pixels). Default root height: 360px.
+Controls use `data-db-scroll-to="start|end"`. Call `DAUB.init(parent)` after adding
+the markup. Apply `db-scroll-fade` to the viewport for edge fades.
+
+```html
+<div class="db-message-scroller" data-db-auto-scroll="true" data-db-scroll-position="end" data-db-scroll-peek="24">
+  <div class="db-message-scroller__viewport db-scroll-fade" tabindex="0" role="region" aria-label="Conversation">
+    <div class="db-message-scroller__content">
+      <div class="db-message-scroller__item" data-db-message-id="m1" data-db-scroll-anchor="true">
+        <div class="db-message db-message--end">
+          <div class="db-message__avatar db-avatar db-avatar--sm" aria-hidden="true">AL</div>
+          <div class="db-message__content">
+            <div class="db-message__header"><span>Ada</span><time>10:42</time></div>
+            <div class="db-bubble db-bubble--secondary db-bubble--end"><div class="db-bubble__content">Review ready.</div></div>
+            <div class="db-message__footer">Delivered</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <button class="db-message-scroller__button" type="button" data-db-scroll-to="end" aria-label="Scroll to end"><i data-lucide="arrow-down" aria-hidden="true"></i></button>
+</div>
+```
+
+### Message - `.db-message`
+
+Parts: `__avatar`, `__content`, `__header`, `__footer`. Use `--end` for end alignment.
+Group rows with `db-message-group`. In renderer specs, `messageId` defaults to the
+element ID. The scroller moves row IDs and anchors onto its `__item` wrappers.
+`avatar` accepts an initials string or `{initials, src}` with a safe image URL.
+`name`, `timestamp`, and `footer` accept plain text.
+
+For native HTML or React, add `db-message__footer--hover` to the footer to reveal
+timestamp and actions on message hover or keyboard focus. Touch devices keep it
+visible. Use a semantic `<time datetime="...">` followed by `.db-message__actions`;
+add icon buttons with `.db-message__action`, `tabindex="0"`, an accessible name,
+and a tooltip.
+The host supplies timestamps and click handlers. Adding more buttons extends the
+action row without changing the message layout.
+
+### Bubble - `.db-bubble`
+
+Parts: `__content`, `__reactions`. Variants: `--primary` (default), `--secondary`,
+`--muted`, `--tinted`, `--outline`, `--ghost`, `--destructive`; use `--end` for
+alignment. The renderer treats `variant:"default"` as `"primary"`.
+Group bubbles with `db-bubble-group`. The `content` prop accepts plain text;
+renderer children provide composed controls or Prose. Reactions accept
+`[{label, count, pressed}]`; your app handles clicks and updates `pressed`.
+
+### Attachment - `.db-attachment`
+
+Parts: `__media` (`--image` for images), `__content`, `__title`, `__description`,
+`__actions`, `__action`, `__trigger`. Modifiers: `--vertical`, `--sm`, `--xs`.
+States: `data-state="idle|uploading|processing|error|done"` (default idle).
+Your app sets the state and progress. The renderer clamps upload progress to
+0-100 and supplies a named progressbar. During uploading/processing, set
+`aria-busy="true"`. Group cards with `db-attachment-group`.
+
+The full-card link uses an empty, named `__trigger` sibling. Keep action buttons
+in `__actions` beside that link. Do not place buttons inside the anchor. Renderer
+children become actions; `src` is an image URL, `href` is a link URL, and `size`
+selects `sm` or `xs` presentation. Put file size text in `description`.
+
+```html
+<div class="db-attachment" data-state="done">
+  <div class="db-attachment__media" aria-hidden="true"><i data-lucide="file" aria-hidden="true"></i></div>
+  <div class="db-attachment__content"><div class="db-attachment__title">Review.pdf</div><div class="db-attachment__description">PDF, 42 KB</div></div>
+  <a class="db-attachment__trigger" href="review.pdf" aria-label="Open Review.pdf"></a>
+  <div class="db-attachment__actions"><button class="db-btn db-btn--ghost db-btn--icon db-attachment__action" type="button" aria-label="Remove attachment"><i data-lucide="x" aria-hidden="true"></i></button></div>
+</div>
+```
+
+### Chat Composer - `.db-chat-composer`
+
+Use an empty native form. Load `daub.js` alongside `daub.css` before mounting.
+`DAUB.init(parent)` enhances native roots from escaped `data-db-chat-options`
+JSON; `DAUB.createChatComposer(root, options)` merges explicit options over that
+attribute and returns the native controller. The controller owns its DOM slots.
+
+```html
+<form class="db-chat-composer" data-db-chat-options="{&quot;models&quot;:[{&quot;id&quot;:&quot;demo&quot;,&quot;label&quot;:&quot;Demo model (simulated)&quot;,&quot;efforts&quot;:[&quot;low&quot;,&quot;high&quot;]}],&quot;model&quot;:&quot;demo&quot;,&quot;approval&quot;:&quot;ask&quot;,&quot;mode&quot;:&quot;chat&quot;}"></form>
+```
+
+Declarative `ChatComposer` props: `models: [{id, label, efforts?: string[]}]`,
+`model`, `effort`, `approval: "ask"|"auto"`, `mode: "chat"|"plan"`,
+`actions: [{id, label, icon?, disabled?}]`,
+`capabilities: {queue?, steer?, attachments?, folders?, dictation?, approval?}`
+(boolean flags), `busy`, `placeholder`, and `id`. Default model labels are
+demo-only (simulated). Supply host model choices for a real engine. Queue, steer,
+attachments, approval, and browser-supported dictation default on; folders need
+browser support. Dictation starts through a user command.
+
+Slots: `__queue`, `__queued-item`, `__queued-text`, `__queued-actions`, `__panel`,
+`__attachments`, `__input`, `__toolbar`, `__status`, `__add`, `__add-menu`,
+`__file-input`, `__folder-input`, `__model`, `__effort`, `__approval`, `__mode`,
+`__goal`, `__dictation`, `__dictation-bar`, `__dictation-cancel`, `__send`,
+`__stop`, `__dropzone`. The queue sits outside the framed composer panel.
+
+Cancelable bubbling events: `db:chat-send` and `db:chat-steer` carry
+`detail.request`; `db:chat-stop` has no request; `db:chat-action` carries
+`detail.action`. Requests contain `id`, `text`, local `files: File[]`, `model`,
+`effort`, `approval`, `mode`, and optional `goal`. Call `event.preventDefault()`
+to retain a rejected send or steer draft/queued item. Informational events:
+`db:chat-queue` (request and queue updates), `db:chat-config` (model, effort,
+approval, mode, goal), `db:chat-dictation` (state and optional error).
+`db:chat-change` carries `detail.state` for host sidebar counts.
+
+Controller methods: `getState()`, `setBusy(boolean)`, `setStatus(string)`,
+`setDraft(string)`, `clearDraft()`, `attachFiles(File[])`, `getQueue()`, `takeNext()`,
+`removeQueued(id)`, `editQueued(id, text)`, `steerQueued(id)`, `setModel(id)`,
+`setEffort(value)`, `setMode(value)`, `setApproval(value)`, `setGoal(string|null)`,
+`startDictation()`, `stopDictation()`, `destroy()`. `getState()` returns text,
+files, queue, busy, model, effort, approval, mode, goal, and dictation state.
+The host toggles `setBusy` during responses and drains its queue through
+`takeNext`. The host owns transport, history, storage, and approval enforcement.
+Configuration describes intent, not access rights. Keep File objects local;
+only host action may read or upload them. `destroy()` cancels dictation,
+removes listeners, and revokes owned preview URLs.
+`clearDraft()` clears pending text and files, preserves the queue, and updates
+host counts through `db:chat-change`.
+
+React: `ChatComposer` renders an empty `data-db-react` form, escapes the same
+JSON options, and calls `window.DAUB.createChatComposer` in an effect. Load the
+native script before mounting. `ref` exposes the form; `onReady(controller)`
+exposes its handle. `onSend`, `onSteer`, `onStop`, `onAction`, `onQueue`,
+`onConfig`, `onDictation`, and `onChange` receive the native CustomEvent, including its
+`detail` and `preventDefault()`. Scalar props update through native setters;
+`updateOptions()` updates models, actions, capabilities, and placeholder without
+discarding drafts, Files, queue items, or preview ownership. Placeholder changes
+apply at once; structural changes wait until the active response unlocks.
+Disabling dictation aborts recognition at once, including during a response.
+Callback changes preserve the controller. Unmount destroys it. SSR needs no browser
+globals; the React wrapper supplies no separate draft or queue engine.
+`onChange` receives `CustomEvent<{state: ChatComposerState}>`, not a React form change
+event. Use `onReady(controller)` for `clearDraft()` and other native commands.
+
+```text
+ChatComposer(models, model, effort, approval, mode, actions, capabilities, busy, placeholder, id)
+```
+
+### Marker - `.db-marker`
+
+Parts: `__icon`, `__content`. Variants: `--border`, `--separator`. Use `status:true`
+for a polite live region and `busy:true` for `aria-busy="true"` in renderer specs.
+Use `db-shimmer` on the content text for streaming status.
+
+```html
+<div class="db-marker db-marker--border" role="status" aria-live="polite" aria-busy="true">
+  <span class="db-marker__icon" aria-hidden="true"><i data-lucide="loader" aria-hidden="true"></i></span>
+  <div class="db-marker__content db-shimmer">Generating response</div>
+</div>
+```
+
+### Change Summary - `.db-change-summary`
+
+Use a compact framed summary inside a message for host-provided file changes.
+This component needs `daub.css` without `daub.js`. DAUB performs no file operations.
+The host owns undo, diff views, and persistence.
+
+Parts: `__header`, `__icon`, `__heading`, `__title`, `__description`, `__totals`,
+`__additions`, `__deletions`, `__actions`, `__files`, `__file`, `__path`, `__counts`.
+Use a 14px or 16px Lucide `files` icon. Files are simple `<ul>` / `<li>` rows.
+Use `role="img"` with accessible labels on count spans to name the numeric glyphs;
+color alone cannot name them.
+
+```html
+<div class="db-change-summary" role="group" aria-label="Prepared 2 demo files">
+  <div class="db-change-summary__header">
+    <span class="db-change-summary__icon" aria-hidden="true"><i data-lucide="files" style="width:16px;height:16px"></i></span>
+    <div class="db-change-summary__heading">
+      <div class="db-change-summary__title">Prepared 2 demo files</div>
+      <p class="db-change-summary__description">Demo changes</p>
+      <span class="db-change-summary__totals"><span class="db-change-summary__additions" role="img" aria-label="48 additions">+48</span><span class="db-change-summary__deletions" role="img" aria-label="4 deletions">-4</span></span>
+    </div>
+  </div>
+  <ul class="db-change-summary__files">
+    <li class="db-change-summary__file" data-status="modified">
+      <span class="db-change-summary__path" title="src/app.ts" aria-label="src/app.ts, modified">src/app.ts</span>
+      <span class="db-change-summary__counts"><span class="db-change-summary__additions" role="img" aria-label="6 additions">+6</span><span class="db-change-summary__deletions" role="img" aria-label="4 deletions">-4</span></span>
+    </li>
+    <li class="db-change-summary__file" data-status="added">
+      <span class="db-change-summary__path" title="src/summary.ts" aria-label="src/summary.ts, added">src/summary.ts</span>
+      <span class="db-change-summary__counts"><span class="db-change-summary__additions" role="img" aria-label="42 additions">+42</span><span class="db-change-summary__deletions" role="img" aria-label="0 deletions">-0</span></span>
+    </li>
+  </ul>
+</div>
+```
+
+Props: `files: [{path: string, additions?: number, deletions?: number,
+status?: "added"|"modified"|"deleted"}]`, `title?: string`, `description?: string`,
+`undoLabel?: string`, `undoDisabled?: boolean`. Spec `children` holds explicit
+host-provided action IDs. The default title for host data is `Edited N file(s)`;
+an empty list uses `No files changed`. Custom titles override that text.
+Render paths as plain text. Both renderers and React floor finite counts and
+clamp rows/totals to `0..Number.MAX_SAFE_INTEGER`; missing, nonnumeric, or
+nonfinite counts become zero. Ignore malformed file entries without string paths.
+Allow `data-status` only for `added`, `modified`, and `deleted`.
+
+Renderers create no implicit Undo or View changes controls. Add `__actions` as
+a child of `__header` only when the host supplies controls with handlers.
+`undoLabel` and `undoDisabled` do not create or configure spec child buttons;
+configure child actions through their own props and host handlers.
+
+React exports `ChangeSummary`, `ChangeSummaryProps`, and `ChangeSummaryFile`.
+The wrapper accepts div props, forwards an `HTMLDivElement` ref, and escapes
+text through React. `onUndo?: MouseEventHandler<HTMLButtonElement>` renders
+an Undo button; `onViewChanges?: MouseEventHandler<HTMLButtonElement>` renders
+a View changes button. Both callbacks receive the button mouse event.
+`undoLabel` defaults to `Undo`; `undoDisabled` defaults to false and disables
+only the callback-backed Undo button. Arbitrary React children fill `__actions`.
+No callbacks means no generated buttons. SSR requires no browser globals.
+
+```tsx
+import { ChangeSummary } from "daub-react";
+
+<ChangeSummary
+  title="Prepared 2 demo files"
+  description="Demo changes"
+  files={[
+    { path: "src/app.ts", additions: 6, deletions: 4, status: "modified" },
+    { path: "src/summary.ts", additions: 42, deletions: 0, status: "added" },
+  ]}
+/>
+```
+
+### JSON-Render and OpenUI
+
+The browser, local MCP, and cloud MCP expose the same seven chat types. OpenUI
+places `children` first on the content families. ChatComposer takes native
+options with no declarative children; metadata accepts named arguments:
+
+```text
+MessageScroller(children, height, autoScroll, defaultScrollPosition, peek)
+Message(children, align, avatar, name, timestamp, messageId, scrollAnchor, footer)
+Bubble(children, content, variant, align, reactions)
+Attachment(children, name, description, src, alt, href, size, state, progress, orientation)
+Marker(children, content, icon, variant, status, busy)
+ChangeSummary(children, files, title, description, undoLabel, undoDisabled)
+ChatComposer(models, model, effort, approval, mode, actions, capabilities, busy, placeholder, id)
+```
+
+```text
+root = MessageScroller([Message([Bubble([], content: "Review ready.", variant: "secondary")], align: "end", avatar: "AL", name: "Ada", messageId: "m1", scrollAnchor: true), Marker([], content: "Today", variant: "separator")], height: 360, autoScroll: true)
+```
+
+For Message/Bubble/Marker, children render inside the family content part. Attachment
+and ChangeSummary children render inside their action parts. Plain text props escape HTML. Image/link
+URLs use the canonical renderer's URL guard.
+
+### Native Message Scroller API
+
+Mount the root in the document before creating its handle. `DAUB.init(parent)`
+also initializes scrollers. Calling `createMessageScroller` again for the same
+root returns its existing handle; set options on the first call or root attributes.
+The native method uses `scrollPosition`/`scrollPeek`; renderer props use
+`defaultScrollPosition`/`peek` and translate those into root attributes.
+
+```js
+const root = document.querySelector('.db-message-scroller');
+const scroller = DAUB.createMessageScroller(root, {
+  autoScroll: true,
+  scrollPosition: 'end', // start, end, last-anchor
+  scrollPeek: 24
+});
+scroller.scrollToStart({ behavior: 'instant' });
+scroller.scrollToEnd({ behavior: 'smooth' });
+scroller.scrollToMessage('m1', { block: 'center', behavior: 'smooth' });
+scroller.getState(); // {atStart, atEnd, currentAnchorId, visibleMessageIds}
+root.addEventListener('db:message-scroll', event => {
+  const { atStart, atEnd, currentAnchorId, visibleMessageIds } = event.detail;
+});
+scroller.destroy();
+```
+
+Scroll commands return a boolean; `scrollToMessage` returns false for an unmounted
+ID. `block` accepts `start`, `center`, `end`, or `nearest`. Reduced-motion users get
+instant movement for smooth commands. The handle exposes scroll-edge, anchor, and
+visible-row state; `db:message-scroll` bubbles when that state changes. The native
+runtime suspends auto-follow when you scroll up, preserves the visible row while
+your app prepends history, and follows live turn anchors. Call `destroy()` before
+discarding a handle. The runtime also cleans up roots after removal from the DOM.
+
+## Responsive Breakpoints
+
+| Breakpoint | Width | Grid behavior |
+|------------|-------|---------------|
+| Mobile | `< 640px` | All grids collapse to 1 column |
+| Tablet | `640px – 1023px` | 4+ column grids collapse to 2 columns |
+| Desktop | `≥ 1024px` | All grid columns as specified |
+
+Visibility: `db-hide-mobile`, `db-show-mobile`, `db-hide-tablet`, `db-show-tablet`, `db-hide-desktop`, `db-show-desktop`.
+
+## JS API Reference
+
+```js
+DAUB.init()                    // Re-initialize all components
+DAUB.toast('Quick message')   // String shorthand → info toast
+DAUB.toast({ type, title, message, duration })
+DAUB.openModal(idOrEl)         // Open modal by id string or element
+DAUB.closeModal(idOrEl)        // Close modal by id string or element
+DAUB.openAlertDialog(id)       // Open alert dialog
+DAUB.closeAlertDialog(id)      // Close alert dialog
+DAUB.openSheet(id)             // Open sheet panel
+DAUB.closeSheet(id)            // Close sheet
+DAUB.openDrawer(id)            // Open drawer
+DAUB.closeDrawer(id)           // Close drawer
+DAUB.openCommand(id)           // Open command palette
+DAUB.closeCommand(id)          // Close command palette
+DAUB.toggleSidebar(el)         // Toggle sidebar collapse
+DAUB.toggleNavbar(el, open?)   // Toggle mobile navbar menu (open: true/false sets it)
+DAUB.refreshIcons()            // Re-init Lucide icons after dynamic content
+DAUB.createMessageScroller(root, { autoScroll, scrollPosition, scrollPeek }) // Mounted native root, handle or null
+DAUB.setTheme(name)            // Set theme (direct)
+DAUB.getTheme()                // Get current theme
+DAUB.cycleTheme()              // Cycle through 21 families
+DAUB.THEMES                    // Array of all theme names
+DAUB.setFamily(name)           // Set theme family (21 families across 4 categories)
+DAUB.getFamily()               // Get current family
+DAUB.setScheme(mode)           // Set color scheme (auto/light/dark)
+DAUB.getScheme()               // Get current scheme
+DAUB.THEME_FAMILIES            // Family → {light, dark} map
+DAUB.FAMILY_NAMES              // Array of 21 family names
+DAUB.THEME_CATEGORIES          // Category → family[] map
+DAUB.CATEGORY_NAMES            // Array of category names
+DAUB.getCategory(family)       // Get category for a family name
+DAUB.setAccent(hex)            // Override accent color
+DAUB.resetAccent()             // Restore theme default accent
+DAUB.getAccent()               // Get current accent color
+DAUB.setTemperature('auto')    // Auto-adjust warmth by time of day and season
+DAUB.setTemperature(0.5)       // Manual temperature (-1 cold to +1 warm)
+DAUB.getTemperature()          // Returns 'auto' or current numeric value
+DAUB.getColor(token)           // Get computed CSS variable value (e.g. 'terracotta' → --db-terracotta)
+```
+
+## Component Init Requirements
+
+**Needs `DAUB.init()` (JS-powered):**
+Switch, Tabs, Modal, Stepper, Tooltip, Slider, Checkbox (custom), Radio (custom), Accordion, Collapsible, Alert Dialog, Sheet, Drawer, Popover, Context Menu, Dropdown, Toggle Group, Custom Select, Command Palette, Menubar, Calendar, Carousel, OTP, Resizable, Chip Close, Chip Toggle, Navbar, Sidebar Toggle, Theme Switcher, Message Scroller.
+
+**Pure CSS (no JS needed):**
+Button, Badge, Card, Input, Textarea, Label, Kbd, Spinner, Separator, Progress, Avatar, Alert, Surface, Skeleton, Breadcrumb, Pagination, Grid, Container, Typography (h1–h6 classes), Prose, Message, Bubble, Attachment, Marker. Consumers wire reactions and attachment actions.
+
+After dynamically adding HTML, call `DAUB.init()` or `DAUB.init(parentElement)` to bind new elements.
+
+## CSS Custom Properties
+
+Core: `--db-cream`, `--db-cream-dark`, `--db-sand`, `--db-terracotta`, `--db-clay`, `--db-warm-gray`, `--db-charcoal`, `--db-ink`, `--db-white`
+Accents: `--db-accent-dark`, `--db-accent-light`, `--db-accent-hover`, `--db-accent-pressed`
+Text variants (AA on bg; set `--db-terracotta-text` whenever you override `--db-terracotta`): `--db-terracotta-text` (links, active nav, tabs), `--db-success-text`, `--db-error-text` (falls back to `--db-error`)
+Status: `--db-error`, `--db-success`, `--db-warning`
+Semantic (theme-aware aliases): `--db-color-bg`, `--db-color-bg-alt`, `--db-color-surface`, `--db-color-text`, `--db-color-text-secondary`, `--db-color-text-muted`, `--db-color-border`, `--db-color-accent`, `--db-color-accent-hover`, `--db-color-success`, `--db-color-warning`, `--db-color-error`, `--db-color-overlay`
+RGB channels: `--db-color-bg-rgb`, `--db-color-text-rgb`, `--db-color-surface-rgb`, `--db-color-accent-rgb`, `--db-color-border-rgb`
+Fonts: `--db-font-heading`, `--db-font-body`, `--db-font-ui`
+Spacing: `--db-space-0` through `--db-space-9`
+Radius: `--db-radius-0` through `--db-radius-4`, `--db-radius-full`
+Shadows: `--db-shadow-1`, `--db-shadow-2`, `--db-shadow-3`, `--db-shadow-inset`
+
+## Data Attributes Reference
+
+| Attribute | Element | Purpose |
+|-----------|---------|---------|
+| `data-theme` | `<html>` | Active theme variant (`light`, `dark`, `ink`, etc.) |
+| `data-scheme` | `<html>` | Color scheme preference (`auto`, `light`, `dark`) |
+| `data-db-texture` | `<html>` | Background texture (`grain`, `paper`, `metal`, `wood`, `glass`, `none`) |
+| `data-db-modal-trigger` | button | Opens modal with matching ID on click |
+| `data-db-chip-toggle` | container | Enables click-to-toggle `db-chip--active` on child chips |
+| `data-db-sort` | `<th>` | Makes table column sortable |
+| `data-multi` | accordion/toggle-group | Allows multiple items open simultaneously |
+| `data-tooltip` | sidebar item | Tooltip text shown when sidebar is collapsed |
+| `data-context-menu` | any element | ID of context menu to show on right-click |
+| `data-action="cancel"` | button | Auto-closes parent alert dialog |
+| `data-db-dismiss` | button | Closes the Modal, Alert Dialog, Sheet or Drawer it sits in; with a value, the one with that id |
+| `data-family` | button | Theme switcher family button (`default`, `grunge`, etc.) |
+| `data-scheme` | button | Theme switcher scheme button (`auto`, `light`, `dark`) |
+| `data-sortable` | `<th>` | Data table sortable column |
+
+## Full-Page Recipes
+
+### Recipe 1: Dashboard with Sidebar
+
+```html
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="https://daub.dev/daub.css">
+</head>
+<body>
+  <nav class="db-navbar">
+    <a class="db-navbar__brand" href="/">Dashboard</a>
+    <div class="db-navbar__nav">
+      <div class="db-nav-menu">
+        <a class="db-nav-menu__item db-nav-menu__item--active" href="/">Overview</a>
+        <a class="db-nav-menu__item" href="/reports">Reports</a>
+      </div>
+    </div>
+    <div class="db-navbar__spacer"></div>
+    <div class="db-navbar__actions">
+      <button class="db-btn db-btn--icon" aria-label="Notifications">🔔</button>
+      <div class="db-avatar db-avatar--sm">JD</div>
+    </div>
+    <button class="db-navbar__toggle" aria-label="Menu">☰</button>
+  </nav>
+
+  <div class="db-flex" style="min-height:calc(100vh - 56px);">
+    <aside class="db-sidebar db-hide-mobile">
+      <div class="db-sidebar__section">
+        <div class="db-sidebar__label">Main</div>
+        <a class="db-sidebar__item db-sidebar__item--active" href="#">Dashboard</a>
+        <a class="db-sidebar__item" href="#">Analytics</a>
+        <a class="db-sidebar__item" href="#">Settings</a>
+      </div>
+    </aside>
+
+    <main class="db-container" style="flex:1; padding-top:var(--db-space-6);">
+      <div class="db-grid db-grid--3 db-gap-4 db-mb-5">
+        <div class="db-card">
+          <div class="db-card__header"><h3 class="db-card__title">Revenue</h3></div>
+          <p class="db-h2">$12,450</p>
+        </div>
+        <div class="db-card">
+          <div class="db-card__header"><h3 class="db-card__title">Users</h3></div>
+          <p class="db-h2">1,284</p>
+        </div>
+        <div class="db-card">
+          <div class="db-card__header"><h3 class="db-card__title">Orders</h3></div>
+          <p class="db-h2">342</p>
+        </div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-card__header"><h3 class="db-card__title">Recent Orders</h3></div>
+        <table class="db-table">
+          <thead><tr><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Alice</td><td>$120</td><td><span class="db-badge db-badge--new">Paid</span></td></tr>
+            <tr><td>Bob</td><td>$85</td><td><span class="db-badge db-badge--warning">Pending</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://daub.dev/daub.js"></script>
+</body>
+</html>
+```
+
+### Recipe 2: Image Card Grid (Pinterest-style)
+
+```html
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Explore</title>
+  <link rel="stylesheet" href="https://daub.dev/daub.css">
+</head>
+<body>
+  <nav class="db-navbar">
+    <a class="db-navbar__brand" href="/">Pinboard</a>
+    <div class="db-navbar__nav">
+      <div class="db-nav-menu">
+        <a class="db-nav-menu__item db-nav-menu__item--active" href="/">Home</a>
+        <a class="db-nav-menu__item" href="/explore">Explore</a>
+      </div>
+    </div>
+    <div class="db-navbar__spacer"></div>
+    <div class="db-navbar__actions">
+      <div class="db-search db-hide-mobile">
+        <svg class="db-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input class="db-input" type="search" placeholder="Search pins...">
+        <button class="db-search__clear" aria-label="Clear">×</button>
+      </div>
+      <div class="db-avatar db-avatar--sm"><img src="user.jpg" alt=""></div>
+    </div>
+    <button class="db-navbar__toggle" aria-label="Menu">☰</button>
+  </nav>
+
+  <main class="db-container db-container--wide" style="padding-top:var(--db-space-6);">
+    <div data-db-chip-toggle class="db-flex db-flex--wrap db-gap-2 db-mb-5">
+      <span class="db-chip db-chip--blue db-chip--active">All</span>
+      <span class="db-chip db-chip--green">Nature</span>
+      <span class="db-chip db-chip--amber">Food</span>
+      <span class="db-chip db-chip--purple">Art</span>
+      <span class="db-chip db-chip--pink">Travel</span>
+    </div>
+
+    <div class="db-grid db-grid--4 db-gap-4">
+      <div class="db-card db-card--media">
+        <div class="db-card__media"><img src="photo1.jpg" alt=""></div>
+        <div class="db-card__body">
+          <h3 class="db-card__title">Mountain Sunrise</h3>
+          <p class="db-card__desc">Beautiful morning light over the peaks.</p>
+        </div>
+        <div class="db-card__footer">
+          <div class="db-avatar-group">
+            <div class="db-avatar db-avatar--sm"><img src="u1.jpg" alt=""></div>
+            <div class="db-avatar db-avatar--sm"><img src="u2.jpg" alt=""></div>
+            <span class="db-avatar-group__overflow">+3</span>
+          </div>
+        </div>
+      </div>
+      <!-- Repeat cards... -->
+    </div>
+  </main>
+
+  <script src="https://daub.dev/daub.js"></script>
+</body>
+</html>
+```
+
+### Recipe 3: Settings Form
+
+```html
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings</title>
+  <link rel="stylesheet" href="https://daub.dev/daub.css">
+</head>
+<body>
+  <nav class="db-navbar">
+    <a class="db-navbar__brand" href="/">MyApp</a>
+    <div class="db-navbar__nav">
+      <div class="db-nav-menu">
+        <a class="db-nav-menu__item" href="/">Home</a>
+        <a class="db-nav-menu__item db-nav-menu__item--active" href="/settings">Settings</a>
+      </div>
+    </div>
+    <div class="db-navbar__spacer"></div>
+    <div class="db-navbar__actions">
+      <div class="db-avatar db-avatar--sm">JD</div>
+    </div>
+    <button class="db-navbar__toggle" aria-label="Menu">☰</button>
+  </nav>
+
+  <main class="db-container db-container--narrow" style="padding-top:var(--db-space-6);">
+    <h1 class="db-h2 db-mb-5">Account Settings</h1>
+
+    <div class="db-card db-mb-5">
+      <div class="db-card__header"><h3 class="db-card__title">Profile</h3></div>
+      <div class="db-flex db-gap-4 db-mb-4" style="align-items:center;">
+        <div class="db-avatar db-avatar--lg"><img src="photo.jpg" alt=""></div>
+        <button class="db-btn db-btn--secondary db-btn--sm">Change Photo</button>
+      </div>
+      <div class="db-field db-mb-4">
+        <label class="db-field__label">Display Name</label>
+        <input class="db-field__input" type="text" value="Jane Doe">
+      </div>
+      <div class="db-field db-mb-4">
+        <label class="db-field__label">Email</label>
+        <input class="db-field__input" type="email" value="jane@example.com">
+        <span class="db-field__helper">We'll never share your email.</span>
+      </div>
+      <div class="db-field">
+        <label class="db-field__label">Bio</label>
+        <textarea class="db-textarea" rows="3">Designer & developer</textarea>
+      </div>
+    </div>
+
+    <div class="db-card db-mb-5">
+      <div class="db-card__header"><h3 class="db-card__title">Notifications</h3></div>
+      <div class="db-flex" style="justify-content:space-between; align-items:center;" class="db-mb-4">
+        <span>Email notifications</span>
+        <div class="db-switch" role="switch" tabindex="0" aria-checked="true">
+          <span class="db-switch__track"><span class="db-switch__thumb"></span></span>
+        </div>
+      </div>
+      <hr class="db-separator">
+      <div class="db-flex" style="justify-content:space-between; align-items:center;">
+        <span>Push notifications</span>
+        <div class="db-switch" role="switch" tabindex="0" aria-checked="false">
+          <span class="db-switch__track"><span class="db-switch__thumb"></span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="db-flex db-gap-3" style="justify-content:flex-end;">
+      <button class="db-btn db-btn--secondary">Cancel</button>
+      <button class="db-btn db-btn--primary">Save Changes</button>
+    </div>
+  </main>
+
+  <script src="https://daub.dev/daub.js"></script>
+</body>
+</html>
+```
+
+## Chart.js Integration Recipe
+
+Use `DAUB.getColor()` to read theme tokens for chart libraries:
+
+```js
+const chart = new Chart(document.getElementById('revenue'), {
+  type: 'bar',
+  data: {
+    labels: ['Jan','Feb','Mar','Apr','May','Jun'],
+    datasets: [{
+      label: 'Revenue',
+      data: [12, 19, 3, 5, 2, 3],
+      backgroundColor: DAUB.getColor('terracotta'),
+      borderColor: DAUB.getColor('clay'),
+      borderWidth: 1
+    }]
+  },
+  options: {
+    plugins: { legend: { labels: { color: DAUB.getColor('charcoal') } } },
+    scales: {
+      x: { ticks: { color: DAUB.getColor('warm-gray') }, grid: { color: DAUB.getColor('sand') } },
+      y: { ticks: { color: DAUB.getColor('warm-gray') }, grid: { color: DAUB.getColor('sand') } }
+    }
+  }
+});
+```
+
+Wrap the canvas inside `db-chart-card` for consistent card framing:
+```html
+<div class="db-chart-card">
+  <div class="db-chart-card__header">
+    <span class="db-chart-card__title">Monthly Revenue</span>
+  </div>
+  <div class="db-chart-card__body">
+    <canvas id="revenue"></canvas>
+  </div>
+</div>
+```
+
+## React Integration (daub-react)
+
+Typed JSX components wrapping DAUB's CSS classes, including compound chat primitives. Full TypeScript, IDE autocomplete, forwardRef on all components.
+
+```bash
+npm install daub-react daub-ui
+```
+
+```tsx
+import "daub-ui/daub.css";
+import { Button, Card, Stack, ThemeProvider, Modal, Tabs, Switch } from "daub-react";
+
+function App() {
+  return (
+    <ThemeProvider theme="bone">
+      <Stack direction="vertical" gap={4}>
+        <Card title="Welcome">
+          <Button variant="primary">Get Started</Button>
+        </Card>
+      </Stack>
+    </ThemeProvider>
+  );
+}
+```
+
+Components: Stack, Grid, Surface, Container, Separator, ScrollArea, AspectRatio, Frame, Group, Toolbar, Card, Badge, Avatar, AvatarGroup, Alert, Progress, Meter, Skeleton, EmptyState, Spinner, StatCard, ChartCard, PreviewCard, Chart, Image, Button, ButtonGroup, Input, Textarea, Field, Fieldset, InputGroup, InputIcon, Search, Select, Label, Kbd, Prose, List, Table, DataTable, Chip, Breadcrumbs, Pagination, NavMenu, BottomNav, Stepper, Navbar, HoverCard, ThemeProvider, Checkbox, CheckboxGroup, Radio, RadioGroup, Switch, Slider, NumberField, Toggle, ToggleGroup, InputOTP, Tabs, Accordion, Collapsible, CustomSelect, Calendar, DatePicker, Carousel, Modal, AlertDialog, Sheet, Drawer, Tooltip, Popover, DropdownMenu, ContextMenu, CommandPalette, Toast, ToastProvider.
+
+Chat exports: MessageScroller, MessageScrollerProvider, MessageScrollerViewport,
+MessageScrollerContent, MessageScrollerItem, MessageScrollerButton; Message,
+MessageAvatar, MessageContent, MessageHeader, MessageFooter, MessageGroup; Bubble,
+BubbleContent, BubbleReactions, BubbleGroup, BubbleCollapsible; Attachment,
+AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription,
+AttachmentActions, AttachmentAction, AttachmentTrigger, AttachmentGroup,
+AttachmentProgress; Marker, MarkerIcon, MarkerContent; ChangeSummary; ChatComposer.
+
+Hooks: useControllable, useToast, useEscapeKey, useOutsideClick, useFocusTrap,
+useMessageScroller, useMessageScrollerScrollable, useMessageScrollerVisibility.
+
+npm: https://www.npmjs.com/package/daub-react
+
+## Design Intelligence (v3.20.1)
+
+DAUB's MCP server and generation pipeline include industry-aware design intelligence that automatically adapts the system prompt based on prompt content.
+
+### Industry Intent Detection
+
+`detectIndustryIntent(prompt)` maps 20 industry categories to optimal DAUB themes and layout guidance:
+
+| Industry | Theme | Key Rules |
+|----------|-------|-----------|
+| SaaS/B2B | github | Trust blue, data-dense, Hero+Features+Pricing |
+| E-commerce | light | Product cards, CTA prominence, grid catalogs |
+| Fintech | material-light | Data-dense, muted palette, StatCards for KPIs |
+| Healthcare | nord-light | Calming, accessible, high contrast, no dark default |
+| Dashboard | github | StatCards + Charts + Tables, sidebar nav, compact |
+| Dev tools | dracula | Dark theme, monospace, Kbd shortcuts, compact |
+| Creative | grunge-dark | Bold, large imagery, full-bleed sections |
+| Gaming | tokyo-night | Dark, immersive, leaderboard tables, bold accents |
+| Music | synthwave | Dark + vibrant, list-based tracks, progress bars |
+
+Plus: education, blog, social, real estate, food, travel, fitness, HR, legal, nonprofit, onboarding.
+
+### UX Validation Warnings
+
+`validateSpec()` returns a `warnings` array with soft UX checks:
+- BottomNav with >5 items
+- Multiple `variant:"primary"` Buttons in same parent
+- Input without Label or Field wrapper
+- Empty Text content
+- Card with no title and no children
+
+### Page Formulas
+
+Structural templates injected into prompts for common page types:
+- Dashboard: Navbar + StatCards + Chart/Table + Activity feed
+- Settings: Sidebar/Tabs + Section cards + Form fields + Save footer
+- Onboarding: Stepper + Welcome + Profile + Preferences + Complete
+- Profile: Avatar + Stats + Tabs + Content
+- Pricing: Toggle + Plan cards + Feature comparison + FAQ
+
+### Mobile Design Rules
+
+`detectMobileIntent(prompt)` triggers mobile-specific guidance:
+- BottomNav (5 tabs max) as primary navigation
+- Single-column layout, 48px touch targets
+- Sheet over Modal, Drawer for settings
+- App Shell pattern: Navbar + content + BottomNav

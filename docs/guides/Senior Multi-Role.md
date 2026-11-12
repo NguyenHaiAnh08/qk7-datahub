@@ -68,6 +68,7 @@
 - Định nghĩa chính sách lưu trữ/xoay vòng `ACCESS_LOG`, lịch backup SQL Server + `uploads/`, có kiểm thử khôi phục (restore drill) định kỳ.
 - Theo dõi phiên bản tối thiểu (Node ≥ 22.13, Python ≥ 3.10, SQL Server) và lên lịch vá lỗi bảo mật.
 - Đảm bảo 4 KPI giám sát SOC (Tổng hoạt động, Cảnh báo an ninh, Thay đổi đặc quyền, Truy xuất văn bản mật) có cơ chế cảnh báo chủ động, không chỉ hiển thị tĩnh.
+- **Kỷ luật Git & Quy tắc No Auto-Push:** Tuyệt đối **KHÔNG** tự ý chạy `git push` lên bất kỳ nhánh nào của GitHub. Chỉ commit ở local; chỉ thực hiện `git push` khi nhận được mệnh lệnh triển khai rõ ràng từ USER chỉ định đích danh nhánh cần đẩy (ví dụ: *"đẩy lên nhánh ... github"*, *"push origin ..."*).
 
 ## Vai trò Đảm bảo Chất lượng & Hỗ trợ (QA/QC Tester)
 

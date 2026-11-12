@@ -47,6 +47,11 @@ Trước khi bắt đầu thực hiện bất kỳ lệnh shell, viết mã hay 
    * Chạy kiểm tra TypeScript `npx tsc --noEmit` và Vite build đảm bảo không phát sinh lỗi biên dịch.
    * Kiểm tra tính toàn vẹn của luồng nghiệp vụ trên cả 2 nền tảng: PC Widescreen và iPad Touch UI.
 
+4. **Kỷ luật Git & Nghiêm cấm tự động Push (Strict No Auto-Push):**
+   * Sau khi hoàn tất kiểm thử và xác minh chất lượng, Agent chỉ được phép tạo Git commit ở môi trường cục bộ (local).
+   * **Tuyệt đối KHÔNG tự ý thực thi `git push` lên bất kỳ nhánh nào trên GitHub.**
+   * Chỉ khi nào có lệnh triển khai rõ ràng từ USER chỉ định cụ thể nhánh cần đẩy (ví dụ: *"đẩy lên nhánh ... github"*, *"triển khai đẩy lên nhánh ..."*, *"push origin ..."*) thì mới được phép thực hiện `git push`.
+
 ---
 
 ## 📝 Bước 3: Cập nhật tài liệu sau khi hoàn thành (Post-task Documentation Update)

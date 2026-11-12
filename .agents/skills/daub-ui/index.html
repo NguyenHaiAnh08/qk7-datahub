@@ -1,0 +1,3740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DAUB — CSS component library for AI | 91 components, 21 themes</title>
+  <meta name="description" content="DAUB is an open-source CSS component library with 91 UI components, 21 theme families, and AI-ready docs (llms.txt, MCP server). Drop-in two CDN files — zero build step. MIT licensed.">
+  <meta name="keywords" content="CSS components, neo-skeuomorphic, UI kit, design system, considered UI, tactile, accessible, themes, AI components, llms.txt, drop-in CSS, dark mode, skeuomorphic, dashboard components, no build step">
+  <meta name="theme-color" content="#C67B5C">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="author" content="Stas Kulesh">
+  <meta property="og:locale" content="en_US">
+  <link rel="canonical" href="https://daub.dev">
+  <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM documentation">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DAUB — CSS component library for AI | 91 components, 21 themes">
+  <meta property="og:description" content="91 UI components with 21 theme families. AI-ready docs (llms.txt, MCP server). Drop-in CSS + JS. No build step.">
+  <meta property="og:url" content="https://daub.dev">
+  <meta property="og:site_name" content="DAUB UI">
+  <meta property="og:image" content="https://daub.dev/og-image.png?v=3.20.6">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="DAUB UI — Considered interface components">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="DAUB — CSS component library for AI | 91 components, 21 themes">
+  <meta name="twitter:description" content="91 UI components with 21 theme families. AI-ready docs (llms.txt, MCP server). Drop-in CSS + JS. No build step.">
+  <meta name="twitter:image" content="https://daub.dev/og-image.png?v=3.20.6">
+  <meta name="twitter:site" content="@staskulesh">
+  <meta name="twitter:creator" content="@staskulesh">
+
+  <!-- Favicon (inline SVG) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "DAUB UI",
+    "alternateName": "daub-ui",
+    "description": "Considered CSS component library with 91 UI components and 21 theme families (42 light/dark variants). Drop-in CSS + JS, zero build step. Neo-skeuomorphic aesthetic with tactile surfaces, letterpress typography, and per-element textures. AI-ready with llms.txt, components.json, and TypeScript declarations.",
+    "url": "https://daub.dev",
+    "codeRepository": "https://github.com/sliday/daub",
+    "programmingLanguage": ["CSS", "JavaScript", "HTML"],
+    "runtimePlatform": "Browser",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Any",
+    "license": "https://opensource.org/licenses/MIT",
+    "version": "3.20.6",
+    "dateCreated": "2026-02-01",
+    "dateModified": "2026-08-26",
+    "author": { "@type": "Person", "name": "Stas Kulesh", "url": "https://x.com/staskulesh" },
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "keywords": ["CSS components", "UI kit", "design system", "neo-skeuomorphic", "themes", "dark mode", "accessible", "AI-friendly", "llms.txt", "drop-in CSS", "no build step"],
+    "image": "https://daub.dev/og-image.png?v=3.20.6",
+    "screenshot": "https://daub.dev/og-image.png?v=3.20.6"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "DAUB UI",
+    "url": "https://daub.dev",
+    "description": "Considered CSS components for discerning interfaces"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is DAUB?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "DAUB is an open-source CSS component library with 91 UI components and 21 theme families (42 light/dark variants). It features a neo-skeuomorphic aesthetic with tactile surfaces and warm shadows. No build step required — just drop in two CDN files."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I install DAUB?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Add two CDN links to your HTML: a stylesheet link to daub.dev/daub.css and a script tag for daub.dev/daub.js. Alternatively, install via npm: npm install daub-ui."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is DAUB free?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, DAUB is completely free and open source under the MIT license. The source code is available on GitHub at github.com/sliday/daub."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does DAUB support dark mode?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. DAUB ships 21 theme families with 42 total variants — each family includes both a light and dark scheme. Themes can be switched at runtime with a single data attribute."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does DAUB work with AI?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "DAUB provides AI-ready documentation via llms.txt, a structured component catalog at components.json, TypeScript declarations, and an MCP server that AI agents can use to browse components, generate UI specs, and render previews."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- FOUC prevention: apply saved theme, scheme & accent before paint -->
+  <script>
+    (function(){try{var t=localStorage.getItem('db-theme');if(t)document.documentElement.setAttribute('data-theme',t);var s=localStorage.getItem('db-scheme');if(s)document.documentElement.setAttribute('data-scheme',s);var a=localStorage.getItem('db-accent');if(a)document.documentElement.style.setProperty('--db-terracotta',a)}catch(e){}})();
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@0.576.0/dist/umd/lucide.min.js" integrity="sha384-b05ba3pt6xaC7F4r130arhf8cF18GH/gKu9JDz/NMf+BhLlBVwIWUdAZSpf1IWRZ" crossorigin="anonymous" defer></script>
+
+  <!-- DAUB -->
+  <link rel="stylesheet" href="daub.css?v=3.20.6">
+  <script src="site-nav.js" defer></script>
+
+  <style>
+    /* Prevent horizontal overflow on mobile */
+    html, body { overflow-x: hidden; }
+
+    /* Temperature auto toggle switch */
+    #db-temp-auto:checked ~ span:first-of-type { background: var(--db-terracotta); }
+    #db-temp-auto:checked ~ span:last-of-type { transform: translateX(12px); }
+
+    /* Demo-only styles */
+    .demo-section {
+      margin-bottom: 80px;
+      scroll-margin-top: 120px;
+    }
+    .demo-section__title {
+      font-family: var(--db-font-ui);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--db-terracotta-text, var(--db-terracotta));
+      margin-bottom: 24px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--db-sand);
+    }
+    .demo-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .demo-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .demo-label {
+      font-family: var(--db-font-ui);
+      font-size: 0.6875rem;
+      color: var(--db-warm-gray);
+      text-transform: none;
+      letter-spacing: 0;
+      margin-bottom: 4px;
+    }
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .demo-surface-box {
+      padding: 24px;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--db-font-ui);
+      font-size: 0.8125rem;
+      color: var(--db-warm-gray);
+    }
+    /* Hero */
+    .db-hero {
+      text-align: center;
+      padding: 96px 24px 48px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .db-hero__announce {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 100%;
+      min-height: 44px;
+      padding: 8px;
+      border-radius: var(--db-radius-full);
+      background: var(--db-cream-dark);
+      border: 1px solid var(--db-sand);
+      font-family: var(--db-font-ui);
+      font-size: 0.8125rem;
+      color: var(--db-charcoal);
+      margin-bottom: 24px;
+      text-decoration: none;
+      transition: border-color var(--db-transition);
+    }
+    .db-hero__announce:hover {
+      border-color: var(--db-terracotta);
+    }
+    .db-hero__announce .db-badge {
+      font-size: 0.6875rem;
+      align-self: center;
+      flex-shrink: 0;
+    }
+    .db-hero__announce-text {
+      min-width: 0;
+      line-height: 1.4;
+      text-align: left;
+    }
+    .db-hero__announce-text span {
+      display: inline-block;
+    }
+    .db-hero__announce > svg {
+      flex-shrink: 0;
+    }
+    .db-hero__headline {
+      font-family: var(--db-font-heading);
+      font-size: clamp(2.25rem, 5vw, 3.75rem);
+      font-weight: 800;
+      color: var(--db-ink);
+      margin: 0 0 16px;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .db-hero__definition {
+      font-family: var(--db-font-body);
+      font-size: 0.9375rem;
+      color: var(--db-warm-gray);
+      margin: 0 auto 24px;
+      max-width: 480px;
+      line-height: 1.6;
+      font-style: italic;
+    }
+    .db-hero__definition strong {
+      font-style: normal;
+      color: var(--db-ink);
+      font-family: var(--db-font-heading);
+      font-weight: 700;
+    }
+    .db-hero__definition .db-hero__pos {
+      font-size: 0.75rem;
+      font-style: italic;
+      color: var(--db-terracotta);
+      margin: 0 2px;
+    }
+    .db-hero__sub {
+      font-family: var(--db-font-body);
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--db-warm-gray);
+      max-width: 560px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+    }
+    .db-hero__actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+    .db-hero__install {
+      display: block;
+      padding: 12px 40px 12px 16px;
+      border-radius: var(--db-radius-2);
+      background: var(--db-cream-dark);
+      border: 1px solid var(--db-sand);
+      font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.8125rem;
+      color: var(--db-charcoal);
+      max-width: calc(100vw - 32px);
+      overflow-x: auto;
+      position: relative;
+    }
+    .db-hero__install code {
+      white-space: pre;
+    }
+    .db-hero__copy {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--db-cream-dark);
+      border: none;
+      cursor: pointer;
+      color: var(--db-warm-gray);
+      padding: 4px;
+      border-radius: var(--db-radius-1);
+      transition: color var(--db-transition);
+    }
+    .db-hero__copy:hover {
+      color: var(--db-terracotta);
+    }
+    @media (max-width: 640px) {
+      .db-hero { padding: 72px 16px 40px; }
+      .db-hero__actions { flex-direction: column; align-items: center; }
+      .demo-row { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* Testimonial */
+    .db-testimonial {
+      max-width: 600px;
+      margin: 0 auto 40px;
+      padding: 0 24px;
+    }
+    .db-testimonial__card {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px 20px;
+      border-radius: var(--db-radius-2);
+      background: var(--db-cream-dark);
+      border: 1px solid var(--db-sand);
+    }
+    .db-testimonial__avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1.5px solid var(--db-sand);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .db-testimonial__body { min-width: 0; }
+    .db-testimonial__quote {
+      font-family: var(--db-font-body);
+      font-size: 0.875rem;
+      line-height: 1.55;
+      color: var(--db-charcoal);
+      font-style: italic;
+      margin: 0 0 6px;
+    }
+    .db-testimonial__footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--db-font-ui);
+      font-size: 0.75rem;
+      color: var(--db-warm-gray);
+    }
+    .db-testimonial__name {
+      font-weight: 600;
+      color: var(--db-ink);
+    }
+    .db-testimonial__link {
+      color: var(--db-terracotta);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .db-testimonial__link:hover {
+      text-decoration: underline;
+    }
+
+    /* Quick Install */
+    .db-quick-install {
+      max-width: 900px;
+      margin: 0 auto 56px;
+      padding: 0 24px;
+    }
+    .db-quick-install__heading {
+      font-family: var(--db-font-ui);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--db-warm-gray);
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .db-quick-install__grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 640px) {
+      .db-quick-install__grid { grid-template-columns: 1fr; }
+    }
+    .db-quick-install__option {
+      padding: 12px 14px;
+      border-radius: var(--db-radius-2);
+      background: var(--db-cream-dark);
+      border: 1px solid var(--db-sand);
+      position: relative;
+      cursor: pointer;
+      transition: border-color var(--db-transition);
+    }
+    .db-quick-install__option:hover {
+      border-color: var(--db-terracotta);
+    }
+    .db-quick-install__label {
+      font-family: var(--db-font-ui);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--db-ink);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .db-quick-install__label .db-badge { font-size: 0.5625rem; padding: 1px 6px; }
+    .db-quick-install__desc {
+      font-family: var(--db-font-ui);
+      font-size: 0.6875rem;
+      color: var(--db-warm-gray);
+      margin-bottom: 8px;
+    }
+    .db-quick-install__code {
+      font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.6875rem;
+      color: var(--db-charcoal);
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.5;
+    }
+    .db-quick-install__copy {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--db-warm-gray);
+      padding: 2px;
+      border-radius: var(--db-radius-1);
+      transition: color var(--db-transition);
+    }
+    .db-quick-install__copy:hover { color: var(--db-terracotta); }
+    .db-quick-install__ai-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      padding: 3px 10px;
+      border-radius: var(--db-radius-full);
+      background: rgba(var(--db-accent-rgb),0.08);
+      border: 1px solid rgba(var(--db-accent-rgb),0.18);
+      font-family: var(--db-font-ui);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--db-terracotta);
+      text-decoration: none;
+      transition: background var(--db-transition);
+    }
+    .db-quick-install__ai-link:hover {
+      background: rgba(var(--db-accent-rgb),0.15);
+    }
+
+    /* Showcase */
+    .db-showcase {
+      max-width: 960px;
+      margin: 0 auto 64px;
+      padding: 0 24px;
+    }
+    .db-showcase__frame {
+      border-radius: calc(var(--db-radius-4) * 1.8);
+      background: var(--db-white);
+      border: 1px solid var(--db-sand);
+      box-shadow: var(--db-shadow-3);
+      padding: 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      overflow: hidden;
+    }
+    .db-showcase__col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      justify-content: center;
+      min-width: 0;
+    }
+    .db-showcase__eyebrow {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--db-terracotta);
+      font-weight: 600;
+      font-family: var(--db-font-ui);
+    }
+    .db-showcase__title {
+      font-family: var(--db-font-heading);
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--db-ink);
+      line-height: 1.2;
+      margin: 0;
+    }
+    .db-showcase__desc {
+      font-size: 0.9375rem;
+      color: var(--db-warm-gray);
+      line-height: 1.6;
+      margin: 0;
+    }
+    .db-showcase__preview {
+      background: var(--db-cream);
+      border: 1px solid var(--db-sand);
+      border-radius: var(--db-radius-3);
+      padding: 12px;
+      transition: all 0.3s ease;
+    }
+    .db-showcase__snippet-label {
+      display: none;
+    }
+    .db-showcase__panel {
+      background: var(--db-cream);
+      border: 1px solid var(--db-sand);
+      border-radius: var(--db-radius-3);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: 100%;
+      justify-content: center;
+    }
+    .db-showcase__panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--db-warm-gray);
+      font-weight: 600;
+      font-family: var(--db-font-ui);
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--db-sand);
+      margin-bottom: 4px;
+    }
+    .db-showcase__section-label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--db-warm-gray);
+      font-weight: 600;
+      font-family: var(--db-font-ui);
+    }
+    /* Inline theme switcher — reuses db-theme-switcher__popover as embedded panel */
+    .db-theme-switcher__popover--inline {
+      position: static !important;
+      display: flex !important;
+      width: auto !important;
+      max-width: 100% !important;
+      padding: 0 !important;
+      background: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      border: none !important;
+      box-shadow: none !important;
+      animation: none !important;
+      min-width: 0 !important;
+      transform: none !important;
+      left: auto !important;
+      top: auto !important;
+      bottom: auto !important;
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__tabs {
+      background: var(--db-cream-dark);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__tab {
+      color: var(--db-warm-gray);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__tab:hover {
+      color: var(--db-charcoal);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__tab[aria-pressed="true"] {
+      color: var(--db-charcoal);
+      background: var(--db-white);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__item:hover {
+      background: var(--db-cream-dark);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__item[aria-pressed="true"] {
+      background: var(--db-cream-dark);
+      border-color: var(--db-terracotta);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__item[aria-pressed="true"] .db-theme-switcher__dot {
+      border-color: var(--db-terracotta);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__item[aria-pressed="true"] .db-theme-switcher__name {
+      color: var(--db-terracotta);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__name {
+      color: var(--db-warm-gray);
+    }
+    .db-theme-switcher__popover--inline .db-theme-switcher__item:hover .db-theme-switcher__name {
+      color: var(--db-charcoal);
+    }
+    /* Segmented texture control — shadcn-style */
+    .db-showcase__segments {
+      display: flex;
+      background: var(--db-cream-dark);
+      border-radius: var(--db-radius-2);
+      padding: 3px;
+      gap: 2px;
+    }
+    .db-showcase__segments button {
+      flex: 1;
+      padding: 5px 8px;
+      font-size: 0.6875rem;
+      font-family: var(--db-font-ui);
+      font-weight: 500;
+      color: var(--db-warm-gray);
+      background: transparent;
+      border: none;
+      border-radius: calc(var(--db-radius-2) - 2px);
+      cursor: pointer;
+      transition: all var(--db-transition);
+      white-space: nowrap;
+    }
+    .db-showcase__segments button:hover {
+      color: var(--db-ink);
+    }
+    .db-showcase__segments button[aria-pressed="true"] {
+      background: var(--db-cream);
+      color: var(--db-ink);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    /* Code output panel */
+    .db-showcase__output {
+      background: var(--db-cream);
+      border: 1px solid var(--db-sand);
+      border-radius: var(--db-radius-3);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: 100%;
+      justify-content: center;
+    }
+    .db-showcase__code-wrap {
+      position: relative;
+      overflow: hidden;
+    }
+    .db-showcase__code {
+      background: var(--db-charcoal, #3D3832);
+      color: var(--db-cream, #FAF8F0);
+      padding: 10px 14px;
+      border-radius: var(--db-radius-2);
+      font-size: 0.6875rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      max-height: 140px;
+      margin: 0;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .db-showcase__code-copy {
+      width: 100%;
+      margin-top: 8px;
+      font-size: 0.9375rem;
+      letter-spacing: 0.02em;
+    }
+    @media (max-width: 720px) {
+      .db-showcase__frame { grid-template-columns: 1fr; padding: 24px; }
+    }
+    @media (max-width: 640px) {
+      .db-showcase { padding: 0 12px; }
+      .db-showcase__frame { padding: 12px; gap: 12px; }
+      .db-showcase__panel { padding: 12px; gap: 10px; overflow: visible; }
+      .db-theme-switcher__popover--inline .db-theme-switcher__tabs {
+        font-size: 0.5rem;
+        gap: 1px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .db-theme-switcher__popover--inline .db-theme-switcher__tabs::-webkit-scrollbar { display: none; }
+      .db-theme-switcher__popover--inline .db-theme-switcher__tab {
+        padding: 3px 4px;
+        font-size: 0.5rem;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .db-theme-switcher__popover--inline .db-theme-switcher__category-items {
+        grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+      }
+      .db-showcase__segments {
+        flex-wrap: wrap;
+      }
+      .db-showcase__segments button {
+        flex: 0 0 calc(33.33% - 2px);
+        font-size: 0.625rem;
+        padding: 4px 6px;
+      }
+    }
+
+    /* AI Section */
+    .db-ai-section {
+      max-width: 960px;
+      margin: 0 auto 64px;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .db-ai-section__heading {
+      font-family: var(--db-font-heading);
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+      font-weight: 700;
+      color: var(--db-ink);
+      margin: 12px 0 12px;
+    }
+    .db-ai-section__desc {
+      font-family: var(--db-font-body);
+      font-size: 1.0625rem;
+      color: var(--db-warm-gray);
+      max-width: 560px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+    }
+    .db-ai-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      text-align: left;
+    }
+    .db-ai-grid .db-card { margin: 0; }
+    .db-ai-grid .db-card__title { font-size: 0.9375rem; }
+    @media (max-width: 720px) {
+      .db-ai-grid { grid-template-columns: 1fr; }
+    }
+
+    /* MCP Server section */
+    .db-mcp-section {
+      max-width: 960px;
+      margin: 0 auto 64px;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .db-mcp-section__heading {
+      font-family: var(--db-font-heading);
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+      font-weight: 700;
+      color: var(--db-ink);
+      margin: 12px 0 12px;
+    }
+    .db-mcp-section__desc {
+      font-family: var(--db-font-body);
+      font-size: 1.0625rem;
+      color: var(--db-warm-gray);
+      max-width: 600px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+    }
+    .db-mcp-install {
+      max-width: 640px;
+      margin: 0 auto 32px;
+      text-align: left;
+    }
+    .db-mcp-install__label {
+      font-family: var(--db-font-ui);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--db-warm-gray);
+      margin-bottom: 8px;
+    }
+    .db-mcp-install__cmd {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--db-charcoal, #2D2A26);
+      border-radius: 8px;
+      font-family: var(--db-font-mono, 'SF Mono', 'Fira Code', monospace);
+      font-size: 0.8125rem;
+      color: var(--db-cream, #FAF8F0);
+      overflow-x: auto;
+    }
+    .db-mcp-install__cmd code { flex: 1; white-space: nowrap; }
+    .db-mcp-install__cmd .db-hero__copy {
+      flex-shrink: 0;
+      color: var(--db-cream, #FAF8F0);
+      opacity: 0.6;
+    }
+    .db-mcp-install__cmd .db-hero__copy:hover { opacity: 1; }
+    .db-mcp-tools {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      max-width: 640px;
+      margin: 0 auto 32px;
+      text-align: left;
+    }
+    .db-mcp-tool {
+      display: flex;
+      gap: 12px;
+      padding: 16px;
+      background: var(--db-color-surface, var(--db-white, #fff));
+      border: 1px solid var(--db-color-border, var(--db-sand));
+      border-radius: 8px;
+    }
+    .db-mcp-tool__icon {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--db-sand, #EDE8D0);
+      border-radius: 8px;
+      color: var(--db-terracotta);
+    }
+    .db-mcp-tool__name {
+      font-family: var(--db-font-mono, monospace);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--db-ink);
+      margin-bottom: 4px;
+    }
+    .db-mcp-tool__desc {
+      font-size: 0.8125rem;
+      color: var(--db-warm-gray);
+      line-height: 1.5;
+    }
+    .db-mcp-example {
+      max-width: 640px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    .db-mcp-example__label {
+      font-family: var(--db-font-ui);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      color: var(--db-warm-gray);
+    }
+    .db-mcp-example__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .db-mcp-example .db-message-scroller {
+      --db-message-scroller-height: 520px;
+      border-block: 1px solid var(--db-color-border);
+    }
+    .db-mcp-example .db-chat-composer {
+      margin-top: 16px;
+    }
+    .db-mcp-example .db-chat-composer__choice,
+    .db-mcp-example .db-chat-composer__settings,
+    .db-mcp-example .db-chat-composer__model,
+    .db-mcp-example .db-chat-composer__effort,
+    .db-mcp-example .db-chat-composer__mode,
+    .db-mcp-example .db-chat-composer__goal {
+      display: none;
+    }
+    @media (max-width: 720px) {
+      .db-mcp-tools { grid-template-columns: 1fr; }
+      .db-mcp-example .db-message-scroller { --db-message-scroller-height: 420px; }
+      .db-mcp-example .db-message-scroller__content { padding-inline: 0; }
+    }
+
+    /* Use with AI section */
+    .db-use-ai {
+      max-width: 960px;
+      margin: 0 auto 64px;
+      padding: 0 24px;
+    }
+    .db-use-ai__heading {
+      font-family: var(--db-font-heading);
+      font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+      font-weight: 700;
+      color: var(--db-ink);
+      margin: 0 0 8px;
+      text-align: center;
+    }
+    .db-use-ai__sub {
+      font-family: var(--db-font-body);
+      font-size: 0.9375rem;
+      color: var(--db-warm-gray);
+      max-width: 540px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .db-prompt-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+    @media (max-width: 720px) {
+      .db-prompt-grid { grid-template-columns: 1fr; }
+    }
+    .db-prompt-card {
+      background: var(--db-cream);
+      border: 1px solid var(--db-sand);
+      border-radius: var(--db-radius-3);
+      padding: 20px;
+      text-align: left;
+      transition: border-color var(--db-transition);
+    }
+    .db-prompt-card:hover { border-color: var(--db-terracotta); }
+    .db-prompt-card__label {
+      font-family: var(--db-font-ui);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--db-terracotta);
+      margin: 0 0 6px;
+    }
+    .db-prompt-card__title {
+      font-family: var(--db-font-heading);
+      font-size: 1.0625rem;
+      font-weight: 700;
+      color: var(--db-ink);
+      margin: 0 0 8px;
+    }
+    .db-prompt-card__text {
+      font-family: var(--db-font-body);
+      font-size: 0.8125rem;
+      color: var(--db-warm-gray);
+      line-height: 1.55;
+      margin: 0;
+    }
+    .db-use-ai__example {
+      background: var(--db-cream);
+      border: 1px solid var(--db-sand);
+      border-radius: var(--db-radius-3);
+      padding: 24px;
+      margin-top: 40px;
+    }
+    .db-use-ai__example-label {
+      font-family: var(--db-font-ui);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--db-terracotta);
+      margin: 0 0 8px;
+    }
+    .db-use-ai__example-title {
+      font-family: var(--db-font-heading);
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--db-ink);
+      margin: 0 0 16px;
+    }
+    .db-use-ai__example { position: relative; }
+    #example-tabs .db-toggle { font-size: 0.75rem; padding: 6px 14px; }
+    @media (max-width: 640px) {
+      .db-use-ai__example > div:first-child { flex-direction: column; align-items: flex-start !important; gap: 12px; }
+    }
+    .db-use-ai__code {
+      background: var(--db-ink);
+      color: var(--db-cream);
+      border-radius: var(--db-radius-2);
+      padding: 20px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+      line-height: 1.65;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Nav bar */
+    .db-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--db-cream);
+      border-bottom: 1px solid var(--db-sand);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+      font-family: var(--db-font-ui);
+      backdrop-filter: blur(8px);
+    }
+    .db-nav__brand {
+      font-family: var(--db-font-heading);
+      font-weight: 800;
+      font-size: 1.125rem;
+      color: var(--db-ink);
+      text-decoration: none;
+    }
+    .db-nav__links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .db-nav__links a {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--db-charcoal);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: var(--db-radius-2);
+      transition: color var(--db-transition), background var(--db-transition);
+    }
+    .db-nav__links a:hover {
+      color: var(--db-terracotta);
+      background: color-mix(in srgb, var(--db-ink) 7%, transparent);
+    }
+    .db-nav__link--active {
+      color: var(--db-terracotta) !important;
+      background: color-mix(in srgb, var(--db-terracotta) 15%, transparent) !important;
+    }
+    .db-nav__github {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--db-charcoal);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: var(--db-radius-2);
+      border: 1px solid var(--db-sand);
+      transition: border-color var(--db-transition);
+    }
+    .db-nav__github:hover {
+      border-color: var(--db-terracotta);
+    }
+    .db-nav__toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: none;
+      border: 1px solid var(--db-sand);
+      border-radius: var(--db-radius-2);
+      cursor: pointer;
+      color: var(--db-ink);
+      flex-shrink: 0;
+    }
+    .db-nav__toggle:hover { background: color-mix(in srgb, var(--db-ink) 5%, transparent); }
+    @media (max-width: 768px) {
+      .db-nav__toggle { display: flex; }
+      .db-nav__links {
+        display: none;
+        position: absolute;
+        top: 48px;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        background: var(--db-cream);
+        border-bottom: 1px solid var(--db-sand);
+        padding: 8px 16px;
+        gap: 0;
+        box-shadow: var(--db-shadow-2);
+        z-index: 99;
+      }
+      .db-nav__links li { width: 100%; }
+      .db-nav__links a { display: block; width: 100%; padding: 10px 12px; font-size: 0.875rem; }
+      .db-nav__links .db-nav__github { display: flex; width: 100%; justify-content: flex-start; border: none; padding: 10px 12px !important; }
+      .db-nav--open .db-nav__links { display: flex; }
+    }
+
+    /* Component index bar */
+    .db-comp-index {
+      position: sticky;
+      top: 48px;
+      z-index: 99;
+      background: var(--db-cream-dark);
+      border-bottom: 1px solid var(--db-sand);
+      padding: 8px 24px;
+      margin-bottom: 32px;
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+      text-align: center;
+    }
+    .db-comp-index a {
+      display: inline-block;
+      font-family: var(--db-font-ui);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--db-warm-gray);
+      text-decoration: none;
+      padding: 4px 12px;
+      border-radius: var(--db-radius-full);
+      transition: color var(--db-transition), background var(--db-transition);
+    }
+    .db-comp-index a:hover {
+      color: var(--db-terracotta);
+      background: var(--db-cream);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SVG filters for grunge effects -->
+  <svg style="position:absolute;width:0;height:0" aria-hidden="true">
+    <filter id="db-grunge-distort">
+      <feTurbulence type="turbulence" baseFrequency="0.015 0.06" numOctaves="3" seed="2" result="turbulence"/>
+      <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="db-grunge-rough">
+      <feTurbulence type="turbulence" baseFrequency="0.03 0.08" numOctaves="4" seed="5" result="turbulence"/>
+      <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="1.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
+
+  <!-- Navigation -->
+  <header>
+  <nav class="db-nav" role="navigation" aria-label="Main">
+    <a href="/" class="db-nav__brand">DAUB</a>
+    <button class="db-nav__toggle" aria-label="Menu" aria-expanded="false" onclick="this.closest('.db-nav').classList.toggle('db-nav--open');this.setAttribute('aria-expanded',this.closest('.db-nav').classList.contains('db-nav--open'))">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <ul class="db-nav__links">
+      <li><a href="components.html">Components</a></li>
+      <li><a href="docs.html">Docs</a></li>
+      <li><a href="demo.html">Layouts</a></li>
+      <li><a href="playground.html">Playground</a></li>
+      <li><a href="themes.html">Themes</a></li>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="case-studies.html">Case studies</a></li>
+      <li><a href="llms.txt">AI Docs</a></li>
+      <li>
+        <a href="https://github.com/sliday/daub" class="db-nav__github" target="_blank" rel="noopener">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          <span>GitHub</span>
+          <span id="gh-stars" style="display:none;font-size:0.75rem;background:var(--db-sand);padding:1px 6px;border-radius:var(--db-radius-1);font-variant-numeric:tabular-nums;"></span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="db-hero">
+    <a class="db-hero__announce" href="https://github.com/sliday/daub" target="_blank" rel="noopener">
+      <span class="db-badge db-badge--new">CDN v3.20.6</span>
+      <span class="db-hero__announce-text"><span>91 components</span> &middot; <span>42 theme variants</span></span>
+      <i data-lucide="arrow-right" aria-hidden="true" style="width:14px;height:14px;"></i>
+    </a>
+    <h1 class="db-hero__headline">DAUB</h1>
+    <p class="db-hero__sub">A considered CSS component library — warm surfaces, tactile depth, 21 theme families. Two files, zero build step, full substance.</p>
+    <div class="db-hero__actions">
+      <a href="#configurator" class="db-btn db-btn--primary db-btn--lg">Get Started</a>
+      <a href="components.html" class="db-btn db-btn--secondary db-btn--lg">View Components</a>
+    </div>
+    <div class="db-hero__badges" style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <a href="https://www.npmjs.com/package/daub-ui" target="_blank" rel="noopener"><img src="https://img.shields.io/npm/v/daub-ui?style=flat-square&color=C1714F&label=npm%20published" alt="Published npm version" height="20"></a>
+      <a href="https://www.npmjs.com/package/daub-ui" target="_blank" rel="noopener"><img src="https://img.shields.io/npm/dm/daub-ui?style=flat-square&color=6B8E6B&label=downloads" alt="npm downloads" height="20"></a>
+      <a href="https://github.com/sliday/daub" target="_blank" rel="noopener"><img src="https://img.shields.io/github/stars/sliday/daub?style=flat-square&color=D4A03C&label=stars" alt="GitHub stars" height="20"></a>
+      <a href="https://github.com/sliday/daub/blob/main/LICENSE" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" height="20"></a>
+    </div>
+  </section>
+
+  <!-- Testimonial -->
+  <section class="db-testimonial">
+    <div class="db-testimonial__card">
+      <img class="db-testimonial__avatar" src="case-studies/marat-avatar.jpg" alt="Marat from Dashrock" width="40" height="40">
+      <div class="db-testimonial__body">
+        <blockquote class="db-testimonial__quote">"Daub gives you the speed of a utility framework with the polish of a design system. Built two production apps with it and would reach for it again without hesitation."</blockquote>
+        <div class="db-testimonial__footer">
+          <span class="db-testimonial__name">Marat, Dashrock</span>
+          <span>&middot;</span>
+          <a class="db-testimonial__link" href="case-studies.html">Read Case Study</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Showcase / Configurator -->
+  <section class="db-showcase" id="configurator">
+    <div class="db-showcase__frame">
+      <div class="db-showcase__col">
+        <div class="db-showcase__panel">
+          <div class="db-showcase__panel-header">
+            <i data-lucide="sliders-horizontal" style="width:14px;height:14px;"></i>
+            Configure
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <span class="db-showcase__section-label">Theme</span>
+            <div class="db-theme-switcher__popover db-theme-switcher__popover--inline" id="db-config-theme-popover"></div>
+          </div>
+          <div class="db-slider" data-db-temperature>
+            <div class="db-slider__label">
+              <span>Temperature</span>
+              <span style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+                <span class="db-slider__value">Auto</span>
+                <label id="db-temp-toggle" style="position:relative;display:inline-block;width:28px;height:16px;cursor:pointer;flex-shrink:0;">
+                  <input type="checkbox" id="db-temp-auto" checked style="opacity:0;width:0;height:0;">
+                  <span style="position:absolute;inset:0;background:var(--db-warm-gray);border-radius:8px;transition:background .2s;"></span>
+                  <span style="position:absolute;top:2px;left:2px;width:12px;height:12px;background:#fff;border-radius:50%;transition:transform .2s;"></span>
+                </label>
+              </span>
+            </div>
+            <input class="db-slider__input" type="range" min="-100" max="100" value="0">
+          </div>
+          <div class="db-slider" data-db-noise>
+            <div class="db-slider__label">
+              <span>Noise</span>
+              <span class="db-slider__value">50</span>
+            </div>
+            <input class="db-slider__input" type="range" min="0" max="100" value="50">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <span class="db-showcase__section-label">Texture</span>
+            <div class="db-showcase__segments" role="group" aria-label="Texture">
+              <button data-db-texture-btn="grain" aria-pressed="true">Grain</button>
+              <button data-db-texture-btn="paper" aria-pressed="false">Paper</button>
+              <button data-db-texture-btn="metal" aria-pressed="false">Metal</button>
+              <button data-db-texture-btn="wood" aria-pressed="false">Wood</button>
+              <button data-db-texture-btn="glass" aria-pressed="false">Glass</button>
+              <button data-db-texture-btn="none" aria-pressed="false">None</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <span class="db-showcase__section-label">Color Scheme</span>
+            <div class="db-showcase__segments" role="group" aria-label="Color Scheme" id="db-scheme-group">
+              <button data-db-scheme="auto" aria-pressed="true">Auto</button>
+              <button data-db-scheme="light" aria-pressed="false">Light</button>
+              <button data-db-scheme="dark" aria-pressed="false">Dark</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <span class="db-showcase__section-label">Accent</span>
+            <div class="db-accent-picker" role="group" aria-label="Accent color">
+              <button class="db-accent-picker__dot" data-accent="#C67B5C" style="background:#C67B5C" aria-label="Terracotta" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#A0522D" style="background:#A0522D" aria-label="Sienna" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#B7410E" style="background:#B7410E" aria-label="Rust" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#CC7722" style="background:#CC7722" aria-label="Ochre" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#B8860B" style="background:#B8860B" aria-label="Goldenrod" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#6B7C3E" style="background:#6B7C3E" aria-label="Olive" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#6B8E6B" style="background:#6B8E6B" aria-label="Sage" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#5A6D8E" style="background:#5A6D8E" aria-label="Slate" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#4B5D78" style="background:#4B5D78" aria-label="Indigo" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#7B506F" style="background:#7B506F" aria-label="Plum" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#6B4423" style="background:#6B4423" aria-label="Umber" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot" data-accent="#505050" style="background:#505050" aria-label="Charcoal" aria-pressed="false"></button>
+              <button class="db-accent-picker__dot db-accent-picker__dot--reset" data-accent="reset" aria-label="Reset accent" aria-pressed="false">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="db-showcase__col">
+        <div class="db-showcase__output">
+          <div class="db-showcase__panel-header">
+            <i data-lucide="eye" style="width:14px;height:14px;"></i>
+            Preview
+          </div>
+          <div class="db-showcase__preview">
+            <div class="db-card" style="margin:0;border-radius:var(--db-radius-2);">
+              <div class="db-card__header">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="db-avatar db-avatar--sm"><span>A</span></div>
+                  <div>
+                    <div class="db-card__title" style="margin:0;font-size:0.875rem;">Alex Morgan</div>
+                    <div class="db-caption" style="margin:0;">Product Designer</div>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:var(--db-space-3) var(--db-space-4);display:flex;gap:6px;flex-wrap:wrap;">
+                <span class="db-chip db-chip--green" style="font-size:0.6875rem;">Design</span>
+                <span class="db-chip db-chip--blue" style="font-size:0.6875rem;">Systems</span>
+                <span class="db-chip db-chip--purple" style="font-size:0.6875rem;">Theme</span>
+              </div>
+              <div class="db-card__footer" style="display:flex;gap:8px;">
+                <button class="db-btn db-btn--primary db-btn--sm" style="flex:1;">Save</button>
+                <button class="db-btn db-btn--secondary db-btn--sm" style="flex:1;">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="db-showcase__snippet-label">
+            <i data-lucide="code" style="width:12px;height:12px;"></i>
+            Your snippet
+          </div>
+          <div class="db-showcase__code-wrap" id="db-snippet-wrap">
+            <pre class="db-showcase__code" id="db-config-code"><code></code></pre>
+          </div>
+          <button class="db-btn db-btn--primary db-showcase__code-copy" id="db-config-copy-cta" title="Copy to clipboard">
+            <i data-lucide="clipboard-copy" style="width:16px;height:16px;"></i>
+            Copy Config Code
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Install Options -->
+  <section class="db-quick-install">
+    <div class="db-quick-install__heading">Or grab a quick snippet</div>
+    <div class="db-quick-install__grid">
+      <div class="db-quick-install__option" onclick="navigator.clipboard.writeText(this.querySelector('.db-quick-install__code').textContent).then(function(){DAUB.toast({type:'success',title:'Copied!',duration:1500})})">
+        <button class="db-quick-install__copy" aria-label="Copy"><i data-lucide="copy" style="width:13px;height:13px;"></i></button>
+        <div class="db-quick-install__label">Classless <span class="db-badge db-badge--new">1 line</span></div>
+        <div class="db-quick-install__desc">Drop-in styling, no classes needed</div>
+        <div class="db-quick-install__code">&lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub-classless.css"&gt;</div>
+        <a class="db-quick-install__ai-link" href="/llms-compact.txt" onclick="event.stopPropagation()"><i data-lucide="bot" style="width:11px;height:11px;"></i> llms-compact.txt</a>
+      </div>
+      <div class="db-quick-install__option" onclick="navigator.clipboard.writeText(this.querySelector('.db-quick-install__code').textContent).then(function(){DAUB.toast({type:'success',title:'Copied!',duration:1500})})">
+        <button class="db-quick-install__copy" aria-label="Copy"><i data-lucide="copy" style="width:13px;height:13px;"></i></button>
+        <div class="db-quick-install__label">Full <span class="db-badge db-badge--updated">2 lines</span></div>
+        <div class="db-quick-install__desc">All 91 components + JS interactivity</div>
+        <div class="db-quick-install__code">&lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.css"&gt;
+&lt;script src="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.js"&gt;&lt;/script&gt;</div>
+        <a class="db-quick-install__ai-link" href="/llms.txt" onclick="event.stopPropagation()"><i data-lucide="bot" style="width:11px;height:11px;"></i> llms.txt</a>
+      </div>
+      <div class="db-quick-install__option" onclick="navigator.clipboard.writeText('npm install daub-react daub-ui').then(function(){DAUB.toast({type:'success',title:'Copied!',duration:1500})})">
+        <button class="db-quick-install__copy" aria-label="Copy"><i data-lucide="copy" style="width:13px;height:13px;"></i></button>
+        <div class="db-quick-install__label">React <span class="db-badge db-badge--info">TypeScript</span></div>
+        <div class="db-quick-install__desc">Typed JSX components with IDE autocomplete</div>
+        <div class="db-quick-install__code">npm install daub-react daub-ui</div>
+        <a class="db-quick-install__ai-link" href="https://www.npmjs.com/package/daub-react" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i data-lucide="package" style="width:11px;height:11px;"></i> npm</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Classless Demo Section -->
+  <section style="max-width:min(960px,100%); margin:0 auto; padding:64px 24px; text-align:center;">
+    <span class="db-badge db-badge--new">Also Available</span>
+    <h2 style="font-family:var(--db-font-heading); font-size:clamp(1.5rem,3vw,2.25rem); font-weight:700; color:var(--db-ink); margin:16px 0 8px; line-height:1.2;">Classless edition</h2>
+    <p style="font-family:var(--db-font-body); font-size:1.0625rem; color:var(--db-warm-gray); line-height:1.6; margin:0 0 32px; max-width:540px; margin-left:auto; margin-right:auto;">Don't need 91 components? Drop in <code style="background:var(--db-cream-dark); padding:2px 6px; border-radius:4px; font-size:0.9375rem;">daub-classless.css</code> and plain HTML gets beautiful typography, forms, and tables — zero classes required.</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; text-align:left; align-items:stretch;" class="db-classless-demo">
+      <div style="display:flex; flex-direction:column;">
+        <div style="font-family:var(--db-font-body); font-size:0.75rem; font-weight:600; color:var(--db-warm-gray); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Your HTML</div>
+        <pre class="db-card" style="padding:20px; font-size:0.8125rem; line-height:1.7; overflow-x:auto; margin:0; white-space:pre; tab-size:2; flex:1;"><span style="color:var(--db-warm-gray);">&lt;!-- That's it. No classes. --&gt;</span>
+&lt;link rel="stylesheet"
+      href="<span style="color:var(--db-terracotta);">daub-classless.css</span>"&gt;
+
+&lt;h2&gt;Project Status&lt;/h2&gt;
+&lt;p&gt;All systems &lt;strong&gt;operational&lt;/strong&gt;.
+   Last checked &lt;em&gt;2 min ago&lt;/em&gt;.&lt;/p&gt;
+
+&lt;details&gt;
+  &lt;summary&gt;View details&lt;/summary&gt;
+  &lt;p&gt;Uptime: 99.98% over 30 days.&lt;/p&gt;
+&lt;/details&gt;
+
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;&lt;th&gt;Service&lt;/th&gt;&lt;th&gt;Ping&lt;/th&gt;&lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;&lt;td&gt;API&lt;/td&gt;&lt;td&gt;12ms&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td&gt;CDN&lt;/td&gt;&lt;td&gt;4ms&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td&gt;DB&lt;/td&gt;&lt;td&gt;8ms&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;blockquote&gt;
+  Ship it. &amp;mdash; Every founder, ever
+&lt;/blockquote&gt;</pre>
+      </div>
+      <div style="display:flex; flex-direction:column;">
+        <div style="font-family:var(--db-font-body); font-size:0.75rem; font-weight:600; color:var(--db-warm-gray); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">What you get</div>
+        <iframe class="db-card" style="width:100%; border:none; border-radius:var(--db-card-radius); overflow:hidden; flex:1; min-height:380px;" srcdoc="<!DOCTYPE html><html><head><link rel='stylesheet' href='daub-classless.css'><style>body{padding:20px 24px;margin:0;}</style></head><body><h2 style='margin-top:0;'>Project status</h2><p>All systems <strong>operational</strong>. Last checked <em>2 min ago</em>.</p><details><summary>View details</summary><p>Uptime: 99.98% over 30 days.</p></details><table><thead><tr><th>Service</th><th>Ping</th></tr></thead><tbody><tr><td>API</td><td>12ms</td></tr><tr><td>CDN</td><td>4ms</td></tr><tr><td>DB</td><td>8ms</td></tr></tbody></table><blockquote>Ship it. &mdash; Every founder, ever</blockquote></body></html>"></iframe>
+      </div>
+    </div>
+    <p style="font-family:var(--db-font-body); font-size:0.875rem; color:var(--db-warm-gray); margin-top:20px;">Or use the full library for <strong style="color:var(--db-charcoal);">91 components</strong> with <code style="background:var(--db-cream-dark); padding:2px 6px; border-radius:4px; font-size:0.8125rem;">daub.css</code> + <code style="background:var(--db-cream-dark); padding:2px 6px; border-radius:4px; font-size:0.8125rem;">daub.js</code></p>
+  </section>
+  <style>
+    @media (max-width: 640px) {
+      .db-classless-demo { grid-template-columns: 1fr !important; }
+      .db-classless-demo pre { font-size: 0.6875rem; max-width: calc(100vw - 48px); overflow-x: auto; box-sizing: border-box; }
+      .db-classless-demo iframe { min-height: 320px !important; }
+    }
+  </style>
+
+  <!-- Built for AI Section -->
+  <section class="db-ai-section">
+    <span class="db-badge db-badge--updated">AI-Native</span>
+    <h2 class="db-ai-section__heading">Fluent in machine and human</h2>
+    <p class="db-ai-section__desc">Every component speaks both languages — structured references for AI agents, refined aesthetics for discerning humans.</p>
+    <div class="db-ai-grid">
+      <div class="db-card">
+        <div class="db-card__header">
+          <div class="db-avatar db-avatar--sm">
+            <i data-lucide="file-text" style="width:16px;height:16px;"></i>
+          </div>
+          <div>
+            <div class="db-card__title">llms.txt</div>
+            <div class="db-caption">LLM Reference</div>
+          </div>
+        </div>
+        <p class="db-card__desc">Point any LLM at <a href="https://daub.dev/llms.txt" style="color:var(--db-terracotta);">daub.dev/llms.txt</a> for full component docs with HTML snippets.</p>
+      </div>
+      <div class="db-card">
+        <div class="db-card__header">
+          <div class="db-avatar db-avatar--sm">
+            <i data-lucide="plug" style="width:16px;height:16px;"></i>
+          </div>
+          <div>
+            <div class="db-card__title">AI plugin</div>
+            <div class="db-caption">Standard Manifest</div>
+          </div>
+        </div>
+        <p class="db-card__desc">Standard <a href="https://daub.dev/.well-known/ai-plugin.json" style="color:var(--db-terracotta);">ai-plugin.json</a> manifest for AI agent discovery and integration.</p>
+      </div>
+      <div class="db-card">
+        <div class="db-card__header">
+          <div class="db-avatar db-avatar--sm">
+            <i data-lucide="terminal" style="width:16px;height:16px;"></i>
+          </div>
+          <div>
+            <div class="db-card__title">SKILL.md</div>
+            <div class="db-caption">Claude Code</div>
+          </div>
+        </div>
+        <p class="db-card__desc">Claude Code skill for instant DAUB development — components, themes, and patterns at your fingertips.</p>
+      </div>
+      <div class="db-card">
+        <div class="db-card__header">
+          <div class="db-avatar db-avatar--sm">
+            <i data-lucide="file-minus" style="width:16px;height:16px;"></i>
+          </div>
+          <div>
+            <div class="db-card__title">llms-compact.txt</div>
+            <div class="db-caption">Token-Efficient</div>
+          </div>
+        </div>
+        <p class="db-card__desc">Condensed <a href="https://daub.dev/llms-compact.txt" style="color:var(--db-terracotta);">llms-compact.txt</a> for token-constrained AI contexts.</p>
+      </div>
+      <div class="db-card">
+        <div class="db-card__header">
+          <div class="db-avatar db-avatar--sm">
+            <i data-lucide="paintbrush" style="width:16px;height:16px;"></i>
+          </div>
+          <div>
+            <div class="db-card__title">Classless CSS</div>
+            <div class="db-caption">Zero Classes</div>
+          </div>
+        </div>
+        <p class="db-card__desc">Drop in <a href="https://daub.dev/daub-classless.css" style="color:var(--db-terracotta);">daub-classless.css</a> — plain HTML looks good. No classes needed.</p>
+      </div>
+      <a href="#mcp" class="db-card" style="text-decoration:none;cursor:pointer;">
+        <div class="db-card__header">
+          <div class="db-avatar db-avatar--sm">
+            <i data-lucide="cpu" style="width:16px;height:16px;"></i>
+          </div>
+          <div>
+            <div class="db-card__title">MCP server</div>
+            <div class="db-caption">AI Integration</div>
+          </div>
+        </div>
+        <p class="db-card__desc">Generate UIs from any AI assistant. <span style="color:var(--db-terracotta);">Learn more &darr;</span></p>
+      </a>
+    </div>
+  </section>
+
+  <!-- MCP Server Section -->
+  <section class="db-mcp-section" id="mcp">
+    <span class="db-badge db-badge--new">New</span>
+    <h2 class="db-mcp-section__heading">MCP server</h2>
+    <p class="db-mcp-section__desc">A remote <a href="https://modelcontextprotocol.io" style="color:var(--db-terracotta);">Model Context Protocol</a> server on Cloudflare's edge. Connect your AI assistant and generate complete DAUB interfaces through natural conversation. No API key required.</p>
+
+    <div class="db-mcp-install">
+      <div class="db-mcp-install__label">Add to Claude Code, Cursor, or any MCP client</div>
+      <div class="db-mcp-install__cmd">
+        <code>claude mcp add daub --transport http https://daub.dev/api/mcp</code>
+        <button class="db-hero__copy" aria-label="Copy to clipboard" onclick="navigator.clipboard.writeText('claude mcp add daub --transport http https://daub.dev/api/mcp').then(function(){DAUB.toast({type:'success',title:'Copied!',message:'MCP command copied to clipboard.',duration:2000})})">
+          <i data-lucide="copy" style="width:14px;height:14px;"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="db-mcp-tools">
+      <div class="db-mcp-tool">
+        <div class="db-mcp-tool__icon"><i data-lucide="wand-2" style="width:18px;height:18px;"></i></div>
+        <div>
+          <div class="db-mcp-tool__name">generate_ui</div>
+          <div class="db-mcp-tool__desc">Describe what you want in plain English. The AI generates a complete DAUB spec with layouts, components, sample data, and theme.</div>
+        </div>
+      </div>
+      <div class="db-mcp-tool">
+        <div class="db-mcp-tool__icon"><i data-lucide="book-open" style="width:18px;height:18px;"></i></div>
+        <div>
+          <div class="db-mcp-tool__name">get_component_catalog</div>
+          <div class="db-mcp-tool__desc">Browse supported spec components, their props, categories, themes, and the spec format.</div>
+        </div>
+      </div>
+      <div class="db-mcp-tool">
+        <div class="db-mcp-tool__icon"><i data-lucide="check-circle" style="width:18px;height:18px;"></i></div>
+        <div>
+          <div class="db-mcp-tool__name">validate_spec</div>
+          <div class="db-mcp-tool__desc">Check a spec for missing children, unknown component types, broken references. Returns detailed issue reports.</div>
+        </div>
+      </div>
+      <div class="db-mcp-tool">
+        <div class="db-mcp-tool__icon"><i data-lucide="eye" style="width:18px;height:18px;"></i></div>
+        <div>
+          <div class="db-mcp-tool__name">render_spec</div>
+          <div class="db-mcp-tool__desc">Get a live playground preview URL for any spec — open in a browser to see the rendered result instantly.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="db-mcp-example">
+      <div class="db-mcp-example__header">
+        <div class="db-mcp-example__label">Example conversation</div>
+        <a class="db-btn db-btn--ghost db-btn--sm" href="chat-demo.html">Try chat <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+      </div>
+      <div class="db-message-scroller" data-db-scroll-position="start" data-db-auto-scroll="false">
+        <div class="db-message-scroller__viewport db-scroll-fade" tabindex="0" aria-label="MCP example conversation">
+          <div class="db-message-scroller__content" role="log" aria-label="Example messages">
+            <div class="db-message-scroller__item" data-db-message-id="mcp-settings-request">
+              <div class="db-message db-message--end"><div class="db-message__content">
+                <div class="db-message__header">You</div>
+                <div class="db-bubble"><div class="db-bubble__content">Build me a settings page with a sidebar, profile card with avatar and form fields, and notification toggles. Use the nord theme.</div></div>
+              </div></div>
+            </div>
+            <div class="db-message-scroller__item" data-db-message-id="mcp-settings-reply">
+              <div class="db-message"><div class="db-message__avatar"><span class="db-avatar" aria-label="DAUB Assistant">D</span></div><div class="db-message__content">
+                <div class="db-message__header">DAUB Assistant</div>
+                <div class="db-marker"><span class="db-marker__icon"><i data-lucide="wand-2" aria-hidden="true"></i></span><span class="db-marker__content"><code>generate_ui</code></span></div>
+                <div class="db-bubble db-bubble--ghost"><div class="db-bubble__content"><p>Generated a 12-element spec with Sidebar, Card, Avatar, Field, and Switch components. Theme: nord-light.</p><a href="playground.html">Open in Playground</a></div></div>
+              </div></div>
+            </div>
+            <div class="db-message-scroller__item" data-db-message-id="mcp-danger-request">
+              <div class="db-message db-message--end"><div class="db-message__content">
+                <div class="db-message__header">You</div>
+                <div class="db-bubble"><div class="db-bubble__content">Add a danger zone with a delete account button that opens an alert dialog.</div></div>
+              </div></div>
+            </div>
+            <div class="db-message-scroller__item" data-db-message-id="mcp-danger-reply">
+              <div class="db-message"><div class="db-message__avatar"><span class="db-avatar" aria-label="DAUB Assistant">D</span></div><div class="db-message__content">
+                <div class="db-message__header">DAUB Assistant</div>
+                <div class="db-marker"><span class="db-marker__icon"><i data-lucide="wand-2" aria-hidden="true"></i></span><span class="db-marker__content"><code>generate_ui</code></span></div>
+                <div class="db-bubble db-bubble--ghost"><div class="db-bubble__content">Updated spec: added danger-card with AlertDialog overlay. Now 16 elements. Validation: all clear.</div></div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+        <button class="db-message-scroller__button" data-db-scroll-to="end" type="button" aria-label="Scroll to latest message" title="Scroll to latest message"><i data-lucide="arrow-down" aria-hidden="true"></i></button>
+      </div>
+      <form class="db-chat-composer" id="mcp-composer" data-db-chat-options='{"placeholder":"Describe your next interface...","models":[{"id":"playground","label":"DAUB Playground"}],"capabilities":{"queue":false,"steer":false,"attachments":false,"folders":false,"approval":false},"actions":[{"id":"full-chat","label":"Open full chat","icon":"messages-square"}]}'></form>
+    </div>
+  </section>
+
+  <!-- Use with AI Section -->
+  <section class="db-use-ai" id="use-with-ai">
+    <span class="db-badge" style="margin:0 auto 12px;display:table;">Sample Prompts</span>
+    <h2 class="db-use-ai__heading">Copy. Paste. Ship.</h2>
+    <p class="db-use-ai__sub">Drop these prompts into Claude, ChatGPT, Cursor, or any AI assistant. Each produces a complete, working HTML page.</p>
+
+    <div class="db-prompt-grid">
+
+      <div class="db-prompt-card">
+        <p class="db-prompt-card__label">Dashboard</p>
+        <p class="db-prompt-card__title">Analytics dashboard</p>
+        <p class="db-prompt-card__text">Build an analytics dashboard using DAUB (daub.dev/daub.css + daub.dev/daub.js). Include a sidebar with navigation, three stat cards, a sortable data table, and a bar chart. Use the dark theme. Fetch docs from daub.dev/llms.txt first.</p>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <a class="db-btn db-btn--sm db-btn--primary" href="#" onclick="var t=this.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent;window.location.href='playground.html?prompt='+encodeURIComponent(t);return false;">
+            <i data-lucide="play" style="width:12px;height:12px;"></i> Code This
+          </a>
+          <button class="db-btn db-btn--sm db-btn--ghost" onclick="var b=this;navigator.clipboard.writeText(b.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent).then(function(){dbCopyFeedback(b,'Copy Prompt')})">
+            <i data-lucide="copy" style="width:12px;height:12px;"></i> Copy Prompt
+          </button>
+        </div>
+      </div>
+
+      <div class="db-prompt-card">
+        <p class="db-prompt-card__label">Settings</p>
+        <p class="db-prompt-card__title">User settings page</p>
+        <p class="db-prompt-card__text">Create a user settings page with DAUB components. Profile section with avatar and text fields, notifications section with switches, danger zone with delete button that opens an alert dialog. Use the nord theme. Fetch docs from daub.dev/llms.txt first.</p>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <a class="db-btn db-btn--sm db-btn--primary" href="#" onclick="var t=this.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent;window.location.href='playground.html?prompt='+encodeURIComponent(t);return false;">
+            <i data-lucide="play" style="width:12px;height:12px;"></i> Code This
+          </a>
+          <button class="db-btn db-btn--sm db-btn--ghost" onclick="var b=this;navigator.clipboard.writeText(b.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent).then(function(){dbCopyFeedback(b,'Copy Prompt')})">
+            <i data-lucide="copy" style="width:12px;height:12px;"></i> Copy Prompt
+          </button>
+        </div>
+      </div>
+
+      <div class="db-prompt-card">
+        <p class="db-prompt-card__label">E-Commerce</p>
+        <p class="db-prompt-card__title">Product catalog</p>
+        <p class="db-prompt-card__text">Build a responsive product catalog with DAUB. Use db-card--media in a db-grid--3 layout, chip filters with data-db-chip-toggle, pagination at the bottom, and a navbar with search. Theme: catppuccin. Fetch docs from daub.dev/llms.txt first.</p>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <a class="db-btn db-btn--sm db-btn--primary" href="#" onclick="var t=this.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent;window.location.href='playground.html?prompt='+encodeURIComponent(t);return false;">
+            <i data-lucide="play" style="width:12px;height:12px;"></i> Code This
+          </a>
+          <button class="db-btn db-btn--sm db-btn--ghost" onclick="var b=this;navigator.clipboard.writeText(b.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent).then(function(){dbCopyFeedback(b,'Copy Prompt')})">
+            <i data-lucide="copy" style="width:12px;height:12px;"></i> Copy Prompt
+          </button>
+        </div>
+      </div>
+
+      <div class="db-prompt-card">
+        <p class="db-prompt-card__label">Productivity</p>
+        <p class="db-prompt-card__title">Task board</p>
+        <p class="db-prompt-card__text">Create a Kanban task board using DAUB. Three columns (To Do, In Progress, Done) with db-card components in a db-grid--3. Each card has title, badge for priority, avatar for assignee. Add command palette (Ctrl+K). Theme: tokyo-night. Fetch docs from daub.dev/llms.txt first.</p>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <a class="db-btn db-btn--sm db-btn--primary" href="#" onclick="var t=this.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent;window.location.href='playground.html?prompt='+encodeURIComponent(t);return false;">
+            <i data-lucide="play" style="width:12px;height:12px;"></i> Code This
+          </a>
+          <button class="db-btn db-btn--sm db-btn--ghost" onclick="var b=this;navigator.clipboard.writeText(b.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent).then(function(){dbCopyFeedback(b,'Copy Prompt')})">
+            <i data-lucide="copy" style="width:12px;height:12px;"></i> Copy Prompt
+          </button>
+        </div>
+      </div>
+
+      <div class="db-prompt-card">
+        <p class="db-prompt-card__label">Content</p>
+        <p class="db-prompt-card__title">Blog reading page</p>
+        <p class="db-prompt-card__text">Build a blog reading page with DAUB. Use db-prose for the article, db-breadcrumbs for navigation, author card with db-avatar, table of contents sidebar using db-nav-menu. Theme: github. Include theme switcher. Fetch docs from daub.dev/llms.txt first.</p>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <a class="db-btn db-btn--sm db-btn--primary" href="#" onclick="var t=this.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent;window.location.href='playground.html?prompt='+encodeURIComponent(t);return false;">
+            <i data-lucide="play" style="width:12px;height:12px;"></i> Code This
+          </a>
+          <button class="db-btn db-btn--sm db-btn--ghost" onclick="var b=this;navigator.clipboard.writeText(b.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent).then(function(){dbCopyFeedback(b,'Copy Prompt')})">
+            <i data-lucide="copy" style="width:12px;height:12px;"></i> Copy Prompt
+          </button>
+        </div>
+      </div>
+
+      <div class="db-prompt-card">
+        <p class="db-prompt-card__label">Onboarding</p>
+        <p class="db-prompt-card__title">Multi-step form</p>
+        <p class="db-prompt-card__text">Create a multi-step onboarding form with DAUB's stepper component. Step 1: account info (fields). Step 2: preferences (checkboxes, switches). Step 3: confirmation (summary card). Use db-stepper for progress, buttons to navigate. Theme: ember-light. Fetch docs from daub.dev/llms.txt first.</p>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <a class="db-btn db-btn--sm db-btn--primary" href="#" onclick="var t=this.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent;window.location.href='playground.html?prompt='+encodeURIComponent(t);return false;">
+            <i data-lucide="play" style="width:12px;height:12px;"></i> Code This
+          </a>
+          <button class="db-btn db-btn--sm db-btn--ghost" onclick="var b=this;navigator.clipboard.writeText(b.closest('.db-prompt-card').querySelector('.db-prompt-card__text').textContent).then(function(){dbCopyFeedback(b,'Copy Prompt')})">
+            <i data-lucide="copy" style="width:12px;height:12px;"></i> Copy Prompt
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="db-use-ai__example">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <p class="db-use-ai__example-label">Minimal Example</p>
+          <p class="db-use-ai__example-title" style="margin-bottom:0">Analytics Dashboard in ~40 Lines</p>
+        </div>
+        <div class="db-toggle-group" id="example-tabs">
+            <button class="db-toggle" aria-pressed="true" onclick="dbExampleTab('preview',this)">Preview</button>
+            <button class="db-toggle" aria-pressed="false" onclick="dbExampleTab('code',this)">Code</button>
+        </div>
+      </div>
+
+      <!-- Preview tab -->
+      <div id="example-preview" class="db-surface--raised" style="border-radius:var(--db-radius-3);overflow-x:auto;overflow-y:hidden;max-width:720px;margin:0 auto;">
+        <nav class="db-navbar">
+          <a class="db-navbar__brand" href="#">Acme</a>
+          <div class="db-navbar__spacer"></div>
+          <div class="db-navbar__actions">
+            <div class="db-avatar db-avatar--sm">JD</div>
+          </div>
+        </nav>
+        <main style="padding:24px 24px 28px">
+          <div class="db-grid db-grid--3 db-gap-4 db-mb-5">
+            <div class="db-card" style="padding:var(--db-space-4)">
+              <div class="db-stat">
+                <span class="db-stat__label">Revenue</span>
+                <span class="db-stat__value">$12,450</span>
+                <span class="db-stat__change db-stat__change--up">&uarr; 12.5%</span>
+              </div>
+            </div>
+            <div class="db-card" style="padding:var(--db-space-4)">
+              <div class="db-stat">
+                <span class="db-stat__label">Users</span>
+                <span class="db-stat__value">1,284</span>
+                <span class="db-stat__change db-stat__change--up">&uarr; 4.3%</span>
+              </div>
+            </div>
+            <div class="db-card" style="padding:var(--db-space-4)">
+              <div class="db-stat">
+                <span class="db-stat__label">Orders</span>
+                <span class="db-stat__value">342</span>
+                <span class="db-stat__change db-stat__change--down">&darr; 2.1%</span>
+              </div>
+            </div>
+          </div>
+          <div class="db-card">
+            <div class="db-card__header">
+              <h3 class="db-card__title">Recent orders</h3>
+              <span class="db-badge">Today</span>
+            </div>
+            <table class="db-table">
+              <thead><tr><th>Customer</th><th class="db-numeric">Amount</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Alice Park</td><td class="db-numeric">$120</td><td><span class="db-badge db-badge--new">Paid</span></td></tr>
+                <tr><td>Bob Chen</td><td class="db-numeric">$85</td><td><span class="db-badge db-badge--warning">Pending</span></td></tr>
+                <tr><td>Carol Davis</td><td class="db-numeric">$240</td><td><span class="db-badge db-badge--new">Paid</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </main>
+      </div>
+
+      <!-- Code tab -->
+      <div id="example-code" style="display:none;position:relative">
+        <button class="db-btn db-btn--sm db-btn--ghost" style="position:absolute;top:8px;right:8px;color:var(--db-cream);z-index:1" onclick="var b=this;navigator.clipboard.writeText(b.closest('.db-use-ai__example').querySelector('.db-use-ai__code').textContent).then(function(){dbCopyFeedback(b,'Copy Code')})">
+          <i data-lucide="copy" style="width:12px;height:12px;"></i> Copy Code
+        </button>
+        <pre class="db-use-ai__code">&lt;!DOCTYPE html&gt;
+&lt;html data-theme="light"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+  &lt;title&gt;Dashboard&lt;/title&gt;
+  &lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.css"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;nav class="db-navbar"&gt;
+    &lt;a class="db-navbar__brand" href="/"&gt;Acme&lt;/a&gt;
+    &lt;div class="db-navbar__spacer"&gt;&lt;/div&gt;
+    &lt;div class="db-navbar__actions"&gt;
+      &lt;div class="db-avatar db-avatar--sm"&gt;JD&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/nav&gt;
+  &lt;main class="db-container" style="padding:var(--db-space-6) var(--db-space-4)"&gt;
+    &lt;div class="db-grid db-grid--3 db-gap-4 db-mb-5"&gt;
+      &lt;div class="db-card" style="padding:var(--db-space-4)"&gt;
+        &lt;div class="db-stat"&gt;
+          &lt;span class="db-stat__label"&gt;Revenue&lt;/span&gt;
+          &lt;span class="db-stat__value"&gt;$12,450&lt;/span&gt;
+          &lt;span class="db-stat__change db-stat__change--up"&gt;&amp;uarr; 12.5%&lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class="db-card" style="padding:var(--db-space-4)"&gt;
+        &lt;div class="db-stat"&gt;
+          &lt;span class="db-stat__label"&gt;Users&lt;/span&gt;
+          &lt;span class="db-stat__value"&gt;1,284&lt;/span&gt;
+          &lt;span class="db-stat__change db-stat__change--up"&gt;&amp;uarr; 4.3%&lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class="db-card" style="padding:var(--db-space-4)"&gt;
+        &lt;div class="db-stat"&gt;
+          &lt;span class="db-stat__label"&gt;Orders&lt;/span&gt;
+          &lt;span class="db-stat__value"&gt;342&lt;/span&gt;
+          &lt;span class="db-stat__change db-stat__change--down"&gt;&amp;darr; 2.1%&lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class="db-card"&gt;
+      &lt;div class="db-card__header"&gt;
+        &lt;h3 class="db-card__title"&gt;Recent orders&lt;/h3&gt;
+        &lt;span class="db-badge"&gt;Today&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;table class="db-table"&gt;
+        &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Customer&lt;/th&gt;&lt;th class="db-numeric"&gt;Amount&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+        &lt;tbody&gt;
+          &lt;tr&gt;&lt;td&gt;Alice Park&lt;/td&gt;&lt;td class="db-numeric"&gt;$120&lt;/td&gt;&lt;td&gt;&lt;span class="db-badge db-badge--new"&gt;Paid&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+          &lt;tr&gt;&lt;td&gt;Bob Chen&lt;/td&gt;&lt;td class="db-numeric"&gt;$85&lt;/td&gt;&lt;td&gt;&lt;span class="db-badge db-badge--warning"&gt;Pending&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+          &lt;tr&gt;&lt;td&gt;Carol Davis&lt;/td&gt;&lt;td class="db-numeric"&gt;$240&lt;/td&gt;&lt;td&gt;&lt;span class="db-badge db-badge--new"&gt;Paid&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+        &lt;/tbody&gt;
+      &lt;/table&gt;
+    &lt;/div&gt;
+  &lt;/main&gt;
+  &lt;div class="db-theme-switcher"&gt;&lt;/div&gt;
+  &lt;script src="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.js"&gt;&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+      </div>
+      <div style="text-align:center;margin-top:32px;">
+        <p style="font-family:var(--db-font-ui);color:var(--db-warm-gray);font-size:0.875rem;margin-bottom:12px;">
+          Powered by <a href="https://github.com/nichochar/json-render" target="_blank" rel="noopener" style="color:var(--db-terracotta);text-decoration:none;font-weight:600;">json-render</a> flat spec format &middot; compatible with <a href="https://github.com/wandb/openui" target="_blank" rel="noopener" style="color:var(--db-terracotta);text-decoration:none;font-weight:600;">OpenUI</a>
+        </p>
+        <a href="playground.html" class="db-btn db-btn--primary">
+          <i data-lucide="sparkles" style="width:16px;height:16px;"></i> Try the Playground — It's Free
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Built with DAUB -->
+  <section style="max-width:800px;margin:0 auto;padding:64px 24px 48px;">
+    <h2 style="font-family:var(--db-font-heading);text-align:center;font-size:clamp(1.6rem,3vw,2.2rem);margin:0 0 8px;color:var(--db-color-text);">Built with DAUB</h2>
+    <p style="text-align:center;color:var(--db-color-text-secondary);font-size:1rem;margin:0 0 32px;font-family:var(--db-font-ui);">Real products shipping with DAUB in production</p>
+
+    <div style="background:var(--db-color-surface);border:1px solid var(--db-color-border);border-radius:var(--db-radius-3);overflow:hidden;">
+      <div style="padding:0;">
+        <img src="case-studies/dashrock-overview.jpg" alt="Dashrock — AWS Bedrock analytics dashboard built with DAUB" style="width:100%;display:block;border-bottom:1px solid var(--db-color-border);" loading="lazy">
+      </div>
+      <div style="padding:24px 28px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <h3 style="font-family:var(--db-font-heading);font-size:1.25rem;margin:0;color:var(--db-color-text);">Dashrock</h3>
+          <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:20px;background:color-mix(in srgb, var(--db-color-success) 15%, transparent);color:var(--db-color-success);">Production</span>
+        </div>
+        <p style="font-family:var(--db-font-ui);color:var(--db-color-text-secondary);font-size:0.95rem;line-height:1.6;margin:0 0 16px;">
+          Open-source AWS Bedrock analytics dashboard. Track usage, cost, and performance by team and app. Deploys in ~3 minutes via SST.
+        </p>
+        <blockquote style="margin:0 0 16px;padding:12px 16px;background:color-mix(in srgb, var(--db-terracotta) 8%, transparent);border-left:3px solid var(--db-terracotta);border-radius:0 var(--db-radius-2) var(--db-radius-2) 0;font-style:italic;font-size:0.9rem;color:var(--db-color-text);line-height:1.55;">
+          "Built dashrock.app, needed to beautifully collect stats on Bedrock, separate respect to @staskulesh for the UI tool."
+          <cite style="display:block;margin-top:8px;font-style:normal;font-size:0.8rem;color:var(--db-color-text-muted);">— <a href="https://x.com/Marat_Galiev" target="_blank" rel="noopener" style="color:var(--db-terracotta);text-decoration:none;">@Marat_Galiev</a>, Mar 9, 2026</cite>
+        </blockquote>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:var(--db-color-bg);border:1px solid var(--db-color-border);color:var(--db-color-text-secondary);font-family:var(--db-font-ui);">Next.js</span>
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:var(--db-color-bg);border:1px solid var(--db-color-border);color:var(--db-color-text-secondary);font-family:var(--db-font-ui);">SST</span>
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:var(--db-color-bg);border:1px solid var(--db-color-border);color:var(--db-color-text-secondary);font-family:var(--db-font-ui);">Chart.js</span>
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:color-mix(in srgb, var(--db-terracotta) 12%, transparent);border:1px solid color-mix(in srgb, var(--db-terracotta) 30%, transparent);color:var(--db-terracotta);font-weight:600;font-family:var(--db-font-ui);">DAUB</span>
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:var(--db-color-bg);border:1px solid var(--db-color-border);color:var(--db-color-text-secondary);font-family:var(--db-font-ui);">AWS</span>
+        </div>
+        <a href="case-studies.html" style="display:inline-flex;align-items:center;gap:6px;font-family:var(--db-font-ui);font-size:0.875rem;font-weight:600;color:var(--db-terracotta);text-decoration:none;">
+          Read case study <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>
+        </a>
+      </div>
+    </div>
+    <div style="background:var(--db-color-surface);border:1px solid var(--db-color-border);border-radius:var(--db-radius-3);overflow:hidden;margin-top:24px;">
+      <div style="padding:0;">
+        <img src="case-studies/tamp-terminal.jpg" alt="Tamp — Claude API token compression proxy built with DAUB" style="width:100%;display:block;border-bottom:1px solid var(--db-color-border);" loading="lazy">
+      </div>
+      <div style="padding:24px 28px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <h3 style="font-family:var(--db-font-heading);font-size:1.25rem;margin:0;color:var(--db-color-text);">Tamp</h3>
+          <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:20px;background:color-mix(in srgb, var(--db-color-success) 15%, transparent);color:var(--db-color-success);">Production</span>
+        </div>
+        <p style="font-family:var(--db-font-ui);color:var(--db-color-text-secondary);font-size:0.95rem;line-height:1.6;margin:0 0 16px;">
+          Transparent HTTP proxy that compresses Claude API requests in real-time. 3-stage pipeline (minify, TOON, LLMLingua) saves up to 50% on input tokens. One command: <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">npx @sliday/tamp</code>
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:var(--db-color-bg);border:1px solid var(--db-color-border);color:var(--db-color-text-secondary);font-family:var(--db-font-ui);">Node.js</span>
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:var(--db-color-bg);border:1px solid var(--db-color-border);color:var(--db-color-text-secondary);font-family:var(--db-font-ui);">TOON</span>
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:var(--db-color-bg);border:1px solid var(--db-color-border);color:var(--db-color-text-secondary);font-family:var(--db-font-ui);">LLMLingua-2</span>
+          <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:color-mix(in srgb, var(--db-terracotta) 12%, transparent);border:1px solid color-mix(in srgb, var(--db-terracotta) 30%, transparent);color:var(--db-terracotta);font-weight:600;font-family:var(--db-font-ui);">DAUB</span>
+        </div>
+        <a href="case-studies.html#tamp" style="display:inline-flex;align-items:center;gap:6px;font-family:var(--db-font-ui);font-size:0.875rem;font-weight:600;color:var(--db-terracotta);text-decoration:none;">
+          Read case study <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Component Index -->
+  <div class="db-comp-index" id="components-index">
+    <a href="#foundations">Foundations</a>
+    <a href="#controls">Controls</a>
+    <a href="#navigation">Navigation</a>
+    <a href="#data-display">Data Display</a>
+    <a href="#feedback">Feedback</a>
+    <a href="#overlays">Overlays</a>
+    <a href="#complex">Complex</a>
+    <a href="chat-demo.html">Chat</a>
+    <a href="#v230">v2.3</a>
+  </div>
+
+  <div class="db-container">
+
+    <!-- ============================================================
+         1. FOUNDATIONS
+         ============================================================ -->
+    <div class="demo-section" id="foundations">
+      <h2 class="demo-section__title">1. Foundations — surfaces &amp; elevation</h2>
+
+      <div class="demo-grid">
+        <div class="demo-surface-box db-surface">Base Surface</div>
+        <div class="demo-surface-box db-surface--raised">Raised Surface</div>
+        <div class="demo-surface-box db-surface--inset">Inset Surface</div>
+        <div class="demo-surface-box db-surface--pressed">Pressed Surface</div>
+      </div>
+
+      <div class="db-mt-6">
+        <div class="demo-label">Elevation scale</div>
+        <div class="demo-row">
+          <div class="demo-surface-box db-surface db-elevation-1" style="border-radius:12px;">Elevation 1</div>
+          <div class="demo-surface-box db-surface db-elevation-2" style="border-radius:12px;">Elevation 2</div>
+          <div class="demo-surface-box db-surface db-elevation-3" style="border-radius:12px;">Elevation 3</div>
+        </div>
+      </div>
+
+      <div class="db-mt-5">
+        <div class="demo-label">Typography</div>
+        <div class="db-h1">Heading 1</div>
+        <div class="db-h2">Heading 2</div>
+        <div class="db-h3">Heading 3</div>
+        <div class="db-h4">Heading 4</div>
+        <p class="db-body db-mt-3">Body text — The quick brown fox jumps over the lazy dog. Charter at 16px with 1.6 line height gives comfortable reading.</p>
+        <p class="db-caption db-mt-2">Caption text — System UI sans-serif for labels and small text.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         2. CONTROLS
+         ============================================================ -->
+    <div class="demo-section" id="controls">
+      <h2 class="demo-section__title">2. Controls — buttons</h2>
+
+      <div class="demo-row">
+        <button class="db-btn db-btn--primary">
+          <i data-lucide="plus" style="width:16px;height:16px;"></i>
+          Primary
+        </button>
+        <button class="db-btn db-btn--primary db-btn--pressed">Pressed</button>
+        <button class="db-btn db-btn--secondary">Secondary</button>
+        <button class="db-btn db-btn--secondary" disabled>Disabled</button>
+        <button class="db-btn db-btn--primary db-btn--loading">Loading</button>
+      </div>
+
+      <div class="demo-row">
+        <button class="db-btn db-btn--primary db-btn--sm">Small</button>
+        <button class="db-btn db-btn--primary">Default</button>
+        <button class="db-btn db-btn--primary db-btn--lg">Large</button>
+        <button class="db-btn db-btn--secondary db-btn--icon" aria-label="Settings">
+          <i data-lucide="settings" style="width:18px;height:18px;"></i>
+        </button>
+      </div>
+
+      <div class="demo-row">
+        <button class="db-btn db-btn--ghost">Ghost</button>
+        <button class="db-btn db-btn--icon db-btn--ghost" aria-label="Close">
+          <i data-lucide="x" style="width:18px;height:18px;"></i>
+        </button>
+        <button class="db-btn db-btn--icon db-btn--icon-danger" aria-label="Delete">
+          <i data-lucide="trash-2" style="width:18px;height:18px;"></i>
+        </button>
+        <button class="db-btn db-btn--icon db-btn--icon-success" aria-label="Approve">
+          <i data-lucide="check" style="width:18px;height:18px;"></i>
+        </button>
+        <button class="db-btn db-btn--icon db-btn--icon-accent" aria-label="Favorite">
+          <i data-lucide="heart" style="width:18px;height:18px;"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">2b. Controls — text fields</h2>
+
+      <div class="demo-grid">
+        <div class="db-field">
+          <label class="db-field__label" for="demo-name">Full Name</label>
+          <input class="db-field__input" id="demo-name" type="text" placeholder="Enter your name" aria-label="Demo: full name field">
+          <span class="db-field__helper">Your display name</span>
+        </div>
+        <div class="db-field">
+          <label class="db-field__label" for="demo-focus">Focused Field</label>
+          <input class="db-field__input" id="demo-focus" type="text" value="Warm terracotta glow" aria-label="Demo: focused field">
+        </div>
+        <div class="db-field db-field--error">
+          <label class="db-field__label" for="demo-error">Email</label>
+          <input class="db-field__input" id="demo-error" type="email" value="not-valid" aria-label="Demo: email field in error state">
+          <span class="db-field__helper">Please enter a valid email</span>
+        </div>
+        <div class="db-field">
+          <label class="db-field__label" for="demo-disabled">Disabled</label>
+          <input class="db-field__input" id="demo-disabled" type="text" value="Read only" disabled aria-label="Demo: disabled field">
+        </div>
+      </div>
+
+      <div class="db-mt-5" style="max-width:min(480px,100%);">
+        <div class="db-field">
+          <label class="db-field__label" for="demo-textarea">Message</label>
+          <textarea class="db-field__input" id="demo-textarea" placeholder="Write your message here..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">2c. Controls — checkbox, radio, switch, slider</h2>
+
+      <div class="demo-grid">
+        <div class="demo-col">
+          <div class="demo-label">Checkboxes</div>
+          <label class="db-checkbox">
+            <input class="db-checkbox__input" type="checkbox" checked>
+            <span class="db-checkbox__box">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+            Enable notifications
+          </label>
+          <label class="db-checkbox">
+            <input class="db-checkbox__input" type="checkbox">
+            <span class="db-checkbox__box">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+            Dark mode
+          </label>
+          <label class="db-checkbox">
+            <input class="db-checkbox__input" type="checkbox" checked>
+            <span class="db-checkbox__box">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+            Auto-save
+          </label>
+        </div>
+
+        <div class="demo-col">
+          <div class="demo-label">Radio group</div>
+          <div class="db-radio-group">
+            <label class="db-radio">
+              <input class="db-radio__input" type="radio" name="demo-radio" value="sm" checked>
+              <span class="db-radio__circle"></span>
+              Small
+            </label>
+            <label class="db-radio">
+              <input class="db-radio__input" type="radio" name="demo-radio" value="md">
+              <span class="db-radio__circle"></span>
+              Medium
+            </label>
+            <label class="db-radio">
+              <input class="db-radio__input" type="radio" name="demo-radio" value="lg">
+              <span class="db-radio__circle"></span>
+              Large
+            </label>
+          </div>
+        </div>
+
+        <div class="demo-col">
+          <div class="demo-label">Switches</div>
+          <div class="db-switch" aria-checked="true" aria-label="Wi-Fi">
+            <span class="db-switch__track"><span class="db-switch__thumb"></span></span>
+            Wi-Fi
+          </div>
+          <div class="db-switch" aria-checked="false" aria-label="Bluetooth">
+            <span class="db-switch__track"><span class="db-switch__thumb"></span></span>
+            Bluetooth
+          </div>
+          <div class="db-switch" aria-checked="true" aria-label="Location">
+            <span class="db-switch__track"><span class="db-switch__thumb"></span></span>
+            Location
+          </div>
+        </div>
+      </div>
+
+      <div class="db-mt-5" style="max-width:min(400px,100%);">
+        <div class="demo-label">Slider</div>
+        <div class="db-slider">
+          <div class="db-slider__label">
+            <span>Volume</span>
+            <span class="db-slider__value">65</span>
+          </div>
+          <input class="db-slider__input" type="range" min="0" max="100" value="65">
+        </div>
+        <div class="db-slider db-mt-4">
+          <div class="db-slider__label">
+            <span>Brightness</span>
+            <span class="db-slider__value">40</span>
+          </div>
+          <input class="db-slider__input" type="range" min="0" max="100" value="40">
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         3. NAVIGATION
+         ============================================================ -->
+    <div class="demo-section" id="navigation">
+      <h2 class="demo-section__title">3. Navigation — tabs</h2>
+
+      <div class="db-tabs">
+        <div class="db-tabs__list">
+          <button class="db-tabs__tab" aria-selected="true">Overview</button>
+          <button class="db-tabs__tab">Features</button>
+          <button class="db-tabs__tab">Pricing</button>
+        </div>
+        <div class="db-tabs__panel">
+          <p class="db-body">Welcome to the overview panel. DAUB is a warm, tactile UI kit built with care for the 8px grid, organic typography, and the joy of physical materials translated to screen.</p>
+        </div>
+        <div class="db-tabs__panel">
+          <p class="db-body">91 production-ready components. Vanilla JS + CSS. No build step required. Accessible by default with full keyboard navigation and ARIA attributes.</p>
+        </div>
+        <div class="db-tabs__panel">
+          <p class="db-body">Free and open source. Drop into any project with just two files: <code>daub.css</code> and <code>daub.js</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">3b. Navigation — breadcrumbs</h2>
+
+      <nav aria-label="Breadcrumb">
+        <ol class="db-breadcrumbs">
+          <li><a href="#">Home</a></li>
+          <li><a href="#">Components</a></li>
+          <li><a href="#">Navigation</a></li>
+          <li><span aria-current="page">Breadcrumbs</span></li>
+        </ol>
+      </nav>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">3c. Navigation — pagination</h2>
+
+      <nav class="db-pagination" aria-label="Pagination">
+        <button class="db-pagination__btn" disabled aria-label="Previous page">
+          <i data-lucide="chevron-left" style="width:16px;height:16px;"></i>
+        </button>
+        <button class="db-pagination__btn" aria-current="page">1</button>
+        <button class="db-pagination__btn">2</button>
+        <button class="db-pagination__btn">3</button>
+        <span class="db-pagination__ellipsis">&hellip;</span>
+        <button class="db-pagination__btn">12</button>
+        <button class="db-pagination__btn" aria-label="Next page">
+          <i data-lucide="chevron-right" style="width:16px;height:16px;"></i>
+        </button>
+      </nav>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">3d. Navigation — stepper</h2>
+
+      <div class="db-stepper">
+        <div class="db-stepper__step db-stepper__step--completed">
+          <div class="db-stepper__indicator">
+            <i data-lucide="check" style="width:16px;height:16px;"></i>
+          </div>
+          <span class="db-stepper__label">Account</span>
+        </div>
+        <div class="db-stepper__step db-stepper__step--completed">
+          <div class="db-stepper__indicator">
+            <i data-lucide="check" style="width:16px;height:16px;"></i>
+          </div>
+          <span class="db-stepper__label">Profile</span>
+        </div>
+        <div class="db-stepper__step db-stepper__step--active">
+          <div class="db-stepper__indicator">3</div>
+          <span class="db-stepper__label">Settings</span>
+        </div>
+        <div class="db-stepper__step db-stepper__step--pending">
+          <div class="db-stepper__indicator">4</div>
+          <span class="db-stepper__label">Review</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">3e. Navigation — bottom nav (mobile)</h2>
+      <div class="db-surface--raised" style="position:relative; height:72px; overflow:hidden; border-radius:var(--db-radius-3);">
+        <nav class="db-bottom-nav db-bottom-nav--always" style="position:absolute;">
+          <a class="db-bottom-nav__item db-bottom-nav__item--active" href="#">
+            <i data-lucide="home" style="width:20px;height:20px;"></i>
+            Home
+          </a>
+          <a class="db-bottom-nav__item" href="#">
+            <i data-lucide="search" style="width:20px;height:20px;"></i>
+            Search
+          </a>
+          <a class="db-bottom-nav__item" href="#">
+            <i data-lucide="bell" style="width:20px;height:20px;"></i>
+            Alerts
+            <span class="db-bottom-nav__badge">3</span>
+          </a>
+          <a class="db-bottom-nav__item" href="#">
+            <i data-lucide="user" style="width:20px;height:20px;"></i>
+            Profile
+          </a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">3f. Navigation — sidebar (collapsible)</h2>
+      <div class="db-surface--raised" style="display:flex; height:280px; overflow:hidden; border-radius:var(--db-radius-3);">
+        <nav class="db-sidebar" style="border-radius:var(--db-radius-3) 0 0 var(--db-radius-3);">
+          <div class="db-sidebar__header" style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-family:var(--db-font-heading); font-weight:700; font-size:1rem;">App</span>
+            <button class="db-sidebar__toggle" aria-label="Toggle sidebar">
+              <i data-lucide="panel-left-close" style="width:16px;height:16px;"></i>
+            </button>
+          </div>
+          <div class="db-sidebar__label">Main</div>
+          <a class="db-sidebar__item db-sidebar__item--active" href="#" data-tooltip="Dashboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            <span>Dashboard</span>
+          </a>
+          <a class="db-sidebar__item" href="#" data-tooltip="Projects">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            <span>Projects</span>
+          </a>
+          <a class="db-sidebar__item" href="#" data-tooltip="Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Settings</span>
+          </a>
+        </nav>
+        <div style="flex:1; padding:var(--db-space-5); display:flex; align-items:center; justify-content:center; color:var(--db-warm-gray); font-family:var(--db-font-ui); font-size:0.875rem;">
+          Click the toggle to collapse the sidebar
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         4. DATA DISPLAY
+         ============================================================ -->
+    <div class="demo-section" id="data-display">
+      <h2 class="demo-section__title">4. Data display — cards</h2>
+
+      <div class="demo-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+        <div class="db-card">
+          <div class="db-card__header">
+            <div class="db-avatar db-avatar--md">
+              <i data-lucide="user" style="width:20px;height:20px;"></i>
+            </div>
+            <div>
+              <div class="db-card__title">Sarah Chen</div>
+              <div class="db-caption">Product Designer</div>
+            </div>
+          </div>
+          <p class="db-card__desc">Passionate about creating interfaces that feel as tangible as the real world. Loves texture and warmth in digital spaces.</p>
+          <div class="db-card__footer">
+            <div class="demo-row" style="margin-bottom:0;">
+              <span class="db-badge db-badge--new">New</span>
+              <span class="db-badge db-badge--updated">Updated</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="db-card">
+          <div class="db-card__header">
+            <div class="db-avatar db-avatar--md">JD</div>
+            <div>
+              <div class="db-card__title">James Doe</div>
+              <div class="db-caption">Engineer</div>
+            </div>
+          </div>
+          <p class="db-card__desc">Building the bridge between skeuomorphic beauty and modern performance. Ships CSS that sparks joy.</p>
+          <div class="db-card__footer">
+            <div class="demo-row" style="margin-bottom:0;">
+              <span class="db-badge db-badge--warning">Beta</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="db-card">
+          <div class="db-card__header">
+            <div class="db-avatar db-avatar--md">
+              <i data-lucide="palette" style="width:20px;height:20px;"></i>
+            </div>
+            <div>
+              <div class="db-card__title">Design system</div>
+              <div class="db-caption">v1.1.0</div>
+            </div>
+          </div>
+          <p class="db-card__desc">A complete component library with 28 hand-crafted pieces. Warm cream palette, 8px grid, organic feel.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">4b. Data display — list items</h2>
+
+      <div class="db-surface--raised" style="max-width:min(480px,100%);">
+        <div class="db-list">
+          <div class="db-list__item">
+            <div class="db-avatar db-avatar--sm">
+              <i data-lucide="file-text" style="width:14px;height:14px;"></i>
+            </div>
+            <div class="db-list__content">
+              <div class="db-list__title">Project Proposal.pdf</div>
+              <div class="db-list__secondary">Modified 2 hours ago</div>
+            </div>
+            <span class="db-badge db-badge--new">New</span>
+          </div>
+          <div class="db-list__item">
+            <div class="db-avatar db-avatar--sm">
+              <i data-lucide="image" style="width:14px;height:14px;"></i>
+            </div>
+            <div class="db-list__content">
+              <div class="db-list__title">Hero Banner.png</div>
+              <div class="db-list__secondary">Modified yesterday</div>
+            </div>
+          </div>
+          <div class="db-list__item">
+            <div class="db-avatar db-avatar--sm">
+              <i data-lucide="code" style="width:14px;height:14px;"></i>
+            </div>
+            <div class="db-list__content">
+              <div class="db-list__title">daub.css</div>
+              <div class="db-list__secondary">Modified just now</div>
+            </div>
+            <span class="db-badge db-badge--updated">Updated</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">4c. Data display — badges &amp; avatars</h2>
+
+      <div class="demo-row">
+        <div class="demo-col">
+          <div class="demo-label">Badges</div>
+          <div class="demo-row">
+            <span class="db-badge db-badge--new">New</span>
+            <span class="db-badge db-badge--updated">Updated</span>
+            <span class="db-badge db-badge--warning">Beta</span>
+            <span class="db-badge db-badge--error">Error</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="db-mt-4">
+        <div class="demo-label">Avatars</div>
+        <div class="demo-row">
+          <div class="db-avatar db-avatar--sm">S</div>
+          <div class="db-avatar db-avatar--md">MD</div>
+          <div class="db-avatar db-avatar--lg">
+            <i data-lucide="user" style="width:24px;height:24px;"></i>
+          </div>
+          <div class="db-avatar db-avatar--lg">LG</div>
+        </div>
+      </div>
+
+      <div class="db-mt-4">
+        <div class="demo-label">Chips / tags</div>
+        <div class="demo-row" style="flex-wrap:wrap;">
+          <span class="db-chip">Default</span>
+          <span class="db-chip db-chip--red">Bug <button class="db-chip__close">&times;</button></span>
+          <span class="db-chip db-chip--green">Done <button class="db-chip__close">&times;</button></span>
+          <span class="db-chip db-chip--blue">Info</span>
+          <span class="db-chip db-chip--purple">Review</span>
+          <span class="db-chip db-chip--amber">Pending</span>
+          <span class="db-chip db-chip--pink">Design</span>
+          <span class="db-chip" style="--db-chip-h:195;--db-chip-s:70%;--db-chip-l:42%;">Custom <button class="db-chip__close">&times;</button></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">4d. Data display — table</h2>
+
+      <div class="db-surface--raised" style="overflow-x:auto;">
+        <table class="db-table">
+          <thead>
+            <tr>
+              <th data-db-sort aria-sort="ascending">
+                Name
+                <span class="db-sort-icon"><i data-lucide="arrow-up" style="width:14px;height:14px;"></i></span>
+              </th>
+              <th data-db-sort>
+                Category
+                <span class="db-sort-icon"><i data-lucide="arrow-up-down" style="width:14px;height:14px;"></i></span>
+              </th>
+              <th data-db-sort>
+                Score
+                <span class="db-sort-icon"><i data-lucide="arrow-up-down" style="width:14px;height:14px;"></i></span>
+              </th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Button</td>
+              <td>Controls</td>
+              <td>98</td>
+              <td><span class="db-badge db-badge--updated">Stable</span></td>
+            </tr>
+            <tr>
+              <td>Modal</td>
+              <td>Feedback</td>
+              <td>95</td>
+              <td><span class="db-badge db-badge--updated">Stable</span></td>
+            </tr>
+            <tr>
+              <td>Stepper</td>
+              <td>Navigation</td>
+              <td>87</td>
+              <td><span class="db-badge db-badge--new">New</span></td>
+            </tr>
+            <tr>
+              <td>Toast</td>
+              <td>Feedback</td>
+              <td>92</td>
+              <td><span class="db-badge db-badge--warning">Beta</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">4e. Data display — tooltip</h2>
+
+      <div class="demo-row">
+        <span class="db-tooltip">
+          <button class="db-btn db-btn--secondary" data-db-tooltip>
+            <i data-lucide="info" style="width:16px;height:16px;"></i>
+            Hover me
+          </button>
+          <span class="db-tooltip__content db-tooltip__content--top">This is a tooltip with helpful info</span>
+        </span>
+
+        <span class="db-tooltip">
+          <button class="db-btn db-btn--secondary db-btn--icon" data-db-tooltip aria-label="Help">
+            <i data-lucide="help-circle" style="width:18px;height:16px;"></i>
+          </button>
+          <span class="db-tooltip__content db-tooltip__content--top">Need help?</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         5. FEEDBACK
+         ============================================================ -->
+    <div class="demo-section" id="feedback">
+      <h2 class="demo-section__title">5. Feedback — modal</h2>
+
+      <button class="db-btn db-btn--primary" data-db-modal-trigger="demo-modal">
+        <i data-lucide="maximize-2" style="width:16px;height:16px;"></i>
+        Open Modal
+      </button>
+
+      <div class="db-modal-overlay" id="demo-modal" aria-hidden="true">
+        <div class="db-modal" role="dialog" aria-labelledby="demo-modal-title">
+          <div class="db-modal__header">
+            <h2 class="db-modal__title" id="demo-modal-title">Confirm action</h2>
+            <button class="db-modal__close" aria-label="Close modal">
+              <i data-lucide="x" style="width:20px;height:20px;"></i>
+            </button>
+          </div>
+          <div class="db-modal__body">
+            <p class="db-body">Are you sure you want to proceed? This modal demonstrates focus trapping, Escape dismiss, and overlay click-to-close.</p>
+            <div class="db-field db-mt-4">
+              <label class="db-field__label" for="modal-input">Confirmation</label>
+              <input class="db-field__input" id="modal-input" type="text" placeholder="Type 'confirm'">
+            </div>
+          </div>
+          <div class="db-modal__footer">
+            <button class="db-btn db-btn--secondary" onclick="DAUB.closeModal(document.getElementById('demo-modal'))">Cancel</button>
+            <button class="db-btn db-btn--primary" onclick="DAUB.closeModal(document.getElementById('demo-modal'))">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">5b. Feedback — toast stack</h2>
+
+      <div class="demo-row">
+        <button class="db-btn db-btn--secondary" onclick="DAUB.toast({ type:'success', title:'Success!', message:'Your changes have been saved.' })">
+          <i data-lucide="check-circle" style="width:16px;height:16px;color:var(--db-success);"></i>
+          Success Toast
+        </button>
+        <button class="db-btn db-btn--secondary" onclick="DAUB.toast({ type:'error', title:'Error', message:'Something went wrong. Please try again.' })">
+          <i data-lucide="x-circle" style="width:16px;height:16px;color:var(--db-error);"></i>
+          Error Toast
+        </button>
+        <button class="db-btn db-btn--secondary" onclick="DAUB.toast({ type:'warning', title:'Warning', message:'Your session will expire in 5 minutes.' })">
+          <i data-lucide="alert-triangle" style="width:16px;height:16px;color:var(--db-warning);"></i>
+          Warning Toast
+        </button>
+        <button class="db-btn db-btn--secondary" onclick="DAUB.toast({ type:'info', title:'Info', message:'New version available. Update now?' })">
+          <i data-lucide="info" style="width:16px;height:16px;color:var(--db-terracotta);"></i>
+          Info Toast
+        </button>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">5c. Feedback — alert banners</h2>
+
+      <div class="demo-col" style="max-width:min(560px,100%);">
+        <div class="db-alert db-alert--warning">
+          <span class="db-alert__icon"><i data-lucide="alert-triangle" style="width:20px;height:20px;"></i></span>
+          <div class="db-alert__content">
+            <div class="db-alert__title">Heads up</div>
+            <div>Your trial expires in 3 days. Upgrade to keep all features.</div>
+          </div>
+        </div>
+        <div class="db-alert db-alert--info">
+          <span class="db-alert__icon"><i data-lucide="info" style="width:20px;height:20px;"></i></span>
+          <div class="db-alert__content">
+            <div class="db-alert__title">Did you know?</div>
+            <div>You can customize all colors via CSS custom properties.</div>
+          </div>
+        </div>
+        <div class="db-alert db-alert--error">
+          <span class="db-alert__icon"><i data-lucide="x-circle" style="width:20px;height:20px;"></i></span>
+          <div class="db-alert__content">
+            <div class="db-alert__title">Connection lost</div>
+            <div>Unable to reach the server. Check your internet connection.</div>
+          </div>
+        </div>
+        <div class="db-alert db-alert--success">
+          <span class="db-alert__icon"><i data-lucide="check-circle" style="width:20px;height:20px;"></i></span>
+          <div class="db-alert__content">
+            <div class="db-alert__title">All clear</div>
+            <div>Your account has been verified successfully.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">5d. Feedback — empty state</h2>
+
+      <div class="db-surface--raised" style="max-width:min(480px,100%);">
+        <div class="db-empty">
+          <div class="db-empty__icon">
+            <i data-lucide="inbox" style="width:64px;height:64px;"></i>
+          </div>
+          <div class="db-empty__title">No items yet</div>
+          <p class="db-empty__message">Get started by creating your first item. It only takes a moment.</p>
+          <button class="db-btn db-btn--primary">
+            <i data-lucide="plus" style="width:16px;height:16px;"></i>
+            Create Item
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2 class="demo-section__title">5e. Feedback — skeleton &amp; progress</h2>
+
+      <div class="demo-grid">
+        <div class="db-surface--raised" style="padding:24px;">
+          <div class="demo-label db-mb-4">Skeleton loading</div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div class="db-skeleton db-skeleton--avatar"></div>
+            <div style="flex:1;">
+              <div class="db-skeleton db-skeleton--heading"></div>
+              <div class="db-skeleton db-skeleton--text"></div>
+              <div class="db-skeleton db-skeleton--text"></div>
+              <div class="db-skeleton db-skeleton--text" style="width:70%;"></div>
+            </div>
+          </div>
+          <div class="db-mt-4">
+            <div class="db-skeleton db-skeleton--btn"></div>
+          </div>
+        </div>
+
+        <div class="demo-col" style="justify-content:center;">
+          <div class="demo-label">Linear progress</div>
+          <div class="db-progress" role="progressbar" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">
+            <div class="db-progress__bar" style="--db-progress: 65%;"></div>
+          </div>
+          <div class="db-mt-4">
+            <div class="demo-label">Progress — 30%</div>
+            <div class="db-progress" role="progressbar" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100">
+              <div class="db-progress__bar" style="--db-progress: 30%;"></div>
+            </div>
+          </div>
+          <div class="db-mt-4">
+            <div class="demo-label">Indeterminate</div>
+            <div class="db-progress db-progress--indeterminate" role="progressbar">
+              <div class="db-progress__bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         NEW IN v2.0 — TIER 1 CSS-ONLY
+         ============================================================ -->
+    <div class="demo-section" id="tier1">
+      <h2 class="demo-section__title">6. New in v2.0 — CSS-only components</h2>
+
+      <div class="demo-label">Separator</div>
+      <hr class="db-separator">
+      <hr class="db-separator db-separator--dashed">
+      <div class="db-separator__label">Or continue with</div>
+
+      <div class="demo-row db-mt-5">
+        <div class="demo-col">
+          <div class="demo-label">Kbd</div>
+          <div class="demo-row">
+            <kbd class="db-kbd">Ctrl</kbd>
+            <kbd class="db-kbd">K</kbd>
+            <span class="db-caption" style="margin: 0 4px;">or</span>
+            <kbd class="db-kbd">&#8984;</kbd>
+            <kbd class="db-kbd">K</kbd>
+          </div>
+        </div>
+        <div class="demo-col">
+          <div class="demo-label">Spinner</div>
+          <div class="demo-row">
+            <span class="db-spinner db-spinner--sm"></span>
+            <span class="db-spinner"></span>
+            <span class="db-spinner db-spinner--lg"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Input (standalone) + input group</div>
+      <div class="demo-grid" style="max-width:min(600px,100%);">
+        <input class="db-input" type="text" placeholder="Standalone input">
+        <div class="db-input-group">
+          <span class="db-input-group__addon">https://</span>
+          <input class="db-input" type="text" placeholder="daub.dev">
+        </div>
+        <div class="db-input-group">
+          <input class="db-input" type="email" placeholder="Email address">
+          <button class="db-btn db-btn--primary">Subscribe</button>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Input with icon</div>
+      <div class="demo-grid" style="max-width:min(600px,100%);">
+        <div class="db-input-icon">
+          <span class="db-input-icon__icon"><i data-lucide="search" style="width:16px;height:16px;"></i></span>
+          <input class="db-input" placeholder="Search...">
+        </div>
+        <div class="db-input-icon db-input-icon--right">
+          <input class="db-input" type="email" placeholder="Email address">
+          <span class="db-input-icon__icon"><i data-lucide="mail" style="width:16px;height:16px;"></i></span>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Toggle / toggle group</div>
+      <div class="demo-row">
+        <button class="db-toggle" aria-pressed="false">
+          <i data-lucide="bold" style="width:16px;height:16px;"></i>
+          Bold
+        </button>
+        <div class="db-toggle-group">
+          <button class="db-toggle db-toggle--active" aria-pressed="true">
+            <i data-lucide="align-left" style="width:16px;height:16px;"></i>
+          </button>
+          <button class="db-toggle" aria-pressed="false">
+            <i data-lucide="align-center" style="width:16px;height:16px;"></i>
+          </button>
+          <button class="db-toggle" aria-pressed="false">
+            <i data-lucide="align-right" style="width:16px;height:16px;"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Button group</div>
+      <div class="demo-row">
+        <div class="db-btn-group">
+          <button class="db-btn db-btn--secondary">Copy</button>
+          <button class="db-btn db-btn--secondary">Cut</button>
+          <button class="db-btn db-btn--secondary">Paste</button>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Native select</div>
+      <div style="max-width:300px;">
+        <div class="db-select">
+          <label class="db-label">Framework</label>
+          <select class="db-select__input">
+            <option value="">Choose one...</option>
+            <option>Vanilla CSS</option>
+            <option>Tailwind</option>
+            <option>Bootstrap</option>
+            <option>DAUB</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         OVERLAYS & INTERACTIVE
+         ============================================================ -->
+    <div class="demo-section" id="overlays">
+      <h2 class="demo-section__title">7. Overlays and interactive</h2>
+
+      <div class="demo-label">Accordion</div>
+      <div class="db-accordion" style="max-width:min(500px,100%);">
+        <div class="db-accordion__item db-accordion__item--open">
+          <button class="db-accordion__trigger" aria-expanded="true">
+            What makes DAUB different?
+            <svg class="db-accordion__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="db-accordion__content">
+            DAUB takes a considered approach to interface design. Every component has tactile surfaces, warm shadows, and depth that feels intentional. 91 components, 21 theme families, zero build step.
+          </div>
+        </div>
+        <div class="db-accordion__item">
+          <button class="db-accordion__trigger" aria-expanded="false">
+            How many themes are available?
+            <svg class="db-accordion__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="db-accordion__content">
+            DAUB ships 21 theme families with light and dark variants. Every family is a complete colour system, including the Monospace family for code-heavy interfaces.
+          </div>
+        </div>
+        <div class="db-accordion__item">
+          <button class="db-accordion__trigger" aria-expanded="false">
+            Do I need a build step?
+            <svg class="db-accordion__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="db-accordion__content">
+            No. DAUB is two files — daub.css and daub.js. Link them from a CDN or serve them locally. No bundler, no framework dependency.
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Collapsible</div>
+      <div class="db-collapsible" style="max-width:min(500px,100%);">
+        <button class="db-collapsible__trigger" aria-expanded="false">
+          <svg class="db-collapsible__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+          Show advanced options
+        </button>
+        <div class="db-collapsible__content">
+          <div class="db-card" style="margin-top:8px;">
+            <p class="db-body--sm">These are the advanced configuration options that are hidden by default. Use the collapsible component for progressive disclosure.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-row db-mt-5">
+        <div class="demo-col">
+          <div class="demo-label">Dropdown menu</div>
+          <div class="db-dropdown">
+            <button class="db-btn db-btn--secondary db-dropdown__trigger">
+              Options
+              <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
+            </button>
+            <div class="db-dropdown__content">
+              <div class="db-dropdown__label">Actions</div>
+              <button class="db-dropdown__item">
+                <i data-lucide="copy" style="width:14px;height:14px;color:var(--db-warm-gray);"></i>
+                Duplicate
+              </button>
+              <button class="db-dropdown__item">
+                <i data-lucide="edit" style="width:14px;height:14px;color:var(--db-warm-gray);"></i>
+                Rename
+              </button>
+              <hr class="db-dropdown__separator">
+              <button class="db-dropdown__item" style="color:var(--db-error);">
+                <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-col">
+          <div class="demo-label">Popover</div>
+          <div class="db-popover">
+            <button class="db-btn db-btn--secondary db-popover__trigger">
+              <i data-lucide="settings" style="width:14px;height:14px;"></i>
+              Settings
+            </button>
+            <div class="db-popover__content db-popover__content--bottom">
+              <div class="db-field" style="margin-bottom:12px;">
+                <label class="db-field__label">Display name</label>
+                <input class="db-field__input" type="text" value="DAUB User">
+              </div>
+              <button class="db-btn db-btn--primary db-btn--sm" style="width:100%;">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-col">
+          <div class="demo-label">Tooltip</div>
+          <div class="db-tooltip">
+            <button class="db-btn db-btn--secondary">Hover me</button>
+            <span class="db-tooltip__content db-tooltip__content--top">This is a tooltip</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-row db-mt-5">
+        <button class="db-btn db-btn--secondary" onclick="DAUB.openAlertDialog('demo-alert-dialog')">
+          Open Alert Dialog
+        </button>
+        <button class="db-btn db-btn--secondary" onclick="DAUB.openSheet('demo-sheet')">
+          Open Sheet
+        </button>
+        <button class="db-btn db-btn--secondary" onclick="DAUB.openDrawer('demo-drawer')">
+          Open Drawer
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert Dialog (hidden) -->
+    <div class="db-alert-dialog" id="demo-alert-dialog">
+      <div class="db-alert-dialog__overlay"></div>
+      <div class="db-alert-dialog__panel">
+        <h3 class="db-alert-dialog__title">Are you sure?</h3>
+        <p class="db-alert-dialog__desc">This action cannot be undone. This will permanently delete the selected item from your account.</p>
+        <div class="db-alert-dialog__actions">
+          <button class="db-btn db-btn--secondary" data-action="cancel">Cancel</button>
+          <button class="db-btn db-btn--primary" onclick="DAUB.closeAlertDialog('demo-alert-dialog');DAUB.toast({type:'success',title:'Deleted',message:'Item removed.',duration:2000})">Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sheet (hidden) -->
+    <div class="db-sheet db-sheet--right" id="demo-sheet">
+      <div class="db-sheet__overlay"></div>
+      <div class="db-sheet__panel">
+        <div class="db-sheet__header">
+          <span class="db-sheet__title">Sheet panel</span>
+          <button class="db-sheet__close" aria-label="Close">
+            <i data-lucide="x" style="width:18px;height:18px;"></i>
+          </button>
+        </div>
+        <div class="db-sheet__body">
+          <p class="db-body">This is a sheet panel that slides in from the right. Use it for detail views, settings, or supplementary content.</p>
+          <div class="db-field db-mt-4">
+            <label class="db-field__label">Name</label>
+            <input class="db-field__input" type="text" placeholder="Enter name">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drawer (hidden) -->
+    <div class="db-drawer" id="demo-drawer">
+      <div class="db-drawer__overlay"></div>
+      <div class="db-drawer__panel">
+        <div class="db-drawer__handle"></div>
+        <div class="db-drawer__body">
+          <div class="db-h3">Drawer</div>
+          <p class="db-body db-mt-3">A mobile-friendly bottom drawer for actions, forms, or navigation.</p>
+          <div class="demo-row db-mt-4">
+            <button class="db-btn db-btn--primary" onclick="DAUB.closeDrawer('demo-drawer')">Done</button>
+            <button class="db-btn db-btn--secondary" onclick="DAUB.closeDrawer('demo-drawer')">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         COMPLEX COMPONENTS
+         ============================================================ -->
+    <div class="demo-section" id="complex">
+      <h2 class="demo-section__title">8. Complex components</h2>
+
+      <div class="demo-label">Calendar</div>
+      <div class="db-calendar" style="max-width:280px;">
+        <div class="db-calendar__header">
+          <button class="db-calendar__nav"><i data-lucide="chevron-left" style="width:14px;height:14px;"></i></button>
+          <span class="db-calendar__title">March 2026</span>
+          <button class="db-calendar__nav"><i data-lucide="chevron-right" style="width:14px;height:14px;"></i></button>
+        </div>
+        <div class="db-calendar__grid">
+          <span class="db-calendar__day-label">Mo</span>
+          <span class="db-calendar__day-label">Tu</span>
+          <span class="db-calendar__day-label">We</span>
+          <span class="db-calendar__day-label">Th</span>
+          <span class="db-calendar__day-label">Fr</span>
+          <span class="db-calendar__day-label">Sa</span>
+          <span class="db-calendar__day-label">Su</span>
+          <button class="db-calendar__day db-calendar__day--outside">23</button>
+          <button class="db-calendar__day db-calendar__day--outside">24</button>
+          <button class="db-calendar__day db-calendar__day--outside">25</button>
+          <button class="db-calendar__day db-calendar__day--outside">26</button>
+          <button class="db-calendar__day db-calendar__day--outside">27</button>
+          <button class="db-calendar__day db-calendar__day--outside">28</button>
+          <button class="db-calendar__day">1</button>
+          <button class="db-calendar__day">2</button>
+          <button class="db-calendar__day">3</button>
+          <button class="db-calendar__day">4</button>
+          <button class="db-calendar__day db-calendar__day--today">5</button>
+          <button class="db-calendar__day">6</button>
+          <button class="db-calendar__day">7</button>
+          <button class="db-calendar__day">8</button>
+          <button class="db-calendar__day">9</button>
+          <button class="db-calendar__day">10</button>
+          <button class="db-calendar__day">11</button>
+          <button class="db-calendar__day">12</button>
+          <button class="db-calendar__day">13</button>
+          <button class="db-calendar__day">14</button>
+          <button class="db-calendar__day db-calendar__day--selected">15</button>
+          <button class="db-calendar__day">16</button>
+          <button class="db-calendar__day">17</button>
+          <button class="db-calendar__day">18</button>
+          <button class="db-calendar__day">19</button>
+          <button class="db-calendar__day">20</button>
+          <button class="db-calendar__day">21</button>
+          <button class="db-calendar__day">22</button>
+          <button class="db-calendar__day">23</button>
+          <button class="db-calendar__day">24</button>
+          <button class="db-calendar__day">25</button>
+          <button class="db-calendar__day">26</button>
+          <button class="db-calendar__day">27</button>
+          <button class="db-calendar__day">28</button>
+          <button class="db-calendar__day">29</button>
+          <button class="db-calendar__day">30</button>
+          <button class="db-calendar__day">31</button>
+          <button class="db-calendar__day db-calendar__day--outside">1</button>
+          <button class="db-calendar__day db-calendar__day--outside">2</button>
+          <button class="db-calendar__day db-calendar__day--outside">3</button>
+          <button class="db-calendar__day db-calendar__day--outside">4</button>
+          <button class="db-calendar__day db-calendar__day--outside">5</button>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Input OTP</div>
+      <div class="db-otp">
+        <input class="db-otp__input" type="text" inputmode="numeric">
+        <input class="db-otp__input" type="text" inputmode="numeric">
+        <input class="db-otp__input" type="text" inputmode="numeric">
+        <span class="db-otp__separator">-</span>
+        <input class="db-otp__input" type="text" inputmode="numeric">
+        <input class="db-otp__input" type="text" inputmode="numeric">
+        <input class="db-otp__input" type="text" inputmode="numeric">
+      </div>
+
+      <div class="demo-label db-mt-5">CSS bar chart</div>
+      <div style="max-width:min(400px,100%);">
+        <div class="db-chart">
+          <div class="db-chart__bar" style="height:40%;"></div>
+          <div class="db-chart__bar" style="height:65%;"></div>
+          <div class="db-chart__bar" style="height:80%;"></div>
+          <div class="db-chart__bar" style="height:55%;"></div>
+          <div class="db-chart__bar" style="height:90%;"></div>
+          <div class="db-chart__bar" style="height:70%;"></div>
+          <div class="db-chart__bar" style="height:45%;"></div>
+        </div>
+        <div class="db-chart__labels">
+          <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Data table</div>
+      <div class="db-scroll-area" style="max-width:min(600px,100%);">
+        <table class="db-data-table">
+          <thead>
+            <tr>
+              <th style="width:40px;"><input class="db-data-table__check" type="checkbox"></th>
+              <th data-sortable>Component</th>
+              <th data-sortable>Category</th>
+              <th data-sortable>Tier</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><input class="db-data-table__check" type="checkbox"></td><td>Accordion</td><td>Interactive</td><td>Tier 2</td></tr>
+            <tr><td><input class="db-data-table__check" type="checkbox"></td><td>Calendar</td><td>Complex</td><td>Tier 3</td></tr>
+            <tr><td><input class="db-data-table__check" type="checkbox"></td><td>Carousel</td><td>Complex</td><td>Tier 3</td></tr>
+            <tr><td><input class="db-data-table__check" type="checkbox"></td><td>Command</td><td>Complex</td><td>Tier 3</td></tr>
+            <tr><td><input class="db-data-table__check" type="checkbox"></td><td>Separator</td><td>CSS-only</td><td>Tier 1</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="demo-label db-mt-5">Custom select (combobox)</div>
+      <div style="max-width:300px;">
+        <div class="db-custom-select">
+          <button class="db-custom-select__trigger" type="button">
+            <span class="db-custom-select__placeholder">Select a component...</span>
+            <svg class="db-custom-select__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="db-custom-select__dropdown">
+            <div class="db-custom-select__search"><input type="text" placeholder="Search..."></div>
+            <div class="db-custom-select__option">Accordion</div>
+            <div class="db-custom-select__option">Button</div>
+            <div class="db-custom-select__option">Calendar</div>
+            <div class="db-custom-select__option">Card</div>
+            <div class="db-custom-select__option">Carousel</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-label db-mt-5">Command palette (<kbd class="db-kbd db-kbd--sm">&#8984;K</kbd>)</div>
+      <button class="db-btn db-btn--secondary" onclick="DAUB.openCommand('demo-command')">
+        <i data-lucide="search" style="width:14px;height:14px;"></i>
+        Open Command Palette
+      </button>
+    </div>
+
+    <!-- Command Palette (hidden) -->
+    <div class="db-command" id="demo-command">
+      <div class="db-command__overlay"></div>
+      <div class="db-command__panel">
+        <div class="db-command__input-wrap">
+          <i data-lucide="search" style="width:18px;height:18px;color:var(--db-warm-gray);"></i>
+          <input class="db-command__input" type="text" placeholder="Type a command or search...">
+        </div>
+        <div class="db-command__list">
+          <div class="db-command__group-label">Navigation</div>
+          <div class="db-command__item">
+            <i data-lucide="home" style="width:16px;height:16px;color:var(--db-warm-gray);"></i>
+            Home
+            <span class="db-command__shortcut"><kbd class="db-kbd db-kbd--sm">&#8984;</kbd><kbd class="db-kbd db-kbd--sm">H</kbd></span>
+          </div>
+          <div class="db-command__item">
+            <i data-lucide="settings" style="width:16px;height:16px;color:var(--db-warm-gray);"></i>
+            Settings
+          </div>
+          <div class="db-command__group-label">Theme</div>
+          <div class="db-command__item" onclick="DAUB.setTheme('light');DAUB.closeCommand('demo-command');">
+            <i data-lucide="sun" style="width:16px;height:16px;color:var(--db-warm-gray);"></i>
+            Light Mode
+          </div>
+          <div class="db-command__item" onclick="DAUB.setTheme('dark');DAUB.closeCommand('demo-command');">
+            <i data-lucide="moon" style="width:16px;height:16px;color:var(--db-warm-gray);"></i>
+            Dark Mode
+          </div>
+          <div class="db-command__empty" style="display:none;">No results found.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         PROSE TYPOGRAPHY DEMO
+         ============================================================ -->
+    <div class="demo-section" id="prose">
+      <h2 class="demo-section__title">9. Prose typography</h2>
+      <div class="db-prose">
+        <h2>The art of considered design</h2>
+        <p>Good interface design is invisible. It operates in the space between intention and action, guiding without commanding. The best components feel <strong>inevitable</strong> rather than clever.</p>
+        <blockquote>Design is not just what it looks like and feels like. Design is how it works.</blockquote>
+        <h3>Principles</h3>
+        <ul>
+          <li>Honour materiality — surfaces should feel real</li>
+          <li>Respect the reader — typography should be comfortable</li>
+          <li>Minimize ceremony — components should require no configuration</li>
+        </ul>
+        <p>Inline code looks like <code>var theme = 'light'</code> and links look like <a href="#">this considered anchor</a>.</p>
+        <pre><code>&lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.css"&gt;
+&lt;script src="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.js"&gt;&lt;/script&gt;</code></pre>
+      </div>
+    </div>
+
+    <!-- v2.3.0 — New Components -->
+    <div class="demo-section" id="v230">
+      <h2 class="demo-section__title">10. New in v2.3 — layout, navbar &amp; more</h2>
+
+      <!-- Navbar -->
+      <h3 class="db-h4 db-mb-4">Navbar</h3>
+      <p class="db-body db-mb-4">Sticky top app bar with brand, nav links, spacer, and action area. Responsive hamburger on mobile.</p>
+      <div class="db-card db-mb-5" style="overflow:visible;">
+        <nav class="db-navbar" style="position:relative; border-radius:var(--db-radius-3);">
+          <a class="db-navbar__brand" href="#v230">DAUB</a>
+          <div class="db-navbar__nav">
+            <div class="db-nav-menu">
+              <a class="db-nav-menu__item db-nav-menu__item--active" href="#v230">Home</a>
+              <a class="db-nav-menu__item" href="#v230">Explore</a>
+              <a class="db-nav-menu__item" href="#v230">About</a>
+            </div>
+          </div>
+          <div class="db-navbar__spacer"></div>
+          <div class="db-navbar__actions">
+            <button class="db-btn db-btn--icon db-btn--sm" aria-label="Search"><i data-lucide="search" style="width:16px;height:16px;"></i></button>
+            <div class="db-avatar db-avatar--sm">JD</div>
+          </div>
+          <button class="db-navbar__toggle" aria-label="Menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Grid 4-6 columns -->
+      <h3 class="db-h4 db-mb-4">Grid — 4, 5 &amp; 6 columns</h3>
+      <p class="db-body db-mb-4">Extended grid with tablet breakpoint (2 cols at &lt;1024px, 1 col at &lt;640px).</p>
+      <div class="db-grid db-grid--4 db-gap-3 db-mb-4">
+        <div class="db-surface--raised" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">1</div>
+        <div class="db-surface--raised" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">2</div>
+        <div class="db-surface--raised" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">3</div>
+        <div class="db-surface--raised" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">4</div>
+      </div>
+      <div class="db-grid db-grid--6 db-gap-3 db-mb-5">
+        <div class="db-surface--inset" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">1</div>
+        <div class="db-surface--inset" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">2</div>
+        <div class="db-surface--inset" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">3</div>
+        <div class="db-surface--inset" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">4</div>
+        <div class="db-surface--inset" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">5</div>
+        <div class="db-surface--inset" style="padding:var(--db-space-3); text-align:center; border-radius:var(--db-radius-2);">6</div>
+      </div>
+
+      <!-- Container variants -->
+      <h3 class="db-h4 db-mb-4">Container variants</h3>
+      <p class="db-body db-mb-4"><code>db-container--wide</code> (1200px) and <code>db-container--narrow</code> (640px).</p>
+      <div class="db-mb-5">
+        <div class="db-container--narrow" style="background:var(--db-cream-dark); padding:var(--db-space-3); border-radius:var(--db-radius-2); text-align:center;">
+          Narrow container (640px)
+        </div>
+      </div>
+
+      <!-- Card media variant -->
+      <h3 class="db-h4 db-mb-4">Card — media variant</h3>
+      <p class="db-body db-mb-4">Edge-to-edge images with <code>db-card--media</code>. No padding fights.</p>
+      <div class="db-grid db-grid--3 db-gap-4 db-mb-5">
+        <div class="db-card db-card--media">
+          <div class="db-card__media" style="height:140px; background:linear-gradient(135deg, var(--db-terracotta), var(--db-clay));"></div>
+          <div class="db-card__body">
+            <h3 class="db-card__title">Mountain sunrise</h3>
+            <p class="db-card__desc">Beautiful morning light.</p>
+          </div>
+        </div>
+        <div class="db-card db-card--media">
+          <div class="db-card__media" style="height:140px; background:linear-gradient(135deg, var(--db-clay), var(--db-ink));"></div>
+          <div class="db-card__body">
+            <h3 class="db-card__title">Ocean depths</h3>
+            <p class="db-card__desc">Deep blue inspiration.</p>
+          </div>
+        </div>
+        <div class="db-card db-card--media">
+          <div class="db-card__media" style="height:140px; background:linear-gradient(135deg, var(--db-sand), var(--db-terracotta));"></div>
+          <div class="db-card__body">
+            <h3 class="db-card__title">Desert sands</h3>
+            <p class="db-card__desc">Warm desert tones.</p>
+          </div>
+          <div class="db-card__footer">
+            <button class="db-btn db-btn--secondary db-btn--sm">View</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chip active / toggle -->
+      <h3 class="db-h4 db-mb-4">Chip — active state &amp; toggle</h3>
+      <p class="db-body db-mb-4">Filter chips with <code>db-chip--active</code>. Wrap in <code>data-db-chip-toggle</code> for click-to-select.</p>
+      <div data-db-chip-toggle class="db-flex db-flex--wrap db-gap-2 db-mb-5">
+        <span class="db-chip db-chip--blue db-chip--active">All</span>
+        <span class="db-chip db-chip--green">Nature</span>
+        <span class="db-chip db-chip--amber">Food</span>
+        <span class="db-chip db-chip--purple">Art</span>
+        <span class="db-chip db-chip--pink">Travel</span>
+        <span class="db-chip db-chip--red">Sports</span>
+      </div>
+
+      <!-- Avatar Group -->
+      <h3 class="db-h4 db-mb-4">Avatar group</h3>
+      <p class="db-body db-mb-4">Overlapping stack with overflow counter.</p>
+      <div class="db-flex db-gap-6 db-mb-5" style="align-items:center;">
+        <div class="db-avatar-group">
+          <div class="db-avatar db-avatar--md" style="background:var(--db-terracotta); color:white;">AL</div>
+          <div class="db-avatar db-avatar--md" style="background:var(--db-clay); color:white;">BK</div>
+          <div class="db-avatar db-avatar--md" style="background:var(--db-ink); color:white;">CM</div>
+          <div class="db-avatar db-avatar--md" style="background:var(--db-warm-gray); color:white;">DN</div>
+          <span class="db-avatar-group__overflow">+8</span>
+        </div>
+        <div class="db-avatar-group">
+          <div class="db-avatar db-avatar--sm" style="background:var(--db-terracotta); color:white;">A</div>
+          <div class="db-avatar db-avatar--sm" style="background:var(--db-clay); color:white;">B</div>
+          <div class="db-avatar db-avatar--sm" style="background:var(--db-ink); color:white;">C</div>
+        </div>
+      </div>
+
+      <!-- Search Input -->
+      <h3 class="db-h4 db-mb-4">Search input</h3>
+      <p class="db-body db-mb-4">Search box with auto-show clear button when input has text.</p>
+      <div style="max-width:min(400px,100%);" class="db-mb-5">
+        <div class="db-search">
+          <svg class="db-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input class="db-input" type="search" placeholder="Search components...">
+          <button class="db-search__clear" aria-label="Clear">&times;</button>
+        </div>
+      </div>
+
+      <!-- Responsive utilities -->
+      <h3 class="db-h4 db-mb-4">Responsive visibility</h3>
+      <p class="db-body db-mb-4">Show/hide elements by breakpoint: <code>db-hide-mobile</code>, <code>db-show-mobile</code>, <code>db-hide-tablet</code>, <code>db-show-tablet</code>, <code>db-hide-desktop</code>, <code>db-show-desktop</code>.</p>
+      <div class="db-flex db-gap-3 db-mb-5">
+        <span class="db-badge db-badge--new db-hide-mobile">Desktop + Tablet</span>
+        <span class="db-badge db-badge--warning db-show-mobile">Mobile only</span>
+        <span class="db-badge db-badge--updated db-show-desktop">Desktop only</span>
+      </div>
+    </div>
+
+  </div><!-- /.db-container -->
+
+  <!-- Comparison Table -->
+  <section style="max-width:min(800px,100%); margin:0 auto; padding:64px 24px;">
+    <h2 style="font-family:var(--db-font-heading); font-size:clamp(1.5rem,3vw,2.25rem); font-weight:700; color:var(--db-ink); margin:0 0 8px; line-height:1.2; text-align:center;">How DAUB compares</h2>
+    <p style="font-family:var(--db-font-body); font-size:1.0625rem; color:var(--db-warm-gray); line-height:1.6; margin:0 0 32px; text-align:center;">A quick look at the landscape.</p>
+    <div style="overflow-x:auto;">
+      <table class="db-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>DAUB</th>
+            <th>shadcn/ui</th>
+            <th>Pico CSS</th>
+            <th>DaisyUI</th>
+            <th>Tailwind</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Components</td>
+            <td><strong>91</strong></td>
+            <td>~50 (copy-in)</td>
+            <td>~20</td>
+            <td>~50</td>
+            <td>0 (utility)</td>
+          </tr>
+          <tr>
+            <td>Theme variants</td>
+            <td><strong>42</strong></td>
+            <td>DIY (CSS vars)</td>
+            <td>2</td>
+            <td>32</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td>Classless mode</td>
+            <td><strong>Yes</strong></td>
+            <td>No</td>
+            <td>Yes</td>
+            <td>No</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>JS included</td>
+            <td><strong>Yes</strong></td>
+            <td>React only</td>
+            <td>No</td>
+            <td>No</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Build step</td>
+            <td><strong>None</strong></td>
+            <td>CLI + Tailwind</td>
+            <td>None</td>
+            <td>Required</td>
+            <td>Required</td>
+          </tr>
+          <tr>
+            <td>AI docs (llms.txt)</td>
+            <td><strong>Yes</strong></td>
+            <td><a href="https://ui.shadcn.com/llms.txt">Yes</a></td>
+            <td>No</td>
+            <td>No</td>
+            <td>No</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Closing CTA -->
+  <section style="max-width:min(640px,100%); margin:0 auto; padding:64px 24px; text-align:center;">
+    <h2 style="font-family:var(--db-font-heading); font-size:clamp(1.5rem, 3vw, 2.25rem); font-weight:700; color:var(--db-ink); margin:0 0 16px; line-height:1.2;">Two files. Full surface.</h2>
+    <p style="font-family:var(--db-font-body); font-size:1.0625rem; color:var(--db-warm-gray); line-height:1.6; margin:0 0 32px;">91 components that respond to light, texture, and theme. Drop them in, ship something that feels considered — without the ceremony.</p>
+    <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+      <a href="#configurator" class="db-btn db-btn--primary db-btn--lg">Get Started</a>
+      <a href="https://github.com/sliday/daub" target="_blank" rel="noopener" class="db-btn db-btn--secondary db-btn--lg">
+        <i data-lucide="github" style="width:16px;height:16px;"></i>
+        GitHub
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer style="text-align:center; padding:8px; background:var(--db-cream-dark); color:var(--db-warm-gray); margin-top:16px; font-family:var(--db-font-ui); font-size:0.75rem;">
+    Made by <a href="https://x.com/staskulesh" target="_blank" rel="noopener" style="color:var(--db-terracotta); text-decoration:none;">@staskulesh</a> <a href="https://aichess.co/static/easter-egg/index.html" title="&#127875;" style="text-decoration:none; display:inline-block; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'">&#128007;</a>
+  </footer>
+
+  <!-- Theme Switcher (popover) -->
+  <div class="db-theme-switcher" role="group" aria-label="Theme switcher">
+    <button class="db-theme-switcher__toggle" aria-label="Open theme picker" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/></svg>
+    </button>
+    <div class="db-theme-switcher__popover" id="db-theme-popover"></div>
+  </div>
+
+  <!-- JS -->
+  <script src="daub.js?v=3.20.6"></script>
+  <script>
+    // Initialize Lucide icons (Lucide script is deferred — wait for DOMContentLoaded)
+    document.addEventListener('DOMContentLoaded', function(){ lucide.createIcons(); });
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var form = document.getElementById('mcp-composer');
+      var composer = DAUB.createChatComposer(form);
+      composer.setStatus('Opens in Playground');
+      form.addEventListener('db:chat-send', function(event) {
+        window.location.href = 'playground.html?prompt=' + encodeURIComponent(event.detail.request.text);
+      });
+      form.addEventListener('db:chat-action', function(event) {
+        if (event.detail.action.id === 'full-chat') window.location.href = 'chat-demo.html';
+      });
+    });
+
+    // Example tab switcher (Preview / Code)
+    function dbExampleTab(tab, btn) {
+      document.getElementById('example-preview').style.display = tab === 'preview' ? 'block' : 'none';
+      document.getElementById('example-code').style.display = tab === 'code' ? 'block' : 'none';
+      var toggles = btn.parentElement.querySelectorAll('.db-toggle');
+      for (var i = 0; i < toggles.length; i++) toggles[i].setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-pressed', 'true');
+    }
+
+    // Copy button feedback: spinner → "Copied!" → restore
+    function dbCopyFeedback(btn, original) {
+      btn.classList.add('db-btn--loading');
+      setTimeout(function() {
+        btn.classList.remove('db-btn--loading');
+        btn.textContent = '';
+        var icon = document.createElement('i');
+        icon.setAttribute('data-lucide', 'check');
+        icon.style.cssText = 'width:12px;height:12px;';
+        btn.appendChild(icon);
+        btn.appendChild(document.createTextNode(' Copied!'));
+        lucide.createIcons({ nodes: [btn] });
+        setTimeout(function() {
+          btn.textContent = '';
+          var restoreIcon = document.createElement('i');
+          restoreIcon.setAttribute('data-lucide', 'copy');
+          restoreIcon.style.cssText = 'width:12px;height:12px;';
+          btn.appendChild(restoreIcon);
+          btn.appendChild(document.createTextNode(' ' + original));
+          lucide.createIcons({ nodes: [btn] });
+        }, 1500);
+      }, 400);
+    }
+
+    // Dynamic code generation for showcase configurator
+    (function() {
+      var codeEl = document.getElementById('db-config-code');
+      var copyBtn = document.getElementById('db-config-copy');
+      if (!codeEl) return;
+
+      var DEFAULTS = { theme: 'light', family: 'default', temperature: 0, noise: 0.18, texture: 'grain', scheme: 'auto' };
+
+      function getState() {
+        var tempMode = DAUB.getTemperature();
+        return {
+          theme: DAUB.getTheme() || 'light',
+          family: DAUB.getFamily() || 'default',
+          scheme: DAUB.getScheme() || 'auto',
+          temperature: tempMode === 'auto' ? 'auto' : (parseFloat(document.documentElement.style.getPropertyValue('--db-temperature')) || DEFAULTS.temperature),
+          noise: parseFloat(document.documentElement.style.getPropertyValue('--db-noise')) || DEFAULTS.noise,
+          texture: document.documentElement.getAttribute('data-db-texture') || 'grain',
+          accent: localStorage.getItem('db-accent') || null
+        };
+      }
+
+      function buildSnippet() {
+        var s = getState();
+        var lines = [
+          '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.css">',
+          '<script src="https://cdn.jsdelivr.net/npm/daub-ui@latest/daub.js"><\/script>'
+        ];
+
+        var cssVars = [];
+        if (s.temperature !== 'auto' && Math.abs(s.temperature - DEFAULTS.temperature) > 0.01) cssVars.push('    --db-temperature: ' + s.temperature + ';');
+        if (Math.abs(s.noise - DEFAULTS.noise) > 0.01) cssVars.push('    --db-noise: ' + s.noise + ';');
+
+        if (cssVars.length) {
+          lines.push('<style>');
+          lines.push('  :root {');
+          cssVars.forEach(function(v) { lines.push(v); });
+          lines.push('  }');
+          lines.push('</style>');
+        }
+
+        var VALID_TEXTURES = ['grain','paper','metal','wood','glass','none'];
+        var VALID_FAMILIES = Object.keys(DAUB.THEME_FAMILIES || {});
+        var VALID_SCHEMES  = ['auto','light','dark'];
+        var VALID_HEX      = /^#[0-9a-fA-F]{6}$/;
+
+        var jsLines = [];
+        if (s.temperature === 'auto') jsLines.push("DAUB.setTemperature('auto');");
+        if (s.texture !== DEFAULTS.texture && VALID_TEXTURES.indexOf(s.texture) !== -1) jsLines.push("DAUB.setTexture('" + s.texture + "');");
+        if (s.family !== DEFAULTS.family && VALID_FAMILIES.indexOf(s.family) !== -1) jsLines.push("DAUB.setFamily('" + s.family + "');");
+        if (s.scheme !== DEFAULTS.scheme && VALID_SCHEMES.indexOf(s.scheme) !== -1) jsLines.push("DAUB.setScheme('" + s.scheme + "');");
+        if (s.accent && VALID_HEX.test(s.accent)) jsLines.push("DAUB.setAccent('" + s.accent + "');");
+
+        if (s.scheme === 'auto' && s.family === DEFAULTS.family && !s.accent && s.texture === DEFAULTS.texture) {
+          // Nothing extra needed — default behavior
+        }
+
+        if (jsLines.length) {
+          lines.push('<script>');
+          jsLines.forEach(function(l) { lines.push('  ' + l); });
+          lines.push('<\/script>');
+        }
+
+        return lines.join('\n');
+      }
+
+      function updateCode() {
+        var code = codeEl.querySelector('code');
+        if (code) code.textContent = buildSnippet();
+      }
+
+      // Color scheme buttons (showcase panel)
+      document.querySelectorAll('[data-db-scheme]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          DAUB.setScheme(btn.getAttribute('data-db-scheme'));
+          document.querySelectorAll('[data-db-scheme]').forEach(function(b) {
+            b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+          });
+          setTimeout(updateCode, 50);
+        });
+      });
+
+      // Listen for changes from controls (family swatches, texture, accent)
+      document.addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-family], [data-db-texture-btn], [data-accent]');
+        if (btn) {
+          setTimeout(updateCode, 60);
+        }
+      });
+      document.addEventListener('input', function(e) {
+        if (e.target.closest('[data-db-temperature], [data-db-noise]')) updateCode();
+      });
+
+      // Temperature auto toggle
+      (function() {
+        var autoChk = document.getElementById('db-temp-auto');
+        var slider = document.querySelector('[data-db-temperature]');
+        if (!autoChk || !slider) return;
+        var input = slider.querySelector('.db-slider__input');
+        var valueEl = slider.querySelector('.db-slider__value');
+        var savedManualValue = input ? parseInt(input.value) : 0;
+
+        function getTimeOfDayLabel() {
+          var h = new Date().getHours();
+          if (h >= 5 && h < 10) return 'Morning light';
+          if (h >= 10 && h < 17) return 'Day light';
+          if (h >= 17 && h < 21) return 'Evening light';
+          return 'Night light';
+        }
+
+        function readAutoTemp() {
+          return parseFloat(document.documentElement.style.getPropertyValue('--db-temperature')) || 0;
+        }
+
+        function setAutoUI(on) {
+          if (input) {
+            input.disabled = on;
+            input.style.opacity = on ? '0.35' : '1';
+            input.style.pointerEvents = on ? 'none' : '';
+          }
+          if (on) {
+            if (valueEl) valueEl.textContent = getTimeOfDayLabel();
+            setTimeout(function() {
+              if (input) input.value = Math.round(readAutoTemp() * 100);
+            }, 300);
+          } else {
+            if (valueEl) valueEl.textContent = 'Auto';
+          }
+        }
+
+        // Reflect initial state (delay so DAUB's own slider init completes first)
+        if (DAUB.getTemperature() === 'auto' || autoChk.checked) {
+          autoChk.checked = true;
+          DAUB.setTemperature('auto');
+          setTimeout(function() { setAutoUI(true); }, 50);
+        }
+
+        // Manual slider drag exits auto mode — keep drag position, don't restore saved
+        if (input) {
+          input.addEventListener('input', function() {
+            if (!autoChk.checked) return;
+            autoChk.checked = false;
+            var val = parseInt(input.value);
+            DAUB.setTemperature(val / 100);
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.pointerEvents = '';
+            if (valueEl) valueEl.textContent = 'Auto';
+            setTimeout(updateCode, 60);
+          });
+        }
+
+        // Checkbox toggle
+        autoChk.addEventListener('change', function() {
+          if (autoChk.checked) {
+            savedManualValue = input ? parseInt(input.value) : 0;
+            DAUB.setTemperature('auto');
+            setAutoUI(true);
+          } else {
+            DAUB.setTemperature(savedManualValue / 100);
+            if (input) input.value = savedManualValue;
+            setAutoUI(false);
+          }
+          setTimeout(updateCode, 60);
+        });
+      })();
+
+      // Copy button
+      function doCopy() {
+        navigator.clipboard.writeText(buildSnippet()).then(function() {
+          DAUB.toast({ type: 'success', title: 'Copied!', message: 'Snippet copied to clipboard.', duration: 2000 });
+        });
+      }
+      var copyCta = document.getElementById('db-config-copy-cta');
+      if (copyCta) copyCta.addEventListener('click', doCopy);
+      if (copyBtn) copyBtn.addEventListener('click', doCopy);
+
+      // Initial render
+      setTimeout(updateCode, 200);
+    })();
+
+    // GitHub stars counter with count-up effect
+    (function() {
+      var el = document.getElementById('gh-stars');
+      if (!el) return;
+      fetch('https://api.github.com/repos/sliday/daub', { headers: { Accept: 'application/vnd.github.v3+json' } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var target = d.stargazers_count;
+          if (!target || target < 1) return;
+          el.style.display = '';
+          var duration = 800;
+          var start = performance.now();
+          function tick(now) {
+            var t = Math.min((now - start) / duration, 1);
+            t = 1 - Math.pow(1 - t, 3); // ease-out cubic
+            el.textContent = '\u2605 ' + Math.round(t * target).toLocaleString();
+            if (t < 1) requestAnimationFrame(tick);
+          }
+          // Start count-up when element is visible
+          if ('IntersectionObserver' in window) {
+            var obs = new IntersectionObserver(function(entries) {
+              if (entries[0].isIntersecting) { obs.disconnect(); requestAnimationFrame(tick); }
+            }, { threshold: 0.1 });
+            obs.observe(el);
+          } else {
+            requestAnimationFrame(tick);
+          }
+        })
+        .catch(function() {});
+    })();
+  </script>
+
+  <!-- Theme switcher nudge (first visit only) -->
+  <style>
+    .db-nudge {
+      position: fixed;
+      bottom: calc(var(--db-space-5) + 48px);
+      left: var(--db-space-5);
+      z-index: 1049;
+      display: flex;
+      align-items: flex-end;
+      gap: 0;
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .db-nudge--visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .db-nudge__bubble {
+      background: var(--db-color-surface);
+      border: 1px solid var(--db-terracotta);
+      border-radius: var(--db-radius-3);
+      padding: 8px 14px;
+      font-family: var(--db-font-ui);
+      font-size: 0.8125rem;
+      color: var(--db-color-text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      white-space: nowrap;
+      cursor: pointer;
+      position: relative;
+    }
+    .db-nudge__bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 16px;
+      width: 10px;
+      height: 10px;
+      background: var(--db-color-surface);
+      border-right: 1px solid var(--db-terracotta);
+      border-bottom: 1px solid var(--db-terracotta);
+      transform: rotate(45deg);
+    }
+    .db-nudge__close {
+      background: none;
+      border: none;
+      color: var(--db-color-text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 0 0 8px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    .db-nudge__close:hover { opacity: 1; }
+@media (max-width: 480px) {
+      .db-nudge__bubble { font-size: 0.75rem; padding: 6px 10px; }
+    }
+  </style>
+  <div class="db-nudge" id="db-nudge" role="tooltip">
+    <div class="db-nudge__bubble" onclick="document.querySelector('.db-theme-switcher__toggle').click(); this.parentElement.remove();">
+      <span>Psst... try me. Every surface changes.</span>
+      <button class="db-nudge__close" onclick="event.stopPropagation(); document.getElementById('db-nudge').remove();" aria-label="Dismiss">&times;</button>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var KEY = 'db-nudge-seen';
+      if (localStorage.getItem(KEY)) return;
+      var delay = Math.floor(Math.random() * 3001) + 8000; // 8-11s
+      var timer = setTimeout(function() {
+        var el = document.getElementById('db-nudge');
+        if (!el) return;
+        el.classList.add('db-nudge--visible');
+        localStorage.setItem(KEY, '1');
+        // Auto-dismiss after 12s if not interacted
+        setTimeout(function() {
+          if (el && el.parentElement) {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(8px)';
+            setTimeout(function() { if (el.parentElement) el.remove(); }, 400);
+          }
+        }, 12000);
+        // Dismiss on first meaningful scroll after showing
+        var shownAt = window.scrollY;
+        var onScroll = function() {
+          if (Math.abs(window.scrollY - shownAt) < 400) return;
+          window.removeEventListener('scroll', onScroll);
+          if (el && el.parentElement) {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(8px)';
+            setTimeout(function() { if (el.parentElement) el.remove(); }, 400);
+          }
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+      }, delay);
+      // Cancel if user opens theme switcher before nudge
+      var toggle = document.querySelector('.db-theme-switcher__toggle');
+      if (toggle) toggle.addEventListener('click', function() {
+        clearTimeout(timer);
+        var el = document.getElementById('db-nudge');
+        if (el) el.remove();
+        localStorage.setItem(KEY, '1');
+      }, { once: true });
+    })();
+  </script>
+
+  <!-- WebMCP — expose DAUB site tools to AI agents via navigator.modelContext -->
+  <script>
+    (function () {
+      if (!('modelContext' in navigator) ||
+          typeof navigator.modelContext.provideContext !== 'function') return;
+
+      var ORIGIN = location.origin;
+
+      navigator.modelContext.provideContext({
+        tools: [
+          {
+            name: 'open_playground',
+            description: 'Open the DAUB generative UI playground.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                prompt: {
+                  type: 'string',
+                  description: 'Optional natural-language UI prompt to pre-fill the playground.'
+                },
+                theme: {
+                  type: 'string',
+                  description: 'Optional DAUB theme family (e.g. "dracula", "github", "bone").'
+                }
+              }
+            },
+            execute: function (args) {
+              var qs = [];
+              if (args && args.prompt) qs.push('prompt=' + encodeURIComponent(args.prompt));
+              if (args && args.theme) qs.push('theme=' + encodeURIComponent(args.theme));
+              var url = '/playground.html' + (qs.length ? '?' + qs.join('&') : '');
+              window.location.href = url;
+              return { ok: true, url: ORIGIN + url };
+            }
+          },
+          {
+            name: 'get_component_catalog',
+            description: 'Fetch the full DAUB component catalog (91 components with props, categories, themes).',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async function () {
+              var res = await fetch('/components.json', { headers: { 'Accept': 'application/json' } });
+              if (!res.ok) throw new Error('components.json fetch failed: ' + res.status);
+              return await res.json();
+            }
+          },
+          {
+            name: 'get_llm_docs',
+            description: 'Fetch the llms.txt AI-ready documentation for DAUB (full component reference).',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                compact: {
+                  type: 'boolean',
+                  description: 'If true, return the compact reference (top 15 components, ~5KB). Default: false.'
+                }
+              }
+            },
+            execute: async function (args) {
+              var path = (args && args.compact) ? '/llms-compact.txt' : '/llms.txt';
+              var res = await fetch(path, { headers: { 'Accept': 'text/plain' } });
+              if (!res.ok) throw new Error(path + ' fetch failed: ' + res.status);
+              return { path: path, text: await res.text() };
+            }
+          },
+          {
+            name: 'generate_ui',
+            description: 'Generate a DAUB UI from a natural-language prompt via the DAUB MCP server. Returns a JSON spec and self-contained HTML.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                prompt: { type: 'string', description: 'Natural-language description of the UI to generate.' },
+                theme: { type: 'string', description: 'Optional DAUB theme family.' }
+              },
+              required: ['prompt']
+            },
+            execute: async function (args) {
+              var body = {
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'tools/call',
+                params: {
+                  name: 'generate_ui',
+                  arguments: {
+                    prompt: args.prompt,
+                    theme: args.theme
+                  }
+                }
+              };
+              var res = await fetch('/api/mcp', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json, text/event-stream'
+                },
+                body: JSON.stringify(body)
+              });
+              if (!res.ok) throw new Error('MCP generate_ui failed: ' + res.status);
+              return await res.json();
+            }
+          },
+          {
+            name: 'view_theme',
+            description: 'Navigate to the DAUB themes gallery showing all 21 theme families (42 light/dark variants).',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                theme: { type: 'string', description: 'Optional specific theme to focus (e.g. "dracula").' }
+              }
+            },
+            execute: function (args) {
+              var url = '/themes.html' + (args && args.theme ? '#' + encodeURIComponent(args.theme) : '');
+              window.location.href = url;
+              return { ok: true, url: ORIGIN + url };
+            }
+          }
+        ]
+      });
+    })();
+  </script>
+</body>
+</html>

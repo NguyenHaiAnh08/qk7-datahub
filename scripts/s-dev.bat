@@ -39,7 +39,7 @@ start "QK7 Frontend Dev" cmd /k "cd /d "%ROOT%frontend" && npm run dev"
 
 REM --- 3. AI boxchat ---
 echo [3/4] Khoi dong AI boxchat (:%PORT_AI%)...
-start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && python main.py"
+start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && if exist venv\Scripts\activate.bat (call venv\Scripts\activate.bat) && python main.py"
 
 REM --- 4. OCR Microservice ---
 echo [4/4] Khoi dong OCR Microservice (:%PORT_OCR%)...

@@ -1,0 +1,502 @@
+{
+  "root": "order-confirmation",
+  "elements": {
+    "order-confirmation": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "container": true
+      },
+      "children": [
+        "success-header",
+        "order-info-row",
+        "separator-1",
+        "line-items-section",
+        "separator-2",
+        "totals-section",
+        "separator-3",
+        "shipping-details",
+        "action-buttons"
+      ]
+    },
+    "success-header": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "success-badge",
+        "success-heading",
+        "success-description"
+      ]
+    },
+    "success-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "Order Confirmed",
+        "variant": "success"
+      }
+    },
+    "success-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h1",
+        "content": "Thank you for your order!",
+        "weight": "bold",
+        "align": "center"
+      }
+    },
+    "success-description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "A confirmation email has been sent to john@example.com with your order details and tracking information.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "order-info-row": {
+      "type": "Grid",
+      "props": {
+        "columns": 3,
+        "gap": 3
+      },
+      "children": [
+        "order-number-card",
+        "order-date-card",
+        "payment-card"
+      ]
+    },
+    "order-number-card": {
+      "type": "Surface",
+      "props": {
+        "variant": "bordered"
+      },
+      "children": [
+        "order-number-stack"
+      ]
+    },
+    "order-number-stack": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "order-number-label",
+        "order-number-value"
+      ]
+    },
+    "order-number-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Order Number",
+        "variant": "muted"
+      }
+    },
+    "order-number-value": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "#ORD-2026-48291",
+        "weight": "bold"
+      }
+    },
+    "order-date-card": {
+      "type": "Surface",
+      "props": {
+        "variant": "bordered"
+      },
+      "children": [
+        "order-date-stack"
+      ]
+    },
+    "order-date-stack": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "order-date-label",
+        "order-date-value"
+      ]
+    },
+    "order-date-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Order Date",
+        "variant": "muted"
+      }
+    },
+    "order-date-value": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "March 10, 2026",
+        "weight": "bold"
+      }
+    },
+    "payment-card": {
+      "type": "Surface",
+      "props": {
+        "variant": "bordered"
+      },
+      "children": [
+        "payment-stack"
+      ]
+    },
+    "payment-stack": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "payment-label",
+        "payment-value"
+      ]
+    },
+    "payment-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Payment",
+        "variant": "muted"
+      }
+    },
+    "payment-value": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Visa ending in 4242",
+        "weight": "bold"
+      }
+    },
+    "separator-1": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "line-items-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "items-heading",
+        "items-table"
+      ]
+    },
+    "items-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Items Ordered",
+        "weight": "bold"
+      }
+    },
+    "items-table": {
+      "type": "DataTable",
+      "props": {
+        "columns": [
+          {
+            "key": "item",
+            "label": "Item"
+          },
+          {
+            "key": "qty",
+            "label": "Qty"
+          },
+          {
+            "key": "price",
+            "label": "Unit Price"
+          },
+          {
+            "key": "total",
+            "label": "Total"
+          }
+        ],
+        "rows": [
+          {
+            "item": "Sony WH-1000XM5 (Black)",
+            "qty": "1",
+            "price": "$328.00",
+            "total": "$328.00"
+          },
+          {
+            "item": "Apple AirPods Pro 2",
+            "qty": "1",
+            "price": "$249.00",
+            "total": "$249.00"
+          },
+          {
+            "item": "Anker USB-C Cable 3-Pack",
+            "qty": "1",
+            "price": "$15.99",
+            "total": "$15.99"
+          }
+        ]
+      }
+    },
+    "separator-2": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "totals-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "subtotal-row",
+        "shipping-row",
+        "tax-row",
+        "totals-separator",
+        "total-row"
+      ]
+    },
+    "subtotal-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "justify": "space-between"
+      },
+      "children": [
+        "subtotal-label",
+        "subtotal-value"
+      ]
+    },
+    "subtotal-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Subtotal"
+      }
+    },
+    "subtotal-value": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "$592.99"
+      }
+    },
+    "shipping-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "justify": "space-between"
+      },
+      "children": [
+        "shipping-label",
+        "shipping-value"
+      ]
+    },
+    "shipping-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Shipping"
+      }
+    },
+    "shipping-value": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Free"
+      }
+    },
+    "tax-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "justify": "space-between"
+      },
+      "children": [
+        "tax-label",
+        "tax-value"
+      ]
+    },
+    "tax-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Tax"
+      }
+    },
+    "tax-value": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "$48.92"
+      }
+    },
+    "totals-separator": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "total-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "justify": "space-between"
+      },
+      "children": [
+        "total-label",
+        "total-value"
+      ]
+    },
+    "total-label": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Total",
+        "weight": "bold"
+      }
+    },
+    "total-value": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "$641.91",
+        "weight": "bold"
+      }
+    },
+    "separator-3": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "shipping-details": {
+      "type": "Surface",
+      "props": {
+        "variant": "bordered"
+      },
+      "children": [
+        "shipping-details-stack"
+      ]
+    },
+    "shipping-details-stack": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 4
+      },
+      "children": [
+        "ship-to-section",
+        "delivery-section"
+      ]
+    },
+    "ship-to-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "ship-to-label",
+        "ship-to-name",
+        "ship-to-address"
+      ]
+    },
+    "ship-to-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Ship To",
+        "weight": "bold"
+      }
+    },
+    "ship-to-name": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "John Doe"
+      }
+    },
+    "ship-to-address": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "123 Main St, Apt 4B, New York, NY 10001",
+        "variant": "muted"
+      }
+    },
+    "delivery-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "delivery-label",
+        "delivery-method",
+        "delivery-estimate"
+      ]
+    },
+    "delivery-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Estimated Delivery",
+        "weight": "bold"
+      }
+    },
+    "delivery-method": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Standard Shipping (Free)"
+      }
+    },
+    "delivery-estimate": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "March 14-17, 2026",
+        "variant": "muted"
+      }
+    },
+    "action-buttons": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3,
+        "justify": "center"
+      },
+      "children": [
+        "track-order-btn",
+        "continue-btn"
+      ]
+    },
+    "track-order-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Track Order",
+        "variant": "primary",
+        "icon": "package"
+      }
+    },
+    "continue-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Continue Shopping",
+        "variant": "outline",
+        "icon": "arrow-right"
+      }
+    }
+  }
+}

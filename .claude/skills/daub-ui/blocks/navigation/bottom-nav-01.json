@@ -1,0 +1,33 @@
+{
+  "root": "bottom-nav",
+  "elements": {
+    "bottom-nav": {
+      "type": "BottomNav",
+      "props": {
+        "items": [
+          {
+            "label": "Home",
+            "icon": "home",
+            "active": true
+          },
+          {
+            "label": "Search",
+            "icon": "search"
+          },
+          {
+            "label": "Orders",
+            "icon": "package"
+          },
+          {
+            "label": "Favorites",
+            "icon": "heart"
+          },
+          {
+            "label": "Account",
+            "icon": "user"
+          }
+        ]
+      }
+    }
+  }
+}

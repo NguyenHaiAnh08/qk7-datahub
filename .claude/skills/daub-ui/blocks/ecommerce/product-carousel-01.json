@@ -1,0 +1,328 @@
+{
+  "root": "product-carousel-section",
+  "elements": {
+    "product-carousel-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "container": true
+      },
+      "children": [
+        "carousel-header",
+        "product-grid"
+      ]
+    },
+    "carousel-header": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "justify": "between",
+        "align": "center"
+      },
+      "children": [
+        "carousel-title",
+        "carousel-nav"
+      ]
+    },
+    "carousel-title": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "carousel-heading",
+        "carousel-subtitle"
+      ]
+    },
+    "carousel-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Featured Products",
+        "weight": "bold"
+      }
+    },
+    "carousel-subtitle": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Hand-picked by our editors this week",
+        "variant": "muted"
+      }
+    },
+    "carousel-nav": {
+      "type": "ButtonGroup",
+      "children": [
+        "prev-button",
+        "next-button"
+      ]
+    },
+    "prev-button": {
+      "type": "Button",
+      "props": {
+        "label": "",
+        "variant": "outline",
+        "icon": "chevron-left"
+      }
+    },
+    "next-button": {
+      "type": "Button",
+      "props": {
+        "label": "",
+        "variant": "outline",
+        "icon": "chevron-right"
+      }
+    },
+    "product-grid": {
+      "type": "Grid",
+      "props": {
+        "columns": 4,
+        "gap": 3
+      },
+      "children": [
+        "featured-1",
+        "featured-2",
+        "featured-3",
+        "featured-4"
+      ]
+    },
+    "featured-1": {
+      "type": "Card",
+      "children": [
+        "featured-1-content"
+      ]
+    },
+    "featured-1-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "featured-1-image",
+        "featured-1-name",
+        "featured-1-desc",
+        "featured-1-price",
+        "featured-1-badge"
+      ]
+    },
+    "featured-1-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/macbook/400/300",
+        "alt": "Apple MacBook Air M3",
+        "height": 180
+      }
+    },
+    "featured-1-name": {
+      "type": "Text",
+      "props": {
+        "tag": "h4",
+        "content": "Apple MacBook Air M3",
+        "weight": "bold"
+      }
+    },
+    "featured-1-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "The world's best consumer laptop, now with M3 chip",
+        "variant": "muted"
+      }
+    },
+    "featured-1-price": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "$1,099.00",
+        "weight": "bold"
+      }
+    },
+    "featured-1-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "New Arrival",
+        "variant": "new"
+      }
+    },
+    "featured-2": {
+      "type": "Card",
+      "children": [
+        "featured-2-content"
+      ]
+    },
+    "featured-2-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "featured-2-image",
+        "featured-2-name",
+        "featured-2-desc",
+        "featured-2-price",
+        "featured-2-badge"
+      ]
+    },
+    "featured-2-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/galaxy25/400/300",
+        "alt": "Samsung Galaxy S25 Ultra",
+        "height": 180
+      }
+    },
+    "featured-2-name": {
+      "type": "Text",
+      "props": {
+        "tag": "h4",
+        "content": "Samsung Galaxy S25 Ultra",
+        "weight": "bold"
+      }
+    },
+    "featured-2-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "AI-powered smartphone with titanium design",
+        "variant": "muted"
+      }
+    },
+    "featured-2-price": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "$1,299.99",
+        "weight": "bold"
+      }
+    },
+    "featured-2-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "Editor's Pick",
+        "variant": "info"
+      }
+    },
+    "featured-3": {
+      "type": "Card",
+      "children": [
+        "featured-3-content"
+      ]
+    },
+    "featured-3-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "featured-3-image",
+        "featured-3-name",
+        "featured-3-desc",
+        "featured-3-price",
+        "featured-3-badge"
+      ]
+    },
+    "featured-3-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/nikedn/400/300",
+        "alt": "Nike Air Max Dn sneakers",
+        "height": 180
+      }
+    },
+    "featured-3-name": {
+      "type": "Text",
+      "props": {
+        "tag": "h4",
+        "content": "Nike Air Max Dn",
+        "weight": "bold"
+      }
+    },
+    "featured-3-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Dynamic Air technology for next-level cushioning",
+        "variant": "muted"
+      }
+    },
+    "featured-3-price": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "$159.99",
+        "weight": "bold"
+      }
+    },
+    "featured-3-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "Trending",
+        "variant": "warning"
+      }
+    },
+    "featured-4": {
+      "type": "Card",
+      "children": [
+        "featured-4-content"
+      ]
+    },
+    "featured-4-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "featured-4-image",
+        "featured-4-name",
+        "featured-4-desc",
+        "featured-4-price",
+        "featured-4-badge"
+      ]
+    },
+    "featured-4-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/dysonair/400/300",
+        "alt": "Dyson Airwrap Complete",
+        "height": 180
+      }
+    },
+    "featured-4-name": {
+      "type": "Text",
+      "props": {
+        "tag": "h4",
+        "content": "Dyson Airwrap Complete",
+        "weight": "bold"
+      }
+    },
+    "featured-4-desc": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Multi-styler with Coanda air technology",
+        "variant": "muted"
+      }
+    },
+    "featured-4-price": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "$599.99",
+        "weight": "bold"
+      }
+    },
+    "featured-4-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "Bestseller",
+        "variant": "success"
+      }
+    }
+  }
+}

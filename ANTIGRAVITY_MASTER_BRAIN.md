@@ -35,6 +35,7 @@ Khi cần tra cứu thông tin nghiệp vụ và kỹ thuật, BẮT BUỘC đ�
 - **Quy trình làm việc của Agent:** [`docs/guides/AGENT_WORKFLOW.md`](./docs/guides/AGENT_WORKFLOW.md)
 - **Quy tắc kỹ sư đa vai trò:** [`docs/guides/Senior Multi-Role.md`](./docs/guides/Senior%20Multi-Role.md)
 - **Báo cáo tái cấu trúc chuẩn Enterprise:** [`docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md`](./docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md)
+- **Báo cáo triển khai & đóng gói OCR Microservice v2.0 (Air-Gapped VLAN):** [`docs/guides/OCR_DEPLOYMENT_REPORT.md`](./docs/guides/OCR_DEPLOYMENT_REPORT.md)
 
 ### 2.4. Quy chuẩn Thiết kế UI/UX — Anti-AI-Slop (`docs/design/`)
 - **Kim chỉ nam Thiết kế Bản sắc Quân sự:** [`docs/design/DESIGN.md`](./docs/design/DESIGN.md)

@@ -27,9 +27,26 @@ if sys.platform == "win32":
             reconfig_err(encoding="utf-8", errors="replace")
     except Exception:
         pass
+
+# ═══════════════════════════════════════════════════════════════
+# Air-Gapped Hardening: Ép offline mode và triệt tiêu telemetry
+# ═══════════════════════════════════════════════════════════════
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+os.environ.setdefault("DO_NOT_TRACK", "1")
+os.environ.setdefault("DISABLE_TELEMETRY", "1")
+os.environ.setdefault("SCARF_NO_ANALYTICS", "1")
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+os.environ.setdefault("DISABLE_PADDLE_UPDATE_CHECK", "1")
+os.environ.setdefault("FLAGS_use_mkldnn", "0")
+
 import json
 import re
 import logging
+import concurrent.futures
 from typing import List, Optional, Any, Tuple
 from contextlib import asynccontextmanager
 
@@ -61,6 +78,9 @@ OCR_ENGINE = os.environ.get("OCR_ENGINE", "auto").lower()
 LOCAL_MODEL_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "model_weight", "MonkeyOCRv2-B-Parsing"
 )
+LOCAL_PADDLE_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "model_weight", "paddleocr"
+)
 if os.path.isdir(LOCAL_MODEL_DIR) and not os.environ.get("MONKEY_MODEL_ID"):
     MONKEY_MODEL_ID = LOCAL_MODEL_DIR
 else:
@@ -71,6 +91,7 @@ MONKEY_DEVICE = os.environ.get("MONKEY_DEVICE", "auto")  # "auto" | "cpu" | "cud
 DEFAULT_DPI    = int(os.environ.get("OCR_DEFAULT_DPI", "150"))
 MAX_DPI        = int(os.environ.get("OCR_MAX_DPI", "300"))
 PORT           = int(os.environ.get("PORT", "8002"))
+HOST           = os.environ.get("HOST", "0.0.0.0")
 
 
 
@@ -100,6 +121,9 @@ def _load_monkey():
         device = MONKEY_DEVICE
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        if os.environ.get("HF_HUB_OFFLINE") == "1":
+            logger.info("[MonkeyOCRv2] Offline mode is enabled (HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1)")
 
         logger.info(
             f"[MonkeyOCRv2] Nạp model '{MONKEY_MODEL_ID}' lên {device}..."
@@ -144,14 +168,29 @@ def _load_monkey():
 
 # ─── PaddleOCR loader (fallback) ─────────────────────────────
 def _load_paddle():
-    """Lazy-load PaddleOCR làm fallback hoặc engine chính."""
+    """Lazy-load PaddleOCR làm fallback hoặc engine chính (ưu tiên weights nội bộ)."""
     global _paddle_engine, _active_engine
     if _paddle_engine is not None:
         return True
     try:
-        logger.info("[PaddleOCR] Khởi tạo PaddleOCR(use_angle_cls=True, lang='vi')...")
         from paddleocr import PaddleOCR  # pyright: ignore[reportMissingImports] # type: ignore
-        _paddle_engine = PaddleOCR(use_angle_cls=True, lang="vi", show_log=False)
+        det_dir = os.path.join(LOCAL_PADDLE_DIR, "det", "en_PP-OCRv3_det_infer")
+        rec_dir = os.path.join(LOCAL_PADDLE_DIR, "rec", "latin_PP-OCRv3_rec_infer")
+        cls_dir = os.path.join(LOCAL_PADDLE_DIR, "cls", "ch_ppocr_mobile_v2.0_cls_infer")
+
+        if os.path.isdir(det_dir) and os.path.isdir(rec_dir) and os.path.isdir(cls_dir):
+            logger.info(f"[PaddleOCR] Sử dụng trọng số nội bộ: {LOCAL_PADDLE_DIR}")
+            _paddle_engine = PaddleOCR(
+                use_angle_cls=True,
+                lang="vi",
+                det_model_dir=det_dir,
+                rec_model_dir=rec_dir,
+                cls_model_dir=cls_dir,
+                show_log=False,
+            )
+        else:
+            logger.info("[PaddleOCR] Khởi tạo PaddleOCR(use_angle_cls=True, lang='vi')...")
+            _paddle_engine = PaddleOCR(use_angle_cls=True, lang="vi", show_log=False)
         logger.info("[PaddleOCR] ✅ Sẵn sàng!")
         _active_engine = "paddleocr"
         return True
@@ -280,32 +319,62 @@ def _ocr_with_monkey(pil_image: Image.Image) -> Tuple[str, float]:
     if _monkey_processor is None or _monkey_model is None:
         raise RuntimeError("MonkeyOCRv2 model hoặc processor chưa được khởi tạo!")
 
+    if _monkey_device == "cpu" and os.environ.get("MONKEY_FORCE_CPU_OCR") != "1":
+        raise RuntimeError(
+            "Môi trường hiện tại vận hành trên CPU (không có CUDA). "
+            "Tự động kích hoạt PaddleOCR fallback để đảm bảo SLA tốc độ < 10s theo quy chuẩn QK7."
+        )
+
     import torch  # pyright: ignore[reportMissingImports] # type: ignore
 
-    prompt = (
-        "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
-        "<|im_start|>user\n<image>\n"
-        "Please recognize the text in this document image. "
-        "Preserve the reading order and layout structure. "
-        "Output structured text with correct Vietnamese diacritics. "
-        "For two-column layout, output left column first then right column.\n"
-        "<|im_end|>\n<|im_start|>assistant\n"
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": pil_image},
+                {
+                    "type": "text",
+                    "text": (
+                        "Please recognize the text in this document image. "
+                        "Preserve the reading order and layout structure. "
+                        "Output structured text with correct Vietnamese diacritics. "
+                        "For two-column layout, output left column first then right column."
+                    ),
+                },
+            ],
+        }
+    ]
+    prompt = _monkey_processor.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
     )
 
     inputs = _monkey_processor(
-        text=prompt,
-        images=pil_image,
+        text=[prompt],
+        images=[pil_image],
+        padding=True,
         return_tensors="pt",
     ).to(_monkey_device)
 
-    with torch.no_grad():
-        output_ids = _monkey_model.generate(
-            **inputs,
-            max_new_tokens=2048,
-            do_sample=False,
-            temperature=1.0,
-            repetition_penalty=1.05,
-        )
+    def _do_generate():
+        with torch.no_grad():
+            return _monkey_model.generate(
+                **inputs,
+                max_new_tokens=int(os.environ.get("MONKEY_MAX_NEW_TOKENS", "512")),
+                do_sample=False,
+                temperature=1.0,
+                repetition_penalty=1.05,
+            )
+
+    timeout = float(os.environ.get("MONKEY_TIMEOUT", "4.0" if _monkey_device == "cpu" else "60.0"))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_do_generate)
+        try:
+            output_ids = future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise TimeoutError(
+                f"MonkeyOCRv2 vượt quá ngưỡng thời gian {timeout}s trên {_monkey_device}. "
+                "Tự động kích hoạt PaddleOCR fallback để đảm bảo SLA < 10s."
+            )
 
     # Chỉ lấy phần sinh ra (bỏ input tokens)
     input_len  = inputs["input_ids"].shape[1]
@@ -636,12 +705,50 @@ def list_engines():
 
 
 # ═══════════════════════════════════════════════════════════════
+# GET /api/ocr/weights-status — Trạng thái trọng số Air-Gapped
+# ═══════════════════════════════════════════════════════════════
+@app.get("/api/ocr/weights-status")
+def weights_status():
+    """Kiểm tra sự tồn tại và tính sẵn sàng của weights trong môi trường Air-Gapped."""
+    det_dir = os.path.join(LOCAL_PADDLE_DIR, "det", "en_PP-OCRv3_det_infer")
+    rec_dir = os.path.join(LOCAL_PADDLE_DIR, "rec", "latin_PP-OCRv3_rec_infer")
+    cls_dir = os.path.join(LOCAL_PADDLE_DIR, "cls", "ch_ppocr_mobile_v2.0_cls_infer")
+    paddle_complete = os.path.isdir(det_dir) and os.path.isdir(rec_dir) and os.path.isdir(cls_dir)
+
+    monkey_safetensors = os.path.join(LOCAL_MODEL_DIR, "model.safetensors")
+    monkey_complete = os.path.isdir(LOCAL_MODEL_DIR) and os.path.isfile(monkey_safetensors)
+
+    return {
+        "status": "ok",
+        "air_gapped_ready": monkey_complete and paddle_complete,
+        "engine_active": _active_engine or "not_loaded",
+        "monkey": {
+            "model_id": MONKEY_MODEL_ID,
+            "is_local_path": os.path.isdir(MONKEY_MODEL_ID),
+            "local_dir": LOCAL_MODEL_DIR,
+            "exists": monkey_complete,
+            "safetensors_present": os.path.isfile(monkey_safetensors),
+            "loaded": _monkey_model is not None,
+            "device": _monkey_device or "n/a",
+        },
+        "paddleocr": {
+            "local_dir": LOCAL_PADDLE_DIR,
+            "exists": paddle_complete,
+            "det_exists": os.path.isdir(det_dir),
+            "rec_exists": os.path.isdir(rec_dir),
+            "cls_exists": os.path.isdir(cls_dir),
+            "loaded": _paddle_engine is not None,
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
 # Entry point
 # ═══════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
+        host=HOST,
         port=PORT,
         reload=False,
         workers=1,

@@ -1,0 +1,236 @@
+{
+  "root": "case-study-card",
+  "elements": {
+    "case-study-card": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5,
+        "container": "wide"
+      },
+      "children": [
+        "case-header",
+        "case-content"
+      ]
+    },
+    "case-header": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1,
+        "align": "center"
+      },
+      "children": [
+        "case-badge",
+        "case-title"
+      ]
+    },
+    "case-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "Case Study",
+        "variant": "success"
+      }
+    },
+    "case-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "How Shopify scaled checkout to 1M+ concurrent users",
+        "align": "center"
+      }
+    },
+    "case-content": {
+      "type": "Surface",
+      "props": {
+        "variant": "bordered"
+      },
+      "children": [
+        "case-inner"
+      ]
+    },
+    "case-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5
+      },
+      "children": [
+        "metrics-row",
+        "case-sep",
+        "case-body"
+      ]
+    },
+    "metrics-row": {
+      "type": "Grid",
+      "props": {
+        "columns": 4,
+        "gap": 4
+      },
+      "children": [
+        "metric-1",
+        "metric-2",
+        "metric-3",
+        "metric-4"
+      ]
+    },
+    "metric-1": {
+      "type": "StatCard",
+      "props": {
+        "value": "99.99%",
+        "label": "Uptime during BFCM",
+        "icon": "shield-check"
+      }
+    },
+    "metric-2": {
+      "type": "StatCard",
+      "props": {
+        "value": "340ms",
+        "label": "Avg. checkout latency",
+        "icon": "zap",
+        "trend": "down",
+        "trendValue": "62%"
+      }
+    },
+    "metric-3": {
+      "type": "StatCard",
+      "props": {
+        "value": "$9.3B",
+        "label": "GMV processed",
+        "icon": "dollar-sign",
+        "trend": "up",
+        "trendValue": "28%"
+      }
+    },
+    "metric-4": {
+      "type": "StatCard",
+      "props": {
+        "value": "1.2M",
+        "label": "Peak concurrent sessions",
+        "icon": "users"
+      }
+    },
+    "case-sep": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "case-body": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 5
+      },
+      "children": [
+        "case-description",
+        "case-quote-block"
+      ]
+    },
+    "case-description": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "case-challenge-label",
+        "case-challenge-text",
+        "case-solution-label",
+        "case-solution-text"
+      ]
+    },
+    "case-challenge-label": {
+      "type": "Text",
+      "props": {
+        "tag": "h5",
+        "content": "The Challenge"
+      }
+    },
+    "case-challenge-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "During Black Friday 2025, Shopify's checkout infrastructure was struggling with cascading timeouts above 800K concurrent sessions. Their existing CDN and database layer couldn't handle the burst traffic patterns."
+      }
+    },
+    "case-solution-label": {
+      "type": "Text",
+      "props": {
+        "tag": "h5",
+        "content": "The Solution"
+      }
+    },
+    "case-solution-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "By migrating to our edge compute platform with automatic regional failover and connection pooling, Shopify achieved sub-400ms checkout latency globally and sustained 1.2M concurrent sessions without degradation."
+      }
+    },
+    "case-quote-block": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "case-quote-text",
+        "case-quote-author"
+      ]
+    },
+    "case-quote-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "“This was the smoothest BFCM we've ever had. Zero pages, zero incidents, and our merchants saw a 12% lift in conversion rates from the faster checkout.”"
+      }
+    },
+    "case-quote-author": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "case-author-avatar",
+        "case-author-info"
+      ]
+    },
+    "case-author-avatar": {
+      "type": "Avatar",
+      "props": {
+        "initials": "JL",
+        "src": "https://i.pravatar.cc/80?u=jean-luc"
+      }
+    },
+    "case-author-info": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "case-author-name",
+        "case-author-role"
+      ]
+    },
+    "case-author-name": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Jean-Luc Bouchard",
+        "weight": "semibold"
+      }
+    },
+    "case-author-role": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "SVP Infrastructure, Shopify",
+        "variant": "muted"
+      }
+    }
+  }
+}

@@ -51,17 +51,19 @@ Trước khi bắt đầu thực hiện bất kỳ lệnh shell, viết mã hay 
    * Sau khi hoàn tất kiểm thử và xác minh chất lượng, Agent tuyệt đối **KHÔNG tự động commit** (`git commit`) và **KHÔNG tự động push** (`git push`).
    * Mọi thay đổi mã nguồn chỉ được lưu lại ở working tree để USER trực tiếp kiểm tra và đánh giá.
    * **Quy trình Commit và Push:** Chỉ kích hoạt `git commit` và `git push origin <nhánh>` khi nhận được câu lệnh cụ thể từ USER (ví dụ: *"đẩy lên nhánh haianh-dev github"*, *"triển khai đẩy lên nhánh main"*...).
+   * **Điều kiện tiên quyết trước khi commit & push:** Ngay khi nhận được lệnh commit & push từ USER, Agent **bắt buộc tự động rà soát và cập nhật toàn bộ các tài liệu Markdown** (`README.md`, `SYSTEM_ARCHITECTURE.md`, `docs/CHANGELOG.md`...) nếu dự án có bất kỳ thay đổi nào trước khi thực hiện commit và push lên nhánh.
 
 ---
 
-## 📝 Bước 3: Cập nhật tài liệu sau khi hoàn thành (Post-task Documentation Update)
+## 📝 Bước 3: Cập nhật tài liệu sau khi hoàn thành & Đồng bộ trước khi Commit/Push (Documentation Sync)
 
-Ngay sau khi hoàn thành công việc và kiểm thử thành công:
+Bất kỳ khi nào có thay đổi mã nguồn, tính năng mới hoặc trước khi kích hoạt quy trình commit & push:
 
-1. **Cập nhật đồng bộ các tài liệu Markdown liên quan:**
-   * **Nếu phát triển tính năng mới:** Cập nhật mô tả tính năng, danh mục API, sơ đồ kiến trúc trong `README.md` và `SYSTEM_ARCHITECTURE.md`.
+1. **Tự động cập nhật đồng bộ toàn bộ tài liệu Markdown liên quan:**
+   * **Nếu có thay đổi mã nguồn, tính năng, script hoặc cấu hình:** Tự động rà soát và cập nhật `README.md`, `SYSTEM_ARCHITECTURE.md`, và ghi nhận chi tiết vào `docs/CHANGELOG.md`.
    * **Nếu khắc phục sự cố / bug fixing:** Ghi lại triệu chứng, nguyên nhân gốc rễ, giải pháp kỹ thuật và bài học phòng ngừa vào `TROUBLESHOOTING_HISTORY.md` và `docs/CHANGELOG.md`.
    * **Nếu có thay đổi schema CSDL hoặc cấu hình hệ thống:** Ghi chú chi tiết trong `SETUP_SERVER.md` và `SYSTEM_ARCHITECTURE.md`.
+   * **Đảm bảo không bỏ sót:** Trước khi commit và push lên Git theo lệnh của USER, toàn bộ tài liệu Markdown phải được cập nhật đầy đủ và chính xác 100%.
 
 2. **Đảm bảo tính nhất quán tuyệt đối:**
    * Tài liệu dự án phải luôn là nguồn chân lý duy nhất (Single Source of Truth), phản ánh chính xác 100% trạng thái hoạt động thực tế của mã nguồn và hệ thống.

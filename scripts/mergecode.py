@@ -2,28 +2,31 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
-QK7 PROJECT MERGER — Gộp TOÀN BỘ source code dự án vào 1 file text (v4.0)
+QK7 PROJECT MERGER — Gộp Source Code Backend (BE) & Frontend (FE) Dự Án (v5.0)
 ================================================================================
 
-CHẾ ĐỘ MẶC ĐỊNH: HYBRID (KHUYẾN NGHỊ)
-    Bước 1 — Gộp EXPLICIT_FILES (thứ tự ưu tiên cho tài liệu).
-    Bước 2 — AUTO-SCAN backend/, frontend/, fingerprint/, boxchat/,
-             ocr-service/, tools/ để bắt MỌI file còn lại (kể cả file mới).
-    Kết quả: merged_code.txt chứa TOÀN BỘ code dự án.
+CHẾ ĐỘ MẶC ĐỊNH: BE & FE SOURCE CODE (KHUYẾN NGHỊ)
+    • Quét và gộp TOÀN BỘ file nguồn của Backend (backend/) và Frontend (frontend/).
+    • TỰ ĐỘNG LOẠI TRỪ:
+        - Thư viện / dependencies: node_modules, package-lock.json, dist, build, public/assets...
+        - File môi trường: .env, .env.*, *.env...
+        - Scripts & công cụ: scripts/, tools/, *.bat, *.ps1, *.sh...
+        - Tệp văn bản & tài liệu: *.txt, *.md, *.rst, *.pdf...
+        - Tệp kiểm thử: test/, tests/, __tests__/, *.test.*, *.spec.*, test-*.js...
+    • TỰ ĐỘNG BẢO MẬT: Che mờ khóa nhạy cảm (JWT_SECRET, mật khẩu, private key, token).
 
-CÁC CHẾ ĐỘ KHÁC:
-    --explicit-only          → CHỈ gộp EXPLICIT_FILES (không auto-scan)
-    --include-only <dir>...  → Gộp theo allowlist thư mục
-    --all                    → Gộp gần hết dự án (exclude mode)
+CÁC CHẾ ĐỘ MỞ RỘNG (TÙY CHỌN):
+    --all              → Gộp toàn bộ dự án (exclude mode)
+    --full-stack       → Gộp BE, FE cùng boxchat, fingerprint, ocr-service
+    --include-tests    → Cho phép gộp thêm tệp kiểm thử (test/spec)
+    --include-scripts  → Cho phép gộp thêm scripts khởi chạy
+    --include-docs     → Cho phép gộp thêm tài liệu markdown (.md)
+    --include-only     → Gộp theo danh sách thư mục tự chọn
 
 Cách dùng:
-    python mergecode.py                              # HYBRID (mặc định)
-    python mergecode.py -o merged_full.txt           # đổi tên output
-    python mergecode.py --explicit-only              # chỉ explicit
-    python mergecode.py --all                        # exclude mode
-    python mergecode.py --include-only backend/src   # allowlist mode
-
-Yêu cầu: Python ≥ 3.8. Không cần cài thêm thư viện.
+    python scripts/mergecode.py                     # Mặc định: Gộp toàn bộ BE & FE
+    python scripts/mergecode.py -o merged_be_fe.txt # Đổi tên tệp đầu ra
+    python scripts/mergecode.py --full-stack        # Gộp cả AI Boxchat & Fingerprint
 ================================================================================
 """
 
@@ -39,240 +42,88 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Iterator
 
-__version__ = "4.1.0"
+__version__ = "5.0.0"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DANH SÁCH FILE CẦN GỘP — THỨ TỰ ĐỌC CHO AI
-# ═══════════════════════════════════════════════════════════════════════════════
-# • Đường dẫn tính từ gốc dự án (thư mục chứa mergecode.py).
-# • File gộp ĐÚNG THỨ TỰ khai báo (tài liệu trước → code sau).
-# • File không tồn tại → cảnh báo, bỏ qua.
-# • File MỚI (chưa có trong list) → tự động bắt bởi AUTO-SCAN.
-# ═══════════════════════════════════════════════════════════════════════════════
-EXPLICIT_FILES: list[str] = [
-    # ═══ 1. HIẾN PHÁP & TÀI LIỆU KIẾN TRÚC (đọc trước để hiểu dự án) ═══
-    "ANTIGRAVITY_MASTER_BRAIN.md",
-    "README.md",
-    "docs/architecture/SYSTEM_ARCHITECTURE.md",
-    "docs/security/SECURITY.md",
-    "docs/security/SECURITY_AUDIT_REPORT.md",
-    "docs/security/strix-pentest-instructions.md",
-    "docs/guides/SETUP_SERVER.md",
-    "docs/guides/TROUBLESHOOTING_HISTORY.md",
-    "docs/guides/ROUTING_CONVENTION.md",
-    "docs/guides/AGENT_WORKFLOW.md",
-    "docs/guides/Senior Multi-Role.md",
-    "docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md",
-    "docs/design/DESIGN.md",
-    "docs/design/SKILL.md",
-    "docs/design/System Architect.md",
-
-    # ═══ 2. PROJECT ROOT & CONFIG ═══
-    "package.json",
-    "docker-compose.yml",
-    ".env.example",
-    ".gitleaks.toml",
-    ".semgrepignore",
-    "config/tsconfig.json",
-    "config/zap.yaml",
-    "config/skills-lock.json",
-    "config/package-lock.json",
-
-    # ═══ 3. SCRIPTS KHỞI CHẠY & TIỆN ÍCH ═══
-    "scripts/s.bat",
-    "scripts/s-dev.bat",
-    "scripts/start-ai.bat",
-    "scripts/load-env.bat",
-    "scripts/generate-client-config.bat",
-    "scripts/mergecode.py",
-
-    # ═══ 4. BACKEND — ROOT (Express Gateway :8000) ═══
-    "backend/s.bat",
-    "backend/server.js",
-    "backend/swagger.js",
-    "backend/package.json",
-    "backend/package-lock.json",
-    "backend/pdf-parser.js",
-    "backend/setupadmin.js",
-    "backend/setuppw.js",
-    "backend/test-pipeline.js",
-    "backend/test-scan-parse.js",
-    "backend/.env.example",
-
-    # ═══ 5. BACKEND — CONFIG & MIGRATIONS ═══
-    "backend/config/parser-patterns.json",
-    "backend/migrations/create_revision_proposals.cjs",
-
-    # ═══ 6. BACKEND — SRC (Logic nghiệp vụ) ═══
-    "backend/src/db.js",
-    "backend/src/clock-authority.js",
-    "backend/src/fingerprint-ws.js",
-    "backend/src/pdf-router.js",
-    "backend/src/permissions.js",
-    "backend/src/route-permissions.js",
-    "backend/src/sessions.js",
-    "backend/src/system-config.js",
-    "backend/src/unit-scope.js",
-    "backend/src/user-roles.js",
-    "backend/src/approval-workflow.js",
-    "backend/src/audit-log-cleaner.js",
-    "backend/src/admin-routes.js",
-    "backend/src/ai-routes.js",
-    "backend/src/lecture-routes.js",
-
-    # ═══ 7. FINGERPRINT — ZKTeco ZK9500 Agent (:9001) ═══
-    "fingerprint/agent.py",
-    "fingerprint/zk_service.py",
-    "fingerprint/s-agent.bat",
-    "fingerprint/requirements.txt",
-    "fingerprint/device_id.txt",
-
-    # ═══ 8. FRONTEND — ROOT CONFIG ═══
-    "frontend/package.json",
-    "frontend/package-lock.json",
-    "frontend/postcss.config.js",
-    "frontend/tailwind.config.js",
-    "frontend/tsconfig.json",
-    "frontend/vite.config.ts",
-    "frontend/index.html",
-
-    # ═══ 9. FRONTEND — SRC ROOT ═══
-    "frontend/src/App.tsx",
-    "frontend/src/main.tsx",
-    "frontend/src/index.css",
-    "frontend/src/vite-env.d.ts",
-
-    # ═══ 10. FRONTEND — SERVICES (Tầng dịch vụ mạng) ═══
-    "frontend/src/services/http.ts",
-    "frontend/src/services/index.ts",
-    "frontend/src/services/api.ts",
-    "frontend/src/services/authService.ts",
-    "frontend/src/services/dashboardApi.ts",
-    "frontend/src/services/documentsApi.ts",
-    "frontend/src/services/usersApi.ts",
-    "frontend/src/services/documentService.ts",
-    "frontend/src/services/documentTypeService.ts",
-    "frontend/src/services/fileService.ts",
-    "frontend/src/services/userService.ts",
-    "frontend/src/services/roleService.ts",
-    "frontend/src/services/permissionService.ts",
-    "frontend/src/services/unitService.ts",
-    "frontend/src/services/securityLevelService.ts",
-    "frontend/src/services/militaryService.ts",
-    "frontend/src/services/logService.ts",
-    "frontend/src/services/systemService.ts",
-    "frontend/src/services/sessionService.ts",
-    "frontend/src/services/approvalService.ts",
-    "frontend/src/services/fingerprintService.ts",
-    "frontend/src/services/pinService.ts",
-    "frontend/src/services/aiService.ts",
-
-    # ═══ 11. FRONTEND — COMPONENTS (Admin modals) ═══
-    "frontend/src/components/users/AssignRoleModal.tsx",
-    "frontend/src/components/users/FingerprintEnrollModal.tsx",
-    "frontend/src/components/users/FingerprintScanModal.tsx",
-    "frontend/src/components/users/GrantPermissionModal.tsx",
-    "frontend/src/components/users/PinManageModal.tsx",
-    "frontend/src/components/users/PinVerifyModal.tsx",
-    "frontend/src/components/users/RolePermissionModal.tsx",
-    "frontend/src/components/users/UserCredentialsModal.tsx",
-    "frontend/src/components/users/UserFormModal.tsx",
-    "frontend/src/components/users/UserTable.tsx",
-    "frontend/src/components/users/UserViewPinModal.tsx",
-]
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# THƯ MỤC QUÉT TỰ ĐỘNG (chỉ dùng trong HYBRID mode)
-# ═══════════════════════════════════════════════════════════════════════════════
-AUTO_SCAN_DIRS = [
-    "backend",
-    "frontend",
-    "fingerprint",
-    "boxchat",
-    "ocr-service",
-    "tools",
-]
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# CẤU HÌNH CŨ — DÙNG CHO --include-only / --all
+# CẤU HÌNH LOẠI TRỪ (EXCLUSIONS)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-DEFAULT_INCLUDE_ONLY = [
-    "backend/config", "backend/migrations", "backend/src",
-    "boxchat", "fingerprint", "frontend", "tools",
-]
-
-DEFAULT_EXCLUDE_PATHS_IN_ALLOWLIST = [
-    "frontend/public",
-    "frontend/node_modules",
-    "backend/node_modules",
-    "boxchat/local_storage",
-    "boxchat/venv",
-    "ocr-service/venv",
-]
-
-DEFAULT_EXCLUDE_DIRS = {
-    ".git", ".svn", ".hg", ".bzr",
-    "node_modules", "bower_components", "jspm_packages",
-    ".venv", ".venv32", ".venv64", "venv", "env", "ENV",
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox",
-    ".idea", ".vscode", ".vs", ".settings",
+# Thư mục loại trừ tuyệt đối trong BE & FE mode
+EXCLUDE_DIRS = {
+    # Thư viện & dependencies
+    "node_modules", "bower_components", "vendor",
+    # Build & artifacts
     "dist", "build", "out", "target", "bin", "obj", "release",
     ".next", ".nuxt", ".svelte-kit", ".cache", ".parcel-cache",
-    "coverage", "htmlcov", ".nyc_output",
-    "uploads",
-    "logs", ".logs",
-    "local_storage",
-    "public",       # build output từ frontend
-    "certs",        # SSL certs — nhạy cảm
-    ".taste-skill",
+    "public", "assets", "uploads", "certs", "coverage", "htmlcov",
+    # Git & IDEs
+    ".git", ".svn", ".idea", ".vscode", ".vs", ".settings",
+    # Python caches & virtualenvs
+    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+    "venv", ".venv", "env", "ENV",
+    # Các phân hệ ngoài BE & FE (khi chạy BE-FE mode)
+    "scripts", "tools", "docs", "reports", "data", "config",
+    ".agents", ".agent", ".claude", ".design-references",
+    # Thư mục kiểm thử (nếu không có flag --include-tests)
+    "test", "tests", "__tests__", "testing", "spec", "specs",
 }
 
-DEFAULT_EXCLUDE_EXTS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", ".tiff", ".tif",
+# Các phân hệ mở rộng trong chế độ --full-stack
+FULLSTACK_DIRS = {
+    "backend", "frontend", "boxchat", "fingerprint", "ocr-service"
+}
+
+# Phần mở rộng loại trừ mặc định
+EXCLUDE_EXTS = {
+    # Tài liệu & tệp văn bản
+    ".md", ".txt", ".rst", ".rtf", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    # Scripts khởi chạy & shell
+    ".bat", ".ps1", ".sh", ".cmd", ".bash", ".vbs",
+    # Ảnh & Media
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", ".svg", ".tiff", ".tif",
     ".mp3", ".mp4", ".wav", ".webm", ".avi", ".mov", ".mkv", ".flac", ".ogg",
+    # Binaries & nén
     ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tgz", ".zst",
     ".exe", ".dll", ".so", ".dylib", ".bin", ".msi", ".dmg", ".app", ".o", ".a",
-    ".pyc", ".pyo", ".pyd", ".whl", ".egg",
-    ".class", ".jar", ".war", ".ear", ".nupkg",
-    ".onnx", ".pt", ".pth", ".h5", ".pkl", ".ckpt", ".safetensors", ".gguf",
-    ".npy", ".npz", ".joblib", ".pb", ".tflite",
-    ".traineddata",
+    ".pyc", ".pyo", ".pyd", ".whl", ".egg", ".class", ".jar",
+    ".traineddata", ".safetensors", ".pdiparams", ".pdmodel",
+    # Database cục bộ
     ".db", ".sqlite", ".sqlite3", ".mdb", ".accdb",
+    # Fonts
     ".ttf", ".otf", ".woff", ".woff2", ".eot",
-    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt",
-    ".log", ".tmp", ".cache", ".lock",
+    # Logs & Locks
+    ".log", ".tmp", ".cache", ".lock", ".lockb",
 }
 
-DEFAULT_EXCLUDE_FILES = {
-    "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
-    "poetry.lock", "Pipfile.lock", "composer.lock",
-    "Cargo.lock", "go.sum", "Gemfile.lock", "bun.lockb",
-    ".DS_Store", "Thumbs.db",
-    "merged_code.txt",
+# Tệp cụ thể loại trừ
+EXCLUDE_FILES = {
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "skills-lock.json",
+    "tsconfig.tsbuildinfo", "Thumbs.db", ".DS_Store",
+    "merged_code.txt", "QK7_FullSourceCode.txt",
 }
 
+# Mẫu tên tệp nhạy cảm (secrets)
 DEFAULT_SECRET_PATTERNS = [
     ".env", ".env.*", "*.env",
     "*.pem", "*.key", "*.crt", "*.p12", "*.pfx", "*.jks",
     "id_rsa", "id_ed25519",
 ]
 
+# Tệp ẩn được phép xem xét nếu cần
 ALLOWED_HIDDEN_FILES = {
-    ".gitignore", ".gitattributes", ".gitmodules",
-    ".dockerignore", ".editorconfig",
+    ".gitignore", ".gitattributes", ".dockerignore", ".editorconfig",
     ".eslintrc", ".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs",
     ".prettierrc", ".prettierrc.json", ".prettierrc.js",
-    ".babelrc", ".babelrc.json",
-    ".npmrc", ".nvmrc", ".yarnrc",
-    ".flaskenv", ".htaccess",
-    ".python-version", ".tool-versions",
-    ".gitleaks.toml",
+}
+
+# Phần mở rộng mã nguồn hợp lệ của BE và FE
+VALID_SOURCE_EXTS = {
+    ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".json", ".css", ".scss", ".html", ".sql"
 }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# HELPERS
+# HELPERS VÀ BỘ LỌC KIỂM THỬ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _match_any(text: str, patterns: list[str]) -> bool:
@@ -293,7 +144,23 @@ def _is_under(path: Path, parent: Path) -> bool:
             return False
 
 
+def is_test_file(path: Path) -> bool:
+    """Xác định tệp có phải tệp kiểm thử (test/spec) hay không."""
+    name = path.name.lower()
+    if name.startswith(("test-", "test_")):
+        return True
+    if name.endswith(("-test.js", "-test.ts", "-spec.js", "-spec.ts", ".test.js", ".test.ts", ".test.tsx", ".spec.js", ".spec.ts", ".spec.tsx")):
+        return True
+    if ".test." in name or ".spec." in name:
+        return True
+    for part in path.parts:
+        if part.lower() in {"test", "tests", "__tests__", "testing", "spec", "specs"}:
+            return True
+    return False
+
+
 def is_binary_file(path: Path, sample_size: int = 8192) -> bool:
+    """Kiểm tra tệp nhị phân."""
     try:
         with open(path, "rb") as f:
             chunk = f.read(sample_size)
@@ -308,12 +175,13 @@ def is_binary_file(path: Path, sample_size: int = 8192) -> bool:
         return False
     except UnicodeDecodeError:
         pass
-    text = chunk.decode("latin-1")
+    text = chunk.decode("latin-1", errors="ignore")
     non_printable = sum(1 for c in text if ord(c) < 32 and c not in "\n\r\t\f\b")
     return (non_printable / max(len(text), 1)) > 0.30
 
 
 def read_text_safe(path: Path) -> str:
+    """Đọc tệp văn bản an toàn đa bảng mã."""
     raw = path.read_bytes()
     for enc in ("utf-8", "utf-8-sig", "utf-16", "utf-16-le", "utf-16-be"):
         try:
@@ -326,28 +194,24 @@ def read_text_safe(path: Path) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 # BỘ LỌC TỰ ĐỘNG CHE MỜ BÍ MẬT (SECRET REDACTION FILTER)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 SECRET_REDACT_RULES = [
-    # 1. API Keys, Tokens & Khóa mã hóa nhạy cảm
     (
         re.compile(r'(?i)\b(FP_ENC_KEY|JWT_SECRET|API_KEY|SECRET_KEY|BRIDGE_TOKEN|FINGERPRINT_BRIDGE_TOKEN|ENCRYPTION_KEY|TOKEN_SECRET)\s*[:=]\s*["\']?([A-Za-z0-9+/=_\-\.]{12,})["\']?'),
         r'\1="[REDACTED_BY_SECURITY_POLICY]"'
     ),
-    # 2. Mật khẩu kết nối DB hoặc tài khoản admin
     (
         re.compile(r'(?i)\b(password|pwd|db_password|admin_password)\s*[:=]\s*["\']([^"\'\n\r]{3,})["\']'),
         r'\1="[REDACTED_PASSWORD]"'
     ),
-    # 3. Private Keys (RSA, EC, OPENSSH)
     (
         re.compile(r'-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'),
         '[REDACTED_PRIVATE_KEY]'
     ),
-    # 4. Bearer tokens
     (
         re.compile(r'(?i)\bBearer\s+[A-Za-z0-9_\-\.]{20,}'),
         'Bearer [REDACTED_BEARER_TOKEN]'
     ),
-    # 5. Connection String Password
     (
         re.compile(r'(?i)(Server=[\w\.\-]+;.*Password=)([^;]+)(;)'),
         r'\1[REDACTED_DB_PWD]\3'
@@ -356,291 +220,141 @@ SECRET_REDACT_RULES = [
 
 
 def redact_sensitive_content(text: str) -> str:
-    """Tự động phát hiện và che giấu các thông tin bí mật trước khi gộp vào tệp."""
+    """Tự động phát hiện và che giấu các thông tin bí mật trước khi ghi vào tệp."""
     redacted = text
     for pattern, replacement in SECRET_REDACT_RULES:
         redacted = pattern.sub(replacement, redacted)
     return redacted
 
 
-def _file_allowed(
-    file_path: Path,
-    rel: Path,
-    exclude_exts: set[str],
-    exclude_files: set[str],
-    secret_patterns: list[str],
-    include_hidden: bool,
-    extra_lower: list[str],
-) -> bool:
-    name = file_path.name
-    rel_posix = rel.as_posix()
-
-    if name in exclude_files:
-        return False
-    if file_path.suffix.lower() in exclude_exts:
-        return False
-    if secret_patterns and (
-        _match_any(name, secret_patterns)
-        or _match_any(rel_posix, secret_patterns)
-    ):
-        return False
-    if (
-        not include_hidden
-        and name.startswith(".")
-        and name not in ALLOWED_HIDDEN_FILES
-    ):
-        return False
-    if _match_any(rel_posix, extra_lower) or _match_any(name, extra_lower):
-        return False
-    return True
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# COLLECT — EXPLICIT MODE
+# BỘ THU THẬP FILE NGUỒN BE VÀ FE (CHÍNH)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def collect_files_explicit(
+def collect_be_fe_files(
     root: Path,
-    explicit_files: list[str],
-    extra_excludes: list[str],
-    secret_patterns: list[str],
-) -> tuple[list[Path], list[str]]:
-    extra_lower = [p.lower() for p in extra_excludes]
-    found: list[Path] = []
-    missing: list[str] = []
-    seen: set[str] = set()
-
-    for rel_str in explicit_files:
-        full = (root / rel_str).resolve()
-
-        if not full.exists() or not full.is_file():
-            missing.append(rel_str)
-            continue
-
-        try:
-            rel = full.relative_to(root)
-        except ValueError:
-            missing.append(rel_str)
-            continue
-
-        rel_posix = rel.as_posix()
-        if rel_posix in seen:
-            continue
-
-        if _match_any(rel_posix, extra_lower) or _match_any(full.name, extra_lower):
-            continue
-
-        if secret_patterns and _match_any(full.name, secret_patterns):
-            print(
-                f"[SKIP] {rel_posix} — khớp secret pattern (dùng --include-env để gộp)",
-                file=sys.stderr,
-            )
-            continue
-
-        seen.add(rel_posix)
-        found.append(rel)
-
-    return found, missing
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# COLLECT — AUTO-SCAN (HYBRID MODE fallback)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def collect_files_autoscan(
-    root: Path,
-    scan_dirs: list[str],
-    already_seen: set[str],
-    exclude_dirs: set[str],
-    exclude_files: set[str],
-    exclude_exts: set[str],
-    extra_excludes: list[str],
+    include_tests: bool = False,
+    include_scripts: bool = False,
+    include_docs: bool = False,
+    include_env: bool = False,
+    full_stack: bool = False,
+    extra_excludes: list[str] | None = None,
 ) -> list[Path]:
     """
-    Quét các thư mục dự án để tìm file MỚI chưa có trong EXPLICIT_FILES.
-    Áp dụng đầy đủ bộ lọc an toàn: bỏ binary, .env, uploads, node_modules, ...
+    Thu thập toàn bộ mã nguồn của Backend và Frontend (hoặc full-stack nếu bật).
+    Loại trừ hoàn toàn thư viện, .env, scripts, txt, md, test files.
     """
-    extra_lower = [p.lower() for p in extra_excludes]
-    found: list[Path] = []
+    extra_lower = [p.lower() for p in (extra_excludes or [])]
+    target_names = ["backend", "frontend"]
+    if full_stack:
+        target_names.extend(["boxchat", "fingerprint", "ocr-service"])
 
-    for subdir_name in scan_dirs:
-        subdir = root / subdir_name
-        if not subdir.exists() or not subdir.is_dir():
+    active_exclude_dirs = set(EXCLUDE_DIRS)
+    if full_stack:
+        active_exclude_dirs -= {"boxchat", "fingerprint", "ocr-service"}
+    if include_scripts:
+        active_exclude_dirs -= {"scripts", "tools"}
+
+    active_exclude_exts = set(EXCLUDE_EXTS)
+    if include_docs:
+        active_exclude_exts.discard(".md")
+    if include_scripts:
+        active_exclude_exts -= {".bat", ".ps1", ".sh", ".cmd"}
+
+    secret_patterns = [] if include_env else DEFAULT_SECRET_PATTERNS
+
+    found: list[Path] = []
+    seen: set[str] = set()
+
+    for target_name in target_names:
+        target_dir = root / target_name
+        if not target_dir.exists() or not target_dir.is_dir():
             continue
 
-        for current_dir_str, dirnames, filenames in os.walk(subdir, followlinks=False):
+        for current_dir_str, dirnames, filenames in os.walk(target_dir, followlinks=False):
             current = Path(current_dir_str)
 
-            # Prune excluded dirs (in-place to affect os.walk)
+            # Prune excluded directories
             dirnames[:] = [
                 d for d in dirnames
-                if d not in exclude_dirs
+                if d not in active_exclude_dirs
                 and not _match_any(d, extra_lower)
+                and (include_tests or d.lower() not in {"test", "tests", "__tests__", "testing", "spec", "specs"})
                 and not d.startswith(".")
             ]
 
             for name in filenames:
                 file_path = current / name
-
-                try:
-                    rel = file_path.relative_to(root)
-                except ValueError:
-                    continue
+                rel = file_path.relative_to(root)
                 rel_posix = rel.as_posix()
 
-                if rel_posix in already_seen:
+                if rel_posix in seen:
                     continue
 
-                if name in exclude_files:
+                # 1. Loại trừ theo danh mục tệp
+                if name in EXCLUDE_FILES or _match_any(name, extra_lower) or _match_any(rel_posix, extra_lower):
                     continue
-                if file_path.suffix.lower() in exclude_exts:
+
+                # 2. Loại trừ theo phần mở rộng
+                ext = file_path.suffix.lower()
+                if ext in active_exclude_exts:
                     continue
-                if _match_any(name, DEFAULT_SECRET_PATTERNS):
+
+                # 3. Chỉ lấy phần mở rộng mã nguồn hợp lệ (trừ khi có cờ đặc biệt)
+                if ext not in VALID_SOURCE_EXTS:
+                    if not (include_docs and ext == ".md") and not (include_scripts and ext in {".bat", ".ps1", ".sh"}):
+                        continue
+
+                # 4. Loại trừ tệp kiểm thử nếu không có cờ --include-tests
+                if not include_tests and is_test_file(file_path):
                     continue
-                if _match_any(rel_posix, extra_lower):
+
+                # 5. Loại trừ các tệp bí mật .env
+                if secret_patterns and (_match_any(name, secret_patterns) or _match_any(rel_posix, secret_patterns)):
                     continue
+
+                # 6. Loại trừ tệp ẩn
                 if name.startswith(".") and name not in ALLOWED_HIDDEN_FILES:
                     continue
+
+                # 7. Loại trừ binary
                 if is_binary_file(file_path):
                     continue
 
+                seen.add(rel_posix)
                 found.append(rel)
 
+    # Sắp xếp logic: Backend trước, sau đó đến Frontend, ưu tiên cấu trúc tầng
+    def _sort_key(p: Path) -> tuple:
+        parts = p.parts
+        top = parts[0]
+        # Thứ tự module: backend -> frontend -> các phân hệ khác
+        module_order = {"backend": 1, "frontend": 2, "boxchat": 3, "fingerprint": 4, "ocr-service": 5}
+        mod_idx = module_order.get(top, 99)
+
+        # Thứ tự trong module
+        sub = parts[1] if len(parts) > 1 else ""
+        sub_order = {
+            # Backend priority
+            "server.js": 1, "swagger.js": 2, "package.json": 3, "config": 4, "migrations": 5, "src": 6,
+            # Frontend priority
+            "index.html": 1, "vite.config.ts": 2, "tailwind.config.js": 3, "tsconfig.json": 4,
+            "App.tsx": 10, "main.tsx": 11, "types": 20, "services": 30, "contexts": 40,
+            "hooks": 50, "utils": 60, "routes": 70, "components": 80, "pages": 90,
+        }
+        sub_idx = sub_order.get(sub, 999)
+        return (mod_idx, sub_idx, p.as_posix().lower())
+
+    found.sort(key=_sort_key)
     return found
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# COLLECT — ALLOWLIST MODE
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def collect_files_allowlist(
-    root: Path,
-    include_paths: list[str],
-    exclude_paths: list[str],
-    exclude_dirs: set[str],
-    exclude_files: set[str],
-    exclude_exts: set[str],
-    extra_excludes: list[str],
-    include_hidden: bool,
-    include_env: bool,
-) -> Iterator[Path]:
-    extra_lower = [p.lower() for p in extra_excludes]
-    secret_patterns = [] if include_env else DEFAULT_SECRET_PATTERNS
-
-    include_abs: list[Path] = []
-    for p in include_paths:
-        full = (root / p).resolve()
-        if full.exists():
-            include_abs.append(full)
-        else:
-            print(f"[WARN] Include path không tồn tại: {p}", file=sys.stderr)
-
-    if not include_abs:
-        return
-
-    exclude_abs: list[Path] = []
-    for p in exclude_paths:
-        exclude_abs.append((root / p).resolve())
-
-    seen: set[str] = set()
-
-    for inc_root in include_abs:
-        if inc_root.is_file():
-            try:
-                rel = inc_root.relative_to(root)
-            except ValueError:
-                continue
-            rel_posix = rel.as_posix()
-            if rel_posix in seen:
-                continue
-            if any(_is_under(inc_root, ep) for ep in exclude_abs):
-                continue
-            if _file_allowed(inc_root, rel, exclude_exts, exclude_files,
-                             secret_patterns, include_hidden, extra_lower):
-                seen.add(rel_posix)
-                yield rel
-            continue
-
-        if not inc_root.is_dir():
-            continue
-
-        for current_dir_str, dirnames, filenames in os.walk(inc_root, followlinks=False):
-            current = Path(current_dir_str)
-
-            kept: list[str] = []
-            for d in dirnames:
-                child = current / d
-                child_abs = child.resolve()
-                if any(_is_under(child_abs, ep) for ep in exclude_abs):
-                    continue
-                if d in exclude_dirs:
-                    continue
-                if _match_any(d, extra_lower):
-                    continue
-                if not include_hidden and d.startswith("."):
-                    continue
-                kept.append(d)
-            dirnames[:] = kept
-
-            for name in filenames:
-                file_path = current / name
-                file_abs = file_path.resolve()
-                if any(_is_under(file_abs, ep) for ep in exclude_abs):
-                    continue
-                try:
-                    rel = file_path.relative_to(root)
-                except ValueError:
-                    continue
-                rel_posix = rel.as_posix()
-                if rel_posix in seen:
-                    continue
-                if not _file_allowed(file_path, rel, exclude_exts, exclude_files,
-                                     secret_patterns, include_hidden, extra_lower):
-                    continue
-                seen.add(rel_posix)
-                yield rel
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# COLLECT — EXCLUDE MODE
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def collect_files_exclude(
-    root: Path,
-    exclude_dirs: set[str],
-    exclude_files: set[str],
-    exclude_exts: set[str],
-    extra_excludes: list[str],
-    include_hidden: bool,
-    include_env: bool,
-) -> Iterator[Path]:
-    extra_lower = [p.lower() for p in extra_excludes]
-    secret_patterns = [] if include_env else DEFAULT_SECRET_PATTERNS
-
-    for current_dir_str, dirnames, filenames in os.walk(root, followlinks=False):
-        current = Path(current_dir_str)
-        dirnames[:] = [
-            d for d in dirnames
-            if d not in exclude_dirs
-            and not _match_any(d, extra_lower)
-            and (include_hidden or not d.startswith("."))
-        ]
-        for name in filenames:
-            file_path = current / name
-            try:
-                rel = file_path.relative_to(root)
-            except ValueError:
-                continue
-            if _file_allowed(file_path, rel, exclude_exts, exclude_files,
-                             secret_patterns, include_hidden, extra_lower):
-                yield rel
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TREE RENDERER
+# CÂY THƯ MỤC & XUẤT TỆP GỘP
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def build_tree(paths: list[Path]) -> str:
+    """Xây dựng biểu đồ cây thư mục trực quan."""
     if not paths:
         return "(empty)"
 
@@ -665,10 +379,6 @@ def build_tree(paths: list[Path]) -> str:
     return "\n".join(lines)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# WRITE MERGED
-# ═══════════════════════════════════════════════════════════════════════════════
-
 def write_merged(
     root: Path,
     files: list[Path],
@@ -678,6 +388,7 @@ def write_merged(
     mode: str,
     verbose: bool = True,
 ) -> dict:
+    """Ghi toàn bộ nội dung file đã thu thập vào tệp đích."""
     max_file_size = int(max_file_size_mb * 1024 * 1024)
     max_total_size = int(max_total_mb * 1024 * 1024)
 
@@ -691,8 +402,9 @@ def write_merged(
 
     with open(output, "w", encoding="utf-8", newline="\n") as out:
         out.write("=" * 80 + "\n")
-        out.write("QK7 DATAHUB — MERGED SOURCE CODE (MẬT QUÂN SỰ / LƯU HÀNH NỘI BỘ)\n")
-        out.write("CẢNH BÁO: Toàn bộ bí mật, API key và mật khẩu đã được tự động REDACTED.\n")
+        out.write("QK7 DATAHUB — MERGED SOURCE CODE (CHỈ BACKEND & FRONTEND SOURCE)\n")
+        out.write("TIÊU CHUẨN: Đã loại trừ node_modules, .env, scripts, txt, md, test files.\n")
+        out.write("CẢNH BÁO: Toàn bộ bí mật, mật khẩu và API key đã được tự động REDACTED.\n")
         out.write("TUYỆT ĐỐI KHÔNG COMMIT TỆP NÀY LÊN HỆ THỐNG QUẢN LÝ PHIÊN BẢN (GIT)!\n")
         out.write(f"Generated : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         out.write(f"Root      : {root}\n")
@@ -700,7 +412,7 @@ def write_merged(
         out.write(f"Files     : {len(files)}\n")
         out.write("=" * 80 + "\n\n")
 
-        out.write("=== PROJECT TREE ===\n")
+        out.write("=== PROJECT TREE (BE & FE) ===\n")
         out.write(build_tree(files) + "\n\n")
         out.write("=== FILE CONTENTS ===\n\n")
 
@@ -758,10 +470,10 @@ def write_merged(
         out.write("=== SUMMARY ===\n")
         out.write(f"Files written : {stats['written']}\n")
         out.write(f"Files skipped : {stats['skipped_binary'] + stats['skipped_size'] + len(stats['errors'])}\n")
-        out.write(f"Total content : {stats['total_source_bytes'] / 1024:.1f} KB\n")
+        out.write(f"Total content : {stats['total_source_bytes'] / 1024:.1f} KB ({stats['total_source_bytes'] / 1024 / 1024:.2f} MB)\n")
 
         if stats["large_files"]:
-            out.write(f"\nLarge files (>500KB):\n")
+            out.write("\nLarge files (>500KB):\n")
             for rel, sz in stats["large_files"]:
                 out.write(f"  - {rel}: {sz / 1024 / 1024:.2f} MB\n")
 
@@ -781,39 +493,37 @@ def write_merged(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="mergecode.py",
-        description="Gộp TOÀN BỘ source code dự án vào 1 file text. Mặc định dùng HYBRID (explicit + auto-scan).",
+        description="Gộp TOÀN BỘ source code Backend & Frontend dự án vào 1 file text (loại trừ thư viện, env, scripts, txt, md, test).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Ví dụ:\n"
-            "  python mergecode.py                         # HYBRID (khuyến nghị)\n"
-            "  python mergecode.py -o merged_full.txt      # đổi tên output\n"
-            "  python mergecode.py --explicit-only         # chỉ file trong EXPLICIT_FILES\n"
-            "  python mergecode.py --all                   # gộp gần hết dự án\n"
-            "  python mergecode.py --include-only backend/src frontend/src\n"
+            "  python scripts/mergecode.py                     # Mặc định: Gộp toàn bộ BE & FE code\n"
+            "  python scripts/mergecode.py -o be_fe_code.txt   # Đổi tên file output\n"
+            "  python scripts/mergecode.py --full-stack        # Gộp cả boxchat, fingerprint, ocr\n"
+            "  python scripts/mergecode.py --include-tests     # Cho phép gộp thêm file test\n"
+            "  python scripts/mergecode.py --include-docs      # Cho phép gộp thêm file markdown\n"
         ),
     )
     script_dir = Path(__file__).resolve().parent
     default_root = ".." if Path.cwd().resolve() == script_dir else "."
-    parser.add_argument("-r", "--root", default=default_root, help=f"Thư mục gốc (mặc định: {default_root})")
+    parser.add_argument("-r", "--root", default=default_root, help=f"Thư mục gốc dự án (mặc định: {default_root})")
     parser.add_argument("-o", "--output", default="merged_code.txt", help="File output (mặc định: merged_code.txt)")
     parser.add_argument("-m", "--max-size", type=float, default=10.0, metavar="MB",
                         help="Kích thước tối đa 1 file (mặc định: 10 MB)")
     parser.add_argument("--max-total", type=float, default=200.0, metavar="MB",
                         help="Tổng dung lượng output tối đa (mặc định: 200 MB)")
-    parser.add_argument("--explicit-only", action="store_true",
-                        help="CHỈ gộp EXPLICIT_FILES (không auto-scan)")
-    parser.add_argument("--include-only", nargs="+", default=None, metavar="PATH",
-                        help="ALLOWLIST MODE — gộp theo danh sách thư mục/file")
-    parser.add_argument("--exclude-paths", nargs="+", default=None, metavar="PATH",
-                        help="(allowlist mode) loại trừ path con")
-    parser.add_argument("--all", action="store_true",
-                        help="EXCLUDE MODE — gộp gần hết dự án")
-    parser.add_argument("-e", "--exclude", nargs="+", default=[], metavar="PATTERN",
-                        help="Pattern loại trừ thêm (fnmatch) — áp dụng cho mọi mode")
+    parser.add_argument("--full-stack", action="store_true",
+                        help="Gộp BE & FE kèm cả boxchat, fingerprint, ocr-service")
+    parser.add_argument("--include-tests", action="store_true",
+                        help="Cho phép gộp thêm tệp kiểm thử (mặc định: LOẠI BỎ test/spec)")
+    parser.add_argument("--include-scripts", action="store_true",
+                        help="Cho phép gộp thêm tệp scripts (.bat, .ps1, .sh)")
+    parser.add_argument("--include-docs", action="store_true",
+                        help="Cho phép gộp thêm tệp tài liệu markdown (.md)")
     parser.add_argument("--include-env", action="store_true",
-                        help="Gộp cả file .env (⚠ nguy hiểm)")
-    parser.add_argument("--include-hidden", action="store_true",
-                        help="(allowlist/exclude mode) gộp cả file/thư mục hidden")
+                        help="Cho phép gộp tệp .env (⚠ cảnh báo rò rỉ bí mật)")
+    parser.add_argument("-e", "--exclude", nargs="+", default=[], metavar="PATTERN",
+                        help="Pattern loại trừ thêm (fnmatch)")
     parser.add_argument("--quiet", action="store_true", help="Không in tiến trình")
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args()
@@ -824,7 +534,7 @@ def main() -> None:
 
     root = Path(args.root).resolve()
     if not root.exists() or not root.is_dir():
-        print(f"[ERR] Thư mục không tồn tại hoặc không phải dir: {root}", file=sys.stderr)
+        print(f"[ERR] Thư mục gốc không tồn tại: {root}", file=sys.stderr)
         sys.exit(1)
 
     output = Path(args.output).resolve()
@@ -836,106 +546,40 @@ def main() -> None:
     if _is_under(output, root):
         extra_excludes.append(output.relative_to(root).as_posix())
 
-    secret_patterns = [] if args.include_env else DEFAULT_SECRET_PATTERNS
-    missing: list[str] = []
-    auto_files: list[Path] = []
+    # Mode description
+    mode_parts = ["BE & FE Source Code"]
+    if args.full_stack:
+        mode_parts.append("+ FullStack Services")
+    if args.include_tests:
+        mode_parts.append("+ Tests")
+    if args.include_scripts:
+        mode_parts.append("+ Scripts")
+    if args.include_docs:
+        mode_parts.append("+ Docs")
+    mode = " ".join(mode_parts)
 
-    # ═══════════════════════════════════════════════════════════
-    # QUYẾT ĐỊNH MODE
-    # ═══════════════════════════════════════════════════════════
-    if args.all:
-        mode = "EXCLUDE (--all)"
-        files = sorted(
-            collect_files_exclude(
-                root=root,
-                exclude_dirs=DEFAULT_EXCLUDE_DIRS,
-                exclude_files=DEFAULT_EXCLUDE_FILES,
-                exclude_exts=DEFAULT_EXCLUDE_EXTS,
-                extra_excludes=extra_excludes,
-                include_hidden=args.include_hidden,
-                include_env=args.include_env,
-            ),
-            key=lambda p: p.as_posix().lower(),
-        )
-
-    elif args.include_only:
-        mode = "ALLOWLIST (--include-only)"
-        exclude_paths = args.exclude_paths if args.exclude_paths is not None \
-            else DEFAULT_EXCLUDE_PATHS_IN_ALLOWLIST
-        files = sorted(
-            collect_files_allowlist(
-                root=root,
-                include_paths=args.include_only,
-                exclude_paths=exclude_paths,
-                exclude_dirs=DEFAULT_EXCLUDE_DIRS,
-                exclude_files=DEFAULT_EXCLUDE_FILES,
-                exclude_exts=DEFAULT_EXCLUDE_EXTS,
-                extra_excludes=extra_excludes,
-                include_hidden=args.include_hidden,
-                include_env=args.include_env,
-            ),
-            key=lambda p: p.as_posix().lower(),
-        )
-
-    elif args.explicit_only:
-        mode = "EXPLICIT-ONLY (--explicit-only)"
-        files, missing = collect_files_explicit(
-            root=root,
-            explicit_files=EXPLICIT_FILES,
-            extra_excludes=extra_excludes,
-            secret_patterns=secret_patterns,
-        )
-
-    else:
-        # ═══════════════════════════════════════════════════════════
-        # HYBRID MODE (MẶC ĐỊNH) — Explicit + Auto-scan
-        # ═══════════════════════════════════════════════════════════
-        mode = "HYBRID (explicit + auto-scan)"
-
-        # Bước 1: Explicit files (giữ thứ tự đọc)
-        files, missing = collect_files_explicit(
-            root=root,
-            explicit_files=EXPLICIT_FILES,
-            extra_excludes=extra_excludes,
-            secret_patterns=secret_patterns,
-        )
-        seen = {p.as_posix() for p in files}
-
-        # Bước 2: Auto-scan bắt file còn lại
-        auto_files = collect_files_autoscan(
-            root=root,
-            scan_dirs=AUTO_SCAN_DIRS,
-            already_seen=seen,
-            exclude_dirs=DEFAULT_EXCLUDE_DIRS,
-            exclude_files=DEFAULT_EXCLUDE_FILES,
-            exclude_exts=DEFAULT_EXCLUDE_EXTS,
-            extra_excludes=extra_excludes,
-        )
-        auto_files.sort(key=lambda p: p.as_posix().lower())
-
-        if auto_files:
-            print(f"[INFO] Auto-scan bắt thêm {len(auto_files)} file MỚI:", file=sys.stderr)
-            for f in auto_files[:15]:
-                print(f"    + {f.as_posix()}", file=sys.stderr)
-            if len(auto_files) > 15:
-                print(f"    ... và {len(auto_files) - 15} file khác", file=sys.stderr)
-
-        files.extend(auto_files)
-
-    # ─── Báo cáo file thiếu ───
-    if missing:
-        print(f"[WARN] {len(missing)} file trong EXPLICIT_FILES không tồn tại:", file=sys.stderr)
-        for m in missing:
-            print(f"    - {m}", file=sys.stderr)
+    files = collect_be_fe_files(
+        root=root,
+        include_tests=args.include_tests,
+        include_scripts=args.include_scripts,
+        include_docs=args.include_docs,
+        include_env=args.include_env,
+        full_stack=args.full_stack,
+        extra_excludes=extra_excludes,
+    )
 
     if not files:
-        print("[WARN] Không có file nào để gộp.", file=sys.stderr)
+        print("[WARN] Không tìm thấy file mã nguồn nào phù hợp.", file=sys.stderr)
         sys.exit(0)
+
+    be_count = sum(1 for f in files if f.parts[0] == "backend")
+    fe_count = sum(1 for f in files if f.parts[0] == "frontend")
+    other_count = len(files) - be_count - fe_count
 
     print(f"[INFO] Root        : {root}", file=sys.stderr)
     print(f"[INFO] Output      : {output}", file=sys.stderr)
     print(f"[INFO] Mode        : {mode}", file=sys.stderr)
-    print(f"[INFO] Tổng số file: {len(files)} (explicit: {len(files) - len(auto_files)}, auto-scan: {len(auto_files)})", file=sys.stderr)
+    print(f"[INFO] Tổng số file: {len(files)} (Backend: {be_count}, Frontend: {fe_count}" + (f", Khác: {other_count})" if other_count else ")"), file=sys.stderr)
 
     t0 = time.time()
     stats = write_merged(
@@ -954,7 +598,7 @@ def main() -> None:
     print("", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
     print(f"[OK] HOÀN TẤT trong {elapsed:.2f}s", file=sys.stderr)
-    print(f"     Đã gộp         : {stats['written']} file", file=sys.stderr)
+    print(f"     Đã gộp         : {stats['written']} file (Backend: {be_count}, Frontend: {fe_count})", file=sys.stderr)
     if stats["skipped_binary"]:
         print(f"     Bỏ qua (binary): {stats['skipped_binary']} file", file=sys.stderr)
     if stats["skipped_size"]:
@@ -967,8 +611,6 @@ def main() -> None:
         print(f"     File lớn >500KB: {len(stats['large_files'])} file", file=sys.stderr)
         for rel, sz in stats["large_files"][:5]:
             print(f"        - {rel}: {sz / 1024 / 1024:.2f} MB", file=sys.stderr)
-    if missing:
-        print(f"     File thiếu     : {len(missing)} file (xem ở trên)", file=sys.stderr)
     print(f"     Kích thước     : {output_size_mb:.2f} MB", file=sys.stderr)
     print(f"     File output    : {output}", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
@@ -980,7 +622,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n[WARN] Đã hủy bởi người dùng.", file=sys.stderr)
         sys.exit(130)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"\n[ERR] Lỗi không mong muốn: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()

@@ -4,6 +4,30 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.1-mergecode-v5-and-doc-sync-rule] — 2026-11-13
+
+### 1. Nâng Cấp Công Cụ Gộp Mã Nguồn Chuẩn Hóa (`scripts/mergecode.py` v5.0.0)
+- **Chế độ mặc định tinh gọn (Pure BE & FE Source Code):**
+  - Chỉ quét và gộp mã nguồn cốt lõi của Backend (`backend/`) và Frontend (`frontend/`).
+  - **Tự động loại trừ triệt để:**
+    - Thư viện / dependencies: `node_modules/`, `package-lock.json`, `dist/`, `build/`, `public/assets/`, `backend/public/`, `certs/`, `uploads/`...
+    - Tệp môi trường: `.env`, `.env.*`, `*.env`...
+    - Kịch bản & công cụ: `scripts/`, `tools/`, `*.bat`, `*.ps1`, `*.sh`...
+    - Tệp văn bản & tài liệu: `*.txt`, `*.md`, `*.rst`, `*.pdf`...
+    - Tệp kiểm thử: `tests/`, `__tests__/`, `*.test.*`, `*.spec.*`, `test-*.js`...
+- **Bảo mật & Tốc độ tối ưu:**
+  - Tự động phát hiện và che mờ các khóa nhạy cảm (`JWT_SECRET`, mật khẩu, Private Key, token xác thực).
+  - Kết quả kiểm thử thực tế: Thu thập chính xác **191 tệp nguồn** (29 Backend, 162 Frontend), kích thước tổng hợp **2.81 MB** trong thời gian thực thi chỉ **0.30 giây**.
+
+### 2. Ban Hành Quy Định Bắt Buộc: Tự Động Cập Nhật Tài Liệu Markdown Trước Khi Commit & Push
+- **Cập nhật đồng bộ các tài liệu nền tảng:**
+  - [`ANTIGRAVITY_MASTER_BRAIN.md`](../ANTIGRAVITY_MASTER_BRAIN.md) (Mục 1 & Mục 4.6): Thiết lập quy tắc bắt buộc tự động rà soát và cập nhật toàn bộ file Markdown trước khi thực thi commit & push.
+  - [`docs/guides/AGENT_WORKFLOW.md`](./guides/AGENT_WORKFLOW.md) (Bước 2 & Bước 3): Quy chuẩn hóa điều kiện tiên quyết trước khi commit/push, đảm bảo không bỏ sót bất kỳ thay đổi nào của dự án.
+  - [`docs/guides/Senior Multi-Role.md`](./guides/Senior%20Multi-Role.md): Quy định cho toàn bộ các vai trò kỹ sư về việc duy trì tài liệu đồng bộ 100% với trạng thái mã nguồn thực tế.
+- **Quy trình phối hợp:** Mọi thay đổi mã nguồn tiếp tục được giữ nguyên tại working tree (tuân thủ nghiêm ngặt nguyên tắc **Strict No Auto-Commit & No Auto-Push**); khi nhận được lệnh commit và push từ USER, Agent sẽ tự động cập nhật toàn bộ tài liệu Markdown tương ứng trước khi tiến hành commit và push lên nhánh được chỉ định.
+
+---
+
 ## [v1.6.0-digital-lecture-scorm-and-design-orchestrator] — 2026-11-13
 
 ### 1. Phân Hệ Bài Giảng Số & Gói Học Liệu Tương Tác SCORM / HTML5

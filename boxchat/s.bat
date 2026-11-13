@@ -23,5 +23,8 @@ if exist "%~dp0local_storage\qdrant_data\.lock" (
 REM --- 3. Khoi dong Microservice ---
 echo.
 echo [3/3] Khoi dong AI Boxchat (:8001)...
+if exist "%~dp0venv\Scripts\activate.bat" (
+    call "%~dp0venv\Scripts\activate.bat"
+)
 python main.py
 

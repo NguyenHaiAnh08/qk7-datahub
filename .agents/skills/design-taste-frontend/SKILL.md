@@ -1,7 +1,7 @@
 ---
 name: design-taste-frontend
 description: >-
-  tasteskill v2, the anti-slop frontend skill. Art direction for websites, distilled from a study of
+  "Must read ANTIGRAVITY_MASTER_BRAIN.md before executing tasks. tasteskill v2, the anti-slop frontend skill. Art direction for websites, distilled from a study of"
   247 curated gallery sites (One Page Love, Awwwards Sites of the Day). Deals researched directions
   (idea, composition, type, palette, photographs, section blueprints) from a library, enforces a strict
   no-slop house style with a real-browser inspector, and runs a look-and-fix loop on screenshots. Use

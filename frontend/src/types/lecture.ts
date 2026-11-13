@@ -4,7 +4,8 @@ export type LectureStatus =
   | 'PENDING_TRAINING'
   | 'PUBLISHED'
   | 'REJECTED'
-  | 'ARCHIVED';
+  | 'ARCHIVED'   // legacy
+  | 'DELETED';   // 🆕
 
 export type ContentType = 'PDF' | 'HTML5' | 'SCORM';
 export type SessionType = 'TEACHER_LED' | 'SELF_STUDY';

@@ -64,12 +64,26 @@ export const lectureService = {
     });
   },
 
-  async archive(id: string): Promise<void> {
+  // ── Xoá mềm / Khôi phục / Xoá vĩnh viễn ──
+  // Backend đã đổi DELETE /:id thành soft delete (status → DELETED)
+  async delete(id: string): Promise<void> {
     return http(`/api/lectures/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
 
+  // Khôi phục từ thùng rác (DELETED → DRAFT)
   async restore(id: string): Promise<void> {
     return http(`/api/lectures/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+  },
+
+  // Xoá vĩnh viễn — chỉ áp dụng cho bài giảng đang ở trạng thái DELETED
+  async purge(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/purge`, { method: 'DELETE' });
+  },
+
+  // ⚠️ DEPRECATED — giữ để tương thích ngược, sẽ bị xoá ở phiên bản sau.
+  // Tương đương delete() vì backend đã đổi DELETE /:id thành soft delete.
+  async archive(id: string): Promise<void> {
+    return this.delete(id);
   },
 
   // ── Duyệt 2 tầng ──
@@ -134,6 +148,21 @@ export const lectureService = {
 
   async getLiveSchedules(): Promise<{ items: TeachingSchedule[]; total: number }> {
     return http('/api/lectures/schedules/live');
+  },
+
+  // ✅ FIX: return type tường minh + guard runtime (chỉ trả về khi có schedule_id)
+  async getScheduleById(id: string): Promise<TeachingSchedule | null> {
+    try {
+      const res: any = await http(
+        `/api/lectures/schedules/${encodeURIComponent(id)}`,
+        { silent: true }
+      );
+      // Chỉ trả về nếu có schedule_id (tránh trường hợp server trả {} rỗng)
+      if (res && res.schedule_id) return res as TeachingSchedule;
+      return null;
+    } catch {
+      return null;
+    }
   },
 
   async forceEndSchedule(id: string): Promise<void> {

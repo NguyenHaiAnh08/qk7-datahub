@@ -111,14 +111,14 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
 
     // 🌟 Tự động nhận diện & tối ưu hóa gói ActivePresenter: ưu tiên demo.html làm bài giảng chính
     const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
-    const folderName = sanitizeFolderName(lec.title || lectureId);
+    const folderName = `${sanitizeFolderName(lec.title || 'Bai_Giang')}_${lectureId}`;
     const date = lec.created_at ? new Date(lec.created_at) : new Date();
     const { absPath: lectureDir, relPath: baseRelPath } = getModuleUploadPath(MODULES.LECTURES, date, folderName);
     if (fs.existsSync(lectureDir)) {
       const rootFiles = fs.readdirSync(lectureDir);
       const isActivePresenter = rootFiles.includes('demo.html') && (rootFiles.includes('rlprez.js') || rootFiles.includes('player'));
       if (isActivePresenter && (!entryPoint || entryPoint.endsWith('index.html'))) {
-        entryPoint = `uploads/lectures/${lectureId}/demo.html`;
+        entryPoint = `${baseRelPath}/demo.html`;
         await pool.request()
           .input('lid', sql.VarChar(50), lectureId)
           .input('ep', sql.NVarChar(500), entryPoint)
@@ -134,7 +134,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         const commonEntries = ['demo.html', 'story.html', 'index.html', 'launch.html', 'story_html5.html'];
         const found = commonEntries.find(f => rootFiles.includes(f)) || rootFiles.find(f => f.toLowerCase().endsWith('.html'));
         if (found) {
-          entryPoint = `uploads/lectures/${lectureId}/${found}`;
+          entryPoint = `${baseRelPath}/${found}`;
           await pool.request()
             .input('lid', sql.VarChar(50), lectureId)
             .input('ep', sql.NVarChar(500), entryPoint)
@@ -435,7 +435,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       const fileId = `DOC-LEC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       
       const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
-      const folderName = sanitizeFolderName(lec.title || lectureId);
+      const folderName = `${sanitizeFolderName(lec.title || 'Bai_Giang')}_${lectureId}`;
       const { absPath: baseAbsPath, relPath: baseRelPath } = getModuleUploadPath(MODULES.LECTURES, now, folderName);
       
       const fileName = `${yyyymmdd}_LECTURE_${lectureId}_${sha256.slice(0, 8)}.pdf`;

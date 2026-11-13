@@ -126,7 +126,7 @@ module.exports = function createApprovalWorkflow({
     const r = await pool.request()
       .input('id', _sql.VarChar(50), lectureId)
       .query(`
-        SELECT lecture_id, pending_scorm_path
+        SELECT lecture_id, pending_scorm_path, title, created_at
         FROM DIGITAL_LECTURE
         WHERE lecture_id = @id
       `);
@@ -145,7 +145,10 @@ module.exports = function createApprovalWorkflow({
       ? lecture.pending_scorm_path
       : path.join(baseDir, lecture.pending_scorm_path);
 
-    const targetDir = path.join(baseDir, 'uploads', 'lectures', lectureId);
+    const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
+    const folderName = sanitizeFolderName(lecture.title || lectureId);
+    const date = lecture.created_at ? new Date(lecture.created_at) : new Date();
+    const { absPath: targetDir } = getModuleUploadPath(MODULES.LECTURES, date, folderName);
 
     const { launchFile } = await extractAndParse(zipPath, targetDir);
 

@@ -15,6 +15,7 @@ const STATUS_CONFIG: Record<LectureStatus, { label: string; color: string; bg: s
   PUBLISHED: { label: 'Đã xuất bản', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
   REJECTED: { label: 'Bị từ chối', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' },
   ARCHIVED: { label: 'Đã lưu trữ', color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
+  DELETED: { label: 'Đã xóa (Thùng rác)', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' },
 };
 
 const FORMAT_CONFIG: Record<string, { label: string; badge: string }> = {
@@ -39,6 +40,7 @@ export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose }) 
 
   const getStageState = (index: number) => {
     if (lecture.status === 'PUBLISHED') return 'completed';
+    if (lecture.status === 'DELETED') return 'rejected'; // 🆕 bài đã bị xoá → toàn bộ quy trình dừng
     if (lecture.status === 'REJECTED') {
       return index === 0 ? 'completed' : 'rejected';
     }

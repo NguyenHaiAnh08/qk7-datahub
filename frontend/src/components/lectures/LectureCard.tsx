@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   FileText, Layers, FileCode, Send, Check, X,
-  Play, Archive, Hash, Building2, User, AlertTriangle, Edit, RotateCcw, Eye,
+  Play, Trash2, Hash, Building2, User, AlertTriangle, Edit, RotateCcw, Eye,
   HelpCircle, Shield, CheckCircle2, Clock
 } from 'lucide-react';
 import { Lecture, ContentType, LectureStatus } from '../../types/lecture';
@@ -13,6 +13,7 @@ const STATUS_STYLES: Record<LectureStatus, { label: string; badgeCls: string; st
   PUBLISHED:        { label: 'Đã xuất bản',       badgeCls: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30', step: 4 },
   REJECTED:         { label: 'Cần chỉnh sửa',     badgeCls: 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30', step: 1 },
   ARCHIVED:         { label: 'Lưu trữ',           badgeCls: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/60 dark:text-slate-500 dark:border-slate-800', step: 0 },
+  DELETED:          { label: 'Đã xóa (Thùng rác)', badgeCls: 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30', step: 0 },
 };
 
 const CONTENT_CONFIG: Record<ContentType, { icon: typeof FileText; label: string; badgeCls: string; iconCls: string }> = {
@@ -56,8 +57,9 @@ export interface LectureCardProps {
   onSubmit: () => void;
   onApprove: () => void;
   onReject: () => void;
-  onArchive: () => void;
-  onRestore: () => void;
+  onSoftDelete: () => void;   // 🆕 — chuyển vào thùng rác
+  onRestore: () => void;      // giữ nguyên — khôi phục từ thùng rác
+  onPurge: () => void;        // 🆕 — xoá vĩnh viễn
   onEdit: () => void;
   onView: () => void;
   onStartSession: () => void;
@@ -65,7 +67,7 @@ export interface LectureCardProps {
 
 export const LectureCard: React.FC<LectureCardProps> = ({
   lecture, viewMode, currentUserId, isAdmin, canApprove, canArchive, canStartSchedule, canEdit,
-  onSubmit, onApprove, onReject, onArchive, onRestore, onEdit, onView, onStartSession,
+  onSubmit, onApprove, onReject, onSoftDelete, onRestore, onPurge, onEdit, onView, onStartSession,
 }) => {
   const statusCfg = STATUS_STYLES[lecture.status] || STATUS_STYLES.DRAFT;
   const contentCfg = CONTENT_CONFIG[lecture.content_type] || CONTENT_CONFIG.PDF;
@@ -77,7 +79,8 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   const isPendingFaculty  = lecture.status === 'PENDING_FACULTY';
   const isPendingTraining = lecture.status === 'PENDING_TRAINING';
   const isPublished       = lecture.status === 'PUBLISHED';
-  const isArchived        = lecture.status === 'ARCHIVED';
+  const isArchived        = lecture.status === 'ARCHIVED';   // legacy — giữ để tương thích
+  const isDeleted         = lecture.status === 'DELETED';    // 🆕 — trong thùng rác
 
   type Action = { label: string; icon: typeof FileText; onClick: () => void; cls: string };
   const actions: Action[] = [];
@@ -134,21 +137,31 @@ export const LectureCard: React.FC<LectureCardProps> = ({
     }
   }
 
-  // 4. Quyền Lưu trữ / Khôi phục
+  // 4. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn
   if (canArchive) {
-    if (!isArchived) {
-      actions.push({
-        label: 'Lưu trữ',
-        icon: Archive,
-        onClick: onArchive,
-        cls: 'bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400'
-      });
+    if (isDeleted) {
+      // Đang trong thùng rác → Khôi phục + Xoá vĩnh viễn
+      actions.push(
+        {
+          label: 'Khôi phục',
+          icon: RotateCcw,
+          onClick: onRestore,
+          cls: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30'
+        },
+        {
+          label: 'Xóa vĩnh viễn',
+          icon: AlertTriangle,
+          onClick: onPurge,
+          cls: 'bg-rose-600 hover:bg-rose-700 text-white border border-rose-700 shadow-md font-bold'
+        },
+      );
     } else {
+      // Đang hoạt động bình thường → Xoá mềm (màu cam)
       actions.push({
-        label: 'Khôi phục',
-        icon: RotateCcw,
-        onClick: onRestore,
-        cls: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30'
+        label: 'Xóa',
+        icon: Trash2,
+        onClick: onSoftDelete,
+        cls: 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30'
       });
     }
   }
@@ -251,7 +264,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
       </div>
 
       {/* Mini Stepper: Quy trình phê duyệt 2 tầng quân sự */}
-      {!isArchived && (
+      {!isArchived && !isDeleted && (
         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.05]">
           <div className="flex items-center justify-between text-[10px] font-semibold mb-1.5">
             <span className="text-slate-500 dark:text-slate-400">Tiến trình duyệt 2 tầng:</span>

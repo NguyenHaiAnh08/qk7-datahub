@@ -172,8 +172,15 @@ export const LecturesPage: React.FC = () => {
   const loadLectures = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await lectureService.list();
-      setAllLectures(res.items || []);
+      // Backend ẩn DELETED mặc định → cần gọi thêm 1 lần với status=DELETED
+      const [normalRes, deletedRes] = await Promise.all([
+        lectureService.list(),
+        lectureService.list({ status: 'DELETED' }),
+      ]);
+      setAllLectures([
+        ...(normalRes.items  || []),
+        ...(deletedRes.items || []),
+      ]);
     } catch (err: any) {
       toast.error('Không thể tải danh sách bài giảng: ' + (err?.message || 'Lỗi không xác định'));
     } finally {
@@ -185,16 +192,73 @@ export const LecturesPage: React.FC = () => {
     loadLectures();
   }, [loadLectures]);
 
+  // 🆕 TỰ ĐỘNG PHỤC HỒI CA DẠY KHI F5 (Đã sửa lỗi 403 — dùng endpoint nhẹ)
+  useEffect(() => {
+    const savedSessionStr = localStorage.getItem('qk7_active_session');
+    if (!savedSessionStr) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const saved = JSON.parse(savedSessionStr);
+        if (!saved?.schedule_id || !saved?.lecture_id) {
+          localStorage.removeItem('qk7_active_session');
+          return;
+        }
+
+        // Gọi API lấy đúng ca dạy của mình — không cần quyền Live Monitor
+        let ongoingSession: TeachingSchedule | null = null;
+        try {
+          const raw: any = await lectureService.getScheduleById(saved.schedule_id);
+          // Runtime guard — chỉ chấp nhận nếu có schedule_id
+          if (raw && raw.schedule_id) {
+            ongoingSession = raw as TeachingSchedule;
+          }
+        } catch {
+          ongoingSession = null;
+        }
+        if (cancelled) return;
+
+        if (ongoingSession && ongoingSession.status === 'ONGOING') {
+          // Ca vẫn đang chạy → phục hồi giao diện LiveSessionRoom
+          const lec = await lectureService.getById(saved.lecture_id);
+          if (cancelled) return;
+
+          if (lec) {
+            setActiveSession(ongoingSession);
+            setCurrentLecture(lec);
+            toast.info(`Đã khôi phục ca giảng dạy "${lec.title}" đang diễn ra.`);
+          }
+        } else {
+          // Ca đã kết thúc (Watchdog hoặc Admin đóng) → dọn dẹp
+          localStorage.removeItem('qk7_active_session');
+          toast.info('Ca giảng dạy trước đó đã kết thúc.');
+        }
+      } catch {
+        // Dữ liệu hỏng hoặc API lỗi → dọn dẹp để không kẹt ở lần F5 sau
+        try { localStorage.removeItem('qk7_active_session'); } catch { /* noop */ }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
   // ── Stats luôn được tính từ toàn bộ kho dữ liệu bài giảng của người dùng ──
-  const stats = useMemo(() => ({
-    total:            allLectures.length,
-    published:        allLectures.filter(l => l.status === 'PUBLISHED').length,
-    pending:          allLectures.filter(l => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length,
-    draft:            allLectures.filter(l => l.status === 'DRAFT' || l.status === 'REJECTED').length,
-    pendingFaculty:   allLectures.filter(l => l.status === 'PENDING_FACULTY').length,
-    pendingTraining:  allLectures.filter(l => l.status === 'PENDING_TRAINING').length,
-    rejected:         allLectures.filter(l => l.status === 'REJECTED').length,
-  }), [allLectures]);
+  const stats = useMemo(() => {
+    const deleted = allLectures.filter(l => l.status === 'DELETED').length;
+    const active  = allLectures.filter(l => l.status !== 'DELETED');
+    return {
+      total:           active.length,               // không tính bài trong thùng rác
+      published:       active.filter(l => l.status === 'PUBLISHED').length,
+      pending:         active.filter(l => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length,
+      draft:           active.filter(l => l.status === 'DRAFT' || l.status === 'REJECTED').length,
+      pendingFaculty:  active.filter(l => l.status === 'PENDING_FACULTY').length,
+      pendingTraining: active.filter(l => l.status === 'PENDING_TRAINING').length,
+      rejected:        active.filter(l => l.status === 'REJECTED').length,
+      deleted,                                      // 🆕 đếm riêng cho chip "Thùng rác"
+    };
+  }, [allLectures]);
 
   // ── Lọc tức thì trên Client (Zero-Latency / Smooth Transition, triệt tiêu giật màn hình) ──
   const filteredLectures = useMemo(() => {
@@ -267,26 +331,51 @@ export const LecturesPage: React.FC = () => {
     }
   };
 
-  const handleArchiveClick = (lec: Lecture) => {
+
+    // ✅ 1. HÀM XÓA MỀM (Chuyển vào thùng rác)
+  const handleSoftDelete = (lec: Lecture) => {
     setConfirmModal({
       open: true,
-      title: 'Xác nhận lưu trữ bài giảng',
-      description: `Đồng chí có chắc chắn muốn lưu trữ bài giảng "${lec.title}" (${lec.lecture_code})? Bài giảng sẽ được chuyển vào mục lưu trữ và tạm ngừng phục vụ giảng dạy.`,
-      confirmText: 'Lưu trữ bài giảng',
+      title: 'Chuyển Vào Thùng Rác',
+      description: `Đồng chí có chắc chắn muốn chuyển bài giảng "${lec.title}" (${lec.lecture_code}) vào thùng rác? Bạn có thể khôi phục lại sau này.`,
+      confirmText: 'Chuyển vào thùng rác',
       isDestructive: true,
       onConfirm: async () => {
         try {
-          await lectureService.archive(lec.lecture_id);
-          toast.info(`Đã lưu trữ "${lec.title}"`);
+          await lectureService.delete(lec.lecture_id);
+          toast.info(`Đã chuyển "${lec.title}" vào thùng rác`);
           loadLectures();
         } catch (err: any) {
-          toast.error(err?.message || 'Lưu trữ thất bại');
+          toast.error(err?.message || 'Xóa mềm thất bại');
         } finally {
           setConfirmModal(prev => ({ ...prev, open: false }));
         }
       },
     });
   };
+
+  // ✅ 2. HÀM XÓA VĨNH VIỄN (Xóa khỏi ổ cứng & CSDL)
+  const handlePurge = (lec: Lecture) => {
+    setConfirmModal({
+      open: true,
+      title: 'CẢNH BÁO: XÓA VĨNH VIỄN',
+      description: `Hành động này sẽ XÓA VĨNH VIỄN bài giảng "${lec.title}", toàn bộ gói học liệu SCORM/HTML5 và câu hỏi Quiz khỏi ổ cứng máy chủ. Thao tác này KHÔNG THỂ HOÀN TÁC!`,
+      confirmText: 'Xóa vĩnh viễn',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await lectureService.purge(lec.lecture_id);
+          toast.success(`Đã xóa vĩnh viễn "${lec.title}" khỏi hệ thống`);
+          loadLectures();
+        } catch (err: any) {
+          toast.error(err?.message || 'Lỗi khi xóa vĩnh viễn');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, open: false }));
+        }
+      },
+    });
+  };
+  
 
   const handleRestoreClick = (lec: Lecture) => {
     setConfirmModal({
@@ -322,6 +411,15 @@ export const LecturesPage: React.FC = () => {
     setEditingLecture(null);
     setActiveSession(session);
     setCurrentLecture(lecture);
+
+    // 🆕 Lưu cờ để phục hồi khi F5
+    try {
+      localStorage.setItem('qk7_active_session', JSON.stringify({
+        schedule_id: session.schedule_id,
+        lecture_id: lecture.lecture_id,
+        started_at: new Date().toISOString(),
+      }));
+    } catch { /* localStorage có thể bị chặn — bỏ qua */ }
   };
 
   const handleEndSession = async () => {
@@ -329,6 +427,10 @@ export const LecturesPage: React.FC = () => {
     try {
       await lectureService.endSchedule(activeSession.schedule_id);
       toast.success('Đã kết thúc ca giảng dạy thành công!');
+
+      // 🆕 Xóa cờ lưu trữ khi kết thúc hợp lệ
+      try { localStorage.removeItem('qk7_active_session'); } catch { /* noop */ }
+
       setActiveSession(null);
       setCurrentLecture(null);
       loadLectures();
@@ -527,6 +629,7 @@ export const LecturesPage: React.FC = () => {
                     <option value="PUBLISHED">Đã xuất bản (Sẵn sàng dạy)</option>
                     <option value="REJECTED">Cần hiệu chỉnh</option>
                     <option value="ARCHIVED">Lưu trữ</option>
+                    <option value="DELETED">🗑️ Thùng rác (Đã xóa)</option>
                   </select>
 
                   <select
@@ -574,6 +677,7 @@ export const LecturesPage: React.FC = () => {
                   { key: 'PENDING_TRAINING', label: 'Chờ BGH duyệt', count: stats.pendingTraining },
                   { key: 'DRAFT', label: 'Bản nháp', count: stats.draft },
                   { key: 'REJECTED', label: 'Cần sửa đổi', count: stats.rejected },
+                  { key: 'DELETED', label: '🗑️ Thùng rác', count: stats.deleted },
                 ].map(chip => {
                   const active = statusFilter === chip.key;
                   return (
@@ -609,7 +713,9 @@ export const LecturesPage: React.FC = () => {
                   <TacticalEmptyState
                     title="Chưa tìm thấy bài giảng nào phù hợp"
                     description={
-                      searchQuery || statusFilter || subjectFilter
+                      statusFilter === 'DELETED'
+                        ? 'Thùng rác đang trống. Các bài giảng đã xóa mềm sẽ xuất hiện ở đây và có thể khôi phục hoặc xóa vĩnh viễn.'
+                        : searchQuery || statusFilter || subjectFilter
                         ? 'Không có bài giảng nào khớp với các tiêu chí tìm kiếm hoặc bộ lọc hiện tại. Đồng chí vui lòng đặt lại bộ lọc.'
                         : canCreate
                         ? 'Kho bài giảng số của Nhà trường đang sẵn sàng. Đồng chí hãy bắt đầu khởi tạo bài giảng đầu tiên bằng nút "Soạn bài giảng mới".'
@@ -642,8 +748,9 @@ export const LecturesPage: React.FC = () => {
                       onSubmit={() => handleSubmit(lec)}
                       onApprove={() => handleApprove(lec)}
                       onReject={() => handleRejectClick(lec)}
-                      onArchive={() => handleArchiveClick(lec)}
+                      onSoftDelete={() => handleSoftDelete(lec)}
                       onRestore={() => handleRestoreClick(lec)}
+                      onPurge={() => handlePurge(lec)}
                       onEdit={() => handleEditClick(lec)}
                       onView={() => setViewingLecture(lec)}
                       onStartSession={() => setStartSessionLecture(lec)}

@@ -105,8 +105,8 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
-              <Play className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <Play className="w-4 h-4 text-emerald-600 dark:text-emerald-400 fill-emerald-600/30" />
             </div>
             <div className="min-w-0">
               <h3 className="font-bold text-sm text-slate-900 dark:text-white">Mở ca giảng dạy</h3>
@@ -141,7 +141,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
             <select
               value={classId}
               onChange={e => setClassId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             >
               <option value="">— Chọn lớp —</option>
               {classes.map(c => (
@@ -160,7 +160,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
               value={venue}
               onChange={e => setVenue(e.target.value)}
               placeholder="VD: Giảng đường A1"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             />
             <datalist id="venues-list">
               {venues.map(v => (
@@ -177,7 +177,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
                 min={0}
                 value={studentCount}
                 onChange={e => setStudentCount(Number(e.target.value) || 0)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
               />
             </div>
             <div>
@@ -185,7 +185,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
               <select
                 value={sessionType}
                 onChange={e => setSessionType(e.target.value as SessionType)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
               >
                 <option value="TEACHER_LED">GV giảng dạy</option>
                 <option value="SELF_STUDY">Tự học</option>
@@ -199,7 +199,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg resize-none text-slate-900 dark:text-slate-100"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg resize-none text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             />
           </div>
 
@@ -215,7 +215,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-gradient-to-r from-[#0e7490] via-[#0891b2] to-[#06b6d4] hover:from-[#0891b2] hover:to-[#22d3ee] text-white rounded-lg font-bold flex items-center gap-1.5 disabled:opacity-40"
+              className="px-4 py-2 bg-gradient-to-r from-[#166534] via-[#15803d] to-[#16a34a] hover:from-[#15803d] hover:to-[#22c55e] border border-emerald-400/30 text-white rounded-lg font-bold flex items-center gap-1.5 disabled:opacity-40 shadow-sm transition active:scale-[0.98]"
             >
               {submitting ? (
                 <>
@@ -224,7 +224,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
                 </>
               ) : (
                 <>
-                  <Play className="w-3.5 h-3.5" />
+                  <Play className="w-3.5 h-3.5 fill-white/20" />
                   <span>Mở ca dạy</span>
                 </>
               )}

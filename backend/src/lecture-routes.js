@@ -432,6 +432,9 @@ module.exports = function createLectureRoutes({
       // cần extract vì còn phải chờ Chỉ huy cấp Trường duyệt.
       // Fail → trả 500, giữ nguyên PENDING_TRAINING, KHÔNG publish nửa vời.
       // ══════════════════════════════════════════════════════════════════
+      let extractedEntryPoint = null;
+      let extractedContentType = null;
+
       if (nextStatus === 'PUBLISHED') {
         if (lec.pending_scorm_path) {
           try {
@@ -441,6 +444,8 @@ module.exports = function createLectureRoutes({
               pendingPath: lec.pending_scorm_path,
             });
             console.log(`[lecture approve] Extracted ${lectureId} → ${out.entry_point} (${out.content_type})`);
+            extractedEntryPoint = out.entry_point;
+            extractedContentType = out.content_type;
           } catch (ex) {
             console.error(`[lecture approve] Extract failed ${lectureId}:`, ex);
             return res.status(500).json({
@@ -448,19 +453,50 @@ module.exports = function createLectureRoutes({
               code: 'EXTRACT_FAILED',
             });
           }
+        } else if (lec.content_type === 'PDF') {
+          if (!lec.document_id) {
+            return res.status(400).json({
+              error: 'Bài giảng PDF chưa có tệp tài liệu đính kèm (thiếu document_id)',
+              code: 'NO_DOCUMENT',
+            });
+          }
         } else if (!lec.scorm_entry_point) {
-          // [3] Không có ZIP pending và cũng chưa có entry point → không thể publish
-          return res.status(400).json({
-            error: 'Bài giảng chưa có gói học liệu (thiếu pending_scorm_path và scorm_entry_point)',
-            code: 'NO_PACKAGE',
-          });
+          // Fallback tự động nhận diện nếu đã giải nén trong uploads/lectures/:lectureId
+          const lectureDir = path.resolve(__dirname, '..', 'uploads', 'lectures', lectureId);
+          if (fs.existsSync(lectureDir)) {
+            const files = fs.readdirSync(lectureDir);
+            const commonEntries = ['index.html', 'story.html', 'launch.html', 'demo.html'];
+            const entry = commonEntries.find(f => files.includes(f)) || files.find(f => f.toLowerCase().endsWith('.html'));
+            if (entry) {
+              extractedEntryPoint = `uploads/lectures/${lectureId}/${entry}`;
+            }
+          }
+          if (!extractedEntryPoint) {
+            // Không có ZIP pending và cũng chưa có entry point → không thể publish
+            return res.status(400).json({
+              error: 'Bài giảng chưa có gói học liệu (thiếu pending_scorm_path và scorm_entry_point)',
+              code: 'NO_PACKAGE',
+            });
+          }
         }
       }
 
-      await pool.request()
+      let updateSql = `UPDATE DIGITAL_LECTURE SET status=@st, reject_reason=NULL, updated_at=GETDATE()`;
+      const updateReq = pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .input('st', sql.VarChar(30), nextStatus)
-        .query(`UPDATE DIGITAL_LECTURE SET status=@st, reject_reason=NULL, updated_at=GETDATE() WHERE lecture_id=@id`);
+        .input('st', sql.VarChar(30), nextStatus);
+
+      if (extractedEntryPoint) {
+        updateSql += `, scorm_entry_point=@ep, pending_scorm_path=NULL`;
+        updateReq.input('ep', sql.NVarChar(500), extractedEntryPoint);
+        if (extractedContentType) {
+          updateSql += `, content_type=@ct`;
+          updateReq.input('ct', sql.VarChar(20), extractedContentType);
+        }
+      }
+
+      updateSql += ` WHERE lecture_id=@id`;
+      await updateReq.query(updateSql);
 
       await logAudit(
         req,

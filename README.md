@@ -14,7 +14,7 @@ graph TD
     
     Sub1["1. DỮ LIỆU SỐ<br/>(ĐÃ HOÀN THIỆN & ĐANG VẬN HÀNH)<br/>• Quản trị văn bản số, lưu trữ PDF an toàn<br/>• Kiểm soát 5 cấp độ mật quân sự<br/>• Trợ lý AI RAG & Sinh trắc học ZK9500 2FA<br/>• Giám sát kiểm toán an ninh SOC 24/7"]
     
-    Sub2["2. BÀI GIẢNG SỐ<br/>(SẮP PHÁT TRIỂN TRONG TƯƠNG LAI)<br/>• Quản lý giáo án điện tử & bài giảng tương tác<br/>• Ngân hàng câu hỏi & đề thi quân sự chuẩn hóa<br/>• Video bài giảng gắn mốc thời gian (Media Timeline)<br/>• Tự động trích xuất nội dung bài giảng qua AI"]
+    Sub2["2. BÀI GIẢNG SỐ<br/>(ĐÃ HOÀN THIỆN & ĐANG VẬN HÀNH)<br/>• Quản lý bài giảng số & gói SCORM/HTML5<br/>• Giải nén an toàn chống ZipSlip & ZipBomb<br/>• Phòng học trực tiếp LiveSessionRoom<br/>• Giám sát giảng dạy LiveMonitor thời gian thực"]
     
     Sub3["3. THƯ VIỆN SỐ<br/>(SẮP PHÁT TRIỂN TRONG TƯƠNG LAI)<br/>• Số hóa sách, giáo trình, tạp chí quân sự<br/>• Kho tư liệu lịch sử LLVT Quân khu 7<br/>• Hệ thống mượn/trả tài liệu điện tử nội bộ<br/>• Phân loại thập phân & độc giả số"]
     
@@ -33,10 +33,13 @@ graph TD
    * Trợ lý AI Boxchat Agentic RAG trả lời câu hỏi kèm trích dẫn số trang chính xác và Smart SQL Fallback.
    * Trung tâm giám sát nhật ký kiểm toán an ninh SOC thời gian thực và xuất báo cáo chuẩn Excel Quân đội.
 
-2. **Bài giảng số (Sắp phát triển trong tương lai):**
-   * Kho quản lý bài giảng điện tử tương tác dành cho giảng viên và học viên Trường Quân sự Quân khu 7.
-   * Số hóa giáo án, slide bài giảng, ngân hàng đề thi trắc nghiệm và tự luận quân sự theo từng chuyên ngành.
-   * Tích hợp AI sinh đề thi tự động từ giáo án và quản lý dòng thời gian video huấn luyện (`MediaTimelineManager`).
+2. **Bài giảng số (Đã hoàn thiện & Đang vận hành chính thức):**
+   * Kho quản lý bài giảng điện tử tương tác dành cho giảng viên và cán bộ Trường Quân sự Quân khu 7.
+   * Hỗ trợ tải lên và xử lý chuyên sâu các gói học liệu chuẩn quốc tế: SCORM 1.2, SCORM 2004 và HTML5 ActivePresenter.
+   * Cơ chế bảo vệ giải nén an toàn chống lỗ hổng nghiêm trọng: **Zip Slip (CWE-22)** và **Zip Bomb (CWE-409)** với giới hạn dung lượng tự động ngắt và lọc file thực thi độc hại.
+   * Phòng học trực tiếp (**`LiveSessionRoom`**) nhúng iframe an toàn (CSP nosniff, dynamic base href) tích hợp công cụ trắc nghiệm và điểm danh.
+   * Bảng giám sát chỉ huy thời gian thực (**`LiveMonitorPanel`**) theo dõi tiến độ %, slide hiện tại, sĩ số và cảnh báo treo lớp học.
+   * Luồng phê duyệt bài giảng điện tử đa cấp (Chỉ huy Khoa / Ban Giám hiệu duyệt kèm lý do từ chối).
 
 3. **Thư viện số (Sắp phát triển trong tương lai):**
    * Số hóa toàn bộ đầu sách, tài liệu nghiên cứu khoa học quân sự, lịch sử truyền thống Quân khu 7.
@@ -256,10 +259,17 @@ qk7-datahub/
 │   │   ├── db.js                               # Kết nối Microsoft SQL Server (QK7_ThuVienSo)
 │   │   ├── admin-routes.js                     # API quản trị CRUD (Users, Roles, Units, Permissions...)
 │   │   ├── ai-routes.js                        # Cổng giao tiếp AI boxchat (:8001) & Smart SQL Fallback
+│   │   ├── lecture-routes.js                   # API quản lý bài giảng số & lịch học
+│   │   ├── scorm-package-routes.js             # API gói học liệu SCORM/HTML5 (tải lên & phục vụ static)
+│   │   ├── lecture-package-helper.js           # Xử lý giải nén an toàn & parse manifest SCORM
 │   │   └── fingerprint-ws.js                   # WebSocket Server (/ws/fingerprint) quản lý ZK9500
 │   ├── uploads/                                # Kho lưu trữ tệp PDF thật (theo hash SHA-256)
 │   ├── public/                                 # Sản phẩm build tĩnh từ Frontend xuất sang
 │   └── server.js                               # Entry point Express API Gateway & Biometrics
+│
+├── .agents/                                    # 🤖 HỆ THỐNG SKILLS & WORKFLOWS ĐIỀU PHỐI AI AGENT
+│   ├── skills/                                 # 7 skills: qk7-design-orchestrator, daub-ui, design-md, unslop...
+│   └── workflows/                              # thiet-ke-ux-ui.md điều phối tự động thiết kế UI/UX
 │
 ├── ocr-service/                                # 🟡 MICROSERVICE OCR NHẬN DẠNG KÝ TỰ QUANG HỌC (:8002 - FastAPI)
 │   ├── main.py                                 # Entry point FastAPI: /health, /api/ocr/extract
@@ -285,11 +295,11 @@ qk7-datahub/
 │
 └── frontend/                                   # 🔵 GIAO DIỆN CLIENT REACT 18 + TS (DUAL-PLATFORM)
     ├── src/
-    │   ├── components/                         # common, users, dashboard, portal, document-desk, ai-chat
-    │   ├── pages/                              # PortalPage, MyUnitPage, AdminDashboardPage, UsersPage...
+    │   ├── components/                         # common, users, dashboard, portal, document-desk, lectures, ai-chat
+    │   ├── pages/                              # PortalPage, LecturesPage, MyUnitPage, AdminDashboardPage...
     │   ├── routes/                             # Auto-Discovery Routing & ProtectedRoute theo Cấp mật
     │   ├── contexts/                           # AuthContext, ThemeContext, DeviceModeContext
-    │   └── services/                           # http.ts, authService, documentService, userService...
+    │   └── services/                           # http.ts, lectureService, authService, documentService...
 ```
 
 ---

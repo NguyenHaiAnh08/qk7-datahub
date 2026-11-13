@@ -1,20 +1,64 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Save, Loader2, FileText, Info, UploadCloud } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  X, Save, Loader2, FileText, BookOpen, Shield,
+  Layers, Sparkles, Check, Info, AlertCircle, Hash
+} from 'lucide-react';
 import { lectureService } from '../../services/lectureService';
 import { toast } from '../common/Toast';
 import { Subject, ContentType, Lecture } from '../../types/lecture';
+import { LecturePackageDropzone } from './LecturePackageDropzone';
 
-// ─── Cấu hình tĩnh cho 2 dropdown ───
-const SECURITY_LEVELS: Array<{ value: number; label: string }> = [
-  { value: 1, label: 'Cấp 1 — Công khai' },
-  { value: 2, label: 'Cấp 2 — Nội bộ' },
-  { value: 3, label: 'Cấp 3 — Mật' },
+// ─── Cấu hình Cấp bảo mật bài giảng ───
+const SECURITY_LEVELS: Array<{ value: number; label: string; desc: string; badge: string }> = [
+  {
+    value: 1,
+    label: 'Cấp 1 — Công khai',
+    desc: 'Học viên và cán bộ toàn trường đều xem được',
+    badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+  },
+  {
+    value: 2,
+    label: 'Cấp 2 — Nội bộ',
+    desc: 'Chỉ lưu hành nội bộ trong đơn vị, khoa đào tạo',
+    badge: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30',
+  },
+  {
+    value: 3,
+    label: 'Cấp 3 — Mật',
+    desc: 'Yêu cầu xác thực sinh trắc học vân tay khi truy cập',
+    badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30',
+  },
 ];
 
-const CONTENT_TYPES: Array<{ value: ContentType; label: string }> = [
-  { value: 'PDF',   label: 'Tệp PDF (Tài liệu tĩnh)' },
-  { value: 'HTML5', label: 'Gói HTML5 (Tương tác)' },
-  { value: 'SCORM', label: 'Gói SCORM (ActivePresenter .zip)' },
+// ─── Cấu hình 3 Định dạng bài giảng số hóa ───
+const CONTENT_TYPE_OPTIONS: Array<{
+  value: ContentType;
+  title: string;
+  badge: string;
+  desc: string;
+  icon: any;
+}> = [
+  {
+    value: 'PDF',
+    title: 'Tệp PDF',
+    badge: 'Văn bản tĩnh',
+    desc: 'Giáo trình, tài liệu bài giảng dạng số tĩnh hoặc liên kết từ kho tài liệu',
+    icon: FileText,
+  },
+  {
+    value: 'HTML5',
+    title: 'Tương tác HTML5',
+    badge: 'Sa bàn số',
+    desc: 'Mô phỏng chiến thuật, bài tập đa phương tiện tương tác cao',
+    icon: Sparkles,
+  },
+  {
+    value: 'SCORM',
+    title: 'Chuẩn SCORM',
+    badge: 'e-Learning LMS',
+    desc: 'Gói ActivePresenter / Storyline theo dõi tiến trình và điểm số học viên',
+    icon: Layers,
+  },
 ];
 
 interface Props {
@@ -39,14 +83,11 @@ export const CreateLectureModal: React.FC<Props> = ({
   const [securityLevel, setSecurityLevel] = useState(2);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  
-  // State cho file upload
-  const [file, setFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ─────────────────────────────────────────────────────────────────
+  // State cho file upload gói .zip
+  const [file, setFile] = useState<File | null>(null);
+
   // Build dropdown level động
-  // ─────────────────────────────────────────────────────────────────
   const effectiveSecurityLevels = useMemo(() => {
     const base = SECURITY_LEVELS.map((x) => ({ ...x }));
     const currentLevel = editLecture?.security_level_id;
@@ -55,8 +96,16 @@ export const CreateLectureModal: React.FC<Props> = ({
       currentLevel > 3 &&
       !base.some((x) => x.value === currentLevel)
     ) {
-      const extraLabel = currentLevel === 4 ? 'Cấp 4 — Tối mật (giữ nguyên)' : 'Cấp 5 — Tuyệt mật (giữ nguyên)';
-      base.push({ value: currentLevel, label: extraLabel });
+      const extraLabel =
+        currentLevel === 4
+          ? 'Cấp 4 — Tối mật (giữ nguyên)'
+          : 'Cấp 5 — Tuyệt mật (giữ nguyên)';
+      base.push({
+        value: currentLevel,
+        label: extraLabel,
+        desc: 'Hồ sơ mật đặc biệt',
+        badge: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30',
+      });
     }
     return base;
   }, [editLecture]);
@@ -76,15 +125,20 @@ export const CreateLectureModal: React.FC<Props> = ({
       setContentType('PDF');
       setSecurityLevel(2);
     }
-    setFile(null); // Reset file khi mở modal
+    setFile(null);
     setError('');
   }, [open, editLecture]);
 
   if (!open) return null;
 
   const reset = () => {
-    setTitle(''); setLectureCode(''); setSubjectId('');
-    setContentType('PDF'); setSecurityLevel(2); setError(''); setFile(null);
+    setTitle('');
+    setLectureCode('');
+    setSubjectId('');
+    setContentType('PDF');
+    setSecurityLevel(2);
+    setError('');
+    setFile(null);
   };
 
   const handleClose = () => {
@@ -93,26 +147,15 @@ export const CreateLectureModal: React.FC<Props> = ({
     onClose();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (selected) {
-      if (!selected.name.toLowerCase().endsWith('.zip')) {
-        toast.error('Chỉ chấp nhận file .zip (Gói HTML5/SCORM)');
-        return;
-      }
-      setFile(selected);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     if (!title.trim()) return setError('Vui lòng nhập tiêu đề bài giảng');
-    if (!subjectId)    return setError('Vui lòng chọn môn học');
+    if (!subjectId) return setError('Vui lòng chọn môn học');
 
     if (!editLecture && securityLevel > 3) {
-      return setError('Cấp bảo mật tối đa cho bài giảng là Cấp 3 — Mật');
+      return setError('Cấp bảo mật tối đa cho bài giảng mới là Cấp 3 — Mật');
     }
 
     // Nếu tạo mới và là HTML5/SCORM, bắt buộc phải có file
@@ -140,145 +183,276 @@ export const CreateLectureModal: React.FC<Props> = ({
       } else {
         const res = await lectureService.create(payload);
         targetLectureId = res.lecture_id;
-        toast.success('Đã tạo bài giảng mới');
+        toast.success('Đã tạo bài giảng mới thành công');
       }
 
-      // BƯỚC 2: Upload file .zip (nếu có)
-      if (file && targetLectureId && contentType !== 'PDF') {
-        toast.info('Đang tải lên gói bài giảng, vui lòng đợi...', { duration: 5000 });
-        await lectureService.uploadPackage(targetLectureId, file, contentType as 'HTML5' | 'SCORM');
-        toast.success('Đã tải lên gói bài giảng thành công');
+      // BƯỚC 2: Upload file bài giảng (PDF / HTML5 / SCORM) nếu có
+      if (file && targetLectureId) {
+        toast.info(
+          contentType === 'PDF'
+            ? 'Đang nạp tệp giáo án PDF lên máy chủ...'
+            : 'Đang nạp gói bài giảng lên máy chủ...',
+          { duration: 4000 }
+        );
+        await lectureService.uploadPackage(
+          targetLectureId,
+          file,
+          contentType
+        );
+        toast.success(
+          contentType === 'PDF'
+            ? 'Đã lưu tệp giáo án PDF cho bài giảng thành công'
+            : 'Đã giải nén và lưu gói bài giảng thành công'
+        );
       }
 
       reset();
       onCreated();
     } catch (err: any) {
-      setError(err?.message || 'Thao tác thất bại');
+      setError(err?.message || 'Thao tác không thành công');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/[0.08] rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+        {/* Header Modal phong cách Chỉ huy Quân sự */}
+        <div className="p-4 border-b border-slate-200 dark:border-white/[0.08] flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/90">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-2xs">
+              <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">
-              {editLecture ? 'Chỉnh sửa bài giảng' : 'Soạn bài giảng mới'}
-            </h3>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  {editLecture ? 'Chỉnh sửa hồ sơ bài giảng' : 'Soạn bài giảng số mới'}
+                </h3>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                  {editLecture ? 'Cập nhật' : 'Khởi tạo'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Trường Quân Sự Quân Khu 7 — Khung chuẩn hóa giáo án & bài giảng điện tử
+              </p>
+            </div>
           </div>
-          <button onClick={handleClose} disabled={submitting}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40">
+          <button
+            onClick={handleClose}
+            disabled={submitting}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 min-h-[38px] min-w-[38px] flex items-center justify-center"
+            title="Đóng (Esc)"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-5 text-xs overflow-y-auto flex-1">
           {error && (
-            <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-300 dark:border-rose-500/30 rounded-lg text-rose-700 dark:text-rose-300">
-              {error}
+            <div className="p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-300 dark:border-rose-500/30 rounded-xl text-rose-700 dark:text-rose-300 flex items-start gap-2.5 shadow-2xs">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+              <span className="font-medium">{error}</span>
             </div>
           )}
 
+          {/* ── BƯỚC 1: Chọn định dạng bài giảng (Card Selector) ── */}
           <div>
-            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Tiêu đề bài giảng <span className="text-rose-500">*</span>
+            <label className="block font-bold text-slate-800 dark:text-slate-200 mb-2">
+              1. Định dạng bài giảng số hóa <span className="text-rose-500">*</span>
             </label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="VD: Bài 1 — Chiến thuật tiến công" autoFocus
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600 text-slate-900 dark:text-slate-100" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {CONTENT_TYPE_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                const isSelected = contentType === opt.value;
+                return (
+                  <div
+                    key={opt.value}
+                    onClick={() => setContentType(opt.value)}
+                    className={`relative p-3.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-xs'
+                        : 'border-slate-200 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 bg-white dark:bg-slate-950/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                      <h4 className="font-bold text-slate-900 dark:text-white text-xs mb-0.5">
+                        {opt.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                        {opt.desc}
+                      </p>
+                    </div>
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-white/[0.04]">
+                      <span className="font-mono text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">
+                        {opt.badge}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Mã bài giảng</label>
-              <input type="text" value={lectureCode} onChange={e => setLectureCode(e.target.value)}
-                placeholder="BG-CTBB-01"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:border-cyan-600 font-mono text-slate-900 dark:text-slate-100" />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Môn học <span className="text-rose-500">*</span></label>
-              <select value={subjectId} onChange={e => setSubjectId(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:border-cyan-600 cursor-pointer text-slate-900 dark:text-slate-100">
-                <option value="">— Chọn môn —</option>
-                {subjects.map(s => <option key={s.subject_id} value={s.subject_id}>{s.name}</option>)}
-              </select>
-            </div>
-          </div>
+          {/* ── BƯỚC 2: Thông tin định danh ── */}
+          <div className="space-y-3.5 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
+            <label className="block font-bold text-slate-800 dark:text-slate-200">
+              2. Thông tin định danh bài giảng
+            </label>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Loại nội dung</label>
-              <select value={contentType} onChange={e => setContentType(e.target.value as ContentType)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100">
-                {CONTENT_TYPES.map(ct => (
-                  <option key={ct.value} value={ct.value}>{ct.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Cấp bảo mật</label>
-              <select value={securityLevel} onChange={e => setSecurityLevel(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100">
-                {effectiveSecurityLevels.map(lv => (
-                  <option key={lv.value} value={lv.value}>{lv.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* ✅ INPUT UPLOAD FILE DÀNH CHO HTML5 / SCORM */}
-          {contentType !== 'PDF' && (
-            <div className="pt-2">
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Tệp gói bài giảng (.zip) <span className="text-rose-500">*</span>
-              </label>
-              
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
-              >
-                <UploadCloud className="w-8 h-8 text-cyan-500" />
-                <span className="font-semibold text-slate-700 dark:text-slate-300 text-center break-all px-2">
-                  {file ? file.name : 'Nhấn để chọn file .zip'}
-                </span>
-                <span className="text-[10px] text-slate-500">
-                  {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'Chứa file index.html và các thư mục con'}
-                </span>
-              </div>
-              
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileChange} 
-                accept=".zip" 
-                className="hidden" 
+              <span className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Tiêu đề bài giảng <span className="text-rose-500">*</span>
+              </span>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="VD: Bài 1 — Chiến thuật tiến công Đại đội Bộ binh"
+                autoFocus
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 text-slate-900 dark:text-slate-100 text-xs font-medium"
               />
-              
-              <div className="flex items-start gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                <Info className="w-3 h-3 shrink-0 mt-0.5" />
-                <span>
-                  Hệ thống sẽ tự động giải nén và lấy entry point từ gói khi <strong>duyệt xuất bản</strong>.
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <span className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                  <Hash className="w-3 h-3 text-slate-400" />
+                  Mã bài giảng
                 </span>
+                <input
+                  type="text"
+                  value={lectureCode}
+                  onChange={(e) => setLectureCode(e.target.value)}
+                  placeholder="VD: BG-CTBB-01"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-600 font-mono text-slate-900 dark:text-slate-100 text-xs"
+                />
+              </div>
+
+              <div>
+                <span className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                  <BookOpen className="w-3 h-3 text-slate-400" />
+                  Môn học trực thuộc <span className="text-rose-500">*</span>
+                </span>
+                <select
+                  value={subjectId}
+                  onChange={(e) => setSubjectId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-600 cursor-pointer text-slate-900 dark:text-slate-100 text-xs"
+                >
+                  <option value="">— Chọn môn học —</option>
+                  {subjects.map((s) => (
+                    <option key={s.subject_id} value={s.subject_id}>
+                      {s.name} {s.faculty_name ? `(${s.faculty_name})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          )}
+          </div>
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-            <button type="button" onClick={handleClose} disabled={submitting}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-semibold disabled:opacity-40">
+          {/* ── BƯỚC 3: Cấp độ bảo mật ── */}
+          <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
+            <label className="block font-bold text-slate-800 dark:text-slate-200">
+              3. Cấp độ bảo mật & Kiểm soát truy cập
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {effectiveSecurityLevels.map((lv) => {
+                const isSelected = securityLevel === lv.value;
+                return (
+                  <div
+                    key={lv.value}
+                    onClick={() => setSecurityLevel(lv.value)}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
+                      isSelected
+                        ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20'
+                        : 'border-slate-200 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20'
+                    }`}
+                  >
+                    <Shield
+                      className={`w-4 h-4 shrink-0 mt-0.5 ${
+                        lv.value === 1
+                          ? 'text-emerald-600'
+                          : lv.value === 2
+                          ? 'text-blue-600'
+                          : 'text-amber-600'
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-900 dark:text-white block text-xs">
+                        {lv.label}
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight mt-0.5">
+                        {lv.desc}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── BƯỚC 4: Tải lên gói tệp bài giảng số hóa ── */}
+          <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-slate-800 dark:text-slate-200">
+                4. Tệp dữ liệu bài giảng số hóa
+              </label>
+              {contentType === 'PDF' && editLecture?.document_id && !file && (
+                <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  Đã có tệp PDF đính kèm
+                </span>
+              )}
+            </div>
+
+            <LecturePackageDropzone
+              selectedFile={file}
+              onFileSelect={setFile}
+              contentType={contentType}
+            />
+          </div>
+
+          {/* Bottom Action Bar */}
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-white/[0.08]">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={submitting}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition disabled:opacity-40 min-h-[44px]"
+            >
               Hủy
             </button>
-            <button type="submit" disabled={submitting}
-              className="px-4 py-2 bg-gradient-to-r from-[#0e7490] via-[#0891b2] to-[#06b6d4] hover:from-[#0891b2] hover:to-[#22d3ee] text-white rounded-lg font-bold flex items-center gap-1.5 disabled:opacity-40">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2.5 bg-gradient-to-r from-[#166534] via-[#15803d] to-[#16a34a] hover:from-[#15803d] hover:to-[#22c55e] border border-emerald-400/30 text-white rounded-xl font-bold flex items-center gap-2 disabled:opacity-40 shadow-sm transition active:scale-[0.98] min-h-[44px]"
+            >
               {submitting ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Đang xử lý...</span></>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Đang xử lý hồ sơ...</span>
+                </>
               ) : (
-                <><Save className="w-3.5 h-3.5" /><span>{editLecture ? 'Lưu thay đổi' : 'Tạo bài giảng'}</span></>
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>{editLecture ? 'Lưu thay đổi' : 'Tạo bài giảng'}</span>
+                </>
               )}
             </button>
           </div>

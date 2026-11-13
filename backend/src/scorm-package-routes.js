@@ -1,8 +1,9 @@
 // backend/src/scorm-package-routes.js
-// Upload ZIP SCORM/HTML5 → lưu pending → (bước approve) extract → serve static → iframe load
+// Upload ZIP SCORM/HTML5 / PDF → lưu pending/storage → phục vụ trình chiếu & quản lý bài giảng
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const multer = require('multer');
 const { sql, getPool } = require('./db');
 
@@ -32,6 +33,18 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
     fileFilter: (req, file, cb) => {
       if (!file.originalname.toLowerCase().endsWith('.zip')) {
         return cb(new Error('Chỉ chấp nhận tệp .zip (gói SCORM/HTML5)'));
+      }
+      cb(null, true);
+    },
+  });
+
+  const uploadPdf = multer({
+    storage: diskStorage,
+    limits: { fileSize: 150 * 1024 * 1024 }, // 150MB cho tệp PDF giáo án
+    fileFilter: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ext !== '.pdf' && file.mimetype !== 'application/pdf') {
+        return cb(new Error('Chỉ chấp nhận tệp tài liệu .pdf'));
       }
       cb(null, true);
     },
@@ -78,7 +91,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
     const lr = await pool.request()
       .input('lid', sql.VarChar(50), lectureId)
       .query(`
-        SELECT security_level_id, content_type, scorm_entry_point, status
+        SELECT security_level_id, content_type, scorm_entry_point, pending_scorm_path, status
         FROM DIGITAL_LECTURE WHERE lecture_id = @lid
       `);
     if (lr.recordset.length === 0) { res.status(404).send('Not found'); return null; }
@@ -93,16 +106,65 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
     if (requirePublished && lec.status !== 'PUBLISHED') {
       res.status(404).send('Bài giảng chưa được xuất bản'); return null;
     }
-    if (!lec.scorm_entry_point) {
+
+    let entryPoint = lec.scorm_entry_point;
+
+    // 🌟 Tự động nhận diện & tối ưu hóa gói ActivePresenter: ưu tiên demo.html làm bài giảng chính
+    const lectureDir = path.resolve(__dirname, '..', 'uploads', 'lectures', lectureId);
+    if (fs.existsSync(lectureDir)) {
+      const rootFiles = fs.readdirSync(lectureDir);
+      const isActivePresenter = rootFiles.includes('demo.html') && (rootFiles.includes('rlprez.js') || rootFiles.includes('player'));
+      if (isActivePresenter && (!entryPoint || entryPoint.endsWith('index.html'))) {
+        entryPoint = `uploads/lectures/${lectureId}/demo.html`;
+        await pool.request()
+          .input('lid', sql.VarChar(50), lectureId)
+          .input('ep', sql.NVarChar(500), entryPoint)
+          .query(`UPDATE DIGITAL_LECTURE SET scorm_entry_point = @ep, pending_scorm_path = NULL WHERE lecture_id = @lid`);
+        console.log(`[activepresenter] Tự động nâng cấp scorm_entry_point cho ${lectureId} → demo.html`);
+      }
+    }
+
+    // 🌟 SELF-HEALING: Tự động phục hồi entry point nếu bài giảng đã được giải nén hoặc còn file pending
+    if (!entryPoint) {
+      if (fs.existsSync(lectureDir)) {
+        const rootFiles = fs.readdirSync(lectureDir);
+        const commonEntries = ['demo.html', 'story.html', 'index.html', 'launch.html', 'story_html5.html'];
+        const found = commonEntries.find(f => rootFiles.includes(f)) || rootFiles.find(f => f.toLowerCase().endsWith('.html'));
+        if (found) {
+          entryPoint = `uploads/lectures/${lectureId}/${found}`;
+          await pool.request()
+            .input('lid', sql.VarChar(50), lectureId)
+            .input('ep', sql.NVarChar(500), entryPoint)
+            .query(`UPDATE DIGITAL_LECTURE SET scorm_entry_point = @ep, pending_scorm_path = NULL WHERE lecture_id = @lid`);
+          console.log(`[self-healing] Tự động khắc phục scorm_entry_point cho ${lectureId} → ${entryPoint}`);
+        }
+      } else if (lec.pending_scorm_path) {
+        try {
+          const { extractAndParse } = require('./lecture-package-helper');
+          const out = await extractAndParse({ lectureId, pendingPath: lec.pending_scorm_path });
+          entryPoint = out.entry_point;
+          await pool.request()
+            .input('lid', sql.VarChar(50), lectureId)
+            .input('ep', sql.NVarChar(500), entryPoint)
+            .input('ct', sql.VarChar(20), out.content_type)
+            .query(`UPDATE DIGITAL_LECTURE SET scorm_entry_point = @ep, content_type = @ct, pending_scorm_path = NULL WHERE lecture_id = @lid`);
+          console.log(`[self-healing] Tự động giải nén và cập nhật scorm_entry_point cho ${lectureId} → ${entryPoint}`);
+        } catch (ex) {
+          console.error(`[self-healing] Lỗi giải nén:`, ex);
+        }
+      }
+    }
+
+    if (!entryPoint) {
       res.status(404).send('Bài giảng chưa có gói học liệu'); return null;
     }
 
-    const entryAbs = path.isAbsolute(lec.scorm_entry_point)
-      ? lec.scorm_entry_point
-      : path.resolve(__dirname, '..', lec.scorm_entry_point);
+    const entryAbs = path.isAbsolute(entryPoint)
+      ? entryPoint
+      : path.resolve(__dirname, '..', entryPoint);
 
     if (!fs.existsSync(entryAbs) || !fs.statSync(entryAbs).isFile()) {
-      res.status(404).send('Tệp không tồn tại'); return null;
+      res.status(404).send('Tệp không tồn tại: ' + path.basename(entryAbs)); return null;
     }
 
     return {
@@ -144,6 +206,19 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
             r.setHeader('X-Content-Type-Options', 'nosniff');
             r.setHeader('Cache-Control', 'private, max-age=300');
             r.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+            r.setHeader('X-Frame-Options', 'SAMEORIGIN');
+            r.setHeader('Content-Security-Policy', [
+              "default-src 'self' blob: data:",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:",
+              "style-src 'self' 'unsafe-inline' blob: data:",
+              "img-src 'self' blob: data:",
+              "media-src 'self' blob: data:",
+              "font-src 'self' blob: data:",
+              "connect-src 'self' blob: data: ws: wss:",
+              "frame-ancestors 'self'",
+              "object-src 'none'",
+              "base-uri 'self'"
+            ].join('; '));
 
             const ext = path.extname(filePath).toLowerCase();
             if (MIME[ext]) {
@@ -183,10 +258,22 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         });
         if (!pkg) return;
 
+        // Cho phép chọn file cụ thể qua query param ?file= (vd: demo.html, tutorial.html)
+        let launchFilePath = pkg.entryAbs;
+        if (req.query.file) {
+          const reqFile = String(req.query.file).replace(/\\/g, '/').replace(/^\/+/, '');
+          if (!reqFile.includes('..') && /\.(html|htm)$/i.test(reqFile)) {
+            const customPath = path.resolve(pkg.packageRoot, reqFile);
+            if (customPath.startsWith(pkg.packageRoot + path.sep) && fs.existsSync(customPath)) {
+              launchFilePath = customPath;
+            }
+          }
+        }
+
         const launchPath = req.originalUrl.split('?')[0];
         const baseHref = launchPath.replace(/\/launch\/?$/, '/assets/');
 
-        let html = fs.readFileSync(pkg.entryAbs, 'utf8');
+        let html = fs.readFileSync(launchFilePath, 'utf8');
         if (!/<base\b/i.test(html)) {
           if (/<head(\s[^>]*)?>/i.test(html)) {
             html = html.replace(/<head(\s[^>]*)?>/i, (m) => `${m}\n    <base href="${baseHref}" />`);
@@ -197,9 +284,44 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
           }
         }
 
+        // Tối ưu chuyển trang trong iframe cho ActivePresenter menu launcher:
+        // chuyển window.openPrez sang window.location.href để không mở tab popup riêng
+        if (html.includes('openPrez')) {
+          const overrideScript = `
+    <script>
+      (function() {
+        window.openPrez = function(url) {
+          if (!url) return false;
+          window.location.href = url;
+          return false;
+        };
+      })();
+    </script>
+`;
+          if (html.includes('</body>')) {
+            html = html.replace('</body>', `${overrideScript}</body>`);
+          } else {
+            html = html + overrideScript;
+          }
+        }
+
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.setHeader('Content-Security-Policy', [
+          "default-src 'self' blob: data:",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:",
+          "style-src 'self' 'unsafe-inline' blob: data:",
+          "img-src 'self' blob: data:",
+          "media-src 'self' blob: data:",
+          "font-src 'self' blob: data:",
+          "connect-src 'self' blob: data: ws: wss:",
+          "frame-ancestors 'self'",
+          "object-src 'none'",
+          "base-uri 'self'"
+        ].join('; '));
+
         res.send(html);
       } catch (e) {
         console.error('[launch]', e);
@@ -271,6 +393,96 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
   }
 
   // ────────────────────────────────────────────────────────────────────
+  // Handler upload tệp giáo án PDF cho bài giảng số hóa
+  // Lưu vào uploads/YYYY/MM/, tạo bản ghi DOCUMENT và gắn document_id vào DIGITAL_LECTURE
+  // ────────────────────────────────────────────────────────────────────
+  async function handlePdfUpload(req, res) {
+    const lectureId = req.params.lectureId;
+    try {
+      if (!req.file) return res.status(400).json({ error: 'Thiếu tệp .pdf' });
+
+      const pool = await getPool();
+      const lr = await pool.request()
+        .input('lid', sql.VarChar(50), lectureId)
+        .query(`SELECT lecture_id, title, security_level_id, faculty_unit_id, author_id, status FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
+
+      if (lr.recordset.length === 0) {
+        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
+      }
+
+      const lec = lr.recordset[0];
+      const isAdmin = (req.user.roles || []).includes('ROL-01');
+      if (!isAdmin && lec.author_id !== req.user.user_id) {
+        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res.status(403).json({ error: 'Chỉ tác giả mới được tải lên tệp giáo án' });
+      }
+
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const sha256 = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+      const fileSize = fs.statSync(req.file.path).size;
+
+      const now = new Date();
+      const yyyy = String(now.getFullYear());
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyymmdd = `${yyyy}${mm}${String(now.getDate()).padStart(2, '0')}`;
+      const fileId = `DOC-LEC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      const fileName = `${yyyymmdd}_LECTURE_${lectureId}_${sha256.slice(0, 8)}.pdf`;
+      const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
+      const absPath = path.join(__dirname, '..', relPath);
+
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      moveFileSafe(req.file.path, absPath);
+
+      // 1. Thêm vào bảng DOCUMENT để có thể xem và trình chiếu qua stream /api/files/:fileId/view
+      await pool.request()
+        .input('fid', sql.VarChar(100), fileId)
+        .input('code', sql.NVarChar(100), `BG-${lectureId}`)
+        .input('title', sql.NVarChar(500), lec.title)
+        .input('unit_id', sql.VarChar(50), lec.faculty_unit_id || null)
+        .input('sec_id', sql.Int, lec.security_level_id || 2)
+        .input('orig_name', sql.NVarChar(500), req.file.originalname)
+        .input('stored_path', sql.NVarChar(500), relPath)
+        .input('file_size', sql.BigInt, fileSize)
+        .input('sha256', sql.Char(64), sha256)
+        .input('uploaded_by', sql.VarChar(50), req.user.user_id)
+        .input('summary', sql.NVarChar(sql.MAX), `Tài liệu bài giảng điện tử: ${lec.title}`)
+        .query(`
+          INSERT INTO DOCUMENT (
+            file_id, document_code, title, doc_type_id, issued_date, issuing_unit_id,
+            signer, summary, security_level_id, original_name, stored_path, mime_type,
+            file_size, sha256, uploaded_by
+          ) VALUES (
+            @fid, @code, @title, NULL, GETDATE(), @unit_id,
+            NULL, @summary, @sec_id, @orig_name, @stored_path, 'application/pdf',
+            @file_size, @sha256, @uploaded_by
+          )
+        `);
+
+      // 2. Cập nhật document_id vào DIGITAL_LECTURE
+      await pool.request()
+        .input('lid', sql.VarChar(50), lectureId)
+        .input('doc_id', sql.VarChar(50), fileId)
+        .query(`
+          UPDATE DIGITAL_LECTURE
+          SET document_id = @doc_id, content_type = 'PDF', updated_at = GETDATE()
+          WHERE lecture_id = @lid
+        `);
+
+      res.json({
+        success: true,
+        file_id: fileId,
+        stored_path: relPath,
+        message: 'Đã lưu tệp giáo án PDF và gắn vào bài giảng thành công'
+      });
+    } catch (e) {
+      console.error('[PDF upload]', e);
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────
   // ROUTES
   // ────────────────────────────────────────────────────────────────────
 
@@ -282,6 +494,10 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
   router.post('/:lectureId/html5/upload',
     requireAuth, requirePermission('LECTURE_CREATE'),
     upload.single('file'), createUploadHandler('HTML5', 'html5'));
+
+  router.post('/:lectureId/pdf/upload',
+    requireAuth, requirePermission('LECTURE_CREATE'),
+    uploadPdf.single('file'), handlePdfUpload);
 
   // Launch
   router.get('/:lectureId/scorm/launch',
@@ -304,6 +520,48 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
 
   router.get('/:lectureId/html5/*path',
     requireAuth, requirePermission('LECTURE_VIEW'), serveHtml5Asset);
+
+  // Lấy danh sách các chế độ trình chiếu khả dụng trong gói học liệu (Demo, Tutorial, Practice, Test...)
+  router.get('/:lectureId/modes', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+    const lectureId = req.params.lectureId;
+    try {
+      const pkg = await loadLecturePackage(lectureId, req, res, {
+        requirePublished: true,
+        contentTypes: ['SCORM', 'HTML5'],
+      });
+      if (!pkg) return;
+
+      const modes = [];
+      if (fs.existsSync(pkg.packageRoot)) {
+        const rootFiles = fs.readdirSync(pkg.packageRoot);
+        if (rootFiles.includes('demo.html')) {
+          modes.push({ id: 'demo', title: 'Minh họa (Demo)', file: 'demo.html' });
+        }
+        if (rootFiles.includes('tutorial.html')) {
+          modes.push({ id: 'tutorial', title: 'Hướng dẫn', file: 'tutorial.html' });
+        }
+        if (rootFiles.includes('practice.html')) {
+          modes.push({ id: 'practice', title: 'Luyện tập', file: 'practice.html' });
+        }
+        if (rootFiles.includes('test.html')) {
+          modes.push({ id: 'test', title: 'Kiểm tra', file: 'test.html' });
+        }
+        if (rootFiles.includes('index.html') && modes.length > 0) {
+          modes.push({ id: 'index', title: 'Menu tổng hợp', file: 'index.html' });
+        }
+      }
+
+      res.json({
+        lecture_id: lectureId,
+        content_type: pkg.lecture.content_type,
+        current_entry: path.basename(pkg.entryAbs),
+        modes
+      });
+    } catch (e) {
+      console.error('[lecture modes]', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
 
   return router;
 };

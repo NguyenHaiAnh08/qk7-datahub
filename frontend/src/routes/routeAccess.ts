@@ -36,7 +36,7 @@ export const ROUTE_ACCESS: Record<string, RouteAccessConfig> = {
   // Ecosystem Macro Modules (Giai đoạn phát triển Blueprint)
   [ROUTE_PATHS.LECTURES]: {
     path: ROUTE_PATHS.LECTURES,
-    requiresAuth: false,
+    requiresAuth: true,
     description: 'Phân hệ Bài giảng số',
   },
   [ROUTE_PATHS.MATERIALS]: {

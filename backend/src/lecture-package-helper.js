@@ -75,21 +75,25 @@ async function extractAndParse({ lectureId, pendingPath }) {
         }
     } else {
         // === XỬ LÝ GÓI HTML5 (Không có imsmanifest.xml) ===
-        // Tìm các file khởi chạy phổ biến ở thư mục gốc
-        const commonEntries = ['index.html', 'story.html', 'launch.html', 'story_html5.html'];
         const rootFiles = fs.readdirSync(targetDir);
         
-        const foundEntry = commonEntries.find(f => rootFiles.includes(f));
-        
-        if (foundEntry) {
-            launchFile = foundEntry;
+        // 1. Kiểm tra gói ActivePresenter (nếu có demo.html và engine player/rlprez.js)
+        if (rootFiles.includes('demo.html') && (rootFiles.includes('rlprez.js') || rootFiles.includes('player'))) {
+            launchFile = 'demo.html';
         } else {
-            // Nếu không thấy các file trên, quét tìm bất kỳ file .html nào ở thư mục gốc
-            const anyHtml = rootFiles.find(f => f.toLowerCase().endsWith('.html'));
-            if (anyHtml) {
-                launchFile = anyHtml;
+            // 2. Tìm các file khởi chạy phổ biến khác (Storyline story.html, index.html...)
+            const commonEntries = ['story.html', 'index.html', 'launch.html', 'story_html5.html', 'demo.html'];
+            const foundEntry = commonEntries.find(f => rootFiles.includes(f));
+            if (foundEntry) {
+                launchFile = foundEntry;
             } else {
-                throw new Error('Không tìm thấy file index.html hoặc imsmanifest.xml trong gói học liệu.');
+                // Quét tìm bất kỳ file .html nào ở thư mục gốc
+                const anyHtml = rootFiles.find(f => f.toLowerCase().endsWith('.html'));
+                if (anyHtml) {
+                    launchFile = anyHtml;
+                } else {
+                    throw new Error('Không tìm thấy file khởi chạy (.html) hoặc imsmanifest.xml trong gói học liệu.');
+                }
             }
         }
     }

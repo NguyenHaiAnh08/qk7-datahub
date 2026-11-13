@@ -115,3 +115,51 @@ export interface HistoryKpi {
   self_study_sessions: number;
   teacher_led_sessions: number;
 }
+
+// ─── QUIZ TƯƠNG TÁC ───
+export interface LectureQuizQuestion {
+  question_id: string;
+  lecture_id: string;
+  question_order: number;
+  question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c?: string | null;
+  option_d?: string | null;
+  correct_answer: 'A' | 'B' | 'C' | 'D';
+  explanation?: string | null;
+  slide_index?: number | null;
+  points?: number;
+  active?: boolean;
+}
+
+export interface CreateQuizPayload {
+  question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c?: string;
+  option_d?: string;
+  correct_answer: 'A' | 'B' | 'C' | 'D';
+  explanation?: string;
+  slide_index?: number;
+  points?: number;
+  question_order?: number;
+}
+
+// ─── SCORM TRACKING & RTE ───
+export interface ScormTrackingData {
+  tracking_id?: string;
+  session_id: string;
+  lecture_id: string;
+  lesson_status: 'not attempted' | 'passed' | 'completed' | 'failed' | 'incomplete';
+  score_raw?: number | null;
+  suspend_data?: string | null;
+  last_accessed?: string;
+}
+
+export interface ScormCommitPayload {
+  lesson_status?: string;
+  score_raw?: number | null;
+  suspend_data?: string | null;
+}
+

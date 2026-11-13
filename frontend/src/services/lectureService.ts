@@ -8,6 +8,10 @@ import {
   TeachingSchedule,
   StartSchedulePayload,
   HistoryKpi,
+  LectureQuizQuestion,
+  CreateQuizPayload,
+  ScormTrackingData,
+  ScormCommitPayload,
 } from '../types/lecture';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -85,24 +89,34 @@ export const lectureService = {
     });
   },
 
-  // ── Upload gói SCORM/HTML5 ──
+  // ── Upload gói SCORM/HTML5 hoặc tệp giáo án PDF ──
   async uploadPackage(
     lectureId: string,
     file: File,
-    type: 'HTML5' | 'SCORM'
-  ): Promise<{ success: boolean; status: string; pending_scorm_path: string }> {
+    type: 'HTML5' | 'SCORM' | 'PDF'
+  ): Promise<{ success: boolean; status: string; pending_scorm_path?: string; file_id?: string }> {
     const formData = new FormData();
     formData.append('file', file);
 
     const endpoint = type === 'SCORM'
       ? `/api/lectures/${encodeURIComponent(lectureId)}/scorm/upload`
-      : `/api/lectures/${encodeURIComponent(lectureId)}/html5/upload`;
+      : type === 'HTML5'
+      ? `/api/lectures/${encodeURIComponent(lectureId)}/html5/upload`
+      : `/api/lectures/${encodeURIComponent(lectureId)}/pdf/upload`;
 
     // Không set Content-Type — browser sẽ tự thêm multipart boundary
     return http(endpoint, {
       method: 'POST',
       body: formData,
     });
+  },
+
+  getScormLaunchUrl(lectureId: string): string {
+    return `/api/lectures/${encodeURIComponent(lectureId)}/scorm/launch`;
+  },
+
+  getHtml5LaunchUrl(lectureId: string): string {
+    return `/api/lectures/${encodeURIComponent(lectureId)}/html5/launch`;
   },
 
   // ── Ca giảng dạy ──
@@ -126,6 +140,22 @@ export const lectureService = {
     return http(`/api/lectures/schedules/${encodeURIComponent(id)}/force-end`, { method: 'POST' });
   },
 
+  async updateSlide(scheduleId: string, slideIndex: number, slideTotal?: number): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/slide`, {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ slide_index: slideIndex, slide_total: slideTotal }),
+    });
+  },
+
+  async updateProgress(scheduleId: string, currentPage: number): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/progress`, {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ current_page: currentPage }),
+    });
+  },
+
   async getHistory(filters: { from?: string; to?: string } = {}): Promise<{
     items: TeachingSchedule[];
     total: number;
@@ -136,6 +166,65 @@ export const lectureService = {
     if (filters.to) p.set('to', filters.to);
     const qs = p.toString();
     return http(`/api/lectures/schedules/history${qs ? `?${qs}` : ''}`);
+  },
+
+  async getAdvancedMonitor(): Promise<{
+    ongoing_count: number;
+    hanging_count: number;
+    items: TeachingSchedule[];
+  }> {
+    return http('/api/lectures/schedules/monitor');
+  },
+
+  // ── Quiz tương tác ──
+  async getQuizzes(lectureId: string): Promise<{ total: number; items: LectureQuizQuestion[] }> {
+    return http(`/api/lectures/${encodeURIComponent(lectureId)}/quiz`);
+  },
+
+  async createQuiz(lectureId: string, payload: CreateQuizPayload): Promise<{ success: boolean; question_id: string }> {
+    return http(`/api/lectures/${encodeURIComponent(lectureId)}/quiz`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateQuiz(lectureId: string, questionId: string, payload: Partial<CreateQuizPayload>): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(lectureId)}/quiz/${encodeURIComponent(questionId)}`, {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteQuiz(lectureId: string, questionId: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(lectureId)}/quiz/${encodeURIComponent(questionId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async activateQuiz(scheduleId: string, questionId: string): Promise<{ success: boolean; activated: boolean }> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/quiz/${encodeURIComponent(questionId)}/activate`, {
+      method: 'POST',
+    });
+  },
+
+  // ── SCORM RTE Tracking ──
+  async commitScorm(scheduleId: string, payload: ScormCommitPayload): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/scorm/commit`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getScormTracking(scheduleId: string): Promise<ScormTrackingData | null> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/scorm/tracking`);
+  },
+
+  // ── Phân khoa ──
+  async getFacultyLectures(facultyUnitId: string): Promise<{ total: number; items: Lecture[] }> {
+    return http(`/api/lectures/faculty/${encodeURIComponent(facultyUnitId)}`);
   },
 };
 

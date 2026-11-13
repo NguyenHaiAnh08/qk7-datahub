@@ -39,6 +39,12 @@ merged_*.txt
 QK7_FullSourceCode.txt
 backend/uploads/scorm/*
 !backend/uploads/scorm/.gitkeep
+backend/uploads/lectures/*
+!backend/uploads/lectures/.gitkeep
+backend/uploads/temp/*
+!backend/uploads/temp/.gitkeep
+backend/uploads/**/20261113_LECTURE_*
+backend/uploads/**/*_LECTURE_*
 
 # Python cache & artifacts
 __pycache__/

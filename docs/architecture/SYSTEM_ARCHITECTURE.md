@@ -1568,6 +1568,13 @@ Tại `backend/src/lecture-package-helper.js`, gói ZIP SCORM/HTML5 bắt buộc
   - Chỉ số KPI trực quan: tên môn, giảng viên, địa điểm phòng học, thời lượng đã học, slide hiện tại trên tổng slide, tiến độ hoàn thành SCORM (%).
   - Phát hiện và cảnh báo treo lớp học (`is_hanging`) khi thời lượng phiên vượt quá 240 phút.
 
+### 32.6. Vòng Đời Quản Lý & Tái Cấu Trúc Lưu Trữ Bài Giảng
+- **Vòng đời Xóa mềm (Soft Delete) & Xóa vĩnh viễn (Permanent Delete):**
+  - Xóa mềm: Bài giảng bị xóa chuyển vào trạng thái lưu trữ tạm thời (`deleted_at`), ẩn khỏi danh sách giảng dạy chính nhưng bảo toàn gói SCORM vật lý để phục vụ kiểm toán hoặc khôi phục (`POST /api/lectures/:id/restore`).
+  - Xóa vĩnh viễn: Chỉ Chỉ huy cấp cao/Quản trị viên mới có thẩm quyền xóa vĩnh viễn (`DELETE /api/lectures/:id/permanent`), giải phóng toàn bộ thư mục dữ liệu SCORM vật lý trên đĩa máy chủ và bản ghi liên quan trong CSDL.
+- **Tái cấu trúc thư mục lưu trữ tập trung (`backend/src/storage-helper.js`):**
+  - Quản lý tập trung các thư mục con: `uploads/lectures/`, `uploads/scorm/`, `uploads/temp/` với cơ chế kiểm tra tự động tạo thư mục an toàn và phân tách phiên bản.
+
 ---
 
 ## 33. Kiến Trúc Bộ Điều Phối Thiết Kế UI/UX Bản Sắc Quân Đội (QK7 Multi-Engine Design Orchestrator)

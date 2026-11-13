@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Square, Clock, Users, BookOpen, ExternalLink, Loader2, AlertTriangle, ShieldCheck, RotateCcw
 } from 'lucide-react';
@@ -60,6 +60,17 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
     setModes([]);
   }, [lecture?.lecture_id]);
 
+    // Lưu trạng thái ca dạy vào localStorage để phục hồi khi F5
+  useEffect(() => {
+    if (open && session?.schedule_id && lecture?.lecture_id) {
+      localStorage.setItem('qk7_active_session', JSON.stringify({
+        schedule_id: session.schedule_id,
+        lecture_id: lecture.lecture_id
+      }));
+    }
+    // Không xóa ở cleanup vì nếu F5, cleanup chạy nhưng ta vẫn muốn giữ để khôi phục
+  }, [open, session?.schedule_id, lecture?.lecture_id]);
+
   // Nạp danh sách các chế độ trình chiếu khả dụng trong gói bài giảng (ActivePresenter/SCORM/HTML5)
   useEffect(() => {
     if (!open || !lecture?.lecture_id || lecture.content_type === 'PDF') return;
@@ -118,6 +129,128 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
     if (launchUrl) window.open(launchUrl, '_blank', 'noopener,noreferrer');
   }, [launchUrl]);
 
+  // ─────────────────────────────────────────────────────────────
+  // 🆕 TÍCH HỢP SCORM API BRIDGE ĐỂ LẤY TIẾN ĐỘ THẬT
+  // ─────────────────────────────────────────────────────────────
+  const scormDataRef = useRef<Record<string, string>>({});
+
+  // Hàm gửi tiến độ lên Backend
+  const sendRealProgress = useCallback(
+    async (slideIndex: number, slideTotal: number, percent: number) => {
+      try {
+        await http(`/api/lectures/schedules/${session.schedule_id}/progress`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            // ⚠️ Backend hiện chỉ đọc `current_page` → giữ tương thích
+            current_page: slideIndex,
+            // Các trường mở rộng — nếu backend chưa hỗ trợ sẽ bị bỏ qua
+            slide_index: slideIndex,
+            slide_total: slideTotal,
+            scorm_progress: percent,
+          }),
+          silent: true,
+        });
+      } catch (_) {
+        /* nuốt lỗi — không chặn trình chiếu */
+      }
+    },
+    [session.schedule_id]
+  );
+
+  useEffect(() => {
+    if (!open || !lecture) return;
+
+    // Reset buffer khi đổi bài giảng để tránh lẫn dữ liệu phiên cũ
+    scormDataRef.current = {};
+
+    // ── 3. Hàm bóc tách số liệu từ chuỗi SCORM trả về
+    //    (Khai báo TRƯỚC 2 object API để tránh TDZ)
+    const parseScormProgress = (value: string) => {
+      try {
+        let current = 0;
+        let total = 0;
+
+        if (value.startsWith('{')) {
+          const data = JSON.parse(value);
+          current = parseInt(
+            data.slideIndex || data.slide || data.currentSlide || 0,
+            10
+          );
+          total = parseInt(
+            data.slideTotal || data.totalSlides || data.total || 0,
+            10
+          );
+        } else {
+          const match = value.match(/\d+/);
+          if (match) current = parseInt(match[0], 10);
+        }
+
+        if (current > 0) {
+          const safeTotal = total > 0 ? total : Math.max(current, 100);
+          const percent = current / safeTotal;
+          sendRealProgress(current, safeTotal, percent);
+        }
+      } catch {
+        /* dữ liệu không đúng định dạng → bỏ qua */
+      }
+    };
+
+    // ── 1. SCORM 1.2 API
+    (window as any).API = {
+      LMSInitialize: () => 'true',
+      LMSFinish: () => 'true',
+      LMSGetValue: (key: string) => scormDataRef.current[key] || '',
+      LMSSetValue: (key: string, value: string) => {
+        scormDataRef.current[key] = value;
+        if (key === 'cmi.core.lesson_location' || key === 'cmi.suspend_data') {
+          parseScormProgress(value);
+        }
+        return 'true';
+      },
+      LMSCommit: () => 'true',
+      LMSGetLastError: () => '0',
+      LMSGetErrorString: () => '',
+      LMSGetDiagnostic: () => '',
+    };
+
+    // ── 2. SCORM 2004 API
+    (window as any).API_1484_11 = {
+      Initialize: () => 'true',
+      Terminate: () => 'true',
+      GetValue: (key: string) => scormDataRef.current[key] || '',
+      SetValue: (key: string, value: string) => {
+        scormDataRef.current[key] = value;
+        if (key === 'cmi.location' || key === 'cmi.suspend_data') {
+          parseScormProgress(value);
+        }
+        return 'true';
+      },
+      Commit: () => 'true',
+      GetLastError: () => '0',
+      GetErrorString: () => '',
+      GetDiagnostic: () => '',
+    };
+
+    // ── 4. Lắng nghe postMessage cho gói HTML5 thuần
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && typeof event.data === 'object') {
+        if (event.data.type === 'slideChange' || event.data.type === 'progress') {
+          const current = event.data.slideIndex || 0;
+          const total = event.data.slideTotal || 100;
+          if (current > 0) sendRealProgress(current, total, current / total);
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      delete (window as any).API;
+      delete (window as any).API_1484_11;
+    };
+  }, [open, lecture, sendRealProgress]);
+
   // ── Hàm render nội dung dựa trên loại file ──
   const renderContent = () => {
     if (lecture.content_type === 'PDF') {
@@ -161,7 +294,7 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
           </div>
         )}
         <iframe
-          key={`html5-${selectedFile}-${reloadKey}`}
+          key={`${lecture.lecture_id}-${reloadKey}`}
           src={launchUrl}
           onLoad={() => setIframeLoaded(true)}
           className="w-full h-full border-0 bg-white"

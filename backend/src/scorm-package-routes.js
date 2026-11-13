@@ -91,7 +91,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
     const lr = await pool.request()
       .input('lid', sql.VarChar(50), lectureId)
       .query(`
-        SELECT security_level_id, content_type, scorm_entry_point, pending_scorm_path, status
+        SELECT title, created_at, security_level_id, content_type, scorm_entry_point, pending_scorm_path, status
         FROM DIGITAL_LECTURE WHERE lecture_id = @lid
       `);
     if (lr.recordset.length === 0) { res.status(404).send('Not found'); return null; }
@@ -110,12 +110,15 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
     let entryPoint = lec.scorm_entry_point;
 
     // 🌟 Tự động nhận diện & tối ưu hóa gói ActivePresenter: ưu tiên demo.html làm bài giảng chính
-    const lectureDir = path.resolve(__dirname, '..', 'uploads', 'lectures', lectureId);
+    const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
+    const folderName = `${sanitizeFolderName(lec.title || 'Bai_Giang')}_${lectureId}`;
+    const date = lec.created_at ? new Date(lec.created_at) : new Date();
+    const { absPath: lectureDir, relPath: baseRelPath } = getModuleUploadPath(MODULES.LECTURES, date, folderName);
     if (fs.existsSync(lectureDir)) {
       const rootFiles = fs.readdirSync(lectureDir);
       const isActivePresenter = rootFiles.includes('demo.html') && (rootFiles.includes('rlprez.js') || rootFiles.includes('player'));
       if (isActivePresenter && (!entryPoint || entryPoint.endsWith('index.html'))) {
-        entryPoint = `uploads/lectures/${lectureId}/demo.html`;
+        entryPoint = `${baseRelPath}/demo.html`;
         await pool.request()
           .input('lid', sql.VarChar(50), lectureId)
           .input('ep', sql.NVarChar(500), entryPoint)
@@ -131,7 +134,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         const commonEntries = ['demo.html', 'story.html', 'index.html', 'launch.html', 'story_html5.html'];
         const found = commonEntries.find(f => rootFiles.includes(f)) || rootFiles.find(f => f.toLowerCase().endsWith('.html'));
         if (found) {
-          entryPoint = `uploads/lectures/${lectureId}/${found}`;
+          entryPoint = `${baseRelPath}/${found}`;
           await pool.request()
             .input('lid', sql.VarChar(50), lectureId)
             .input('ep', sql.NVarChar(500), entryPoint)
@@ -141,7 +144,12 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       } else if (lec.pending_scorm_path) {
         try {
           const { extractAndParse } = require('./lecture-package-helper');
-          const out = await extractAndParse({ lectureId, pendingPath: lec.pending_scorm_path });
+          const out = await extractAndParse({ 
+            lectureId, 
+            pendingPath: lec.pending_scorm_path,
+            title: lec.title,
+            createdAt: lec.created_at
+          });
           entryPoint = out.entry_point;
           await pool.request()
             .input('lid', sql.VarChar(50), lectureId)
@@ -360,7 +368,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
           return res.status(403).json({ error: 'Chỉ tác giả mới được upload' });
         }
 
-        const pendingDir = path.join(__dirname, '..', 'uploads', 'pending', folder);
+        const pendingDir = path.join(__dirname, '..', 'uploads', 'bai-giang-so', 'pending', folder);
         fs.mkdirSync(pendingDir, { recursive: true });
         const pendingAbs = path.join(pendingDir, `${lectureId}.zip`);
 
@@ -372,7 +380,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
           return res.status(500).json({ error: 'Lỗi di chuyển tệp tin: ' + moveErr.message });
         }
 
-        const relPending = `uploads/pending/${folder}/${lectureId}.zip`;
+        const relPending = `uploads/bai-giang-so/pending/${folder}/${lectureId}.zip`;
         await pool.request()
           .input('lid', sql.VarChar(50), lectureId)
           .input('pp',  sql.NVarChar(500), relPending)
@@ -423,13 +431,16 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       const fileSize = fs.statSync(req.file.path).size;
 
       const now = new Date();
-      const yyyy = String(now.getFullYear());
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const yyyymmdd = `${yyyy}${mm}${String(now.getDate()).padStart(2, '0')}`;
+      const yyyymmdd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
       const fileId = `DOC-LEC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      
+      const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
+      const folderName = `${sanitizeFolderName(lec.title || 'Bai_Giang')}_${lectureId}`;
+      const { absPath: baseAbsPath, relPath: baseRelPath } = getModuleUploadPath(MODULES.LECTURES, now, folderName);
+      
       const fileName = `${yyyymmdd}_LECTURE_${lectureId}_${sha256.slice(0, 8)}.pdf`;
-      const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
-      const absPath = path.join(__dirname, '..', relPath);
+      const relPath = `${baseRelPath}/${fileName}`;
+      const absPath = path.join(baseAbsPath, fileName);
 
       fs.mkdirSync(path.dirname(absPath), { recursive: true });
       moveFileSafe(req.file.path, absPath);

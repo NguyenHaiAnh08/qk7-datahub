@@ -10,6 +10,8 @@
 // - SCORM: commit vào SCORM_TRACKING
 // ============================================================
 const express = require('express');
+const path = require('path');
+const fs = require('fs');         
 const { sql, getPool } = require('./db');
 
 const HANGING_THRESHOLD_MINUTES = 4 * 60; // 4 giờ
@@ -185,7 +187,13 @@ module.exports = function createLectureRoutes({
         }
       }
 
-      if (req.query.status)           { query += ` AND l.status = @status`;         r.input('status', sql.VarChar(30), req.query.status); }
+      if (req.query.status) {
+        query += ` AND l.status = @status`;
+        r.input('status', sql.VarChar(30), req.query.status);
+      } else {
+        // Mặc định: Ẩn các bài giảng đã bị xóa mềm
+        query += ` AND l.status != 'DELETED'`;
+      }
       if (req.query.subject_id)       { query += ` AND l.subject_id = @subId`;      r.input('subId', sql.VarChar(50), req.query.subject_id); }
       if (req.query.faculty_unit_id)  { query += ` AND l.faculty_unit_id = @fac`;   r.input('fac', sql.VarChar(50), req.query.faculty_unit_id); }
       if (req.query.q)                { query += ` AND (l.title LIKE N'%' + @q + N'%' OR l.lecture_code LIKE '%' + @q + '%')`; r.input('q', sql.NVarChar(200), req.query.q); }
@@ -319,20 +327,24 @@ module.exports = function createLectureRoutes({
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  // 1. API Lưu trữ (Archive) — CHẶN Ở BACKEND: chỉ Chỉ huy cấp trên
+  // 1. API Xoá mềm — CHẶN Ở BACKEND: chỉ Chỉ huy cấp trên
   router.delete('/:id', requireAuth, requirePermission('LECTURE_DELETE'), async (req, res) => {
     try {
       const pool = await getPool();
-      // Kiểm tra quyền Chỉ huy
       if (!(await requireCommander(pool, req, res))) return;
 
+      const lectureId = req.params.id;
       const r = await pool.request()
-        .input('id', sql.VarChar(50), req.params.id)
-        .query(`UPDATE DIGITAL_LECTURE SET status = 'ARCHIVED', updated_at = GETDATE() WHERE lecture_id = @id`);
+        .input('id', sql.VarChar(50), lectureId)
+        .query(`UPDATE DIGITAL_LECTURE SET status = 'DELETED', updated_at = GETDATE() WHERE lecture_id = @id`);
+
       if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
-      await logAudit(req, 'LECTURE_ARCHIVE', `Lưu trữ bài giảng ${req.params.id}`, req.params.id);
-      res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+
+      await logAudit(req, 'LECTURE_SOFT_DELETE', `Chuyển bài giảng ${lectureId} vào thùng rác`, lectureId);
+      res.json({ success: true, message: 'Đã chuyển bài giảng vào thùng rác' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Gửi duyệt
@@ -357,35 +369,72 @@ module.exports = function createLectureRoutes({
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  // 2. API Khôi phục (Restore) — CHẶN Ở BACKEND: chỉ Chỉ huy cấp trên
-  //    (Đưa RA NGOÀI handler submit — bản gốc bị lồng trong submit nên không được đăng ký)
+  // 2. API KHÔI PHỤC BÀI GIẢNG TỪ THÙNG RÁC
   router.post('/:id/restore', requireAuth, requirePermission('LECTURE_DELETE'), async (req, res) => {
     try {
       const pool = await getPool();
-      // Kiểm tra quyền Chỉ huy
       if (!(await requireCommander(pool, req, res))) return;
 
       const lectureId = req.params.id;
-      const check = await pool.request()
+      const r = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .query(`SELECT status FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
-      if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
+        .query(`UPDATE DIGITAL_LECTURE SET status = 'DRAFT', updated_at = GETDATE() WHERE lecture_id = @id AND status = 'DELETED'`);
 
-      if (check.recordset[0].status !== 'ARCHIVED') {
-        return res.status(400).json({ error: 'Bài giảng không ở trạng thái lưu trữ' });
+      if (r.rowsAffected[0] === 0) {
+        return res.status(400).json({ error: 'Bài giảng không ở trạng thái đã xóa' });
       }
 
-      await pool.request()
-        .input('id', sql.VarChar(50), lectureId)
-        .query(`UPDATE DIGITAL_LECTURE SET status='DRAFT', updated_at=GETDATE() WHERE lecture_id=@id`);
-
-      await logAudit(req, 'LECTURE_RESTORE', `Khôi phục bài giảng ${lectureId}`, lectureId);
+      await logAudit(req, 'LECTURE_RESTORE', `Khôi phục bài giảng ${lectureId} từ thùng rác`, lectureId);
       res.json({ success: true });
     } catch (err) {
-      console.error('[POST restore]', err);
       res.status(500).json({ error: err.message });
     }
   });
+
+
+  // 3. API XÓA VĨNH VIỄN (CHỈ DÀNH CHO BÀI GIẢNG ĐÃ Ở TRONG THÙNG RÁC)
+  router.delete('/:id/purge', requireAuth, requirePermission('LECTURE_DELETE'), async (req, res) => {
+    try {
+      const pool = await getPool();
+      if (!(await requireCommander(pool, req, res))) return;
+
+      const lectureId = req.params.id;
+
+      // Lấy thông tin để xóa file vật lý
+      const check = await pool.request()
+        .input('id', sql.VarChar(50), lectureId)
+        .query(`SELECT title, created_at, status, pending_scorm_path FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+
+      if (check.recordset.length === 0 || check.recordset[0].status !== 'DELETED') {
+        return res.status(400).json({ error: 'Chỉ có thể xóa vĩnh viễn bài giảng đang ở trong thùng rác' });
+      }
+      const lec = check.recordset[0];
+
+      // Xóa DB (Cascade sẽ xóa Quiz, SCORM Package)
+      await pool.request()
+        .input('id', sql.VarChar(50), lectureId)
+        .query(`DELETE FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+
+      // Xóa File Vật Lý
+      const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
+      const folderName = `${sanitizeFolderName(lec.title || 'Bai_Giang')}_${lectureId}`;
+      const date = lec.created_at ? new Date(lec.created_at) : new Date();
+      const { absPath: targetDir } = getModuleUploadPath(MODULES.LECTURES, date, folderName);
+
+      if (fs.existsSync(targetDir)) fs.rmSync(targetDir, { recursive: true, force: true });
+
+      if (lec.pending_scorm_path) {
+        const pendingAbs = path.resolve(__dirname, '..', lec.pending_scorm_path);
+        if (fs.existsSync(pendingAbs)) fs.unlinkSync(pendingAbs);
+      }
+
+      await logAudit(req, 'LECTURE_PURGE', `Xóa vĩnh viễn bài giảng ${lectureId} khỏi hệ thống`, lectureId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
 
   // Duyệt 2 tầng
   router.post('/:id/approve', requireAuth, requirePermission('LECTURE_APPROVE'), async (req, res) => {
@@ -395,7 +444,8 @@ module.exports = function createLectureRoutes({
       const check = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
         .query(`SELECT status, faculty_unit_id, content_type,
-                       pending_scorm_path, scorm_entry_point
+                       pending_scorm_path, scorm_entry_point,
+                       title, created_at, document_id
                 FROM DIGITAL_LECTURE WHERE lecture_id = @id`);                 // [1]
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
 
@@ -442,6 +492,8 @@ module.exports = function createLectureRoutes({
             const out = await extractAndParse({
               lectureId,
               pendingPath: lec.pending_scorm_path,
+              title:     lec.title,
+              createdAt: lec.created_at,
             });
             console.log(`[lecture approve] Extracted ${lectureId} → ${out.entry_point} (${out.content_type})`);
             extractedEntryPoint = out.entry_point;
@@ -461,14 +513,21 @@ module.exports = function createLectureRoutes({
             });
           }
         } else if (!lec.scorm_entry_point) {
-          // Fallback tự động nhận diện nếu đã giải nén trong uploads/lectures/:lectureId
-          const lectureDir = path.resolve(__dirname, '..', 'uploads', 'lectures', lectureId);
+          // Fallback tự động nhận diện trong thư mục chuẩn mới:
+          // uploads/bai-giang-so/YYYY/MM/<Ten_Bai_Giang>_<MaLecture>/
+          const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
+          const folderName = `${sanitizeFolderName(lec.title || 'Bai_Giang')}_${lectureId}`; // Thêm _lectureId
+          const date = lec.created_at ? new Date(lec.created_at) : new Date();
+          const { absPath: lectureDir, relPath: baseRelPath } =
+            getModuleUploadPath(MODULES.LECTURES, date, folderName);
+
           if (fs.existsSync(lectureDir)) {
             const files = fs.readdirSync(lectureDir);
             const commonEntries = ['index.html', 'story.html', 'launch.html', 'demo.html'];
-            const entry = commonEntries.find(f => files.includes(f)) || files.find(f => f.toLowerCase().endsWith('.html'));
+            const entry = commonEntries.find(f => files.includes(f))
+              || files.find(f => f.toLowerCase().endsWith('.html'));
             if (entry) {
-              extractedEntryPoint = `uploads/lectures/${lectureId}/${entry}`;
+              extractedEntryPoint = `${baseRelPath}/${entry}`.replace(/\\/g, '/');
             }
           }
           if (!extractedEntryPoint) {
@@ -630,6 +689,10 @@ module.exports = function createLectureRoutes({
       res.status(500).json({ error: err.message });
     }
   });
+
+
+
+  
 
   // Cập nhật tiến độ
   router.put('/schedules/:id/progress', requireAuth, requirePermission('SCHEDULE_START'), async (req, res) => {
@@ -893,6 +956,34 @@ module.exports = function createLectureRoutes({
     }
   });
 
+      // API nhẹ: Lấy thông tin 1 ca dạy cụ thể (Dùng để phục hồi khi F5)
+  router.get('/schedules/:id', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+    try {
+      const pool = await getPool();
+      const r = await pool.request()
+        .input('id', sql.VarChar(50), req.params.id)
+        .query(`
+          SELECT s.*, l.title AS lecture_title, l.content_type, c.class_name 
+          FROM TEACHING_SCHEDULE s 
+          JOIN DIGITAL_LECTURE l ON l.lecture_id = s.lecture_id 
+          LEFT JOIN TRAINING_CLASS c ON c.class_id = s.class_id 
+          WHERE s.schedule_id = @id
+        `);
+      
+      if (r.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy ca dạy' });
+      
+      const session = r.recordset[0];
+      // Chỉ người tạo ca, BGH hoặc Admin mới được xem
+      if (session.presenter_id !== req.user.user_id && !(req.user.roles || []).includes('ROL-01') && !(req.user.roles || []).includes('ROL-02')) {
+        return res.status(403).json({ error: 'Không có quyền xem ca dạy này' });
+      }
+      
+      res.json(session);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ═════════════════════════════════════════════════════════════
   // PHẦN 4 — SCORM TRACKING (Proxy cho SCORM RTE)
   // ═════════════════════════════════════════════════════════════
@@ -963,5 +1054,80 @@ module.exports = function createLectureRoutes({
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+    // ═════════════════════════════════════════════════════════════
+  // WATCHDOG: Tự động ngắt các ca giảng dạy treo quá HARD_LIMIT
+  // ═════════════════════════════════════════════════════════════
+  const HARD_LIMIT_MINUTES = 300; // 5 giờ — vượt xa HANGING_THRESHOLD_MINUTES (4 giờ)
+
+  const autoCloseHangingSchedules = async () => {
+    try {
+      const pool = await getPool();
+      const hasNote = await hasColumn(pool, 'TEACHING_SCHEDULE', 'note');
+
+      // Tìm ca ONGOING đã vượt ngưỡng cứng
+      const r = await pool.request()
+        .input('limit', sql.Int, HARD_LIMIT_MINUTES)
+        .query(`
+          SELECT schedule_id, presenter_id, lecture_id,
+                 DATEDIFF(MINUTE, start_time, GETDATE()) AS elapsed
+          FROM TEACHING_SCHEDULE
+          WHERE status = 'ONGOING'
+            AND DATEDIFF(MINUTE, start_time, GETDATE()) >= @limit
+        `);
+
+      if (r.recordset.length === 0) return;
+
+      for (const row of r.recordset) {
+        try {
+          if (hasNote) {
+            await pool.request()
+              .input('id', sql.VarChar(50), row.schedule_id)
+              .query(`
+                UPDATE TEACHING_SCHEDULE
+                SET status = 'COMPLETED',
+                    end_time = GETDATE(),
+                    note = ISNULL(note, '') + ' [Hệ thống tự động đóng do treo quá ${HARD_LIMIT_MINUTES} phút]'
+                WHERE schedule_id = @id AND status = 'ONGOING'
+              `);
+          } else {
+            await pool.request()
+              .input('id', sql.VarChar(50), row.schedule_id)
+              .query(`
+                UPDATE TEACHING_SCHEDULE
+                SET status = 'COMPLETED', end_time = GETDATE()
+                WHERE schedule_id = @id AND status = 'ONGOING'
+              `);
+          }
+
+          console.log(`[Watchdog] ⏱ Tự động đóng ca treo: ${row.schedule_id} (${row.elapsed} phút)`);
+
+          // Audit log — dùng writeAccessLog có sẵn trong closure
+          if (typeof writeAccessLog === 'function') {
+            writeAccessLog({
+              userId: 'SYSTEM',
+              fileId: row.lecture_id,
+              action: 'SCHEDULE_AUTO_CLOSE',
+              ip: '127.0.0.1',
+              note: `[Watchdog] Tự động đóng ca ${row.schedule_id} treo ${row.elapsed} phút`,
+            }).catch(() => {});
+          }
+        } catch (rowErr) {
+          console.error(`[Watchdog] Lỗi đóng ca ${row.schedule_id}:`, rowErr.message);
+        }
+      }
+    } catch (err) {
+      console.error('[Watchdog] Lỗi quét ca treo:', err.message);
+    }
+  };
+
+  // Chạy kiểm tra định kỳ mỗi 5 phút
+  const watchdogTimer = setInterval(autoCloseHangingSchedules, 5 * 60 * 1000);
+  if (typeof watchdogTimer.unref === 'function') watchdogTimer.unref();
+
+  // Chạy 1 lần sau 30 giây khởi động (không đợi 5 phút)
+  const watchdogBootTimer = setTimeout(autoCloseHangingSchedules, 30 * 1000);
+  if (typeof watchdogBootTimer.unref === 'function') watchdogBootTimer.unref();
+
   return router;
+
 };

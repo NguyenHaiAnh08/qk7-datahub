@@ -26,6 +26,16 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
   - [`docs/guides/Senior Multi-Role.md`](./guides/Senior%20Multi-Role.md): Quy định cho toàn bộ các vai trò kỹ sư về việc duy trì tài liệu đồng bộ 100% với trạng thái mã nguồn thực tế.
 - **Quy trình phối hợp:** Mọi thay đổi mã nguồn tiếp tục được giữ nguyên tại working tree (tuân thủ nghiêm ngặt nguyên tắc **Strict No Auto-Commit & No Auto-Push**); khi nhận được lệnh commit và push từ USER, Agent sẽ tự động cập nhật toàn bộ tài liệu Markdown tương ứng trước khi tiến hành commit và push lên nhánh được chỉ định.
 
+### 3. Đồng Bộ Toàn Diện Tính Năng Từ Nhánh `final-test` Sang `haianh-dev`
+- **Quản lý Vòng đời Bài giảng Điện tử (Lecture Lifecycle):**
+  - Bổ sung cơ chế Xóa mềm (`soft delete`), Khôi phục (`restore`) và Xóa vĩnh viễn (`permanent delete`) bài giảng trên cả Backend ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js)) và Frontend ([`frontend/src/services/lectureService.ts`](../frontend/src/services/lectureService.ts), [`frontend/src/components/lectures/LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx), [`frontend/src/pages/LecturesPage.tsx`](../frontend/src/pages/LecturesPage.tsx)).
+- **Tái Cấu Trúc Lưu Trữ Học Liệu ([`backend/src/storage-helper.js`](../backend/src/storage-helper.js)):**
+  - Tối ưu hóa đường dẫn lưu trữ tệp tin tải lên theo cấu trúc thư mục quy chuẩn, tự động tạo và bảo vệ cấu trúc thư mục lưu trữ SCORM / Bài giảng (`uploads/lectures/`, `uploads/scorm/`, `uploads/temp/`).
+- **Tối ưu hóa Phòng học Trực tiếp ([`LiveSessionRoom.tsx`](../frontend/src/components/lectures/LiveSessionRoom.tsx)):**
+  - Nâng cấp trải nghiệm tương tác trong phòng học SCORM/HTML5, giám sát chỉ số học tập thời gian thực ([`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx)).
+- **Khởi chạy Hệ thống An toàn:**
+  - Nâng cấp `s.bat`, [`scripts/s.bat`](../scripts/s.bat), [`scripts/s-dev.bat`](../scripts/s-dev.bat) bổ sung kiểm tra và giải phóng tự động cổng AI Boxchat (:8001) khi khởi động.
+
 ---
 
 ## [v1.6.0-digital-lecture-scorm-and-design-orchestrator] — 2026-11-13

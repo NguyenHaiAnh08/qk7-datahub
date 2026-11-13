@@ -106,19 +106,11 @@ module.exports = function createApprovalWorkflow({
   // ─────────────────────────────────────────────────────────────
   // Execute sau khi DUYỆT: giải nén SCORM → PUBLISHED, xoá zip tạm
   // ─────────────────────────────────────────────────────────────
-  async function executeLectureUpload(request, deps = {}) {
+    async function executeLectureUpload(request, deps = {}) {
     const {
       getPool: gp = getPool,
       sql: _sql = sql,
-      extractAndParse,
-      baseDir = process.cwd(),
     } = deps;
-
-    if (typeof extractAndParse !== 'function') {
-      throw new Error(
-        'executeLectureUpload: cần truyền extractAndParse(zipPath, targetDir) trong deps'
-      );
-    }
 
     const lectureId = extractLectureId(request);
     const pool = await gp();
@@ -126,7 +118,7 @@ module.exports = function createApprovalWorkflow({
     const r = await pool.request()
       .input('id', _sql.VarChar(50), lectureId)
       .query(`
-        SELECT lecture_id, pending_scorm_path
+        SELECT lecture_id, pending_scorm_path, title, created_at
         FROM DIGITAL_LECTURE
         WHERE lecture_id = @id
       `);
@@ -141,34 +133,39 @@ module.exports = function createApprovalWorkflow({
       );
     }
 
-    const zipPath = path.isAbsolute(lecture.pending_scorm_path)
-      ? lecture.pending_scorm_path
-      : path.join(baseDir, lecture.pending_scorm_path);
+    // ✅ Gọi extractAndParse theo signature MỚI (object argument).
+    // Helper tự resolve thư mục đích từ title + createdAt + lectureId,
+    // tự giải nén, tự xoá ZIP tạm.
+    const { extractAndParse } = require('./lecture-package-helper');
+    const out = await extractAndParse({
+      lectureId,
+      pendingPath: lecture.pending_scorm_path,
+      title:       lecture.title,
+      createdAt:   lecture.created_at,
+    });
 
-    const targetDir = path.join(baseDir, 'uploads', 'lectures', lectureId);
-
-    const { launchFile } = await extractAndParse(zipPath, targetDir);
-
+    // ✅ out.entry_point đã là relPath đầy đủ:
+    //    uploads/bai-giang-so/YYYY/MM/<Ten_Bai_Giang>_<MaLecture>/index.html
     await pool.request()
       .input('id', _sql.VarChar(50), lectureId)
-      .input('launch', _sql.NVarChar(500), launchFile)
+      .input('launch', _sql.NVarChar(500), out.entry_point)
+      .input('ct', _sql.VarChar(20), out.content_type)
       .query(`
         UPDATE DIGITAL_LECTURE
         SET status = 'PUBLISHED',
             scorm_entry_point = @launch,
+            content_type = @ct,
             pending_scorm_path = NULL,
             updated_at = GETDATE()
         WHERE lecture_id = @id
       `);
 
-    // Xoá zip tạm (best-effort — không chặn thành công của giao dịch)
-    try {
-      fs.unlinkSync(zipPath);
-    } catch (err) {
-      console.warn('[approval] không xoá được zip tạm:', zipPath, '—', err.message);
-    }
-
-    return { lectureId, launchFile, status: 'PUBLISHED' };
+    return {
+      lectureId,
+      entryPoint: out.entry_point,
+      content_type: out.content_type,
+      status: 'PUBLISHED',
+    };
   }
 
   // ─────────────────────────────────────────────────────────────

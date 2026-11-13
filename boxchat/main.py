@@ -11,6 +11,15 @@ if sys.platform.startswith('win'):
     try:
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
         sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        # Tự động vô hiệu hóa QuickEdit Mode để tránh Windows CMD bị đóng băng (Freeze/Pause) khi click chuột
+        import ctypes
+        _kernel32 = ctypes.windll.kernel32
+        _h_stdin = _kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+        _mode = ctypes.c_ulong()
+        if _kernel32.GetConsoleMode(_h_stdin, ctypes.byref(_mode)):
+            _mode.value &= ~0x0040  # Bỏ cờ ENABLE_QUICK_EDIT_MODE
+            _mode.value |= 0x0080   # Bật cờ ENABLE_EXTENDED_FLAGS bắt buộc
+            _kernel32.SetConsoleMode(_h_stdin, _mode.value)
     except Exception:
         pass
 
@@ -273,13 +282,38 @@ async def chat_with_tutor(req: ChatRequest):
         # Tối ưu truy vấn đa lượt (Query Rewriting với ngữ cảnh history)
         rewritten_query = agent_tutor._rewrite_query_with_history(req.query, req.history or [])
 
+        # Nhận diện tự động nếu câu hỏi đề cập số hiệu văn bản cụ thể
+        effective_file_id = req.file_id
+        if not effective_file_id and vector_store.chunks_cache:
+            q_clean = f"{req.query} {rewritten_query}".lower()
+            for c in vector_store.chunks_cache:
+                doc_code = (c.get("document_code") or "").strip().lower()
+                fid = (c.get("file_id") or "").strip().lower()
+                if doc_code and (doc_code in q_clean or doc_code.replace(" ", "") in q_clean.replace(" ", "")):
+                    effective_file_id = c.get("file_id")
+                    break
+                if fid and fid in q_clean:
+                    effective_file_id = c.get("file_id")
+                    break
+
         # 1. Tìm kiếm chunks phù hợp với cấp quyền của quân nhân
         retrieved_chunks = vector_store.search(
             query=rewritten_query,
             max_security_level=req.user_clearance,
-            file_id=req.file_id,
+            file_id=effective_file_id,
             top_k=5
         )
+
+        # Nếu đang tập trung vào một file cụ thể, đảm bảo Page 1 luôn có trong ngữ cảnh
+        if effective_file_id and vector_store.chunks_cache:
+            has_p1 = any(c.get("page") == 1 for c in retrieved_chunks)
+            if not has_p1:
+                p1_chunk = next(
+                    (c for c in vector_store.chunks_cache if c.get("file_id") == effective_file_id and c.get("page") == 1),
+                    None
+                )
+                if p1_chunk and int(p1_chunk.get("security_level_id", 1)) <= req.user_clearance:
+                    retrieved_chunks.insert(0, p1_chunk)
 
         # Detect clearance leak (should never happen)
         leaks = [c for c in retrieved_chunks if int(c.get("security_level_id", 1)) > req.user_clearance]
@@ -298,7 +332,7 @@ async def chat_with_tutor(req: ChatRequest):
             user_rank=req.user_rank,
             user_clearance=req.user_clearance,
             retrieved_chunks=retrieved_chunks,
-            file_id=req.file_id,
+            file_id=effective_file_id,
             history=req.history,
             biometric_verified=bool(req.biometric_verified),
             all_chunks=vector_store.chunks_cache

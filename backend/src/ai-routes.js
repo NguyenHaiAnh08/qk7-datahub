@@ -14,7 +14,7 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
   const router = express.Router();
 
   const AI_BASE = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8001';
-  const AI_HEALTH_TIMEOUT_MS = 2000;
+  const AI_HEALTH_TIMEOUT_MS = 5000;
   const AI_CHAT_TIMEOUT_MS = parseInt(process.env.AI_CHAT_TIMEOUT_MS || '75000', 10);
 
   // ✅ MỚI: Trích xuất file_id từ JWT token vân tay (dùng cho trường hợp chat chung không có file_id)
@@ -188,7 +188,32 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
         file_id || null
       );
 
-      // Bước 1: Kiểm tra sống/chết :8001 với timeout nhanh <= 2s
+      // Tự động nhận diện văn bản nếu câu hỏi chứa số hiệu trong CSDL
+      let resolvedFileId = file_id || null;
+      let targetDocFromDb = null;
+      try {
+        const pool = await getPool();
+        const docRes = await pool.request()
+          .input('clr', sql.TinyInt, user_clearance)
+          .query(`
+            SELECT file_id, document_code, title, summary, security_level_id, issued_date, signer
+            FROM DOCUMENT
+            WHERE deleted_at IS NULL AND security_level_id <= @clr
+          `);
+        const qNorm = query.toLowerCase().replace(/\s+/g, '');
+        for (const d of docRes.recordset) {
+          const codeNorm = (d.document_code || '').toLowerCase().replace(/\s+/g, '');
+          if (codeNorm && qNorm.includes(codeNorm)) {
+            targetDocFromDb = d;
+            resolvedFileId = d.file_id;
+            break;
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[AI chat] Lỗi tra cứu document_code trước khi gọi AI:', dbErr.message);
+      }
+
+      // Bước 1: Kiểm tra sống/chết :8001 với timeout nhanh <= 5s
       let isMicroserviceAlive = false;
       try {
         const health = await callAI('/ai/health', 'GET', null, AI_HEALTH_TIMEOUT_MS);
@@ -196,7 +221,7 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
           isMicroserviceAlive = true;
         }
       } catch (pingErr) {
-        console.warn('[AI chat] Microservice :8001 kiểm tra sống/chết thất bại (<=2s):', pingErr.message);
+        console.warn('[AI chat] Microservice :8001 kiểm tra sống/chết thất bại (<=5s):', pingErr.message);
         isMicroserviceAlive = false;
       }
 
@@ -210,10 +235,59 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
             user_position,
             user_rank,
             user_clearance,
-            file_id: file_id || null,
+            file_id: resolvedFileId,
             history,
             biometric_verified,
           }, AI_CHAT_TIMEOUT_MS);
+
+          // Nếu LLM từ chối do thiếu đoạn trích cụ thể nhưng câu hỏi hỏi về metadata chính thức trong CSDL
+          const isNoData = !aiRes.answer
+            || aiRes.answer.includes('không có trong các văn bản thuộc phạm vi cấp quyền')
+            || aiRes.answer.includes('không tìm thấy thông tin')
+            || aiRes.answer.includes('không cung cấp thông tin')
+            || aiRes.answer.includes('chưa có thông tin');
+          if (isNoData && targetDocFromDb) {
+            const qLower = query.toLowerCase();
+            const docCode = targetDocFromDb.document_code || targetDocFromDb.file_id;
+            let salutation = user_name && user_position ? `Báo cáo Đồng chí ${user_name} - ${user_position},` : (user_name ? `Báo cáo Đồng chí ${user_name},` : 'Báo cáo đồng chí,');
+            let metaAnswer = '';
+
+            if (qLower.includes('ngày') || qLower.includes('phát hành') || qLower.includes('ban hành') || qLower.includes('thời gian')) {
+              const dateStr = targetDocFromDb.issued_date ? new Date(targetDocFromDb.issued_date).toLocaleDateString('vi-VN') : 'Chưa ghi nhận ngày ban hành';
+              metaAnswer = `${salutation}\n\nVăn bản số hiệu **${docCode}** có ngày ban hành là: **${dateStr}**.\n\n*Trích yếu:* ${targetDocFromDb.title} [p.1]`;
+            } else if (qLower.includes('người ký') || qLower.includes('ai ký') || qLower.includes('ký bởi') || qLower.includes('chức vụ')) {
+              const signerStr = targetDocFromDb.signer || 'Chưa ghi nhận người ký';
+              metaAnswer = `${salutation}\n\nNgười ký văn bản số hiệu **${docCode}** là: **${signerStr}**.\n\n*Trích yếu:* ${targetDocFromDb.title} [p.1]`;
+            } else if (qLower.includes('tiêu đề') || qLower.includes('tên văn bản') || qLower.includes('tên tài liệu')) {
+              metaAnswer = `${salutation}\n\nTiêu đề của văn bản số hiệu **${docCode}** là: **"${targetDocFromDb.title}"** [p.1].`;
+            } else if (qLower.includes('nội dung') || qLower.includes('trích yếu') || qLower.includes('tóm tắt')) {
+              metaAnswer = `${salutation}\n\nNội dung tóm tắt của văn bản số hiệu **${docCode}**:\n\n${targetDocFromDb.summary || targetDocFromDb.title} [p.1]`;
+            }
+
+            if (metaAnswer) {
+              return res.json({
+                answer: metaAnswer,
+                citations: [{
+                  file_id: targetDocFromDb.file_id,
+                  document_code: docCode,
+                  title: targetDocFromDb.title,
+                  page: 1,
+                  security_level_name: `Cấp ${targetDocFromDb.security_level_id}`,
+                  snippet: targetDocFromDb.title,
+                  requires_biometric: false,
+                }],
+                requires_biometric: false,
+                reasoning: {
+                  mem: `[Agent Memory] Quân nhân ID: ${req.user.user_id} | Họ tên: ${user_name} | Chức vụ: ${user_position}. Cấp bảo mật: Cấp ${user_clearance}. Văn bản: ${docCode}.`,
+                  think: `[Agent Think] Câu hỏi tra cứu thuộc tính văn bản ${docCode}. CSDL lưu trữ chính thống thông tin số hiệu và ngày ký/người ký/trích yếu.`,
+                  tool_call: `[Database Grounding] Trích xuất thuộc tính chuẩn từ CSDL SQL Server Quân khu 7 [p.1].`
+                },
+                retrieval_mode: 'db_metadata',
+                synthesis_mode: 'official_metadata'
+              });
+            }
+          }
+
           return res.json(aiRes);
         } catch (chatErr) {
           if (chatErr.name === 'AbortError') {
@@ -233,7 +307,7 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       const pool = await getPool();
 
       let sqlQuery = `
-        SELECT TOP 5 file_id, document_code, title, summary, security_level_id
+        SELECT TOP 5 file_id, document_code, title, summary, security_level_id, issued_date, signer
         FROM DOCUMENT
         WHERE deleted_at IS NULL
           AND security_level_id <= @clr
@@ -343,8 +417,29 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       // ✅ SỬA: requiresBiometric = true khi còn bất kỳ văn bản mật nào bị khóa
       const requiresBiometric = lockedSecretItems.length > 0;
 
+      const qLower = query.toLowerCase();
+      const targetDoc = items[0];
+
       if (items.length === 0) {
         answer = `${salutation} không tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.`;
+      } else if (items.length === 1 && targetDoc) {
+        const docCode = targetDoc.document_code || targetDoc.file_id;
+        const isSecretLocked = (targetDoc.security_level_id >= 3) && !isBiometricTrustedForDoc(targetDoc);
+        if (isSecretLocked) {
+          answer = `${salutation} tài liệu "${docCode}" thuộc danh mục văn bản bảo mật (Cấp ${targetDoc.security_level_id}). Yêu cầu cán bộ xác thực vân tay ZK9500 để xem nội dung chi tiết.`;
+        } else if (qLower.includes('ngày') || qLower.includes('phát hành') || qLower.includes('ban hành') || qLower.includes('thời gian')) {
+          const dateStr = targetDoc.issued_date ? new Date(targetDoc.issued_date).toLocaleDateString('vi-VN') : 'Chưa ghi nhận ngày ban hành';
+          answer = `${salutation}\n\nVăn bản số hiệu **${docCode}** có ngày ban hành là: **${dateStr}**.\n\n*Trích yếu:* ${targetDoc.title}`;
+        } else if (qLower.includes('người ký') || qLower.includes('ai ký') || qLower.includes('ký bởi') || qLower.includes('chức vụ')) {
+          const signerStr = targetDoc.signer || 'Chưa ghi nhận người ký';
+          answer = `${salutation}\n\nNgười ký văn bản số hiệu **${docCode}** là: **${signerStr}**.\n\n*Trích yếu:* ${targetDoc.title}`;
+        } else if (qLower.includes('tiêu đề') || qLower.includes('tên văn bản') || qLower.includes('tên tài liệu')) {
+          answer = `${salutation}\n\nTiêu đề của văn bản số hiệu **${docCode}** là: **"${targetDoc.title}"**.`;
+        } else if (qLower.includes('nội dung') || qLower.includes('trích yếu') || qLower.includes('tóm tắt')) {
+          answer = `${salutation}\n\nNội dung tóm tắt của văn bản số hiệu **${docCode}** ("${targetDoc.title}"):\n\n${targetDoc.summary || targetDoc.title}`;
+        } else {
+          answer = `${salutation} tìm thấy 1 văn bản liên quan:\n1. ${docCode} — ${targetDoc.title}`;
+        }
       } else if (lockedSecretItems.length > 0) {
         if (visibleItems.length === 0) {
           answer = `${salutation} tài liệu liên quan thuộc danh mục văn bản bảo mật (Cấp 3 trở lên). Yêu cầu cán bộ xác thực vân tay trên máy quét ZKTeco ZK9500 (hoặc bấm vào thẻ trích dẫn văn bản bên dưới để quét vân tay) trước khi Trợ lý AI trích xuất nội dung mật.`;

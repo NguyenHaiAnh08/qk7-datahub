@@ -34,15 +34,15 @@ conda activate MonkeyOCRv2Parsing
 
 > **Lưu ý quan trọng:** Cần cài đặt PyTorch phù hợp với phần cứng trước khi cài đặt các thư viện khác.
 
-#### Trường hợp 1: Máy chủ có GPU NVIDIA (CUDA 12.6 / 12.x)
+#### Trường hợp 1: Máy chủ có GPU NVIDIA (CUDA 12.6 / 12.x) — Đã kiểm thử chuẩn trên Server-Online (RTX 2060 6GB)
 ```bash
-pip install torch==2.8.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 ```
-*(Nếu hệ thống dùng CUDA 12.1 hoặc 11.8, có thể thay đổi URL tương ứng: `cu121` hoặc `cu118`)*
+*(Lệnh trên tự động lấy bản PyTorch CUDA 12.6 tương thích tối ưu với phiên bản Python trên máy chủ, ví dụ: `2.14.1+cu126` trên Python 3.13)*
 
 #### Trường hợp 2: Máy chủ chỉ chạy CPU (Không có card đồ họa rời)
 ```bash
-pip install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ---

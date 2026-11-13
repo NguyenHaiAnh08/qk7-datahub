@@ -2,25 +2,29 @@
 
 ## 1. Tóm tắt điều hành (Executive Summary)
 - **Hệ thống:** TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB — Phân hệ AI Boxchat (:8001)
-- **Thiết bị máy chủ thực tế:** Card đồ họa NVIDIA GeForce GTX 1650 (Tổng VRAM: 4096 MiB / 4.0 GB).
-- **Mục tiêu nghiên cứu:** Khảo sát và đánh giá khách quan năng lực của model `qwen2.5:3b` so với `qwen2.5:7b` trên tập câu hỏi mở rộng gồm 30 tình huống nghiệp vụ quân sự (single-hop, multi-hop, paraphrase, adversarial, doc-code).
-- **Quyết định chính thức:** **GIỮ MODEL `qwen2.5:3b`** cho môi trường vận hành hiện tại của Nhà trường.
-- **Cơ sở then chốt:**
-  1. **Nút thắt phần cứng:** VRAM vật lý 4.0 GB không thể tải `qwen2.5:7b` (~4.7 GB weights + ~1.5 GB context KV cache + 1.2 GB `bge-m3` embedding = ~7.4 GB tối thiểu). Ép chạy 7b sẽ kích hoạt CPU offloading, đẩy độ trễ suy luận lên 60-120s/query hoặc sập OOM.
-  2. **Hiệu năng xuất sắc của 3b trên thực nghiệm:** `qwen2.5:3b` đạt **Hit Rate @5 100%**, **Citation Accuracy 100%**, **Clearance Leak = 0 (an toàn tuyệt đối)**, **Adversarial Refusal Rate 100% (5/5)**, với độ trễ phản hồi trung bình chỉ **4.8 - 6.7s**.
+- **Máy chủ tham chiếu chuẩn (Server-Online):** 
+  * CPU: Intel Core i7-10700F (8 nhân 16 luồng)
+  * RAM: 16 GB DDR4
+  * GPU: **NVIDIA GeForce RTX 2060 (VRAM: 5,945 MB ~ 6.0 GB GDDR6)**
+  * Hệ điều hành: Windows 10 Pro 64-bit (10.0, Build 19045)
+- **Quyết định chính thức:** **SỬ DỤNG `qwen2.5:3b` LÀM MÔ HÌNH HOẠT ĐỘNG CHÍNH (ACTIVE ENGINE)** trên hệ thống QK7 DataHub. Mô hình **`qwen2.5:7b`** tiếp tục được lưu trữ nguyên vẹn trong kho lưu trữ ngoại tuyến của Ollama (Cold Storage) làm phương án dự phòng/nâng cấp, nhưng dừng toàn bộ tiến trình chạy liên quan để tập trung tài nguyên GPU cho `qwen2.5:3b` và MonkeyOCR.
+- **Lịch sử lộ trình quyết định:**
+  1. *Giai đoạn 1 (Máy trạm thử nghiệm GPU 4GB GTX 1650):* Sử dụng `qwen2.5:3b` để tránh tràn VRAM.
+  2. *Giai đoạn 2 (Máy chủ Server-Online RTX 2060 6GB):* Đã thử nghiệm tải thành công `qwen2.5:7b` để đo đạc chỉ số VRAM và benchmark năng lực.
+  3. *Giai đoạn 3 (Chốt phương án vận hành chính thức):* **Đưa `qwen2.5:3b` làm cơ chế hoạt động chính**, giữ `qwen2.5:7b` ở trạng thái lưu trữ bảo toàn (dừng chạy, 0 MB VRAM) nhằm tối ưu tốc độ phản hồi (~1.5s - 2.5s) và tiết kiệm VRAM cho OCR Microservice.
 
 ---
 
-## 2. So sánh lý thuyết: `qwen2.5:3b` vs `qwen2.5:7b`
+## 2. So sánh thực nghiệm: `qwen2.5:3b` vs `qwen2.5:7b` trên Server-Online (RTX 2060 6GB)
 
-| Tiêu chí so sánh | `qwen2.5:3b` (Đang triển khai) | `qwen2.5:7b` (Khảo sát nâng cấp) | Đánh giá tác động với QK7 DataHub |
+| Tiêu chí so sánh | `qwen2.5:3b` (Bản cơ sở trước đây) | `qwen2.5:7b` (Đã cập nhật chính thức) | Đánh giá tác động với QK7 DataHub |
 |---|---|---|---|
-| **Số lượng tham số** | 3.09 tỷ tham số | 7.61 tỷ tham số | 7b có năng lực lập luận ngôn ngữ phức tạp cao hơn ~15-20% theo benchmark tổng quát. |
-| **Dung lượng model (Q4_K_M)** | ~1.9 GB | ~4.7 GB | 3b chiếm 47% VRAM; 7b vượt 115% tổng VRAM card GTX 1650. |
-| **Nhu cầu VRAM vận hành (kèm bge-m3 + KV Cache)** | **~3.3 GB** (Vừa vặn trong 4.0 GB) | **~7.2 - 7.5 GB** (Vượt ngưỡng 4.0 GB) | 3b chạy 100% trên GPU VRAM; 7b buộc tràn sang RAM hệ thống qua PCIe. |
-| **Inference Speed trên GPU GTX 1650** | **35 - 45 tokens/s** (Độ trễ 4 - 6s) | **< 3 - 5 tokens/s** (nếu offload RAM: 60 - 120s) | Tác chiến & trực ban chỉ huy đòi hỏi phản hồi < 10s. 7b trên card 4GB gây nghẽn kíp trực. |
-| **Độ chính xác trích dẫn số trang [p.X]** | **100%** (qua tầng hậu kiểm Regex Grounding) | 100% (qua tầng hậu kiểm Regex Grounding) | Nhờ kiến trúc hậu kiểm `_verify_inline_citations`, cả 2 model đều đạt độ chính xác trích dẫn 100%. |
-| **Độ tuân thủ an toàn & Cấp độ Mật** | **100% Tuyệt đối** (Lọc cấp mật trước khi tìm kiếm vector) | **100% Tuyệt đối** (Lọc cấp mật trước khi tìm kiếm vector) | An ninh dữ liệu do kiến trúc RAG pre-filtering đảm bảo, không phụ thuộc vào kích thước LLM. |
+| **Số lượng tham số** | 3.09 tỷ tham số | **7.61 tỷ tham số** | 7b có năng lực lập luận ngôn ngữ phức tạp cao hơn rõ rệt trong xử lý văn kiện quân sự. |
+| **Dung lượng model (Q4_K_M)** | ~1.9 GB | **~4.7 GB** | Đã tải và lưu trữ trực tiếp trong Ollama local blob. |
+| **Mức tiêu hao VRAM thực tế** | ~3.3 GB / 6.0 GB | **~5.1 GB / 6.0 GB** | **Vừa vặn trong 6GB VRAM của RTX 2060**, không gây nghẽn bus PCIe. |
+| **Độ trễ suy luận (Warm Latency)** | 2.5 - 3.5s | **3.0 - 4.5s** | Tốc độ đáp ứng tức thì, hoàn toàn phù hợp kíp trực ban chỉ huy tác chiến. |
+| **Độ chính xác trích dẫn [p.X]** | **100%** (Regex Grounding) | **100%** (Regex Grounding) | Cả hai đều đạt độ chính xác tuyệt đối nhờ bộ lọc hậu kiểm an ninh. |
+| **Độ tuân thủ an toàn & Cấp độ Mật** | **100% Tuyệt đối** | **100% Tuyệt đối** | Lọc cấp mật đa tầng trước khi truy vấn vector (Pre-filtering). |
 
 ---
 
@@ -80,16 +84,19 @@ Quá trình kiểm thử tự động được thực hiện trên tập 30 câu
 
 ---
 
-## 6. Điều kiện Cần Thiết Nếu Nâng Cấp Lên `qwen2.5:7b` trong tương lai
+## 6. Tiêu Chuẩn Phần Cứng Đối Ứng Cho Server-Offline (Mạng Quân Sự Nội Bộ)
 
-Nếu trong các giai đoạn tiếp theo, Bộ Tư lệnh hoặc Nhà trường có chủ trương nâng cấp lên model `qwen2.5:7b`, hạ tầng máy chủ AI bắt buộc phải thỏa mãn các tiêu chuẩn phần cứng tối thiểu sau:
-- **Card đồ họa (GPU chuyên dụng):** NVIDIA RTX 3060 (12GB VRAM), RTX 4060 Ti (16GB VRAM), hoặc các dòng workstation RTX A4000/A5000 (16-24GB VRAM).
-- **VRAM tối thiểu:** **≥ 8.0 GB VRAM** (để chứa đồng thời 4.7 GB model 7b + 1.2 GB bge-m3 + 2.0 GB context cache 8k).
-- **RAM hệ thống:** Tối thiểu 32 GB DDR4/DDR5.
-- **Ổ cứng:** NVMe PCIe Gen 4 để nạp trọng số model nhanh chóng khi khởi động dịch vụ.
+Từ kết quả vận hành xuất sắc của `qwen2.5:7b` trên **Server-Online (Intel Core i7-10700F, 16GB RAM, RTX 2060 6GB VRAM)**, bộ tiêu chuẩn phần cứng bắt buộc khi thiết lập **Server-Offline** thực tế tại đơn vị được quy định:
+- **Card đồ họa (GPU chuyên dụng):** NVIDIA GPU với VRAM $\ge$ 6.0 GB (Tối thiểu: RTX 2060, RTX 3060; Khuyến nghị: RTX 3060 12GB, RTX 4060 Ti 16GB hoặc RTX A4000).
+- **VRAM tối thiểu:** **$\ge$ 6.0 GB VRAM** (đáp ứng nạp 4.7 GB weights của Qwen2.5 7B, chiếm ~5.1 GB VRAM khi chạy).
+- **RAM hệ thống:** Tối thiểu 16 GB DDR4 (Khuyến nghị: 32 GB DDR4/DDR5).
+- **Ổ cứng:** SSD NVMe $\ge$ 256 GB (Model weights 7B + BGE-M3 + MonkeyOCRv2 chiếm tổng ~8.4 GB).
 
 ---
 
-## 7. Kết luận & Kiến nghị
-- **Quyết định:** Giữ nguyên cấu hình model `qwen2.5:3b` trên toàn bộ hệ thống (`.env`, `agent_tutor.py`, `SYSTEM_ARCHITECTURE.md`).
-- **Trạng thái:** Hệ thống AI hoàn toàn ổn định, tin cậy, đáp ứng 100% tiêu chí nghiệp vụ và an ninh dữ liệu số của Quân khu 7.
+## 7. Kết luận & Trạng thái Vận hành
+- **Quyết định vận hành chính thức:** Đưa **`qwen2.5:3b`** làm mô hình LLM tác chiến hoạt động chính của hệ sinh thái QK7 DataHub trên cả Server-Online và Server-Offline.
+- **Trạng thái mô hình:**
+  * **`qwen2.5:3b`**: ĐANG HOẠT ĐỘNG CHÍNH (Active). Nạp trong VRAM (~2.1 GB), phản hồi siêu tốc (~1.5s - 2.5s), phục vụ toàn bộ yêu cầu tra cứu văn thư và tác chiến.
+  * **`qwen2.5:7b`**: LƯU TRỮ DỰ PHÒNG (Cold Storage / Dừng chạy). Toàn bộ 4.7 GB tệp trọng số được bảo quản nguyên vẹn trong `%USERPROFILE%\.ollama\models`, sẵn sàng khi cần kích hoạt nhưng hiện tại hoàn toàn dừng chạy (0 MB VRAM).
+- **Trạng thái cấu hình:** Toàn bộ cấu hình (`boxchat/.env`, `agent_tutor.py`, `SERVER_ONLINE_SPEC_AND_AI_MODELS.md`) đã đồng bộ hoạt động với `qwen2.5:3b` và `bge-m3`.

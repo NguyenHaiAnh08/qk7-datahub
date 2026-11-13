@@ -15,9 +15,13 @@ echo   QK7 DataHub - KHOI DONG SERVER
 echo ==========================================
 echo.
 
-REM --- Kiem tra va giai phong port 8000, 8002 neu bi chiem ---
-echo [0/3] Kiem tra va giai phong port 8000, 8002...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort 8000,8002 -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Phat hien port dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port thanh cong.' } else { Write-Host '[OK] Cac port dang san sang.' } } catch { Write-Host '[OK] Cac port dang san sang.' }; exit 0"
+REM --- Kiem tra va giai phong port 8000, 8001, 8002 neu bi chiem ---
+echo [0/3] Kiem tra va giai phong port 8000, 8001, 8002...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort 8000,8001,8002 -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Phat hien port dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port thanh cong.' } else { Write-Host '[OK] Cac port dang san sang.' } } catch { Write-Host '[OK] Cac port dang san sang.' }; exit 0"
+echo.
+
+REM Kiem tra va khoi dong Ollama neu chua chay
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $null = Invoke-WebRequest -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 1 -UseBasicParsing; Write-Host '[OK] Ollama server dang chay.' } catch { if (Test-Path \"$env:LOCALAPPDATA\Programs\Ollama\ollama.exe\") { Write-Host '[INFO] Dang khoi dong Ollama serve...'; Start-Process \"$env:LOCALAPPDATA\Programs\Ollama\ollama.exe\" -ArgumentList 'serve' -WindowStyle Hidden; Start-Sleep -Seconds 2; Write-Host '[OK] Da khoi dong Ollama.' } else { Write-Host '[CANH BAO] Khong tim thay Ollama.' } }"
 echo.
 
 REM --- 1. Backend ---
@@ -35,7 +39,7 @@ timeout /t 4 >nul
 
 REM --- 2. AI boxchat ---
 echo [2/3] Khoi dong AI boxchat (:8001)...
-start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && if exist venv\Scripts\activate.bat (call venv\Scripts\activate.bat) && python main.py"
+start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && if exist venv\Scripts\activate.bat (call venv\Scripts\activate.bat) && echo [QK7 AI] Luu y: Khong click chuot vao giua man hinh de tranh dong bang (pause) console! && python main.py"
 
 REM --- 3. OCR Microservice (MonkeyOCRv2 / PaddleOCR) ---
 echo [3/3] Khoi dong OCR Microservice (:8002)...

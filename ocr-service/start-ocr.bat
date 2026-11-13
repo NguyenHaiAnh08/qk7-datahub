@@ -75,7 +75,7 @@ if not defined OCR_ENGINE set "OCR_ENGINE=auto"
 
 REM Device: "auto" = tu dong chon CUDA neu co, nguoc lai CPU
 REM         "cpu"  = ep CPU (an toan, luon chay duoc)
-if not defined MONKEY_DEVICE set "MONKEY_DEVICE=cpu"
+if not defined MONKEY_DEVICE set "MONKEY_DEVICE=auto"
 
 echo    OCR_ENGINE   = %OCR_ENGINE%
 echo    MONKEY_DEVICE= %MONKEY_DEVICE%

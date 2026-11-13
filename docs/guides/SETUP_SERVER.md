@@ -4,6 +4,25 @@ Tài liệu hướng dẫn chi tiết quy trình thiết lập máy chủ (Serve
 
 ---
 
+## 🖥️ CẤU HÌNH PHẦN CỨNG THỰC TẾ CỦA SERVER-ONLINE (CƠ SỞ ĐỐI CHUẨN SETUP SERVER-OFFLINE)
+Hệ thống **Server-Online** (Computer Name: `DESKTOP-AGM2OGL`) đóng vai trò là **máy chủ hoàn chỉnh chuẩn**, dùng để kiểm thử toàn diện và chuẩn bị các gói cài đặt, trọng số mô hình trước khi chuyển giao vào mạng nội bộ quân sự (**Server-Offline** / Air-Gapped).
+
+* **CPU:** Intel(R) Core(TM) i7-10700F CPU @ 2.90GHz (8 Cores, 16 Threads)
+* **RAM:** 16,384 MB (16 GB DDR4) — Page file: ~26 GB
+* **GPU Card:** NVIDIA GeForce RTX 2060 (VRAM chuyên dụng: 5,945 MB ~ 6 GB GDDR6, Shared Memory: 8,140 MB)
+* **Driver / CUDA:** Driver Version 32.0.15.6094 / CUDA 12.6 (DirectX 12)
+* **Mainboard:** MSI MS-7D06 (BIOS A.10)
+* **Hệ điều hành:** Windows 10 Pro 64-bit (10.0, Build 19045)
+* **Hệ sinh thái AI Models đã tích hợp & cập nhật:**
+  * **LLM Boxchat:** Vận hành chính thức **`qwen2.5:3b`** (chạy GPU Ollama, chiếm ~2.1 GB VRAM, phản hồi siêu tốc ~1.5s - 2.5s; mô hình `qwen2.5:7b` được lưu trữ ngoại tuyến làm dự phòng nâng cấp).
+  * **Vector Embedding:** **`bge-m3`** (Ollama GPU, trích xuất đặc trưng 1024-d cho Hybrid Search RRF).
+  * **OCR Engine chính:** **`MonkeyOCRv2-B-Parsing`** (PyTorch 2.14.1+cu126 trên CUDA 12.6, lưu sẵn 2.5 GB weights tại `ocr-service/model_weight`).
+  * **OCR Engine phụ:** **`PaddleOCR`** (PaddlePaddle 3.3.1, chế độ fallback offline).
+
+> 📌 Chi tiết báo cáo năng lực và hướng dẫn chuyển giao xem tại: **[SERVER_ONLINE_SPEC_AND_AI_MODELS.md](./SERVER_ONLINE_SPEC_AND_AI_MODELS.md)**.
+
+---
+
 ## PHẦN A — SETUP MÁY SERVER (192.168.1.xxx)
 *(Thay `192.168.1.xxx` bằng địa chỉ IP server thực tế trong mạng LAN)*
 
@@ -82,7 +101,7 @@ Tạo hoặc mở file `boxchat\.env` (nếu chưa có thì tạo mới):
 BACKEND_UPLOADS_DIR=../backend/uploads
 QDRANT_STORAGE_PATH=./local_storage/qdrant_data
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_MODEL=qwen2.5:3b
 ```
 
 ---

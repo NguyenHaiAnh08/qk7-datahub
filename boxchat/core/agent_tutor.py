@@ -336,11 +336,12 @@ class AgentTutor:
         # --- SINGLE-DOCUMENT FOCUS & DOMINANT DOCUMENT FILTERING ---
         # Đảm bảo chỉ gợi ý đúng 1 file phù hợp nhất khi người dùng tra cứu thông tin văn bản
         query_lower = query.lower()
-        code_matches = re.findall(r'(\d+[\/\-][A-Za-z0-9\/\-]+|\b\d{2,4}\b)', query)
-        target_file_id = None
+        code_matches = re.findall(r'(\d+[\/\-_][\w\/\-_]+|\b\d{2,4}\b)', query)
+        target_file_id = file_id or None
 
-        if code_matches and raw_valid:
-            for chunk in raw_valid:
+        if not target_file_id and code_matches:
+            search_pool = raw_valid + (all_chunks or [])
+            for chunk in search_pool:
                 chunk_code = (chunk.get("document_code") or "").lower()
                 chunk_title = (chunk.get("title") or "").lower()
                 chunk_fid = (chunk.get("file_id") or "").lower()
@@ -362,7 +363,12 @@ class AgentTutor:
 
         if target_file_id:
             # Ưu tiên tuyệt đối văn bản có số hiệu khớp với câu hỏi
-            valid_chunks = [c for c in raw_valid if c.get("file_id") == target_file_id] or raw_valid
+            valid_chunks = [c for c in raw_valid if c.get("file_id") == target_file_id]
+            if not valid_chunks and all_chunks:
+                # Nếu raw_valid không có chunks của target_file_id, lấy trực tiếp từ all_chunks
+                valid_chunks = [c for c in all_chunks if c.get("file_id") == target_file_id and int(c.get("security_level_id", 1)) <= user_clearance][:5]
+            if not valid_chunks:
+                valid_chunks = raw_valid
         elif is_single_doc_query and raw_valid:
             # Câu hỏi tra cứu thuộc tính văn bản: Giữ duy nhất file đứng đầu (top 1)
             top_file_id = raw_valid[0].get("file_id")

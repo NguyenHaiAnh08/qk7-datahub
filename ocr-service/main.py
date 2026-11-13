@@ -25,6 +25,15 @@ if sys.platform == "win32":
         reconfig_err = getattr(sys.stderr, "reconfigure", None)
         if callable(reconfig_err):
             reconfig_err(encoding="utf-8", errors="replace")
+        # Vô hiệu hóa QuickEdit mode tránh console bị freeze
+        import ctypes
+        _k32 = ctypes.windll.kernel32
+        _hin = _k32.GetStdHandle(-10)
+        _cmode = ctypes.c_ulong()
+        if _k32.GetConsoleMode(_hin, ctypes.byref(_cmode)):
+            _cmode.value &= ~0x0040
+            _cmode.value |= 0x0080
+            _k32.SetConsoleMode(_hin, _cmode.value)
     except Exception:
         pass
 

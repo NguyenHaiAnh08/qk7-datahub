@@ -35,19 +35,25 @@ echo [INFO] Sử dụng Python mặc định trên hệ thống.
 
 :env_ready
 echo.
-echo [1/3] Đang cài đặt PyTorch CPU (phiên bản ổn định 2.5.1+cpu)...
-echo       (Quá trình tải có thể mất vài phút tùy tốc độ mạng)
+echo [1/3] Đang cài đặt PyTorch (CUDA 12.6 hoặc CPU)...
 echo -----------------------------------------------------------------
-"%PIP_EXE%" install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+where nvidia-smi >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo [Phát hiện GPU NVIDIA] Đang cài PyTorch hỗ trợ GPU CUDA 12.6...
+    "%PIP_EXE%" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+) else (
+    echo [Không có GPU rời] Đang cài PyTorch CPU...
+    "%PIP_EXE%" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+)
 if %ERRORLEVEL% neq 0 (
-    echo [CẢNH BÁO] Không tải được từ download.pytorch.org. Thử cài đặt torch từ PyPI...
+    echo [CẢNH BÁO] Không tải được từ pytorch.org. Thử cài đặt torch từ PyPI...
     "%PIP_EXE%" install torch torchvision torchaudio
 )
 
 echo.
 echo [2/3] Đang cài đặt Transformers, Accelerate & Qwen-VL-Utils...
 echo -----------------------------------------------------------------
-"%PIP_EXE%" install transformers==4.57.1 accelerate==1.11.0 qwen_vl_utils==0.0.14
+"%PIP_EXE%" install transformers accelerate qwen_vl_utils einops sentencepiece huggingface_hub modelscope paddlepaddle paddleocr
 
 echo.
 echo [3/3] Kiểm tra lại môi trường sau khi cài đặt...

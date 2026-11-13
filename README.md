@@ -53,6 +53,8 @@ graph TD
 ## 📌 Danh Mục Tài Liệu Kỹ Thuật Dự Án
 
 * 🧠 **[ANTIGRAVITY_MASTER_BRAIN.md](./ANTIGRAVITY_MASTER_BRAIN.md)**: **Hiến pháp tối cao của dự án — AI Agent bắt buộc phải đọc đầu tiên**.
+* 👉 **[SERVER_ONLINE_SPEC_AND_AI_MODELS.md](./docs/guides/SERVER_ONLINE_SPEC_AND_AI_MODELS.md)**: **Thông số phần cứng chuẩn Server-Online (i7-10700F, RTX 2060 6GB) & Hệ sinh thái AI Models hoàn chỉnh (Qwen2.5 3B Active, Qwen2.5 7B Cold Storage, BGE-M3, MonkeyOCRv2 CUDA 12.6)**.
+* 👉 **[MODEL_DECISION.md](./docs/MODEL_DECISION.md)**: Báo cáo thực nghiệm & quyết định mô hình AI: Vận hành chính Qwen2.5 3B, lưu trữ dự phòng 7B.
 * 👉 **[SYSTEM_ARCHITECTURE.md](./docs/architecture/SYSTEM_ARCHITECTURE.md)**: Kiến trúc toàn diện 5 tầng, ERD, luồng dữ liệu, phân quyền bảo mật 3 lớp.
 * 👉 **[SETUP_SERVER.md](./docs/guides/SETUP_SERVER.md)**: Sổ tay hướng dẫn cài đặt Server, Client, ZKTeco SDK và kết nối phần cứng.
 * 👉 **[SECURITY.md](./docs/security/SECURITY.md)**: Chính sách an ninh thông tin, danh mục Security Headers và **DevSecOps Pipeline (4 Chốt Chặn)**.

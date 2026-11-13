@@ -10,6 +10,8 @@
 // - SCORM: commit vào SCORM_TRACKING
 // ============================================================
 const express = require('express');
+const path = require('path');
+const fs = require('fs');         
 const { sql, getPool } = require('./db');
 
 const HANGING_THRESHOLD_MINUTES = 4 * 60; // 4 giờ
@@ -395,7 +397,8 @@ module.exports = function createLectureRoutes({
       const check = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
         .query(`SELECT status, faculty_unit_id, content_type,
-                       pending_scorm_path, scorm_entry_point
+                       pending_scorm_path, scorm_entry_point,
+                       title, created_at, document_id
                 FROM DIGITAL_LECTURE WHERE lecture_id = @id`);                 // [1]
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
 
@@ -442,6 +445,8 @@ module.exports = function createLectureRoutes({
             const out = await extractAndParse({
               lectureId,
               pendingPath: lec.pending_scorm_path,
+              title:     lec.title,
+              createdAt: lec.created_at,
             });
             console.log(`[lecture approve] Extracted ${lectureId} → ${out.entry_point} (${out.content_type})`);
             extractedEntryPoint = out.entry_point;
@@ -461,14 +466,21 @@ module.exports = function createLectureRoutes({
             });
           }
         } else if (!lec.scorm_entry_point) {
-          // Fallback tự động nhận diện nếu đã giải nén trong uploads/lectures/:lectureId
-          const lectureDir = path.resolve(__dirname, '..', 'uploads', 'lectures', lectureId);
+          // Fallback tự động nhận diện trong thư mục chuẩn mới:
+          // uploads/bai-giang-so/YYYY/MM/<Ten_Bai_Giang>/
+          const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
+          const folderName = sanitizeFolderName(lec.title || lectureId);
+          const date = lec.created_at ? new Date(lec.created_at) : new Date();
+          const { absPath: lectureDir, relPath: baseRelPath } =
+            getModuleUploadPath(MODULES.LECTURES, date, folderName);
+
           if (fs.existsSync(lectureDir)) {
             const files = fs.readdirSync(lectureDir);
             const commonEntries = ['index.html', 'story.html', 'launch.html', 'demo.html'];
-            const entry = commonEntries.find(f => files.includes(f)) || files.find(f => f.toLowerCase().endsWith('.html'));
+            const entry = commonEntries.find(f => files.includes(f))
+              || files.find(f => f.toLowerCase().endsWith('.html'));
             if (entry) {
-              extractedEntryPoint = `uploads/lectures/${lectureId}/${entry}`;
+              extractedEntryPoint = `${baseRelPath}/${entry}`.replace(/\\/g, '/');
             }
           }
           if (!extractedEntryPoint) {

@@ -1,0 +1,64 @@
+{
+  "root": "footer-minimal",
+  "elements": {
+    "footer-minimal": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3,
+        "container": "wide"
+      },
+      "children": [
+        "divider",
+        "footer-row"
+      ]
+    },
+    "divider": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "footer-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 4,
+        "align": "center",
+        "justify": "between"
+      },
+      "children": [
+        "copyright",
+        "links"
+      ]
+    },
+    "copyright": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "© 2026 Acme Studio",
+        "variant": "muted"
+      }
+    },
+    "links": {
+      "type": "NavMenu",
+      "props": {
+        "direction": "horizontal",
+        "items": [
+          {
+            "label": "Privacy",
+            "href": "/privacy"
+          },
+          {
+            "label": "Terms",
+            "href": "/terms"
+          },
+          {
+            "label": "Contact",
+            "href": "/contact"
+          }
+        ]
+      }
+    }
+  }
+}

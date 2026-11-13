@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # QK7 DataHub — Bộ Kịch Bản Tự Động Quét & Kiểm Tra An Ninh Cục Bộ (DevSecOps)
 # Tiêu chuẩn: OWASP Top 10, CWE/SANS Top 25, HCL AppScan Cleanliness Baseline
 # ==============================================================================
@@ -218,7 +218,8 @@ else {
 
 # 5. Safe SCORM Zip Extraction & Path Traversal guard (CWE-22 / CWE-409)
 $lectureExtJs = if (Test-Path "backend/src/lecture-extended-routes.js") { Get-Content "backend/src/lecture-extended-routes.js" -Raw } else { "" }
-if ($lectureExtJs -match "extractZipSafely" -and $lectureExtJs -match "Zip Slip") {
+$lectureHelperJs = if (Test-Path "backend/src/lecture-package-helper.js") { Get-Content "backend/src/lecture-package-helper.js" -Raw } else { "" }
+if (($lectureExtJs -match "extractZipSafely" -or $lectureHelperJs -match "extractZipSafely") -and ($lectureExtJs -match "Zip Slip" -or $lectureHelperJs -match "Zip Slip")) {
     Write-Host "  [✓] SCORM Safe Extraction (CWE-22 / CWE-409 Anti-ZipSlip): Kích hoạt" -ForegroundColor Green
 }
 else {
@@ -226,13 +227,13 @@ else {
 }
 
 # 6. Anti-Secret Dump Protection
-$trackedMerged = git ls-files "merged_code*.txt" 2>$null
+$trackedMerged = git ls-files "merged_code*.txt" "*FullSourceCode*.txt" 2>$null
 if ($trackedMerged) {
-    Write-Host "  [✗] Phát hiện tệp merged_code*.txt bị track trong Git!" -ForegroundColor Red
-    $results["Secret Dump Leak"] = "FAILED (tracked merged_code.txt)"
+    Write-Host "  [✗] Phát hiện tệp code dump (*.txt) bị track trong Git!" -ForegroundColor Red
+    $results["Secret Dump Leak"] = "FAILED (tracked code dump .txt)"
 }
 else {
-    Write-Host "  [✓] Không có tệp code dump (merged_code*.txt) rò rỉ trong Git" -ForegroundColor Green
+    Write-Host "  [✓] Không có tệp code dump (*.txt) rò rỉ trong Git" -ForegroundColor Green
 }
 
 # ------------------------------------------------------------------------------

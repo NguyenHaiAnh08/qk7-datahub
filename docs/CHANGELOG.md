@@ -4,6 +4,55 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.0-digital-lecture-scorm-and-design-orchestrator] — 2026-11-13
+
+### 1. Phân Hệ Bài Giảng Số & Gói Học Liệu Tương Tác SCORM / HTML5
+- **Giao diện Quản trị & Trình chiếu Bài giảng (`frontend/src/components/lectures/`):**
+  - [`LecturesPage.tsx`](../frontend/src/pages/LecturesPage.tsx): Giao diện danh sách bài giảng, bộ lọc đa năng theo môn học, trạng thái phê duyệt và định dạng.
+  - [`CreateLectureModal.tsx`](../frontend/src/components/lectures/CreateLectureModal.tsx) & [`LecturePackageDropzone.tsx`](../frontend/src/components/lectures/LecturePackageDropzone.tsx): Tải lên bài giảng điện tử và kéo thả gói nén SCORM/HTML5 (hỗ trợ tối đa 300MB).
+  - [`LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx) & [`LectureDetailModal.tsx`](../frontend/src/components/lectures/LectureDetailModal.tsx): Hiển thị chi tiết bài giảng, siêu dữ liệu SCORM, trạng thái duyệt và hành động thao tác.
+  - [`LiveSessionRoom.tsx`](../frontend/src/components/lectures/LiveSessionRoom.tsx): Phòng học trực tiếp toàn màn hình, nhúng iframe SCORM/HTML5 có bảo vệ, tích hợp câu hỏi trắc nghiệm và đếm thời lượng.
+  - [`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx): Bảng giám sát chỉ huy thời gian thực (sĩ số, slide hiện tại/tổng slide, tiến độ SCORM %, cảnh báo phiên treo > 240 phút).
+  - [`TeachingHistoryPanel.tsx`](../frontend/src/components/lectures/TeachingHistoryPanel.tsx): Thống kê lịch sử giảng dạy và KPI đào tạo.
+  - [`RejectReasonModal.tsx`](../frontend/src/components/lectures/RejectReasonModal.tsx): Luồng từ chối bài giảng kèm lý do chi tiết chuyển ngược cho giảng viên hiệu chỉnh.
+  - [`lectureService.ts`](../frontend/src/services/lectureService.ts): Bộ API client wrapper đầy đủ cho nghiệp vụ bài giảng, lịch giảng và gói SCORM.
+- **Dịch vụ Máy chủ Backend (`backend/src/`):**
+  - [`scorm-package-routes.js`](../backend/src/scorm-package-routes.js): Tiếp nhận tải lên bằng DiskStorage tạm thời, phục vụ static assets SCORM với bảo vệ định danh tệp (`nosniff`, `cross-origin`, dynamic `<base href="..." />`).
+  - [`lecture-package-helper.js`](../backend/src/lecture-package-helper.js): Giải nén an toàn và tự động nhận diện entry point (`index.html`, `story.html`, `imsmanifest.xml`).
+  - [`scorm-manifest.js`](../backend/src/scorm-manifest.js): Trích xuất cấu trúc siêu dữ liệu và tài nguyên từ `imsmanifest.xml`.
+  - [`approval-workflow.js`](../backend/src/approval-workflow.js): Mở rộng quy trình phê duyệt tài liệu và bài giảng đa cấp.
+
+### 2. Gia Cố An Ninh SCORM & Chống Rò Rỉ Mã Nguồn
+- **Giải nén an toàn chống Zip Slip (CWE-22) & Zip Bomb (CWE-409):**
+  - Triển khai `extractZipSafely`: Thẩm định đường dẫn đích trước khi ghi, chặn ký tự `../` và đường dẫn ngoài phạm vi thư mục đích, tự động hủy bỏ giải nén khi vượt quá 300MB uncompressed, chặn 10 định dạng thực thi nguy hiểm (`.exe`, `.bat`, `.cmd`, `.sh`, `.ps1`...).
+- **Chống rò rỉ tệp Code Dump:**
+  - Bổ sung quy tắc `*FullSourceCode*.txt` vào `.gitignore` và nâng cấp kịch bản kiểm tra an ninh [`scripts/security-scan.ps1`](../scripts/security-scan.ps1).
+
+### 3. Tích Hợp Bộ Điều Phối Thiết Kế UI/UX Bản Sắc Quân Đội (`.agents/`)
+- Thiết lập hệ thống kỹ năng thiết kế chuyên sâu tại `.agents/skills/` gồm 7 kỹ năng phối hợp: `qk7-design-orchestrator`, `daub-ui`, `design-md`, `huashu-design`, `ui-ux-pro-max`, `unslop`, `design-taste-frontend`.
+- Thiết lập kịch bản điều phối tự động 6 bước tại workflow [`thiet-ke-ux-ui.md`](../.agents/workflows/thiet-ke-ux-ui.md).
+- Bổ sung kho tham chiếu kỹ thuật vẽ tay quân sự `sketchbook-ui`.
+
+### 4. Thiết Lập Kỷ Luật Git Bắt Buộc (Strict No Auto-Commit & No Auto-Push)
+- Cập nhật Hiến pháp Tối cao [`ANTIGRAVITY_MASTER_BRAIN.md`](../ANTIGRAVITY_MASTER_BRAIN.md), Quy trình làm việc [`AGENT_WORKFLOW.md`](./guides/AGENT_WORKFLOW.md), và Quy tắc Kỹ sư Senior [`Senior Multi-Role.md`](./guides/Senior%20Multi-Role.md).
+- Quy định nghiêm ngặt: AI Agent tuyệt đối **không tự động commit** và **không tự động push**. Mọi mã nguồn chỉ lưu tại working tree; chỉ thực hiện commit và push khi có câu lệnh triển khai chỉ định nhánh cụ thể từ USER.
+
+---
+
+## [v1.5.0-enterprise-restructuring-and-master-brain] — 2026-11-11
+
+### 1. Tái Cấu Trúc Toàn Diện Thư Mục Chuẩn Enterprise
+- Di chuyển toàn bộ tài liệu từ thư mục gốc vào `docs/` (`architecture/`, `security/`, `guides/`, `design/`) bằng `git mv` bảo toàn 100% Git history.
+- Quy hoạch tập trung toàn bộ script tiện ích khởi chạy, quét an ninh và biên dịch vào thư mục `scripts/` (`s.bat`, `s-dev.bat`, `start-ai.bat`, `mergecode.py`, `security-scan.ps1`...).
+- Quy hoạch cấu hình phụ trợ vào `config/` (`zap.yaml`, `tsconfig.json`, `package-lock.json`...) và dữ liệu tĩnh vào `data/` (`eng.traineddata`, `vie.traineddata`).
+- Chuẩn hóa toàn bộ relative links liên kết chéo giữa các tài liệu.
+
+### 2. Thiết Lập Bộ Não Tổng (Master Brain)
+- Soạn thảo và ban hành Hiến pháp Tối cao của dự án: [`ANTIGRAVITY_MASTER_BRAIN.md`](../ANTIGRAVITY_MASTER_BRAIN.md) làm Single Source of Truth cho toàn bộ đội ngũ kỹ sư và AI Agent.
+- Xuất bản Báo cáo thực thi tái cấu trúc toàn diện: [`docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md`](./guides/ENTERPRISE_RESTRUCTURING_REPORT.md).
+
+---
+
 ## [v1.4.1-ocr-air-gapped-vlan-hardened] — 2026-11-11
 
 ### 1. Đóng Gói Toàn Diện Trọng Số Mô Hình Cục Bộ & Cấu Hình Git LFS

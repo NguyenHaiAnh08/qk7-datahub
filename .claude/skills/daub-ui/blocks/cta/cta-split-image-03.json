@@ -1,0 +1,110 @@
+{
+  "root": "cta-split-image",
+  "elements": {
+    "cta-split-image": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": -6
+      },
+      "children": [
+        "background-image",
+        "overlap-container"
+      ]
+    },
+    "background-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cta-split-image-03-background-image/1440/400",
+        "alt": "CTA background",
+        "objectFit": "cover"
+      }
+    },
+    "overlap-container": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "container": "wide",
+        "padding": [
+          0,
+          8
+        ]
+      },
+      "children": [
+        "overlap-card"
+      ]
+    },
+    "overlap-card": {
+      "type": "Card",
+      "props": {
+        "padding": 12,
+        "elevated": true
+      },
+      "children": [
+        "card-inner"
+      ]
+    },
+    "card-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "align": "center",
+        "justify": "between",
+        "gap": 8
+      },
+      "children": [
+        "card-text",
+        "card-buttons"
+      ]
+    },
+    "card-text": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "heading",
+        "description"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Start your free trial"
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Join over 4,000+ startups already growing with Daub.",
+        "variant": "secondary"
+      }
+    },
+    "card-buttons": {
+      "type": "ButtonGroup",
+      "children": [
+        "btn-learn",
+        "btn-start"
+      ]
+    },
+    "btn-learn": {
+      "type": "Button",
+      "props": {
+        "label": "Learn more",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "btn-start": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg"
+      }
+    }
+  }
+}

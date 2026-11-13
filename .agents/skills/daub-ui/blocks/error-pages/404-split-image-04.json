@@ -1,0 +1,189 @@
+{
+  "root": "not-found-split-04",
+  "elements": {
+    "not-found-split-04": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "align": "center",
+        "justify": "center",
+        "gap": 6,
+        "container": true,
+        "padding": [
+          8,
+          0
+        ]
+      },
+      "children": [
+        "text-section",
+        "image-section"
+      ]
+    },
+    "text-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6
+      },
+      "children": [
+        "heading-group",
+        "search-row",
+        "resources"
+      ]
+    },
+    "heading-group": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "error-label",
+        "heading",
+        "description"
+      ]
+    },
+    "error-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "404 error",
+        "variant": "brand"
+      }
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h1",
+        "content": "We lost this page"
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Sorry, the page you are looking for doesn't exist.",
+        "variant": "secondary"
+      }
+    },
+    "search-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3
+      },
+      "children": [
+        "search-input",
+        "search-btn"
+      ]
+    },
+    "search-input": {
+      "type": "Search",
+      "props": {
+        "placeholder": "Search our site"
+      }
+    },
+    "search-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Search",
+        "variant": "primary"
+      }
+    },
+    "resources": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "resource-docs",
+        "resource-blog",
+        "resource-support"
+      ]
+    },
+    "resource-docs": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "docs-link",
+        "docs-text"
+      ]
+    },
+    "docs-link": {
+      "type": "Link",
+      "props": {
+        "label": "Documentation"
+      }
+    },
+    "docs-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Dive in to learn all about our product.",
+        "variant": "secondary"
+      }
+    },
+    "resource-blog": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "blog-link",
+        "blog-text"
+      ]
+    },
+    "blog-link": {
+      "type": "Link",
+      "props": {
+        "label": "Our blog"
+      }
+    },
+    "blog-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Read the latest posts on our blog.",
+        "variant": "secondary"
+      }
+    },
+    "resource-support": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 1
+      },
+      "children": [
+        "support-link",
+        "support-text"
+      ]
+    },
+    "support-link": {
+      "type": "Link",
+      "props": {
+        "label": "Chat to support"
+      }
+    },
+    "support-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Our friendly team is here to help.",
+        "variant": "secondary"
+      }
+    },
+    "image-section": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/404-split-image-04-image-section/592/640",
+        "alt": "Dashboard placeholder",
+        "rounded": true
+      }
+    }
+  }
+}

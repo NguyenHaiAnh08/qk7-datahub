@@ -94,7 +94,7 @@ export const useToast = () => {
   if (!ctx) {
     // Fallback an toàn nếu chưa bọc Provider: dùng global dispatcher
     return {
-      toasts: [],
+      toasts: [] as ToastItem[],
       addToast: (msg: string, type: ToastType = 'success', opts?: ToastOptions) => {
         showAnimatedToast(msg, type, opts);
         return 'temp-id';
@@ -111,193 +111,200 @@ export const useAnimatedToast = useToast;
 
 // =========================================================================
 // Single Animated Toast Card Component (JolyUI & Spring Physics)
+// ✅ Dùng React.forwardRef để AnimatePresence mode="popLayout" có thể gắn ref
+//    đo kích thước/vị trí khi toast exit (tránh warning PopChild).
 // =========================================================================
 interface SingleToastCardProps {
   item: ToastItem;
   onDismiss: (id: string) => void;
 }
 
-const SingleToastCard: React.FC<SingleToastCardProps> = ({ item, onDismiss }) => {
-  const duration = item.duration || 3600;
-  const [isHovered, setIsHovered] = useState(false);
-  const [progress, setProgress] = useState(100);
-  const startTimeRef = useRef<number>(Date.now());
-  const remainingTimeRef = useRef<number>(duration);
-  const timerIdRef = useRef<any>(null);
-  const animationFrameRef = useRef<number | null>(null);
+const SingleToastCard = React.forwardRef<HTMLDivElement, SingleToastCardProps>(
+  ({ item, onDismiss }, ref) => {
+    const duration = item.duration || 3600;
+    const [isHovered, setIsHovered] = useState(false);
+    const [progress, setProgress] = useState(100);
+    const startTimeRef = useRef<number>(Date.now());
+    const remainingTimeRef = useRef<number>(duration);
+    const timerIdRef = useRef<any>(null);
+    const animationFrameRef = useRef<number | null>(null);
 
-  // Xử lý đếm ngược và tạm dừng khi hover chuột (Hover Pause)
-  useEffect(() => {
-    if (isHovered) {
-      if (timerIdRef.current) clearTimeout(timerIdRef.current);
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      return;
-    }
+    // Xử lý đếm ngược và tạm dừng khi hover chuột (Hover Pause)
+    useEffect(() => {
+      if (isHovered) {
+        if (timerIdRef.current) clearTimeout(timerIdRef.current);
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        return;
+      }
 
-    startTimeRef.current = Date.now();
+      startTimeRef.current = Date.now();
 
-    const updateProgress = () => {
-      const elapsed = Date.now() - startTimeRef.current;
-      const currentRemaining = Math.max(0, remainingTimeRef.current - elapsed);
-      const pct = (currentRemaining / duration) * 100;
-      setProgress(pct);
+      const updateProgress = () => {
+        const elapsed = Date.now() - startTimeRef.current;
+        const currentRemaining = Math.max(0, remainingTimeRef.current - elapsed);
+        const pct = (currentRemaining / duration) * 100;
+        setProgress(pct);
 
-      if (currentRemaining > 0) {
-        animationFrameRef.current = requestAnimationFrame(updateProgress);
+        if (currentRemaining > 0) {
+          animationFrameRef.current = requestAnimationFrame(updateProgress);
+        }
+      };
+
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
+
+      timerIdRef.current = setTimeout(() => {
+        onDismiss(item.id);
+      }, remainingTimeRef.current);
+
+      return () => {
+        if (timerIdRef.current) clearTimeout(timerIdRef.current);
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        remainingTimeRef.current = Math.max(0, remainingTimeRef.current - (Date.now() - startTimeRef.current));
+      };
+    }, [isHovered, duration, item.id, onDismiss]);
+
+    // Cấu hình giao diện chuẩn Bản sắc Quân sự & Tactical Command Center
+    const getThemeConfig = () => {
+      switch (item.type) {
+        case 'success':
+          return {
+            icon: <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />,
+            iconBg: 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-300',
+            progressBar: 'bg-gradient-to-r from-[#166534] to-[#10b981]',
+            badgeBg: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40',
+            borderHighlight: 'border-emerald-500/30 dark:border-emerald-500/40 shadow-emerald-950/10 dark:shadow-emerald-950/40',
+            defaultTitle: 'Thao tác thành công',
+          };
+        case 'warning':
+          return {
+            icon: <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />,
+            iconBg: 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-300',
+            progressBar: 'bg-gradient-to-r from-[#d97706] to-[#fbbf24]',
+            badgeBg: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-500/40',
+            borderHighlight: 'border-amber-500/30 dark:border-amber-500/40 shadow-amber-950/10 dark:shadow-amber-950/40',
+            defaultTitle: 'Lưu ý kiểm duyệt',
+          };
+        case 'securityAlert':
+        case 'error':
+        case 'danger':
+          return {
+            icon: <ShieldAlert className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 animate-pulse" />,
+            iconBg: 'bg-rose-50 dark:bg-rose-500/15 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-300',
+            progressBar: 'bg-gradient-to-r from-[#b91c1c] via-[#dc2626] to-[#f87171]',
+            badgeBg: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-500/40',
+            borderHighlight: 'border-rose-500/40 dark:border-red-500/50 shadow-rose-950/20 dark:shadow-rose-950/50',
+            defaultTitle: item.type === 'securityAlert' ? 'Cảnh báo an ninh' : 'Lỗi xử lý hệ thống',
+          };
+        case 'info':
+        default:
+          return {
+            icon: <Compass className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />,
+            iconBg: 'bg-blue-50 dark:bg-blue-500/15 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-300',
+            progressBar: 'bg-gradient-to-r from-blue-600 to-sky-400',
+            badgeBg: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300 dark:border-blue-500/40',
+            borderHighlight: 'border-blue-500/30 dark:border-blue-500/40 shadow-blue-950/10 dark:shadow-blue-950/40',
+            defaultTitle: 'Thông tin tác chiến',
+          };
       }
     };
 
-    animationFrameRef.current = requestAnimationFrame(updateProgress);
+    const theme = getThemeConfig();
+    const timeFormatted = item.timestamp
+      ? new Date(item.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      : undefined;
 
-    timerIdRef.current = setTimeout(() => {
-      onDismiss(item.id);
-    }, remainingTimeRef.current);
+    return (
+      <motion.div
+        ref={ref}
+        layout
+        initial={{ opacity: 0, y: 32, scale: 0.9, filter: 'blur(4px)' }}
+        animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+        exit={{ opacity: 0, scale: 0.92, y: 16, filter: 'blur(4px)', transition: { duration: 0.2 } }}
+        transition={{
+          type: 'spring',
+          stiffness: 380,
+          damping: 26,
+          mass: 0.75,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`group pointer-events-auto relative w-full sm:w-auto min-w-[320px] sm:min-w-[480px] md:min-w-[540px] max-w-full overflow-hidden rounded-2xl border bg-white/95 dark:bg-[#0c1420]/95 backdrop-blur-xl shadow-xl transition-all duration-200 select-none ${theme.borderHighlight}`}
+        style={{
+          boxShadow: isHovered
+            ? '0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+            : '0 10px 30px -6px rgba(0, 0, 0, 0.35)',
+        }}
+      >
+        <div className="flex items-start gap-3.5 p-3.5 sm:p-4">
+          {/* Status Icon with Spring Pop & Glow */}
+          <motion.div
+            initial={{ scale: 0.6, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${theme.iconBg} shadow-xs`}
+          >
+            {theme.icon}
+          </motion.div>
 
-    return () => {
-      if (timerIdRef.current) clearTimeout(timerIdRef.current);
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      remainingTimeRef.current = Math.max(0, remainingTimeRef.current - (Date.now() - startTimeRef.current));
-    };
-  }, [isHovered, duration, item.id, onDismiss]);
+          {/* Content Body */}
+          <div className="flex-1 min-w-0 pr-1">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap shrink-0 tracking-tight">
+                  {item.title || theme.defaultTitle}
+                </span>
+                {item.badge && (
+                  <span
+                    className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-md font-bold border tracking-wider shrink-0 ${theme.badgeBg}`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </div>
 
-  // Cấu hình giao diện chuẩn Bản sắc Quân sự & Tactical Command Center
-  const getThemeConfig = () => {
-    switch (item.type) {
-      case 'success':
-        return {
-          icon: <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />,
-          iconBg: 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-300',
-          progressBar: 'bg-gradient-to-r from-[#166534] to-[#10b981]',
-          badgeBg: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40',
-          borderHighlight: 'border-emerald-500/30 dark:border-emerald-500/40 shadow-emerald-950/10 dark:shadow-emerald-950/40',
-          defaultTitle: 'Thao tác thành công',
-        };
-      case 'warning':
-        return {
-          icon: <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />,
-          iconBg: 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-300',
-          progressBar: 'bg-gradient-to-r from-[#d97706] to-[#fbbf24]',
-          badgeBg: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-500/40',
-          borderHighlight: 'border-amber-500/30 dark:border-amber-500/40 shadow-amber-950/10 dark:shadow-amber-950/40',
-          defaultTitle: 'Lưu ý kiểm duyệt',
-        };
-      case 'securityAlert':
-      case 'error':
-      case 'danger':
-        return {
-          icon: <ShieldAlert className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 animate-pulse" />,
-          iconBg: 'bg-rose-50 dark:bg-rose-500/15 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-300',
-          progressBar: 'bg-gradient-to-r from-[#b91c1c] via-[#dc2626] to-[#f87171]',
-          badgeBg: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-500/40',
-          borderHighlight: 'border-rose-500/40 dark:border-red-500/50 shadow-rose-950/20 dark:shadow-rose-950/50',
-          defaultTitle: item.type === 'securityAlert' ? 'Cảnh báo an ninh' : 'Lỗi xử lý hệ thống',
-        };
-      case 'info':
-      default:
-        return {
-          icon: <Compass className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />,
-          iconBg: 'bg-blue-50 dark:bg-blue-500/15 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-300',
-          progressBar: 'bg-gradient-to-r from-blue-600 to-sky-400',
-          badgeBg: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300 dark:border-blue-500/40',
-          borderHighlight: 'border-blue-500/30 dark:border-blue-500/40 shadow-blue-950/10 dark:shadow-blue-950/40',
-          defaultTitle: 'Thông tin tác chiến',
-        };
-    }
-  };
-
-  const theme = getThemeConfig();
-  const timeFormatted = item.timestamp
-    ? new Date(item.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : undefined;
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 32, scale: 0.9, filter: 'blur(4px)' }}
-      animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-      exit={{ opacity: 0, scale: 0.92, y: 16, filter: 'blur(4px)', transition: { duration: 0.2 } }}
-      transition={{
-        type: 'spring',
-        stiffness: 380,
-        damping: 26,
-        mass: 0.75,
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`group pointer-events-auto relative w-full sm:w-auto min-w-[320px] sm:min-w-[480px] md:min-w-[540px] max-w-full overflow-hidden rounded-2xl border bg-white/95 dark:bg-[#0c1420]/95 backdrop-blur-xl shadow-xl transition-all duration-200 select-none ${theme.borderHighlight}`}
-      style={{
-        boxShadow: isHovered
-          ? '0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1)'
-          : '0 10px 30px -6px rgba(0, 0, 0, 0.35)',
-      }}
-    >
-      <div className="flex items-start gap-3.5 p-3.5 sm:p-4">
-        {/* Status Icon with Spring Pop & Glow */}
-        <motion.div
-          initial={{ scale: 0.6, rotate: -20 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 20 }}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${theme.iconBg} shadow-xs`}
-        >
-          {theme.icon}
-        </motion.div>
-
-        {/* Content Body */}
-        <div className="flex-1 min-w-0 pr-1">
-          <div className="flex items-center justify-between gap-3 mb-1">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap shrink-0 tracking-tight">
-                {item.title || theme.defaultTitle}
-              </span>
-              {item.badge && (
-                <span
-                  className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-md font-bold border tracking-wider shrink-0 ${theme.badgeBg}`}
-                >
-                  {item.badge}
+              {timeFormatted && (
+                <span className="text-[10.5px] font-mono tabular-nums text-slate-400 dark:text-slate-500 shrink-0 ml-2">
+                  {timeFormatted}
                 </span>
               )}
             </div>
 
-            {timeFormatted && (
-              <span className="text-[10.5px] font-mono tabular-nums text-slate-400 dark:text-slate-500 shrink-0 ml-2">
-                {timeFormatted}
-              </span>
-            )}
+            <p
+              className={`text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 font-medium ${
+                item.message.length <= 110
+                  ? 'whitespace-normal sm:whitespace-nowrap leading-normal'
+                  : 'leading-relaxed break-words'
+              }`}
+            >
+              {item.message}
+            </p>
           </div>
 
-          <p
-            className={`text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 font-medium ${
-              item.message.length <= 110
-                ? 'whitespace-normal sm:whitespace-nowrap leading-normal'
-                : 'leading-relaxed break-words'
-            }`}
+          {/* Close Button with Tactile Feedback */}
+          <button
+            type="button"
+            onClick={() => onDismiss(item.id)}
+            className="shrink-0 -mr-1 -mt-1 p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all active:scale-90 cursor-pointer"
+            aria-label="Đóng thông báo"
           >
-            {item.message}
-          </p>
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Close Button with Tactile Feedback */}
-        <button
-          type="button"
-          onClick={() => onDismiss(item.id)}
-          className="shrink-0 -mr-1 -mt-1 p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all active:scale-90 cursor-pointer"
-          aria-label="Đóng thông báo"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+        {/* Auto-dismiss Countdown Progress Bar */}
+        <div className="relative h-1 w-full bg-slate-100 dark:bg-slate-800/60 overflow-hidden">
+          <motion.div
+            className={`h-full ${theme.progressBar}`}
+            style={{ width: `${progress}%` }}
+            transition={{ ease: 'linear', duration: 0.05 }}
+          />
+        </div>
+      </motion.div>
+    );
+  }
+);
 
-      {/* Auto-dismiss Countdown Progress Bar */}
-      <div className="relative h-1 w-full bg-slate-100 dark:bg-slate-800/60 overflow-hidden">
-        <motion.div
-          className={`h-full ${theme.progressBar}`}
-          style={{ width: `${progress}%` }}
-          transition={{ ease: 'linear', duration: 0.05 }}
-        />
-      </div>
-    </motion.div>
-  );
-};
+SingleToastCard.displayName = 'SingleToastCard';
 
 // =========================================================================
 // Toast Provider: Quản lý danh sách toast xếp chồng (Stacking Toast Container)
@@ -374,7 +381,6 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 // =========================================================================
 // Backwards-compatible Standalone Toast Component
 // Hỗ trợ nguyên vẹn cú pháp cũ <Toast toast={toast} onClose={...} />
-// Giúp nâng cấp ngay toàn bộ các trang đang có mà không làm gãy props cũ
 // =========================================================================
 export interface ToastState {
   show: boolean;

@@ -7,6 +7,10 @@ paths = [
     '''SETUP_SERVER\.md''',
     '''SYSTEM_ARCHITECTURE\.md''',
     '''\.env\.example''',
-    '''config/client\.info\.example'''
+    '''config/client\.info\.example''',
+    '''voiceover-pipeline\.md'''
+]
+stopwords = [
+    "zh_female_xiaohe_uranus_bigtts"
 ]
 

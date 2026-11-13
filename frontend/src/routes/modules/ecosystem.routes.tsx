@@ -1,6 +1,7 @@
 import React from 'react';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { RouteObject, Navigate } from 'react-router-dom';
+import { ProtectedRoute } from '../../components/common/ProtectedRoute';
 import { ROUTE_PATHS } from '../routePaths';
 
 const LecturesPage = lazyWithRetry(() => import('../../pages/LecturesPage').then((m) => ({ default: m.LecturesPage })));
@@ -19,7 +20,11 @@ const ecosystemRoutes: RouteModuleExport = {
   routes: [
     {
       path: ROUTE_PATHS.LECTURES,
-      element: <LecturesPage />,
+      element: (
+        <ProtectedRoute requiredPermission="LECTURE_VIEW">
+          <LecturesPage />
+        </ProtectedRoute>
+      ),
     },
     {
       path: ROUTE_PATHS.MATERIALS,
@@ -29,7 +34,11 @@ const ecosystemRoutes: RouteModuleExport = {
       path: ROUTE_PATHS.LIBRARY,
       element: <LibraryPage />,
     },
-    // Vietnamese URL slug aliases
+
+    {
+      path: '/du-lieu-so',
+      element: <Navigate to={ROUTE_PATHS.PORTAL} replace />,
+    },
     {
       path: '/bai-giang-so',
       element: <Navigate to={ROUTE_PATHS.LECTURES} replace />,

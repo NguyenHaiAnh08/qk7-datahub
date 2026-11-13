@@ -2169,17 +2169,33 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       pos.includes('thủ trưởng') ||
       pos.includes('chủ nhiệm');
 
-    const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+    // [STORAGE-HELPER] Thay đổi cấu trúc thư mục lưu trữ:
+    //   Cũ: uploads/YYYY/MM/<file>.pdf
+    //   Mới: uploads/du-lieu-so/YYYY/MM/<file>.pdf
+    const { getModuleUploadPath, MODULES } = require('./src/storage-helper');
+
+    const { yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
       docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
     });
     const sha8 = sha256.slice(0, 8);
     const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
-    const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
-    if (!validateStoredPath(relPath)) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
-    const absPath = safePathJoin(ROOT_DIR, relPath);
-    if (!absPath) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
 
-    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+    const now = new Date();
+    const { absPath: folderAbsPath, relPath: folderRelPath } = getModuleUploadPath(
+      MODULES.DOCUMENTS, now
+    );
+
+    const relPath = `${folderRelPath}/${fileName}`;
+    const absPath = path.join(folderAbsPath, fileName);
+
+    if (!validateStoredPath(relPath)) {
+      return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
+    }
+    if (!absPath) {
+      return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
+    }
+
+    fs.mkdirSync(folderAbsPath, { recursive: true });
     fs.writeFileSync(absPath, req.file.buffer);
 
     const pool = await getPool();
@@ -3526,6 +3542,10 @@ app.use('/api/lectures', requireAuth, require('./src/lecture-routes')({
 
 app.use('/api/lectures', requireAuth, require('./src/lecture-extended-routes')({
   requireAuth, requirePermission, writeAccessLog, getClientIp,
+}));
+
+app.use('/api/lectures', requireAuth, require('./src/scorm-package-routes')({
+  requireAuth, requirePermission
 }));
 
 // ═══════════════════════════════════════════════════════════════

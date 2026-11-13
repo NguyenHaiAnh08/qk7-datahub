@@ -1520,3 +1520,71 @@ Tại phân hệ "Kho dữ liệu chung" (`PortalPage`), tích hợp hệ thốn
    - Tự động gộp toàn bộ văn bản do Ban Giám hiệu ký (`TQS` và `U-BGH`) về Ban Giám hiệu; loại bỏ 100% các cơ quan bên ngoài/cấp trên.
    - Thiết kế Header 2 tầng phân cấp chuẩn Command Center, chống ngắt dòng chữ "Vị" và số "7".
    - Tích hợp Click-to-filter tương tác hai chiều và đồng bộ Gateway `/api/documents`.
+
+---
+
+## 32. Kiến Trúc Phân Hệ Bài Giảng Số & Gói Học Liệu Tương Tác SCORM / HTML5 (Digital Lecture & SCORM/HTML5 Engine)
+
+### 32.1. Đặt Vấn Đề Nghiệp Vụ & Mô Hình Tổng Thể
+Nhằm đáp ứng yêu cầu hiện đại hóa công tác giáo dục - đào tạo quân sự, phân hệ **Bài giảng số** (`LecturesPage.tsx`) chuyển từ trạng thái nghiên cứu sang **vận hành chính thức**, tạo môi trường quản trị bài giảng điện tử tương tác và các gói học liệu chuẩn quốc tế (SCORM 1.2, SCORM 2004, ActivePresenter HTML5).
+
+```mermaid
+graph TD
+    Teacher["Giảng viên / Cán bộ đào tạo"] -->|Tải lên bài giảng / Gói ZIP| UploadModal["CreateLectureModal.tsx & LecturePackageDropzone.tsx"]
+    UploadModal -->|Multipart Form-Data| GatewayRoute["scorm-package-routes.js / lecture-routes.js (:8000)"]
+    GatewayRoute -->|Lưu ZIP tạm disk-storage| TempDir["backend/uploads/temp/"]
+    GatewayRoute -->|Giải nén an toàn & Parse manifest| Helper["lecture-package-helper.js & scorm-manifest.js"]
+    Helper -->|Chống Zip Slip & Zip Bomb| SafeExtract["extractZipSafely() -> backend/uploads/lectures/:lectureId/"]
+    SafeExtract -->|Cập nhật CSDL| SQLDB[("MSSQL: DIGITAL_LECTURE & SCORM_PACKAGE")]
+    Teacher -->|Tạo phiên giảng dạy| StartModal["StartSessionModal.tsx"]
+    StartModal -->|Bắt đầu phiên| SessionRoom["LiveSessionRoom.tsx (Trình chiếu SCORM / Slide / Quiz)"]
+    Commander["Chỉ huy / Ban Giám hiệu"] -->|Giám sát giảng dạy trực tiếp| Monitor["LiveMonitorPanel.tsx (Sĩ số, tiến độ %, slide hiện tại)"]
+    Commander -->|Phê duyệt bài giảng| Approval["Luồng Duyệt Bài giảng: Phê duyệt / Từ chối (RejectReasonModal.tsx)"]
+```
+
+### 32.2. Thực Thể Cơ Sở Dữ Liệu Quản Trị Bài Giảng & SCORM
+Hệ thống bổ sung 4 bảng dữ liệu cốt lõi trong SQL Server `QK7_ThuVienSo`:
+1. **`DIGITAL_LECTURE`:** Mã bài giảng (`lecture_id`), mã định danh (`lecture_code`), tiêu đề (`title`), giảng viên biên soạn (`author_id`), đơn vị bộ môn (`unit_id`), cấp độ mật (`security_level_id`), định dạng (`content_type`: `'PDF'`, `'SCORM'`, `'HTML5'`, `'VIDEO'`), trạng thái phê duyệt (`approval_status`: `'PENDING'`, `'APPROVED'`, `'REJECTED'`), điểm khởi chạy (`scorm_entry_point`).
+2. **`SCORM_PACKAGE`:** Mã gói (`package_id`), mã bài giảng (`lecture_id`), đường dẫn lưu trữ (`stored_path`), tệp entry point (`entry_point`), phiên bản (`schema_version`: `'1.2'`, `'2004'`), mã băm mật mã học (`sha256`), dung lượng (`file_size`), cấu trúc XML lược đồ (`manifest_xml`).
+3. **`TEACHING_SCHEDULE`:** Phiên giảng dạy trực tiếp (`schedule_id`), giảng viên đứng lớp (`teacher_id`), lớp học (`class_name`), địa điểm (`venue`), thời gian bắt đầu (`start_time`), thời gian kết thúc (`end_time`), trạng thái (`status`: `'ACTIVE'`, `'COMPLETED'`), slide hiện tại (`slide_index`), tổng slide (`slide_total`), tiến độ SCORM (`scorm_progress`).
+4. **`LECTURE_QUIZ_QUESTION` & `LECTURE_QUIZ_ATTEMPT`:** Ngân hàng câu hỏi trắc nghiệm gắn với từng slide bài giảng và kết quả kiểm tra nhận thức của học viên.
+
+### 32.3. Quy Trình Giải Nén An Toàn Chống Lỗ Hổng (CWE-22 Zip Slip & CWE-409 Zip Bomb)
+Tại `backend/src/lecture-package-helper.js`, gói ZIP SCORM/HTML5 bắt buộc phải đi qua chốt chặn `extractZipSafely`:
+- **Chống Zip Slip (CWE-22):** Thẩm định từng `entryName` trong ZIP, resolve đường dẫn đích và cưỡng chế kiểm tra `destPath.startsWith(resolvedTarget + path.sep)`. Mọi tệp chứa relative traversal `../` hoặc trỏ ra ngoài thư mục đích đều bị hủy bỏ ngay lập tức và ném lỗi an ninh.
+- **Chống Zip Bomb (CWE-409):** Tích lũy tổng dung lượng giải nén (`entry.header.size`). Nếu vượt ngưỡng 300MB, quá trình giải nén bị ngắt lập tức để bảo vệ tài nguyên đĩa máy chủ.
+- **Lọc tệp thực thi nguy hiểm:** Cấm tuyệt đối giải nén các tệp có đuôi `.exe`, `.bat`, `.cmd`, `.sh`, `.ps1`, `.vbs`, `.py`, `.php`, `.jar`, `.com`.
+
+### 32.4. Phân Phối Tĩnh Gói SCORM & Cách Ly Iframe Bảo Mật
+- Endpoint phục vụ static assets (`/api/scorm/:lectureId/scorm/assets/*path` và `/api/scorm/:lectureId/html5/assets/*path`) tích hợp cơ chế:
+  - Cưỡng chế xác thực JWT và kiểm tra quyền `LECTURE_VIEW`.
+  - Tự động chèn thẻ `<base href="..." />` vào header của entry point HTML để iframe load chính xác mọi CSS, JS, hình ảnh tương đối.
+  - Thiết lập nghiêm ngặt Security Headers: `X-Content-Type-Options: nosniff`, `Cross-Origin-Resource-Policy: cross-origin`, và ánh xạ đúng MIME types cho các định dạng bài giảng đa phương tiện.
+
+### 32.5. Phòng Học Trực Tiếp & Giám Sát Thời Gian Thực
+- **`LiveSessionRoom.tsx`:** Trình chiếu toàn màn hình bài giảng điện tử, nhúng SCORM/HTML5 iframe có bảo vệ, hiển thị sĩ số quân số, thời gian giảng bài và công cụ trắc nghiệm nhanh.
+- **`LiveMonitorPanel.tsx`:** Bảng giám sát chỉ huy dành cho Ban Giám hiệu và Trưởng Bộ môn:
+  - Hiển thị các lớp đang lên lớp trong toàn trường theo thời gian thực.
+  - Chỉ số KPI trực quan: tên môn, giảng viên, địa điểm phòng học, thời lượng đã học, slide hiện tại trên tổng slide, tiến độ hoàn thành SCORM (%).
+  - Phát hiện và cảnh báo treo lớp học (`is_hanging`) khi thời lượng phiên vượt quá 240 phút.
+
+---
+
+## 33. Kiến Trúc Bộ Điều Phối Thiết Kế UI/UX Bản Sắc Quân Đội (QK7 Multi-Engine Design Orchestrator)
+
+### 33.1. Nguyên Lý Điều Phối Đa Kỹ Năng (7-Skill Integrated Engine)
+Để giải quyết triệt để tình trạng giao diện AI-slop (gradient tím hồng lòe loẹt, icon bóng bẩy vô nghĩa, hiệu ứng hoạt họa sáo rỗng), hệ thống thiết lập bộ điều phối thiết kế chuyên sâu tại `.agents/skills/qk7-design-orchestrator/` kết hợp cùng 6 kỹ năng con theo quy trình 6 bước tại workflow [`thiet-ke-ux-ui.md`](file:///d:/QK7_DataHub/qk7-datahub/.agents/workflows/thiet-ke-ux-ui.md):
+1. **`design-md`:** Trích xuất Design Tokens, bảng màu Quân đội và quy chuẩn typography.
+2. **`ui-ux-pro-max` + `design-taste-frontend`:** Định hình phong cách, phân lớp chiều sâu (layered surfaces), nhãn nhỏ sắc nét, viền `border-white/10`.
+3. **`huashu-design`:** Đề xuất concept trực quan trước khi viết code.
+4. **`daub-ui` & `sketchbook-ui`:** Tham chiếu component bản vẽ kỹ thuật quân sự, hand-drawn wireframes và thư viện component phi AI-slop.
+5. **`unslop`:** Kiểm tra 9 tầng diệt gradient cầu vồng, card bo tròn quá mức và copy vô cảm.
+6. **Linter & Audit:** Chạy `node .agents/skills/design-taste-frontend/scripts/lint.mjs` bảo đảm 100% tiêu chí thô ráp, uy nghiêm, trang trọng của Nhà trường Quân đội.
+
+### 33.2. Bảng Triad Màu Quân Sự Chuẩn Mực
+- **Primary (Xanh Lục Quân):** `#166534` (Light) • `#10b981` (Dark) — Tượng trưng màu áo người lính Quân khu 7.
+- **Secondary (Vàng Kim Quân Hiệu & Đồng Cổ):** `#d97706` (Light) • `#fbbf24` (Dark) — Uy nghiêm, chuẩn mực.
+- **Accent/Alert (Đỏ Quân Kỳ):** `#b91c1c` (Light) • `#f87171` (Dark) — Cảnh báo cấp mật tối cao.
+- **Neutral (Tím Thư Viện):** `#722ED1` — Màu thương hiệu truyền thống của hệ thống Trung tâm Thư viện số QK7.
+- **Typography:** `Be Vietnam Pro` (văn bản hành chính) + `JetBrains Mono` (`font-mono tabular-nums` cho số liệu tọa độ, quân số, mật mã).
+

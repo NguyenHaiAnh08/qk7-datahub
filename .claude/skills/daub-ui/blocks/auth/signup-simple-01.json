@@ -1,0 +1,185 @@
+{
+  "root": "signup-simple",
+  "elements": {
+    "signup-simple": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0,
+        "align": "center",
+        "justify": "center",
+        "container": "narrow"
+      },
+      "children": [
+        "main-content"
+      ]
+    },
+    "main-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 8,
+        "align": "center"
+      },
+      "children": [
+        "logo-icon",
+        "header",
+        "form-section",
+        "footer-section"
+      ]
+    },
+    "logo-icon": {
+      "type": "Icon",
+      "props": {
+        "name": "layers"
+      }
+    },
+    "header": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "heading",
+        "subtitle"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Create an account",
+        "align": "center"
+      }
+    },
+    "subtitle": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Start your 30-day free trial.",
+        "variant": "secondary",
+        "align": "center"
+      }
+    },
+    "form-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "align": "stretch"
+      },
+      "children": [
+        "name-field",
+        "email-field",
+        "password-field",
+        "password-hint",
+        "get-started-btn",
+        "google-btn"
+      ]
+    },
+    "name-field": {
+      "type": "Field",
+      "props": {
+        "label": "Name"
+      },
+      "children": [
+        "name-input"
+      ]
+    },
+    "name-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Enter your name",
+        "type": "text"
+      }
+    },
+    "email-field": {
+      "type": "Field",
+      "props": {
+        "label": "Email"
+      },
+      "children": [
+        "email-input"
+      ]
+    },
+    "email-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Enter your email",
+        "type": "email"
+      }
+    },
+    "password-field": {
+      "type": "Field",
+      "props": {
+        "label": "Password"
+      },
+      "children": [
+        "password-input"
+      ]
+    },
+    "password-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Create a password",
+        "type": "password"
+      }
+    },
+    "password-hint": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Must be at least 8 characters.",
+        "variant": "muted"
+      }
+    },
+    "get-started-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg",
+        "fullWidth": true
+      }
+    },
+    "google-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Sign up with Google",
+        "variant": "outline",
+        "size": "lg",
+        "icon": "google",
+        "fullWidth": true
+      }
+    },
+    "footer-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 1,
+        "align": "center",
+        "justify": "center"
+      },
+      "children": [
+        "login-text",
+        "login-link"
+      ]
+    },
+    "login-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Already have an account?",
+        "variant": "secondary"
+      }
+    },
+    "login-link": {
+      "type": "Link",
+      "props": {
+        "label": "Log in"
+      }
+    }
+  }
+}

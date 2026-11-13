@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "daub-ui": {
+      "source": "sliday/daub",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "d6484ff496af0eb0c4283ce72fb02ae0f9650ed8b60818364834e5f1ec36ea4b"
+    },
+    "design-md": {
+      "source": "nexu-io/open-design",
+      "sourceType": "github",
+      "skillPath": "skills/design-md/SKILL.md",
+      "computedHash": "32912e591b63ca0b9bd865d9aa04f210f12f56a230944902be998a2a5b1ac7d1"
+    },
+    "huashu-design": {
+      "source": "alchaincyf/huashu-design",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "88c1ab5faeb8a99e87bae70ec2d694f54be74a269ee6fb9650ea4144a11fcbce"
+    },
+    "unslop": {
+      "source": "heydamir/unslop",
+      "sourceType": "github",
+      "skillPath": "skills/unslop/SKILL.md",
+      "computedHash": "d1d4d2f3ca3f1e394d764462b55bc2dc09814dc87439cc00ee359580f8e2070d"
+    }
+  }
+}

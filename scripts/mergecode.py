@@ -2,26 +2,27 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
-QK7 PROJECT MERGER — Gộp TOÀN BỘ source code dự án vào 1 file text (v4.0)
+QK7 PROJECT MERGER — Gộp TOÀN BỘ source code dự án vào 1 file text (v4.2)
 ================================================================================
 
 CHẾ ĐỘ MẶC ĐỊNH: HYBRID (KHUYẾN NGHỊ)
-    Bước 1 — Gộp EXPLICIT_FILES (thứ tự ưu tiên cho tài liệu).
+    Bước 1 — Gộp EXPLICIT_FILES (thứ tự ưu tiên: routes → pages → services → components).
     Bước 2 — AUTO-SCAN backend/, frontend/, fingerprint/, boxchat/,
-             ocr-service/, tools/ để bắt MỌI file còn lại (kể cả file mới).
+             ocr-service/, tools/ để bắt MỌI file còn lại.
     Kết quả: merged_code.txt chứa TOÀN BỘ code dự án.
 
-CÁC CHẾ ĐỘ KHÁC:
-    --explicit-only          → CHỈ gộp EXPLICIT_FILES (không auto-scan)
-    --include-only <dir>...  → Gộp theo allowlist thư mục
-    --all                    → Gộp gần hết dự án (exclude mode)
+THAY ĐỔI v4.2:
+    - Bổ sung nhóm frontend routes/pages/contexts/hooks/constants/types/utils
+      vào EXPLICIT_FILES để không bị cắt khi output giới hạn.
+    - Loại trừ file base64 (touchid_assets.ts) gây phình output.
+    - Truncate file text lớn (80KB–500KB): giữ phần đầu + cuối, cắt giữa.
 
-Cách dùng:
-    python mergecode.py                              # HYBRID (mặc định)
-    python mergecode.py -o merged_full.txt           # đổi tên output
-    python mergecode.py --explicit-only              # chỉ explicit
-    python mergecode.py --all                        # exclude mode
-    python mergecode.py --include-only backend/src   # allowlist mode
+CÁCH DÙNG:
+    python scripts/mergecode.py                              # HYBRID (mặc định)
+    python scripts/mergecode.py -o merged_full.txt           # đổi tên output
+    python scripts/mergecode.py --explicit-only              # chỉ explicit
+    python scripts/mergecode.py --include-only frontend/src/routes frontend/src/pages -o fe_routes.txt
+    python scripts/mergecode.py --all                        # exclude mode
 
 Yêu cầu: Python ≥ 3.8. Không cần cài thêm thư viện.
 ================================================================================
@@ -39,18 +40,13 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Iterator
 
-__version__ = "4.1.0"
+__version__ = "4.2.0"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DANH SÁCH FILE CẦN GỘP — THỨ TỰ ĐỌC CHO AI
 # ═══════════════════════════════════════════════════════════════════════════════
-# • Đường dẫn tính từ gốc dự án (thư mục chứa mergecode.py).
-# • File gộp ĐÚNG THỨ TỰ khai báo (tài liệu trước → code sau).
-# • File không tồn tại → cảnh báo, bỏ qua.
-# • File MỚI (chưa có trong list) → tự động bắt bởi AUTO-SCAN.
-# ═══════════════════════════════════════════════════════════════════════════════
 EXPLICIT_FILES: list[str] = [
-    # ═══ 1. HIẾN PHÁP & TÀI LIỆU KIẾN TRÚC (đọc trước để hiểu dự án) ═══
+    # ═══ 1. HIẾN PHÁP & TÀI LIỆU KIẾN TRÚC ═══
     "ANTIGRAVITY_MASTER_BRAIN.md",
     "README.md",
     "docs/architecture/SYSTEM_ARCHITECTURE.md",
@@ -78,7 +74,7 @@ EXPLICIT_FILES: list[str] = [
     "config/skills-lock.json",
     "config/package-lock.json",
 
-    # ═══ 3. SCRIPTS KHỞI CHẠY & TIỆN ÍCH ═══
+    # ═══ 3. SCRIPTS ═══
     "scripts/s.bat",
     "scripts/s-dev.bat",
     "scripts/start-ai.bat",
@@ -86,12 +82,11 @@ EXPLICIT_FILES: list[str] = [
     "scripts/generate-client-config.bat",
     "scripts/mergecode.py",
 
-    # ═══ 4. BACKEND — ROOT (Express Gateway :8000) ═══
+    # ═══ 4. BACKEND — ROOT ═══
     "backend/s.bat",
     "backend/server.js",
     "backend/swagger.js",
     "backend/package.json",
-    "backend/package-lock.json",
     "backend/pdf-parser.js",
     "backend/setupadmin.js",
     "backend/setuppw.js",
@@ -102,8 +97,10 @@ EXPLICIT_FILES: list[str] = [
     # ═══ 5. BACKEND — CONFIG & MIGRATIONS ═══
     "backend/config/parser-patterns.json",
     "backend/migrations/create_revision_proposals.cjs",
+    "backend/migrations/create_lecture_quiz_scorm.cjs",
+    "backend/migrations/seed_lecture_permissions.cjs",
 
-    # ═══ 6. BACKEND — SRC (Logic nghiệp vụ) ═══
+    # ═══ 6. BACKEND — SRC ═══
     "backend/src/db.js",
     "backend/src/clock-authority.js",
     "backend/src/fingerprint-ws.js",
@@ -116,33 +113,127 @@ EXPLICIT_FILES: list[str] = [
     "backend/src/user-roles.js",
     "backend/src/approval-workflow.js",
     "backend/src/audit-log-cleaner.js",
+    "backend/src/security-headers.js",
     "backend/src/admin-routes.js",
     "backend/src/ai-routes.js",
     "backend/src/lecture-routes.js",
+    "backend/src/lecture-extended-routes.js",
+    "backend/src/lecture-package-helper.js",
+    "backend/src/scorm-manifest.js",
+    "backend/src/scorm-package-routes.js",
 
-    # ═══ 7. FINGERPRINT — ZKTeco ZK9500 Agent (:9001) ═══
+    # ═══ 7. FINGERPRINT ═══
     "fingerprint/agent.py",
     "fingerprint/zk_service.py",
     "fingerprint/s-agent.bat",
     "fingerprint/requirements.txt",
     "fingerprint/device_id.txt",
 
-    # ═══ 8. FRONTEND — ROOT CONFIG ═══
+    # ═══ 8. BOXCHAT (AI Microservice) ═══
+    "boxchat/main.py",
+    "boxchat/requirements.txt",
+    "boxchat/core/__init__.py",
+    "boxchat/core/pdf_processor.py",
+    "boxchat/core/vector_store.py",
+    "boxchat/core/agent_tutor.py",
+    "boxchat/core/study_book_gen.py",
+    "boxchat/core/media_timeline.py",
+    "boxchat/core/metrics.py",
+    "boxchat/test_chunking.py",
+    "boxchat/test_hybrid_security.py",
+    "boxchat/test_multiturn_and_biometric.py",
+    "boxchat/test_qdrant_safety.py",
+    "boxchat/test_e2e_15_scenarios.py",
+    "boxchat/measure_chunking.py",
+    "boxchat/reindex_all.py",
+    "boxchat/s.bat",
+
+    # ═══ 9. FRONTEND — ROOT CONFIG ═══
     "frontend/package.json",
-    "frontend/package-lock.json",
     "frontend/postcss.config.js",
     "frontend/tailwind.config.js",
     "frontend/tsconfig.json",
     "frontend/vite.config.ts",
     "frontend/index.html",
 
-    # ═══ 9. FRONTEND — SRC ROOT ═══
+    # ═══ 10. FRONTEND — SRC ROOT ═══
     "frontend/src/App.tsx",
     "frontend/src/main.tsx",
     "frontend/src/index.css",
     "frontend/src/vite-env.d.ts",
 
-    # ═══ 10. FRONTEND — SERVICES (Tầng dịch vụ mạng) ═══
+    # ═══ 11. FRONTEND — ROUTES (quyết định SPA có chạy được không) ═══
+    "frontend/src/routes/routePaths.ts",
+    "frontend/src/routes/routeAccess.ts",
+    "frontend/src/routes/getAppRoutes.ts",
+    "frontend/src/routes/RouterProvider.tsx",
+    "frontend/src/routes/modules/auth.routes.tsx",
+    "frontend/src/routes/modules/portal.routes.tsx",
+    "frontend/src/routes/modules/myunit.routes.tsx",
+    "frontend/src/routes/modules/desk.routes.tsx",
+    "frontend/src/routes/modules/ecosystem.routes.tsx",
+    "frontend/src/routes/modules/admin.routes.tsx",
+    "frontend/src/routes/modules/myApprovals.routes.tsx",
+    "frontend/src/routes/modules/error.routes.tsx",
+    "frontend/src/routes/modules/fallback.routes.tsx",
+
+    # ═══ 12. FRONTEND — PAGES ═══
+    "frontend/src/pages/LoginPage.tsx",
+    "frontend/src/pages/PortalPage.tsx",
+    "frontend/src/pages/MyUnitPage.tsx",
+    "frontend/src/pages/DocumentDeskPage.tsx",
+    "frontend/src/pages/LecturesPage.tsx",
+    "frontend/src/pages/MaterialsPage.tsx",
+    "frontend/src/pages/LibraryPage.tsx",
+    "frontend/src/pages/AdminDashboardPage.tsx",
+    "frontend/src/pages/UsersPage.tsx",
+    "frontend/src/pages/SessionsPage.tsx",
+    "frontend/src/pages/TrashPage.tsx",
+    "frontend/src/pages/ApprovalQueuePage.tsx",
+    "frontend/src/pages/MyApprovalsPage.tsx",
+    "frontend/src/pages/HttpErrorPage.tsx",
+    "frontend/src/pages/ProtectedPermissionsConfigPage.tsx",
+
+    # ═══ 13. FRONTEND — CONTEXTS ═══
+    "frontend/src/contexts/AuthContext.tsx",
+    "frontend/src/contexts/AIChatContext.tsx",
+    "frontend/src/contexts/ApprovalContext.tsx",
+    "frontend/src/contexts/DeviceModeContext.tsx",
+    "frontend/src/contexts/NetworkStatusContext.tsx",
+    "frontend/src/contexts/ThemeContext.tsx",
+
+    # ═══ 14. FRONTEND — HOOKS ═══
+    "frontend/src/hooks/useAuth.ts",
+    "frontend/src/hooks/useAntiScreenshot.ts",
+    "frontend/src/hooks/useDeviceMode.ts",
+    "frontend/src/hooks/useApprovalCount.ts",
+    "frontend/src/hooks/useTheme.ts",
+    "frontend/src/hooks/useDebounce.ts",
+    "frontend/src/hooks/useVirtualScroll.ts",
+    "frontend/src/hooks/useFloatingWatermark.ts",
+
+    # ═══ 15. FRONTEND — CONSTANTS ═══
+    "frontend/src/constants/apiEndpoints.ts",
+    "frontend/src/constants/permissionSubGroups.ts",
+    "frontend/src/constants/protectedAccounts.ts",
+
+    # ═══ 16. FRONTEND — TYPES ═══
+    "frontend/src/types/index.ts",
+    "frontend/src/types/document.ts",
+    "frontend/src/types/user.ts",
+    "frontend/src/types/lecture.ts",
+
+    # ═══ 17. FRONTEND — UTILS ═══
+    "frontend/src/utils/unitTree.tsx",
+    "frontend/src/utils/formatFileSize.ts",
+    "frontend/src/utils/dateUtils.ts",
+    "frontend/src/utils/pdfWatermark.ts",
+    "frontend/src/utils/lazyWithRetry.ts",
+    "frontend/src/utils/approvalUtils.ts",
+    "frontend/src/utils/avatarUtils.ts",
+    "frontend/src/utils/exportAuditReportExcel.ts",
+
+    # ═══ 18. FRONTEND — SERVICES ═══
     "frontend/src/services/http.ts",
     "frontend/src/services/index.ts",
     "frontend/src/services/api.ts",
@@ -166,23 +257,10 @@ EXPLICIT_FILES: list[str] = [
     "frontend/src/services/fingerprintService.ts",
     "frontend/src/services/pinService.ts",
     "frontend/src/services/aiService.ts",
-
-    # ═══ 11. FRONTEND — COMPONENTS (Admin modals) ═══
-    "frontend/src/components/users/AssignRoleModal.tsx",
-    "frontend/src/components/users/FingerprintEnrollModal.tsx",
-    "frontend/src/components/users/FingerprintScanModal.tsx",
-    "frontend/src/components/users/GrantPermissionModal.tsx",
-    "frontend/src/components/users/PinManageModal.tsx",
-    "frontend/src/components/users/PinVerifyModal.tsx",
-    "frontend/src/components/users/RolePermissionModal.tsx",
-    "frontend/src/components/users/UserCredentialsModal.tsx",
-    "frontend/src/components/users/UserFormModal.tsx",
-    "frontend/src/components/users/UserTable.tsx",
-    "frontend/src/components/users/UserViewPinModal.tsx",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# THƯ MỤC QUÉT TỰ ĐỘNG (chỉ dùng trong HYBRID mode)
+# THƯ MỤC QUÉT TỰ ĐỘNG (HYBRID mode)
 # ═══════════════════════════════════════════════════════════════════════════════
 AUTO_SCAN_DIRS = [
     "backend",
@@ -194,9 +272,8 @@ AUTO_SCAN_DIRS = [
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CẤU HÌNH CŨ — DÙNG CHO --include-only / --all
+# CẤU HÌNH LOẠI TRỪ
 # ═══════════════════════════════════════════════════════════════════════════════
-
 DEFAULT_INCLUDE_ONLY = [
     "backend/config", "backend/migrations", "backend/src",
     "boxchat", "fingerprint", "frontend", "tools",
@@ -223,9 +300,10 @@ DEFAULT_EXCLUDE_DIRS = {
     "uploads",
     "logs", ".logs",
     "local_storage",
-    "public",       # build output từ frontend
-    "certs",        # SSL certs — nhạy cảm
+    "public",
+    "certs",
     ".taste-skill",
+    "model_weight",
 }
 
 DEFAULT_EXCLUDE_EXTS = {
@@ -244,12 +322,18 @@ DEFAULT_EXCLUDE_EXTS = {
     ".log", ".tmp", ".cache", ".lock",
 }
 
+# v4.2: loại trừ file base64 gây phình output, khiến file sau bị cắt
 DEFAULT_EXCLUDE_FILES = {
     "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
     "poetry.lock", "Pipfile.lock", "composer.lock",
     "Cargo.lock", "go.sum", "Gemfile.lock", "bun.lockb",
     ".DS_Store", "Thumbs.db",
     "merged_code.txt",
+    # v4.2: base64/asset nội tuyến gây phình output
+    "touchid_assets.ts",
+    "dongson-drum-assets.ts",
+    "svg-assets.ts",
+    "icons-bundle.ts",
 }
 
 DEFAULT_SECRET_PATTERNS = [
@@ -323,31 +407,45 @@ def read_text_safe(path: Path) -> str:
     return raw.decode("latin-1", errors="replace")
 
 
+# v4.2: truncate file text lớn (giữ đầu + cuối, cắt giữa)
+def truncate_large_text(text: str, file_size: int) -> tuple[str, bool]:
+    if file_size <= 80 * 1024:
+        return text, False
+    if file_size > 500 * 1024:
+        # Quá lớn — chỉ lấy 20KB đầu để lấy import/interface
+        head = text[:20_000]
+        return head + "\n\n[... TRUNCATED — file > 500KB, chỉ giữ 20KB đầu ...]\n", True
+    # 80KB–500KB — giữ 40KB đầu + 20KB cuối, cắt giữa
+    head = text[:40_000]
+    tail = text[-20_000:]
+    return (
+        head
+        + f"\n\n[... TRUNCATED — file {file_size // 1024}KB, cắt phần giữa ...]\n\n"
+        + tail,
+        True,
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# BỘ LỌC TỰ ĐỘNG CHE MỜ BÍ MẬT (SECRET REDACTION FILTER)
+# BỘ LỌC CHE MỜ BÍ MẬT
 # ═══════════════════════════════════════════════════════════════════════════════
 SECRET_REDACT_RULES = [
-    # 1. API Keys, Tokens & Khóa mã hóa nhạy cảm
     (
         re.compile(r'(?i)\b(FP_ENC_KEY|JWT_SECRET|API_KEY|SECRET_KEY|BRIDGE_TOKEN|FINGERPRINT_BRIDGE_TOKEN|ENCRYPTION_KEY|TOKEN_SECRET)\s*[:=]\s*["\']?([A-Za-z0-9+/=_\-\.]{12,})["\']?'),
         r'\1="[REDACTED_BY_SECURITY_POLICY]"'
     ),
-    # 2. Mật khẩu kết nối DB hoặc tài khoản admin
     (
         re.compile(r'(?i)\b(password|pwd|db_password|admin_password)\s*[:=]\s*["\']([^"\'\n\r]{3,})["\']'),
         r'\1="[REDACTED_PASSWORD]"'
     ),
-    # 3. Private Keys (RSA, EC, OPENSSH)
     (
         re.compile(r'-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'),
         '[REDACTED_PRIVATE_KEY]'
     ),
-    # 4. Bearer tokens
     (
         re.compile(r'(?i)\bBearer\s+[A-Za-z0-9_\-\.]{20,}'),
         'Bearer [REDACTED_BEARER_TOKEN]'
     ),
-    # 5. Connection String Password
     (
         re.compile(r'(?i)(Server=[\w\.\-]+;.*Password=)([^;]+)(;)'),
         r'\1[REDACTED_DB_PWD]\3'
@@ -356,7 +454,6 @@ SECRET_REDACT_RULES = [
 
 
 def redact_sensitive_content(text: str) -> str:
-    """Tự động phát hiện và che giấu các thông tin bí mật trước khi gộp vào tệp."""
     redacted = text
     for pattern, replacement in SECRET_REDACT_RULES:
         redacted = pattern.sub(replacement, redacted)
@@ -444,7 +541,7 @@ def collect_files_explicit(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# COLLECT — AUTO-SCAN (HYBRID MODE fallback)
+# COLLECT — AUTO-SCAN
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def collect_files_autoscan(
@@ -456,10 +553,6 @@ def collect_files_autoscan(
     exclude_exts: set[str],
     extra_excludes: list[str],
 ) -> list[Path]:
-    """
-    Quét các thư mục dự án để tìm file MỚI chưa có trong EXPLICIT_FILES.
-    Áp dụng đầy đủ bộ lọc an toàn: bỏ binary, .env, uploads, node_modules, ...
-    """
     extra_lower = [p.lower() for p in extra_excludes]
     found: list[Path] = []
 
@@ -471,7 +564,6 @@ def collect_files_autoscan(
         for current_dir_str, dirnames, filenames in os.walk(subdir, followlinks=False):
             current = Path(current_dir_str)
 
-            # Prune excluded dirs (in-place to affect os.walk)
             dirnames[:] = [
                 d for d in dirnames
                 if d not in exclude_dirs
@@ -490,7 +582,6 @@ def collect_files_autoscan(
 
                 if rel_posix in already_seen:
                     continue
-
                 if name in exclude_files:
                     continue
                 if file_path.suffix.lower() in exclude_exts:
@@ -683,6 +774,7 @@ def write_merged(
 
     stats = {
         "written": 0, "skipped_binary": 0, "skipped_size": 0,
+        "truncated": 0,
         "errors": [], "total_source_bytes": 0, "large_files": [],
         "written_files": [],
     }
@@ -698,6 +790,7 @@ def write_merged(
         out.write(f"Root      : {root}\n")
         out.write(f"Mode      : {mode}\n")
         out.write(f"Files     : {len(files)}\n")
+        out.write(f"Version   : mergecode.py v{__version__}\n")
         out.write("=" * 80 + "\n\n")
 
         out.write("=== PROJECT TREE ===\n")
@@ -735,11 +828,18 @@ def write_merged(
                 stats["errors"].append((rel.as_posix(), str(e)))
                 continue
 
+            # v4.2: truncate file text lớn thay vì gộp nguyên
+            text, was_truncated = truncate_large_text(text, file_size)
+            if was_truncated:
+                stats["truncated"] += 1
+
             if file_size > 500 * 1024:
                 stats["large_files"].append((rel.as_posix(), file_size))
 
             out.write(f"\n{'=' * 80}\n")
             out.write(f"File: {rel.as_posix()}\n")
+            if was_truncated:
+                out.write(f"NOTE: File lớn {file_size // 1024}KB — đã truncate (giữ đầu + cuối).\n")
             out.write(f"{'=' * 80}\n\n")
             out.write(text)
             if not text.endswith("\n"):
@@ -757,11 +857,12 @@ def write_merged(
         out.write("\n" + "=" * 80 + "\n")
         out.write("=== SUMMARY ===\n")
         out.write(f"Files written : {stats['written']}\n")
+        out.write(f"Files truncated: {stats['truncated']}\n")
         out.write(f"Files skipped : {stats['skipped_binary'] + stats['skipped_size'] + len(stats['errors'])}\n")
         out.write(f"Total content : {stats['total_source_bytes'] / 1024:.1f} KB\n")
 
         if stats["large_files"]:
-            out.write(f"\nLarge files (>500KB):\n")
+            out.write(f"\nLarge files (>500KB) — đã truncate:\n")
             for rel, sz in stats["large_files"]:
                 out.write(f"  - {rel}: {sz / 1024 / 1024:.2f} MB\n")
 
@@ -789,7 +890,7 @@ def parse_args() -> argparse.Namespace:
             "  python mergecode.py -o merged_full.txt      # đổi tên output\n"
             "  python mergecode.py --explicit-only         # chỉ file trong EXPLICIT_FILES\n"
             "  python mergecode.py --all                   # gộp gần hết dự án\n"
-            "  python mergecode.py --include-only backend/src frontend/src\n"
+            "  python mergecode.py --include-only frontend/src/routes frontend/src/pages -o fe.txt\n"
         ),
     )
     script_dir = Path(__file__).resolve().parent
@@ -840,9 +941,6 @@ def main() -> None:
     missing: list[str] = []
     auto_files: list[Path] = []
 
-    # ═══════════════════════════════════════════════════════════
-    # QUYẾT ĐỊNH MODE
-    # ═══════════════════════════════════════════════════════════
     if args.all:
         mode = "EXCLUDE (--all)"
         files = sorted(
@@ -887,12 +985,7 @@ def main() -> None:
         )
 
     else:
-        # ═══════════════════════════════════════════════════════════
-        # HYBRID MODE (MẶC ĐỊNH) — Explicit + Auto-scan
-        # ═══════════════════════════════════════════════════════════
         mode = "HYBRID (explicit + auto-scan)"
-
-        # Bước 1: Explicit files (giữ thứ tự đọc)
         files, missing = collect_files_explicit(
             root=root,
             explicit_files=EXPLICIT_FILES,
@@ -901,7 +994,6 @@ def main() -> None:
         )
         seen = {p.as_posix() for p in files}
 
-        # Bước 2: Auto-scan bắt file còn lại
         auto_files = collect_files_autoscan(
             root=root,
             scan_dirs=AUTO_SCAN_DIRS,
@@ -922,7 +1014,6 @@ def main() -> None:
 
         files.extend(auto_files)
 
-    # ─── Báo cáo file thiếu ───
     if missing:
         print(f"[WARN] {len(missing)} file trong EXPLICIT_FILES không tồn tại:", file=sys.stderr)
         for m in missing:
@@ -955,6 +1046,8 @@ def main() -> None:
     print("=" * 60, file=sys.stderr)
     print(f"[OK] HOÀN TẤT trong {elapsed:.2f}s", file=sys.stderr)
     print(f"     Đã gộp         : {stats['written']} file", file=sys.stderr)
+    if stats["truncated"]:
+        print(f"     Truncate       : {stats['truncated']} file lớn", file=sys.stderr)
     if stats["skipped_binary"]:
         print(f"     Bỏ qua (binary): {stats['skipped_binary']} file", file=sys.stderr)
     if stats["skipped_size"]:
@@ -964,7 +1057,7 @@ def main() -> None:
         for rel, err in stats["errors"][:5]:
             print(f"        - {rel}: {err}", file=sys.stderr)
     if stats["large_files"]:
-        print(f"     File lớn >500KB: {len(stats['large_files'])} file", file=sys.stderr)
+        print(f"     File lớn >500KB: {len(stats['large_files'])} file (đã truncate)", file=sys.stderr)
         for rel, sz in stats["large_files"][:5]:
             print(f"        - {rel}: {sz / 1024 / 1024:.2f} MB", file=sys.stderr)
     if missing:
@@ -980,7 +1073,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n[WARN] Đã hủy bởi người dùng.", file=sys.stderr)
         sys.exit(130)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"\n[ERR] Lỗi không mong muốn: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()

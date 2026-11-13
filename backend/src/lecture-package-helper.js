@@ -33,8 +33,8 @@ async function extractAndParse({ lectureId, pendingPath, title, createdAt }) {
     const projectRoot = path.resolve(__dirname, '..'); 
     const zipAbsPath = path.resolve(projectRoot, pendingPath);
     
-    // Cấu trúc mới: uploads/bai-giang-so/YYYY/MM/<Ten_Bai_Giang_Da_Xoa_Dau>
-    const folderName = sanitizeFolderName(title || lectureId);
+    // ✅ TẠO THƯ MỤC: bai-giang-so/YYYY/MM/Ten_Bai_Giang_MaLecture
+    const folderName = `${sanitizeFolderName(title || 'Bai_Giang')}_${lectureId}`;
     const date = createdAt ? new Date(createdAt) : new Date();
     const { absPath: targetDir, relPath: baseRelPath } = getModuleUploadPath(MODULES.LECTURES, date, folderName);
 
@@ -85,11 +85,11 @@ async function extractAndParse({ lectureId, pendingPath, title, createdAt }) {
         }
     }
 
-    // Trả về đường dẫn tương đối cho DB: uploads/bai-giang-so/YYYY/MM/Ten_Bai_Giang/index.html
+    // Trả về đường dẫn tương đối cho DB: uploads/bai-giang-so/YYYY/MM/Ten_Bai_Giang_MaLecture/index.html
     const relativeEntryPoint = `${baseRelPath}/${launchFile}`.replace(/\\/g, '/');
     
     try {
-        fs.unlinkSync(zipAbsPath);
+        fs.unlinkSync(zipAbsPath); // Xóa file ZIP tạm
     } catch (err) {
         console.warn('Không thể xóa file ZIP tạm:', err.message);
     }

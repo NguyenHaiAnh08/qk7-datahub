@@ -188,6 +188,36 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
                   )}
                 </div>
 
+                {/* 🆕 THÊM MỚI: THANH TIẾN ĐỘ & SLIDE */}
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/60 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Monitor className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      Tiến độ bài giảng
+                    </span>
+                    <span className="font-mono text-emerald-700 dark:text-emerald-400 text-sm tabular-nums">
+                      {s.slide_total 
+                        ? `Slide ${s.slide_index || 1} / ${s.slide_total}` 
+                        : 'Đang khởi động...'}
+                    </span>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      style={{ width: `${Math.round((s.scorm_progress || 0) * 100)}%` }}
+                      className={`h-full transition-all duration-500 ${
+                        (s.scorm_progress || 0) >= 0.9 ? 'bg-emerald-500' : 'bg-amber-400'
+                      }`}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>Đã hoàn thành: {Math.round((s.scorm_progress || 0) * 100)}%</span>
+                    {s.is_hanging && <span className="text-rose-500 animate-pulse font-bold">⚠️ CẢNH BÁO QUÁ GIỜ</span>}
+                  </div>
+                </div>
+
                 {/* Nút điều khiển ca dạy */}
                 {(canEndOwn || canForce) && (
                   <div className="mt-auto pt-2 border-t border-slate-100 dark:border-white/[0.04] flex items-center justify-end gap-2">

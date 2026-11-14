@@ -165,6 +165,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .forEach(k => sessionStorage.removeItem(k));
         sessionStorage.removeItem('qk7_screenshot_violation_count');
         sessionStorage.removeItem('qk7_account_locked_screenshot');
+
+        // Dọn dẹp an toàn các phiên bài giảng số trong localStorage khi đăng xuất
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('qk7_active_session'))
+          .forEach(k => localStorage.removeItem(k));
       } catch (e) {}
     }
   }, [navigate]);

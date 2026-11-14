@@ -39,7 +39,11 @@ timeout /t 4 >nul
 
 REM --- 2. AI boxchat ---
 echo [2/3] Khoi dong AI boxchat (:8001)...
-start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && if exist venv\Scripts\activate.bat (call venv\Scripts\activate.bat) && echo [QK7 AI] Luu y: Khong click chuot vao giua man hinh de tranh dong bang (pause) console! && python main.py"
+if exist "%ROOT%boxchat\s.bat" (
+    start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && s.bat"
+) else (
+    start "QK7 AI" cmd /k "cd /d "%ROOT%boxchat" && (if exist venv\Scripts\activate.bat call venv\Scripts\activate.bat) & python main.py"
+)
 
 REM --- 3. OCR Microservice (MonkeyOCRv2 / PaddleOCR) ---
 echo [3/3] Khoi dong OCR Microservice (:8002)...

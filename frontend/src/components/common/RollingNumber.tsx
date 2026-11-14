@@ -75,7 +75,7 @@ export const RollingNumber: React.FC<RollingNumberProps> = ({
     });
 
     return () => cancelAnimationFrame(raf1);
-  }, [refreshKey]);
+  }, [refreshKey, strValue]);
 
   return (
     <span

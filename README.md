@@ -241,7 +241,7 @@ qk7-datahub/
 │   ├── start-ai.bat                            # Khởi động AI Boxchat & Ollama
 │   ├── load-env.bat                            # Nạp biến môi trường từ .env
 │   ├── generate-client-config.bat              # Sinh cấu hình kết nối cho trạm quét vân tay
-│   ├── mergecode.py                            # Tiện ích gộp mã nguồn an toàn (có che giấu bí mật)
+│   ├── mergecode.py                            # Tiện ích gộp mã nguồn an toàn BE & FE v5.0 (tự động loại trừ dependencies, .env, scripts, test, docs và che mờ bí mật)
 │   └── security-scan.ps1                       # Script quét an ninh tổng hợp (Gitleaks, Trivy, CSP)
 │
 ├── data/                                       # 📦 DỮ LIỆU TĨNH (Traineddata Tesseract / OCR)

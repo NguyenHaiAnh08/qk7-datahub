@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Radio, RefreshCw, AlertTriangle, Clock, Users, Building2, User,
-  Square, ShieldAlert, Monitor, Sparkles, BookOpen, Layers, HelpCircle
+  Square, ShieldAlert, Monitor, Sparkles, BookOpen, Layers, HelpCircle, CheckCircle2
 } from 'lucide-react';
 import { lectureService } from '../../services/lectureService';
 import { toast } from '../common/Toast';
@@ -40,7 +40,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 15000);
+    const t = setInterval(load, 5000); // 5s thay vì 15s để đồng bộ tiến độ slide và thời gian tức thời
     return () => clearInterval(t);
   }, []);
 
@@ -132,7 +132,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
                     </div>
                     <div className="min-w-0">
                       <div className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
-                        {s.venue_name}
+                        {s.venue_name.toLowerCase().startsWith('giảng đường') ? s.venue_name : `Giảng đường: ${s.venue_name}`}
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
                         Lớp: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{s.class_name || 'Học viên'}</strong>
@@ -163,60 +163,167 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
                   </p>
                 </div>
 
-                {/* Thông tin giảng dạy chi tiết */}
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-400 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.04]">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className={`truncate ${isOwner ? 'font-bold text-emerald-700 dark:text-emerald-400' : ''}`}>
-                      {s.presenter_rank ? `${s.presenter_rank} ` : ''}{s.presenter_name}
-                      {isOwner && ' (Đồng chí)'}
-                    </span>
+                {/* 3 Ô thông tin chi tiết độc lập */}
+                <div className="space-y-2 text-xs">
+                  {/* Ô 1: Giảng viên & Chức danh / Chức vụ */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.06] flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-300/40">
+                      <User className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none uppercase tracking-wider">
+                        Cán bộ giảng dạy
+                      </span>
+                      <span className={`font-bold text-slate-900 dark:text-white truncate block mt-0.5 text-xs ${isOwner ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>
+                        {s.presenter_rank ? `${s.presenter_rank} ` : ''}{s.presenter_name}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="font-semibold">{s.student_count} học viên</span>
+
+                  {/* 2 Ô hàng dưới: Sĩ số học viên & Thời lượng ca giảng */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Ô 2: Sĩ số học viên */}
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.06] flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-300/40">
+                        <Users className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none uppercase tracking-wider">
+                          Sĩ số
+                        </span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200 truncate block mt-0.5 text-xs">
+                          {s.student_count} học viên
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Ô 3: Thời lượng chuẩn đồng bộ với phòng chiếu */}
+                    {(() => {
+                      const elapsedMinutes = s.start_time
+                        ? Math.max(0, Math.floor((Date.now() - new Date(s.start_time).getTime()) / 60000))
+                        : (s.duration_minutes || 0);
+
+                      return (
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.06] flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-300/40">
+                            <Clock className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none uppercase tracking-wider">
+                              Thời lượng
+                            </span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200 font-mono truncate block mt-0.5 text-xs">
+                              {elapsedMinutes} phút
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="font-mono">{s.duration_minutes || 0} phút</span>
-                  </div>
+
+                  {/* Quiz kích hoạt (nếu có) */}
                   {typeof s.quiz_activated_count === 'number' && s.quiz_activated_count > 0 && (
-                    <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-semibold">
-                      <HelpCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{s.quiz_activated_count} Quiz kích hoạt</span>
+                    <div className="px-2.5 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-300/40 dark:border-amber-700/40 flex items-center gap-2 text-amber-800 dark:text-amber-300 font-semibold text-xs">
+                      <HelpCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>{s.quiz_activated_count} Quiz đã kích hoạt cho học viên</span>
                     </div>
                   )}
                 </div>
 
-                {/* 🆕 THÊM MỚI: THANH TIẾN ĐỘ & SLIDE */}
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/60 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      <Monitor className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      Tiến độ bài giảng
-                    </span>
-                    <span className="font-mono text-emerald-700 dark:text-emerald-400 text-sm tabular-nums">
-                      {s.slide_total 
-                        ? `Slide ${s.slide_index || 1} / ${s.slide_total}` 
-                        : 'Đang khởi động...'}
-                    </span>
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div 
-                      style={{ width: `${Math.round((s.scorm_progress || 0) * 100)}%` }}
-                      className={`h-full transition-all duration-500 ${
-                        (s.scorm_progress || 0) >= 0.9 ? 'bg-emerald-500' : 'bg-amber-400'
-                      }`}
-                    />
-                  </div>
-                  
-                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                    <span>Đã hoàn thành: {Math.round((s.scorm_progress || 0) * 100)}%</span>
-                    {s.is_hanging && <span className="text-rose-500 animate-pulse font-bold">⚠️ CẢNH BÁO QUÁ GIỜ</span>}
-                  </div>
-                </div>
+                {/* 🆕 TIẾN ĐỘ CA DẠY — UX/UI ĐẲNG CẤP, RÕ RÀNG % VÀ ĐOẠN ĐANG DẠY */}
+                {(() => {
+                  const slidePercent = s.slide_total && s.slide_total > 0
+                    ? Math.round(((s.slide_index || 0) / s.slide_total) * 100)
+                    : 0;
+                  const rawPercent = s.scorm_progress !== undefined && s.scorm_progress !== null
+                    ? Math.round(s.scorm_progress * 100)
+                    : slidePercent;
+                  const percent = Math.min(100, Math.max(0, rawPercent));
+                  const isDone = percent >= 100;
+                  const isRunning = percent > 0 && percent < 100;
+                  const elapsedMinutes = s.start_time
+                    ? Math.max(0, Math.floor((Date.now() - new Date(s.start_time).getTime()) / 60000))
+                    : (s.duration_minutes || 0);
+
+                  return (
+                    <div className="p-3.5 rounded-xl bg-slate-50/90 dark:bg-slate-900/80 border border-slate-200/90 dark:border-slate-800 space-y-2.5 shadow-2xs">
+                      {/* Tiêu đề tiến độ + Vị trí / Đoạn bài giảng đang dạy */}
+                      <div className="flex items-center justify-between text-xs font-semibold gap-2">
+                        <span className="text-slate-800 dark:text-slate-200 flex items-center gap-1.5 font-bold">
+                          <Monitor className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          Tiến độ bài giảng
+                        </span>
+
+                        {/* Đoạn bài giảng / Slide đang dạy */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {s.slide_total ? (
+                            <span className="font-mono text-emerald-800 dark:text-emerald-300 text-[11px] font-bold tabular-nums bg-emerald-100/80 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-300/60 dark:border-emerald-600/40 shadow-2xs">
+                              Đang dạy: Slide {s.slide_index || Math.max(1, Math.ceil((percent / 100) * s.slide_total))}/{s.slide_total}
+                            </span>
+                          ) : isDone ? (
+                            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                              Trọn bài
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                              {s.current_page ? `Trang ${s.current_page}` : 'Khởi động ca'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Thanh Track Tiến độ gradient sống động có glow */}
+                      <div className="w-full h-3 bg-slate-200/90 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 relative border border-slate-300/60 dark:border-slate-700/60 shadow-inner">
+                        <div
+                          style={{ width: `${Math.max(percent, isRunning ? 2 : 0)}%` }}
+                          className={`h-full rounded-full transition-all duration-700 ease-out relative ${
+                            isDone
+                              ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-400 shadow-xs'
+                              : isRunning
+                              ? 'bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 shadow-xs'
+                              : 'bg-slate-300 dark:bg-slate-700'
+                          }`}
+                        />
+                      </div>
+
+                      {/* Dòng trạng thái theo đề xuất Chỉ huy: Tiến độ ca dạy: 54% | 100% Hoàn thành */}
+                      <div className="flex items-center justify-between text-xs">
+                        {isDone ? (
+                          <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                            <span>Tiến độ ca dạy: <strong className="font-extrabold font-mono text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm">100% Hoàn thành</strong></span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
+                            <span className="text-slate-600 dark:text-slate-400 font-medium">Tiến độ ca dạy:</span>
+                            <strong className="font-extrabold font-mono text-sky-600 dark:text-sky-400 text-xs sm:text-sm">
+                              {percent}%
+                            </strong>
+                            {isRunning && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse ml-0.5" />
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          {s.is_hanging ? (
+                            <span className="text-rose-600 dark:text-rose-400 animate-pulse font-extrabold flex items-center gap-1 text-[10px]">
+                              ⚠️ CẢNH BÁO QUÁ GIỜ
+                            </span>
+                          ) : isDone ? (
+                            <span className="text-emerald-700 dark:text-emerald-400 font-bold text-[11px] bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700/50">
+                              ✓ Sẵn sàng kết thúc ca
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                              Đã dạy {elapsedMinutes} phút
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Nút điều khiển ca dạy */}
                 {(canEndOwn || canForce) && (

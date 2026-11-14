@@ -208,6 +208,65 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         const originalUrl = req.url;
         req.url = '/' + subPath;
 
+        // Nếu tệp tĩnh là HTML (ví dụ demo.html khi iframe tự chuyển), inject <base> để không lạc đường dẫn
+        if (/\.(html|htm)$/i.test(subPath)) {
+          const targetHtmlPath = path.resolve(pkg.packageRoot, subPath);
+          if (targetHtmlPath.startsWith(pkg.packageRoot + path.sep) && fs.existsSync(targetHtmlPath)) {
+            let htmlContent = fs.readFileSync(targetHtmlPath, 'utf8');
+            const baseHref = `/api/lectures/${lectureId}/${contentTypes[0].toLowerCase()}/assets/`;
+            if (!/<base\b/i.test(htmlContent)) {
+              if (/<head(\s[^>]*)?>/i.test(htmlContent)) {
+                htmlContent = htmlContent.replace(/<head(\s[^>]*)?>/i, (m) => `${m}\n    <base href="${baseHref}" />`);
+              } else if (/<html(\s[^>]*)?>/i.test(htmlContent)) {
+                htmlContent = htmlContent.replace(/<html(\s[^>]*)?>/i, (m) => `${m}\n  <head><base href="${baseHref}" /></head>`);
+              } else {
+                htmlContent = `<base href="${baseHref}" />\n` + htmlContent;
+              }
+            }
+            if (htmlContent.includes('openPrez')) {
+              const overrideScript = `
+    <script>
+      (function() {
+        window.openPrez = function(url) {
+          if (!url) return false;
+          try {
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({ type: 'AP_CHANGE_MODE', file: url }, '*');
+              return false;
+            }
+          } catch (_) {}
+          window.location.href = url;
+          return false;
+        };
+      })();
+    </script>
+`;
+              if (htmlContent.includes('</body>')) {
+                htmlContent = htmlContent.replace('</body>', `${overrideScript}</body>`);
+              } else {
+                htmlContent = htmlContent + overrideScript;
+              }
+            }
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+            res.setHeader('Content-Security-Policy', [
+              "default-src 'self' blob: data:",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:",
+              "style-src 'self' 'unsafe-inline' blob: data:",
+              "img-src 'self' blob: data:",
+              "media-src 'self' blob: data:",
+              "font-src 'self' blob: data:",
+              "connect-src 'self' blob: data: ws: wss:",
+              "frame-ancestors 'self'",
+              "object-src 'none'",
+              "base-uri 'self'"
+            ].join('; '));
+            return res.send(htmlContent);
+          }
+        }
+
         express.static(pkg.packageRoot, {
           fallthrough: false,
           setHeaders: (r, filePath) => {
@@ -293,13 +352,19 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         }
 
         // Tối ưu chuyển trang trong iframe cho ActivePresenter menu launcher:
-        // chuyển window.openPrez sang window.location.href để không mở tab popup riêng
+        // Gửi tin nhắn qua postMessage tới cửa sổ cha (LiveSessionRoom) để chuyển đổi chế độ chuẩn
         if (html.includes('openPrez')) {
           const overrideScript = `
     <script>
       (function() {
         window.openPrez = function(url) {
           if (!url) return false;
+          try {
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({ type: 'AP_CHANGE_MODE', file: url }, '*');
+              return false;
+            }
+          } catch (_) {}
           window.location.href = url;
           return false;
         };
@@ -545,8 +610,12 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       const modes = [];
       if (fs.existsSync(pkg.packageRoot)) {
         const rootFiles = fs.readdirSync(pkg.packageRoot);
+        // Thứ tự chuẩn: Menu tổng hợp (Home) -> Minh họa -> Hướng dẫn -> Luyện tập -> Kiểm tra
+        if (rootFiles.includes('index.html')) {
+          modes.push({ id: 'index', title: 'Menu tổng hợp', file: 'index.html' });
+        }
         if (rootFiles.includes('demo.html')) {
-          modes.push({ id: 'demo', title: 'Minh họa (Demo)', file: 'demo.html' });
+          modes.push({ id: 'demo', title: 'Minh họa', file: 'demo.html' });
         }
         if (rootFiles.includes('tutorial.html')) {
           modes.push({ id: 'tutorial', title: 'Hướng dẫn', file: 'tutorial.html' });
@@ -556,9 +625,6 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         }
         if (rootFiles.includes('test.html')) {
           modes.push({ id: 'test', title: 'Kiểm tra', file: 'test.html' });
-        }
-        if (rootFiles.includes('index.html') && modes.length > 0) {
-          modes.push({ id: 'index', title: 'Menu tổng hợp', file: 'index.html' });
         }
       }
 

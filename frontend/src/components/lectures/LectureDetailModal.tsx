@@ -14,7 +14,7 @@ const STATUS_CONFIG: Record<LectureStatus, { label: string; color: string; bg: s
   PENDING_TRAINING: { label: 'Chờ BGH duyệt', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
   PUBLISHED: { label: 'Đã xuất bản', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
   REJECTED: { label: 'Bị từ chối', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' },
-  ARCHIVED: { label: 'Đã lưu trữ', color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
+  ARCHIVED: { label: 'Đã lưu trữ', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-500/15', border: 'border-amber-300 dark:border-amber-500/30' },
   DELETED: { label: 'Đã xóa (Thùng rác)', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' },
 };
 
@@ -159,7 +159,7 @@ export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose }) 
           {/* Telemetry Matrix Grid */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-white/[0.06]">
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Môn học trực thuộc</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Môn học</span>
               <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span className="truncate">{lecture.subject_name || 'Chưa gán môn'}</span>

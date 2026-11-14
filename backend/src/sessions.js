@@ -59,8 +59,8 @@ module.exports = function createSessionModule({
       const r = await pool.request()
         .input('tok', sql.Char(64), tokenHash)
         .query(`
-          SELECT session_id, user_id, ip, expires_at, revoked, revoked_reason
-          FROM USER_SESSION WHERE token = @tok
+          SELECT session_id, user_id, ip, expires_at, revoked, revoked_reason, last_seen_at
+          FROM USER_SESSION WITH (NOLOCK) WHERE token = @tok
         `);
 
       if (r.recordset.length === 0) {
@@ -86,11 +86,14 @@ module.exports = function createSessionModule({
         }).catch(() => {});
       }
 
-      // Update last_seen (async)
-      pool.request()
-        .input('tok', sql.Char(64), tokenHash)
-        .query(`UPDATE USER_SESSION SET last_seen_at = GETDATE() WHERE token = @tok`)
-        .catch(() => {});
+      // Update last_seen (async) — chỉ ghi xuống DB nếu lần ghi trước đã quá 2 phút để giảm áp lực I/O
+      const shouldUpdateLastSeen = !s.last_seen_at || (Date.now() - new Date(s.last_seen_at).getTime() > 120_000);
+      if (shouldUpdateLastSeen) {
+        pool.request()
+          .input('tok', sql.Char(64), tokenHash)
+          .query(`UPDATE USER_SESSION SET last_seen_at = GETDATE() WHERE token = @tok`)
+          .catch(() => {});
+      }
 
       cache.set(tokenHash, {
         valid: true, user_id: s.user_id, ip: s.ip, cachedAt: Date.now(),
@@ -169,8 +172,8 @@ module.exports = function createSessionModule({
       SELECT s.session_id, s.user_id, u.full_name, u.[rank], u.[position],
              s.ip, s.user_agent, s.created_at, s.last_seen_at, s.expires_at,
              DATEDIFF(MINUTE, s.last_seen_at, GETDATE()) AS minutes_idle
-      FROM USER_SESSION s
-      JOIN [USER] u ON u.user_id = s.user_id
+      FROM USER_SESSION s WITH (NOLOCK)
+      JOIN [USER] u WITH (NOLOCK) ON u.user_id = s.user_id
       WHERE s.revoked = 0 
         AND s.expires_at > GETDATE()
         AND s.last_seen_at > DATEADD(MINUTE, -@idleTimeout, GETDATE())

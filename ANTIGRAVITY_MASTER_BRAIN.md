@@ -11,6 +11,7 @@
 - **KỶ LUẬT THƯ MỤC:** Chỉ được tạo file/thư mục theo đúng cấu trúc quy định tại Mục 3 dưới đây. Nghiêm cấm tạo file rác, file nháp, file dump ở thư mục gốc.
 - **DI CHUYỂN AN TOÀN:** Mọi thao tác di chuyển file phải dùng lệnh `git mv` để bảo toàn lịch sử mã nguồn (Git history). Tuyệt đối không copy/paste làm đứt gãy tracking.
 - **NGHIÊM CẤM TỰ ĐỘNG COMMIT VÀ PUSH (STRICT NO AUTO-COMMIT & NO AUTO-PUSH):** Tuyệt đối **KHÔNG** tự động thực thi `git commit` và **KHÔNG** tự ý thực thi `git push`. Khi hoàn thành bất kỳ tác vụ nào, mã nguồn chỉ được lưu giữ ở working tree để USER trực tiếp kiểm tra, đánh giá. Quy trình Commit và Push chỉ được kích hoạt (`git commit` và `git push origin <nhánh>`) khi nhận được câu lệnh cụ thể từ USER (ví dụ: *"đẩy lên nhánh haianh-dev github"*, *"triển khai đẩy lên nhánh main"*, *"commit và push lên nhánh..."*).
+- **TỰ ĐỘNG CẬP NHẬT TÀI LIỆU MARKDOWN TRƯỚC KHI COMMIT & PUSH:** Trước khi thực hiện commit và push lên bất kỳ nhánh nào theo lệnh của USER, Agent **BẮT BUỘC TỰ ĐỘNG RÀ SOÁT VÀ CẬP NHẬT TOÀN BỘ CÁC TÀI LIỆU MARKDOWN LIÊN QUAN** (`README.md`, `SYSTEM_ARCHITECTURE.md`, `docs/CHANGELOG.md`, `docs/guides/*`...) nếu dự án có bất kỳ thay đổi nào về mã nguồn, kịch bản, cấu hình hoặc tính năng mới. Tuyệt đối không để mã nguồn và tài liệu bị lệch pha.
 
 ---
 
@@ -122,5 +123,12 @@ Khi xây dựng giao diện hoặc tích hợp API, BẮT BUỘC tuân thủ:
    - AI Agent tuyệt đối **KHÔNG tự động commit** (`git commit`) và **KHÔNG tự động push** (`git push`).
    - Mọi kết quả code/sửa file sau khi hoàn thành chỉ lưu lại ở working tree để USER rà soát.
    - **Quy trình Commit & Push:** Chỉ kích hoạt `git commit` và `git push origin <nhánh>` khi nhận được câu lệnh cụ thể từ USER (ví dụ: *"đẩy lên nhánh haianh-dev github"*, *"triển khai đẩy lên nhánh haianh-dev"*...).
-   - Khi có lệnh commit/push: Bắt buộc kiểm chuẩn chất lượng (build sạch) và an ninh (`gitleaks protect --staged`) trước khi tạo commit và push lên nhánh được chỉ định.
+
+6. **TỰ ĐỘNG CẬP NHẬT TOÀN BỘ MARKDOWN TRƯỚC KHI COMMIT VÀ PUSH:**
+   - Ngay khi nhận được lệnh commit & push từ USER, trước khi thực hiện `git add`/`git commit`, Agent **BẮT BUỘC tự động rà soát và cập nhật toàn bộ các tài liệu Markdown** nếu dự án có bất kỳ thay đổi nào:
+     - `README.md` & `docs/architecture/SYSTEM_ARCHITECTURE.md`: Cập nhật khi có thay đổi kiến trúc, tính năng mới, cấu trúc cây thư mục, kịch bản lệnh hoặc mở rộng dịch vụ.
+     - `docs/CHANGELOG.md`: Ghi chép chi tiết toàn bộ các thay đổi mã nguồn, tính năng, cấu hình và bản vá kỹ thuật vừa thực hiện.
+     - `docs/guides/TROUBLESHOOTING_HISTORY.md`: Cập nhật khi có sự cố kỹ thuật vừa được phân tích và khắc phục thành công.
+     - `docs/guides/SETUP_SERVER.md`: Cập nhật khi có thay đổi về biến môi trường, cổng dịch vụ, thư viện hoặc quy trình khởi chạy.
+   - Sau khi cập nhật Markdown đầy đủ, Agent kiểm chuẩn chất lượng (build sạch) và an ninh (`gitleaks protect --staged`) rồi mới tạo commit và push lên nhánh được chỉ định.
 

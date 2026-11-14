@@ -128,22 +128,22 @@ export const LecturePackageDropzone: React.FC<LecturePackageDropzoneProps> = ({
     if (contentType === 'PDF') {
       return {
         label: 'PDF',
-        icon: <FileText className="w-3.5 h-3.5 text-rose-500" />,
+        icon: <FileText className="w-5 h-5 text-rose-600 dark:text-rose-400" />,
         badge: 'bg-rose-500/15 border-rose-500/30 text-rose-700 dark:text-rose-400',
         hint: 'Giáo án điện tử, tài liệu bài giảng số hóa định dạng PDF (tối đa 100MB)',
       };
     }
     if (contentType === 'SCORM') {
       return {
-        label: 'SCORM.ZIP',
-        icon: <Layers className="w-3.5 h-3.5 text-amber-500" />,
+        label: 'SCORM',
+        icon: <Layers className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
         badge: 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-400',
         hint: 'Tương thích gói SCORM 1.2 / 2004 (ActivePresenter / Storyline)',
       };
     }
     return {
-      label: 'HTML5.ZIP',
-      icon: <Sparkles className="w-3.5 h-3.5 text-emerald-500" />,
+      label: 'HTML5',
+      icon: <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />,
       badge: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-400',
       hint: 'Chứa tệp index.html và các tài nguyên đa phương tiện',
     };
@@ -223,11 +223,11 @@ export const LecturePackageDropzone: React.FC<LecturePackageDropzoneProps> = ({
           <div className="u032-item">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center space-x-3 min-w-0">
-                {/* Format Badge */}
+                {/* Format Icon Box */}
                 <div
-                  className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold text-[10px] sm:text-[11px] tracking-wide shrink-0 shadow-xs ${fmt.badge}`}
+                  className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs ${fmt.badge}`}
                 >
-                  {fmt.label}
+                  {fmt.icon}
                 </div>
 
                 <div className="min-w-0 flex-1">

@@ -161,12 +161,21 @@ module.exports = function createLectureRoutes({
                s.name AS subject_name,
                u.full_name AS author_name, u.[rank] AS author_rank,
                un.name AS faculty_name,
-               sl.name AS security_name
+               sl.name AS security_name,
+               sch.class_name,
+               sch.venue_name
         FROM DIGITAL_LECTURE l
         JOIN SUBJECT s ON s.subject_id = l.subject_id
         JOIN [USER] u ON u.user_id = l.author_id
         JOIN UNIT un ON un.unit_id = l.faculty_unit_id
         JOIN SECURITY_LEVEL sl ON sl.level_id = l.security_level_id
+        OUTER APPLY (
+          SELECT TOP 1 ts.venue_name, tc.class_name
+          FROM TEACHING_SCHEDULE ts
+          LEFT JOIN TRAINING_CLASS tc ON tc.class_id = ts.class_id
+          WHERE ts.lecture_id = l.lecture_id
+          ORDER BY CASE WHEN ts.status = 'ONGOING' THEN 0 ELSE 1 END, ts.start_time DESC
+        ) sch
         WHERE l.security_level_id <= @clearance
       `;
       r.input('clearance', sql.Int, clearance);
@@ -215,12 +224,20 @@ module.exports = function createLectureRoutes({
         .query(`
           SELECT l.*, s.name AS subject_name,
                  u.full_name AS author_name, u.[rank] AS author_rank, u.[position] AS author_position,
-                 un.name AS faculty_name, sl.name AS security_name
+                 un.name AS faculty_name, sl.name AS security_name,
+                 sch.class_name, sch.venue_name
           FROM DIGITAL_LECTURE l
           JOIN SUBJECT s ON s.subject_id = l.subject_id
           JOIN [USER] u ON u.user_id = l.author_id
           JOIN UNIT un ON un.unit_id = l.faculty_unit_id
           JOIN SECURITY_LEVEL sl ON sl.level_id = l.security_level_id
+          OUTER APPLY (
+            SELECT TOP 1 ts.venue_name, tc.class_name
+            FROM TEACHING_SCHEDULE ts
+            LEFT JOIN TRAINING_CLASS tc ON tc.class_id = ts.class_id
+            WHERE ts.lecture_id = l.lecture_id
+            ORDER BY CASE WHEN ts.status = 'ONGOING' THEN 0 ELSE 1 END, ts.start_time DESC
+          ) sch
           WHERE l.lecture_id = @id
         `);
       if (r.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
@@ -617,11 +634,39 @@ module.exports = function createLectureRoutes({
       // Kiểm tra bài giảng
       const lecCheck = await pool.request()
         .input('lid', sql.VarChar(50), lecture_id)
-        .query(`SELECT status, title FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
+        .query(`SELECT status, title, security_level_id, document_id
+                FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
       if (lecCheck.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lecture = lecCheck.recordset[0];
       if (lecture.status !== 'PUBLISHED') {
         return res.status(400).json({ error: 'Chỉ có thể mở ca với bài giảng đã PUBLISHED' });
+      }
+
+      // 🛡️ CHỐT CHẶN BẢO MẬT: Bài giảng Cấp 3+ bắt buộc phải có token vân tay hợp lệ
+      // Ngăn chặn việc dùng Postman gọi thẳng API mà bỏ qua bước quét vân tay ở FE
+      if (lecture.security_level_id >= 3) {
+        const fpToken = req.headers['x-fingerprint-token'];
+        if (!fpToken) {
+          return res.status(403).json({
+            error: 'Bài giảng cấp 3+ yêu cầu xác thực sinh trắc học (vân tay) trước khi mở ca dạy.',
+            require_fingerprint: true,
+          });
+        }
+        try {
+          const jwt = require('jsonwebtoken');
+          const JWT_SECRET = process.env.JWT_SECRET || 'QK7-DEV-SECRET-CHANGE-IN-PROD-XXX';
+          const decoded = jwt.verify(fpToken, JWT_SECRET);
+          if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
+
+          // Xác thực chéo: token phải khớp đúng bài giảng VÀ đúng user đang đăng nhập
+          if (decoded.file_id !== lecture.lecture_id) throw new Error('Token không khớp bài giảng');
+          if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
+        } catch (err) {
+          return res.status(403).json({
+            error: 'Phiên xác thực vân tay không hợp lệ hoặc đã hết hạn. Vui lòng quét lại.',
+            require_fingerprint: true,
+          });
+        }
       }
 
       // Kiểm tra giảng đường trống
@@ -694,21 +739,25 @@ module.exports = function createLectureRoutes({
 
   
 
-  // Cập nhật tiến độ
+  // Cập nhật tiến độ bài giảng trực tiếp (slide_index, slide_total, scorm_progress)
   router.put('/schedules/:id/progress', requireAuth, requirePermission('SCHEDULE_START'), async (req, res) => {
     try {
-      const page = parseInt(req.body?.current_page, 10);
-      if (!Number.isFinite(page) || page < 1) {
-        return res.status(400).json({ error: 'current_page không hợp lệ' });
-      }
-      const pool = await getPool();
-      const hasCurrentPage = await hasColumn(pool, 'TEACHING_SCHEDULE', 'current_page');
-      if (!hasCurrentPage) {
-        return res.status(501).json({
-          error: 'Chưa chạy migration v2: cột TEACHING_SCHEDULE.current_page chưa tồn tại',
-        });
+      const rawIndex = req.body?.slide_index ?? req.body?.current_page;
+      const slideIndex = parseInt(rawIndex, 10);
+      const slideTotal = req.body?.slide_total ? parseInt(req.body.slide_total, 10) : null;
+      let scormProgress = req.body?.scorm_progress !== undefined && req.body?.scorm_progress !== null
+        ? parseFloat(req.body.scorm_progress)
+        : null;
+
+      if (scormProgress === null && Number.isFinite(slideIndex) && slideTotal && slideTotal > 0) {
+        scormProgress = Math.min(1, +(slideIndex / slideTotal).toFixed(4));
       }
 
+      if (!Number.isFinite(slideIndex) || slideIndex < 1) {
+        return res.status(400).json({ error: 'slide_index hoặc current_page không hợp lệ' });
+      }
+
+      const pool = await getPool();
       const check = await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
         .query(`SELECT presenter_id, status FROM TEACHING_SCHEDULE WHERE schedule_id = @id`);
@@ -719,12 +768,38 @@ module.exports = function createLectureRoutes({
         return res.status(403).json({ error: 'Chỉ người mở ca mới cập nhật được tiến độ' });
       }
 
-      await pool.request()
-        .input('id', sql.VarChar(50), req.params.id)
-        .input('pg', sql.Int, page)
-        .query(`UPDATE TEACHING_SCHEDULE SET current_page = @pg WHERE schedule_id = @id`);
-      res.json({ success: true, current_page: page });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+      const hasSlideIndex = await hasColumn(pool, 'TEACHING_SCHEDULE', 'slide_index');
+      const hasCurrentPage = await hasColumn(pool, 'TEACHING_SCHEDULE', 'current_page');
+
+      const updates = [];
+      const r = pool.request().input('id', sql.VarChar(50), req.params.id);
+
+      if (hasSlideIndex) {
+        updates.push('slide_index = @si', 'slide_total = @st', 'scorm_progress = @sp');
+        r.input('si', sql.Int, slideIndex);
+        r.input('st', sql.Int, slideTotal);
+        r.input('sp', sql.Float, scormProgress);
+      }
+      if (hasCurrentPage) {
+        updates.push('current_page = @pg');
+        r.input('pg', sql.Int, slideIndex);
+      }
+
+      if (updates.length > 0) {
+        await r.query(`UPDATE TEACHING_SCHEDULE SET ${updates.join(', ')} WHERE schedule_id = @id`);
+      }
+
+      res.json({
+        success: true,
+        slide_index: slideIndex,
+        slide_total: slideTotal,
+        scorm_progress: scormProgress,
+        current_page: slideIndex,
+      });
+    } catch (err) {
+      console.error('[PUT /schedules/:id/progress]', err);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Kết thúc ca — LÕI XỬ LÝ CHUNG
@@ -824,6 +899,9 @@ module.exports = function createLectureRoutes({
 
       const hasSessionType = await hasColumn(pool, 'TEACHING_SCHEDULE', 'session_type');
       const hasCurrentPage = await hasColumn(pool, 'TEACHING_SCHEDULE', 'current_page');
+      const hasSlideIndex = await hasColumn(pool, 'TEACHING_SCHEDULE', 'slide_index');
+      const hasSlideTotal = await hasColumn(pool, 'TEACHING_SCHEDULE', 'slide_total');
+      const hasScormProgress = await hasColumn(pool, 'TEACHING_SCHEDULE', 'scorm_progress');
       const hasNote = await hasColumn(pool, 'TEACHING_SCHEDULE', 'note');
 
       const r = pool.request();
@@ -831,13 +909,16 @@ module.exports = function createLectureRoutes({
         SELECT s.schedule_id, s.lecture_id, s.presenter_id, s.class_id,
                s.venue_name, s.student_count, s.start_time, s.status,
                ${hasSessionType ? 's.session_type' : "'TEACHER_LED' AS session_type"},
-               ${hasCurrentPage ? 's.current_page' : '1 AS current_page'},
+               ${hasSlideIndex ? 's.slide_index' : 'NULL AS slide_index'},
+               ${hasSlideTotal ? 's.slide_total' : 'NULL AS slide_total'},
+               ${hasScormProgress ? 's.scorm_progress' : 'NULL AS scorm_progress'},
+               ${hasCurrentPage ? 's.current_page' : 'COALESCE(s.slide_index, 1) AS current_page'},
                ${hasNote ? 's.note' : 'NULL AS note'},
                l.title AS lecture_title, l.content_type,
                sub.name AS subject_name,
                u.full_name AS presenter_name, u.[rank] AS presenter_rank, u.[position] AS presenter_position,
                c.class_name, un.name AS unit_name, un.unit_id AS unit_id,
-               DATEDIFF(MINUTE, s.start_time, GETDATE()) AS duration_minutes,
+               FLOOR(DATEDIFF(SECOND, s.start_time, GETDATE()) / 60.0) AS duration_minutes,
                CASE WHEN DATEDIFF(MINUTE, s.start_time, GETDATE()) > ${HANGING_THRESHOLD_MINUTES}
                     THEN 1 ELSE 0 END AS is_hanging
         FROM TEACHING_SCHEDULE s
@@ -899,7 +980,7 @@ module.exports = function createLectureRoutes({
                l.title AS lecture_title, sub.name AS subject_name,
                u.full_name AS presenter_name, u.[rank] AS presenter_rank,
                c.class_name, un.name AS unit_name,
-               DATEDIFF(MINUTE, s.start_time, s.end_time) AS duration_minutes
+               FLOOR(DATEDIFF(SECOND, s.start_time, s.end_time) / 60.0) AS duration_minutes
         FROM TEACHING_SCHEDULE s
         JOIN DIGITAL_LECTURE l ON l.lecture_id = s.lecture_id
         JOIN SUBJECT sub ON sub.subject_id = l.subject_id

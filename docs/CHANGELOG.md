@@ -4,6 +4,63 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.2-lecture-session-and-db-optimization] — 2026-11-14
+
+### 1. Tối Ưu Hóa Kết Nối Cơ Sở Dữ Liệu & Quản Lý Phiên (Database & Session Optimization)
+- **Tối ưu hóa kết nối SQL Server ([`backend/src/db.js`](../backend/src/db.js)):**
+  - Mở rộng cấu hình connection pool (`max: 25`, `min: 2`), tăng `cancelTimeout` lên 15.000ms nhằm chống ngắt kết nối socket đột ngột khi SQL Server xử lý các tác vụ nặng.
+- **Giảm tải I/O ghi nhận phiên đăng nhập ([`backend/src/sessions.js`](../backend/src/sessions.js)):**
+  - Bổ sung chỉ thị `WITH (NOLOCK)` cho các truy vấn kiểm tra phiên `USER_SESSION` nhằm loại bỏ hiện tượng khóa bảng (table locking).
+  - Điều tiết tần suất cập nhật thời gian hoạt động cuối (`last_seen_at`), chỉ ghi xuống CSDL khi khoảng cách vượt quá 2 phút (120s), giảm thiểu đáng kể số lượng lệnh `UPDATE` liên tục.
+
+### 2. Nâng Cấp Toàn Diện Phân Hệ Bài Giảng Số & Phòng Học Trực Tiếp (Digital Lectures & Live Sessions)
+- **Cải tiến Máy chủ Backend:**
+  - [`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js): Mở rộng truy vấn liên kết thông tin lớp học (`class_name`) và địa điểm phòng học (`venue_name`), chuẩn hóa luồng cập nhật tiến độ bài giảng trực tiếp (`slide_index`, `slide_total`, `scorm_progress`).
+  - [`backend/src/scorm-package-routes.js`](../backend/src/scorm-package-routes.js): Tích hợp cơ chế giao tiếp `postMessage` (`AP_CHANGE_MODE`) giữa iframe học liệu ActivePresenter và cửa sổ cha (`LiveSessionRoom`), tối ưu Content Security Policy cho phép nạp tài nguyên an toàn.
+- **Nâng cấp Giao diện Frontend (`frontend/src/components/lectures/`):**
+  - [`LiveSessionRoom.tsx`](../frontend/src/components/lectures/LiveSessionRoom.tsx): Nâng cấp trình chiếu toàn màn hình, chuyển đổi mượt mà các chế độ học liệu, theo dõi thời lượng và điểm danh.
+  - [`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx) & [`TeachingHistoryPanel.tsx`](../frontend/src/components/lectures/TeachingHistoryPanel.tsx): Cải tiến bảng giám sát chỉ huy và thống kê lịch sử giảng dạy.
+  - [`LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx), [`StartSessionModal.tsx`](../frontend/src/components/lectures/StartSessionModal.tsx), [`LecturesPage.tsx`](../frontend/src/pages/LecturesPage.tsx): Tinh chỉnh luồng bắt đầu phiên giảng dạy và quản trị trạng thái bài giảng.
+
+### 3. Cấu Hình Kỷ Luật Mã Nguồn & Giữ Sạch Source Control ([`.gitignore`](../.gitignore))
+- Cấu hình tự động loại trừ các kho kỹ năng AI và tệp log công ty ảo cục bộ (`.agents/skills/*`, `.agents/company-*.md`), giữ lại 7 kỹ năng UI/UX cốt lõi, bảo đảm kho mã nguồn luôn gọn gàng và không kích hoạt cảnh báo Gitleaks.
+
+---
+
+## [v1.6.1-mergecode-v5-and-doc-sync-rule] — 2026-11-13
+
+### 1. Nâng Cấp Công Cụ Gộp Mã Nguồn Chuẩn Hóa (`scripts/mergecode.py` v5.0.0)
+- **Chế độ mặc định tinh gọn (Pure BE & FE Source Code):**
+  - Chỉ quét và gộp mã nguồn cốt lõi của Backend (`backend/`) và Frontend (`frontend/`).
+  - **Tự động loại trừ triệt để:**
+    - Thư viện / dependencies: `node_modules/`, `package-lock.json`, `dist/`, `build/`, `public/assets/`, `backend/public/`, `certs/`, `uploads/`...
+    - Tệp môi trường: `.env`, `.env.*`, `*.env`...
+    - Kịch bản & công cụ: `scripts/`, `tools/`, `*.bat`, `*.ps1`, `*.sh`...
+    - Tệp văn bản & tài liệu: `*.txt`, `*.md`, `*.rst`, `*.pdf`...
+    - Tệp kiểm thử: `tests/`, `__tests__/`, `*.test.*`, `*.spec.*`, `test-*.js`...
+- **Bảo mật & Tốc độ tối ưu:**
+  - Tự động phát hiện và che mờ các khóa nhạy cảm (`JWT_SECRET`, mật khẩu, Private Key, token xác thực).
+  - Kết quả kiểm thử thực tế: Thu thập chính xác **191 tệp nguồn** (29 Backend, 162 Frontend), kích thước tổng hợp **2.81 MB** trong thời gian thực thi chỉ **0.30 giây**.
+
+### 2. Ban Hành Quy Định Bắt Buộc: Tự Động Cập Nhật Tài Liệu Markdown Trước Khi Commit & Push
+- **Cập nhật đồng bộ các tài liệu nền tảng:**
+  - [`ANTIGRAVITY_MASTER_BRAIN.md`](../ANTIGRAVITY_MASTER_BRAIN.md) (Mục 1 & Mục 4.6): Thiết lập quy tắc bắt buộc tự động rà soát và cập nhật toàn bộ file Markdown trước khi thực thi commit & push.
+  - [`docs/guides/AGENT_WORKFLOW.md`](./guides/AGENT_WORKFLOW.md) (Bước 2 & Bước 3): Quy chuẩn hóa điều kiện tiên quyết trước khi commit/push, đảm bảo không bỏ sót bất kỳ thay đổi nào của dự án.
+  - [`docs/guides/Senior Multi-Role.md`](./guides/Senior%20Multi-Role.md): Quy định cho toàn bộ các vai trò kỹ sư về việc duy trì tài liệu đồng bộ 100% với trạng thái mã nguồn thực tế.
+- **Quy trình phối hợp:** Mọi thay đổi mã nguồn tiếp tục được giữ nguyên tại working tree (tuân thủ nghiêm ngặt nguyên tắc **Strict No Auto-Commit & No Auto-Push**); khi nhận được lệnh commit và push từ USER, Agent sẽ tự động cập nhật toàn bộ tài liệu Markdown tương ứng trước khi tiến hành commit và push lên nhánh được chỉ định.
+
+### 3. Đồng Bộ Toàn Diện Tính Năng Từ Nhánh `final-test` Sang `haianh-dev`
+- **Quản lý Vòng đời Bài giảng Điện tử (Lecture Lifecycle):**
+  - Bổ sung cơ chế Xóa mềm (`soft delete`), Khôi phục (`restore`) và Xóa vĩnh viễn (`permanent delete`) bài giảng trên cả Backend ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js)) và Frontend ([`frontend/src/services/lectureService.ts`](../frontend/src/services/lectureService.ts), [`frontend/src/components/lectures/LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx), [`frontend/src/pages/LecturesPage.tsx`](../frontend/src/pages/LecturesPage.tsx)).
+- **Tái Cấu Trúc Lưu Trữ Học Liệu ([`backend/src/storage-helper.js`](../backend/src/storage-helper.js)):**
+  - Tối ưu hóa đường dẫn lưu trữ tệp tin tải lên theo cấu trúc thư mục quy chuẩn, tự động tạo và bảo vệ cấu trúc thư mục lưu trữ SCORM / Bài giảng (`uploads/lectures/`, `uploads/scorm/`, `uploads/temp/`).
+- **Tối ưu hóa Phòng học Trực tiếp ([`LiveSessionRoom.tsx`](../frontend/src/components/lectures/LiveSessionRoom.tsx)):**
+  - Nâng cấp trải nghiệm tương tác trong phòng học SCORM/HTML5, giám sát chỉ số học tập thời gian thực ([`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx)).
+- **Khởi chạy Hệ thống An toàn:**
+  - Nâng cấp `s.bat`, [`scripts/s.bat`](../scripts/s.bat), [`scripts/s-dev.bat`](../scripts/s-dev.bat) bổ sung kiểm tra và giải phóng tự động cổng AI Boxchat (:8001) khi khởi động.
+
+---
+
 ## [v1.6.0-digital-lecture-scorm-and-design-orchestrator] — 2026-11-13
 
 ### 1. Phân Hệ Bài Giảng Số & Gói Học Liệu Tương Tác SCORM / HTML5

@@ -1297,18 +1297,38 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
     }
 
     const pool = await getPool();
-    const docRes = await pool.request()
+
+    let security_level_id = 1;
+    let isDeleted = false;
+
+    // 1. Ưu tiên check DIGITAL_LECTURE trước (vì đây là ngữ cảnh bài giảng)
+    const lecRes = await pool.request()
       .input('file_id', sql.VarChar(50), file_id)
-      .query(`SELECT security_level_id, deleted_at FROM DOCUMENT WHERE file_id = @file_id`);
-    if (docRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
-    const doc = docRes.recordset[0];
+      .query(`SELECT security_level_id FROM DIGITAL_LECTURE
+              WHERE lecture_id = @file_id`);     // ⚠️ THIẾU "OR document_id = @file_id"
+
+    if (lecRes.recordset.length > 0) {
+      security_level_id = lecRes.recordset[0].security_level_id;
+    } else {
+      // 2. Nếu không phải bài giảng → check DOCUMENT
+      const docRes = await pool.request()
+        .input('file_id', sql.VarChar(50), file_id)
+        .query(`SELECT security_level_id, deleted_at FROM DOCUMENT WHERE file_id = @file_id`);
+
+      if (docRes.recordset.length > 0) {
+        security_level_id = docRes.recordset[0].security_level_id;
+        isDeleted = Boolean(docRes.recordset[0].deleted_at);
+      } else {
+        return res.status(404).json({ error: 'Không tìm thấy tài liệu hoặc bài giảng' });
+      }
+    }
 
     const isAdminUser = (req.user.roles || []).includes('ROL-01');
-    if (doc.deleted_at && !isAdminUser) {
+    if (isDeleted && !isAdminUser) {
       return res.status(404).json({ error: 'Tài liệu không tồn tại hoặc đã bị xóa' });
     }
 
-    if (doc.security_level_id < 3) {
+    if (security_level_id < 3) {
       return res.json({ success: true, required: false, fingerprint_token: null });
     }
 
@@ -1347,7 +1367,7 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
 
     let scanResult;
     try {
-      scanResult = await requestScan(deviceId, { template_b64: templateB64, file_id });
+      scanResult = await requestScan(deviceId, { template_b64: templateB64, file_id: 'VERIFY' });
     } catch (err) {
       if (err.message === 'AGENT_OFFLINE' || err.message === 'AGENT_DISCONNECTED') {
         return res.status(503).json({ error: 'Máy quét vừa mất kết nối.', agent_offline: true });
@@ -1410,56 +1430,56 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
     }
 
     // ═══════════════════════════════════════════════════════════════
-// [v5.1] Cấp 4-5: kiểm tra PIN trước khi cấp token
-// ═══════════════════════════════════════════════════════════════
-if (doc.security_level_id >= 4) {
-  const pinRes = await pool.request()
-    .input('uid', sql.VarChar(50), req.user.user_id)
-    .query(`SELECT pin_hash FROM [USER] WHERE user_id = @uid`);
-  const pinHash = pinRes.recordset[0]?.pin_hash;
+    // [v5.1] Cấp 4-5: kiểm tra PIN trước khi cấp token
+    // ═══════════════════════════════════════════════════════════════
+    if (security_level_id >= 4) {                                      // ← MỚI
+      const pinRes = await pool.request()
+        .input('uid', sql.VarChar(50), req.user.user_id)
+        .query(`SELECT pin_hash FROM [USER] WHERE user_id = @uid`);
+      const pinHash = pinRes.recordset[0]?.pin_hash;
 
-  // Chưa có PIN → ghi log yêu cầu Admin cấp, từ chối
-  if (!pinHash) {
-    await writeAccessLog({
-      userId: req.user.user_id, fileId: file_id, action: 'PIN_REQUEST',
-      ip: getClientIp(req),
-      note: `Vân tay OK nhưng chưa có PIN — yêu cầu Admin cấp (Cấp ${doc.security_level_id})`,
-    });
-    return res.status(403).json({
-      error: 'Tài khoản chưa được cấp mã PIN. Vui lòng gửi yêu cầu đến Quản trị viên (USR-001) để được cấp PIN trước khi mở tài liệu Cấp 4-5.',
-      code: 'PIN_NOT_SET',
-      needs_admin_pin: true,
-    });
-  }
+      // Chưa có PIN → ghi log yêu cầu Admin cấp, từ chối
+      if (!pinHash) {
+        await writeAccessLog({
+          userId: req.user.user_id, fileId: file_id, action: 'PIN_REQUEST',
+          ip: getClientIp(req),
+          note: `Vân tay OK nhưng chưa có PIN — yêu cầu Admin cấp (Cấp ${security_level_id})`,  // ← MỚI
+        });
+        return res.status(403).json({
+          error: 'Tài khoản chưa được cấp mã PIN. Vui lòng gửi yêu cầu đến Quản trị viên (USR-001) để được cấp PIN trước khi mở tài liệu Cấp 4-5.',
+          code: 'PIN_NOT_SET',
+          needs_admin_pin: true,
+        });
+      }
 
-  // Đã có PIN → cấp challenge token 2 phút
-  const pinChallenge = jwt.sign(
-    {
-      user_id: req.user.user_id,
-      file_id,
-      security_level_id: doc.security_level_id,
-      purpose: 'pin_challenge',
-    },
-    JWT_SECRET,
-    { expiresIn: '2m' }
-  );
+      // Đã có PIN → cấp challenge token 2 phút
+      const pinChallenge = jwt.sign(
+        {
+          user_id: req.user.user_id,
+          file_id,
+          security_level_id: security_level_id,                        // ← MỚI
+          purpose: 'pin_challenge',
+        },
+        JWT_SECRET,
+        { expiresIn: '2m' }
+      );
 
-  await writeAccessLog({
-    userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_OK_PIN_PENDING',
-    ip: getClientIp(req),
-    note: `FP OK (score=${scanResult.score}, device=${deviceId}) — chờ PIN (Cấp ${doc.security_level_id})`,
-  });
+      await writeAccessLog({
+        userId: req.user.user_id, fileId: file_id, action: 'FINGERPRINT_OK_PIN_PENDING',
+        ip: getClientIp(req),
+        note: `FP OK (score=${scanResult.score}, device=${deviceId}) — chờ PIN (Cấp ${security_level_id})`,  // ← MỚI
+      });
 
-  return res.json({
-    success: true,
-    required: true,
-    require_pin: true,
-    pin_challenge_token: pinChallenge,
-    pin_expires_in: '2m',
-    score: scanResult.score,
-    security_level_id: doc.security_level_id,
-  });
-}
+      return res.json({
+        success: true,
+        required: true,
+        require_pin: true,
+        pin_challenge_token: pinChallenge,
+        pin_expires_in: '2m',
+        score: scanResult.score,
+        security_level_id: security_level_id,                          // ← MỚI
+      });
+    }
 
 // ─── Level 3 (hoặc thấp hơn): cấp token ngay như cũ ───
 const fpToken = jwt.sign(

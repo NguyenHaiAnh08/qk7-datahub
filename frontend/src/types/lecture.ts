@@ -30,6 +30,8 @@ export interface Lecture {
   quiz_count?: number;
   status: LectureStatus;
   reject_reason?: string;
+  class_name?: string;
+  venue_name?: string;
   created_at: string;
   updated_at: string;
 }

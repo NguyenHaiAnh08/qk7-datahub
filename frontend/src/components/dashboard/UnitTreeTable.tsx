@@ -1011,10 +1011,10 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                                       {/* Đầu nối nhánh L cho cấp hiện tại */}
                                       {isLastLevel && (
                                         <>
-                                          <div className="absolute -top-3.5 bottom-1/2 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
+                                          <div className="absolute -top-3.5 h-[calc(50%+14px)] left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
                                           <div className="absolute top-1/2 left-3 w-3.5 border-b border-slate-300 dark:border-slate-700/70" />
                                           {!isLastChild && (
-                                            <div className="absolute top-1/2 -bottom-3.5 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
+                                            <div className="absolute top-1/2 h-[calc(50%+14px)] left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
                                           )}
                                         </>
                                       )}

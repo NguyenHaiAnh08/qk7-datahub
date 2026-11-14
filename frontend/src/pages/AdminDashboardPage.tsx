@@ -33,6 +33,13 @@ import {
   Bell,
   AlertCircle,
   Lock,
+  GraduationCap,
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  Database,
 } from 'lucide-react';
 
 import { TrashPage } from './TrashPage';
@@ -40,7 +47,7 @@ import { SessionsPage } from './SessionsPage';
 import { useAuth } from '../hooks/useAuth';
 import { useDeviceMode } from '../contexts/DeviceModeContext';
 import { Header } from '../components/common/Header';
-import { Sidebar } from '../components/common/Sidebar';
+import { Sidebar, ADMIN_NAV_GROUPS } from '../components/common/Sidebar';
 import { Toast, ToastState } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { StatCard } from '../components/dashboard/StatCard';
@@ -64,6 +71,7 @@ import { Tooltip } from 'antd';
 import { dashboardApi } from '../services/dashboardApi';
 import { permissionService } from '../services/permissionService';
 import { usersApi } from '../services/usersApi';
+import { lectureService } from '../services/lectureService';
 import { formatFileSize } from '../utils/formatFileSize';
 import {
   User,
@@ -119,22 +127,8 @@ const getNextPositionId = (positions: MilitaryPosition[]): string => {
   return `P-${String(candidate).padStart(2, '0')}`;
 };
 
-const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any; permission?: string }> = [
-  { id: 'overview',    label: 'Tổng quan',     icon: LayoutDashboard, permission: 'SYSTEM_STATS_VIEW' },
-  { id: 'users',       label: 'Người dùng',    icon: Users,           permission: 'USER_VIEW' },
-  { id: 'roles',       label: 'Vai trò',       icon: KeyRound,        permission: 'ROLE_VIEW' },
-  { id: 'permissions', label: 'Quyền',         icon: ShieldAlert,     permission: 'PERMISSION_VIEW' },
-  { id: 'units',       label: 'Đơn vị',        icon: Building,        permission: 'UNIT_VIEW' },
-  { id: 'doctypes',    label: 'Loại văn bản',  icon: FileText,        permission: 'DOCTYPE_VIEW' },
-  { id: 'levels',      label: 'Mức bảo mật',   icon: Shield,          permission: 'SECLEVEL_VIEW' },
-  { id: 'ranks',       label: 'Cấp bậc',       icon: Award,           permission: 'RANK_VIEW' },
-  { id: 'positions',   label: 'Chức vụ',       icon: Briefcase,       permission: 'POSITION_VIEW' },
-  { id: 'logs',        label: 'Nhật ký',       icon: Activity,        permission: 'AUDIT_VIEW' },
-  { id: 'sessions',    label: 'Phiên online',  icon: Monitor,         permission: 'SESSION_VIEW' },
-  { id: 'trash',       label: 'Thùng rác',     icon: Trash2,          permission: 'DOC_TRASH_VIEW' },
-  { id: 'approvals',   label: 'Phê duyệt yêu cầu', icon: Bell,        permission: 'APPROVAL_VALIDATE' },
-  { id: 'protection_config', label: 'Khóa bảo vệ', icon: Lock, permission: 'PERMISSION_VIEW' },
-];
+const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any; permission?: string }> =
+  ADMIN_NAV_GROUPS.flatMap((g) => g.items);
 
 const PERMISSION_GROUPS = [
   { value: 'DOCUMENT',    label: '📄 Văn bản' },
@@ -268,6 +262,15 @@ export const AdminDashboardPage: React.FC = () => {
     : (sidebarCollapsed ? 'w-[76px]' : 'w-[260px]');
 
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [lectureStats, setLectureStats] = useState<{
+    total: number;
+    published: number;
+    pending: number;
+    draft: number;
+  } | null>(null);
+  const [loadingLectureStats, setLoadingLectureStats] = useState(false);
+  const [isDataSectionExpanded, setIsDataSectionExpanded] = useState(true);
+  const [isLectureSectionExpanded, setIsLectureSectionExpanded] = useState(true);
   const [overviewRefreshKey, setOverviewRefreshKey] = useState(0);
 
   const tabStripRef = React.useRef<HTMLDivElement>(null);
@@ -383,6 +386,26 @@ const pinPendingCount = useMemo(
       setStats(data);
     } catch (err: any) {
       showToast('Lỗi tải thống kê: ' + err.message, 'error');
+    }
+  };
+
+  const loadLectureStats = async () => {
+    setLoadingLectureStats(true);
+    try {
+      const res = await lectureService.list();
+      const items = res?.items || [];
+      const active = items.filter((l: any) => l.status !== 'DELETED');
+      setLectureStats({
+        total: active.length,
+        published: active.filter((l: any) => l.status === 'PUBLISHED').length,
+        pending: active.filter((l: any) => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length,
+        draft: active.filter((l: any) => l.status === 'DRAFT' || l.status === 'REJECTED').length,
+      });
+    } catch (err: any) {
+      console.warn('Không thể nạp thống kê bài giảng số:', err);
+      setLectureStats({ total: 0, published: 0, pending: 0, draft: 0 });
+    } finally {
+      setLoadingLectureStats(false);
     }
   };
 
@@ -503,6 +526,7 @@ const pinPendingCount = useMemo(
     switch (activeTab) {
       case 'overview':    
         loadStats(); 
+        loadLectureStats();
         break;
       case 'users':
         loadUsers();
@@ -805,30 +829,35 @@ const pinPendingCount = useMemo(
               <div
                 ref={tabStripRef}
                 onWheel={handleTabStripWheel}
-                className="flex-1 flex overflow-x-auto no-scrollbar gap-1.5 py-0.5 scroll-smooth"
+                className="flex-1 flex items-center overflow-x-auto no-scrollbar gap-1.5 py-0.5 scroll-smooth"
               >
                 {visibleTabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
+                  const isSectionStart = tab.id === 'approvals' || tab.id === 'protection_config';
                   return (
-                    <button
-                      key={tab.id}
-                      data-tab-id={tab.id}
-                      onClick={() => handleTabChange(tab.id)}   // ✅ sync URL
-                      className={`whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-                        isActive
-                          ? 'bg-[#166534] text-white shadow-xs dark:bg-emerald-600/25 dark:text-emerald-300 dark:border dark:border-emerald-500/40'
-                          : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5 shrink-0" />
-                      <span>{tab.label}</span>
-                      {tab.id === 'approvals' && approvalCount > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold">
-                          {approvalCount > 99 ? '99+' : approvalCount}
-                        </span>
+                    <React.Fragment key={tab.id}>
+                      {isSectionStart && (
+                        <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 shrink-0 mx-1" />
                       )}
-                    </button>
+                      <button
+                        data-tab-id={tab.id}
+                        onClick={() => handleTabChange(tab.id)}   // ✅ sync URL
+                        className={`whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                          isActive
+                            ? 'bg-[#166534] text-white shadow-xs dark:bg-emerald-600/25 dark:text-emerald-300 dark:border dark:border-emerald-500/40'
+                            : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <span>{tab.label}</span>
+                        {tab.id === 'approvals' && approvalCount > 0 && (
+                          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                            {approvalCount > 99 ? '99+' : approvalCount}
+                          </span>
+                        )}
+                      </button>
+                    </React.Fragment>
                   );
                 })}
               </div>
@@ -848,18 +877,21 @@ const pinPendingCount = useMemo(
           {/* ============== TAB PANELS ============== */}
 
           {activeTab === 'overview' && (
-            <div className="space-y-5">
+            <div className="space-y-6">
+              {/* Header Tổng quan */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <LayoutDashboard className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Tổng Quan Hệ Thống
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Thống kê dữ liệu hoạt động thời gian thực</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Thống kê dữ liệu hoạt động thời gian thực trên toàn bộ các phân hệ
+                  </p>
                 </div>
                 <button
                   onClick={async () => {
                     setOverviewRefreshKey((prev) => prev + 1);
-                    await loadStats();
+                    await Promise.all([loadStats(), loadLectureStats()]);
                     showToast('Đã làm mới dữ liệu tổng quan!', 'success');
                   }}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0"
@@ -868,40 +900,225 @@ const pinPendingCount = useMemo(
                 </button>
               </div>
 
-              <div className={
-                isIPadLandscape
-                  ? 'grid grid-cols-4 gap-3'
-                  : isIPadPortrait
-                    ? 'grid grid-cols-2 gap-3'
-                    : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4'
-              }>
-                <StatCard label="Quân nhân & Người dùng" loading={!stats} value={stats?.users ?? "—"}      icon={<Users className="w-6 h-6" />}      color="blue"    subtext="Đã kích hoạt trên hệ thống" refreshKey={overviewRefreshKey} />
-                <StatCard label="Văn bản & Tài liệu" loading={!stats} value={stats?.documents ?? "—"}  icon={<FileCheck className="w-6 h-6" />}  color="emerald" subtext="Lưu trữ trong kho số"       delay={0.05} refreshKey={overviewRefreshKey} />
-                <StatCard label="Tổng dung lượng tệp" loading={!stats} value={stats ? formatFileSize(stats.totalSize) : "—"} icon={<HardDrive className="w-6 h-6" />} color="amber" subtext="Ổ đĩa dữ liệu an toàn"      delay={0.1}  refreshKey={overviewRefreshKey} />
-                <StatCard label="Truy cập nhật ký 24h" loading={!stats} value={stats?.logs24h ?? "—"}    icon={<History className="w-6 h-6" />}    color="red"     subtext="Bản ghi kiểm toán an ninh" delay={0.15} refreshKey={overviewRefreshKey} />
+              {/* ======================================================== */}
+              {/* KHUNG 1: TỔNG QUAN DỮ LIỆU SỐ (Tài liệu / Văn bản số)    */}
+              {/* ======================================================== */}
+              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-xs transition-all duration-300">
+                {/* Header Khung Dữ liệu số */}
+                <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800/80 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                          Tổng Quan Dữ Liệu Số
+                        </h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30">
+                          Kho Dữ Liệu Số
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                        Quân nhân, văn bản số hóa, dung lượng lưu trữ an toàn và nhật ký an ninh
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsDataSectionExpanded((prev) => !prev)}
+                      className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer select-none"
+                      title={isDataSectionExpanded ? 'Thu gọn khung Dữ liệu số' : 'Mở rộng khung Dữ liệu số'}
+                    >
+                      {isDataSectionExpanded ? (
+                        <>
+                          <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden sm:inline">Thu gọn</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden sm:inline">Mở rộng</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Nội dung Khung Dữ liệu số */}
+                {isDataSectionExpanded ? (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className={
+                      isIPadLandscape
+                        ? 'grid grid-cols-4 gap-3'
+                        : isIPadPortrait
+                          ? 'grid grid-cols-2 gap-3'
+                          : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4'
+                    }>
+                      <StatCard label="Quân nhân & Người dùng" loading={!stats} value={stats?.users ?? "—"}      icon={<Users className="w-6 h-6" />}      color="blue"    subtext="Đã kích hoạt trên hệ thống" refreshKey={overviewRefreshKey} />
+                      <StatCard label="Văn bản & Tài liệu" loading={!stats} value={stats?.documents ?? "—"}  icon={<FileCheck className="w-6 h-6" />}  color="emerald" subtext="Lưu trữ trong kho số"       delay={0.05} refreshKey={overviewRefreshKey} />
+                      <StatCard label="Tổng dung lượng tệp" loading={!stats} value={stats ? formatFileSize(stats.totalSize) : "—"} icon={<HardDrive className="w-6 h-6" />} color="amber" subtext="Ổ đĩa dữ liệu an toàn"      delay={0.1}  refreshKey={overviewRefreshKey} />
+                      <StatCard label="Truy cập nhật ký 24h" loading={!stats} value={stats?.logs24h ?? "—"}    icon={<History className="w-6 h-6" />}    color="red"     subtext="Bản ghi kiểm toán an ninh" delay={0.15} refreshKey={overviewRefreshKey} />
+                    </div>
+
+                    <div className={
+                      isIPadLandscape
+                        ? 'grid grid-cols-2 gap-4'
+                        : isIPadPortrait
+                          ? 'grid grid-cols-1 gap-4'
+                          : 'grid grid-cols-1 xl:grid-cols-2 gap-4'
+                    }>
+                      <DistributionChart
+                        title="Phân Bố Tài Liệu Theo Mức Bảo Mật"
+                        icon={<Shield className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
+                        barColor="amber"
+                        items={(stats?.byLevel || []).map((x) => ({ id: x.lv, label: x.lvName, count: x.n }))}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <DistributionChart
+                        title="Phân Bố Tài Liệu Theo Thể Loại Văn Bản"
+                        icon={<FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
+                        barColor="emerald"
+                        items={(stats?.byType || []).map((t) => ({ id: t.id, label: t.name, count: t.n }))}
+                        refreshKey={overviewRefreshKey}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-white/[0.04] text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-medium">
+                      Quân nhân: <b className="text-slate-800 dark:text-slate-200">{stats?.users ?? '—'}</b> • 
+                      Văn bản: <b className="text-slate-800 dark:text-slate-200">{stats?.documents ?? '—'}</b> • 
+                      Dung lượng: <b className="text-slate-800 dark:text-slate-200">{stats ? formatFileSize(stats.totalSize) : '—'}</b> • 
+                      Nhật ký 24h: <b className="text-slate-800 dark:text-slate-200">{stats?.logs24h ?? '—'}</b>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsDataSectionExpanded(true)}
+                      className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline cursor-pointer"
+                    >
+                      Bấm để xem chi tiết
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className={
-                isIPadLandscape
-                  ? 'grid grid-cols-2 gap-4'
-                  : isIPadPortrait
-                    ? 'grid grid-cols-1 gap-4'
-                    : 'grid grid-cols-1 xl:grid-cols-2 gap-4'
-              }>
-                <DistributionChart
-                  title="Phân Bố Tài Liệu Theo Mức Bảo Mật"
-                  icon={<Shield className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
-                  barColor="amber"
-                  items={(stats?.byLevel || []).map((x) => ({ id: x.lv, label: x.lvName, count: x.n }))}
-                  refreshKey={overviewRefreshKey}
-                />
-                <DistributionChart
-                  title="Phân Bố Tài Liệu Theo Thể Loại Văn Bản"
-                  icon={<FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
-                  barColor="emerald"
-                  items={(stats?.byType || []).map((t) => ({ id: t.id, label: t.name, count: t.n }))}
-                  refreshKey={overviewRefreshKey}
-                />
+              {/* ======================================================== */}
+              {/* KHUNG 2: TỔNG QUAN BÀI GIẢNG SỐ (Giảng đường / Học viện) */}
+              {/* ======================================================== */}
+              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-xs transition-all duration-300">
+                {/* Header Khung Bài giảng số */}
+                <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800/80 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-500/20 shrink-0">
+                      <GraduationCap className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                          Tổng Quan Bài Giảng Số
+                        </h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 border border-blue-300 dark:border-blue-500/30">
+                          Học Viện Số
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                        Quản trị bài giảng điện tử, quy trình duyệt 2 tầng quân sự và sẵn sàng giảng dạy
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsLectureSectionExpanded((prev) => !prev)}
+                      className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer select-none"
+                      title={isLectureSectionExpanded ? 'Thu gọn khung Bài giảng số' : 'Mở rộng khung Bài giảng số'}
+                    >
+                      {isLectureSectionExpanded ? (
+                        <>
+                          <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden sm:inline">Thu gọn</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden sm:inline">Mở rộng</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Nội dung Khung Bài giảng số */}
+                {isLectureSectionExpanded ? (
+                  <div className={
+                    isIPadLandscape
+                      ? 'grid grid-cols-4 gap-3 animate-in fade-in duration-200'
+                      : isIPadPortrait
+                        ? 'grid grid-cols-2 gap-3 animate-in fade-in duration-200'
+                        : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4 animate-in fade-in duration-200'
+                  }>
+                    <StatCard
+                      label="Tổng số bài giảng"
+                      loading={loadingLectureStats || !lectureStats}
+                      value={lectureStats?.total ?? "—"}
+                      icon={<BookOpen className="w-6 h-6" />}
+                      color="blue"
+                      subtext="Toàn bộ phân hệ quản lý"
+                      delay={0.0}
+                      refreshKey={overviewRefreshKey}
+                    />
+                    <StatCard
+                      label="Sẵn sàng giảng dạy"
+                      loading={loadingLectureStats || !lectureStats}
+                      value={lectureStats?.published ?? "—"}
+                      icon={<CheckCircle2 className="w-6 h-6" />}
+                      color="emerald"
+                      subtext="Đã xuất bản (Published)"
+                      delay={0.05}
+                      refreshKey={overviewRefreshKey}
+                    />
+                    <StatCard
+                      label="Đang chờ duyệt 2 tầng"
+                      loading={loadingLectureStats || !lectureStats}
+                      value={lectureStats?.pending ?? "—"}
+                      icon={<Clock className="w-6 h-6" />}
+                      color="amber"
+                      subtext="Cấp Khoa & BGH phê duyệt"
+                      delay={0.1}
+                      refreshKey={overviewRefreshKey}
+                    />
+                    <StatCard
+                      label="Bản nháp / Cần sửa"
+                      loading={loadingLectureStats || !lectureStats}
+                      value={lectureStats?.draft ?? "—"}
+                      icon={<FileText className="w-6 h-6" />}
+                      color="purple"
+                      subtext="Đang biên soạn & hoàn thiện"
+                      delay={0.15}
+                      refreshKey={overviewRefreshKey}
+                    />
+                  </div>
+                ) : (
+                  <div className="py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-white/[0.04] text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-medium">
+                      Tổng số: <b className="text-slate-800 dark:text-slate-200">{lectureStats?.total ?? '—'}</b> • 
+                      Sẵn sàng: <b className="text-emerald-700 dark:text-emerald-400">{lectureStats?.published ?? '—'}</b> • 
+                      Chờ duyệt: <b className="text-amber-700 dark:text-amber-400">{lectureStats?.pending ?? '—'}</b> • 
+                      Bản nháp: <b className="text-purple-700 dark:text-purple-400">{lectureStats?.draft ?? '—'}</b>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsLectureSectionExpanded(true)}
+                      className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                    >
+                      Bấm để xem chi tiết
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

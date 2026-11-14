@@ -2266,6 +2266,43 @@ html.dark .u032-progress-track,
   }
 }
 
+/* Ẩn mũi tên dropdown mặc định của input có datalist */
+input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
+
+/* =========================================================================
+   QK7 Sidebar Collapsed Tooltip Adaptive Styles (Light & Dark Mode)
+   ========================================================================= */
+html:not(.dark) .qk7-sidebar-tooltip .ant-tooltip-inner {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+html:not(.dark) .qk7-sidebar-tooltip .ant-tooltip-arrow:before {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+html.dark .qk7-sidebar-tooltip .ant-tooltip-inner {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.65) !important;
+}
+
+html.dark .qk7-sidebar-tooltip .ant-tooltip-arrow:before {
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+
 
 
 

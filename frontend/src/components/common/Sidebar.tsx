@@ -19,6 +19,9 @@ import {
   Monitor,
   Bell,
   Lock,
+  BookOpen,
+  GraduationCap,
+  Building2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
@@ -92,6 +95,16 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
       { id: 'logs',              label: 'Nhật ký',       icon: Activity,    permission: 'AUDIT_VIEW' },
       { id: 'sessions',          label: 'Phiên online',  icon: Monitor,     permission: 'SESSION_VIEW' },
       { id: 'trash',             label: 'Thùng rác',     icon: Trash2,      permission: 'DOC_TRASH_VIEW' },
+    ],
+  },
+
+  {
+    id: 'lecture_catalogs',
+    title: 'Bài giảng số',
+    items: [
+      { id: 'lec-subjects',   label: 'Môn học',     icon: BookOpen,     permission: 'SUBJECT_VIEW' },
+      { id: 'lec-classes',    label: 'Lớp học',     icon: GraduationCap, permission: 'CLASS_VIEW' },
+      { id: 'lec-classrooms', label: 'Giảng đường', icon: Building2,    permission: 'CLASSROOM_VIEW' },
     ],
   },
 ];

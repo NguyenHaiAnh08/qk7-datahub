@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Play, Loader2 } from 'lucide-react';
 import { lectureService } from '../../services/lectureService';
 import { toast } from '../common/Toast';
@@ -24,6 +24,13 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // ⭐ Lấy lớp đang chọn ở cấp component — dùng chung cho render + submit
+  const selectedClass = useMemo(
+    () => classes.find(c => c.class_id === classId) || null,
+    [classes, classId]
+  );
+
+  // Load catalogs (classes + venues) khi modal mở
   useEffect(() => {
     if (!open) return;
     Promise.all([lectureService.getClasses(), lectureService.getVenues()])
@@ -45,97 +52,111 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
     setError('');
   }, [open]);
 
+  // ⭐ Auto-select lớp đầu tiên + tự điền sĩ số khi classes load xong
+  useEffect(() => {
+    if (classes.length > 0 && !classId) {
+      const first = classes[0];
+      setClassId(first.class_id);
+      if (first.student_total != null) {
+        setStudentCount(String(first.student_total));
+      }
+    }
+  }, [classes, classId]);
+
   if (!open || !lecture) return null;
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
-  if (!classId) return setError('Vui lòng chọn lớp học');
-  if (!venue.trim()) return setError('Vui lòng nhập giảng đường');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!classId) return setError('Vui lòng chọn lớp học');
+    if (!venue.trim()) return setError('Vui lòng nhập giảng đường');
 
-  setSubmitting(true);
-  const tokenKey = `qk7_fp_lecture_${lecture.lecture_id}`;
+    setSubmitting(true);
+    const tokenKey = `qk7_fp_lecture_${lecture.lecture_id}`;
 
-  try {
-    const parsedCount = parseInt(studentCount, 10);
-    const count = Number.isFinite(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
+    try {
+      const parsedCount = parseInt(studentCount, 10);
+      const count = Number.isFinite(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
 
-    // ⚠️ Chỉ yêu cầu token nếu bài giảng Cấp 3+
-    const fpToken =
-      lecture.security_level_id >= 3 && typeof window !== 'undefined'
-        ? sessionStorage.getItem(tokenKey)
-        : null;
+      // ⚠️ Chỉ yêu cầu token nếu bài giảng Cấp 3+
+      const fpToken =
+        lecture.security_level_id >= 3 && typeof window !== 'undefined'
+          ? sessionStorage.getItem(tokenKey)
+          : null;
 
-    if (lecture.security_level_id >= 3 && !fpToken) {
-      setError('Phiên xác thực vân tay đã hết hạn hoặc chưa có. Vui lòng đóng hộp thoại này và bấm "Mở ca dạy" lại để quét vân tay.');
-      setSubmitting(false);
-      return;
-    }
+      if (lecture.security_level_id >= 3 && !fpToken) {
+        setError(
+          'Phiên xác thực vân tay đã hết hạn hoặc chưa có. Vui lòng đóng hộp thoại này và bấm "Mở ca dạy" lại để quét vân tay.'
+        );
+        setSubmitting(false);
+        return;
+      }
 
-    const { schedule_id } = await lectureService.startSchedule(
-      {
+      const { schedule_id } = await lectureService.startSchedule(
+        {
+          lecture_id: lecture.lecture_id,
+          class_id: classId,
+          venue_name: venue.trim(),
+          student_count: count,
+          session_type: sessionType,
+          note: note.trim() || undefined,
+        },
+        fpToken || undefined
+      );
+
+      // Xóa token sau khi mở ca thành công
+      if (fpToken) sessionStorage.removeItem(tokenKey);
+
+      // Construct đầy đủ TeachingSchedule để LiveSessionRoom render được ngay
+      const session: TeachingSchedule = {
+        schedule_id,
         lecture_id: lecture.lecture_id,
+        lecture_title: lecture.title,
+        subject_name: lecture.subject_name,
+
+        presenter_id: user?.user_id ?? lecture.author_id,
+        presenter_name: user?.full_name ?? lecture.author_name,
+        presenter_rank: user?.rank_name ?? lecture.author_rank,
+        presenter_position: user?.position,
+
         class_id: classId,
+        class_name: selectedClass?.class_name,
+        class_student_total: selectedClass?.student_total,   // ⭐ Đính kèm sĩ số chính thức
+
         venue_name: venue.trim(),
         student_count: count,
         session_type: sessionType,
         note: note.trim() || undefined,
-      },
-      fpToken || undefined
-    );
+        start_time: new Date().toISOString(),
+        status: 'ONGOING',
+        is_hanging: false,
+        quiz_activated_count: 0,
+        quiz_total_count: 0,
+      };
 
-    // Xóa token sau khi mở ca thành công
-    if (fpToken) sessionStorage.removeItem(tokenKey);
+      toast.success(`Đã mở ca giảng dạy cho "${lecture.title}"`);
+      onStarted(session, lecture);
+    } catch (err: any) {
+      const msg = err?.message || 'Mở ca thất bại';
 
-    const selectedClass = classes.find(c => c.class_id === classId);
-
-    const session: TeachingSchedule = {
-      schedule_id,
-      lecture_id: lecture.lecture_id,
-      lecture_title: lecture.title,
-      subject_name: lecture.subject_name,
-
-      presenter_id: user?.user_id ?? lecture.author_id,
-      presenter_name: user?.full_name ?? lecture.author_name,
-      presenter_rank: user?.rank_name ?? lecture.author_rank,
-      presenter_position: user?.position,
-
-      class_id: classId,
-      class_name: selectedClass?.class_name,
-      venue_name: venue.trim(),
-      student_count: count,
-      session_type: sessionType,
-      note: note.trim() || undefined,
-      start_time: new Date().toISOString(),
-      status: 'ONGOING',
-      is_hanging: false,
-      quiz_activated_count: 0,
-      quiz_total_count: 0,
-    };
-
-    toast.success(`Đã mở ca giảng dạy cho "${lecture.title}"`);
-    onStarted(session, lecture);
-  } catch (err: any) {
-    const msg = err?.message || 'Mở ca thất bại';
-
-    // 🧹 Token hỏng/hết hạn → PHẢI xóa để user quét lại từ đầu
-    if (
-      msg.includes('vân tay') ||
-      msg.includes('quét lại') ||
-      msg.includes('hết hạn') ||
-      err?.status === 403
-    ) {
-      sessionStorage.removeItem(tokenKey);
-      setError(
-        `${msg}\n\nVui lòng đóng hộp thoại này, bấm "Mở ca dạy" trên bài giảng để quét vân tay lại.`
-      );
-    } else {
-      setError(msg);
+      // 🧹 Token hỏng/hết hạn → PHẢI xóa để user quét lại từ đầu
+      if (
+        msg.includes('vân tay') ||
+        msg.includes('quét lại') ||
+        msg.includes('hết hạn') ||
+        err?.status === 403
+      ) {
+        sessionStorage.removeItem(tokenKey);
+        setError(
+          `${msg}\n\nVui lòng đóng hộp thoại này, bấm "Mở ca dạy" trên bài giảng để quét vân tay lại.`
+        );
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setSubmitting(false);
     }
-  } finally {
-    setSubmitting(false);
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -166,7 +187,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs">
           {error && (
-            <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-300 dark:border-rose-500/30 rounded-lg text-rose-700 dark:text-rose-300">
+            <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-300 dark:border-rose-500/30 rounded-lg text-rose-700 dark:text-rose-300 whitespace-pre-line">
               {error}
             </div>
           )}
@@ -177,7 +198,14 @@ const handleSubmit = async (e: React.FormEvent) => {
             </label>
             <select
               value={classId}
-              onChange={e => setClassId(e.target.value)}
+              onChange={e => {
+                const newId = e.target.value;
+                setClassId(newId);
+                const cls = classes.find(c => c.class_id === newId);
+                if (cls?.student_total != null) {
+                  setStudentCount(String(cls.student_total));   // ⭐ Auto-fill sĩ số
+                }
+              }}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             >
               <option value="">Chọn lớp</option>
@@ -208,15 +236,29 @@ const handleSubmit = async (e: React.FormEvent) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Sĩ số học viên</label>
-              <input
-                type="number"
-                min={0}
-                value={studentCount}
-                onChange={e => setStudentCount(e.target.value)}
-                placeholder="VD: 100"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Sĩ số học viên
+                {selectedClass?.student_total != null && (
+                  <span className="ml-1 text-[10px] font-normal text-slate-400">
+                    (Cố định: {selectedClass.student_total})
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  value={studentCount}
+                  onChange={e => setStudentCount(e.target.value)}
+                  placeholder="VD: 100"
+                  className="w-full px-3 py-2 pr-12 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                {selectedClass?.student_total != null && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-amber-600 dark:text-amber-400 pointer-events-none">
+                    / {selectedClass.student_total}
+                  </span>
+                )}
+              </div>
             </div>
             <div>
               <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Loại ca</label>

@@ -260,6 +260,58 @@ export const lectureService = {
   async getFacultyLectures(facultyUnitId: string): Promise<{ total: number; items: Lecture[] }> {
     return http(`/api/lectures/faculty/${encodeURIComponent(facultyUnitId)}`);
   },
+
+  // ─── ADMIN CRUD — LECTURE CATALOGS ───
+  async adminListSubjects(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/subjects');
+  },
+  async adminCreateSubject(data: any): Promise<{ success: boolean; subject_id: string }> {
+    return http('/api/admin/lectures/subjects', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateSubject(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/subjects/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteSubject(id: string): Promise<{ success: boolean; soft_deleted?: boolean; note?: string }> {
+    return http(`/api/admin/lectures/subjects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async adminListClasses(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/classes');
+  },
+  async adminCreateClass(data: any): Promise<{ success: boolean; class_id: string }> {
+    return http('/api/admin/lectures/classes', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateClass(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/classes/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteClass(id: string): Promise<{ success: boolean; soft_deleted?: boolean; note?: string }> {
+    return http(`/api/admin/lectures/classes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async adminListClassrooms(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/classrooms');
+  },
+  async adminCreateClassroom(data: any): Promise<{ success: boolean; room_id: string }> {
+    return http('/api/admin/lectures/classrooms', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateClassroom(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/classrooms/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteClassroom(id: string): Promise<{ success: boolean; soft_deleted?: boolean }> {
+    return http(`/api/admin/lectures/classrooms/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
 };
 
 export default lectureService;

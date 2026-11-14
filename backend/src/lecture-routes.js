@@ -917,7 +917,8 @@ module.exports = function createLectureRoutes({
                l.title AS lecture_title, l.content_type,
                sub.name AS subject_name,
                u.full_name AS presenter_name, u.[rank] AS presenter_rank, u.[position] AS presenter_position,
-               c.class_name, un.name AS unit_name, un.unit_id AS unit_id,
+               c.class_name, c.student_total AS class_student_total,
+               un.name AS unit_name, un.unit_id AS unit_id,
                FLOOR(DATEDIFF(SECOND, s.start_time, GETDATE()) / 60.0) AS duration_minutes,
                CASE WHEN DATEDIFF(MINUTE, s.start_time, GETDATE()) > ${HANGING_THRESHOLD_MINUTES}
                     THEN 1 ELSE 0 END AS is_hanging
@@ -979,7 +980,8 @@ module.exports = function createLectureRoutes({
                ${hasSessionType ? 's.session_type' : "'TEACHER_LED' AS session_type"},
                l.title AS lecture_title, sub.name AS subject_name,
                u.full_name AS presenter_name, u.[rank] AS presenter_rank,
-               c.class_name, un.name AS unit_name,
+               c.class_name, c.student_total AS class_student_total,
+               un.name AS unit_name,
                FLOOR(DATEDIFF(SECOND, s.start_time, s.end_time) / 60.0) AS duration_minutes
         FROM TEACHING_SCHEDULE s
         JOIN DIGITAL_LECTURE l ON l.lecture_id = s.lecture_id

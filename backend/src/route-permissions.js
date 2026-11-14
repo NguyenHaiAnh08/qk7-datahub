@@ -33,6 +33,9 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/documents\/trash$/,                 'DOC_TRASH_VIEW'],
     [/^\/api\/documents\/my-unit$/,               'DOC_VIEW'],
     [/^\/api\/documents\/proposals\/pending$/,    'DOC_VIEW'],
+    [/^\/api\/admin\/lectures\/subjects$/,    'SUBJECT_VIEW'],
+    [/^\/api\/admin\/lectures\/classes$/,     'CLASS_VIEW'],
+    [/^\/api\/admin\/lectures\/classrooms$/,  'CLASSROOM_VIEW'],
   ],
 
   POST: [
@@ -54,6 +57,9 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/documents\/proposals\/[^/]+\/reject$/,  'DOC_EDIT'],
     [/^\/api\/ai\/sync-all$/,                     'AI_SYNC'],
     [/^\/api\/ai\/chat$/,                         'AI_QUERY'],
+    [/^\/api\/admin\/lectures\/subjects$/,    'SUBJECT_MANAGE'],
+    [/^\/api\/admin\/lectures\/classes$/,     'CLASS_MANAGE'],
+    [/^\/api\/admin\/lectures\/classrooms$/,  'CLASSROOM_MANAGE'],
 
     // ─── LECTURES ───
     [/^\/api\/lectures\/upload-scorm$/,           'LECTURE_CREATE'],
@@ -79,6 +85,9 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/positions\/[^/]+$/,                 'POSITION_EDIT'],         // ← TÁCH
     [/^\/api\/admin\/unit-aliases\/[^/]+$/,              'UNIT_ALIAS_EDIT'],       // ← TÁCH
     [/^\/api\/documents\/[^/]+$/,                 'DOC_EDIT'],
+    [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
+    [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
+    [/^\/api\/admin\/lectures\/classrooms\/[^/]+$/,  'CLASSROOM_MANAGE'],
   ],
 
   DELETE: [
@@ -101,6 +110,9 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/protected-permissions\/[^/]+$/,     'ROLE_EDIT'],
     [/^\/api\/documents\/[^/]+\/purge$/,          'DOC_PURGE'],
     [/^\/api\/documents\/[^/]+$/,                 'DOC_DELETE'],
+    [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
+    [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
+    [/^\/api\/admin\/lectures\/classrooms\/[^/]+$/,  'CLASSROOM_MANAGE'],
   ],
 };
 

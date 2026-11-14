@@ -182,7 +182,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
 
                   {/* 2 Ô hàng dưới: Sĩ số học viên & Thời lượng ca giảng */}
                   <div className="grid grid-cols-2 gap-2">
-                    {/* Ô 2: Sĩ số học viên */}
+                    {/* Ô 2: Sĩ số học viên — Hiển thị "X / Y HV" khi có sĩ số chính thức */}
                     <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.06] flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-300/40">
                         <Users className="w-3.5 h-3.5" />
@@ -191,8 +191,14 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
                         <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none uppercase tracking-wider">
                           Sĩ số
                         </span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200 truncate block mt-0.5 text-xs">
-                          {s.student_count} học viên
+                        <span className="font-bold text-slate-800 dark:text-slate-200 font-mono truncate block mt-0.5 text-xs">
+                          {s.student_count}
+                          {s.class_student_total != null && (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              {' / '}{s.class_student_total}
+                            </span>
+                          )}
+                          <span className="font-normal text-slate-500 dark:text-slate-400"> HV</span>
                         </span>
                       </div>
                     </div>

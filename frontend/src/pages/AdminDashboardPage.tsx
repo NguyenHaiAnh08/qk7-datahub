@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Drawer } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PinManageModal } from '../components/users/PinManageModal';
+import { LectureCatalogsPage } from './LectureCatalogsPage';
 
 import {
   LayoutDashboard,
@@ -2261,6 +2262,10 @@ const pinPendingCount = useMemo(
       />
 
       <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
+
+      {activeTab === 'lec-subjects'   && <LectureCatalogsPage catalogType="subjects" />}
+      {activeTab === 'lec-classes'    && <LectureCatalogsPage catalogType="classes" />}
+      {activeTab === 'lec-classrooms' && <LectureCatalogsPage catalogType="classrooms" />}
     </div>
   );
 };

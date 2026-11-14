@@ -53,6 +53,7 @@ export interface TrainingClass {
   unit_name?: string;
   course_year?: number;
   student_total?: number;
+  description?: string;
   active: boolean;
 }
 
@@ -67,6 +68,7 @@ export interface TeachingSchedule {
   presenter_position?: string;
   class_id: string;
   class_name?: string;
+  class_student_total?: number;
   venue_name: string;
   student_count: number;
   session_type: SessionType;

@@ -634,11 +634,39 @@ module.exports = function createLectureRoutes({
       // Kiểm tra bài giảng
       const lecCheck = await pool.request()
         .input('lid', sql.VarChar(50), lecture_id)
-        .query(`SELECT status, title FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
+        .query(`SELECT status, title, security_level_id, document_id
+                FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
       if (lecCheck.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lecture = lecCheck.recordset[0];
       if (lecture.status !== 'PUBLISHED') {
         return res.status(400).json({ error: 'Chỉ có thể mở ca với bài giảng đã PUBLISHED' });
+      }
+
+      // 🛡️ CHỐT CHẶN BẢO MẬT: Bài giảng Cấp 3+ bắt buộc phải có token vân tay hợp lệ
+      // Ngăn chặn việc dùng Postman gọi thẳng API mà bỏ qua bước quét vân tay ở FE
+      if (lecture.security_level_id >= 3) {
+        const fpToken = req.headers['x-fingerprint-token'];
+        if (!fpToken) {
+          return res.status(403).json({
+            error: 'Bài giảng cấp 3+ yêu cầu xác thực sinh trắc học (vân tay) trước khi mở ca dạy.',
+            require_fingerprint: true,
+          });
+        }
+        try {
+          const jwt = require('jsonwebtoken');
+          const JWT_SECRET = process.env.JWT_SECRET || 'QK7-DEV-SECRET-CHANGE-IN-PROD-XXX';
+          const decoded = jwt.verify(fpToken, JWT_SECRET);
+          if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
+
+          // Xác thực chéo: token phải khớp đúng bài giảng VÀ đúng user đang đăng nhập
+          if (decoded.file_id !== lecture.lecture_id) throw new Error('Token không khớp bài giảng');
+          if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
+        } catch (err) {
+          return res.status(403).json({
+            error: 'Phiên xác thực vân tay không hợp lệ hoặc đã hết hạn. Vui lòng quét lại.',
+            require_fingerprint: true,
+          });
+        }
       }
 
       // Kiểm tra giảng đường trống

@@ -133,11 +133,16 @@ export const lectureService = {
     return `/api/lectures/${encodeURIComponent(lectureId)}/html5/launch`;
   },
 
-  // ── Ca giảng dạy ──
-  async startSchedule(payload: StartSchedulePayload): Promise<{ schedule_id: string }> {
+    // ── Ca giảng dạy ──
+  async startSchedule(payload: StartSchedulePayload, fingerprintToken?: string): Promise<{ schedule_id: string }> {
+    const headers: Record<string, string> = { ...JSON_HEADERS };
+    if (fingerprintToken) {
+      headers['X-Fingerprint-Token'] = fingerprintToken;
+    }
+
     return http('/api/lectures/schedules/start', {
       method: 'POST',
-      headers: JSON_HEADERS,
+      headers,
       body: JSON.stringify(payload),
     });
   },

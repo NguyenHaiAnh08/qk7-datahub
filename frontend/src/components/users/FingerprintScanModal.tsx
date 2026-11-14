@@ -68,6 +68,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      inFlightRef.current = false;
       abortRef.current?.abort();
       abortRef.current = null;
       if (autoRetryTimerRef.current) {
@@ -124,10 +125,11 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       let deviceId: string;
       try {
         deviceId = await fingerprintService.getLocalDeviceId(2000);
-      } catch {
+      } catch (err) {
         if (signal.aborted || !mountedRef.current) return;
-        setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy này.');
+        setError('Chưa kết nối máy quét vân tay. Vui lòng bật Fingerprint Agent trên máy tính này.');
         setPhase('error');
+        setRetryExhausted(true);
         return;
       }
 
@@ -157,8 +159,10 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         return;
       }
 
-      // ── Nhánh 2: xác thực xem file ──
+      // ── Nhánh 2: Xác thực xem file / bài giảng ──
+      // BẮT BUỘC PHẢI CÓ DÒNG NÀY ĐỂ GỬI REQUEST
       const res = await fingerprintService.verify(fileId, deviceId, signal);
+      
       if (signal.aborted || !mountedRef.current) return;
 
       if (!res.required) { setPhase('success'); onSuccess(''); return; }
@@ -185,6 +189,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       setTimeout(() => {
         if (mountedRef.current && !signal.aborted) onSuccess(res.fingerprint_token!);
       }, 900);
+
     } catch (err: any) {
       if (err?.name === 'AbortError' || signal.aborted || !mountedRef.current) return;
 
@@ -198,20 +203,10 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       );
       const isNeedsEnroll = Boolean(err.data?.needs_enroll);
       const isPinNotSet = Boolean(err.data?.needs_admin_pin) || err.data?.code === 'PIN_NOT_SET';
-      const isTemplateCorrupted =
-        err.data?.code === 'TEMPLATE_DECRYPT_FAILED' || /Template vân tay bị hỏng/i.test(msg);
+      const isTemplateCorrupted = err.data?.code === 'TEMPLATE_DECRYPT_FAILED' || /Template vân tay bị hỏng/i.test(msg);
       const isCancelled = Boolean(err.data?.cancelled) || err.message === 'CANCELLED';
-      const isTimeout =
-        Boolean(err.data?.timeout) || err.status === 408 || /Hết thời gian/i.test(msg);
+      const isTimeout = Boolean(err.data?.timeout) || err.status === 408 || /Hết thời gian/i.test(msg);
       const isDeviceError = Boolean(err.data?.device_error) || /Lỗi máy quét/i.test(msg);
-
-      console.error('[FingerprintScanModal] ❌ Lỗi xác thực vân tay:', {
-        message: err.message,
-        code: err.data?.code,
-        details: err.data?.details,
-        purpose,
-        fileId,
-      });
 
       if (isCancelled) {
         if (retryCountRef.current < 1) {
@@ -229,10 +224,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       }
 
       if (isAgentOffline) {
-        setError(
-          err.data?.error ||
-          'Chưa kết nối hoặc chưa mở được đầu đọc vân tay ZK9500. Vui lòng kiểm tra cáp USB và Agent.'
-        );
+        setError(err.data?.error || 'Chưa kết nối hoặc chưa mở được đầu đọc vân tay ZK9500. Vui lòng kiểm tra cáp USB và Agent.');
         setPhase('error');
         setRetryExhausted(true);
       } else if (isTimeout) {
@@ -244,9 +236,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         setPhase('error');
         setRetryExhausted(true);
       } else if (isPinNotSet) {
-        setError(
-          'Tài khoản chưa được cấp mã PIN. Vui lòng gửi yêu cầu đến Quản trị viên (USR-001) để được cấp PIN trước khi mở tài liệu Cấp 4-5.'
-        );
+        setError('Tài khoản chưa được cấp mã PIN. Vui lòng gửi yêu cầu đến Quản trị viên (USR-001) để được cấp PIN trước khi mở tài liệu Cấp 4-5.');
         setPhase('error');
         setPinNotSet(true);
         setRetryExhausted(true);
@@ -256,10 +246,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         setPhase('error');
         setRetryExhausted(true);
       } else if (isTemplateCorrupted) {
-        setError(
-          err.data?.details ||
-          'Template vân tay bị hỏng hoặc sai khóa mã hóa hệ thống. Cần đăng ký lại (re-enroll).'
-        );
+        setError(err.data?.details || 'Template vân tay bị hỏng hoặc sai khóa mã hóa hệ thống. Cần đăng ký lại (re-enroll).');
         setPhase('error');
         setRetryExhausted(true);
       } else {

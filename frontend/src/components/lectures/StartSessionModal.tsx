@@ -47,61 +47,95 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
 
   if (!open || !lecture) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (!classId) return setError('Vui lòng chọn lớp học');
-    if (!venue.trim()) return setError('Vui lòng nhập giảng đường');
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
+  if (!classId) return setError('Vui lòng chọn lớp học');
+  if (!venue.trim()) return setError('Vui lòng nhập giảng đường');
 
-    setSubmitting(true);
-    try {
-      const parsedCount = parseInt(studentCount, 10);
-      const count = Number.isFinite(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
+  setSubmitting(true);
+  const tokenKey = `qk7_fp_lecture_${lecture.lecture_id}`;
 
-      const { schedule_id } = await lectureService.startSchedule({
+  try {
+    const parsedCount = parseInt(studentCount, 10);
+    const count = Number.isFinite(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
+
+    // ⚠️ Chỉ yêu cầu token nếu bài giảng Cấp 3+
+    const fpToken =
+      lecture.security_level_id >= 3 && typeof window !== 'undefined'
+        ? sessionStorage.getItem(tokenKey)
+        : null;
+
+    if (lecture.security_level_id >= 3 && !fpToken) {
+      setError('Phiên xác thực vân tay đã hết hạn hoặc chưa có. Vui lòng đóng hộp thoại này và bấm "Mở ca dạy" lại để quét vân tay.');
+      setSubmitting(false);
+      return;
+    }
+
+    const { schedule_id } = await lectureService.startSchedule(
+      {
         lecture_id: lecture.lecture_id,
         class_id: classId,
         venue_name: venue.trim(),
         student_count: count,
         session_type: sessionType,
         note: note.trim() || undefined,
-      });
+      },
+      fpToken || undefined
+    );
 
-      const selectedClass = classes.find(c => c.class_id === classId);
+    // Xóa token sau khi mở ca thành công
+    if (fpToken) sessionStorage.removeItem(tokenKey);
 
-      // Construct đầy đủ TeachingSchedule để LiveSessionRoom render được ngay
-      const session: TeachingSchedule = {
-  schedule_id,
-  lecture_id:         lecture.lecture_id,
-  lecture_title:      lecture.title,
-  subject_name:       lecture.subject_name,
+    const selectedClass = classes.find(c => c.class_id === classId);
 
-  presenter_id:       user?.user_id ?? lecture.author_id,
-  presenter_name:     user?.full_name ?? lecture.author_name,
-  presenter_rank:     user?.rank_name ?? lecture.author_rank,
-  presenter_position: user?.position,
+    const session: TeachingSchedule = {
+      schedule_id,
+      lecture_id: lecture.lecture_id,
+      lecture_title: lecture.title,
+      subject_name: lecture.subject_name,
 
-  class_id:           classId,
-  class_name:         selectedClass?.class_name,
-  venue_name:         venue.trim(),
-  student_count:      count,
-  session_type:       sessionType,
-  note:               note.trim() || undefined,
-  start_time:         new Date().toISOString(),
-  status:             'ONGOING',
-  is_hanging:         false,
-  quiz_activated_count: 0,
-  quiz_total_count:     0,
-};
+      presenter_id: user?.user_id ?? lecture.author_id,
+      presenter_name: user?.full_name ?? lecture.author_name,
+      presenter_rank: user?.rank_name ?? lecture.author_rank,
+      presenter_position: user?.position,
 
-      toast.success(`Đã mở ca giảng dạy cho "${lecture.title}"`);
-      onStarted(session, lecture);
-    } catch (err: any) {
-      setError(err?.message || 'Mở ca thất bại');
-    } finally {
-      setSubmitting(false);
+      class_id: classId,
+      class_name: selectedClass?.class_name,
+      venue_name: venue.trim(),
+      student_count: count,
+      session_type: sessionType,
+      note: note.trim() || undefined,
+      start_time: new Date().toISOString(),
+      status: 'ONGOING',
+      is_hanging: false,
+      quiz_activated_count: 0,
+      quiz_total_count: 0,
+    };
+
+    toast.success(`Đã mở ca giảng dạy cho "${lecture.title}"`);
+    onStarted(session, lecture);
+  } catch (err: any) {
+    const msg = err?.message || 'Mở ca thất bại';
+
+    // 🧹 Token hỏng/hết hạn → PHẢI xóa để user quét lại từ đầu
+    if (
+      msg.includes('vân tay') ||
+      msg.includes('quét lại') ||
+      msg.includes('hết hạn') ||
+      err?.status === 403
+    ) {
+      sessionStorage.removeItem(tokenKey);
+      setError(
+        `${msg}\n\nVui lòng đóng hộp thoại này, bấm "Mở ca dạy" trên bài giảng để quét vân tay lại.`
+      );
+    } else {
+      setError(msg);
     }
-  };
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">

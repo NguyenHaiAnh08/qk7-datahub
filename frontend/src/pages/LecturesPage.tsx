@@ -20,6 +20,7 @@ import { RejectReasonModal } from '../components/lectures/RejectReasonModal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { TacticalEmptyState } from '../components/common/TacticalEmptyState';
 import { RollingNumber } from '../components/common/RollingNumber';
+import { FingerprintScanModal } from '../components/users/FingerprintScanModal';
 import { Lecture, LectureStatus, Subject, TeachingSchedule } from '../types/lecture';
 
 type TabKey = 'list' | 'live' | 'history';
@@ -103,6 +104,9 @@ export const LecturesPage: React.FC = () => {
   const [startSessionLecture, setStartSessionLecture] = useState<Lecture | null>(null);
   const [viewingLecture, setViewingLecture] = useState<Lecture | null>(null);
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
+
+  // Trạng thái chờ quét vân tay để mở ca dạy đối với bài giảng Cấp 3+
+  const [verifySessionLecture, setVerifySessionLecture] = useState<Lecture | null>(null);
 
   // Modal từ chối & Hộp thoại xác nhận
   const [rejectingLecture, setRejectingLecture] = useState<Lecture | null>(null);
@@ -775,7 +779,16 @@ export const LecturesPage: React.FC = () => {
                       onPurge={() => handlePurge(lec)}
                       onEdit={() => handleEditClick(lec)}
                       onView={() => setViewingLecture(lec)}
-                      onStartSession={() => setStartSessionLecture(lec)}
+                      onStartSession={() => {
+                        // KIỂM TRA CẤP ĐỘ BẢO MẬT
+                        if (lec.security_level_id >= 3) {
+                          // Nếu Cấp 3+ -> Bắt buộc quét vân tay trước
+                          setVerifySessionLecture(lec);
+                        } else {
+                          // Nếu Cấp 1, 2 -> Mở ca dạy bình thường
+                          setStartSessionLecture(lec);
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -842,6 +855,30 @@ export const LecturesPage: React.FC = () => {
         onClose={() => setStartSessionLecture(null)}
         onStarted={handleStartSessionSuccess}
       />
+
+      {/* Modal Xác Thực Vân Tay Cho Bài Giảng Cấp 3+ */}
+      {verifySessionLecture && (
+        <FingerprintScanModal
+          open={!!verifySessionLecture}
+          fileId={verifySessionLecture.lecture_id}
+          onSuccess={(token) => {
+            // Lưu token để truyền lên Backend khi mở ca dạy (nếu cần)
+            if (token) {
+              sessionStorage.setItem(
+                `qk7_fp_lecture_${verifySessionLecture.lecture_id}`,
+                token
+              );
+            }
+            // Chuyển sang Modal mở ca dạy
+            setStartSessionLecture(verifySessionLecture);
+            setVerifySessionLecture(null);
+            toast.success(
+              'Xác thực vân tay thành công! Vui lòng điền thông tin để mở ca dạy.'
+            );
+          }}
+          onCancel={() => setVerifySessionLecture(null)}
+        />
+      )}
 
       <LectureDetailModal
         open={!!viewingLecture}

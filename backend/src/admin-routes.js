@@ -2253,4 +2253,260 @@ module.exports = (app, deps) => {
             }
         });
 
+        // ═══════════════════════════════════════════════════════════
+// LECTURE CATALOGS — Môn học / Lớp học / Giảng đường
+// ═══════════════════════════════════════════════════════════
+
+// ── MÔN HỌC ──
+app.get('/api/admin/lectures/subjects', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT s.subject_id, s.subject_code, s.name, s.faculty_unit_id,
+             s.security_level_id, s.active, s.description,
+             u.name AS faculty_name
+      FROM SUBJECT s
+      LEFT JOIN UNIT u ON u.unit_id = s.faculty_unit_id
+      ORDER BY s.active DESC, s.name
+    `);
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/lectures/subjects', async (req, res) => {
+  try {
+    const { subject_id, subject_code, name, faculty_unit_id, security_level_id, description } = req.body;
+    if (!subject_id || !name) return res.status(400).json({ error: 'Thiếu subject_id hoặc name' });
+    const pool = await getPool();
+    await pool.request()
+      .input('id', sql.VarChar(50), subject_id)
+      .input('code', sql.VarChar(50), subject_code || subject_id)
+      .input('name', sql.NVarChar(200), name)
+      .input('fac', sql.VarChar(50), faculty_unit_id || null)
+      .input('lvl', sql.Int, security_level_id || 2)
+      .input('desc', sql.NVarChar(500), description || null)
+      .query(`INSERT INTO SUBJECT (subject_id, subject_code, name, faculty_unit_id, security_level_id, description, active)
+              VALUES (@id, @code, @name, @fac, @lvl, @desc, 1)`);
+    await log(req, 'LECTURE_SUBJECT_CREATE', `Tạo môn học ${subject_id} - ${name}`);
+    res.json({ success: true, subject_id });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'subject_id đã tồn tại' });
+    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'subject_code đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/subjects/:id', async (req, res) => {
+  try {
+    const { subject_code, name, faculty_unit_id, security_level_id, description, active } = req.body;
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .input('code', sql.VarChar(50), subject_code || null)
+      .input('name', sql.NVarChar(200), name)
+      .input('fac', sql.VarChar(50), faculty_unit_id || null)
+      .input('lvl', sql.Int, security_level_id || null)
+      .input('desc', sql.NVarChar(500), description || null)
+      .input('act', sql.Bit, active !== false ? 1 : 0)
+      .query(`UPDATE SUBJECT SET
+              subject_code = COALESCE(@code, subject_code),
+              name = @name,
+              faculty_unit_id = @fac,
+              security_level_id = COALESCE(@lvl, security_level_id),
+              description = @desc,
+              active = @act
+              WHERE subject_id = @id`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy môn học' });
+    await log(req, 'LECTURE_SUBJECT_UPDATE', `Sửa môn học ${req.params.id}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/subjects/:id', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .query(`SELECT COUNT(*) AS n FROM DIGITAL_LECTURE WHERE subject_id = @id`);
+    if (used.recordset[0].n > 0) {
+      await pool.request().input('id', sql.VarChar(50), req.params.id)
+        .query(`UPDATE SUBJECT SET active = 0 WHERE subject_id = @id`);
+      return res.json({ success: true, soft_deleted: true, note: `${used.recordset[0].n} bài giảng đang dùng → chỉ ẩn` });
+    }
+    await pool.request().input('id', sql.VarChar(50), req.params.id)
+      .query(`DELETE FROM SUBJECT WHERE subject_id = @id`);
+    await log(req, 'LECTURE_SUBJECT_DELETE', `Xóa môn học ${req.params.id}`);
+    res.json({ success: true, soft_deleted: false });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── LỚP HỌC ──
+app.get('/api/admin/lectures/classes', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT c.class_id, c.class_name, c.unit_id, c.course_year,
+             c.student_total, c.description, c.active,
+             u.name AS unit_name
+      FROM TRAINING_CLASS c
+      LEFT JOIN UNIT u ON u.unit_id = c.unit_id
+      ORDER BY c.active DESC, c.class_name
+    `);
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/lectures/classes', async (req, res) => {
+  try {
+    const { class_id, class_name, unit_id, course_year, student_total, description } = req.body;
+    if (!class_id || !class_name) return res.status(400).json({ error: 'Thiếu class_id hoặc class_name' });
+    const total = parseInt(student_total, 10);
+    if (!Number.isFinite(total) || total < 0) return res.status(400).json({ error: 'student_total không hợp lệ' });
+    const pool = await getPool();
+    await pool.request()
+      .input('id', sql.VarChar(50), class_id)
+      .input('name', sql.NVarChar(100), class_name)
+      .input('unit', sql.VarChar(50), unit_id || 'TQS')
+      .input('year', sql.Int, course_year || null)
+      .input('total', sql.Int, total)
+      .input('desc', sql.NVarChar(500), description || null)
+      .query(`INSERT INTO TRAINING_CLASS (class_id, class_name, unit_id, course_year, student_total, description, active)
+              VALUES (@id, @name, @unit, @year, @total, @desc, 1)`);
+    await log(req, 'LECTURE_CLASS_CREATE', `Tạo lớp học ${class_id} - ${class_name} (${total} HV)`);
+    res.json({ success: true, class_id });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'class_id đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/classes/:id', async (req, res) => {
+  try {
+    const { class_name, unit_id, course_year, student_total, description, active } = req.body;
+    const pool = await getPool();
+    const totalVal = (student_total !== undefined && student_total !== null && student_total !== '')
+      ? parseInt(student_total, 10) : null;
+    const r = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .input('name', sql.NVarChar(100), class_name)
+      .input('unit', sql.VarChar(50), unit_id || null)
+      .input('year', sql.Int, course_year || null)
+      .input('total', sql.Int, totalVal)
+      .input('desc', sql.NVarChar(500), description || null)
+      .input('act', sql.Bit, active !== false ? 1 : 0)
+      .query(`UPDATE TRAINING_CLASS SET
+              class_name = @name,
+              unit_id = COALESCE(@unit, unit_id),
+              course_year = @year,
+              student_total = @total,
+              description = @desc,
+              active = @act
+              WHERE class_id = @id`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy lớp học' });
+    await log(req, 'LECTURE_CLASS_UPDATE', `Sửa lớp học ${req.params.id}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/classes/:id', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .query(`SELECT COUNT(*) AS n FROM TEACHING_SCHEDULE WHERE class_id = @id`);
+    if (used.recordset[0].n > 0) {
+      await pool.request().input('id', sql.VarChar(50), req.params.id)
+        .query(`UPDATE TRAINING_CLASS SET active = 0 WHERE class_id = @id`);
+      return res.json({ success: true, soft_deleted: true, note: `${used.recordset[0].n} ca dạy đang dùng → chỉ ẩn` });
+    }
+    await pool.request().input('id', sql.VarChar(50), req.params.id)
+      .query(`DELETE FROM TRAINING_CLASS WHERE class_id = @id`);
+    await log(req, 'LECTURE_CLASS_DELETE', `Xóa lớp học ${req.params.id}`);
+    res.json({ success: true, soft_deleted: false });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GIẢNG ĐƯỜNG ──
+app.get('/api/admin/lectures/classrooms', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT room_id, room_name, building_name, room_type, capacity, description, active
+      FROM CLASSROOM
+      ORDER BY active DESC, room_name
+    `);
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/lectures/classrooms', async (req, res) => {
+  try {
+    const { room_id, room_name, building_name, room_type, capacity, description } = req.body;
+    if (!room_id || !room_name) return res.status(400).json({ error: 'Thiếu room_id hoặc room_name' });
+    const validTypes = ['LECTURE_HALL', 'COMPUTER_LAB', 'SEMINAR'];
+    const rt = validTypes.includes(room_type) ? room_type : 'LECTURE_HALL';
+    const pool = await getPool();
+    await pool.request()
+      .input('id', sql.VarChar(50), room_id)
+      .input('name', sql.NVarChar(100), room_name)
+      .input('bld', sql.NVarChar(100), building_name || null)
+      .input('type', sql.VarChar(30), rt)
+      .input('cap', sql.Int, capacity || null)
+      .input('desc', sql.NVarChar(500), description || null)
+      .query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, room_type, capacity, description, active)
+              VALUES (@id, @name, @bld, @type, @cap, @desc, 1)`);
+    await log(req, 'LECTURE_CLASSROOM_CREATE', `Tạo giảng đường ${room_id} - ${room_name}`);
+    res.json({ success: true, room_id });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'room_id đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/classrooms/:id', async (req, res) => {
+  try {
+    const { room_name, building_name, room_type, capacity, description, active } = req.body;
+    const validTypes = ['LECTURE_HALL', 'COMPUTER_LAB', 'SEMINAR'];
+    const rt = validTypes.includes(room_type) ? room_type : null;
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .input('name', sql.NVarChar(100), room_name)
+      .input('bld', sql.NVarChar(100), building_name || null)
+      .input('type', sql.VarChar(30), rt)
+      .input('cap', sql.Int, capacity || null)
+      .input('desc', sql.NVarChar(500), description || null)
+      .input('act', sql.Bit, active !== false ? 1 : 0)
+      .query(`UPDATE CLASSROOM SET
+              room_name = @name,
+              building_name = @bld,
+              room_type = COALESCE(@type, room_type),
+              capacity = @cap,
+              description = @desc,
+              active = @act
+              WHERE room_id = @id`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy giảng đường' });
+    await log(req, 'LECTURE_CLASSROOM_UPDATE', `Sửa giảng đường ${req.params.id}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/classrooms/:id', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .query(`SELECT COUNT(*) AS n FROM TEACHING_SCHEDULE WHERE room_id = @id`);
+    if (used.recordset[0].n > 0) {
+      await pool.request().input('id', sql.VarChar(50), req.params.id)
+        .query(`UPDATE CLASSROOM SET active = 0 WHERE room_id = @id`);
+      return res.json({ success: true, soft_deleted: true });
+    }
+    await pool.request().input('id', sql.VarChar(50), req.params.id)
+      .query(`DELETE FROM CLASSROOM WHERE room_id = @id`);
+    await log(req, 'LECTURE_CLASSROOM_DELETE', `Xóa giảng đường ${req.params.id}`);
+    res.json({ success: true, soft_deleted: false });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 };

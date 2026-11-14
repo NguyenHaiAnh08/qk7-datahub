@@ -18,7 +18,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
   const [venues, setVenues] = useState<{ venue_name: string; usage_count: number }[]>([]);
   const [classId, setClassId] = useState('');
   const [venue, setVenue] = useState('');
-  const [studentCount, setStudentCount] = useState(0);
+  const [studentCount, setStudentCount] = useState<string>('');
   const [sessionType, setSessionType] = useState<SessionType>('TEACHER_LED');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +39,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
       });
     setClassId('');
     setVenue('');
-    setStudentCount(0);
+    setStudentCount('');
     setSessionType('TEACHER_LED');
     setNote('');
     setError('');
@@ -55,11 +55,14 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
 
     setSubmitting(true);
     try {
+      const parsedCount = parseInt(studentCount, 10);
+      const count = Number.isFinite(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
+
       const { schedule_id } = await lectureService.startSchedule({
         lecture_id: lecture.lecture_id,
         class_id: classId,
         venue_name: venue.trim(),
-        student_count: studentCount,
+        student_count: count,
         session_type: sessionType,
         note: note.trim() || undefined,
       });
@@ -81,7 +84,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
   class_id:           classId,
   class_name:         selectedClass?.class_name,
   venue_name:         venue.trim(),
-  student_count:      studentCount,
+  student_count:      count,
   session_type:       sessionType,
   note:               note.trim() || undefined,
   start_time:         new Date().toISOString(),
@@ -143,7 +146,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
               onChange={e => setClassId(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             >
-              <option value="">— Chọn lớp —</option>
+              <option value="">Chọn lớp</option>
               {classes.map(c => (
                 <option key={c.class_id} value={c.class_id}>{c.class_name}</option>
               ))}
@@ -160,7 +163,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
               value={venue}
               onChange={e => setVenue(e.target.value)}
               placeholder="VD: Giảng đường A1"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:opacity-0"
             />
             <datalist id="venues-list">
               {venues.map(v => (
@@ -171,13 +174,14 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Sĩ số</label>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Sĩ số học viên</label>
               <input
                 type="number"
                 min={0}
                 value={studentCount}
-                onChange={e => setStudentCount(Number(e.target.value) || 0)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                onChange={e => setStudentCount(e.target.value)}
+                placeholder="VD: 100"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <div>
@@ -199,7 +203,8 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg resize-none text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+              placeholder="VD: Ôn tập kiến thức"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg resize-none text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
           </div>
 

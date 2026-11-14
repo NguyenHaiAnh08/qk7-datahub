@@ -323,9 +323,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
                     color={isProtected ? 'red' : expiresAt ? 'orange' : 'gold'}
                     closable={!isBusy && !isProtected}
                     onClose={() => {
-                      if (window.confirm(`Gỡ vai trò "${rName}" của ${record.full_name}?`)) {
-                        handleRevokeRole(record.user_id, rId, rName);
-                      }
+                      handleRevokeRole(record.user_id, rId, rName);
                     }}
                     className={`font-semibold text-xs px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 shadow-2xs font-mono m-0 ${
                       isProtected ? 'cursor-not-allowed' : ''
@@ -452,9 +450,7 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
                       key: rId,
                       label: <span>Gỡ: <strong>{rName}</strong></span>,
                       onClick: () => {
-                        if (window.confirm(`Gỡ vai trò "${rName}" của ${record.full_name}?`)) {
-                          handleRevokeRole(record.user_id, rId, rName);
-                        }
+                        handleRevokeRole(record.user_id, rId, rName);
                       },
                     };
                   }),

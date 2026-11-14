@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   FileText, Layers, FileCode, Send, Check, X,
-  Play, Trash2, Hash, Building2, User, AlertTriangle, Edit, RotateCcw, Eye,
+  Play, Trash2, Hash, User, AlertTriangle, Edit, RotateCcw, Eye,
   HelpCircle, Shield, CheckCircle2, Clock
 } from 'lucide-react';
 import { Lecture, ContentType, LectureStatus } from '../../types/lecture';
@@ -12,7 +12,7 @@ const STATUS_STYLES: Record<LectureStatus, { label: string; badgeCls: string; st
   PENDING_TRAINING: { label: 'Chờ BGH duyệt',     badgeCls: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40', step: 3 },
   PUBLISHED:        { label: 'Đã xuất bản',       badgeCls: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30', step: 4 },
   REJECTED:         { label: 'Cần chỉnh sửa',     badgeCls: 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30', step: 1 },
-  ARCHIVED:         { label: 'Lưu trữ',           badgeCls: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/60 dark:text-slate-500 dark:border-slate-800', step: 0 },
+  ARCHIVED:         { label: 'Lưu trữ',           badgeCls: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30', step: 0 },
   DELETED:          { label: 'Đã xóa (Thùng rác)', badgeCls: 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30', step: 0 },
 };
 
@@ -70,8 +70,6 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   onSubmit, onApprove, onReject, onSoftDelete, onRestore, onPurge, onEdit, onView, onStartSession,
 }) => {
   const statusCfg = STATUS_STYLES[lecture.status] || STATUS_STYLES.DRAFT;
-  const contentCfg = CONTENT_CONFIG[lecture.content_type] || CONTENT_CONFIG.PDF;
-  const ContentIcon = contentCfg.icon;
   const secCfg = SECURITY_LEVEL_LABELS[lecture.security_level_id] || SECURITY_LEVEL_LABELS[2];
 
   const isAuthor = isAdmin || (currentUserId && currentUserId === lecture.author_id);
@@ -85,40 +83,30 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   type Action = { label: string; icon: typeof FileText; onClick: () => void; cls: string };
   const actions: Action[] = [];
 
-  // 1. Xem chi tiết
-  actions.push({
-    label: 'Xem chi tiết',
-    icon: Eye,
-    onClick: onView,
-    cls: 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-  });
+  // 1. Mở ca dạy khi đã PUBLISHED (Ưu tiên số 1 theo yêu cầu chỉ huy)
+  if (isPublished && isAuthor && canStartSchedule) {
+    actions.push({
+      label: 'Mở ca dạy',
+      icon: Play,
+      onClick: onStartSession,
+      cls: 'bg-gradient-to-r from-[#166534] to-[#15803d] hover:from-[#15803d] hover:to-[#16a34a] text-white font-bold border border-emerald-500/40 shadow-xs'
+    });
+  }
 
-  // 2. Tác giả: Sửa, Gửi duyệt, Mở ca dạy
-  if (isAuthor) {
-    if (isDraftOrRejected && canEdit) {
-      actions.push({
-        label: 'Chỉnh sửa',
-        icon: Edit,
-        onClick: onEdit,
-        cls: 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30'
-      });
-      actions.push({
-        label: 'Gửi duyệt',
-        icon: Send,
-        onClick: onSubmit,
-        cls: 'bg-[#166534] hover:bg-[#14532d] text-white border border-emerald-600 shadow-xs'
-      });
-    }
-
-    // Mở ca dạy khi đã PUBLISHED
-    if (isPublished && canStartSchedule) {
-      actions.push({
-        label: 'Mở ca dạy',
-        icon: Play,
-        onClick: onStartSession,
-        cls: 'bg-gradient-to-r from-[#166534] to-[#15803d] hover:from-[#15803d] hover:to-[#16a34a] text-white font-bold border border-emerald-500/40 shadow-xs'
-      });
-    }
+  // 2. Chỉnh sửa & Gửi duyệt khi là DRAFT / REJECTED
+  if (isAuthor && isDraftOrRejected && canEdit) {
+    actions.push({
+      label: 'Chỉnh sửa',
+      icon: Edit,
+      onClick: onEdit,
+      cls: 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30'
+    });
+    actions.push({
+      label: 'Gửi duyệt',
+      icon: Send,
+      onClick: onSubmit,
+      cls: 'bg-[#166534] hover:bg-[#14532d] text-white border border-emerald-600 shadow-xs'
+    });
   }
 
   // 3. Quyền phê duyệt 2 tầng (Chỉ huy Khoa / Đào tạo / BGH)
@@ -137,7 +125,15 @@ export const LectureCard: React.FC<LectureCardProps> = ({
     }
   }
 
-  // 4. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn
+  // 4. Xem chi tiết
+  actions.push({
+    label: 'Xem chi tiết',
+    icon: Eye,
+    onClick: onView,
+    cls: 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+  });
+
+  // 5. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn
   if (canArchive) {
     if (isDeleted) {
       // Đang trong thùng rác → Khôi phục + Xoá vĩnh viễn
@@ -156,12 +152,12 @@ export const LectureCard: React.FC<LectureCardProps> = ({
         },
       );
     } else {
-      // Đang hoạt động bình thường → Xoá mềm (màu cam)
+      // Đang hoạt động bình thường → Xoá mềm (màu đỏ theo yêu cầu)
       actions.push({
         label: 'Xóa',
         icon: Trash2,
         onClick: onSoftDelete,
-        cls: 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30'
+        cls: 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 dark:bg-red-500/15 dark:hover:bg-red-500/25 dark:text-red-300 dark:border-red-500/30'
       });
     }
   }
@@ -169,54 +165,64 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   // ── TABLE VIEW ──
   if (viewMode === 'table') {
     return (
-      <div className="bg-white dark:bg-[#111827] p-3 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-500/40 hover:shadow-xs transition-all">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className={`w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700 ${contentCfg.iconCls}`}>
-            <ContentIcon className="w-4 h-4" />
+      <div className="bg-white dark:bg-[#111827] p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-500/40 hover:shadow-xs transition-all">
+        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300/40 dark:border-emerald-700/40 flex items-center justify-center shrink-0 text-emerald-700 dark:text-emerald-400 font-bold mt-0.5 sm:mt-0">
+            <Hash className="w-4 h-4" />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 space-y-1">
+            {/* Header dòng 1: Tiêu đề + Cấp bảo mật + Trạng thái (Đã xuất bản / Lưu trữ nằm kế cấp bảo mật) */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-sm text-slate-900 dark:text-white truncate" title={lecture.title}>
+              <span
+                className="font-bold text-sm text-slate-900 dark:text-white truncate cursor-pointer hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+                onClick={onView}
+                title={lecture.title}
+              >
                 {lecture.title}
-              </span>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${contentCfg.badgeCls}`}>
-                {lecture.content_type}
               </span>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${secCfg.cls}`}>
                 {secCfg.label.split('—')[0].trim()}
               </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shadow-2xs ${statusCfg.badgeCls}`}>
+                {statusCfg.label}
+              </span>
             </div>
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              <span className="font-mono text-emerald-700 dark:text-emerald-400 font-semibold">{lecture.lecture_code}</span>
-              <span>Môn: <strong className="text-slate-700 dark:text-slate-300">{lecture.subject_name || '—'}</strong></span>
-              <span className="truncate">Khoa: {lecture.faculty_name || '—'}</span>
-              <span>GV: {lecture.author_name || '—'}</span>
+
+            {/* Dòng trên: Mã bài giảng & Môn học (in đậm giá trị) */}
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded text-[11px]">
+                #{lecture.lecture_code}
+              </span>
+              <span>Môn: <strong className="text-slate-900 dark:text-slate-100 font-bold">{lecture.subject_name || '—'}</strong></span>
+            </div>
+
+            {/* Dòng dưới: Khoa / Bộ môn & GV (in đậm giá trị) */}
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+              <span>Khoa: <strong className="text-slate-900 dark:text-slate-100 font-bold">{lecture.faculty_name || '—'}</strong></span>
+              <span>GV: <strong className="text-slate-900 dark:text-slate-100 font-bold">{lecture.author_rank ? `${lecture.author_rank} ` : ''}{lecture.author_name || '—'}</strong></span>
               {typeof lecture.quiz_count === 'number' && lecture.quiz_count > 0 && (
-                <span className="text-amber-700 dark:text-amber-400 font-semibold">• {lecture.quiz_count} câu hỏi Quiz</span>
+                <span className="text-amber-700 dark:text-amber-400 font-bold">• {lecture.quiz_count} câu hỏi Quiz</span>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border whitespace-nowrap ${statusCfg.badgeCls}`}>
-            {statusCfg.label}
-          </span>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {actions.map((a, i) => {
-              const I = a.icon;
-              return (
-                <button
-                  key={i}
-                  onClick={a.onClick}
-                  className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${a.cls}`}
-                >
-                  <I className="w-3.5 h-3.5" />
-                  <span>{a.label}</span>
-                </button>
-              );
-            })}
-          </div>
+        {/* Nút thao tác ở bên phải */}
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+          {actions.map((a, i) => {
+            const I = a.icon;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={a.onClick}
+                className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-2xs ${a.cls}`}
+              >
+                <I className="w-3.5 h-3.5" />
+                <span>{a.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -224,48 +230,41 @@ export const LectureCard: React.FC<LectureCardProps> = ({
 
   // ── GRID VIEW (TACTICAL COMMAND CARD) ──
   return (
-    <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-4 flex flex-col gap-3.5 hover:border-emerald-500/40 hover:shadow-md transition-all h-full relative group">
+    <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-4 flex flex-col gap-3 hover:border-emerald-500/40 hover:shadow-md transition-all h-full relative group">
       
-      {/* Header Card: Icon định dạng + Badge trạng thái & Bảo mật */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <div className={`w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center shrink-0 shadow-2xs ${contentCfg.iconCls}`}>
-            <ContentIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${contentCfg.badgeCls}`}>
-                {contentCfg.label}
-              </span>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${secCfg.cls}`}>
-                {secCfg.label.split('—')[0].trim()}
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-              <Hash className="w-3 h-3 text-slate-400" />
-              <span className="font-bold text-emerald-800 dark:text-emerald-400">{lecture.lecture_code}</span>
-            </div>
-          </div>
+      {/* 1. Header Card: Mã bài giảng nổi bật + Cấp độ & Trạng thái (Bỏ badge Gói) */}
+      <div className="flex items-center justify-between gap-2">
+        {/* Mã danh sách bài giảng nổi bật */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300/70 dark:border-emerald-700/60 font-mono text-xs font-bold text-emerald-800 dark:text-emerald-300 shadow-2xs tracking-wide">
+          <Hash className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>{lecture.lecture_code}</span>
         </div>
 
-        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${statusCfg.badgeCls}`}>
-          {statusCfg.label}
-        </span>
+        {/* Cụm Cấp độ bảo mật & Trạng thái xuất bản */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border shadow-2xs ${secCfg.cls}`}>
+            {secCfg.label.split('—')[0].trim()}
+          </span>
+          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${statusCfg.badgeCls}`}>
+            {statusCfg.label}
+          </span>
+        </div>
       </div>
 
-      {/* Tiêu đề bài giảng */}
-      <div className="flex-1 min-w-0">
+      {/* 2. Tên danh sách bài giảng (Hero Title) */}
+      <div className="min-w-0">
         <h3
-          className="font-bold text-sm text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors"
+          className="font-bold text-[15px] text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors cursor-pointer"
+          onClick={onView}
           title={lecture.title}
         >
           {lecture.title}
         </h3>
       </div>
 
-      {/* Mini Stepper: Quy trình phê duyệt 2 tầng quân sự */}
+      {/* 3. Mini Stepper: Quy trình duyệt 2 tầng quân sự */}
       {!isArchived && !isDeleted && (
-        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.05]">
+        <div className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/80 dark:border-white/[0.04]">
           <div className="flex items-center justify-between text-[10px] font-semibold mb-1.5">
             <span className="text-slate-500 dark:text-slate-400">Tiến trình duyệt 2 tầng:</span>
             <span className="text-emerald-700 dark:text-emerald-400 font-bold">
@@ -303,7 +302,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
       )}
 
       {/* Metadata chi tiết */}
-      <div className="space-y-1.5 text-[11px] text-slate-600 dark:text-slate-400 border-t border-slate-100 dark:border-white/[0.04] pt-2.5">
+      <div className="space-y-1.5 text-[11px] text-slate-600 dark:text-slate-400 border-t border-slate-100 dark:border-white/[0.04] pt-2">
         <div className="flex items-center justify-between gap-1 truncate">
           <span className="text-slate-400 shrink-0">Môn học:</span>
           <span className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={lecture.subject_name}>

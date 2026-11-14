@@ -18,9 +18,10 @@ const config = {
     encrypt:                process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_CERT === 'true',
     enableArithAbort:       true,
-    useUTC: false
+    useUTC:                 false,
+    cancelTimeout:          15000, // Tăng thời gian chờ hủy từ 5s lên 15s để chống rớt socket khi SQL Server bận
   },
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
+  pool: { max: 25, min: 2, idleTimeoutMillis: 30000 },
   connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000', 10),
   requestTimeout:    parseInt(process.env.DB_REQUEST_TIMEOUT || '30000', 10)
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Clock, RefreshCw, Calendar, User, Building2, Users, TrendingUp, History
+  Clock, RefreshCw, Calendar, User, Building2, Users, TrendingUp, History, GraduationCap
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { lectureService } from '../../services/lectureService';
@@ -205,51 +205,72 @@ export const TeachingHistoryPanel: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map((s) => (
-            <div
-              key={s.schedule_id}
-              className="bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-500/40 hover:shadow-xs transition-all"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1" title={s.lecture_title}>
-                    {s.lecture_title}
-                  </span>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 shrink-0">
-                    Hoàn thành
-                  </span>
-                </div>
-                <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  <span className="flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-slate-400" />
-                    <strong className="text-slate-700 dark:text-slate-300 font-semibold">{s.presenter_name}</strong>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{s.venue_name}</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Lớp {s.class_name || 'Học viên'} ({s.student_count} HV)</span>
-                  </span>
-                </div>
-              </div>
+          {items.map((s) => {
+            const presenterFull = [s.presenter_rank, s.presenter_name].filter(Boolean).join(' ') || s.presenter_name || 'Chưa xác định';
+            const venueLabel = s.venue_name || '1';
+            const classLabel = s.class_name || 'Học viên';
+            const studentCountLabel = s.student_count ?? 0;
 
-              <div className="flex items-center gap-3 shrink-0 text-xs">
-                <div className="text-right">
-                  <div className="font-mono text-slate-700 dark:text-slate-300 font-medium">
-                    {new Date(s.start_time).toLocaleDateString('vi-VN')}
+            const startDate = s.start_time ? new Date(s.start_time) : null;
+            const startTimeStr = startDate ? startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+            const endDate = s.end_time
+              ? new Date(s.end_time)
+              : (startDate && s.duration_minutes
+                  ? new Date(startDate.getTime() + s.duration_minutes * 60000)
+                  : null);
+            const endTimeStr = endDate ? endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+            const dateStr = startDate ? startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+            return (
+              <div
+                key={s.schedule_id}
+                className="bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-500/40 hover:shadow-xs transition-all"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-1" title={s.lecture_title}>
+                      {s.lecture_title}
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 shrink-0">
+                      Hoàn thành
+                    </span>
                   </div>
-                  <div className="text-[10px] text-slate-400">
-                    {new Date(s.start_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  <div className="flex items-center flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-slate-400 mt-1.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Giảng viên: <strong className="font-bold text-slate-900 dark:text-white">{presenterFull}</strong></span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>Giảng đường: <strong className="font-bold text-slate-900 dark:text-white">{venueLabel}</strong></span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <GraduationCap className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                      <span>Lớp: <strong className="font-bold text-slate-900 dark:text-white">{classLabel}</strong></span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <span>Sĩ số học viên tham gia: <strong className="font-bold text-slate-900 dark:text-white">{studentCountLabel}</strong></span>
+                    </span>
                   </div>
                 </div>
-                <span className="font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30">
-                  {s.duration_minutes || 0} phút
-                </span>
+
+                <div className="flex items-center gap-3 shrink-0 text-xs">
+                  <div className="text-right flex flex-col items-end justify-center">
+                    <div className="font-mono text-sm font-bold text-slate-900 dark:text-white">
+                      {startTimeStr} - {endTimeStr}
+                    </div>
+                    <div className="font-mono text-xs font-bold text-slate-600 dark:text-slate-400 mt-0.5">
+                      {dateStr}
+                    </div>
+                  </div>
+                  <span className="font-mono font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 text-xs shadow-2xs">
+                    {s.duration_minutes || 0} phút
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

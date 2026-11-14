@@ -349,14 +349,14 @@ export const CreateLectureModal: React.FC<Props> = ({
               <div>
                 <span className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                   <BookOpen className="w-3 h-3 text-slate-400" />
-                  Môn học trực thuộc <span className="text-rose-500">*</span>
+                  Môn học <span className="text-rose-500">*</span>
                 </span>
                 <select
                   value={subjectId}
                   onChange={(e) => setSubjectId(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-600 cursor-pointer text-slate-900 dark:text-slate-100 text-xs"
                 >
-                  <option value="">— Chọn môn học —</option>
+                  <option value="">Chọn môn học</option>
                   {subjects.map((s) => (
                     <option key={s.subject_id} value={s.subject_id}>
                       {s.name} {s.faculty_name ? `(${s.faculty_name})` : ''}

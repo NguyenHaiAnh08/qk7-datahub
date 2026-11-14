@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  MonitorPlay, Plus, Search, RefreshCw, LayoutGrid, List,
+  MonitorPlay, Plus, Search, RefreshCw, RotateCw, LayoutGrid, List,
   BookOpen, Radio, Clock, CheckCircle2, FileText, X,
   Shield, AlertTriangle, Layers, HelpCircle, Sparkles
 } from 'lucide-react';
@@ -192,9 +192,14 @@ export const LecturesPage: React.FC = () => {
     loadLectures();
   }, [loadLectures]);
 
-  // 🆕 TỰ ĐỘNG PHỤC HỒI CA DẠY KHI F5 (Đã sửa lỗi 403 — dùng endpoint nhẹ)
+  // 🆕 TỰ ĐỘNG PHỤC HỒI CA DẠY KHI F5 (Được cô lập hoàn toàn theo user_id, ngăn chặn tuyệt đối lỗi chiếm quyền phiên giữa các tài khoản)
   useEffect(() => {
-    const savedSessionStr = localStorage.getItem('qk7_active_session');
+    // Luôn dọn dẹp key cũ không có namespace để tránh rò rỉ ca dạy giữa các người dùng
+    try { localStorage.removeItem('qk7_active_session'); } catch {}
+
+    if (!user?.user_id) return;
+    const userSessionKey = `qk7_active_session_${user.user_id}`;
+    const savedSessionStr = localStorage.getItem(userSessionKey);
     if (!savedSessionStr) return;
 
     let cancelled = false;
@@ -203,7 +208,7 @@ export const LecturesPage: React.FC = () => {
       try {
         const saved = JSON.parse(savedSessionStr);
         if (!saved?.schedule_id || !saved?.lecture_id) {
-          localStorage.removeItem('qk7_active_session');
+          localStorage.removeItem(userSessionKey);
           return;
         }
 
@@ -220,8 +225,12 @@ export const LecturesPage: React.FC = () => {
         }
         if (cancelled) return;
 
-        if (ongoingSession && ongoingSession.status === 'ONGOING') {
-          // Ca vẫn đang chạy → phục hồi giao diện LiveSessionRoom
+        // 🛡️ CHỐT CHẶN BẢO MẬT: Chỉ phục hồi nếu ca vẫn đang ONGOING VÀ presenter_id khớp tuyệt đối với user đang đăng nhập
+        if (
+          ongoingSession &&
+          ongoingSession.status === 'ONGOING' &&
+          ongoingSession.presenter_id === user.user_id
+        ) {
           const lec = await lectureService.getById(saved.lecture_id);
           if (cancelled) return;
 
@@ -231,18 +240,20 @@ export const LecturesPage: React.FC = () => {
             toast.info(`Đã khôi phục ca giảng dạy "${lec.title}" đang diễn ra.`);
           }
         } else {
-          // Ca đã kết thúc (Watchdog hoặc Admin đóng) → dọn dẹp
-          localStorage.removeItem('qk7_active_session');
-          toast.info('Ca giảng dạy trước đó đã kết thúc.');
+          // Ca đã kết thúc hoặc không phải do user này mở → xóa cờ lưu trữ an toàn
+          localStorage.removeItem(userSessionKey);
+          if (ongoingSession && ongoingSession.presenter_id === user.user_id) {
+            toast.info('Ca giảng dạy trước đó đã kết thúc.');
+          }
         }
       } catch {
         // Dữ liệu hỏng hoặc API lỗi → dọn dẹp để không kẹt ở lần F5 sau
-        try { localStorage.removeItem('qk7_active_session'); } catch { /* noop */ }
+        try { localStorage.removeItem(userSessionKey); } catch { /* noop */ }
       }
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [user?.user_id]);
 
   // ── Stats luôn được tính từ toàn bộ kho dữ liệu bài giảng của người dùng ──
   const stats = useMemo(() => {
@@ -412,14 +423,19 @@ export const LecturesPage: React.FC = () => {
     setActiveSession(session);
     setCurrentLecture(lecture);
 
-    // 🆕 Lưu cờ để phục hồi khi F5
-    try {
-      localStorage.setItem('qk7_active_session', JSON.stringify({
-        schedule_id: session.schedule_id,
-        lecture_id: lecture.lecture_id,
-        started_at: new Date().toISOString(),
-      }));
-    } catch { /* localStorage có thể bị chặn — bỏ qua */ }
+    // 🆕 Lưu cờ để phục hồi khi F5 — cô lập theo user_id để không xung đột phiên
+    const currentUid = user?.user_id || session.presenter_id;
+    if (currentUid) {
+      try {
+        localStorage.setItem(`qk7_active_session_${currentUid}`, JSON.stringify({
+          schedule_id: session.schedule_id,
+          lecture_id: lecture.lecture_id,
+          presenter_id: currentUid,
+          started_at: new Date().toISOString(),
+        }));
+        localStorage.removeItem('qk7_active_session');
+      } catch { /* localStorage có thể bị chặn — bỏ qua */ }
+    }
   };
 
   const handleEndSession = async () => {
@@ -428,7 +444,11 @@ export const LecturesPage: React.FC = () => {
       await lectureService.endSchedule(activeSession.schedule_id);
       toast.success('Đã kết thúc ca giảng dạy thành công!');
 
-      // 🆕 Xóa cờ lưu trữ khi kết thúc hợp lệ
+      // 🆕 Xóa cờ lưu trữ khi kết thúc hợp lệ theo user_id
+      const currentUid = user?.user_id || activeSession.presenter_id;
+      if (currentUid) {
+        try { localStorage.removeItem(`qk7_active_session_${currentUid}`); } catch {}
+      }
       try { localStorage.removeItem('qk7_active_session'); } catch { /* noop */ }
 
       setActiveSession(null);
@@ -495,14 +515,16 @@ export const LecturesPage: React.FC = () => {
             <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setKpiRefreshKey(prev => prev + 1);
-                  loadLectures();
+                  await loadLectures();
+                  toast.success('Đã làm mới dữ liệu bài giảng số!');
                 }}
                 disabled={loading}
                 className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-2xs"
+                title="Làm mới dữ liệu bài giảng"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 <span>Làm mới</span>
               </button>
 

@@ -4,6 +4,29 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.2-lecture-session-and-db-optimization] — 2026-11-14
+
+### 1. Tối Ưu Hóa Kết Nối Cơ Sở Dữ Liệu & Quản Lý Phiên (Database & Session Optimization)
+- **Tối ưu hóa kết nối SQL Server ([`backend/src/db.js`](../backend/src/db.js)):**
+  - Mở rộng cấu hình connection pool (`max: 25`, `min: 2`), tăng `cancelTimeout` lên 15.000ms nhằm chống ngắt kết nối socket đột ngột khi SQL Server xử lý các tác vụ nặng.
+- **Giảm tải I/O ghi nhận phiên đăng nhập ([`backend/src/sessions.js`](../backend/src/sessions.js)):**
+  - Bổ sung chỉ thị `WITH (NOLOCK)` cho các truy vấn kiểm tra phiên `USER_SESSION` nhằm loại bỏ hiện tượng khóa bảng (table locking).
+  - Điều tiết tần suất cập nhật thời gian hoạt động cuối (`last_seen_at`), chỉ ghi xuống CSDL khi khoảng cách vượt quá 2 phút (120s), giảm thiểu đáng kể số lượng lệnh `UPDATE` liên tục.
+
+### 2. Nâng Cấp Toàn Diện Phân Hệ Bài Giảng Số & Phòng Học Trực Tiếp (Digital Lectures & Live Sessions)
+- **Cải tiến Máy chủ Backend:**
+  - [`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js): Mở rộng truy vấn liên kết thông tin lớp học (`class_name`) và địa điểm phòng học (`venue_name`), chuẩn hóa luồng cập nhật tiến độ bài giảng trực tiếp (`slide_index`, `slide_total`, `scorm_progress`).
+  - [`backend/src/scorm-package-routes.js`](../backend/src/scorm-package-routes.js): Tích hợp cơ chế giao tiếp `postMessage` (`AP_CHANGE_MODE`) giữa iframe học liệu ActivePresenter và cửa sổ cha (`LiveSessionRoom`), tối ưu Content Security Policy cho phép nạp tài nguyên an toàn.
+- **Nâng cấp Giao diện Frontend (`frontend/src/components/lectures/`):**
+  - [`LiveSessionRoom.tsx`](../frontend/src/components/lectures/LiveSessionRoom.tsx): Nâng cấp trình chiếu toàn màn hình, chuyển đổi mượt mà các chế độ học liệu, theo dõi thời lượng và điểm danh.
+  - [`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx) & [`TeachingHistoryPanel.tsx`](../frontend/src/components/lectures/TeachingHistoryPanel.tsx): Cải tiến bảng giám sát chỉ huy và thống kê lịch sử giảng dạy.
+  - [`LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx), [`StartSessionModal.tsx`](../frontend/src/components/lectures/StartSessionModal.tsx), [`LecturesPage.tsx`](../frontend/src/pages/LecturesPage.tsx): Tinh chỉnh luồng bắt đầu phiên giảng dạy và quản trị trạng thái bài giảng.
+
+### 3. Cấu Hình Kỷ Luật Mã Nguồn & Giữ Sạch Source Control ([`.gitignore`](../.gitignore))
+- Cấu hình tự động loại trừ các kho kỹ năng AI và tệp log công ty ảo cục bộ (`.agents/skills/*`, `.agents/company-*.md`), giữ lại 7 kỹ năng UI/UX cốt lõi, bảo đảm kho mã nguồn luôn gọn gàng và không kích hoạt cảnh báo Gitleaks.
+
+---
+
 ## [v1.6.1-mergecode-v5-and-doc-sync-rule] — 2026-11-13
 
 ### 1. Nâng Cấp Công Cụ Gộp Mã Nguồn Chuẩn Hóa (`scripts/mergecode.py` v5.0.0)

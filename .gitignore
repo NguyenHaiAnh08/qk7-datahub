@@ -90,4 +90,16 @@ strix_runs/
 offline_packages/
 tools/gitleaks/
 
+# Virtual Company Logs & Local Agent Skills (Local AI Runtime & Talent Pool)
+.agents/company-*.md
+.agents/skills/*
+!.agents/skills/daub-ui/
+!.agents/skills/design-md/
+!.agents/skills/design-taste-frontend/
+!.agents/skills/huashu-design/
+!.agents/skills/qk7-design-orchestrator/
+!.agents/skills/ui-ux-pro-max/
+!.agents/skills/unslop/
+
+
 

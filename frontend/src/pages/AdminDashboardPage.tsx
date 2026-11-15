@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PinManageModal } from '../components/users/PinManageModal';
 import { LectureCatalogsPage } from './LectureCatalogsPage';
 
+
 import {
   LayoutDashboard,
   Users,
@@ -1845,6 +1846,10 @@ const pinPendingCount = useMemo(
           {activeTab === 'protection_config' && (
             <ProtectedPermissionsConfigPage />
           )}
+
+          {activeTab === 'lec-subjects'   && <LectureCatalogsPage catalogType="subjects" />}
+          {activeTab === 'lec-classes'    && <LectureCatalogsPage catalogType="classes" />}
+          {activeTab === 'lec-classrooms' && <LectureCatalogsPage catalogType="classrooms" />}
         </main>
       </div>
 
@@ -2262,10 +2267,6 @@ const pinPendingCount = useMemo(
       />
 
       <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
-
-      {activeTab === 'lec-subjects'   && <LectureCatalogsPage catalogType="subjects" />}
-      {activeTab === 'lec-classes'    && <LectureCatalogsPage catalogType="classes" />}
-      {activeTab === 'lec-classrooms' && <LectureCatalogsPage catalogType="classrooms" />}
     </div>
   );
 };

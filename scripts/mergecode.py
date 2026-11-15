@@ -462,12 +462,13 @@ def _write_file_block(out, root: Path, rel: Path, stats: dict) -> int:
     return out_bytes_estimate
 
 
-def _write_summary(out, stats: dict, files: list[Path], elapsed: float | None = None) -> None:
+def _write_summary(out, stats: dict, files: list[Path] | None = None, elapsed: float | None = None) -> None:
     """Ghi SUMMARY — luôn được gọi từ finally."""
     try:
+        total_files = len(files) if files is not None else stats.get("written", 0)
         out.write("\n" + "=" * 80 + "\n")
         out.write("=== SUMMARY ===\n")
-        out.write(f"Files written : {stats['written']}/{len(files)}\n")
+        out.write(f"Files written : {stats['written']}/{total_files}\n")
         out.write(f"Files skipped : {stats['skipped_binary'] + stats['skipped_size'] + len(stats['errors'])}\n")
         out.write(f"  - binary    : {stats['skipped_binary']}\n")
         out.write(f"  - size      : {stats['skipped_size']}\n")
@@ -631,7 +632,7 @@ def write_merged(
                             break
                 finally:
                     # LUÔN ghi SUMMARY dù có exception
-                    _write_summary(out, part_stats)
+                    _write_summary(out, part_stats, part_files)
 
         except Exception as e:
             print(f"[ERR] Lỗi ghi part {part_idx}: {e}", file=sys.stderr)

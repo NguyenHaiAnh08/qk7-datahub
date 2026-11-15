@@ -4,6 +4,26 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.3-lecture-catalogs-and-fingerprint-enhancement] — 2026-11-15
+
+### 1. Phân Hệ Quản Lý Danh Mục Bài Giảng Số (Lecture Catalogs System)
+- **Giao diện Quản trị Danh mục Bài giảng:**
+  - Bổ sung màn hình chuyên trách [`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx) phục vụ phân loại, tổ chức danh mục bài giảng khoa học và trực quan.
+  - Tích hợp mục danh mục vào thanh điều hướng bên [`Sidebar.tsx`](../frontend/src/components/common/Sidebar.tsx) và trung tâm chỉ huy [`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx).
+- **Hạ tầng Dữ liệu & API Backend:**
+  - Bổ sung script migration [`upgrade_lecture_catalogs.cjs`](../backend/migrations/upgrade_lecture_catalogs.cjs) nâng cấp cấu trúc bảng danh mục bài giảng.
+  - Bổ sung các endpoint quản trị danh mục trong [`backend/src/admin-routes.js`](../backend/src/admin-routes.js) và khai báo phân quyền chặt chẽ trong [`backend/src/route-permissions.js`](../backend/src/route-permissions.js).
+
+### 2. Tinh Chỉnh Xác Thực Sinh Trắc Học & Quản Trị Bài Giảng
+- Nâng cấp modal quét vân tay [`FingerprintScanModal.tsx`](../frontend/src/components/users/FingerprintScanModal.tsx) và [`fingerprintService.ts`](../frontend/src/services/fingerprintService.ts) tăng độ ổn định khi giao tiếp máy quét ZKTeco.
+- Cải tiến modal bắt đầu phiên giảng dạy [`StartSessionModal.tsx`](../frontend/src/components/lectures/StartSessionModal.tsx) và dịch vụ bài giảng [`lectureService.ts`](../frontend/src/services/lectureService.ts).
+
+### 3. Tối Ưu Hóa & Sửa Lỗi Tiện Ích Gộp Mã Nguồn (`scripts/mergecode.py` v5.1.1)
+- Khắc phục lỗi thiếu đối số `files` tại hàm `_write_summary()` trong `scripts/mergecode.py`.
+- Bổ sung mẫu `mergecode*.txt` vào [`.gitignore`](../.gitignore) và loại bỏ tệp dump `mergecode_full.txt` (4.7 MB) khỏi kho mã nguồn Git, bảo đảm tuân thủ Hiến pháp Kỷ luật Thư mục của dự án.
+
+---
+
 ## [v1.6.2-lecture-session-and-db-optimization] — 2026-11-14
 
 ### 1. Tối Ưu Hóa Kết Nối Cơ Sở Dữ Liệu & Quản Lý Phiên (Database & Session Optimization)

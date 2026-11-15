@@ -4,6 +4,22 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.4-admin-dashboard-catalogs-and-theme-enhancements] — 2026-11-15
+
+### 1. Nâng Cấp Bảng Điều Khiển Chỉ Huy & Quản Trị Hệ Thống (Admin Dashboard Suite)
+- **Đại tu màn hình Admin Dashboard ([`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx)):**
+  - Mở rộng giao diện điều khiển với các bảng số liệu, biểu đồ phân bố, trạng thái dịch vụ thời gian thực và quản trị tài nguyên toàn trường.
+  - Tối ưu hóa hiệu năng render bảng dữ liệu và nâng cấp trải nghiệm người dùng theo tiêu chuẩn bản sắc quân đội.
+- **Nâng Cấp Quản Trị Danh Mục & Cấu Hình Phân Quyền Bảo Vệ:**
+  - Hoàn thiện giao diện [`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx) phục vụ phân loại giáo trình bài giảng.
+  - Bổ sung màn hình quản lý phân quyền được bảo vệ [`ProtectedPermissionsConfigPage.tsx`](../frontend/src/pages/ProtectedPermissionsConfigPage.tsx) và hàng đợi phê duyệt [`ApprovalQueuePage.tsx`](../frontend/src/pages/ApprovalQueuePage.tsx).
+
+### 2. Tối Ưu Hóa Khởi Tạo Chủ Đề & Chống Chớp Giao Diện (Theme Initialization)
+- Cập nhật [`theme-init.js`](../frontend/public/theme-init.js) và [`backend/public/theme-init.js`](../backend/public/theme-init.js) thực thi trước khi tải DOM để loại bỏ hiện tượng Flash of Unstyled Content (FOUC).
+- Hoàn thiện thanh điều hướng bên [`Sidebar.tsx`](../frontend/src/components/common/Sidebar.tsx), hộp thoại xác nhận [`ConfirmDialog.tsx`](../frontend/src/components/common/ConfirmDialog.tsx) và modal so sánh phê duyệt [`ApprovalDiffModal.tsx`](../frontend/src/components/document-desk/ApprovalDiffModal.tsx).
+
+---
+
 ## [v1.6.3-lecture-catalogs-and-fingerprint-enhancement] — 2026-11-15
 
 ### 1. Phân Hệ Quản Lý Danh Mục Bài Giảng Số (Lecture Catalogs System)

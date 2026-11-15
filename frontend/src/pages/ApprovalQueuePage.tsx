@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShieldCheck,
   Clock,
@@ -648,9 +649,9 @@ export const ApprovalQueuePage: React.FC = () => {
       {/* ========================================================= */}
       {/* MODAL 2: DUYỆT CÁC YÊU CẦU CẤP PIN HOẶC QUẢN TRỊ HỆ THỐNG */}
       {/* ========================================================= */}
-      {selected && (!selected.request_id.startsWith('PROP-') || !selectedProposalData) && (
+      {selected && (!selected.request_id.startsWith('PROP-') || !selectedProposalData) && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans"
           onClick={() => !processing && setSelected(null)}
         >
           <div
@@ -814,14 +815,15 @@ export const ApprovalQueuePage: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================= */}
       {/* MODAL HIỂN THỊ MÃ PIN SAU KHI DUYỆT THÀNH CÔNG           */}
       {/* ========================================================= */}
-      {generatedPinResult && (
-        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
+      {generatedPinResult && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-emerald-500/30 text-center animate-in zoom-in-95">
             <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
@@ -866,7 +868,8 @@ export const ApprovalQueuePage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

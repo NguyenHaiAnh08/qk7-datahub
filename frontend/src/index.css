@@ -44,6 +44,17 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Remove number input spinners globally across all browsers */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   body {
     @apply font-sans antialiased selection:bg-amber-500 selection:text-slate-900;
   }

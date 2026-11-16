@@ -13,6 +13,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');         
 const { sql, getPool } = require('./db');
+const { getLectureScope, bindUnitIn, inScope } = require('./lecture-scope');
 
 const HANGING_THRESHOLD_MINUTES = 4 * 60; // 4 giờ
 
@@ -151,7 +152,7 @@ module.exports = function createLectureRoutes({
       const isAdmin = roles.includes('ROL-01');
       const isCommander = roles.includes('ROL-02');
       const deptHead = await isDeptHead(pool, req.user);
-      const userUnit = await getUserUnitId(pool, userId);
+      
       const clearance = req.user.clearance_level_id || 1;
 
       let query = `
@@ -180,20 +181,11 @@ module.exports = function createLectureRoutes({
       `;
       r.input('clearance', sql.Int, clearance);
 
-      if (!isAdmin && !isCommander) {
-        if (deptHead && userUnit) {
-          query += ` AND (l.faculty_unit_id = @userUnit OR l.author_id = @selfId)`;
-          r.input('userUnit', sql.VarChar(50), userUnit);
-          r.input('selfId', sql.VarChar(50), userId);
-        } else {
-          query += ` AND (l.status = 'PUBLISHED' OR l.author_id = @selfId`;
-          r.input('selfId', sql.VarChar(50), userId);
-          if (userUnit) {
-            query += ` OR l.faculty_unit_id = @userUnit`;
-            r.input('userUnit', sql.VarChar(50), userUnit);
-          }
-          query += `)`;
-        }
+      const scope = await getLectureScope({ userId, roles, deptHead });
+      if (!scope.all) {
+        const inList = bindUnitIn(r, scope.unitIds);
+        query += ` AND (l.faculty_unit_id IN (${inList}) OR l.author_id = @selfId)`;
+        r.input('selfId', sql.VarChar(50), userId);
       }
 
       if (req.query.status) {
@@ -244,6 +236,13 @@ module.exports = function createLectureRoutes({
       const lec = r.recordset[0];
       if (lec.security_level_id > (req.user.clearance_level_id || 1)) {
         return res.status(403).json({ error: 'Không đủ cấp bảo mật để xem bài giảng này' });
+      }
+      const roles = await resolveUserRoles(pool, req.user);
+      const scope = await getLectureScope({
+        userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
+      });
+      if (!inScope(scope, lec.faculty_unit_id) && lec.author_id !== req.user.user_id) {
+        return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
       }
       res.json(lec);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -427,10 +426,31 @@ module.exports = function createLectureRoutes({
       }
       const lec = check.recordset[0];
 
-      // Xóa DB (Cascade sẽ xóa Quiz, SCORM Package)
-      await pool.request()
+      // Không cho xóa nếu còn ca đang diễn ra
+      const ongoing = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .query(`DELETE FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT COUNT(*) AS n FROM TEACHING_SCHEDULE
+                WHERE lecture_id = @id AND status = 'ONGOING'`);
+      if (ongoing.recordset[0].n > 0) {
+        return res.status(409).json({ error: 'Bài giảng đang có ca giảng dạy diễn ra, hãy kết thúc ca trước khi xóa vĩnh viễn' });
+      }
+
+      // Xóa DB trong 1 transaction: bảng con không có CASCADE xử lý trước, bảng cha xóa sau
+      const tx = new sql.Transaction(pool);
+      await tx.begin();
+      try {
+        const run = (text) => new sql.Request(tx)
+          .input('id', sql.VarChar(50), lectureId)
+          .query(text);
+        await run(`DELETE FROM SCORM_TRACKING WHERE lecture_id = @id`);
+        await run(`UPDATE TEACHING_HISTORY SET lecture_id = NULL WHERE lecture_id = @id`);
+        await run(`DELETE FROM TEACHING_SCHEDULE WHERE lecture_id = @id`);   // kéo theo LECTURE_QUIZ_ATTEMPT (CASCADE)
+        await run(`DELETE FROM DIGITAL_LECTURE WHERE lecture_id = @id`);     // kéo theo Quiz, SCORM_PACKAGE (CASCADE)
+        await tx.commit();
+      } catch (e) {
+        await tx.rollback().catch(() => {});
+        throw e;
+      }
 
       // Xóa File Vật Lý
       const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
@@ -477,16 +497,22 @@ module.exports = function createLectureRoutes({
         if (!isAdmin && !isCommander && !deptHead) {
           return res.status(403).json({ error: 'Chỉ Trưởng bộ môn hoặc BGH mới duyệt cấp Khoa' });
         }
-        if (!isAdmin && !isCommander && deptHead) {
-          const userUnit = await getUserUnitId(pool, req.user.user_id);
-          if (userUnit && lec.faculty_unit_id !== userUnit) {
-            return res.status(403).json({ error: 'Chỉ được duyệt bài giảng thuộc khoa/bộ môn của mình' });
+        if (!isAdmin) {
+          const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
+          if (!inScope(scope, lec.faculty_unit_id)) {
+            return res.status(403).json({ error: 'Chỉ được duyệt bài giảng thuộc đơn vị của mình hoặc cấp dưới' });
           }
         }
         nextStatus = 'PENDING_TRAINING';
       } else if (lec.status === 'PENDING_TRAINING') {
         if (!isAdmin && !isCommander) {
           return res.status(403).json({ error: 'Chỉ BGH/Admin mới duyệt cấp Trường' });
+        }
+        if (!isAdmin) {
+          const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
+          if (!inScope(scope, lec.faculty_unit_id)) {
+            return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
+          }
         }
         nextStatus = 'PUBLISHED';
       } else {
@@ -594,8 +620,17 @@ module.exports = function createLectureRoutes({
       const pool = await getPool();
       const check = await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
-        .query(`SELECT status FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT status, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
+      {
+        const roles = await resolveUserRoles(pool, req.user);
+        const scope = await getLectureScope({
+          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
+        });
+        if (!inScope(scope, check.recordset[0].faculty_unit_id)) {
+          return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
+        }
+      }
       if (!['PENDING_FACULTY', 'PENDING_TRAINING'].includes(check.recordset[0].status)) {
         return res.status(400).json({ error: 'Trạng thái không hợp lệ để từ chối' });
       }
@@ -634,10 +669,19 @@ module.exports = function createLectureRoutes({
       // Kiểm tra bài giảng
       const lecCheck = await pool.request()
         .input('lid', sql.VarChar(50), lecture_id)
-        .query(`SELECT status, title, security_level_id, document_id
+        .query(`SELECT status, title, security_level_id, document_id, faculty_unit_id
                 FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
       if (lecCheck.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lecture = lecCheck.recordset[0];
+      {
+        const roles = await resolveUserRoles(pool, req.user);
+        const scope = await getLectureScope({
+          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
+        });
+        if (!inScope(scope, lecture.faculty_unit_id)) {
+          return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
+        }
+      }
       if (lecture.status !== 'PUBLISHED') {
         return res.status(400).json({ error: 'Chỉ có thể mở ca với bài giảng đã PUBLISHED' });
       }
@@ -931,14 +975,9 @@ module.exports = function createLectureRoutes({
         WHERE s.status = 'ONGOING'
       `;
 
-      if (!isAdmin && !isCommander && deptHead) {
-        const userUnit = await getUserUnitId(pool, req.user.user_id);
-        if (userUnit) {
-          query += ` AND un.unit_id = @userUnit`;
-          r.input('userUnit', sql.VarChar(50), userUnit);
-        } else {
-          query += ` AND 1=0`;
-        }
+      if (!isAdmin) {
+        const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
+        query += ` AND un.unit_id IN (${bindUnitIn(r, scope.unitIds)})`;
       }
 
       if (req.query.venue_name)   { query += ` AND s.venue_name = @venue`;   r.input('venue', sql.NVarChar(100), req.query.venue_name); }
@@ -992,15 +1031,10 @@ module.exports = function createLectureRoutes({
         WHERE s.status IN ('COMPLETED','CANCELLED') AND s.end_time IS NOT NULL
       `;
 
-      if (!isAdmin && !isCommander) {
-        if (deptHead) {
-          const userUnit = await getUserUnitId(pool, req.user.user_id);
-          if (userUnit) {
-            query += ` AND un.unit_id = @userUnit`;
-            r.input('userUnit', sql.VarChar(50), userUnit);
-          } else {
-            query += ` AND 1=0`;
-          }
+      if (!isAdmin) {
+        if (deptHead || isCommander) {
+          const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
+          query += ` AND un.unit_id IN (${bindUnitIn(r, scope.unitIds)})`;
         } else {
           query += ` AND s.presenter_id = @selfId`;
           r.input('selfId', sql.VarChar(50), req.user.user_id);

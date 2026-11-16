@@ -345,28 +345,28 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       const lockedSecretItems = secretItems.filter((d) => !isBiometricTrustedForDoc(d));
       const visibleItems = [...publicItems, ...unlockedSecretItems];
 
-      let salutation = 'Báo cáo đồng chí,';
+      let salutation = 'Báo cáo đồng chí.';
       if (user_name && user_position) {
-        salutation = `Báo cáo Đồng chí ${user_name} - ${user_position},`;
+        salutation = `Báo cáo Đồng chí ${user_name} - ${user_position}.`;
       } else if (user_name) {
-        salutation = `Báo cáo Đồng chí ${user_name},`;
+        salutation = `Báo cáo Đồng chí ${user_name}.`;
       }
 
       let answer = '';
       const requiresBiometric = lockedSecretItems.length > 0;
 
       if (items.length === 0) {
-        answer = `${salutation} không tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.`;
+        answer = `${salutation}\nKhông tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.`;
       } else if (lockedSecretItems.length > 0) {
         if (visibleItems.length === 0) {
-          answer = `${salutation} tài liệu liên quan thuộc danh mục văn bản bảo mật (Cấp 3 trở lên). Yêu cầu cán bộ xác thực vân tay trên máy quét ZKTeco ZK9500 (hoặc bấm vào thẻ trích dẫn văn bản bên dưới để quét vân tay) trước khi Trợ lý AI trích xuất nội dung mật.`;
+          answer = `${salutation}\nTài liệu liên quan thuộc danh mục văn bản bảo mật (Cấp 3 trở lên).\nYêu cầu cán bộ xác thực vân tay trên máy quét ZKTeco ZK9500 (hoặc bấm vào thẻ trích dẫn văn bản bên dưới để quét vân tay) trước khi Trợ lý AI trích xuất nội dung mật.`;
         } else {
-          answer = `${salutation} tìm thấy ${items.length} văn bản liên quan. Phần hiển thị được:\n` +
+          answer = `${salutation}\nTìm thấy ${items.length} văn bản liên quan. Phần hiển thị được:\n` +
             visibleItems.map((d, i) => `${i + 1}. ${d.document_code || d.file_id} — ${d.title}`).join('\n') +
             `\n\n*(Lưu ý: Có ${lockedSecretItems.length} văn bản Cấp 3+ Mật/Tối mật/Tuyệt mật yêu cầu xác thực vân tay ZK9500 để xem nội dung chi tiết)*`;
         }
       } else {
-        answer = `${salutation} tìm thấy ${items.length} văn bản liên quan:\n` +
+        answer = `${salutation}\nTìm thấy ${items.length} văn bản liên quan:\n` +
           items.map((d, i) => `${i + 1}. ${d.document_code || d.file_id} — ${d.title}`).join('\n');
       }
 

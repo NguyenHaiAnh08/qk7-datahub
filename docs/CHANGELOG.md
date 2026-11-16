@@ -4,6 +4,62 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.5-ai-chat-drawer-pdf-viewer-and-admin-stats-upgrade] — 2026-11-16
+
+### 1. Nâng Cấp Toàn Diện Ngăn Trợ Lý AI RAG (AI Chat Drawer Suite)
+- **Giao diện Ngăn kéo AI Chat ([`AIChatDrawer.tsx`](../frontend/src/components/ai-chat/AIChatDrawer.tsx) & [`AIChatWidget.tsx`](../frontend/src/components/ai-chat/AIChatWidget.tsx)):**
+  - Mở rộng trải nghiệm ngăn kéo tương tác trượt từ mép màn hình, phân chia khu vực điều khiển thông minh, hiển thị nguồn tài liệu trích dẫn kèm số trang chi tiết.
+  - Tối ưu hóa hiệu năng render hội thoại trực tiếp và hiệu ứng chuyển động Anti-AI-Slop.
+- **Dịch vụ Hậu tầng Trí tuệ Nhân tạo:**
+  - Đồng bộ cập nhật [`boxchat/core/agent_tutor.py`](../boxchat/core/agent_tutor.py) và [`backend/src/ai-routes.js`](../backend/src/ai-routes.js), bảo đảm lọc dữ liệu theo cấp độ bảo mật nghiêm ngặt.
+
+### 2. Tối Ưu Hóa Trình Đọc PDF & Xem Trước Văn Bản Bảo Mật
+- **Trình đọc trang PDF nâng cao ([`PdfPagesViewer.tsx`](../frontend/src/components/document-desk/PdfPagesViewer.tsx) & [`DocumentPreviewModal.tsx`](../frontend/src/components/document-desk/DocumentPreviewModal.tsx)):**
+  - Tích hợp cuộn mượt và lazy-render trang tài liệu bảo mật, tối ưu hóa kích thước hiển thị và tích hợp cơ chế chống chụp màn hình.
+  - Tinh chỉnh hiển thị thẻ tài liệu [`DocumentCard.tsx`](../frontend/src/components/portal/DocumentCard.tsx) trên Cổng thông tin số.
+
+### 3. Tinh Chỉnh Chỉ Số Bảng Điều Khiển Quản Trị & Giám Sát Giảng Dạy
+- Hoàn thiện thẻ chỉ số [`StatCard.tsx`](../frontend/src/components/dashboard/StatCard.tsx) và giao diện tổng quan [`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx).
+- Tinh chỉnh giao diện bảng điều khiển giám sát giảng dạy thời gian thực [`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx) và [`Header.tsx`](../frontend/src/components/common/Header.tsx).
+
+---
+
+## [v1.6.4-admin-dashboard-catalogs-and-theme-enhancements] — 2026-11-15
+
+### 1. Nâng Cấp Bảng Điều Khiển Chỉ Huy & Quản Trị Hệ Thống (Admin Dashboard Suite)
+- **Đại tu màn hình Admin Dashboard ([`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx)):**
+  - Mở rộng giao diện điều khiển với các bảng số liệu, biểu đồ phân bố, trạng thái dịch vụ thời gian thực và quản trị tài nguyên toàn trường.
+  - Tối ưu hóa hiệu năng render bảng dữ liệu và nâng cấp trải nghiệm người dùng theo tiêu chuẩn bản sắc quân đội.
+- **Nâng Cấp Quản Trị Danh Mục & Cấu Hình Phân Quyền Bảo Vệ:**
+  - Hoàn thiện giao diện [`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx) phục vụ phân loại giáo trình bài giảng.
+  - Bổ sung màn hình quản lý phân quyền được bảo vệ [`ProtectedPermissionsConfigPage.tsx`](../frontend/src/pages/ProtectedPermissionsConfigPage.tsx) và hàng đợi phê duyệt [`ApprovalQueuePage.tsx`](../frontend/src/pages/ApprovalQueuePage.tsx).
+
+### 2. Tối Ưu Hóa Khởi Tạo Chủ Đề & Chống Chớp Giao Diện (Theme Initialization)
+- Cập nhật [`theme-init.js`](../frontend/public/theme-init.js) và [`backend/public/theme-init.js`](../backend/public/theme-init.js) thực thi trước khi tải DOM để loại bỏ hiện tượng Flash of Unstyled Content (FOUC).
+- Hoàn thiện thanh điều hướng bên [`Sidebar.tsx`](../frontend/src/components/common/Sidebar.tsx), hộp thoại xác nhận [`ConfirmDialog.tsx`](../frontend/src/components/common/ConfirmDialog.tsx) và modal so sánh phê duyệt [`ApprovalDiffModal.tsx`](../frontend/src/components/document-desk/ApprovalDiffModal.tsx).
+
+---
+
+## [v1.6.3-lecture-catalogs-and-fingerprint-enhancement] — 2026-11-15
+
+### 1. Phân Hệ Quản Lý Danh Mục Bài Giảng Số (Lecture Catalogs System)
+- **Giao diện Quản trị Danh mục Bài giảng:**
+  - Bổ sung màn hình chuyên trách [`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx) phục vụ phân loại, tổ chức danh mục bài giảng khoa học và trực quan.
+  - Tích hợp mục danh mục vào thanh điều hướng bên [`Sidebar.tsx`](../frontend/src/components/common/Sidebar.tsx) và trung tâm chỉ huy [`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx).
+- **Hạ tầng Dữ liệu & API Backend:**
+  - Bổ sung script migration [`upgrade_lecture_catalogs.cjs`](../backend/migrations/upgrade_lecture_catalogs.cjs) nâng cấp cấu trúc bảng danh mục bài giảng.
+  - Bổ sung các endpoint quản trị danh mục trong [`backend/src/admin-routes.js`](../backend/src/admin-routes.js) và khai báo phân quyền chặt chẽ trong [`backend/src/route-permissions.js`](../backend/src/route-permissions.js).
+
+### 2. Tinh Chỉnh Xác Thực Sinh Trắc Học & Quản Trị Bài Giảng
+- Nâng cấp modal quét vân tay [`FingerprintScanModal.tsx`](../frontend/src/components/users/FingerprintScanModal.tsx) và [`fingerprintService.ts`](../frontend/src/services/fingerprintService.ts) tăng độ ổn định khi giao tiếp máy quét ZKTeco.
+- Cải tiến modal bắt đầu phiên giảng dạy [`StartSessionModal.tsx`](../frontend/src/components/lectures/StartSessionModal.tsx) và dịch vụ bài giảng [`lectureService.ts`](../frontend/src/services/lectureService.ts).
+
+### 3. Tối Ưu Hóa & Sửa Lỗi Tiện Ích Gộp Mã Nguồn (`scripts/mergecode.py` v5.1.1)
+- Khắc phục lỗi thiếu đối số `files` tại hàm `_write_summary()` trong `scripts/mergecode.py`.
+- Bổ sung mẫu `mergecode*.txt` vào [`.gitignore`](../.gitignore) và loại bỏ tệp dump `mergecode_full.txt` (4.7 MB) khỏi kho mã nguồn Git, bảo đảm tuân thủ Hiến pháp Kỷ luật Thư mục của dự án.
+
+---
+
 ## [v1.6.2-lecture-session-and-db-optimization] — 2026-11-14
 
 ### 1. Tối Ưu Hóa Kết Nối Cơ Sở Dữ Liệu & Quản Lý Phiên (Database & Session Optimization)

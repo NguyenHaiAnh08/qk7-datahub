@@ -62,8 +62,10 @@ export interface NavGroup {
  * Cấu trúc phân nhóm Navigation Sidebar chuẩn kiến trúc QK7 DataHub:
  * 1. ĐIỀU HÀNH CHUNG: Tổng quan
  * 2. PHÂN HỆ DỮ LIỆU SỐ: Phê duyệt yêu cầu, Loại văn bản
- * 3. HỆ THỐNG & BẢO MẬT: Khóa bảo vệ, Người dùng, Vai trò, Quyền, Đơn vị, Mức bảo mật, Cấp bậc, Chức vụ, Nhật ký, Phiên online, Thùng rác
- * (Sẵn sàng mở rộng thêm Bài giảng số, Học liệu số, Thư viện số trong tương lai)
+ * 3. PHÂN HỆ BÀI GIẢNG SỐ: Môn học, Lớp học, Giảng đường
+ * 4. PHÂN HỆ HỌC LIỆU SỐ (sẵn sàng kiến trúc mở rộng)
+ * 5. PHÂN HỆ THƯ VIỆN SỐ (sẵn sàng kiến trúc mở rộng)
+ * 6. HỆ THỐNG & BẢO MẬT: Khóa bảo vệ, Người dùng, Vai trò, Quyền, Đơn vị, Mức bảo mật, Cấp bậc, Chức vụ, Nhật ký, Phiên online, Thùng rác
  */
 export const ADMIN_NAV_GROUPS: NavGroup[] = [
   {
@@ -81,6 +83,33 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: 'lecture_catalogs',
+    title: 'Bài giảng số',
+    items: [
+      { id: 'lec-subjects',   label: 'Môn học',     icon: BookOpen,     permission: 'SUBJECT_VIEW' },
+      { id: 'lec-classes',    label: 'Lớp học',     icon: GraduationCap, permission: 'CLASS_VIEW' },
+      { id: 'lec-classrooms', label: 'Giảng đường', icon: Building2,    permission: 'CLASSROOM_VIEW' },
+    ],
+  },
+  /*
+  // [KIẾN TRÚC MỞ RỘNG TƯƠNG LAI]
+  // Theo chuẩn quy hoạch khi kích hoạt phân hệ Học liệu số & Thư viện số:
+  {
+    id: 'learning_materials',
+    title: 'Học liệu số',
+    items: [
+      // { id: 'mat-catalog', label: 'Danh mục học liệu', icon: FolderKanban, permission: 'MATERIAL_VIEW' },
+    ],
+  },
+  {
+    id: 'digital_library',
+    title: 'Thư viện số',
+    items: [
+      // { id: 'lib-catalog', label: 'Sách & Ấn phẩm', icon: Library, permission: 'LIBRARY_VIEW' },
+    ],
+  },
+  */
+  {
     id: 'system_security',
     title: 'Hệ thống & Bảo mật',
     items: [
@@ -95,16 +124,6 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
       { id: 'logs',              label: 'Nhật ký',       icon: Activity,    permission: 'AUDIT_VIEW' },
       { id: 'sessions',          label: 'Phiên online',  icon: Monitor,     permission: 'SESSION_VIEW' },
       { id: 'trash',             label: 'Thùng rác',     icon: Trash2,      permission: 'DOC_TRASH_VIEW' },
-    ],
-  },
-
-  {
-    id: 'lecture_catalogs',
-    title: 'Bài giảng số',
-    items: [
-      { id: 'lec-subjects',   label: 'Môn học',     icon: BookOpen,     permission: 'SUBJECT_VIEW' },
-      { id: 'lec-classes',    label: 'Lớp học',     icon: GraduationCap, permission: 'CLASS_VIEW' },
-      { id: 'lec-classrooms', label: 'Giảng đường', icon: Building2,    permission: 'CLASSROOM_VIEW' },
     ],
   },
 ];
@@ -186,7 +205,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           } border-b border-slate-100 dark:border-slate-800/80 mb-2`}
         >
           {!collapsed && (
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate pl-1">
+            <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate pl-1">
               Danh mục Quản trị
             </span>
           )}
@@ -220,14 +239,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <button
                 onClick={onToggleCollapse}
-                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer group"
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition cursor-pointer group"
                 title={!collapsed ? 'Thu gọn danh mục quản trị' : undefined}
                 aria-label={collapsed ? 'Mở rộng danh mục quản trị' : 'Thu gọn danh mục quản trị'}
               >
                 {collapsed ? (
-                  <ChevronRight className="w-4 h-4 text-emerald-700 dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+                  <ChevronRight className="w-4 h-4 stroke-[2.5] text-emerald-700 dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
                 ) : (
-                  <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                  <ChevronLeft className="w-4 h-4 stroke-[2.5] group-hover:-translate-x-0.5 transition-transform" />
                 )}
               </button>
             </Tooltip>
@@ -250,19 +269,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleGroupCollapse(group.id)}
-                    className="w-full flex items-center justify-between px-1.5 py-1 rounded-lg text-[10px] font-bold text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/50 uppercase tracking-wider transition cursor-pointer select-none group"
+                    className="w-full flex items-center justify-between px-1.5 py-1.5 rounded-lg text-[11px] font-extrabold text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100/90 dark:hover:bg-slate-800/70 uppercase tracking-wider transition cursor-pointer select-none group"
                     title={isGroupCollapsed ? `Mở rộng ${group.title}` : `Thu gọn ${group.title}`}
                     aria-expanded={!isGroupCollapsed}
                   >
                     <span className="truncate">{group.title}</span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 font-mono">
+                      <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 font-mono">
                         {group.items.length}
                       </span>
                       {isGroupCollapsed ? (
-                        <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-200" />
+                        <ChevronDown className="w-3.5 h-3.5 stroke-[2.5] text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-transform duration-200" />
                       ) : (
-                        <ChevronUp className="w-3 h-3 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-200" />
+                        <ChevronUp className="w-3.5 h-3.5 stroke-[2.5] text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-transform duration-200" />
                       )}
                     </div>
                   </button>
@@ -299,12 +318,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           onClick={() => handleSelect(item.id)}
                           className={`w-full flex items-center ${
                             collapsed ? 'justify-center p-2.5 relative' : 'justify-start space-x-3 px-3 py-2'
-                          } rounded-xl text-xs transition-all duration-150 cursor-pointer group select-none ${
+                          } rounded-xl text-[13px] transition-all duration-150 cursor-pointer group select-none ${
                             isActive
                               ? collapsed
-                                ? 'bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold shadow-xs'
-                                : 'bg-emerald-500/15 border-l-4 border-emerald-500 text-emerald-700 dark:text-emerald-400 border-t border-b border-r border-emerald-500/25 font-semibold shadow-xs'
-                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium border border-transparent'
+                                ? 'bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold shadow-xs'
+                                : 'bg-emerald-500/15 border-l-4 border-emerald-600 dark:border-emerald-400 text-emerald-800 dark:text-emerald-300 border-t border-b border-r border-emerald-500/25 font-bold shadow-xs'
+                              : 'text-slate-700 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 font-bold border border-transparent'
                           }`}
                         >
                           {/* Tactical Active Indicator Bar (vạch chỉ thị cạnh trái phát quang hoàn hảo khi thu gọn) */}
@@ -315,8 +334,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {/* Vùng Icon căn giữa hoàn hảo khi thu gọn (Zero-Misalignment) */}
                           <div className="relative inline-flex items-center justify-center shrink-0">
                             <Icon
-                              className={`w-4 h-4 flex-shrink-0 group-hover:scale-110 transition-transform duration-150 ${
-                                isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'
+                              className={`w-[18px] h-[18px] flex-shrink-0 group-hover:scale-110 transition-transform duration-150 ${
+                                isActive
+                                  ? 'text-emerald-700 dark:text-emerald-400 stroke-[2.6]'
+                                  : 'text-slate-600 dark:text-slate-300 group-hover:text-slate-950 dark:group-hover:text-white stroke-[2.4]'
                               }`}
                             />
                             {/* Chỉ số thông báo dạng số mũ bình phương (a²) góc trên bên phải khi Sidebar thu gọn */}
@@ -333,7 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {/* Nhãn và Badge khi mở rộng Sidebar */}
                           {!collapsed && (
                             <>
-                              <span className="truncate flex-1 text-left">{item.label}</span>
+                              <span className="truncate flex-1 text-left font-bold tracking-tight">{item.label}</span>
                               {hasCount && (
                                 <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0 shadow-xs tabular-nums">
                                   {displayCount}
@@ -346,6 +367,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                       if (collapsed) {
                         const isDigitalData = group.id === 'digital_data';
+                        const isLectures = group.id === 'lecture_catalogs';
                         const isSystemSec = group.id === 'system_security';
 
                         return (
@@ -373,6 +395,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                       className={`text-[9.5px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                                         isDigitalData
                                           ? 'text-emerald-700 dark:text-emerald-400'
+                                          : isLectures
+                                          ? 'text-sky-600 dark:text-sky-400'
                                           : isSystemSec
                                           ? 'text-indigo-600 dark:text-indigo-400'
                                           : 'text-slate-500 dark:text-slate-400'
@@ -382,6 +406,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         className={`w-1.5 h-1.5 rounded-full shrink-0 inline-block ${
                                           isDigitalData
                                             ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]'
+                                            : isLectures
+                                            ? 'bg-sky-500 shadow-[0_0_6px_rgba(14,165,233,0.8)]'
                                             : isSystemSec
                                             ? 'bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.8)]'
                                             : 'bg-slate-400'

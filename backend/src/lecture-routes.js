@@ -901,7 +901,7 @@ module.exports = function createLectureRoutes({
     }
   });
 
-  // API Buộc kết thúc (Dành cho Chỉ huy/Admin xử lý ca treo của người khác)
+  // API Buộc kết thúc (Dành cho Quản trị viên Admin kết thúc ca tại phòng giám sát)
   router.post('/schedules/:id/force-end', requireAuth, async (req, res) => {
     try {
       const pool = await getPool();

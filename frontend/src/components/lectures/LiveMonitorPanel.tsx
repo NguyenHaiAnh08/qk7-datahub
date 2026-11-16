@@ -8,13 +8,17 @@ import { toast } from '../common/Toast';
 import { TeachingSchedule } from '../../types/lecture';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
+import { useAuth } from '../../hooks/useAuth';
 
 interface Props {
   currentUserId?: string;
-  canForceEnd: boolean;
+  canForceEnd?: boolean;
+  isAdmin?: boolean;
 }
 
-export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }) => {
+export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd = false, isAdmin: propIsAdmin }) => {
+  const { user: authUser, isAdmin: authIsAdmin } = useAuth();
+  const isAdministrator = Boolean(propIsAdmin ?? (authIsAdmin || (authUser?.roles || []).includes('ROL-01')));
   const [sessions, setSessions] = useState<TeachingSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -112,7 +116,6 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {sessions.map((s) => {
             const isOwner = s.presenter_id === currentUserId;
-            const canEndOwn = isOwner;
             const canForce = !isOwner && canForceEnd;
 
             return (
@@ -331,41 +334,23 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
                   );
                 })()}
 
-                {/* Nút điều khiển ca dạy */}
-                {(canEndOwn || canForce) && (
+                {/* Nút điều khiển ca dạy — CHỈ DÀNH RIÊNG CHO QUẢN TRỊ VIÊN (ADMIN) */}
+                {isAdministrator && (
                   <div className="mt-auto pt-2 border-t border-slate-100 dark:border-white/[0.04] flex items-center justify-end gap-2">
-                    {canEndOwn && (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmTarget({ session: s, isForce: false })}
-                        disabled={endingId === s.schedule_id}
-                        className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950/30 dark:hover:bg-rose-900/50 dark:text-rose-300 dark:border-rose-800/50 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50"
-                      >
-                        {endingId === s.schedule_id ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 fill-current" />
-                        )}
-                        <span>Kết thúc ca dạy</span>
-                      </button>
-                    )}
-
-                    {canForce && (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmTarget({ session: s, isForce: true })}
-                        disabled={endingId === s.schedule_id}
-                        className="px-3.5 py-1.5 bg-gradient-to-r from-[#b91c1c] to-[#dc2626] hover:from-[#dc2626] hover:to-[#ef4444] text-white border border-rose-700 shadow-xs rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50"
-                        title="Quyền Chỉ huy/Admin: Buộc kết thúc ca dạy bị treo"
-                      >
-                        {endingId === s.schedule_id ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <ShieldAlert className="w-3.5 h-3.5" />
-                        )}
-                        <span>Buộc kết thúc ca treo</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setConfirmTarget({ session: s, isForce: true })}
+                      disabled={endingId === s.schedule_id}
+                      className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950/30 dark:hover:bg-rose-900/50 dark:text-rose-300 dark:border-rose-800/50 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                      title="Quyền Quản trị viên (Admin): Kết thúc ca giảng dạy này"
+                    >
+                      {endingId === s.schedule_id ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                      )}
+                      <span>Kết thúc ca dạy</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -377,13 +362,13 @@ export const LiveMonitorPanel: React.FC<Props> = ({ currentUserId, canForceEnd }
       {/* ConfirmDialog thay thế hoàn toàn window.confirm */}
       <ConfirmDialog
         open={!!confirmTarget}
-        title={confirmTarget?.isForce ? 'Xác nhận Buộc Kết Thúc Ca Giảng Dạy' : 'Xác nhận Kết Thúc Ca Giảng Dạy'}
+        title="Xác nhận Kết Thúc Ca Giảng Dạy"
         description={
-          confirmTarget?.isForce
-            ? `Đồng chí đang thực hiện quyền Chỉ huy/Admin để BUỘC KẾT THÚC ca giảng dạy "${confirmTarget.session.lecture_title}" của giảng viên ${confirmTarget.session.presenter_name}. Hành động này sẽ giải phóng giảng đường "${confirmTarget.session.venue_name}" ngay lập tức.`
-            : `Đồng chí có chắc chắn muốn KẾT THÚC ca giảng dạy "${confirmTarget?.session.lecture_title}" tại ${confirmTarget?.session.venue_name}? Dữ liệu thời lượng và tiến độ sẽ được lưu vào Lịch sử giảng dạy.`
+          confirmTarget
+            ? `Đồng chí Quản trị viên (Admin) đang thực hiện kết thúc ca giảng dạy "${confirmTarget.session.lecture_title}" của giảng viên ${confirmTarget.session.presenter_name}. Hành động này sẽ hoàn tất phiên học và giải phóng giảng đường "${confirmTarget.session.venue_name}".`
+            : ''
         }
-        confirmText={confirmTarget?.isForce ? 'Buộc kết thúc ngay' : 'Kết thúc ca học'}
+        confirmText="Xác nhận kết thúc"
         cancelText="Quay lại"
         isDestructive={true}
         onConfirm={handleConfirmEnd}

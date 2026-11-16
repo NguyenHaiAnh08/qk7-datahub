@@ -68,6 +68,21 @@ export const userService = {
     });
   },
 
+  setUserRoles: async (
+    userId: string,
+    roles: string[],
+    expiresAt?: string | null
+  ): Promise<{ success: boolean }> => {
+    return http<{ success: boolean }>(API_ENDPOINTS.ADMIN.USER_ROLES(userId), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roles,
+        ...(expiresAt !== undefined && { expires_at: expiresAt }),
+      }),
+    });
+  },
+
   unlockUser: async (userId: string): Promise<{ success: boolean; user_id: string; reset_violations?: boolean }> => {
     return http(API_ENDPOINTS.ADMIN.USER_UNLOCK(userId), {
       method: 'POST',

@@ -83,6 +83,22 @@ if (!FP_ENC_KEY) {
 }
 
 const USE_HTTPS = (process.env.USE_HTTPS || 'false').toLowerCase() === 'true';
+
+// ✅ Cookie Secure flag phải khớp protocol thực tế:
+// - HTTPS (kể cả TLS terminate ở reverse proxy) → secure=true
+// - HTTP                                         → secure=false
+// Nếu để secure=true trên HTTP, browser sẽ KHÔNG set cookie → dead code.
+// Nếu để secure=false trên HTTP, cookie truyền cleartext → chấp nhận được
+// trong LAN nội bộ nhưng phải cảnh báo rõ ràng.
+const COOKIE_SECURE = USE_HTTPS;
+if (!COOKIE_SECURE) {
+  console.warn(
+    '[SECURITY] ⚠️  Server HTTP: cookie qk7_session/token sẽ được set với secure=false ' +
+    '(truyền cleartext trên LAN). Khuyến nghị bật USE_HTTPS=true (kể cả khi TLS terminate ở nginx/Caddy). ' +
+    'Nếu không, client nên ưu tiên Bearer token từ sessionStorage thay vì dựa vào cookie.'
+  );
+}
+
 const SSL_KEY_PATH = process.env.SSL_KEY_PATH
   ? path.resolve(__dirname, process.env.SSL_KEY_PATH)
   : path.join(__dirname, 'certs', 'private-key.pem');
@@ -551,8 +567,10 @@ function requireGuestOrAuth(req, res, next) {
   // Đã đăng nhập đầy đủ → OK
   if (req.user && req.user.is_authenticated) return next();
 
-  // Anonymous → kiểm tra Guest Session
-  const guestToken = req.headers['x-guest-token'] || req.query.guest_token;
+  // Anonymous → CHỈ chấp nhận token qua HTTP Header (loại bỏ req.query.guest_token)
+  const rawToken = req.headers['x-guest-token'];
+  const guestToken = typeof rawToken === 'string' ? rawToken.trim() : '';
+
   if (!guestToken) {
     return res.status(401).json({
       error: 'Cần đăng nhập hoặc có phiên khách để truy cập.',
@@ -890,13 +908,24 @@ async function handleLogin(req, res) {
       }
     }
 
-    const pwdHash = user.password_hash || user.pin_hash;
-    if (!pwdHash) {
+    // 🔒 KHÔNG BAO GIỜ fallback về pin_hash:
+    // PIN 6 số chỉ có 10^6 khả năng → brute-force được trong vài phút.
+    // PIN chỉ dùng cho xác thực vân tay / 2FA, KHÔNG dùng làm mật khẩu đăng nhập.
+    if (!user.password_hash) {
       await writeLoginAttempt({ ip, username, result: 'WRONG_PASSWORD' });
-      return res.status(403).json({ error: 'Tài khoản chưa được cấp mật khẩu' });
+      await writeAccessLog({
+        userId: user.user_id, fileId: null,
+        action: 'LOGIN_NO_PASSWORD', ip,
+        note: 'Tài khoản chưa được cấp mật khẩu (password_hash NULL) — từ chối đăng nhập',
+      });
+      // Rate-limit IP chống enumeration account không có mật khẩu
+      await checkAndBlockIp(ip, 'wrong_password');
+      return res.status(403).json({
+        error: 'Tài khoản chưa được cấp mật khẩu. Vui lòng liên hệ Quản trị viên.',
+      });
     }
 
-    const ok = await bcrypt.compare(password, pwdHash);
+    const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
       const adminCheck = await pool.request()
         .input('uid', sql.VarChar(50), user.user_id)
@@ -1054,21 +1083,21 @@ async function handleLogin(req, res) {
 
     const permissions = await getUserPermissions(user.user_id);
 
-    // Thiết lập session cookie với flags Secure, HttpOnly, SameSite=Strict (chống CSRF)
-    res.cookie('qk7_session', token, {
+    // ✅ Session cookie:
+    //   - secure: bật khi HTTPS (COOKIE_SECURE — xem đầu file)
+    //   - httpOnly: chặn XSS đọc token
+    //   - sameSite=strict: chống CSRF
+    // Lưu ý: trên HTTP, cookie này sẽ truyền cleartext → hệ thống vẫn chấp nhận
+    // Bearer token (frontend sessionStorage) làm kênh xác thực chính.
+    const sessionCookieOpts = {
       httpOnly: true,
-      secure: true,
+      secure: COOKIE_SECURE,
       sameSite: 'strict',
       path: '/',
       maxAge: ttlMs,
-    });
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: ttlMs,
-    });
+    };
+    res.cookie('qk7_session', token, sessionCookieOpts);
+    res.cookie('token', token, sessionCookieOpts);
 
     if (req.originalUrl === '/login' && req.headers.accept?.includes('text/html') && !req.headers.accept?.includes('application/json')) {
       return res.redirect(303, '/portal');
@@ -1299,12 +1328,16 @@ app.post('/api/auth/login/admin-fp-verify',
 
     const permissions = await getUserPermissions(user.user_id);
 
-    res.cookie('qk7_session', token, {
-      httpOnly: true, secure: true, sameSite: 'strict', path: '/', maxAge: ttlMs,
-    });
-    res.cookie('token', token, {
-      httpOnly: true, secure: true, sameSite: 'strict', path: '/', maxAge: ttlMs,
-    });
+    // Cùng cấu hình cookie như handleLogin (đồng bộ secure flag với protocol).
+    const sessionCookieOpts = {
+      httpOnly: true,
+      secure: COOKIE_SECURE,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: ttlMs,
+    };
+    res.cookie('qk7_session', token, sessionCookieOpts);
+    res.cookie('token', token, sessionCookieOpts);
 
     res.json({
       success: true, token, expires_in: JWT_EXPIRES_IN,

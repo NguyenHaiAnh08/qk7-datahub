@@ -25,11 +25,7 @@ import { FingerprintScanModal } from '../users/FingerprintScanModal';
 import { CompactDownloadButton } from '../common/CompactDownloadButton';
 import { AccessDeniedCard } from '../common/AccessDeniedCard';
 import { toast } from '../common/Toast';
-import {
-  formatUserDisplayName,
-  formatWatermarkDateTime,
-} from '../../hooks/useFloatingWatermark';
-import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
+
 import { useAntiScreenshot } from '../../hooks/useAntiScreenshot';
 import { SecurityScreenShield } from '../common/SecurityScreenShield';
 
@@ -219,16 +215,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         return;
       }
 
-      const userDisplayName = formatUserDisplayName(user?.full_name, user?.username);
-      // Sử dụng thời gian chuẩn từ máy chủ NTP (tuyệt đối không dùng new Date() của client)
-      const timeStr = formatWatermarkDateTime(fileResult.serverTime);
-      const blob = await stampWatermarkOnPdf(fileResult.blob, {
-        userDisplayName,
-        timeStr,
-        traceId: fileResult.traceId,
-        opacity: 0.18,
-      });
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(fileResult.blob);
       setBlobUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return url;
@@ -292,7 +279,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         duration: 2500,
       });
 
-      // Tải tệp gốc sạch sẽ từ server (không chứa watermark)
+      // ⚠️ Không dùng blobUrl đang xem (đã watermark) để tải — luôn gọi server
+      // để lấy bản stream mới với traceId riêng cho hành động DOWNLOAD.
       if (false && blobUrl) {
         return () => {
           const a = window.document.createElement('a');

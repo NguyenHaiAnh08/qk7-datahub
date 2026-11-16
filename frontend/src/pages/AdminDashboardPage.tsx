@@ -2039,6 +2039,7 @@ const pinPendingCount = useMemo(
                 else if (parentCat === 'tieu_doan') defaultType = 'dai_doi';
                 else if (parentCat === 'dai_doi') defaultType = 'to';
                 else if (parentCat === 'khoa') defaultType = 'bo_mon';
+                else if (parentCat === 'trung_tam') defaultType = 'ban';
                 else if (parentCat === 'bo_mon') defaultType = 'to';
                 else if (parentCat === 'phong' || parentCat === 'ban') defaultType = 'to';
                 setGenericFormData({ unit_id: '', name: '', parent_id: parentUnit.unit_id, unit_type: defaultType });
@@ -2835,6 +2836,7 @@ const pinPendingCount = useMemo(
                           <option value="dai_doi">Đại đội</option>
                           <option value="ban_chi_huy">Ban Chỉ huy</option>
                           <option value="nha_truong">Nhà trường / Viện</option>
+                          <option value="trung_tam">Trung tâm</option>
                           <option value="co_quan">Cơ quan</option>
                           <option value="khoa">Khoa</option>
                           <option value="bo_mon">Bộ môn</option>

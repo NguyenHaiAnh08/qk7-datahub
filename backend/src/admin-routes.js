@@ -2377,16 +2377,18 @@ app.post('/api/admin/lectures/subjects', async (req, res) => {
     const { subject_id, subject_code, name, faculty_unit_id, security_level_id, description } = req.body;
     if (!subject_id || !name) return res.status(400).json({ error: 'Thiếu subject_id hoặc name' });
     const pool = await getPool();
+    // Giới hạn cấp độ bảo mật môn học: Cấp 1 (Công khai) đến Cấp 3 (Mật)
+    const validLevel = security_level_id ? Math.min(3, Math.max(1, Number(security_level_id))) : 2;
     await pool.request()
       .input('id', sql.VarChar(50), subject_id)
       .input('code', sql.VarChar(50), subject_code || subject_id)
       .input('name', sql.NVarChar(200), name)
       .input('fac', sql.NVarChar(50), faculty_unit_id || null)
-      .input('lvl', sql.Int, security_level_id || 2)
+      .input('lvl', sql.Int, validLevel)
       .input('desc', sql.NVarChar(500), description || null)
       .query(`INSERT INTO SUBJECT (subject_id, subject_code, name, faculty_unit_id, security_level_id, description, active)
               VALUES (@id, @code, @name, @fac, @lvl, @desc, 1)`);
-    await log(req, 'LECTURE_SUBJECT_CREATE', `Tạo môn học ${subject_id} - ${name}`);
+    await log(req, 'LECTURE_SUBJECT_CREATE', `Tạo môn học ${subject_id} - ${name} (Cấp ${validLevel})`);
     res.json({ success: true, subject_id });
   } catch (e) {
     if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'subject_id đã tồn tại' });
@@ -2399,12 +2401,16 @@ app.put('/api/admin/lectures/subjects/:id', async (req, res) => {
   try {
     const { subject_code, name, faculty_unit_id, security_level_id, description, active } = req.body;
     const pool = await getPool();
+    // Giới hạn cấp độ bảo mật môn học: Cấp 1 (Công khai) đến Cấp 3 (Mật)
+    const validLevel = security_level_id !== undefined && security_level_id !== null && security_level_id !== ''
+      ? Math.min(3, Math.max(1, Number(security_level_id)))
+      : null;
     const r = await pool.request()
       .input('id', sql.VarChar(50), req.params.id)
       .input('code', sql.VarChar(50), subject_code || null)
       .input('name', sql.NVarChar(200), name)
       .input('fac', sql.NVarChar(50), faculty_unit_id || null)
-      .input('lvl', sql.Int, security_level_id || null)
+      .input('lvl', sql.Int, validLevel)
       .input('desc', sql.NVarChar(500), description || null)
       .input('act', sql.Bit, active !== false ? 1 : 0)
       .query(`UPDATE SUBJECT SET

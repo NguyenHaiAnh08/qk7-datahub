@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, RotateCw, Eraser, Calendar } from 'lucide-react';
 import { DocumentType, Unit, SecurityLevel } from '../../types';
-import { getMainIssuingUnits, getSchoolDepartmentsTree } from '../../utils/unitTree';
+import { getMainIssuingUnits, getSchoolDepartmentsTree, isSchoolUnitId } from '../../utils/unitTree';
 import { DateRangePicker } from '../common/DateRangePicker';
 
 export interface DocumentFiltersProps {
@@ -59,13 +59,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
 
   // 3. Kiểm tra xem người dùng có chọn Trường Quân sự Quân khu 7 hay không
   const isSchoolSelected = React.useMemo(() => {
-    if (!selectedUnit) return false;
-    const u = units.find((x) => x.unit_id === selectedUnit);
-    return (
-      selectedUnit === 'TQS' ||
-      selectedUnit === 'U-TQS' ||
-      Boolean(u?.name && (u.name.toLowerCase().includes('trường quân sự') || u.name.toLowerCase().includes('tqs')))
-    );
+    return isSchoolUnitId(selectedUnit, units);
   }, [selectedUnit, units]);
 
   return (

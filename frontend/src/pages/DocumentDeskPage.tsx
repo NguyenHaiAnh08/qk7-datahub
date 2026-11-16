@@ -17,6 +17,7 @@ import { isUserAdmin } from '../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
+import { isSchoolUnitId } from '../utils/unitTree';
 
 const ITEMS_PER_PAGE = 30;
 
@@ -99,14 +100,14 @@ const canUpload = hasPermission('DOC_UPLOAD');
       let queryUnit: string | undefined = undefined;
       let includeChildren: boolean | undefined = undefined;
 
-      const isSchool = selectedUnit === 'TQS' || selectedUnit === 'U-TQS';
+      const isSchool = isSchoolUnitId(selectedUnit, meta.units);
 
       if (isSchool) {
         if (selectedDepartment) {
           queryUnit = selectedDepartment;
           includeChildren = true;
         } else {
-          queryUnit = 'TQS';
+          queryUnit = selectedUnit;
           includeChildren = true;
         }
       } else if (selectedUnit) {

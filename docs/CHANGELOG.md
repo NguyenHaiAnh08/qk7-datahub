@@ -4,6 +4,26 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.7-military-unit-hierarchy-and-catalogs-treeselect] — 2026-11-16
+
+### 1. Chuẩn Hóa Trọng Số Phân Cấp & Cây Đơn Vị Quân Sự (Military Unit Hierarchy Suite)
+- **Chuẩn hóa Trọng số Sắp xếp Quân sự ([`unitTree.tsx`](../frontend/src/utils/unitTree.tsx) & [`UnitTreeTable.tsx`](../frontend/src/components/dashboard/UnitTreeTable.tsx)):**
+  - Xây dựng hàm `getMilitaryUnitSortWeight` áp dụng quy chuẩn phân cấp thứ bậc quân đội: Quân khu 7 -> Nhà trường / Viện -> Sư đoàn 5 -> Ban Chỉ huy -> Trung đoàn -> Cơ quan Đảng / UBKT Đảng (nằm trên Ban Giám hiệu) -> Ban Giám hiệu -> Các Phòng chức năng (Đào tạo, Chính trị, Hậu cần - Kỹ thuật, Tham mưu - Hành chính) -> Các Tiểu đoàn 1..5 -> Các Khoa giáo viên -> Trung tâm (Trung Tâm GDQP & AN) -> Lớp học viên / Lớp đào tạo -> Đại đội, Bộ môn, Ban, Tổ -> Khối cơ quan Trung ương / Bộ.
+  - Bổ sung danh mục phân loại đơn vị mới: `trung_tam` (Trung tâm) với biểu tượng `Compass`, Badge Violet tác chiến, tích hợp vào các dropdown và bộ lọc phân loại.
+  - Tối ưu cơ chế mở rộng mặc định gọn gàng: Chỉ mở Level 0 (Quân khu) và Level 1 (Nhà trường/Sư đoàn), thu gọn các cấp sâu hơn để tránh quá tải giao diện.
+- **Nhận Diện Đa Mã Định Danh Đơn Vị Nhà Trường:**
+  - Nâng cấp `isSchoolUnitId` và `findSchoolUnit` hỗ trợ đa mã nhận diện (`TQS-QK7`, `TQS`, `U-TQS` hoặc tên trường) đồng bộ trên [`PortalPage.tsx`](../frontend/src/pages/PortalPage.tsx), [`DocumentDeskPage.tsx`](../frontend/src/pages/DocumentDeskPage.tsx), [`DocumentFilters.tsx`](../frontend/src/components/document-desk/DocumentFilters.tsx), và [`SchoolOverviewSection.tsx`](../frontend/src/components/portal/SchoolOverviewSection.tsx).
+
+### 2. Nâng Cấp Quản Trị Danh Mục Bài Giảng & TreeSelect Đơn Vị (Lecture Catalogs Suite)
+- **Tích hợp TreeSelect Cây Đơn vị ([`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx)):**
+  - Thay thế input text thông thường bằng `TreeSelect` trực quan cho "Đơn vị phụ trách" (Môn học) và "Đơn vị quản lý" (Lớp học đào tạo).
+  - Hỗ trợ tìm kiếm nhanh, hiển thị cấu trúc cây đa tầng, nút xóa và tùy chỉnh icon switcher thu gọn/mở rộng.
+- **Ràng Buộc Cấp Độ Bảo Mật Môn Học (Security Constraints):**
+  - Frontend: Bắt buộc người dùng chọn Cấp độ bảo mật khi tạo mới hoặc cập nhật môn học (không cho phép để trống).
+  - Backend ([`backend/src/admin-routes.js`](../backend/src/admin-routes.js)): Ràng buộc giá trị cấp độ bảo mật môn học nằm trong khoảng từ Cấp 1 (Công khai) đến Cấp 3 (Mật), ngăn chặn chỉ định vượt cấp trái thẩm quyền.
+
+---
+
 ## [v1.6.6-unit-tree-and-admin-unit-management-upgrade] — 2026-11-16
 
 ### 1. Nâng Cấp Quản Lý Cây Đơn Vị Quân Sự (Unit Tree & Organization Suite)

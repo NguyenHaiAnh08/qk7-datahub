@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus,
+  Minus,
   Pencil,
   Trash2,
   BookOpen,
@@ -23,6 +24,10 @@ import {
   Calendar,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TreeSelect } from 'antd';
+import { Unit } from '../types/user';
+import { unitService } from '../services/unitService';
+import { buildUnitTree, filterSchoolUnits } from '../utils/unitTree';
 import { lectureService } from '../services/lectureService';
 import { toast } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -123,6 +128,64 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
   const [submitting, setSubmitting] = useState(false);
   const [deleteItem, setDeleteItem] = useState<any | null>(null);
 
+  // ── Cây đơn vị cho TreeSelect (Đơn vị phụ trách môn học & Đơn vị quản lý lớp học) ──
+  const [availableUnits, setAvailableUnits] = useState<Unit[]>([]);
+
+  useEffect(() => {
+    unitService
+      .getUnits()
+      .then((res: any) => setAvailableUnits(res.items || res || []))
+      .catch((err) => console.error('Lỗi tải danh mục đơn vị:', err));
+  }, []);
+
+  const selectedUnitId = catalogType === 'subjects' ? form.faculty_unit_id : form.unit_id;
+  const filteredUnits = useMemo(
+    () => filterSchoolUnits(availableUnits, selectedUnitId),
+    [availableUnits, selectedUnitId]
+  );
+  const unitTree = useMemo(() => buildUnitTree(filteredUnits), [filteredUnits]);
+
+  // Thu gọn mặc định: Chỉ mở Level 0 (Quân khu) và Level 1 (Nhà trường)
+  const defaultExpandedKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const root of unitTree) {
+      if (root.children && root.children.length > 0) {
+        keys.push(String(root.key));
+        for (const child of root.children) {
+          if (child.children && child.children.length > 0) {
+            keys.push(String(child.key));
+          }
+        }
+      }
+    }
+    if (selectedUnitId) {
+      const findAncestors = (nodes: any[], targetId: string, currentPath: string[]): boolean => {
+        for (const n of nodes) {
+          if (String(n.key) === targetId || String(n.value) === targetId) {
+            keys.push(...currentPath);
+            return true;
+          }
+          if (n.children && n.children.length > 0) {
+            if (findAncestors(n.children, targetId, [...currentPath, String(n.key)])) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      findAncestors(unitTree, selectedUnitId, []);
+    }
+    return Array.from(new Set(keys));
+  }, [unitTree, selectedUnitId]);
+
+  const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (modalOpen && defaultExpandedKeys.length > 0) {
+      setTreeExpandedKeys(defaultExpandedKeys);
+    }
+  }, [modalOpen, defaultExpandedKeys]);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -172,9 +235,11 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
     setEditing(null);
     setForm({
       active: true,
-      security_level_id: 2,
+      security_level_id: '',
       course_year: '',
       room_type: 'LECTURE_HALL',
+      faculty_unit_id: '',
+      unit_id: '',
     });
     setModalOpen(true);
   };
@@ -187,6 +252,10 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (catalogType === 'subjects' && !form.security_level_id) {
+      toast.error('Vui lòng chọn cấp độ bảo mật cho môn học');
+      return;
+    }
     setSubmitting(true);
     try {
       if (editing) {
@@ -657,25 +726,91 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
                           icon={BookOpen}
                         />
                       </div>
-                      <FormInput
-                        label="Đơn vị phụ trách"
-                        value={form.faculty_unit_id || ''}
-                        onChange={(val) => setForm({ ...form, faculty_unit_id: val })}
-                        placeholder="VD: Khoa giáo viên"
-                        icon={Building}
-                      />
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          Cấp độ bảo mật
+                        <label className="flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          <Building className="w-3 h-3 text-slate-400" />
+                          <span>Đơn vị phụ trách</span>
+                        </label>
+                        <div className="unit-treeselect-wrapper" style={{ position: 'relative', width: '100%' }}>
+                          <TreeSelect
+                            value={form.faculty_unit_id || undefined}
+                            onChange={(val) => setForm({ ...form, faculty_unit_id: val || '' })}
+                            treeData={unitTree}
+                            placeholder="Chọn đơn vị phụ trách"
+                            allowClear={{
+                              clearIcon: (
+                                <span
+                                  className="flex items-center justify-center w-4 h-4 rounded-full bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-700/70 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 transition-all cursor-pointer"
+                                  title="Xóa lựa chọn đơn vị"
+                                >
+                                  <X className="w-2.5 h-2.5 stroke-[2]" />
+                                </span>
+                              ),
+                            }}
+                            treeExpandedKeys={treeExpandedKeys}
+                            onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
+                            onOpenChange={(visible) => {
+                              if (visible && defaultExpandedKeys.length > 0) {
+                                setTreeExpandedKeys(defaultExpandedKeys);
+                              }
+                            }}
+                            treeLine={{ showLeafIcon: false }}
+                            switcherIcon={(nodeProps: any) => {
+                              if (nodeProps.isLeaf) return null;
+                              const isExpanded = Boolean(nodeProps.expanded);
+                              return (
+                                <span
+                                  className={`qk7-tree-switcher-btn ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+                                  title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                                >
+                                  {isExpanded ? (
+                                    <Minus className="w-3 h-3 stroke-[2.5]" />
+                                  ) : (
+                                    <Plus className="w-3 h-3 stroke-[2.5]" />
+                                  )}
+                                </span>
+                              );
+                            }}
+                            treeNodeLabelProp="name"
+                            treeNodeFilterProp="name"
+                            filterTreeNode={(input: string, node: any) =>
+                              String(node.name || '').toLowerCase().includes(input.toLowerCase().trim())
+                            }
+                            getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
+                            className="qk7-treeselect w-full"
+                            classNames={{ popup: { root: 'qk7-unit-treeselect-popup' } }}
+                            style={{ width: '100%', height: 38 }}
+                            popupMatchSelectWidth={false}
+                            styles={{
+                              popup: {
+                                root: {
+                                  minWidth: 280,
+                                  maxWidth: 'min(520px, 90vw)',
+                                  maxHeight: 380,
+                                  overflowX: 'hidden',
+                                  overflowY: 'auto',
+                                },
+                              },
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          <Shield className="w-3 h-3 text-slate-400" />
+                          <span>Cấp độ bảo mật</span>
+                          <span className="text-rose-500">*</span>
                         </label>
                         <select
-                          value={form.security_level_id || 2}
-                          onChange={(e) => setForm({ ...form, security_level_id: Number(e.target.value) })}
-                          className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30"
+                          value={form.security_level_id || ''}
+                          onChange={(e) => setForm({ ...form, security_level_id: e.target.value ? Number(e.target.value) : '' })}
+                          required
+                          className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 cursor-pointer h-[38px]"
                         >
-                          <option value={1}>Cấp 1 - Công khai</option>
-                          <option value={2}>Cấp 2 - Nội bộ</option>
-                          <option value={3}>Cấp 3 - Mật</option>
+                          <option value="">Chọn độ bảo mật</option>
+                          <option value={1}>Cấp 1 – Công khai</option>
+                          <option value={2}>Cấp 2 – Nội bộ</option>
+                          <option value={3}>Cấp 3 – Mật</option>
                         </select>
                       </div>
                       <div className="sm:col-span-2">
@@ -713,13 +848,75 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
                         placeholder="VD: Trung đội 10 - Đại đội 1"
                         icon={GraduationCap}
                       />
-                      <FormInput
-                        label="Đơn vị quản lý"
-                        value={form.unit_id || ''}
-                        onChange={(val) => setForm({ ...form, unit_id: val })}
-                        placeholder="VD: Trường Quân sự QK7"
-                        icon={Building}
-                      />
+                      <div>
+                        <label className="flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          <Building className="w-3 h-3 text-slate-400" />
+                          <span>Đơn vị quản lý</span>
+                        </label>
+                        <div className="unit-treeselect-wrapper" style={{ position: 'relative', width: '100%' }}>
+                          <TreeSelect
+                            value={form.unit_id || undefined}
+                            onChange={(val) => setForm({ ...form, unit_id: val || '' })}
+                            treeData={unitTree}
+                            placeholder="Chọn đơn vị quản lý"
+                            allowClear={{
+                              clearIcon: (
+                                <span
+                                  className="flex items-center justify-center w-4 h-4 rounded-full bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-700/70 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 transition-all cursor-pointer"
+                                  title="Xóa lựa chọn đơn vị"
+                                >
+                                  <X className="w-2.5 h-2.5 stroke-[2]" />
+                                </span>
+                              ),
+                            }}
+                            treeExpandedKeys={treeExpandedKeys}
+                            onTreeExpand={(keys) => setTreeExpandedKeys(keys as string[])}
+                            onOpenChange={(visible) => {
+                              if (visible && defaultExpandedKeys.length > 0) {
+                                setTreeExpandedKeys(defaultExpandedKeys);
+                              }
+                            }}
+                            treeLine={{ showLeafIcon: false }}
+                            switcherIcon={(nodeProps: any) => {
+                              if (nodeProps.isLeaf) return null;
+                              const isExpanded = Boolean(nodeProps.expanded);
+                              return (
+                                <span
+                                  className={`qk7-tree-switcher-btn ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+                                  title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                                >
+                                  {isExpanded ? (
+                                    <Minus className="w-3 h-3 stroke-[2.5]" />
+                                  ) : (
+                                    <Plus className="w-3 h-3 stroke-[2.5]" />
+                                  )}
+                                </span>
+                              );
+                            }}
+                            treeNodeLabelProp="name"
+                            treeNodeFilterProp="name"
+                            filterTreeNode={(input: string, node: any) =>
+                              String(node.name || '').toLowerCase().includes(input.toLowerCase().trim())
+                            }
+                            getPopupContainer={(trigger) => (trigger.parentElement as HTMLElement) || window.document.body}
+                            className="qk7-treeselect w-full"
+                            classNames={{ popup: { root: 'qk7-unit-treeselect-popup' } }}
+                            style={{ width: '100%', height: 38 }}
+                            popupMatchSelectWidth={false}
+                            styles={{
+                              popup: {
+                                root: {
+                                  minWidth: 280,
+                                  maxWidth: 'min(520px, 90vw)',
+                                  maxHeight: 380,
+                                  overflowX: 'hidden',
+                                  overflowY: 'auto',
+                                },
+                              },
+                            }}
+                          />
+                        </div>
+                      </div>
                       <FormInput
                         label="Khóa đào tạo"
                         type="text"

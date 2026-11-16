@@ -166,27 +166,51 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   );
   const unitTree = React.useMemo(() => buildUnitTree(filteredUnits), [filteredUnits]);
 
+  // ── Khóa mở rộng mặc định: Chỉ mở cấp Quân khu (Level 0) và cấp Nhà trường (Level 1) để cây gọn gàng ──
   const defaultExpandedKeys = React.useMemo(() => {
     const keys: string[] = [];
-    const collectParentKeys = (nodes: any[]) => {
-      for (const n of nodes) {
-        if (n.children && n.children.length > 0) {
-          keys.push(String(n.key));
-          collectParentKeys(n.children);
+
+    // Chỉ tự động mở cấp Gốc (Quân khu) và cấp Con trực tiếp (Nhà trường / Sư đoàn)
+    for (const root of unitTree) {
+      if (root.children && root.children.length > 0) {
+        keys.push(String(root.key));
+        for (const child of root.children) {
+          if (child.children && child.children.length > 0) {
+            keys.push(String(child.key));
+          }
         }
       }
-    };
-    collectParentKeys(unitTree);
-    return keys;
-  }, [unitTree]);
+    }
+
+    // Nếu người dùng đã chọn sẵn đơn vị (sửa user), tự động mở rộng chuỗi cha để lộ ra node đang chọn
+    if (formData.unit_id) {
+      const findAncestors = (nodes: any[], targetId: string, currentPath: string[]): boolean => {
+        for (const n of nodes) {
+          if (String(n.key) === targetId || String(n.value) === targetId) {
+            keys.push(...currentPath);
+            return true;
+          }
+          if (n.children && n.children.length > 0) {
+            if (findAncestors(n.children, targetId, [...currentPath, String(n.key)])) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      findAncestors(unitTree, formData.unit_id, []);
+    }
+
+    return Array.from(new Set(keys));
+  }, [unitTree, formData.unit_id]);
 
   const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
 
   useEffect(() => {
-    if (defaultExpandedKeys.length > 0) {
+    if (open && defaultExpandedKeys.length > 0) {
       setTreeExpandedKeys(defaultExpandedKeys);
     }
-  }, [defaultExpandedKeys]);
+  }, [open, defaultExpandedKeys]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');

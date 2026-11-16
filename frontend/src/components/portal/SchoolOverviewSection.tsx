@@ -95,6 +95,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
       const uId = d.issuing_unit_id;
       return (
         uId === 'TQS' ||
+        uId === 'TQS-QK7' ||
         uId === 'U-TQS' ||
         tqsDepartments.some((dept) => dept.unit_id === uId) ||
         (d.unit_name &&
@@ -114,6 +115,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
             return (
               d.issuing_unit_id === 'U-BGH' ||
               d.issuing_unit_id === 'TQS' ||
+              d.issuing_unit_id === 'TQS-QK7' ||
               d.issuing_unit_id === 'U-TQS' ||
               (d.unit_name &&
                 (d.unit_name.toLowerCase().includes('ban giám hiệu') ||

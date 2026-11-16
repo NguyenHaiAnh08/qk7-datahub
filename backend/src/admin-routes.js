@@ -246,7 +246,7 @@ module.exports = (app, deps) => {
         try {
             const pool = await getPool();
             const r = await pool.request()
-                .input('uid', sql.VarChar(50), unitId)
+                .input('uid', sql.NVarChar(50), unitId)
                 .query(`
                     WITH unit_tree AS (
                         SELECT unit_id FROM UNIT WHERE unit_id = @uid
@@ -450,7 +450,7 @@ module.exports = (app, deps) => {
                 .input('full_name', sql.NVarChar(100), full_name)
                 .input('rank', sql.NVarChar(50), rank_name || null)
                 .input('position', sql.NVarChar(100), position || null)
-                .input('unit_id', sql.VarChar(50), unit_id || null)
+                .input('unit_id', sql.NVarChar(50), unit_id || null)
                 .input('status', sql.VarChar(20), status || 'active')
                 .input('clearance_level_id', sql.Int, targetClearance)
                 .input('password_hash', sql.VarChar(255), passwordHash)
@@ -550,7 +550,7 @@ module.exports = (app, deps) => {
             .input('full_name', sql.NVarChar(100), full_name)
             .input('rank', sql.NVarChar(50), rank_name || null)
             .input('position', sql.NVarChar(100), position || null)
-            .input('unit_id', sql.VarChar(50), unit_id || null)
+            .input('unit_id', sql.NVarChar(50), unit_id || null)
             .input('status', sql.VarChar(20), status || targetUser.status || 'active')
             .input('clearance_level_id', sql.Int,
                 canChangeClearance && clearance_level_id !== undefined
@@ -1268,9 +1268,9 @@ module.exports = (app, deps) => {
             if (!unit_id || !name) return res.status(400).json({ error: 'Thiếu unit_id/name' });
             const pool = await getPool();
             await pool.request()
-                .input('id', sql.VarChar(50), unit_id)
+                .input('id', sql.NVarChar(50), unit_id)
                 .input('n', sql.NVarChar(200), name)
-                .input('p', sql.VarChar(50), parent_id || null)
+                .input('p', sql.NVarChar(50), parent_id || null)
                 .input('t', sql.VarChar(50), unit_type || null)
                 .query(`INSERT INTO UNIT (unit_id, name, parent_id, unit_type) VALUES (@id, @n, @p, @t)`);
             res.json({ success: true });
@@ -1282,23 +1282,122 @@ module.exports = (app, deps) => {
 
     app.put('/api/admin/units/:id', async (req, res) => {
         try {
-            const { name, parent_id, unit_type } = req.body;
+            const oldId = req.params.id ? req.params.id.trim() : '';
+            const { unit_id, name, parent_id, unit_type } = req.body;
+            const newId = (unit_id && typeof unit_id === 'string' && unit_id.trim()) ? unit_id.trim() : oldId;
+            const trimmedName = (name && typeof name === 'string') ? name.trim() : '';
+            const trimmedParentId = (parent_id && typeof parent_id === 'string' && parent_id.trim()) ? parent_id.trim() : null;
+
+            if (!oldId || !trimmedName) {
+                return res.status(400).json({ error: 'Thiếu thông tin bắt buộc (mã hoặc tên đơn vị)' });
+            }
+
+            if (trimmedParentId && (trimmedParentId === newId || trimmedParentId === oldId)) {
+                return res.status(400).json({ error: 'Đơn vị không thể là cấp trên của chính nó' });
+            }
+
             const pool = await getPool();
-            const r = await pool.request()
-                .input('id', sql.VarChar(50), req.params.id)
-                .input('n', sql.NVarChar(200), name)
-                .input('p', sql.VarChar(50), parent_id || null)
-                .input('t', sql.VarChar(50), unit_type || null)
-                .query(`UPDATE UNIT SET name=@n, parent_id=@p, unit_type=@t WHERE unit_id=@id`);
-            if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy' });
-            res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+
+            // Kiểm tra xem đơn vị cũ có tồn tại không
+            const oldUnitCheck = await pool.request()
+                .input('oldId', sql.NVarChar(50), oldId)
+                .query(`SELECT unit_id FROM UNIT WHERE unit_id = @oldId`);
+            if (oldUnitCheck.recordset.length === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy đơn vị cần chỉnh sửa' });
+            }
+
+            // Nếu mã đơn vị thay đổi (newId !== oldId)
+            if (newId !== oldId) {
+                // Kiểm tra xem newId đã tồn tại chưa
+                const dupCheck = await pool.request()
+                    .input('newId', sql.NVarChar(50), newId)
+                    .query(`SELECT 1 FROM UNIT WHERE unit_id = @newId`);
+                if (dupCheck.recordset.length > 0) {
+                    return res.status(409).json({ error: `Mã đơn vị "${newId}" đã tồn tại trên hệ thống, vui lòng chọn mã khác` });
+                }
+
+                // Thực thi Transaction Cascade an toàn
+                const queryCascade = `
+                    SET QUOTED_IDENTIFIER ON;
+                    SET ANSI_NULLS ON;
+                    BEGIN TRANSACTION;
+
+                    -- 1. Tạm thời NOCHECK các Foreign Key liên quan đến UNIT
+                    ALTER TABLE UNIT NOCHECK CONSTRAINT FK_UNIT_PARENT;
+                    ALTER TABLE DOCUMENT NOCHECK CONSTRAINT FK_DOC_UNIT;
+                    ALTER TABLE DOCUMENT_REVISION_PROPOSAL NOCHECK CONSTRAINT FK_PROPOSAL_UNIT;
+                    ALTER TABLE UNIT_ALIAS NOCHECK CONSTRAINT FK_UA_UNIT;
+                    ALTER TABLE DIGITAL_LECTURE NOCHECK CONSTRAINT FK_DL_UNIT;
+                    ALTER TABLE SUBJECT NOCHECK CONSTRAINT FK_SUB_UNIT;
+                    ALTER TABLE TRAINING_CLASS NOCHECK CONSTRAINT FK_TC_UNIT;
+                    ALTER TABLE [USER] NOCHECK CONSTRAINT FK_USER_UNIT;
+
+                    -- 2. Cập nhật bản ghi chính UNIT
+                    UPDATE UNIT SET unit_id = @new_id, name = @n, parent_id = @p, unit_type = @t WHERE unit_id = @old_id;
+
+                    -- 3. Cascade cập nhật mã đơn vị sang toàn bộ các bảng tham chiếu
+                    UPDATE UNIT SET parent_id = @new_id WHERE parent_id = @old_id;
+                    UPDATE [USER] SET unit_id = @new_id WHERE unit_id = @old_id;
+                    UPDATE DOCUMENT SET issuing_unit_id = @new_id WHERE issuing_unit_id = @old_id;
+                    UPDATE DOCUMENT_VERSION SET issuing_unit_id = @new_id WHERE issuing_unit_id = @old_id;
+                    UPDATE DOCUMENT_REVISION_PROPOSAL SET issuing_unit_id = @new_id WHERE issuing_unit_id = @old_id;
+                    UPDATE APPROVAL_REQUEST SET requester_unit_id = @new_id WHERE requester_unit_id = @old_id;
+                    UPDATE SUBJECT SET faculty_unit_id = @new_id WHERE faculty_unit_id = @old_id;
+                    UPDATE TRAINING_CLASS SET unit_id = @new_id WHERE unit_id = @old_id;
+                    UPDATE DIGITAL_LECTURE SET faculty_unit_id = @new_id WHERE faculty_unit_id = @old_id;
+                    UPDATE TEACHING_SCHEDULE SET faculty_unit_id = @new_id WHERE faculty_unit_id = @old_id;
+                    UPDATE TEACHING_HISTORY SET unit_id = @new_id WHERE unit_id = @old_id;
+                    UPDATE UNIT_ALIAS SET unit_id = @new_id WHERE unit_id = @old_id;
+
+                    -- 4. Bật lại và thẩm định toàn vẹn Foreign Key constraints
+                    ALTER TABLE UNIT WITH CHECK CHECK CONSTRAINT FK_UNIT_PARENT;
+                    ALTER TABLE DOCUMENT WITH CHECK CHECK CONSTRAINT FK_DOC_UNIT;
+                    ALTER TABLE DOCUMENT_REVISION_PROPOSAL WITH CHECK CHECK CONSTRAINT FK_PROPOSAL_UNIT;
+                    ALTER TABLE UNIT_ALIAS WITH CHECK CHECK CONSTRAINT FK_UA_UNIT;
+                    ALTER TABLE DIGITAL_LECTURE WITH CHECK CHECK CONSTRAINT FK_DL_UNIT;
+                    ALTER TABLE SUBJECT WITH CHECK CHECK CONSTRAINT FK_SUB_UNIT;
+                    ALTER TABLE TRAINING_CLASS WITH CHECK CHECK CONSTRAINT FK_TC_UNIT;
+                    ALTER TABLE [USER] WITH CHECK CHECK CONSTRAINT FK_USER_UNIT;
+
+                    COMMIT TRANSACTION;
+                `;
+
+                await pool.request()
+                    .input('old_id', sql.NVarChar(50), oldId)
+                    .input('new_id', sql.NVarChar(50), newId)
+                    .input('n', sql.NVarChar(200), trimmedName)
+                    .input('p', sql.NVarChar(50), trimmedParentId)
+                    .input('t', sql.VarChar(50), unit_type || null)
+                    .query(queryCascade);
+
+                await log(req, 'UPDATE_UNIT_ID', `Đổi mã đơn vị từ "${oldId}" sang "${newId}", tên: "${trimmedName}"`);
+            } else {
+                // Mã đơn vị không đổi -> Chỉ cập nhật thông tin đơn vị
+                await pool.request()
+                    .input('id', sql.NVarChar(50), oldId)
+                    .input('n', sql.NVarChar(200), trimmedName)
+                    .input('p', sql.NVarChar(50), trimmedParentId)
+                    .input('t', sql.VarChar(50), unit_type || null)
+                    .query(`UPDATE UNIT SET name = @n, parent_id = @p, unit_type = @t WHERE unit_id = @id`);
+
+                await log(req, 'UPDATE_UNIT', `Cập nhật thông tin đơn vị ${oldId}: "${trimmedName}"`);
+            }
+
+            if (invalidateCatalogCache) invalidateCatalogCache();
+            res.json({ success: true, unit_id: newId });
+        } catch (e) {
+            console.error('[PUT /api/admin/units/:id]', e);
+            if (e.message.includes('PRIMARY KEY') || e.message.includes('UNIQUE')) {
+                return res.status(409).json({ error: 'Trùng mã đơn vị hoặc tên đơn vị đã tồn tại trong hệ thống' });
+            }
+            res.status(500).json({ error: e.message });
+        }
     });
 
     app.delete('/api/admin/units/:id', async (req, res) => {
         try {
             const pool = await getPool();
-            const r = await pool.request().input('id', sql.VarChar(50), req.params.id).query(`DELETE FROM UNIT WHERE unit_id = @id`);
+            const r = await pool.request().input('id', sql.NVarChar(50), req.params.id).query(`DELETE FROM UNIT WHERE unit_id = @id`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy' });
             res.json({ success: true });
         } catch (e) {
@@ -1654,7 +1753,7 @@ module.exports = (app, deps) => {
             const pool = await getPool();
             const r = pool.request();
             let query = `SELECT ua.alias_id, ua.unit_id, u.name AS unit_name, ua.alias_text, ua.priority, ua.created_at FROM UNIT_ALIAS ua JOIN UNIT u ON u.unit_id = ua.unit_id WHERE 1=1`;
-            if (req.query.unit_id) { query += ` AND ua.unit_id = @uid`; r.input('uid', sql.VarChar(50), req.query.unit_id); }
+            if (req.query.unit_id) { query += ` AND ua.unit_id = @uid`; r.input('uid', sql.NVarChar(50), req.query.unit_id); }
             query += ` ORDER BY ua.unit_id, ua.priority DESC, ua.alias_text`;
             const result = await r.query(query);
             res.json({ items: result.recordset });
@@ -1666,15 +1765,15 @@ module.exports = (app, deps) => {
             const { unit_id, alias_text, priority } = req.body;
             if (!unit_id || !alias_text) return res.status(400).json({ error: 'Thiếu unit_id hoặc alias_text' });
             const pool = await getPool();
-            const chk = await pool.request().input('uid', sql.VarChar(50), unit_id).query(`SELECT 1 FROM UNIT WHERE unit_id = @uid`);
+            const chk = await pool.request().input('uid', sql.NVarChar(50), unit_id).query(`SELECT 1 FROM UNIT WHERE unit_id = @uid`);
             if (chk.recordset.length === 0) return res.status(404).json({ error: 'Đơn vị không tồn tại' });
             const dup = await pool.request()
-                .input('uid', sql.VarChar(50), unit_id)
+                .input('uid', sql.NVarChar(50), unit_id)
                 .input('a', sql.NVarChar(200), alias_text.trim())
                 .query(`SELECT 1 FROM UNIT_ALIAS WHERE unit_id = @uid AND alias_text = @a`);
             if (dup.recordset.length > 0) return res.status(409).json({ error: 'Alias này đã có cho đơn vị' });
             const r = await pool.request()
-                .input('uid', sql.VarChar(50), unit_id)
+                .input('uid', sql.NVarChar(50), unit_id)
                 .input('a', sql.NVarChar(200), alias_text.trim())
                 .input('p', sql.Int, priority || 0)
                 .query(`INSERT INTO UNIT_ALIAS (unit_id, alias_text, priority) OUTPUT INSERTED.alias_id VALUES (@uid, @a, @p)`);
@@ -1803,7 +1902,7 @@ module.exports = (app, deps) => {
                     if (allowedUnits.length > 0) {
                         const params = allowedUnits.map((_, i) => `@aru_${i}`);
                         query += ` AND u.unit_id IN (${params.join(', ')})`;
-                        allowedUnits.forEach((u, i) => request.input(`aru_${i}`, sql.VarChar(50), u));
+                        allowedUnits.forEach((u, i) => request.input(`aru_${i}`, sql.NVarChar(50), u));
                     } else {
                         query += ` AND 1=0`;
                     }
@@ -1868,7 +1967,7 @@ module.exports = (app, deps) => {
                     if (allowedUnits.length > 0) {
                         const params = allowedUnits.map((_, i) => `@pu_${i}`);
                         propQuery += ` AND (d.issuing_unit_id IN (${params.join(', ')}) OR p.issuing_unit_id IN (${params.join(', ')}) OR u.unit_id IN (${params.join(', ')}))`;
-                        allowedUnits.forEach((u, i) => propRequest.input(`pu_${i}`, sql.VarChar(50), u));
+                        allowedUnits.forEach((u, i) => propRequest.input(`pu_${i}`, sql.NVarChar(50), u));
                     } else {
                         propQuery += ` AND 1=0`;
                     }
@@ -2282,7 +2381,7 @@ app.post('/api/admin/lectures/subjects', async (req, res) => {
       .input('id', sql.VarChar(50), subject_id)
       .input('code', sql.VarChar(50), subject_code || subject_id)
       .input('name', sql.NVarChar(200), name)
-      .input('fac', sql.VarChar(50), faculty_unit_id || null)
+      .input('fac', sql.NVarChar(50), faculty_unit_id || null)
       .input('lvl', sql.Int, security_level_id || 2)
       .input('desc', sql.NVarChar(500), description || null)
       .query(`INSERT INTO SUBJECT (subject_id, subject_code, name, faculty_unit_id, security_level_id, description, active)
@@ -2304,7 +2403,7 @@ app.put('/api/admin/lectures/subjects/:id', async (req, res) => {
       .input('id', sql.VarChar(50), req.params.id)
       .input('code', sql.VarChar(50), subject_code || null)
       .input('name', sql.NVarChar(200), name)
-      .input('fac', sql.VarChar(50), faculty_unit_id || null)
+      .input('fac', sql.NVarChar(50), faculty_unit_id || null)
       .input('lvl', sql.Int, security_level_id || null)
       .input('desc', sql.NVarChar(500), description || null)
       .input('act', sql.Bit, active !== false ? 1 : 0)
@@ -2366,7 +2465,7 @@ app.post('/api/admin/lectures/classes', async (req, res) => {
     await pool.request()
       .input('id', sql.VarChar(50), class_id)
       .input('name', sql.NVarChar(100), class_name)
-      .input('unit', sql.VarChar(50), unit_id || 'TQS')
+      .input('unit', sql.NVarChar(50), unit_id || 'TQS')
       .input('year', sql.NVarChar(50), course_year ? String(course_year) : null)
       .input('total', sql.Int, total)
       .input('desc', sql.NVarChar(500), description || null)
@@ -2389,7 +2488,7 @@ app.put('/api/admin/lectures/classes/:id', async (req, res) => {
     const r = await pool.request()
       .input('id', sql.VarChar(50), req.params.id)
       .input('name', sql.NVarChar(100), class_name)
-      .input('unit', sql.VarChar(50), unit_id || null)
+      .input('unit', sql.NVarChar(50), unit_id || null)
       .input('year', sql.NVarChar(50), course_year ? String(course_year) : null)
       .input('total', sql.Int, totalVal)
       .input('desc', sql.NVarChar(500), description || null)

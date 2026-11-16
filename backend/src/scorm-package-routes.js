@@ -515,7 +515,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         .input('fid', sql.VarChar(100), fileId)
         .input('code', sql.NVarChar(100), `BG-${lectureId}`)
         .input('title', sql.NVarChar(500), lec.title)
-        .input('unit_id', sql.VarChar(50), lec.faculty_unit_id || null)
+        .input('unit_id', sql.NVarChar(50), lec.faculty_unit_id || null)
         .input('sec_id', sql.Int, lec.security_level_id || 2)
         .input('orig_name', sql.NVarChar(500), req.file.originalname)
         .input('stored_path', sql.NVarChar(500), relPath)

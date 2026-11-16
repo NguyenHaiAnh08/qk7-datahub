@@ -4,6 +4,18 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.6-unit-tree-and-admin-unit-management-upgrade] — 2026-11-16
+
+### 1. Nâng Cấp Quản Lý Cây Đơn Vị Quân Sự (Unit Tree & Organization Suite)
+- **Giao diện Cây Đơn vị Trực quan ([`UnitTreeTable.tsx`](../frontend/src/components/dashboard/UnitTreeTable.tsx)):**
+  - Cải tiến bảng danh mục đơn vị dạng cây phân cấp (tree-table), hỗ trợ đóng/mở nhánh, hiển thị cấp bậc, đơn vị cha/con, tìm kiếm nhanh và thao tác thêm/sửa/xóa trực tiếp.
+  - Tích hợp và đồng bộ trạng thái cây đơn vị với bảng điều khiển [`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx).
+- **Chuẩn Hóa Dữ Liệu & API Quản Trị Đơn Vị:**
+  - Mở rộng các endpoint quản trị cây đơn vị trong [`backend/src/admin-routes.js`](../backend/src/admin-routes.js).
+  - Chuẩn hóa kiểu dữ liệu định danh đơn vị sang `sql.NVarChar(50)` đồng bộ trên toàn bộ các route và middleware: [`backend/src/approval-workflow.js`](../backend/src/approval-workflow.js), [`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js), [`backend/src/lecture-extended-routes.js`](../backend/src/lecture-extended-routes.js), [`backend/src/unit-scope.js`](../backend/src/unit-scope.js), [`backend/src/scorm-package-routes.js`](../backend/src/scorm-package-routes.js).
+
+---
+
 ## [v1.6.5-ai-chat-drawer-pdf-viewer-and-admin-stats-upgrade] — 2026-11-16
 
 ### 1. Nâng Cấp Toàn Diện Ngăn Trợ Lý AI RAG (AI Chat Drawer Suite)

@@ -158,7 +158,7 @@ module.exports = function createLectureExtendedRoutes({
         }
 
         const r = await pool.request()
-          .input('fac', sql.VarChar(50), req.params.facultyUnitId)
+          .input('fac', sql.NVarChar(50), req.params.facultyUnitId)
           .input('clr', sql.Int, req.user.clearance_level_id || 1)
           .query(`
             SELECT l.lecture_id, l.lecture_code, l.title, l.status,

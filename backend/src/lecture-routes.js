@@ -183,14 +183,14 @@ module.exports = function createLectureRoutes({
       if (!isAdmin && !isCommander) {
         if (deptHead && userUnit) {
           query += ` AND (l.faculty_unit_id = @userUnit OR l.author_id = @selfId)`;
-          r.input('userUnit', sql.VarChar(50), userUnit);
+          r.input('userUnit', sql.NVarChar(50), userUnit);
           r.input('selfId', sql.VarChar(50), userId);
         } else {
           query += ` AND (l.status = 'PUBLISHED' OR l.author_id = @selfId`;
           r.input('selfId', sql.VarChar(50), userId);
           if (userUnit) {
             query += ` OR l.faculty_unit_id = @userUnit`;
-            r.input('userUnit', sql.VarChar(50), userUnit);
+            r.input('userUnit', sql.NVarChar(50), userUnit);
           }
           query += `)`;
         }
@@ -204,7 +204,7 @@ module.exports = function createLectureRoutes({
         query += ` AND l.status != 'DELETED'`;
       }
       if (req.query.subject_id)       { query += ` AND l.subject_id = @subId`;      r.input('subId', sql.VarChar(50), req.query.subject_id); }
-      if (req.query.faculty_unit_id)  { query += ` AND l.faculty_unit_id = @fac`;   r.input('fac', sql.VarChar(50), req.query.faculty_unit_id); }
+      if (req.query.faculty_unit_id)  { query += ` AND l.faculty_unit_id = @fac`;   r.input('fac', sql.NVarChar(50), req.query.faculty_unit_id); }
       if (req.query.q)                { query += ` AND (l.title LIKE N'%' + @q + N'%' OR l.lecture_code LIKE '%' + @q + '%')`; r.input('q', sql.NVarChar(200), req.query.q); }
 
       query += ` ORDER BY l.created_at DESC`;
@@ -276,7 +276,7 @@ module.exports = function createLectureRoutes({
         .input('title', sql.NVarChar(500), title)
         .input('subject_id', sql.VarChar(50), subject_id)
         .input('author_id', sql.VarChar(50), authorId)
-        .input('faculty_unit_id', sql.VarChar(50), facultyUnitId)
+        .input('faculty_unit_id', sql.NVarChar(50), facultyUnitId)
         .input('security_level_id', sql.Int, security_level_id || 2)
         .input('content_type', sql.VarChar(20), ctype)
         .input('scorm_entry_point', sql.NVarChar(255), scorm_entry_point || null)
@@ -935,7 +935,7 @@ module.exports = function createLectureRoutes({
         const userUnit = await getUserUnitId(pool, req.user.user_id);
         if (userUnit) {
           query += ` AND un.unit_id = @userUnit`;
-          r.input('userUnit', sql.VarChar(50), userUnit);
+          r.input('userUnit', sql.NVarChar(50), userUnit);
         } else {
           query += ` AND 1=0`;
         }
@@ -997,7 +997,7 @@ module.exports = function createLectureRoutes({
           const userUnit = await getUserUnitId(pool, req.user.user_id);
           if (userUnit) {
             query += ` AND un.unit_id = @userUnit`;
-            r.input('userUnit', sql.VarChar(50), userUnit);
+            r.input('userUnit', sql.NVarChar(50), userUnit);
           } else {
             query += ` AND 1=0`;
           }

@@ -350,7 +350,7 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
                     <th className="py-3 px-4 w-28">Mã môn</th>
                     <th className="py-3 px-4 w-28">Mã số</th>
                     <th className="py-3 px-4">Tên môn học</th>
-                    <th className="py-3 px-4">Khoa / Bộ môn</th>
+                    <th className="py-3 px-4">Đơn vị</th>
                     <th className="py-3 px-4 w-36">Cấp bảo mật</th>
                     <th className="py-3 px-4 w-32">Trạng thái</th>
                   </>
@@ -658,7 +658,7 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
                         />
                       </div>
                       <FormInput
-                        label="Khoa / Bộ môn phụ trách"
+                        label="Đơn vị phụ trách"
                         value={form.faculty_unit_id || ''}
                         onChange={(val) => setForm({ ...form, faculty_unit_id: val })}
                         placeholder="VD: Khoa giáo viên"

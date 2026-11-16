@@ -2034,6 +2034,10 @@ const pinPendingCount = useMemo(
                 const parentCat = parentUnit.unit_type || getUnitCategory(parentUnit);
                 if (parentUnit.unit_id === 'QK7') defaultType = 'su_doan';
                 else if (parentUnit.unit_id === 'TQS') defaultType = 'khoa';
+                else if (parentCat === 'su_doan') defaultType = 'trung_doan';
+                else if (parentCat === 'trung_doan') defaultType = 'tieu_doan';
+                else if (parentCat === 'tieu_doan') defaultType = 'dai_doi';
+                else if (parentCat === 'dai_doi') defaultType = 'to';
                 else if (parentCat === 'khoa') defaultType = 'bo_mon';
                 else if (parentCat === 'bo_mon') defaultType = 'to';
                 else if (parentCat === 'phong' || parentCat === 'ban') defaultType = 'to';
@@ -2801,10 +2805,15 @@ const pinPendingCount = useMemo(
                     <>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Mã Đơn Vị *</label>
-                        <input type="text" disabled={Boolean(genericModal.item)} value={genericFormData.unit_id || ''}
+                        <input type="text" value={genericFormData.unit_id || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, unit_id: e.target.value })} required
                           placeholder="VD: QK7, TQS, BQP, U-CT..."
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 text-sm font-mono font-medium" />
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-mono font-medium focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        {genericModal.item && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                            Lưu ý: Thay đổi mã đơn vị sẽ tự động đồng bộ sang tất cả văn bản, tài khoản và đơn vị trực thuộc.
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-sm">Tên Đơn Vị *</label>
@@ -2821,6 +2830,10 @@ const pinPendingCount = useMemo(
                           <option value="trung_uong">Cấp Trung ương / Bộ</option>
                           <option value="quan_khu">Cấp Quân khu</option>
                           <option value="su_doan">Sư đoàn</option>
+                          <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
+                          <option value="tieu_doan">Tiểu đoàn</option>
+                          <option value="dai_doi">Đại đội</option>
+                          <option value="ban_chi_huy">Ban Chỉ huy</option>
                           <option value="nha_truong">Nhà trường / Viện</option>
                           <option value="co_quan">Cơ quan</option>
                           <option value="khoa">Khoa</option>
@@ -2829,7 +2842,6 @@ const pinPendingCount = useMemo(
                           <option value="ban">Ban</option>
                           <option value="to">Tổ</option>
                           <option value="lop">Lớp</option>
-                          <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
                         </select>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Quy định cấp bậc hiển thị và thẩm quyền quản lý của đơn vị</p>
                       </div>

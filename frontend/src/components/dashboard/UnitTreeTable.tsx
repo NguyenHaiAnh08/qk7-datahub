@@ -35,6 +35,9 @@ export type UnitCategory =
   | 'quan_khu'
   | 'su_doan'
   | 'trung_doan'
+  | 'tieu_doan'
+  | 'dai_doi'
+  | 'ban_chi_huy'
   | 'nha_truong'
   | 'co_quan'
   | 'khoa'
@@ -82,6 +85,9 @@ export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
       t === 'quan_khu' ||
       t === 'su_doan' ||
       t === 'trung_doan' ||
+      t === 'tieu_doan' ||
+      t === 'dai_doi' ||
+      t === 'ban_chi_huy' ||
       t === 'nha_truong' ||
       t === 'co_quan' ||
       t === 'khoa' ||
@@ -126,9 +132,21 @@ export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
   if (id.startsWith('SD') || name.includes('sư đoàn')) {
     return 'su_doan';
   }
-  // 5. Trung đoàn
+  // 5. Trung đoàn / Lữ đoàn
   if (id.startsWith('TD') || name.includes('trung đoàn') || name.includes('lữ đoàn')) {
     return 'trung_doan';
+  }
+  // 5.1. Ban Chỉ huy
+  if (name.includes('ban chỉ huy') || name.includes('bch') || id.startsWith('BCH-') || id.startsWith('BCH_') || id.startsWith('BCH')) {
+    return 'ban_chi_huy';
+  }
+  // 5.2. Tiểu đoàn
+  if (name.includes('tiểu đoàn') || id.startsWith('D-') || id.startsWith('D_') || id.startsWith('TD_')) {
+    return 'tieu_doan';
+  }
+  // 5.3. Đại đội
+  if (name.includes('đại đội') || id.startsWith('C-') || id.startsWith('C_')) {
+    return 'dai_doi';
   }
   // 6. Khoa
   if (name.includes('khoa') || id.startsWith('K-') || id.startsWith('K_')) {
@@ -196,12 +214,36 @@ export const CATEGORY_CONFIG: Record<
       'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30',
   },
   trung_doan: {
-    label: 'Trung đoàn',
+    label: 'Trung đoàn / Lữ đoàn',
     icon: ShieldCheck,
     badgeClass:
       'bg-cyan-100 text-cyan-900 border-cyan-300 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/30',
     iconBgClass:
       'bg-cyan-100 text-cyan-800 border border-cyan-300 dark:bg-cyan-500/15 dark:text-cyan-300 dark:border-cyan-500/30',
+  },
+  tieu_doan: {
+    label: 'Tiểu đoàn',
+    icon: Shield,
+    badgeClass:
+      'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30',
+    iconBgClass:
+      'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30',
+  },
+  dai_doi: {
+    label: 'Đại đội',
+    icon: Flag,
+    badgeClass:
+      'bg-teal-100 text-teal-900 border-teal-300 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+    iconBgClass:
+      'bg-teal-100 text-teal-800 border border-teal-300 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-500/30',
+  },
+  ban_chi_huy: {
+    label: 'Ban Chỉ huy',
+    icon: Award,
+    badgeClass:
+      'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+    iconBgClass:
+      'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
   },
   nha_truong: {
     label: 'Nhà trường / Viện',
@@ -287,7 +329,13 @@ export const getCategoryFilterLabel = (cat: UnitCategory): string => {
     case 'su_doan':
       return 'Sư đoàn';
     case 'trung_doan':
-      return 'Trung đoàn';
+      return 'Trung đoàn / Lữ đoàn';
+    case 'tieu_doan':
+      return 'Tiểu đoàn';
+    case 'dai_doi':
+      return 'Đại đội';
+    case 'ban_chi_huy':
+      return 'Ban Chỉ huy';
     case 'nha_truong':
       return 'Nhà trường / Viện';
     case 'co_quan':
@@ -375,14 +423,17 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
       if (cat === 'quan_khu') return 1;
       if (cat === 'nha_truong') return 2;
       if (cat === 'su_doan') return 3;
-      if (cat === 'co_quan') return 4;
-      if (cat === 'khoa') return 5;
-      if (cat === 'bo_mon') return 6;
-      if (cat === 'phong') return 7;
-      if (cat === 'ban') return 8;
-      if (cat === 'to') return 9;
-      if (cat === 'lop') return 10;
-      if (cat === 'trung_doan') return 11;
+      if (cat === 'ban_chi_huy') return 4;
+      if (cat === 'trung_doan') return 5;
+      if (cat === 'tieu_doan') return 6;
+      if (cat === 'dai_doi') return 7;
+      if (cat === 'co_quan') return 8;
+      if (cat === 'khoa') return 9;
+      if (cat === 'bo_mon') return 10;
+      if (cat === 'phong') return 11;
+      if (cat === 'ban') return 12;
+      if (cat === 'to') return 13;
+      if (cat === 'lop') return 14;
 
       // Cấp Trung ương / Bộ nằm ở dưới Sư đoàn 5
       if (cat === 'trung_uong') {
@@ -893,6 +944,10 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               <option value="quan_khu">Cấp Quân khu</option>
               <option value="school_and_depts">Trường QS & Trực thuộc</option>
               <option value="su_doan">Sư đoàn</option>
+              <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
+              <option value="tieu_doan">Tiểu đoàn</option>
+              <option value="dai_doi">Đại đội</option>
+              <option value="ban_chi_huy">Ban Chỉ huy</option>
               <option value="nha_truong">Nhà trường / Viện</option>
               <option value="co_quan">Cơ quan</option>
               <option value="khoa">Khoa</option>
@@ -901,7 +956,6 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               <option value="ban">Ban</option>
               <option value="to">Tổ</option>
               <option value="lop">Lớp</option>
-              <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
             </select>
           </div>
         </div>

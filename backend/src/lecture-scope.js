@@ -21,7 +21,7 @@ async function getLectureScope({ userId, roles, deptHead }) {
 // Gắn danh sách unit vào request, trả về "@su0,@su1,..." dùng trong IN (...)
 function bindUnitIn(request, ids, prefix = 'su') {
   if (!ids || ids.length === 0) return 'NULL';
-  ids.forEach((id, i) => request.input(`${prefix}${i}`, sql.VarChar(50), id));
+  ids.forEach((id, i) => request.input(`${prefix}${i}`, sql.NVarChar(50), id));
   return ids.map((_, i) => `@${prefix}${i}`).join(',');
 }
 

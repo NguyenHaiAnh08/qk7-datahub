@@ -52,18 +52,35 @@ const ROOT_DIR = __dirname;
 const PDF_ROOT = path.join(ROOT_DIR, 'uploads');
 const publicDir = path.join(ROOT_DIR, 'public');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'QK7-DEV-SECRET-CHANGE-IN-PROD-' + crypto.randomBytes(16).toString('hex');
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  console.error('[FATAL] JWT_SECRET chưa set hoặc < 32 ký tự. Dừng server.');
+  process.exit(1);
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const FINGERPRINT_TOKEN_EXPIRES_IN = '5m';
-const BRIDGE_TOKEN = process.env.FINGERPRINT_BRIDGE_TOKEN || '';
+const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN;
+if (!BRIDGE_TOKEN || BRIDGE_TOKEN.length < 32) {
+  console.error('[FATAL] BRIDGE_TOKEN chưa set hoặc < 32 ký tự. Dừng server.');
+  process.exit(1);
+}
 
 // ✅ CẤU HÌNH BẢO MẬT ADMIN (2FA)
 const PROTECTED_ADMIN_USER_ID = process.env.PROTECTED_ADMIN_USER_ID || 'USR-001';
-const ADMIN_ALLOWED_IP = (process.env.ADMIN_ALLOWED_IP || '').split(',').map(ip => ip.trim()).filter(Boolean);
+const ADMIN_ALLOWED_IP = (process.env.ADMIN_ALLOWED_IP || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+if (ADMIN_ALLOWED_IP.length === 0) {
+  console.error('[FATAL] ADMIN_ALLOWED_IP chưa set. Tài khoản USR-001 sẽ không được bảo vệ bằng IP whitelist.');
+  process.exit(1);
+}
 
 const FP_ENC_KEY = process.env.FP_ENC_KEY
   ? crypto.scryptSync(process.env.FP_ENC_KEY, 'qk7-fp-salt', 32)
   : null;
+if (!FP_ENC_KEY) {
+  console.error('[FATAL] FP_ENC_KEY chưa set. Không thể khởi động vì template vân tay sẽ không được mã hóa.');
+  process.exit(1);
+}
 
 const USE_HTTPS = (process.env.USE_HTTPS || 'false').toLowerCase() === 'true';
 const SSL_KEY_PATH = process.env.SSL_KEY_PATH
@@ -83,6 +100,17 @@ const IPBLOCK_DURATION_MINUTES = parseInt(process.env.IPBLOCK_DURATION_MINUTES |
 if (!process.env.JWT_SECRET) console.warn('[SECURITY] ⚠️  JWT_SECRET chưa set');
 if (!BRIDGE_TOKEN || BRIDGE_TOKEN.length < 16) console.warn('[SECURITY] ⚠️  BRIDGE_TOKEN thiếu');
 if (!FP_ENC_KEY) console.warn('[SECURITY] ⚠️  FP_ENC_KEY chưa set');
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN 2FA OPAQUE TICKET (chống forge JWT)
+// ═══════════════════════════════════════════════════════════════
+const {
+  issueTicket: issueAdmin2FATicket,
+  consumeTicket: consumeAdmin2FATicket,
+  cleanupExpiredTickets: cleanupAdmin2FATickets,
+  getRecentFailures: getAdmin2FAFailures,
+  TICKET_TTL_SECONDS: ADMIN_2FA_TTL_SECONDS,
+} = require('./src/admin-2fa-ticket');
 
 // ═══════════════════════════════════════════════════════════════
 // SECURITY MIDDLEWARE
@@ -167,6 +195,40 @@ const aiLimiter = rateLimit({
   windowMs: 60 * 1000, max: 30,
   standardHeaders: true, legacyHeaders: false,
   message: { error: 'Thao tác hỏi đáp Trợ lý AI quá dồn dập. Vui lòng thử lại sau giây lát.', code: 'AI_RATE_LIMITED' },
+});
+
+const parseLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 20,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Thao tác phân tích tài liệu quá dồn dập. Vui lòng thử lại sau giây lát.', code: 'PARSE_RATE_LIMITED' },
+});
+
+// ═══════════════════════════════════════════════════════════════
+// RATE LIMITER CHO ADMIN 2FA VERIFY
+// - Global 100/15min (chống distributed)
+// - IP-based 20/15min (đủ rộng cho admin thật, chặn brute-force từ 1 IP)
+// ═══════════════════════════════════════════════════════════════
+const adminFpGlobalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Hệ thống tạm thời hạn chế xác thực 2FA. Vui lòng thử lại sau.',
+    code: 'ADMIN_2FA_GLOBAL_RATE_LIMITED',
+  },
+});
+
+const adminFpIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `admin2fa:ip:${ipKeyGenerator(req.ip)}`,
+  message: {
+    error: 'Quá nhiều lần xác thực 2FA từ IP này. Vui lòng thử lại sau 15 phút.',
+    code: 'ADMIN_2FA_IP_RATE_LIMITED',
+  },
 });
 
 app.use('/api', globalLimiter);
@@ -425,6 +487,110 @@ setInterval(async () => {
 
 console.log(`[Session] ⏰ Idle timeout: ${SESSION_IDLE_TIMEOUT_MINUTES} phút (tự động logout)`);
 
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ GUEST SESSION (cho Đại biểu tham quan Thư viện số) — P1-2
+// ═══════════════════════════════════════════════════════════════
+const GUEST_SESSION_TTL_MINUTES = parseInt(process.env.GUEST_SESSION_TTL_MINUTES || '120', 10);
+const GUEST_SESSION_MAX_PER_IP = parseInt(process.env.GUEST_SESSION_MAX_PER_IP || '5', 10);
+const guestSessions = new Map();  // guestToken → { expiresAt, ip, createdAt }
+
+const guestSessionLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: GUEST_SESSION_MAX_PER_IP,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `guest:${ipKeyGenerator(req.ip)}`,
+  message: {
+    error: 'Quá nhiều yêu cầu truy cập khách. Vui lòng thử lại sau.',
+    code: 'GUEST_RATE_LIMITED',
+  },
+});
+
+// ✅ Cleanup định kỳ — tránh memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of guestSessions.entries()) {
+    if (v.expiresAt < now) guestSessions.delete(k);
+  }
+}, 5 * 60 * 1000);
+
+app.post('/api/guest/session', guestSessionLimiter, async (req, res) => {
+  try {
+    const ip = getClientIp(req);
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = Date.now() + GUEST_SESSION_TTL_MINUTES * 60 * 1000;
+
+    guestSessions.set(token, { ip, createdAt: Date.now(), expiresAt });
+
+    // Cleanup ngay khi tạo (không chờ interval)
+    for (const [k, v] of guestSessions.entries()) {
+      if (v.expiresAt < Date.now()) guestSessions.delete(k);
+    }
+
+    await writeAccessLog({
+      userId: 'GUEST', fileId: null, action: 'GUEST_SESSION_CREATED', ip,
+      note: `Guest session created, expires in ${GUEST_SESSION_TTL_MINUTES} min`,
+    });
+
+    res.json({
+      success: true,
+      guest_token: token,
+      expires_in: GUEST_SESSION_TTL_MINUTES * 60,
+      scope: 'DOC_VIEW_PUBLIC',   // ✅ CHỈ Cấp 1
+    });
+  } catch (err) {
+    console.error('[POST /api/guest/session]', err);
+    res.status(500).json({ error: 'Không thể tạo phiên khách' });
+  }
+});
+
+// ✅ Middleware xác thực Guest Session
+function requireGuestOrAuth(req, res, next) {
+  // Đã đăng nhập đầy đủ → OK
+  if (req.user && req.user.is_authenticated) return next();
+
+  // Anonymous → kiểm tra Guest Session
+  const guestToken = req.headers['x-guest-token'] || req.query.guest_token;
+  if (!guestToken) {
+    return res.status(401).json({
+      error: 'Cần đăng nhập hoặc có phiên khách để truy cập.',
+      code: 'AUTH_REQUIRED',
+    });
+  }
+
+  const session = guestSessions.get(guestToken);
+  if (!session || session.expiresAt < Date.now()) {
+    guestSessions.delete(guestToken);
+    return res.status(401).json({
+      error: 'Phiên khách đã hết hạn. Vui lòng tạo phiên mới.',
+      code: 'GUEST_SESSION_EXPIRED',
+    });
+  }
+
+  // ✅ Bind IP để chống share token
+  if (session.ip !== getClientIp(req)) {
+    return res.status(401).json({
+      error: 'Phiên khách không hợp lệ cho IP này.',
+      code: 'GUEST_SESSION_IP_MISMATCH',
+    });
+  }
+
+  // Gán quyền Guest — CHỈ Cấp 1, KHÔNG download
+  req.user = {
+    user_id: 'GUEST',
+    full_name: 'Đại biểu',
+    clearance_level_id: 1,          // ✅ CHỈ Cấp 1
+    roles: ['DELEGATE'],
+    permissions: ['DOC_VIEW'],      // ✅ KHÔNG DOC_DOWNLOAD
+    is_authenticated: false,
+    is_guest: true,
+    guest_session_token: guestToken,
+  };
+  next();
+}
+
+
 // ═══════════════════════════════════════════════════════════════
 // AUTH MIDDLEWARE — JWT + Session validation
 // ═══════════════════════════════════════════════════════════════
@@ -453,15 +619,19 @@ app.use('/api', async (req, res, next) => {
     if (match) rawToken = decodeURIComponent(match[1]).trim();
   }
 
-  if (!rawToken) {
+    if (!rawToken) {
+    // ✅ P1-2: Anonymous KHÔNG có quyền gì
+    // - clearance=1 để không phá logic query hiện có (1 = Cấp Công khai)
+    // - permissions=[] để requirePermission chặn mọi thao tác ghi
+    // - KHÔNG set is_guest (chỉ Guest Session mới có is_guest=true)
     req.user = {
-      user_id: 'GUEST',
-      full_name: 'Đại biểu',
-      clearance_level_id: 2, // Đại biểu được xem và tải tài liệu Cấp 1 (Công khai) và Cấp 2 (Nội bộ Thư viện số)
-      roles: ['DELEGATE'],
-      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
+      user_id: 'ANONYMOUS',
+      full_name: 'Khách',
+      clearance_level_id: 1,
+      roles: [],
+      permissions: [],
       is_authenticated: false,
-      is_guest: true,
+      is_anonymous: true,
     };
     return next();
   }
@@ -470,6 +640,16 @@ app.use('/api', async (req, res, next) => {
 
     const sess = await validateSession({ token: rawToken, ip: getClientIp(req) });
     if (!sess.valid) {
+      // ✅ IP_CHANGED → yêu cầu re-auth (khác với SESSION_INVALID thông thường)
+      if (sess.reason === 'IP_CHANGED' || sess.requires_reauth) {
+        return res.status(401).json({
+          error: 'Phiên làm việc đã bị hủy do phát hiện truy cập từ địa chỉ IP khác thường. Vui lòng đăng nhập lại.',
+          code: 'SESSION_REAUTH_REQUIRED',
+          requires_reauth: true,
+          reason: sess.reason,
+        });
+      }
+
       const revokedReasons = ['ADMIN_KILL', 'ACCOUNT_LOCKED', 'PASSWORD_CHANGED'];
       return res.status(401).json({
         error: revokedReasons.includes(sess.reason)
@@ -682,13 +862,13 @@ async function handleLogin(req, res) {
     const userRoleNames = rolesRes.recordset.map((x) => x.name);
 
     // ✅ BƯỚC 1: KIỂM TRA IP TĨNH ĐỐI VỚI ADMIN (TRƯỚC KHI CHECK PASS)
-    // if (user.user_id === PROTECTED_ADMIN_USER_ID) {
-    //   if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
-    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
-    //     await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
-    //     return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
-    //   }
-    // }
+    if (user.user_id === PROTECTED_ADMIN_USER_ID) {
+      if (ADMIN_ALLOWED_IP.length > 0 && !ADMIN_ALLOWED_IP.includes(ip)) {
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_DENIED_IP' });
+        await writeAccessLog({ userId: user.user_id, fileId: null, action: 'LOGIN_DENIED_IP', ip, note: `IP ${ip} không nằm trong Whitelist Admin` });
+        return res.status(403).json({ error: `Truy cập bị từ chối. IP hiện tại (${ip}) không được phép đăng nhập tài khoản Quản trị tối cao.` });
+      }
+    }
 
     if (user.status !== 'active') {
       await writeLoginAttempt({ ip, username, result: 'LOCKED' });
@@ -753,65 +933,78 @@ async function handleLogin(req, res) {
     // - USR-001 (Quản trị tối cao): bắt buộc nếu đã enroll, cảnh báo nếu chưa
     // - Admin tạm thời (được gán ROL-01): BẮT BUỘC phải có vân tay
     // ═══════════════════════════════════════════════════════════
-    // const PROTECTED_ADMIN_ROLE_ID = process.env.PROTECTED_ADMIN_ROLE_ID || 'ROL-01';
-    // const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
-    // const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
+    const PROTECTED_ADMIN_ROLE_ID = process.env.PROTECTED_ADMIN_ROLE_ID || 'ROL-01';
+    const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
+    const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
 
-    // if (isProtectedAdmin || hasAdminRole) {
-    //   // Dùng luôn user.has_fingerprint đã load trong query đầu
-    //   const hasFingerprint = user.has_fingerprint === 1;
+    if (isProtectedAdmin || hasAdminRole) {
+      // Dùng luôn user.has_fingerprint đã load trong query đầu
+      const hasFingerprint = user.has_fingerprint === 1;
 
-    //   if (!hasFingerprint) {
-    //     if (isProtectedAdmin) {
-    //       // USR-001 chưa enroll → cho qua password-only để enroll admin khác
-    //       console.warn(
-    //         `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
-    //         `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
-    //       );
-    //       await writeAccessLog({
-    //         userId: user.user_id, fileId: null,
-    //         action: 'LOGIN_NO_FP_WARNING', ip,
-    //         note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
-    //       });
-    //       // Không return — rơi xuống nhánh cấp JWT bên dưới
+      if (!hasFingerprint) {
+        if (isProtectedAdmin) {
+          // USR-001 chưa enroll → cho qua password-only để enroll admin khác
+          console.warn(
+            `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
+            `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
+          );
+          await writeAccessLog({
+            userId: user.user_id, fileId: null,
+            action: 'LOGIN_NO_FP_WARNING', ip,
+            note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
+          });
+          // Không return — rơi xuống nhánh cấp JWT bên dưới
 
-    //     } else {
-    //       // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
-    //       await writeAccessLog({
-    //         userId: user.user_id, fileId: null,
-    //         action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
-    //         note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
-    //               `nhưng chưa enroll vân tay — từ chối đăng nhập`
-    //       });
-    //       return res.status(403).json({
-    //         error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
-    //                'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
-    //         code: 'ADMIN_FINGERPRINT_REQUIRED',
-    //         needs_enroll: true,
-    //         enroll_via: PROTECTED_ADMIN_USER_ID,
-    //       });
-    //     }
-    //   } else {
-    //     // Đã có vân tay → yêu cầu quét qua 202
-    //     await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
+        } else {
+          // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
+          await writeAccessLog({
+            userId: user.user_id, fileId: null,
+            action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
+            note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
+                  `nhưng chưa enroll vân tay — từ chối đăng nhập`
+          });
+          return res.status(403).json({
+            error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
+                   'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
+            code: 'ADMIN_FINGERPRINT_REQUIRED',
+            needs_enroll: true,
+            enroll_via: PROTECTED_ADMIN_USER_ID,
+          });
+        }
+      } else {
+        // Đã có vân tay → yêu cầu quét qua 202
+        await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });
 
-    //     const tempTicket = jwt.sign(
-    //       { user_id: user.user_id, purpose: 'admin_login_fp' },
-    //       JWT_SECRET,
-    //       { expiresIn: '2m' }
-    //     );
+        // ✅ OPAQUE TICKET: phát hành server-side, KHÔNG dùng JWT tự verify
+        let tempTicket;
+        try {
+          const issued = await issueAdmin2FATicket({
+            userId: user.user_id,
+            deviceId: null,   // sẽ bind tại bước 2
+            ip,
+          });
+          tempTicket = issued.ticket;
+        } catch (issueErr) {
+          console.error('[login] issueAdmin2FATicket:', issueErr.message);
+          return res.status(500).json({
+            error: 'Không thể tạo phiên xác thực 2FA. Vui lòng thử lại.',
+            code: 'TICKET_ISSUE_FAILED',
+          });
+        }
 
-    //     return res.status(202).json({
-    //       success: true,
-    //       require_admin_fp: true,
-    //       temp_ticket: tempTicket,
-    //       is_protected_admin: isProtectedAdmin,
-    //       message: isProtectedAdmin
-    //         ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
-    //         : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
-    //     });
-    //   }
-    // }
+        return res.status(202).json({
+          success: true,
+          require_admin_fp: true,
+          temp_ticket: tempTicket,
+          user_id: user.user_id,   // ✅ để client gửi lại ở bước 2
+          is_protected_admin: isProtectedAdmin,
+          expires_in: `${ADMIN_2FA_TTL_SECONDS}s`,
+          message: isProtectedAdmin
+            ? 'Yêu cầu xác thực vân tay Quản trị viên tối cao.'
+            : 'Yêu cầu xác thực vân tay để kích hoạt quyền Admin tạm thời.',
+        });
+      }
+    }
 
 
     // User thường -> Cấp JWT và cho vào luôn
@@ -895,59 +1088,115 @@ app.post('/api/auth/login', handleLogin);
 app.post('/login', express.urlencoded({ extended: false }), handleLogin);
 app.get('/login', (req, res) => serveSpaIndex(req, res));
 
-// ✅ BƯỚC 3: API XÁC THỰC VÂN TAY ĐỂ HOÀN TẤT LOGIN ADMIN
-app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
-  const { temp_ticket, device_id } = req.body;
+// ═══════════════════════════════════════════════════════════════
+// ADMIN 2FA VERIFY — dùng OPAQUE TICKET (không JWT tự verify)
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/auth/login/admin-fp-verify',
+  adminFpGlobalLimiter,
+  adminFpIpLimiter,
+  async (req, res) => {
+  const { temp_ticket, device_id, user_id: bodyUserId } = req.body;
   const ip = getClientIp(req);
 
   try {
-    if (!temp_ticket || !device_id) return res.status(400).json({ error: 'Thiếu dữ liệu xác thực (temp_ticket hoặc device_id)' });
-    if (!isAgentOnline(device_id)) return res.status(503).json({ error: 'Máy quét vân tay chưa sẵn sàng.', agent_offline: true });
-
-    // 1. Verify vé tạm
-    let decoded;
-    try {
-      decoded = jwt.verify(temp_ticket, JWT_SECRET);
-      if (decoded.purpose !== 'admin_login_fp') throw new Error('Sai purpose');
-    } catch {
-      return res.status(401).json({ error: 'Phiên xác thực đã hết hạn. Vui lòng đăng nhập lại.' });
+    if (!temp_ticket || !device_id) {
+      return res.status(400).json({
+        error: 'Thiếu dữ liệu xác thực (temp_ticket hoặc device_id)',
+        code: 'MISSING_INPUT',
+      });
     }
 
-    // 2. Lấy Template vân tay của Admin trong DB
+    // ── 1. Consume ticket (opaque, one-time use, TTL 2 phút) ──
+    const ticketResult = await consumeAdmin2FATicket({
+      ticket: temp_ticket,
+      deviceId: device_id,
+      ip,
+    });
+
+    if (!ticketResult.valid) {
+      await writeAccessLog({
+        userId: bodyUserId || null,
+        fileId: null,
+        action: 'ADMIN_2FA_TICKET_FAIL',
+        ip,
+        note: `Lý do: ${ticketResult.reason}, device: ${device_id}`,
+      });
+
+      if (bodyUserId) {
+        try {
+          const fails = await getAdmin2FAFailures(bodyUserId, 60);
+          if (fails >= 3) {
+            console.warn(`[SECURITY] ⚠️ User ${bodyUserId} có ${fails} lần 2FA thất bại trong 1 giờ — có thể bị tấn công.`);
+            await writeAccessLog({
+              userId: bodyUserId, fileId: null,
+              action: 'ADMIN_2FA_FAILURE_ALERT',
+              ip, note: `${fails} lần thất bại trong 1 giờ`,
+            });
+          }
+        } catch (_) {}
+      }
+
+      return res.status(401).json({
+        error: 'Phiên xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.',
+        code: 'TICKET_INVALID',
+      });
+    }
+
+    const decodedUserId = ticketResult.userId;
+
+    // ── 2. Log IP mismatch (không chặn) ──
+    if (ticketResult.ipMismatch) {
+      await writeAccessLog({
+        userId: decodedUserId, fileId: null,
+        action: 'ADMIN_2FA_IP_MISMATCH',
+        ip,
+        note: `IP bước 2 (${ip}) khác bước 1 (${ticketResult.issuedIp}) cho user ${decodedUserId} — chỉ log, không chặn`,
+      });
+      console.warn(`[SECURITY] IP mismatch cho 2FA user ${decodedUserId}: ${ticketResult.issuedIp} → ${ip}`);
+    }
+
+    // ── 3. Verify agent online ──
+    if (!isAgentOnline(device_id)) {
+      return res.status(503).json({
+        error: 'Máy quét vân tay chưa sẵn sàng.',
+        agent_offline: true,
+      });
+    }
+
+    // ── 4. Lấy template vân tay của user ──
     const pool = await getPool();
     const fpRes = await pool.request()
-      .input('uid', sql.VarChar(50), decoded.user_id)
+      .input('uid', sql.VarChar(50), decodedUserId)
       .query(`SELECT template_enc FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
-    
+
     if (fpRes.recordset.length === 0) {
       return res.status(403).json({ error: 'Chưa đăng ký vân tay.' });
     }
 
     const templateBuffer = decryptTemplate(fpRes.recordset[0].template_enc, {
-      userId: decoded.user_id,
-      action: 'ADMIN_LOGIN_2FA'
+      userId: decodedUserId,
+      action: 'ADMIN_LOGIN_2FA',
     });
     if (!templateBuffer) {
-      console.error(`[admin-fp-verify] ❌ Template vân tay của Admin (${decoded.user_id}) bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY.`);
+      console.error(`[admin-fp-verify] ❌ Template vân tay Admin (${decodedUserId}) hỏng hoặc sai FP_ENC_KEY.`);
       await writeAccessLog({
-        userId: decoded.user_id,
-        fileId: null,
-        action: 'LOGIN_FAIL_FP',
-        ip,
-        note: 'Admin 2FA thất bại: Template vân tay bị hỏng hoặc sai khóa mã hóa FP_ENC_KEY'
+        userId: decodedUserId, fileId: null, action: 'LOGIN_FAIL_FP', ip,
+        note: 'Admin 2FA thất bại: Template hỏng hoặc sai khóa mã hóa FP_ENC_KEY',
       });
       return res.status(500).json({
         error: 'Template vân tay bị hỏng hoặc sai khóa mã hóa hệ thống.',
         code: 'TEMPLATE_DECRYPT_FAILED',
-        details: 'Không thể giải mã template vân tay bằng khóa FP_ENC_KEY hiện tại. Vui lòng kiểm tra khóa bí mật hoặc enroll lại vân tay.'
       });
     }
     const templateB64 = templateBuffer.toString('base64');
 
-    // 3. Gửi lệnh quét xuống Agent
+    // ── 5. Gửi lệnh quét xuống Agent ──
     let scanResult;
     try {
-      scanResult = await requestScan(device_id, { template_b64: templateB64, file_id: 'ADMIN_LOGIN' });
+      scanResult = await requestScan(device_id, {
+        template_b64: templateB64,
+        file_id: 'ADMIN_LOGIN',
+      });
     } catch (err) {
       if (err.message === 'AGENT_OFFLINE' || err.message === 'AGENT_DISCONNECTED') {
         return res.status(503).json({ error: 'Máy quét vừa mất kết nối.', agent_offline: true });
@@ -958,29 +1207,26 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
       throw err;
     }
 
+    // ── 6. Quét sai vân tay → KHÔNG đếm failed_attempts ──
     if (!scanResult.match) {
       if (scanResult.error === 'CANCELLED') {
         return res.status(409).json({ error: 'Yêu cầu đã bị hủy bởi thao tác mới.', cancelled: true });
       }
       if (scanResult.error === 'DEVICE_OFFLINE') {
         return res.status(503).json({
-          error: 'Không tìm thấy đầu đọc vân tay ZK9500 hoặc thiết bị đang bận. Vui lòng kiểm tra cáp USB.',
-          device_offline: true,
-          agent_offline: true,
+          error: 'Không tìm thấy đầu đọc vân tay ZK9500. Vui lòng kiểm tra cáp USB.',
+          device_offline: true, agent_offline: true,
         });
       }
       if (scanResult.error === 'TIMEOUT') {
         return res.status(408).json({ error: 'Hết thời gian chờ quét vân tay.', timeout: true });
       }
       if (scanResult.error) {
-        return res.status(500).json({ error: `Lỗi máy quét vân tay: ${scanResult.error}`, device_error: true });
+        return res.status(500).json({ error: `Lỗi máy quét: ${scanResult.error}`, device_error: true });
       }
       await writeAccessLog({
-        userId: decoded.user_id,
-        fileId: null,
-        action: 'LOGIN_FAIL_FP',
-        ip,
-        note: `Admin 2FA không khớp (score=${scanResult.score})`,
+        userId: decodedUserId, fileId: null, action: 'LOGIN_FAIL_FP', ip,
+        note: `Admin 2FA không khớp (score=${scanResult.score}) — không đếm vào failed_attempts`,
       });
       return res.status(403).json({
         error: `Vân tay quản trị viên không khớp (score=${scanResult.score}). Vui lòng thử lại.`,
@@ -988,10 +1234,9 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
       });
     }
 
-    // Defense-in-depth: kiểm tra template vẫn tồn tại sau khi quét
-    // (phòng trường hợp admin bị xoá template trong 2 phút temp_ticket)
+    // ── 7. Defense-in-depth: kiểm tra template vẫn tồn tại ──
     const fpCheckAgain = await pool.request()
-      .input('uid', sql.VarChar(50), decoded.user_id)
+      .input('uid', sql.VarChar(50), decodedUserId)
       .query(`SELECT 1 FROM USER_FINGERPRINT WHERE user_id = @uid AND active = 1`);
     if (fpCheckAgain.recordset.length === 0) {
       return res.status(403).json({
@@ -1000,9 +1245,9 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
       });
     }
 
-    // 4. Vân tay khớp -> Lấy lại thông tin User và Cấp JWT chính thức
+    // ── 8. Lấy thông tin user và cấp JWT chính thức ──
     const uRes = await pool.request()
-      .input('uid', sql.VarChar(50), decoded.user_id)
+      .input('uid', sql.VarChar(50), decodedUserId)
       .query(`
         SELECT u.user_id, u.username, u.full_name, u.[rank] AS rank_name,
                u.[position], u.unit_id, u.status, u.clearance_level_id,
@@ -1041,33 +1286,23 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
     await createSession({
       userId: user.user_id,
       clearanceLevelId: user.clearance_level_id,
-      token,
-      ip,
+      token, ip,
       userAgent: req.headers['user-agent'],
       expiresInMs: ttlMs,
     });
 
     await writeAccessLog({
       userId: user.user_id, fileId: null, action: 'LOGIN_ADMIN_2FA', ip,
-      note: `${user.full_name} (Đăng nhập Admin 2FA vân tay)`,
+      note: `${user.full_name} (Đăng nhập Admin 2FA vân tay — opaque ticket)`,
     });
 
     const permissions = await getUserPermissions(user.user_id);
 
-    // Thiết lập session cookie với flags Secure, HttpOnly, SameSite=Strict (chống CSRF)
     res.cookie('qk7_session', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: ttlMs,
+      httpOnly: true, secure: true, sameSite: 'strict', path: '/', maxAge: ttlMs,
     });
     res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: ttlMs,
+      httpOnly: true, secure: true, sameSite: 'strict', path: '/', maxAge: ttlMs,
     });
 
     res.json({
@@ -1077,7 +1312,7 @@ app.post('/api/auth/login/admin-fp-verify', async (req, res) => {
 
   } catch (err) {
     console.error('[POST /api/auth/login/admin-fp-verify]', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Lỗi xác thực 2FA' });
   }
 });
 
@@ -1961,7 +2196,7 @@ app.get('/api/documents/:fileId', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // DOCUMENT PARSE / UPLOAD / UPDATE / DELETE / RESTORE / PURGE
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), validateUploadedPdf, async (req, res) => {
+app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), validateUploadedPdf, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
 
@@ -2051,7 +2286,40 @@ app.post('/api/documents/parse', requireAuth, requirePermission('DOC_PARSE'), up
     });
 
     const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
-    const documentCode = (req.body.document_code || result?.parsed?.document_code || '').trim() || null;
+
+    // ✅ VALIDATE document_code: ưu tiên extracted, nhưng phải đúng format
+    // Format cho phép: chữ, số, gạch ngang, gạch chéo, dấu chấm (vd: 123/QĐ-QK7, 45/2024/TT-BQP)
+    const DOC_CODE_REGEX = /^[A-Za-z0-9À-ỹ][A-Za-z0-9À-ỹ\-/._ ]{0,99}$/;
+
+    const extractedCode = (result?.parsed?.document_code || '').trim();
+    const clientCode = (req.body.document_code || '').trim();
+
+    const isValidCode = (c) => c && c.length <= 100 && DOC_CODE_REGEX.test(c);
+
+    let documentCode = null;
+    if (isValidCode(extractedCode)) {
+      documentCode = extractedCode;
+      if (clientCode && clientCode !== extractedCode && isValidCode(clientCode)) {
+        // Cả 2 đều hợp lệ nhưng khác nhau → log để audit, dùng extracted
+        await writeAccessLog({
+          userId: req.user.user_id, fileId: null,
+          action: 'DOC_CODE_MISMATCH',
+          ip: getClientIp(req),
+          note: `Client gửi document_code="${clientCode}" nhưng PDF có "${extractedCode}" — dùng extracted`,
+        });
+      }
+    } else if (isValidCode(clientCode)) {
+      // PDF không trích được hoặc trích ra rác → dùng client (đã validate format)
+      documentCode = clientCode;
+    } else if (extractedCode || clientCode) {
+      // Có dữ liệu nhưng không hợp lệ → log, bỏ qua
+      await writeAccessLog({
+        userId: req.user.user_id, fileId: null,
+        action: 'DOC_CODE_INVALID',
+        ip: getClientIp(req),
+        note: `document_code không hợp lệ — extracted="${extractedCode}", client="${clientCode}"`,
+      });
+    }
 
     let shaMatches = [], codeMatches = [];
     try {
@@ -2136,6 +2404,9 @@ const syncToAI = async (action, doc) => {
 };
 
 app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), upload.single('file'), validateUploadedPdf, async (req, res) => {
+  // Biến ngoài try để dọn file nếu lỗi giữa chừng
+  let absPathToCleanup = null;
+
   try {
     if (!req.file) return res.status(400).json({ error: 'Thiếu file PDF' });
 
@@ -2143,9 +2414,78 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       document_code, title, doc_type_id, issued_date, issuing_unit_id,
       signer, summary, security_level_id,
     } = req.body;
-    if (!title || !title.trim()) return res.status(400).json({ error: 'Thiếu trích yếu' });
-    if (!security_level_id) return res.status(400).json({ error: 'Thiếu mức bảo mật' });
 
+    // ─────────────────────────────────────────────────────────────
+    // 1. Validate đầu vào cơ bản
+    // ─────────────────────────────────────────────────────────────
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Thiếu trích yếu' });
+    }
+    if (!security_level_id) {
+      return res.status(400).json({ error: 'Thiếu mức bảo mật' });
+    }
+
+    const requestedLevel = parseInt(security_level_id, 10);
+    if (isNaN(requestedLevel) || requestedLevel < 1 || requestedLevel > 5) {
+      return res.status(400).json({
+        error: 'Mức bảo mật không hợp lệ (phải từ 1 đến 5).',
+        code: 'INVALID_SECURITY_LEVEL',
+      });
+    }
+
+    // ✅ Validate format document_code (chống dữ liệu rác / injection)
+    // Cho phép: chữ (kể cả tiếng Việt), số, gạch ngang, gạch chéo, dấu chấm, khoảng trắng
+    const DOC_CODE_REGEX = /^[A-Za-z0-9À-ỹ][A-Za-z0-9À-ỹ\-/._ ]{0,99}$/;
+    const cleanDocumentCode = (document_code || '').trim();
+    if (cleanDocumentCode && !DOC_CODE_REGEX.test(cleanDocumentCode)) {
+      return res.status(400).json({
+        error: 'Số hiệu văn bản không hợp lệ (chỉ cho phép chữ, số, gạch ngang, gạch chéo, dấu chấm).',
+        code: 'INVALID_DOCUMENT_CODE',
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2. Xác định vai trò — GỌI DB 1 LẦN DUY NHẤT
+    // ─────────────────────────────────────────────────────────────
+    const userRoles = await resolveUserRoles(req.user);
+    const roleIds = new Set([
+      ...(userRoles || []),
+      ...((req.user?.roles || [])),
+    ]);
+    const roleNamesLower = (req.user?.role_names || []).map((r) => String(r).toLowerCase());
+
+    const isAdmin =
+      roleIds.has('ROL-01') ||
+      req.user?.user_id === 'USR-001' ||
+      roleNamesLower.some((s) => s.includes('admin') || s.includes('quản trị'));
+
+    const pos = (req.user?.position || '').toLowerCase();
+    const isCommander =
+      roleIds.has('ROL-02') ||
+      roleNamesLower.some((s) =>
+        s.includes('chỉ huy') || s.includes('trưởng phòng') ||
+        s.includes('thủ trưởng') || s.includes('chủ nhiệm')
+      ) ||
+      pos.includes('chỉ huy') || pos.includes('trưởng phòng') ||
+      pos.includes('thủ trưởng') || pos.includes('chủ nhiệm');
+
+    // ✅ Validate security_level theo clearance (admin bypass)
+    if (!isAdmin && requestedLevel > req.user.clearance_level_id) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId: null,
+        action: 'UPLOAD_DENIED_CLEARANCE',
+        ip: getClientIp(req),
+        note: `Cố upload tài liệu Cấp ${requestedLevel} nhưng clearance chỉ ${req.user.clearance_level_id}`,
+      });
+      return res.status(403).json({
+        error: `Bạn chỉ được upload tài liệu Cấp ${req.user.clearance_level_id} trở xuống.`,
+        code: 'CLEARANCE_EXCEEDED',
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 3. Sinh ID + hash + kiểm tra trùng
+    // ─────────────────────────────────────────────────────────────
     const fileId = 'DOC-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
 
@@ -2157,45 +2497,27 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
         .query(`SELECT file_id, document_code, title, security_level_id, created_at FROM DOCUMENT WHERE sha256 = @sha AND deleted_at IS NULL`);
       if (dup.recordset.length > 0) {
         const ex = dup.recordset[0];
-        await writeAccessLog({ userId: req.user.user_id, fileId: ex.file_id, action: 'UPLOAD_DUPLICATE', ip: getClientIp(req), note: `Trùng SHA256 với ${ex.file_id}` });
-        return res.status(409).json({ error: 'File đã tồn tại trong hệ thống', is_duplicate: true, match_type: 'sha256', existing: ex });
+        await writeAccessLog({
+          userId: req.user.user_id, fileId: ex.file_id, action: 'UPLOAD_DUPLICATE',
+          ip: getClientIp(req), note: `Trùng SHA256 với ${ex.file_id}`,
+        });
+        return res.status(409).json({
+          error: 'File đã tồn tại trong hệ thống',
+          is_duplicate: true, match_type: 'sha256', existing: ex,
+        });
       }
     }
 
-    const userRoles = await resolveUserRoles(req.user);
-    const isAdmin =
-      userRoles.includes('ROL-01') ||
-      (req.user?.roles || []).includes('ROL-01') ||
-      req.user?.user_id === 'USR-001' ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
-      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
-
-    const pos = (req.user?.position || '').toLowerCase();
-    const isCommander =
-      userRoles.includes('ROL-02') ||
-      (req.user?.roles || []).includes('ROL-02') ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
-      (req.user?.role_names || []).some((r) => {
-        const s = String(r).toLowerCase();
-        return (
-          s.includes('chỉ huy') ||
-          s.includes('trưởng phòng') ||
-          s.includes('thủ trưởng') ||
-          s.includes('chủ nhiệm')
-        );
-      }) ||
-      pos.includes('chỉ huy') ||
-      pos.includes('trưởng phòng') ||
-      pos.includes('thủ trưởng') ||
-      pos.includes('chủ nhiệm');
-
-    // [STORAGE-HELPER] Thay đổi cấu trúc thư mục lưu trữ:
-    //   Cũ: uploads/YYYY/MM/<file>.pdf
-    //   Mới: uploads/du-lieu-so/YYYY/MM/<file>.pdf
+    // ─────────────────────────────────────────────────────────────
+    // 4. Chuẩn bị đường dẫn lưu trữ
+    // [STORAGE-HELPER] Cấu trúc: uploads/du-lieu-so/YYYY/MM/<file>.pdf
+    // ─────────────────────────────────────────────────────────────
     const { getModuleUploadPath, MODULES } = require('./src/storage-helper');
 
     const { yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
-      docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
+      docTypeId: doc_type_id,
+      documentCode: cleanDocumentCode,
+      fallbackId: fileId,
     });
     const sha8 = sha256.slice(0, 8);
     const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
@@ -2217,22 +2539,24 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
 
     fs.mkdirSync(folderAbsPath, { recursive: true });
     fs.writeFileSync(absPath, req.file.buffer);
+    absPathToCleanup = absPath; // ✅ đánh dấu để dọn nếu lỗi sau đó
 
     const pool = await getPool();
 
-    // 🎖️ NGUYÊN TẮC PHÊ DUYỆT ĐĂNG TẢI (Maker-Checker Approval Flow):
-    // Cán bộ nghiệp vụ (Trợ lý, Văn thư, Cơ yếu, IT...) đăng tải văn bản mới -> Chuyển vào hàng đợi chờ Chỉ huy / Admin duyệt
+    // ─────────────────────────────────────────────────────────────
+    // 5. Nhánh Maker-Checker: Cán bộ nghiệp vụ → chờ Chỉ huy/Admin duyệt
+    // ─────────────────────────────────────────────────────────────
     if (!isAdmin && !isCommander) {
       await pool.request()
         .input('file_id', sql.VarChar(50), fileId)
-        .input('document_code', sql.NVarChar(100), document_code || null)
+        .input('document_code', sql.NVarChar(100), cleanDocumentCode || null)
         .input('title', sql.NVarChar(500), title.trim())
         .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
         .input('issued_date', sql.Date, issued_date || null)
         .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
         .input('signer', sql.NVarChar(100), signer || null)
         .input('summary', sql.NVarChar(sql.MAX), summary || null)
-        .input('security_level_id', sql.Int, parseInt(security_level_id, 10))
+        .input('security_level_id', sql.Int, requestedLevel)
         .input('original_name', sql.NVarChar(255), req.file.originalname)
         .input('stored_path', sql.NVarChar(500), relPath)
         .input('mime_type', sql.VarChar(100), req.file.mimetype)
@@ -2254,14 +2578,14 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
         .input('pid', sql.VarChar(50), proposalId)
         .input('fid', sql.VarChar(50), fileId)
         .input('req_id', sql.VarChar(50), req.user.user_id)
-        .input('doc_code', sql.NVarChar(100), document_code || null)
+        .input('doc_code', sql.NVarChar(100), cleanDocumentCode || null)
         .input('title', sql.NVarChar(500), title.trim())
         .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
         .input('issued_date', sql.Date, issued_date || null)
         .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
         .input('signer', sql.NVarChar(100), signer || null)
         .input('summary', sql.NVarChar(sql.MAX), summary || null)
-        .input('sec_id', sql.Int, parseInt(security_level_id, 10))
+        .input('sec_id', sql.Int, requestedLevel)
         .input('new_path', sql.NVarChar(500), relPath)
         .input('new_name', sql.NVarChar(255), req.file.originalname)
         .input('new_mime', sql.VarChar(100), req.file.mimetype)
@@ -2290,6 +2614,9 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
         note: `Đăng tải văn bản mới chờ Chỉ huy duyệt: ${title.trim()}`,
       });
 
+      // ✅ Ghi DB thành công → không cần dọn file
+      absPathToCleanup = null;
+
       return res.json({
         success: true,
         pending_approval: true,
@@ -2299,17 +2626,19 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       });
     }
 
-    await pool.request()
+    // ─────────────────────────────────────────────────────────────
+    // 6. Nhánh Admin/Chỉ huy: lưu thẳng vào DOCUMENT (active)
+    // ─────────────────────────────────────────────────────────────
     await pool.request()
       .input('file_id', sql.VarChar(50), fileId)
-      .input('document_code', sql.NVarChar(100), document_code || null)
+      .input('document_code', sql.NVarChar(100), cleanDocumentCode || null)
       .input('title', sql.NVarChar(500), title.trim())
       .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
       .input('issued_date', sql.Date, issued_date || null)
       .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
       .input('signer', sql.NVarChar(100), signer || null)
       .input('summary', sql.NVarChar(sql.MAX), summary || null)
-      .input('security_level_id', sql.Int, parseInt(security_level_id, 10))
+      .input('security_level_id', sql.Int, requestedLevel)
       .input('original_name', sql.NVarChar(255), req.file.originalname)
       .input('stored_path', sql.NVarChar(500), relPath)
       .input('mime_type', sql.VarChar(100), req.file.mimetype)
@@ -2329,18 +2658,32 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       ip: getClientIp(req), note: `Upload: ${req.file.originalname}`,
     });
 
-    // Tự động đồng bộ tài liệu sang Boxchat Vector Store
+    // ✅ Ghi DB thành công → không cần dọn file
+    absPathToCleanup = null;
+
+    // Đồng bộ sang Boxchat Vector Store (fire-and-forget, có timeout)
     syncToAI('ingest', {
       file_id: fileId,
-      document_code: document_code || fileId,
+      document_code: cleanDocumentCode || fileId,
       title: title.trim(),
       stored_path: relPath,
-      security_level_id: parseInt(security_level_id, 10),
+      security_level_id: requestedLevel,
     });
 
     res.json({ success: true, file_id: fileId, stored_path: relPath, sha256 });
   } catch (err) {
     console.error('[POST upload]', err);
+
+    // ✅ Dọn file vật lý nếu đã ghi nhưng DB insert thất bại
+    if (absPathToCleanup && fs.existsSync(absPathToCleanup)) {
+      try {
+        fs.unlinkSync(absPathToCleanup);
+        console.warn('[POST upload] Đã dọn file rác sau lỗi:', absPathToCleanup);
+      } catch (cleanupErr) {
+        console.error('[POST upload] Không thể dọn file rác:', cleanupErr.message);
+      }
+    }
+
     res.status(500).json({ error: err.message });
   }
 });
@@ -3645,6 +3988,15 @@ async function start() {
 
   setupFingerprintWS(server, { BRIDGE_TOKEN });
   startMonthlyArchiveScheduler(getPool, writeAccessLog);
+
+  // ✅ Cleanup ticket 2FA hết hạn mỗi 5 phút
+  setInterval(async () => {
+    try {
+      await cleanupAdmin2FATickets();
+    } catch (err) {
+      console.error('[2FA cleanup]', err.message);
+    }
+  }, 5 * 60 * 1000);
 
   const protocol = USE_HTTPS ? 'https' : 'http';
   const wsProtocol = USE_HTTPS ? 'wss' : 'ws';

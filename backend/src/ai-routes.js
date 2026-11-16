@@ -7,17 +7,25 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { sql, getPool } = require('./db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'qk7-secret-key-change-in-production-2026';
+// ❌ ĐÃ XÓA fallback hardcode:
+// const JWT_SECRET = process.env.JWT_SECRET || 'qk7-secret-key-change-in-production-2026';
 
 module.exports = function createAIRoutes({ requirePermission, writeAccessLog, getClientIp, JWT_SECRET: passedSecret }) {
-  const effectiveJwtSecret = passedSecret || JWT_SECRET;
+  // ✅ BẮT BUỘC truyền secret, fail-fast nếu thiếu
+  if (!passedSecret || typeof passedSecret !== 'string' || passedSecret.length < 32) {
+    throw new Error(
+      '[FATAL] ai-routes: JWT_SECRET bắt buộc phải được truyền từ server.js và >= 32 ký tự. ' +
+      'Không có fallback để tránh bypass biometric guard.'
+    );
+  }
+  const effectiveJwtSecret = passedSecret;
   const router = express.Router();
 
   const AI_BASE = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8001';
   const AI_HEALTH_TIMEOUT_MS = 2000;
   const AI_CHAT_TIMEOUT_MS = parseInt(process.env.AI_CHAT_TIMEOUT_MS || '75000', 10);
 
-  // ✅ MỚI: Trích xuất file_id từ JWT token vân tay (dùng cho trường hợp chat chung không có file_id)
+  // ✅ Trích xuất file_id từ JWT token vân tay (chỉ chấp nhận purpose='file_access')
   async function getBiometricTokenFileId(req) {
     const userId = req.user?.user_id;
     if (!userId) return null;
@@ -25,8 +33,11 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
     if (!fpToken) return null;
     try {
       const decoded = jwt.verify(fpToken, effectiveJwtSecret);
-      if (decoded && decoded.user_id === userId) {
+      if (decoded && decoded.user_id === userId && decoded.purpose === 'file_access') {
         return decoded.file_id || null;
+      }
+      if (decoded && decoded.purpose !== 'file_access') {
+        console.warn(`[AI Security] getBiometricTokenFileId: token purpose='${decoded.purpose}' không hợp lệ (user=${userId})`);
       }
     } catch (e) {}
     return null;
@@ -41,12 +52,16 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
     if (fpToken) {
       try {
         const decoded = jwt.verify(fpToken, effectiveJwtSecret);
-        if (decoded && decoded.user_id === userId) {
+        // ✅ BẮT BUỘC: chỉ chấp nhận token có purpose='file_access'
+        if (decoded && decoded.user_id === userId && decoded.purpose === 'file_access') {
           if (targetFileId && decoded.file_id !== targetFileId) {
             console.warn(`[AI Security] Cảnh báo: User ${userId} dùng token của file ${decoded.file_id} để truy cập file ${targetFileId}`);
             return false;
           }
           return true;
+        }
+        if (decoded && decoded.purpose !== 'file_access') {
+          console.warn(`[AI Security] checkBiometricVerified: token purpose='${decoded.purpose}' không hợp lệ (user=${userId})`);
         }
       } catch (tokenErr) {}
     }
@@ -164,12 +179,10 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
 
       // Kiểm tra xác thực sinh trắc học vân tay ZK9500
       const biometric_verified = await checkBiometricVerified(req, false, file_id);
-      // ✅ MỚI: Lấy file_id thực sự của token để xử lý đúng trường hợp chat chung
+      // Lấy file_id thực sự của token để xử lý đúng trường hợp chat chung
       const tokenFileId = biometric_verified ? await getBiometricTokenFileId(req) : null;
 
-      // ✅ MỚI: Helper quyết định xem có được tin tưởng biometric cho citation này không
-      // - Khi request có file_id: checkBiometricVerified đã validate token khớp file đó → tin tưởng
-      // - Khi chat chung (không có file_id): chỉ tin tưởng nếu citation khớp tokenFileId
+      // Helper quyết định xem có được tin tưởng biometric cho citation này không
       const isBiometricTrustedForDoc = (d) => {
         if (!biometric_verified) return false;
         if (file_id) {
@@ -325,7 +338,7 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
         }
       }
 
-      // ✅ SỬA: Phân loại theo khả năng mở khóa (per-file) thay vì flat theo biometric_verified
+      // Phân loại theo khả năng mở khóa (per-file)
       const publicItems = items.filter((d) => (d.security_level_id || 1) <= 2);
       const secretItems = items.filter((d) => (d.security_level_id || 1) >= 3);
       const unlockedSecretItems = secretItems.filter(isBiometricTrustedForDoc);
@@ -340,7 +353,6 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       }
 
       let answer = '';
-      // ✅ SỬA: requiresBiometric = true khi còn bất kỳ văn bản mật nào bị khóa
       const requiresBiometric = lockedSecretItems.length > 0;
 
       if (items.length === 0) {
@@ -358,10 +370,9 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
           items.map((d, i) => `${i + 1}. ${d.document_code || d.file_id} — ${d.title}`).join('\n');
       }
 
-      // ✅ SỬA: Citations map dùng per-file biometric trust
+      // Citations map dùng per-file biometric trust
       const citations = items.map((d) => {
         const isSecret = (d.security_level_id || 1) >= 3;
-        // Chỉ mở khóa khi: file này đã pass biometric (khớp file_id request hoặc khớp tokenFileId)
         const blocked = isSecret && !isBiometricTrustedForDoc(d);
         return {
           file_id: d.file_id,

@@ -1,6 +1,7 @@
 // backend/src/lecture-extended-routes.js
 const express = require('express');
 const { sql, getPool } = require('./db');
+const { getLectureScope, inScope } = require('./lecture-scope');
 
 module.exports = function createLectureExtendedRoutes({
   requireAuth, requirePermission,
@@ -148,13 +149,18 @@ module.exports = function createLectureExtendedRoutes({
     async (req, res) => {
       try {
         const pool = await getPool();
-        const userUnit = await pool.request()
+        const roleRs = await pool.request()
           .input('uid', sql.VarChar(50), req.user.user_id)
-          .query(`SELECT unit_id FROM [USER] WHERE user_id = @uid`);
-        const myUnit = userUnit.recordset[0]?.unit_id;
+          .query(`SELECT role_id FROM USER_ROLE
+                  WHERE user_id = @uid AND (expires_at IS NULL OR expires_at > GETDATE())`);
+        const roles = roleRs.recordset.map((x) => x.role_id);
+        const pos = String(req.user.position || '').toLowerCase();
+        const deptHead = roles.includes('ROL-06')
+          || ['trưởng bộ môn', 'trưởng khoa', 'chủ nhiệm khoa', 'trưởng phòng'].some((k) => pos.includes(k));
         const canViewAll = (req.user.permissions || []).includes('SCHEDULE_MONITOR_ALL');
-        if (!canViewAll && myUnit !== req.params.facultyUnitId) {
-          return res.status(403).json({ error: 'Chỉ xem được bài giảng của khoa mình' });
+        const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
+        if (!canViewAll && !inScope(scope, req.params.facultyUnitId)) {
+          return res.status(403).json({ error: 'Chỉ xem được bài giảng của đơn vị mình hoặc cấp dưới' });
         }
 
         const r = await pool.request()

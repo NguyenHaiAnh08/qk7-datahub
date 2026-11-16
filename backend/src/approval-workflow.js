@@ -266,7 +266,7 @@ module.exports = function createApprovalWorkflow({
       await pool.request()
         .input('rid', sql.VarChar(50), requestId)
         .input('uid', sql.VarChar(50), req.user.user_id)
-        .input('req_unit', sql.VarChar(50), requesterUnitId)
+        .input('req_unit', sql.NVarChar(50), requesterUnitId)
         .input('perm', sql.VarChar(50), permId)
         .input('method', sql.VarChar(10), req.method)
         .input('path', sql.VarChar(500), req.originalUrl || req.url)

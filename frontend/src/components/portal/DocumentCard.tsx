@@ -43,7 +43,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   const isSecretLevel = docLevel >= 3;
 
   return (
-    <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col justify-between hover:border-emerald-600/40 dark:hover:border-emerald-500/40 transition-colors duration-150 group">
+    <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col justify-between hover:border-emerald-600/40 dark:hover:border-emerald-500/40 transition-colors duration-150 group h-full shadow-xs">
       <div>
         {/* Top Badges */}
         <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -59,33 +59,44 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           </span>
         </div>
 
-        {/* Title */}
-        <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors line-clamp-2 mb-2">
-          {document.title}
-        </h4>
+        {/* Title / Trích yếu nội dung: Chuẩn 3 dòng cho văn bản quân sự dài, không flex để line-clamp chuẩn 100% */}
+        <div className="min-h-[3.85rem] mb-2 overflow-hidden">
+          <h4
+            className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors line-clamp-3 leading-snug"
+            title={document.title}
+          >
+            {document.title}
+          </h4>
+        </div>
 
-        {/* Summary */}
-        {document.summary && (
-          <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mb-3">
-            {document.summary}
-          </p>
-        )}
+        {/* Summary: Cố định chuẩn chiều cao 2.25rem, tách biệt hoàn toàn không bị đè chữ */}
+        <div className="min-h-[2.25rem] mb-3 overflow-hidden">
+          {document.summary ? (
+            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed" title={document.summary}>
+              {document.summary}
+            </p>
+          ) : (
+            <p className="text-[11px] text-slate-400/80 dark:text-slate-500/80 italic line-clamp-1 leading-relaxed">
+              Văn bản số hóa lưu trữ chuẩn Trung tâm dữ liệu số
+            </p>
+          )}
+        </div>
 
-        {/* Metadata Details */}
+        {/* Metadata Details: Mỗi dòng chuẩn 1 dòng duy nhất, không co giãn gây lệch hàng */}
         <div className="space-y-1.5 text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/80 pt-2.5">
-          <div className="flex items-start justify-between gap-2.5">
+          <div className="flex items-center justify-between gap-2.5">
             <span className="text-slate-400 dark:text-slate-500 shrink-0">Thể loại:</span>
             <span
-              className="text-slate-700 dark:text-slate-300 font-medium text-right flex-1 break-normal leading-snug"
+              className="text-slate-700 dark:text-slate-300 font-medium text-right flex-1 truncate"
               title={document.doc_type_name || document.type_name}
             >
               {document.doc_type_name || document.type_name || '—'}
             </span>
           </div>
-          <div className="flex items-start justify-between gap-2.5">
+          <div className="flex items-center justify-between gap-2.5">
             <span className="text-slate-400 dark:text-slate-500 shrink-0">Đơn vị:</span>
             <span
-              className="text-slate-700 dark:text-slate-300 font-medium text-right flex-1 break-normal leading-snug"
+              className="text-slate-700 dark:text-slate-300 font-medium text-right flex-1 truncate"
               title={document.unit_name}
             >
               {document.unit_name || '—'}
@@ -106,8 +117,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         </div>
       </div>
 
-      {/* Action Footer */}
-      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+      {/* Action Footer: Luôn ghim sát đáy thẻ */}
+      <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
         {isRestricted ? (
           <div className="w-full min-h-[40px] py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5">
             <Lock className="w-3.5 h-3.5" />

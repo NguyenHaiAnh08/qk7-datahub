@@ -257,6 +257,7 @@ app.use('/api/auth/fingerprint/verify', fingerprintLimiter);
 // STATIC & SWAGGER
 // ═══════════════════════════════════════════════════════════════
 app.use(express.static(publicDir, {
+  index: false, // Bắt buộc tắt index mặc định để request '/' đi vào serveSpaIndex và inject nonce bảo mật
   setHeaders: (res, filePath) => {
     // Không cache file HTML để client luôn cập nhật phiên bản mới nhất ngay lập tức
     if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {

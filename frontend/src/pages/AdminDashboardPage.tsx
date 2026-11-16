@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Drawer } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PinManageModal } from '../components/users/PinManageModal';
@@ -42,6 +43,8 @@ import {
   ChevronDown,
   ChevronUp,
   Database,
+  Fingerprint,
+  Sparkles,
 } from 'lucide-react';
 
 import { TrashPage } from './TrashPage';
@@ -129,6 +132,63 @@ const getNextPositionId = (positions: MilitaryPosition[]): string => {
   return `P-${String(candidate).padStart(2, '0')}`;
 };
 
+// Cấu hình hiển thị chuẩn quân sự cho 5 Cấp Độ Bảo Mật Dữ Liệu
+const LEVEL_CONFIGS: Record<number, {
+  label: string;
+  badgeBg: string;
+  badgeText: string;
+  border: string;
+  badgeDot: string;
+  requires2FA: boolean;
+  desc: string;
+}> = {
+  1: {
+    label: 'Công khai',
+    badgeBg: 'bg-emerald-500/15',
+    badgeText: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-500/30',
+    badgeDot: 'bg-emerald-500',
+    requires2FA: false,
+    desc: 'Phổ biến rộng rãi, cán bộ chiến sĩ và công chúng được phép tiếp cận',
+  },
+  2: {
+    label: 'Nội bộ',
+    badgeBg: 'bg-sky-500/15',
+    badgeText: 'text-sky-700 dark:text-sky-300',
+    border: 'border-sky-500/30',
+    badgeDot: 'bg-sky-500',
+    requires2FA: false,
+    desc: 'Lưu hành trong nội bộ đơn vị, không công khai ra ngoài mạng diện rộng',
+  },
+  3: {
+    label: 'Mật',
+    badgeBg: 'bg-amber-500/15',
+    badgeText: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-500/30',
+    badgeDot: 'bg-amber-500',
+    requires2FA: true,
+    desc: 'Bí mật quân sự; bắt buộc quét vân tay 2FA cấp token 5 phút để giải mã / xem',
+  },
+  4: {
+    label: 'Tối mật',
+    badgeBg: 'bg-rose-500/15',
+    badgeText: 'text-rose-700 dark:text-rose-300',
+    border: 'border-rose-500/30',
+    badgeDot: 'bg-rose-500',
+    requires2FA: true,
+    desc: 'Tài liệu tối mật tác chiến; chỉ dành cho cán bộ có thẩm quyền cấp 4 kèm vân tay',
+  },
+  5: {
+    label: 'Tuyệt mật',
+    badgeBg: 'bg-purple-500/15',
+    badgeText: 'text-purple-700 dark:text-purple-300',
+    border: 'border-purple-500/30',
+    badgeDot: 'bg-purple-500',
+    requires2FA: true,
+    desc: 'Mức mật tuyệt đối; kiểm soát nghiêm ngặt nhất với kiểm toán an ninh SOC thời gian thực',
+  },
+};
+
 const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any; permission?: string }> =
   ADMIN_NAV_GROUPS.flatMap((g) => g.items);
 
@@ -156,21 +216,30 @@ const PERMISSION_TONES = [
 const getPermissionGroupBadge = (groupCode?: string) => {
   const g = (groupCode || '').toUpperCase();
   if (g === 'DOCUMENT') {
-    return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+    return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30';
   }
-  if (g === 'SYSTEM') {
-    return 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30';
+  if (g === 'SYSTEM' || g === 'SYSTEM_STATS') {
+    return 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30';
   }
   if (g === 'ROLE') {
-    return 'bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30';
+    return 'bg-purple-500/15 text-purple-800 dark:text-purple-300 border-purple-500/30';
+  }
+  if (g === 'USER') {
+    return 'bg-blue-500/15 text-blue-800 dark:text-blue-300 border-blue-500/30';
   }
   if (g === 'FINGERPRINT') {
-    return 'bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30';
+    return 'bg-teal-500/15 text-teal-800 dark:text-teal-300 border-teal-500/30';
   }
   if (g === 'AUDIT') {
-    return 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/30';
+    return 'bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-500/30';
   }
-  return 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30';
+  if (g === 'APPROVAL') {
+    return 'bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/30';
+  }
+  if (g === 'AI') {
+    return 'bg-violet-500/15 text-violet-800 dark:text-violet-300 border-violet-500/30';
+  }
+  return 'bg-sky-500/15 text-sky-800 dark:text-sky-300 border-sky-500/30';
 };
 
 // Helper khởi tạo form data cho permission (new hoặc edit)
@@ -269,6 +338,15 @@ export const AdminDashboardPage: React.FC = () => {
     published: number;
     pending: number;
     draft: number;
+    liveSchedulesCount: number;
+    liveStudentsCount: number;
+    liveVenueName?: string;
+    subjectsCount: number;
+    classesCount: number;
+    venuesCount: number;
+    scormCount: number;
+    secretCount: number;
+    readinessRate: number;
   } | null>(null);
   const [loadingLectureStats, setLoadingLectureStats] = useState(false);
   const [isDataSectionExpanded, setIsDataSectionExpanded] = useState(true);
@@ -324,6 +402,100 @@ const pinPendingCount = useMemo(
   () => usersList.filter((u) => u.pin_requested && !u.has_pin).length,
   [usersList]
 );
+
+  // Search & Filter state cho Ranks và Positions
+  const [rankSearch, setRankSearch] = useState('');
+  const [rankStatusFilter, setRankStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  const [positionSearch, setPositionSearch] = useState('');
+  const [positionStatusFilter, setPositionStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  // Danh sách cấp bậc sau khi tìm kiếm và lọc trạng thái
+  const filteredRanks = useMemo(() => {
+    let result = [...ranksList];
+    if (rankSearch.trim()) {
+      const q = rankSearch.toLowerCase().trim();
+      result = result.filter(
+        (r) =>
+          (r.rank_id || '').toLowerCase().includes(q) ||
+          (r.name || '').toLowerCase().includes(q)
+      );
+    }
+    if (rankStatusFilter === 'active') {
+      result = result.filter((r) => r.active !== false);
+    } else if (rankStatusFilter === 'inactive') {
+      result = result.filter((r) => r.active === false);
+    }
+    return result;
+  }, [ranksList, rankSearch, rankStatusFilter]);
+
+  // Danh sách chức vụ sau khi tìm kiếm và lọc trạng thái
+  const filteredPositions = useMemo(() => {
+    let result = [...positionsList];
+    if (positionSearch.trim()) {
+      const q = positionSearch.toLowerCase().trim();
+      result = result.filter(
+        (p) =>
+          (p.position_id || '').toLowerCase().includes(q) ||
+          (p.name || '').toLowerCase().includes(q)
+      );
+    }
+    if (positionStatusFilter === 'active') {
+      result = result.filter((p) => p.active !== false);
+    } else if (positionStatusFilter === 'inactive') {
+      result = result.filter((p) => p.active === false);
+    }
+    return result;
+  }, [positionsList, positionSearch, positionStatusFilter]);
+
+  // Search state cho Roles
+  const [roleSearch, setRoleSearch] = useState('');
+
+  // Danh sách vai trò sau khi tìm kiếm
+  const filteredRoles = useMemo(() => {
+    if (!roleSearch.trim()) return rolesList;
+    const q = roleSearch.toLowerCase().trim();
+    return rolesList.filter(
+      (r) =>
+        (r.role_id || '').toLowerCase().includes(q) ||
+        (r.name || '').toLowerCase().includes(q)
+    );
+  }, [rolesList, roleSearch]);
+
+  // Search & Filter state cho Permissions
+  const [permSearch, setPermSearch] = useState('');
+  const [permGroupFilter, setPermGroupFilter] = useState('ALL');
+
+  // Danh sách quyền hạn sau khi tìm kiếm và lọc nhóm
+  const filteredPerms = useMemo(() => {
+    let result = permsList;
+    if (permGroupFilter !== 'ALL') {
+      result = result.filter(
+        (p: any) => ((p.group_code || 'SYSTEM').toUpperCase()) === permGroupFilter
+      );
+    }
+    if (permSearch.trim()) {
+      const q = permSearch.toLowerCase().trim();
+      result = result.filter(
+        (p: any) =>
+          (p.permission_id || '').toLowerCase().includes(q) ||
+          (p.code || p.name || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q) ||
+          (p.group_code || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [permsList, permSearch, permGroupFilter]);
+
+  // Các nhóm quyền duy nhất để tạo filter chips
+  const permGroups = useMemo(() => {
+    const groups = new Set<string>();
+    permsList.forEach((p: any) => {
+      const g = (p.group_code || 'SYSTEM').toUpperCase();
+      if (g) groups.add(g);
+    });
+    return Array.from(groups).sort();
+  }, [permsList]);
 
   // === MODALS ===
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -394,18 +566,64 @@ const pinPendingCount = useMemo(
   const loadLectureStats = async () => {
     setLoadingLectureStats(true);
     try {
-      const res = await lectureService.list();
-      const items = res?.items || [];
+      const [lecturesRes, liveRes, subjectsRes, classesRes, venuesRes] = await Promise.allSettled([
+        lectureService.list(),
+        lectureService.getLiveSchedules(),
+        lectureService.getSubjects(),
+        lectureService.getClasses(),
+        lectureService.getVenues(),
+      ]);
+
+      const items = lecturesRes.status === 'fulfilled' ? lecturesRes.value?.items || [] : [];
       const active = items.filter((l: any) => l.status !== 'DELETED');
+      const total = active.length;
+      const published = active.filter((l: any) => l.status === 'PUBLISHED').length;
+      const pending = active.filter((l: any) => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length;
+      const draft = active.filter((l: any) => l.status === 'DRAFT' || l.status === 'REJECTED').length;
+      const scormCount = active.filter((l: any) => Boolean(l.scorm_entry_point || l.content_type === 'SCORM')).length;
+      const secretCount = active.filter((l: any) => (l.security_level_id || 1) >= 3).length;
+      const readinessRate = total > 0 ? Math.round((published / total) * 100) : 0;
+
+      const liveItems = liveRes.status === 'fulfilled' ? liveRes.value?.items || [] : [];
+      const liveSchedulesCount = liveItems.length;
+      const liveStudentsCount = liveItems.reduce((acc: number, curr: any) => acc + (curr.student_count || 0), 0);
+      const liveVenueName = liveItems.length > 0 ? (liveItems[0].venue_name || liveItems[0].class_name) : undefined;
+
+      const subjectsCount = subjectsRes.status === 'fulfilled' ? (subjectsRes.value || []).length : 0;
+      const classesCount = classesRes.status === 'fulfilled' ? (classesRes.value || []).length : 0;
+      const venuesCount = venuesRes.status === 'fulfilled' ? (venuesRes.value || []).length : 0;
+
       setLectureStats({
-        total: active.length,
-        published: active.filter((l: any) => l.status === 'PUBLISHED').length,
-        pending: active.filter((l: any) => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length,
-        draft: active.filter((l: any) => l.status === 'DRAFT' || l.status === 'REJECTED').length,
+        total,
+        published,
+        pending,
+        draft,
+        liveSchedulesCount,
+        liveStudentsCount,
+        liveVenueName,
+        subjectsCount,
+        classesCount,
+        venuesCount,
+        scormCount,
+        secretCount,
+        readinessRate,
       });
     } catch (err: any) {
       console.warn('Không thể nạp thống kê bài giảng số:', err);
-      setLectureStats({ total: 0, published: 0, pending: 0, draft: 0 });
+      setLectureStats({
+        total: 0,
+        published: 0,
+        pending: 0,
+        draft: 0,
+        liveSchedulesCount: 0,
+        liveStudentsCount: 0,
+        subjectsCount: 0,
+        classesCount: 0,
+        venuesCount: 0,
+        scormCount: 0,
+        secretCount: 0,
+        readinessRate: 0,
+      });
     } finally {
       setLoadingLectureStats(false);
     }
@@ -828,7 +1046,7 @@ const pinPendingCount = useMemo(
                 {visibleTabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
-                  const isSectionStart = tab.id === 'approvals' || tab.id === 'protection_config';
+                  const isSectionStart = tab.id === 'approvals' || tab.id === 'lec-subjects' || tab.id === 'protection_config';
                   return (
                     <React.Fragment key={tab.id}>
                       {isSectionStart && (
@@ -1048,68 +1266,180 @@ const pinPendingCount = useMemo(
 
                 {/* Nội dung Khung Bài giảng số */}
                 {isLectureSectionExpanded ? (
-                  <div className={
-                    isIPadLandscape
-                      ? 'grid grid-cols-4 gap-3 animate-in fade-in duration-200'
-                      : isIPadPortrait
-                        ? 'grid grid-cols-2 gap-3 animate-in fade-in duration-200'
-                        : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4 animate-in fade-in duration-200'
-                  }>
-                    <StatCard
-                      label="Tổng số bài giảng"
-                      loading={loadingLectureStats || !lectureStats}
-                      value={lectureStats?.total ?? "—"}
-                      icon={<BookOpen className="w-6 h-6" />}
-                      color="blue"
-                      subtext="Toàn bộ phân hệ quản lý"
-                      delay={0.0}
-                      refreshKey={overviewRefreshKey}
-                    />
-                    <StatCard
-                      label="Sẵn sàng giảng dạy"
-                      loading={loadingLectureStats || !lectureStats}
-                      value={lectureStats?.published ?? "—"}
-                      icon={<CheckCircle2 className="w-6 h-6" />}
-                      color="emerald"
-                      subtext="Đã xuất bản (Published)"
-                      delay={0.05}
-                      refreshKey={overviewRefreshKey}
-                    />
-                    <StatCard
-                      label="Đang chờ duyệt 2 tầng"
-                      loading={loadingLectureStats || !lectureStats}
-                      value={lectureStats?.pending ?? "—"}
-                      icon={<Clock className="w-6 h-6" />}
-                      color="amber"
-                      subtext="Cấp Khoa & BGH phê duyệt"
-                      delay={0.1}
-                      refreshKey={overviewRefreshKey}
-                    />
-                    <StatCard
-                      label="Bản nháp / Cần sửa"
-                      loading={loadingLectureStats || !lectureStats}
-                      value={lectureStats?.draft ?? "—"}
-                      icon={<FileText className="w-6 h-6" />}
-                      color="purple"
-                      subtext="Đang biên soạn & hoàn thiện"
-                      delay={0.15}
-                      refreshKey={overviewRefreshKey}
-                    />
+                  <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200">
+                    {/* TẦNG 1: TACTICAL LIVE STATUS BAR (Nhịp đập Giảng đường & Tác chiến Số) */}
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-gradient-to-r from-slate-50 via-slate-50/80 to-blue-50/40 dark:from-slate-950/80 dark:via-slate-900/60 dark:to-blue-950/20 border border-slate-200/80 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      {/* Chip 1: Trực chiến Giảng đường (Radar Pulse) */}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {lectureStats && lectureStats.liveSchedulesCount > 0 ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-semibold shrink-0">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                            </span>
+                            <span>ĐANG LÊN LỚP ({lectureStats.liveSchedulesCount})</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-semibold shrink-0">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                            <span>GIẢNG ĐƯỜNG TRỰC CHIẾN</span>
+                          </span>
+                        )}
+                        <span className="text-slate-600 dark:text-slate-300 font-medium truncate text-xs">
+                          {lectureStats && lectureStats.liveSchedulesCount > 0
+                            ? `${lectureStats.liveSchedulesCount} tiết giảng trực tuyến • ${lectureStats.liveStudentsCount} học viên${lectureStats.liveVenueName ? ` (${lectureStats.liveVenueName})` : ''}`
+                            : 'Hệ thống phòng học sẵn sàng nạp phiên giảng dạy mới'}
+                        </span>
+                      </div>
+
+                      {/* Các chỉ số mini tác chiến bên phải */}
+                      <div className="flex items-center gap-3.5 flex-wrap text-[11px] shrink-0 text-slate-500 dark:text-slate-400">
+                        {/* Mini Gauge: Tỷ lệ sẵn sàng */}
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">Sẵn sàng huấn luyện:</span>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-16 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                                style={{ width: `${lectureStats?.readinessRate ?? 0}%` }}
+                              />
+                            </div>
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{lectureStats?.readinessRate ?? 0}%</span>
+                          </div>
+                        </div>
+
+                        <span className="hidden md:inline text-slate-300 dark:text-slate-700">|</span>
+
+                        {/* Chip Giáo án Cấp Mật */}
+                        <div className="flex items-center gap-1.5" title="Giáo án tác chiến Cấp 3 (Mật) & Cấp 4 (Tối Mật) yêu cầu 2FA vân tay">
+                          <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Giáo án Mật:</span>
+                          <b className="font-mono text-slate-800 dark:text-slate-200">{lectureStats?.secretCount ?? 0} bài (2FA)</b>
+                        </div>
+
+                        <span className="hidden md:inline text-slate-300 dark:text-slate-700">|</span>
+
+                        {/* Chip SCORM Tương tác */}
+                        <div className="flex items-center gap-1.5" title="Gói bài giảng điện tử chuẩn SCORM đa phương tiện tương tác">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Gói SCORM:</span>
+                          <b className="font-mono text-slate-800 dark:text-slate-200">{lectureStats?.scormCount ?? 0} tương tác</b>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* TẦNG 2: LƯỚI 6 THẺ KPI TÁC CHIẾN (Bố cục 3 thẻ trên, 3 thẻ dưới) */}
+                    <div className={
+                      isIPadLandscape
+                        ? 'grid grid-cols-3 gap-3 sm:gap-3.5'
+                        : isIPadPortrait
+                          ? 'grid grid-cols-2 sm:grid-cols-3 gap-3'
+                          : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4'
+                    }>
+                      <StatCard
+                        label="Tổng số bài giảng"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.total ?? "—"}
+                        icon={<BookOpen className="w-5 h-5" />}
+                        color="blue"
+                        subtext="Toàn bộ phân hệ quản lý"
+                        delay={0.0}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Sẵn sàng giảng dạy"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.published ?? "—"}
+                        icon={<CheckCircle2 className="w-5 h-5" />}
+                        color="emerald"
+                        subtext="Đã xuất bản (Published)"
+                        delay={0.05}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Đang chờ duyệt 2 tầng"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.pending ?? "—"}
+                        icon={<Clock className="w-5 h-5" />}
+                        color="amber"
+                        subtext="Cấp Khoa & BGH phê duyệt"
+                        delay={0.1}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Bản nháp / Cần sửa"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.draft ?? "—"}
+                        icon={<FileText className="w-5 h-5" />}
+                        color="purple"
+                        subtext="Đang biên soạn & hoàn thiện"
+                        delay={0.15}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Môn học Quân sự"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.subjectsCount ?? "—"}
+                        icon={<Award className="w-5 h-5" />}
+                        color="cyan"
+                        subtext="Chương trình đào tạo"
+                        delay={0.2}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Lớp & Giảng đường"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats ? `${lectureStats.classesCount} / ${lectureStats.venuesCount}` : "—"}
+                        icon={<Users className="w-5 h-5" />}
+                        color="indigo"
+                        subtext="Lớp đào tạo / Phòng học"
+                        delay={0.25}
+                        refreshKey={overviewRefreshKey}
+                      />
+                    </div>
                   </div>
                 ) : (
-                  <div className="py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-white/[0.04] text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between flex-wrap gap-2">
-                    <span className="font-medium">
-                      Tổng số: <b className="text-slate-800 dark:text-slate-200">{lectureStats?.total ?? '—'}</b> • 
-                      Sẵn sàng: <b className="text-emerald-700 dark:text-emerald-400">{lectureStats?.published ?? '—'}</b> • 
-                      Chờ duyệt: <b className="text-amber-700 dark:text-amber-400">{lectureStats?.pending ?? '—'}</b> • 
-                      Bản nháp: <b className="text-purple-700 dark:text-purple-400">{lectureStats?.draft ?? '—'}</b>
-                    </span>
+                  <div className="py-2.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-white/[0.04] text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between flex-wrap gap-2.5">
+                    <div className="flex items-center gap-2 flex-wrap font-medium">
+                      <span>
+                        Tổng số: <b className="text-slate-800 dark:text-slate-200 font-mono">{lectureStats?.total ?? '—'}</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Sẵn sàng: <b className="text-emerald-700 dark:text-emerald-400 font-mono">{lectureStats?.published ?? '—'} ({lectureStats?.readinessRate ?? 0}%)</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Chờ duyệt: <b className="text-amber-700 dark:text-amber-400 font-mono">{lectureStats?.pending ?? '—'}</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Bản nháp: <b className="text-purple-700 dark:text-purple-400 font-mono">{lectureStats?.draft ?? '—'}</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Môn học: <b className="text-cyan-700 dark:text-cyan-400 font-mono">{lectureStats?.subjectsCount ?? '—'}</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Lớp/Phòng: <b className="text-indigo-700 dark:text-indigo-400 font-mono">{lectureStats?.classesCount ?? '—'}/{lectureStats?.venuesCount ?? '—'}</b>
+                      </span>
+                      {lectureStats && lectureStats.liveSchedulesCount > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                            Đang lên lớp: {lectureStats.liveSchedulesCount}
+                          </span>
+                        </>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setIsLectureSectionExpanded(true)}
-                      className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                      className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer select-none"
                     >
-                      Bấm để xem chi tiết
+                      Mở rộng bảng chỉ số HUD →
                     </button>
                   </div>
                 )}
@@ -1220,288 +1550,191 @@ const pinPendingCount = useMemo(
 
           {activeTab === 'roles' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <KeyRound className="w-5 h-5 text-amber-500 dark:text-amber-400" />
-                    <span>Quản Lý Vai Trò</span>
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Phân quyền vai trò chức năng hệ thống • Tổng số:{' '}
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">{rolesList.length}</span> vai trò
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      loadUsers();
-                      setAssignRoleModal({ open: true, selectedRole: null });
-                    }}
-                    className="px-3.5 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-emerald-950/20 border border-amber-500/25"
-                  >
-                    <UserCheck className="w-4 h-4" /> Gán vai trò
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGenericFormData({ role_id: getNextRoleId(rolesList), name: '' });
-                      setGenericModal({ open: true, type: 'roles', item: null });
-                    }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" /> Thêm vai trò
-                  </button>
+              {/* Executive Header Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50/90 via-white to-amber-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/40 border border-amber-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden">
+                <div className="absolute right-0 top-0 bottom-0 w-80 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_70%)] pointer-events-none" />
+                <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5 max-w-2xl">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-500/20 border border-amber-300/80 dark:border-amber-500/30 flex items-center justify-center shrink-0 shadow-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      <KeyRound className="w-6 h-6 stroke-[2.2]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                          Quản Lý Vai Trò & Phân Quyền
+                        </h1>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
+                          RBAC Access Control
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                        Thiết lập danh mục các vai trò tác chiến và phân bổ thẩm quyền trong hệ thống. Riêng vai trò Quản trị viên tối cao (Admin) sở hữu đặc quyền bypass toàn bộ bộ lọc phân quyền.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start lg:self-center shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        loadUsers();
+                        setAssignRoleModal({ open: true, selectedRole: null });
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-emerald-950/20 border border-amber-500/25 active:scale-95"
+                      title="Gán vai trò cho quân nhân"
+                    >
+                      <UserCheck className="w-4 h-4" /> <span>Gán vai trò</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGenericFormData({ role_id: getNextRoleId(rolesList), name: '' });
+                        setGenericModal({ open: true, type: 'roles', item: null });
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                      title="Thêm vai trò mới"
+                    >
+                      <Plus className="w-4 h-4" /> <span>Thêm vai trò</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+              {/* Tactical Search & Toolbar */}
+              <div className="p-3 bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={roleSearch}
+                    onChange={(e) => setRoleSearch(e.target.value)}
+                    placeholder="Tìm theo mã vai trò hoặc tên vai trò..."
+                    className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-amber-500 transition"
+                  />
+                  {roleSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setRoleSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    Hiển thị <span className="font-bold text-slate-800 dark:text-slate-200">{filteredRoles.length}</span> / {rolesList.length} vai trò
+                  </span>
+                </div>
+              </div>
+
+              {/* Roles Table */}
+              <div className="bg-white dark:bg-slate-900/90 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[500px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[650px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/95 text-slate-500 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
                       <tr>
-                        <th className="py-3 px-4">Mã Role</th>
-                        <th className="py-3 px-4">Tên vai trò</th>
-                        <th className="py-3 px-4 text-right">Thao tác</th>
+                        <th className="py-3.5 px-4 w-36 whitespace-nowrap">Mã Vai Trò</th>
+                        <th className="py-3.5 px-4 w-60 whitespace-nowrap">Tên Vai Trò</th>
+                        <th className="py-3.5 px-4 whitespace-nowrap">Đặc Tính Phân Quyền & Thẩm Quyền</th>
+                        <th className="py-3.5 px-4 text-right w-36 whitespace-nowrap">Thao Tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {rolesList.length === 0 ? (
+                      {filteredRoles.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                          <td colSpan={4} className="py-12 text-center text-slate-400 dark:text-slate-500">
                             <div className="flex flex-col items-center gap-2">
                               <KeyRound className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                              <span className="text-sm font-semibold">Chưa có vai trò nào</span>
-                              <span className="text-xs">Bấm "Thêm vai trò" để tạo vai trò đầu tiên.</span>
+                              <span className="text-sm font-semibold">Không tìm thấy vai trò nào</span>
+                              <span className="text-xs">Thử thay đổi từ khóa tìm kiếm hoặc bấm "Thêm vai trò".</span>
                             </div>
                           </td>
                         </tr>
                       ) : (
-                        rolesList.map((r) => (
-                          <tr key={r.role_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              <span className="font-mono text-xs px-2.5 py-1 rounded-md text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-bold tracking-wider inline-block">
-                                {r.role_id}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
-                            <td className="py-3 px-4 text-right whitespace-nowrap">
-                              {r.role_id === 'ROL-01' ? (
-                                <button disabled className="p-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 rounded-lg mr-1.5 cursor-not-allowed opacity-60" title="Role Admin bypass toàn quyền — không cần phân quyền">
-                                  <ShieldCheck className="w-3.5 h-3.5" />
-                                </button>
-                              ) : (
-                                <button onClick={() => setRolePermModal({ open: true, role: r })} className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 dark:border-amber-500/30 rounded-lg mr-1.5 transition cursor-pointer" title="Phân quyền cho vai trò">
-                                  <ShieldCheck className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => {
-                                  setGenericFormData({ ...r });
-                                  setGenericModal({ open: true, type: 'roles', item: r });
-                                }}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition cursor-pointer"
-                                title="Sửa vai trò"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              {(() => {
-                                const needsApproval = !isAdmin;
-                                return (
-                                  <Tooltip
-                                    title={
-                                      needsApproval
-                                        ? '⚠️ Yêu cầu quyền Admin để xóa vai trò — bấm để gửi yêu cầu phê duyệt'
-                                        : 'Xóa vai trò'
-                                    }
-                                    placement="top"
-                                    arrow
-                                  >
+                        filteredRoles.map((r) => {
+                          const isSuperAdmin = r.role_id === 'ROL-01';
+
+                          return (
+                            <tr key={r.role_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className="font-mono text-xs px-2.5 py-1 rounded-md text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-bold tracking-wider inline-block">
+                                  {r.role_id}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-slate-900 dark:text-white font-bold text-sm whitespace-nowrap">
+                                {r.name}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                {isSuperAdmin ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                    <span>Quản trị viên tối cao • Bypass toàn bộ phân quyền</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                    <Shield className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span>Vai trò tác chiến • Phân quyền theo ma trận RBAC</span>
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap space-x-1.5">
+                                {isSuperAdmin ? (
+                                  <Tooltip title="Role Admin bypass toàn quyền — không cần phân quyền" placement="top" arrow>
                                     <button
-                                      onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
-                                      className={`
-                                        p-1.5 rounded-lg transition cursor-pointer
-                                        ${
+                                      disabled
+                                      className="p-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 rounded-lg cursor-not-allowed opacity-60"
+                                    >
+                                      <ShieldCheck className="w-3.5 h-3.5" />
+                                    </button>
+                                  </Tooltip>
+                                ) : (
+                                  <Tooltip title="Phân quyền chi tiết cho vai trò này" placement="top" arrow>
+                                    <button
+                                      onClick={() => setRolePermModal({ open: true, role: r })}
+                                      className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 dark:border-amber-500/30 rounded-lg transition cursor-pointer active:scale-95 shadow-xs"
+                                    >
+                                      <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                    </button>
+                                  </Tooltip>
+                                )}
+                                <Tooltip title="Sửa thông tin vai trò" placement="top" arrow>
+                                  <button
+                                    onClick={() => {
+                                      setGenericFormData({ ...r });
+                                      setGenericModal({ open: true, type: 'roles', item: r });
+                                    }}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg transition cursor-pointer active:scale-95 shadow-xs"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                </Tooltip>
+                                {(() => {
+                                  const needsApproval = !isAdmin;
+                                  return (
+                                    <Tooltip
+                                      title={
+                                        needsApproval
+                                          ? '⚠️ Yêu cầu quyền Admin để xóa vai trò — bấm để gửi yêu cầu phê duyệt'
+                                          : 'Xóa vai trò'
+                                      }
+                                      placement="top"
+                                      arrow
+                                    >
+                                      <button
+                                        onClick={() => handleGenericDelete('roles', r.role_id, r.name)}
+                                        className={`p-1.5 rounded-lg transition cursor-pointer active:scale-95 shadow-xs ${
                                           needsApproval
                                             ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 hover:text-amber-600 dark:hover:text-amber-400'
                                             : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent'
-                                        }
-                                      `}
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </Tooltip>
-                                );
-                              })()}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'permissions' && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Sách Quyền
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Các quyền hạn truy xuất trong hệ thống • Tổng số:{' '}
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">{permsList.length}</span> quyền
-                    {isReorderingPerms && (
-                      <span className="ml-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse">
-                        • Đang lưu thứ tự mới...
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={async () => {
-                      await loadPermissions();
-                      showToast('Đã làm mới danh sách quyền!', 'success');
-                    }}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95"
-                    title="Làm mới danh sách quyền"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" /> Làm mới
-                  </button>
-                  <button
-                    onClick={() => {
-                      const nextOrder = (permsList.length + 1) * 10;
-                      setGenericFormData(buildPermissionFormData(null, nextOrder));
-                      setGenericModal({ open: true, type: 'permissions', item: null });
-                    }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm active:scale-95"
-                    title="Thêm quyền mới vào hệ thống"
-                  >
-                    <Plus className="w-4 h-4" /> Thêm quyền
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-slate-900/90 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[700px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/95 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
-                      <tr>
-                        <th className="py-3 px-3 text-center w-12" title="Kéo thả để sắp xếp thứ tự">
-                          <GripVertical className="w-4 h-4 mx-auto text-slate-400" />
-                        </th>
-                        <th className="py-3 px-4 whitespace-nowrap">Mã Quyền</th>
-                        <th className="py-3 px-4 whitespace-nowrap">Tên quyền</th>
-                        <th className="py-3 px-4">Mô tả</th>
-                        <th className="py-3 px-4 whitespace-nowrap">Nhóm</th>
-                        <th className="py-3 px-4 text-right whitespace-nowrap">Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {permsList.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                            Chưa có quyền nào
-                          </td>
-                        </tr>
-                      ) : (
-                        permsList.map((p, index) => {
-                          const isBeingDragged = draggedPermIndex === index;
-                          const isOver = dragOverPermIndex === index;
-
-                          return (
-                            <tr
-                              key={p.permission_id}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = 'move';
-                                if (dragOverPermIndex !== index) {
-                                  setDragOverPermIndex(index);
-                                }
-                              }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                handleReorderPerms(index);
-                              }}
-                              className={`transition-colors duration-150 ${
-                                isBeingDragged
-                                  ? 'opacity-30 bg-emerald-500/10 dark:bg-emerald-500/20'
-                                  : isOver
-                                  ? 'border-t-2 border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10'
-                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                              }`}
-                            >
-                              {/* 0. Cột Thao tác Kéo Thả (Drag Handle) */}
-                              <td className="py-3 px-3 text-center w-12">
-                                <div
-                                  draggable
-                                  onDragStart={(e) => {
-                                    e.dataTransfer.setData('text/plain', String(index));
-                                    e.dataTransfer.effectAllowed = 'move';
-                                    setDraggedPermIndex(index);
-                                  }}
-                                  onDragEnd={() => {
-                                    setDraggedPermIndex(null);
-                                    setDragOverPermIndex(null);
-                                  }}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
-                                  title="Bấm giữ và kéo thả để đổi thứ tự quyền"
-                                >
-                                  <GripVertical className="w-4 h-4" />
-                                </div>
-                              </td>
-
-                              {/* 1. Mã Quyền */}
-                              <td className="py-3 px-4 font-mono tabular-nums text-sm text-amber-600 dark:text-amber-400 font-semibold whitespace-nowrap">
-                                {p.permission_id}
-                              </td>
-
-                              {/* 2. Tên quyền (Mã code UPPER_SNAKE) */}
-                              <td className="py-3 px-4 font-mono text-sm text-slate-800 dark:text-amber-400 font-medium whitespace-nowrap">
-                                {p.code || p.name || p.permission_id}
-                              </td>
-
-                              {/* 3. Mô tả */}
-                              <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                                {p.description || '—'}
-                              </td>
-
-                              {/* 4. Nhóm (Group Badge) */}
-                              <td className="py-3 px-4 whitespace-nowrap">
-                                <span
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-xs ${getPermissionGroupBadge(
-                                    (p as any).group_code
-                                  )}`}
-                                >
-                                  {(p as any).group_code || 'SYSTEM'}
-                                </span>
-                              </td>
-
-                              {/* 5. Cột Thao tác */}
-                              <td className="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setGenericFormData(buildPermissionFormData(p));
-                                    setGenericModal({ open: true, type: 'permissions', item: p });
-                                  }}
-                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg transition cursor-pointer shadow-xs active:scale-95"
-                                  title="Chỉnh sửa quyền này"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)
-                                  }
-                                  className="p-1.5 border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/20 rounded-lg transition cursor-pointer shadow-xs active:scale-95"
-                                  title="Xóa quyền này"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                        }`}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </Tooltip>
+                                  );
+                                })()}
                               </td>
                             </tr>
                           );
@@ -1514,7 +1747,274 @@ const pinPendingCount = useMemo(
             </div>
           )}
 
-          {activeTab === 'units' && (
+                    {activeTab === 'permissions' && (
+            <div className="space-y-4">
+              {/* Executive Header Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50/90 via-white to-amber-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/40 border border-amber-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden">
+                <div className="absolute right-0 top-0 bottom-0 w-80 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_70%)] pointer-events-none" />
+                <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5 max-w-2xl">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-500/20 border border-amber-300/80 dark:border-amber-500/30 flex items-center justify-center shrink-0 shadow-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      <ShieldAlert className="w-6 h-6 stroke-[2.2]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                          Danh Sách Quyền Hạn Hệ Thống
+                        </h1>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
+                          {permsList.length} Quyền Hạn
+                        </span>
+                        {isReorderingPerms && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 animate-pulse">
+                            <RotateCw className="w-3 h-3 animate-spin" /> Đang lưu thứ tự sắp xếp...
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                        Định nghĩa các quyền hạn truy xuất chức năng hệ thống QK7 DataHub. Bấm giữ biểu tượng grip (⋮⋮) ở cột đầu tiên và kéo thả để sắp xếp thứ tự ưu tiên quyền.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start lg:self-center shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await loadPermissions();
+                        showToast('Đã làm mới danh sách quyền!', 'success');
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                      title="Làm mới danh sách quyền"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Làm mới</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextOrder = (permsList.length + 1) * 10;
+                        setGenericFormData(buildPermissionFormData(null, nextOrder));
+                        setGenericModal({ open: true, type: 'permissions', item: null });
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                      title="Thêm quyền mới vào hệ thống"
+                    >
+                      <Plus className="w-4 h-4" /> <span>Thêm quyền</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tactical Search & Group Filters Toolbar */}
+              <div className="p-3.5 bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={permSearch}
+                      onChange={(e) => setPermSearch(e.target.value)}
+                      placeholder="Tìm theo mã quyền (PERM-...), tên quyền (DOC_...), mô tả..."
+                      className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-amber-500 transition"
+                    />
+                    {permSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setPermSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium self-end sm:self-center shrink-0">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-500/20 text-[11px] font-semibold">
+                      <GripVertical className="w-3.5 h-3.5 shrink-0" /> Kéo thả dòng để xếp thứ tự
+                    </span>
+                    <span>
+                      Hiển thị <span className="font-bold text-slate-800 dark:text-slate-200">{filteredPerms.length}</span> / {permsList.length} quyền
+                    </span>
+                  </div>
+                </div>
+
+                {/* Group Filter Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                  <button
+                    type="button"
+                    onClick={() => setPermGroupFilter('ALL')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      permGroupFilter === 'ALL'
+                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Tất cả ({permsList.length})
+                  </button>
+                  {permGroups.map((grp) => {
+                    const count = permsList.filter((p: any) => ((p.group_code || 'SYSTEM').toUpperCase()) === grp).length;
+                    const isSelected = permGroupFilter === grp;
+                    return (
+                      <button
+                        key={grp}
+                        type="button"
+                        onClick={() => setPermGroupFilter(grp)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer border ${
+                          isSelected
+                            ? 'bg-slate-900 text-white border-slate-900 dark:bg-amber-400 dark:text-slate-950 dark:border-amber-400 font-bold'
+                            : 'bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                        }`}
+                      >
+                        {grp} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Permissions Table with 100% Intact Drag & Drop */}
+              <div className="bg-white dark:bg-slate-900/90 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs transition-colors duration-200">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[760px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/95 text-slate-500 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
+                      <tr>
+                        <th className="py-3.5 px-3 text-center w-12" title="Bấm giữ và kéo thả để sắp xếp thứ tự">
+                          <GripVertical className="w-4 h-4 mx-auto text-slate-400" />
+                        </th>
+                        <th className="py-3.5 px-4 w-36 whitespace-nowrap">Mã Quyền</th>
+                        <th className="py-3.5 px-4 w-52 whitespace-nowrap">Tên Quyền / Mã Code</th>
+                        <th className="py-3.5 px-4 min-w-[200px]">Mô Tả Chức Năng</th>
+                        <th className="py-3.5 px-4 w-36 whitespace-nowrap">Phân Nhóm</th>
+                        <th className="py-3.5 px-4 text-right w-28 whitespace-nowrap">Thao Tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                      {filteredPerms.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            <div className="flex flex-col items-center gap-2">
+                              <ShieldAlert className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                              <span className="text-sm font-semibold">Không tìm thấy quyền hạn nào phù hợp</span>
+                              <span className="text-xs">Thử thay đổi từ khóa tìm kiếm hoặc chọn nhóm khác.</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredPerms.map((p, filteredIndex) => {
+                          const realIndex = permsList.findIndex((item) => item.permission_id === p.permission_id);
+                          const isBeingDragged = draggedPermIndex === realIndex;
+                          const isOver = dragOverPermIndex === realIndex;
+
+                          return (
+                            <tr
+                              key={p.permission_id}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                if (dragOverPermIndex !== realIndex) {
+                                  setDragOverPermIndex(realIndex);
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                handleReorderPerms(realIndex);
+                              }}
+                              className={`transition-colors duration-150 ${
+                                isBeingDragged
+                                  ? 'opacity-30 bg-emerald-500/10 dark:bg-emerald-500/20'
+                                  : isOver
+                                  ? 'border-t-2 border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10'
+                                  : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
+                              }`}
+                            >
+                              {/* 0. Cột Thao tác Kéo Thả (Drag Handle) */}
+                              <td className="py-3 px-3 text-center w-12">
+                                <div
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData('text/plain', String(realIndex));
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    setDraggedPermIndex(realIndex);
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedPermIndex(null);
+                                    setDragOverPermIndex(null);
+                                  }}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
+                                  title="Bấm giữ và kéo thả để đổi thứ tự quyền"
+                                >
+                                  <GripVertical className="w-4 h-4" />
+                                </div>
+                              </td>
+
+                              {/* 1. Mã Quyền */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className="font-mono text-xs px-2.5 py-1 rounded-md text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-bold tracking-wider inline-block">
+                                  {p.permission_id}
+                                </span>
+                              </td>
+
+                              {/* 2. Tên quyền (Mã code UPPER_SNAKE) */}
+                              <td className="py-3 px-4 font-mono text-xs font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                                {p.code || p.name || p.permission_id}
+                              </td>
+
+                              {/* 3. Mô tả */}
+                              <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                                {p.description || '—'}
+                              </td>
+
+                              {/* 4. Nhóm (Group Badge) */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span
+                                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shadow-xs inline-flex items-center gap-1 ${getPermissionGroupBadge(
+                                    (p as any).group_code
+                                  )}`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                                  {(p as any).group_code || 'SYSTEM'}
+                                </span>
+                              </td>
+
+                              {/* 5. Cột Thao tác */}
+                              <td className="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
+                                <Tooltip title="Chỉnh sửa quyền này" placement="top" arrow>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setGenericFormData(buildPermissionFormData(p));
+                                      setGenericModal({ open: true, type: 'permissions', item: p });
+                                    }}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg transition cursor-pointer active:scale-95 shadow-xs"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                </Tooltip>
+                                <Tooltip title="Xóa quyền này" placement="top" arrow>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleGenericDelete('permissions', p.permission_id, p.name || p.code || p.permission_id)
+                                    }
+                                    className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition cursor-pointer active:scale-95 shadow-xs"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </Tooltip>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+                    {activeTab === 'units' && (
             <UnitTreeTable
               units={unitsList}
               onAddRoot={() => {
@@ -1608,62 +2108,137 @@ const pinPendingCount = useMemo(
 
           {activeTab === 'levels' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Cấp Độ Bảo Mật Dữ Liệu
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Phân cấp bí mật nhà nước và quân đội (Cấp 1 - 5)</p>
+              {/* Executive Header Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50/90 via-white to-amber-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/40 border border-amber-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden">
+                <div className="absolute right-0 top-0 bottom-0 w-80 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_70%)] pointer-events-none" />
+                <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5 max-w-2xl">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-500/20 border border-amber-300/80 dark:border-amber-500/30 flex items-center justify-center shrink-0 shadow-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      <ShieldCheck className="w-6 h-6 stroke-[2.2]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                          Cấp Độ Bảo Mật Dữ Liệu
+                        </h1>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
+                          Clearance Cấp 1 - 5
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                        Phân cấp 5 mức độ mật nhà nước và quốc phòng. Quy định quyền xem/tải và kích hoạt bắt buộc xác thực sinh trắc học vân tay 2FA từ Cấp 3 trở lên.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => loadLevels()}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                      title="Tải lại danh sách"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Đồng bộ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGenericFormData({ level_id: (levelsList.length || 0) + 1, code: '', name: '' });
+                        setGenericModal({ open: true, type: 'levels', item: null });
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs shrink-0"
+                    >
+                      <Plus className="w-4 h-4" /> <span>Thêm mức bảo mật</span>
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setGenericFormData({ level_id: 1, code: '', name: '' });
-                    setGenericModal({ open: true, type: 'levels', item: null });
-                  }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                >
-                  <Plus className="w-4 h-4" /> Thêm mức bảo mật
-                </button>
               </div>
 
-              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+              {/* Bảng danh sách Cấp độ bảo mật */}
+              <div className="bg-white dark:bg-slate-900/90 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[500px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[700px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/95 text-slate-500 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
                       <tr>
-                        <th className="py-3 px-4">Cấp Số</th>
-                        <th className="py-3 px-4">Mã ký hiệu</th>
-                        <th className="py-3 px-4">Tên mức độ mật</th>
-                        <th className="py-3 px-4 text-right">Thao tác</th>
+                        <th className="py-3.5 px-4 w-28 whitespace-nowrap">Cấp Số</th>
+                        <th className="py-3.5 px-4 w-36 whitespace-nowrap">Mã Ký Hiệu</th>
+                        <th className="py-3.5 px-4 whitespace-nowrap">Tên Mức Độ Mật</th>
+                        <th className="py-3.5 px-4 whitespace-nowrap">Quy Chuẩn An Ninh & Xác Thực</th>
+                        <th className="py-3.5 px-4 text-right w-24 whitespace-nowrap">Thao Tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {levelsList.map((lvl) => (
-                        <tr key={lvl.level_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-bold">Cấp {lvl.level_id}</td>
-                          <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-mono tabular-nums">{lvl.code}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{lvl.name}</td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => {
-                                setGenericFormData({ ...lvl });
-                                setGenericModal({ open: true, type: 'levels', item: lvl });
-                              }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
-                              title="Sửa mức bảo mật"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleGenericDelete('levels', lvl.level_id, lvl.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
-                              title="Xóa mức bảo mật"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {levelsList.map((lvl) => {
+                        const conf = LEVEL_CONFIGS[lvl.level_id] || {
+                          label: lvl.name,
+                          badgeBg: 'bg-slate-500/10',
+                          badgeText: 'text-slate-700 dark:text-slate-300',
+                          border: 'border-slate-300',
+                          badgeDot: 'bg-slate-500',
+                          requires2FA: lvl.level_id >= 3,
+                          desc: 'Cấp độ bảo mật dữ liệu',
+                        };
+                        return (
+                          <tr key={lvl.level_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3.5 px-4">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold font-mono border ${conf.badgeBg} ${conf.badgeText} ${conf.border}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${conf.badgeDot}`} />
+                                Cấp {lvl.level_id}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                {lvl.code}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div>
+                                <span className="text-slate-900 dark:text-white font-bold text-sm block">
+                                  {lvl.name}
+                                </span>
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                                  {conf.desc}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              {conf.requires2FA ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                  <Fingerprint className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                  <span>Bắt buộc Vân tay 2FA (ZKTeco ZK9500)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                  <Shield className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span>Xác thực tài khoản (Clearance)</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGenericFormData({ ...lvl });
+                                  setGenericModal({ open: true, type: 'levels', item: lvl });
+                                }}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
+                                title="Sửa mức bảo mật"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleGenericDelete('levels', lvl.level_id, lvl.name)}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
+                                title="Xóa mức bảo mật"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1673,56 +2248,168 @@ const pinPendingCount = useMemo(
 
           {activeTab === 'ranks' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Award className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Cấp Bậc Quân Hàm
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Số thứ tự nhỏ hiển thị trước trong dropdown</p>
+              {/* Executive Header Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50/90 via-white to-yellow-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/40 border border-amber-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden">
+                <div className="absolute right-0 top-0 bottom-0 w-80 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_70%)] pointer-events-none" />
+                <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5 max-w-2xl">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-500/20 border border-amber-300/80 dark:border-amber-500/30 flex items-center justify-center shrink-0 shadow-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      <Award className="w-6 h-6 stroke-[2.2]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                          Danh Mục Cấp Bậc Quân Hàm
+                        </h1>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
+                          {ranksList.length} cấp bậc
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                        Chuẩn hóa cấp bậc quân đội theo quy định Bộ Quốc phòng. Số thứ tự nhỏ hiển thị ưu tiên trước trong dropdown hồ sơ quân nhân.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => loadRanks()}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                      title="Tải lại danh sách"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Đồng bộ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGenericFormData({ rank_id: getNextRankId(ranksList), name: '', sort_order: (ranksList.length + 1) * 10 });
+                        setGenericModal({ open: true, type: 'ranks', item: null });
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs shrink-0"
+                    >
+                      <Plus className="w-4 h-4" /> <span>Thêm cấp bậc</span>
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setGenericFormData({ rank_id: getNextRankId(ranksList), name: '', sort_order: ranksList.length + 1 });
-                    setGenericModal({ open: true, type: 'ranks', item: null });
-                  }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                >
-                  <Plus className="w-4 h-4" /> Thêm cấp bậc
-                </button>
               </div>
 
-              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+              {/* Tactical Filter Toolbar */}
+              <div className="p-3 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={rankSearch}
+                    onChange={(e) => setRankSearch(e.target.value)}
+                    placeholder="Tìm theo mã (R-01...) hoặc tên cấp bậc (Đại tá, Thượng tá...)"
+                    className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                  />
+                  {rankSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setRankSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setRankStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                      rankStatusFilter === 'all'
+                        ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 border border-transparent'
+                    }`}
+                  >
+                    Tất cả ({ranksList.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRankStatusFilter('active')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                      rankStatusFilter === 'active'
+                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 border border-transparent'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Đang dùng ({ranksList.filter((r) => r.active !== false).length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRankStatusFilter('inactive')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                      rankStatusFilter === 'inactive'
+                        ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 border border-transparent'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span>Đã ẩn ({ranksList.filter((r) => r.active === false).length})</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bảng Cấp Bậc Quân Hàm */}
+              <div className="bg-white dark:bg-slate-900/90 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[700px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/95 text-slate-500 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
                       <tr>
-                        <th className="py-3 px-4">Mã</th>
-                        <th className="py-3 px-4">Tên cấp bậc</th>
-                        <th className="py-3 px-4">Thứ tự</th>
-                        <th className="py-3 px-4">Trạng thái</th>
-                        <th className="py-3 px-4 text-right">Thao tác</th>
+                        <th className="py-3.5 px-4 w-28 whitespace-nowrap">Mã</th>
+                        <th className="py-3.5 px-4">Tên Cấp Bậc Quân Hàm</th>
+                        <th className="py-3.5 px-4 w-40 whitespace-nowrap">Thứ Tự Ưu Tiên</th>
+                        <th className="py-3.5 px-4 w-36 whitespace-nowrap">Trạng Thái</th>
+                        <th className="py-3.5 px-4 text-right w-24 whitespace-nowrap">Thao Tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {ranksList.length === 0 ? (
-                        <tr><td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">Chưa có cấp bậc nào</td></tr>
+                      {filteredRanks.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            Không tìm thấy cấp bậc nào phù hợp với bộ lọc
+                          </td>
+                        </tr>
                       ) : (
-                        ranksList.map((r) => (
-                          <tr key={r.rank_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{r.rank_id}</td>
-                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{r.name}</td>
-                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-mono tabular-nums">{r.sort_order ?? 0}</td>
-                            <td className="py-3 px-4">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                r.active !== false
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
-                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
-                              }`}>
-                                {r.active !== false ? 'Đang dùng' : 'Đã ẩn'}
+                        filteredRanks.map((r) => (
+                          <tr key={r.rank_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3.5 px-4 font-mono font-bold text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                                {r.rank_id}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <td className="py-3.5 px-4">
+                              <span className="text-slate-900 dark:text-white font-bold text-sm">
+                                {r.name}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-[11px] border border-slate-200 dark:border-slate-700">
+                                Thứ tự: {r.sort_order ?? 0}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              {r.active !== false ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>Đang dùng</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                  <span>Đã ẩn</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
                               <button
+                                type="button"
                                 onClick={() => {
                                   setGenericFormData({ ...r });
                                   setGenericModal({ open: true, type: 'ranks', item: r });
@@ -1733,6 +2420,7 @@ const pinPendingCount = useMemo(
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
+                                type="button"
                                 onClick={() => handleGenericDelete('ranks', r.rank_id, r.name)}
                                 className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                                 title="Xóa cấp bậc"
@@ -1752,56 +2440,168 @@ const pinPendingCount = useMemo(
 
           {activeTab === 'positions' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Briefcase className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Chức Vụ
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Số thứ tự nhỏ hiển thị trước trong dropdown</p>
+              {/* Executive Header Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-sky-50/90 via-white to-indigo-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/40 border border-sky-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden">
+                <div className="absolute right-0 top-0 bottom-0 w-80 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.12),transparent_70%)] pointer-events-none" />
+                <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5 max-w-2xl">
+                    <div className="w-12 h-12 rounded-2xl bg-sky-100 dark:bg-sky-500/20 border border-sky-300/80 dark:border-sky-500/30 flex items-center justify-center shrink-0 shadow-xs text-sky-700 dark:text-sky-400 mt-0.5">
+                      <Briefcase className="w-6 h-6 stroke-[2.2]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                          Danh Mục Chức Vụ
+                        </h1>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-sky-100 dark:bg-sky-500/20 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-500/40">
+                          {positionsList.length} chức vụ
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                        Chuẩn hóa chức vụ chỉ huy, giảng dạy và quản lý. Số thứ tự nhỏ hiển thị ưu tiên trước trong dropdown hồ sơ quân nhân.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => loadPositions()}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                      title="Tải lại danh sách"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Đồng bộ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGenericFormData({ position_id: getNextPositionId(positionsList), name: '', sort_order: (positionsList.length + 1) * 10 });
+                        setGenericModal({ open: true, type: 'positions', item: null });
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-xs shrink-0"
+                    >
+                      <Plus className="w-4 h-4" /> <span>Thêm chức vụ</span>
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setGenericFormData({ position_id: getNextPositionId(positionsList), name: '', sort_order: positionsList.length + 1 });
-                    setGenericModal({ open: true, type: 'positions', item: null });
-                  }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                >
-                  <Plus className="w-4 h-4" /> Thêm chức vụ
-                </button>
               </div>
 
-              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+              {/* Tactical Filter Toolbar */}
+              <div className="p-3 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={positionSearch}
+                    onChange={(e) => setPositionSearch(e.target.value)}
+                    placeholder="Tìm theo mã (P-01...) hoặc tên chức vụ (Hiệu trưởng, Chính ủy, Trợ lý...)"
+                    className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                  />
+                  {positionSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setPositionSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPositionStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                      positionStatusFilter === 'all'
+                        ? 'bg-sky-100 dark:bg-sky-500/20 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-500/40 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 border border-transparent'
+                    }`}
+                  >
+                    Tất cả ({positionsList.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPositionStatusFilter('active')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                      positionStatusFilter === 'active'
+                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 border border-transparent'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Đang dùng ({positionsList.filter((p) => p.active !== false).length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPositionStatusFilter('inactive')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                      positionStatusFilter === 'inactive'
+                        ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 border border-transparent'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span>Đã ẩn ({positionsList.filter((p) => p.active === false).length})</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bảng Chức Vụ */}
+              <div className="bg-white dark:bg-slate-900/90 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[700px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/95 text-slate-500 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
                       <tr>
-                        <th className="py-3 px-4">Mã</th>
-                        <th className="py-3 px-4">Tên chức vụ</th>
-                        <th className="py-3 px-4">Thứ tự</th>
-                        <th className="py-3 px-4">Trạng thái</th>
-                        <th className="py-3 px-4 text-right">Thao tác</th>
+                        <th className="py-3.5 px-4 w-28 whitespace-nowrap">Mã</th>
+                        <th className="py-3.5 px-4">Tên Chức Vụ</th>
+                        <th className="py-3.5 px-4 w-40 whitespace-nowrap">Thứ Tự Ưu Tiên</th>
+                        <th className="py-3.5 px-4 w-36 whitespace-nowrap">Trạng Thái</th>
+                        <th className="py-3.5 px-4 text-right w-24 whitespace-nowrap">Thao Tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {positionsList.length === 0 ? (
-                        <tr><td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">Chưa có chức vụ nào</td></tr>
+                      {filteredPositions.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                            Không tìm thấy chức vụ nào phù hợp với bộ lọc
+                          </td>
+                        </tr>
                       ) : (
-                        positionsList.map((p) => (
-                          <tr key={p.position_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{p.position_id}</td>
-                            <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{p.name}</td>
-                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-mono tabular-nums">{p.sort_order ?? 0}</td>
-                            <td className="py-3 px-4">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                p.active !== false
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-transparent'
-                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-transparent'
-                              }`}>
-                                {p.active !== false ? 'Đang dùng' : 'Đã ẩn'}
+                        filteredPositions.map((p) => (
+                          <tr key={p.position_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3.5 px-4 font-mono font-bold text-sky-700 dark:text-sky-400 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/20">
+                                {p.position_id}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <td className="py-3.5 px-4">
+                              <span className="text-slate-900 dark:text-white font-bold text-sm">
+                                {p.name}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-[11px] border border-slate-200 dark:border-slate-700">
+                                Thứ tự: {p.sort_order ?? 0}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              {p.active !== false ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>Đang dùng</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                  <span>Đã ẩn</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
                               <button
+                                type="button"
                                 onClick={() => {
                                   setGenericFormData({ ...p });
                                   setGenericModal({ open: true, type: 'positions', item: p });
@@ -1812,6 +2612,7 @@ const pinPendingCount = useMemo(
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
+                                type="button"
                                 onClick={() => handleGenericDelete('positions', p.position_id, p.name)}
                                 className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
                                 title="Xóa chức vụ"
@@ -1910,36 +2711,63 @@ const pinPendingCount = useMemo(
         />
       )}
 
-      <AnimatePresence>
-        {genericModal.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`bg-white dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${
-                genericModal.type === 'permissions' ? 'max-w-2xl' : 'max-w-md'
-              } p-6 shadow-2xl text-xs space-y-4`}
-            >
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                  {genericModal.item ? 'Chỉnh Sửa' : 'Thêm Mới'}{' '}
-                  {genericModal.type === 'units' ? 'Đơn Vị'
-                    : genericModal.type === 'roles' ? 'Vai Trò'
-                      : genericModal.type === 'doctypes' ? 'Loại Văn Bản'
-                        : genericModal.type === 'levels' ? 'Mức Bảo Mật'
-                          : genericModal.type === 'ranks' ? 'Cấp Bậc'
-                            : genericModal.type === 'positions' ? 'Chức Vụ'
-                              : genericModal.type === 'permissions' ? 'Quyền (Permission)'
-                                : genericModal.type}
-                </h3>
-                <button
-                  onClick={() => setGenericModal({ open: false, type: null, item: null })}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+      {createPortal(
+        <AnimatePresence>
+          {genericModal.open && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.15 }}
+                className={`bg-white dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${
+                  genericModal.type === 'permissions' ? 'max-w-2xl' : 'max-w-md'
+                } p-6 shadow-2xl text-xs space-y-4`}
+              >
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+                      {genericModal.type === 'levels' ? (
+                        <ShieldCheck className="w-5 h-5" />
+                      ) : genericModal.type === 'ranks' ? (
+                        <Award className="w-5 h-5" />
+                      ) : genericModal.type === 'positions' ? (
+                        <Briefcase className="w-5 h-5" />
+                      ) : genericModal.type === 'units' ? (
+                        <Building className="w-5 h-5" />
+                      ) : genericModal.type === 'roles' ? (
+                        <ShieldAlert className="w-5 h-5" />
+                      ) : genericModal.type === 'doctypes' ? (
+                        <FileText className="w-5 h-5" />
+                      ) : (
+                        <KeyRound className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                        {genericModal.item ? 'Chỉnh Sửa' : 'Thêm Mới'}{' '}
+                        {genericModal.type === 'units' ? 'Đơn Vị'
+                          : genericModal.type === 'roles' ? 'Vai Trò'
+                            : genericModal.type === 'doctypes' ? 'Loại Văn Bản'
+                              : genericModal.type === 'levels' ? 'Mức Bảo Mật'
+                                : genericModal.type === 'ranks' ? 'Cấp Bậc Quân Hàm'
+                                  : genericModal.type === 'positions' ? 'Chức Vụ'
+                                    : genericModal.type === 'permissions' ? 'Quyền (Permission)'
+                                      : genericModal.type}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Điền thông tin chuẩn hóa và bấm &ldquo;Lưu lại&rdquo; để cập nhật hệ thống
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setGenericModal({ open: false, type: null, item: null })}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
 
               <form onSubmit={handleGenericSave} className="space-y-3">
                 <div className="max-h-[65vh] overflow-y-auto pr-1 space-y-3">
@@ -2038,89 +2866,98 @@ const pinPendingCount = useMemo(
                   )}
 
                   {genericModal.type === 'levels' && (
-                    <>
+                    <div className="space-y-3.5">
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Cấp Độ (1 - 5) *</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Cấp Độ Bảo Mật (1 - 5) *</label>
                         <input type="number" min="1" max="5" disabled={Boolean(genericModal.item)}
                           value={genericFormData.level_id || 1}
                           onChange={(e) => setGenericFormData({ ...genericFormData, level_id: Number(e.target.value) })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm disabled:opacity-50 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Cấp 1: Công khai • Cấp 2: Nội bộ • Cấp 3: Mật • Cấp 4: Tối mật • Cấp 5: Tuyệt mật</p>
                       </div>
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Ký Hiệu *</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Mã Ký Hiệu * (UPPER_CASE)</label>
                         <input type="text" value={genericFormData.code || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, code: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          onChange={(e) => setGenericFormData({ ...genericFormData, code: e.target.value.toUpperCase() })} required
+                          placeholder="VD: CONFIDENTIAL"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm uppercase focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
                       </div>
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Mức Bảo Mật *</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Tên Mức Bảo Mật *</label>
                         <input type="text" value={genericFormData.name || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          placeholder="VD: Mật"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
                       </div>
-                    </>
+                    </div>
                   )}
 
                   {genericModal.type === 'ranks' && (
-                    <>
+                    <div className="space-y-3.5">
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Cấp Bậc (Tự động)</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Mã Cấp Bậc (Tự động)</label>
                         <input type="text" readOnly disabled value={genericFormData.rank_id || ''} placeholder="VD: R-21"
-                          className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80"
+                          className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono text-sm cursor-not-allowed opacity-80"
                           title="Mã cấp bậc được hệ thống tự động sinh theo thứ tự" />
                       </div>
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Cấp Bậc *</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Tên Cấp Bậc Quân Hàm *</label>
                         <input type="text" value={genericFormData.name || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
-                          placeholder="VD: Trung sĩ QNCN" required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          placeholder="VD: Trung tá QNCN" required
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
                       </div>
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Thứ tự</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Thứ Tự Ưu Tiên Hiển Thị</label>
                         <input type="number" value={genericFormData.sort_order ?? 0}
                           onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          placeholder="VD: 10, 20, 30..."
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Số thứ tự nhỏ hơn sẽ hiển thị trước trong danh sách chọn</p>
                       </div>
                       {genericModal.item && (
-                        <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold">
+                        <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer">
                           <input type="checkbox" checked={genericFormData.active !== false}
-                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })} />
-                          <span>Đang kích hoạt</span>
+                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" />
+                          <span>Kích hoạt sử dụng cấp bậc này</span>
                         </label>
                       )}
-                    </>
+                    </div>
                   )}
 
                   {genericModal.type === 'positions' && (
-                    <>
+                    <div className="space-y-3.5">
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Chức Vụ (Tự động)</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Mã Chức Vụ (Tự động)</label>
                         <input type="text" readOnly disabled value={genericFormData.position_id || ''} placeholder="VD: P-19"
-                          className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed opacity-80"
+                          className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono text-sm cursor-not-allowed opacity-80"
                           title="Mã chức vụ được hệ thống tự động sinh theo thứ tự" />
                       </div>
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Chức Vụ *</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Tên Chức Vụ *</label>
                         <input type="text" value={genericFormData.name || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
                           placeholder="VD: Phó phòng Kỹ thuật" required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
                       </div>
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Thứ tự</label>
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">Thứ Tự Ưu Tiên Hiển Thị</label>
                         <input type="number" value={genericFormData.sort_order ?? 0}
                           onChange={(e) => setGenericFormData({ ...genericFormData, sort_order: Number(e.target.value) })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          placeholder="VD: 10, 20, 30..."
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" />
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Số thứ tự nhỏ hơn sẽ hiển thị trước trong danh sách chọn</p>
                       </div>
                       {genericModal.item && (
-                        <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold">
+                        <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer">
                           <input type="checkbox" checked={genericFormData.active !== false}
-                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })} />
-                          <span>Đang kích hoạt</span>
+                            onChange={(e) => setGenericFormData({ ...genericFormData, active: e.target.checked })}
+                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" />
+                          <span>Kích hoạt sử dụng chức vụ này</span>
                         </label>
                       )}
-                    </>
+                    </div>
                   )}
 
                   {genericModal.type === 'permissions' && (
@@ -2216,13 +3053,13 @@ const pinPendingCount = useMemo(
                   )}
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-2">
+                <div className="pt-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-2.5">
                   <button type="button" onClick={() => setGenericModal({ open: false, type: null, item: null })}
-                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-xl transition font-medium">
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-xl transition font-medium cursor-pointer">
                     Hủy bỏ
                   </button>
                   <button type="submit"
-                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm">
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer active:scale-95">
                     <Save className="w-3.5 h-3.5" /> Lưu lại
                   </button>
                 </div>
@@ -2230,7 +3067,9 @@ const pinPendingCount = useMemo(
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    )}
 
       <ConfirmDialog
         open={deleteConfirm.open}

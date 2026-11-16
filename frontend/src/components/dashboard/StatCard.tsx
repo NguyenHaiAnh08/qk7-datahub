@@ -7,7 +7,7 @@ export interface StatCardProps {
   label: string;
   value: string | number;
   icon: ReactNode;
-  color?: 'blue' | 'emerald' | 'purple' | 'red' | 'amber';
+  color?: 'blue' | 'emerald' | 'purple' | 'red' | 'amber' | 'cyan' | 'indigo';
   subtext?: string;
   delay?: number;
   refreshKey?: number | string;
@@ -26,8 +26,8 @@ const colorMap = {
     valueText: 'text-slate-900 dark:text-white'
   },
   purple: {
-    border: 'border-l-amber-500',
-    iconText: 'text-amber-600 dark:text-amber-400',
+    border: 'border-l-purple-500',
+    iconText: 'text-purple-600 dark:text-purple-400',
     valueText: 'text-slate-900 dark:text-white'
   },
   red: {
@@ -39,6 +39,16 @@ const colorMap = {
     border: 'border-l-amber-500',
     iconText: 'text-amber-600 dark:text-amber-400',
     valueText: 'text-amber-600 dark:text-amber-400'
+  },
+  cyan: {
+    border: 'border-l-cyan-500',
+    iconText: 'text-cyan-600 dark:text-cyan-400',
+    valueText: 'text-slate-900 dark:text-white'
+  },
+  indigo: {
+    border: 'border-l-indigo-500',
+    iconText: 'text-indigo-600 dark:text-indigo-400',
+    valueText: 'text-slate-900 dark:text-white'
   }
 };
 

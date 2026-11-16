@@ -51,7 +51,7 @@ export interface TrainingClass {
   class_name: string;
   unit_id: string;
   unit_name?: string;
-  course_year?: number;
+  course_year?: number | string;
   student_total?: number;
   description?: string;
   active: boolean;

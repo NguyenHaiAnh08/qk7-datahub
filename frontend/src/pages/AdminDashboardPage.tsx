@@ -564,45 +564,37 @@ const pinPendingCount = useMemo(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // === USER CRUD ===
-       const handleSaveUser = async (userData: Partial<User> & { role_id?: string; roles?: string[] }) => {
+// === USER CRUD ===
+  const handleSaveUser = async (
+    userData: Partial<User> & { role_id?: string; roles?: string[]; expires_at?: string | null }
+  ) => {
     try {
       if (selectedUser?.user_id) {
-        // 1. Tách role_id ra khỏi object để không gửi nhầm lên API updateUser
-        const { role_id, roles, ...updateData } = userData;
+        // 1. Tách role_id, roles, expires_at ra khỏi object để không gửi nhầm lên API updateUser
+        const { role_id, roles, expires_at, ...updateData } = userData;
 
         // 2. Cập nhật thông tin cơ bản (Tên, chức vụ, đơn vị, độ mật...)
         await usersApi.updateUser(selectedUser.user_id, updateData);
 
-        // 3. Xử lý Vai trò (Nếu có thay đổi)
-        // Kiểm tra xem Role được chọn trên form có khác Role hiện tại trong DB không
-        const currentRole = selectedUser.roles?.[0]; // Vì thiết kế 1 user 1 role nên lấy phần tử đầu tiên
-        if (role_id && role_id !== currentRole) {
-          
-          // BƯỚC 3.1: Gỡ toàn bộ role cũ (nếu có)
-          if (selectedUser.roles && selectedUser.roles.length > 0) {
-            for (const oldRoleId of selectedUser.roles) {
-              // Không cho phép gỡ role Admin tối cao (để bảo vệ hệ thống)
-              if (oldRoleId !== 'ROL-01') {
-                await usersApi.revokeRole(selectedUser.user_id, oldRoleId);
-              }
-            }
-          }
-
-          // BƯỚC 3.2: Gán role mới
-          await usersApi.assignRole(selectedUser.user_id, role_id);
+        // 3. ✅ ATOMIC: Cập nhật vai trò qua 1 endpoint PUT duy nhất (nếu có thay đổi)
+        // Server wrap DELETE cũ + INSERT mới trong transaction → tránh trạng thái mất role giữa chừng
+        const currentRole = selectedUser.roles?.[0] || null;
+        if (role_id !== undefined && role_id !== currentRole) {
+          const newRoles = role_id ? [role_id] : [];
+          await usersApi.setUserRoles(selectedUser.user_id, newRoles, expires_at ?? null);
         }
 
-        await loadUsers();
         showToast('Đã cập nhật thông tin quân nhân thành công');
       } else {
         // Tạo mới: Form đã gửi kèm role_id, Backend sẽ tự xử lý
         await usersApi.createUser(userData as any);
-        await loadUsers();
         showToast('Đã tạo quân nhân mới thành công');
       }
     } catch (err: any) {
-      showToast('Lỗi: ' + err.message, 'error');
+      showToast('Lỗi: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      // Luôn tải lại danh sách để UI đồng bộ với DB kể cả khi cập nhật chỉ thành công một phần
+      await loadUsers();
     }
   };
 

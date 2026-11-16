@@ -1,6 +1,13 @@
 /**
  * sessions.js — JWT + Session Hybrid Validation
  * Cache 30 giây, IP binding chặt (LAN/WAN + subnet), revoke tức thì.
+ *
+ * Lịch sử fix:
+ *  - P1-1: IP change detection (LAN↔WAN + LAN_DIFF_SUBNET + WAN→WAN khác)
+ *  - Cache check: revalidate mọi thay đổi không phải LAN_SAME_SUBNET
+ *  - Targeted cache invalidate: chỉ xoá entry của token bị revoke,
+ *    không dùng lastGlobalInvalidation trong hot path
+ *  - killSessionById / revokeIdleSessions: OUTPUT INSERTED.token
  */
 
 const crypto = require('crypto');
@@ -8,7 +15,9 @@ const crypto = require('crypto');
 const CACHE_TTL_MS = 30 * 1000;
 const cache = new Map(); // tokenHash → { valid, user_id, ip, reason, cachedAt }
 
-// ✅ Global invalidation timestamp — revoke có hiệu lực ngay
+// ✅ Global invalidation timestamp — chỉ dùng cho các thao tác bulk
+// không biết trước token (vd: migration, force-reset). KHÔNG dùng trong
+// hot path logout / kill-by-id / idle-revoke vì đã targeted delete.
 let lastGlobalInvalidation = 0;
 
 function hashToken(rawJwt) {
@@ -108,17 +117,21 @@ module.exports = function createSessionModule({
 
     // ─── 1. Check cache ───
     const cached = cache.get(tokenHash);
-        if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
       if (cached.cachedAt < lastGlobalInvalidation) {
         cache.delete(tokenHash);
       } else if (!cached.valid) {
         return { valid: false, reason: cached.reason };
       } else {
-        // ✅ Defense-in-depth: IP đổi loại (LAN↔WAN) trên cache → bỏ cache, query DB
-        const cacheSuspicious = cached.ip && ip && cached.ip !== ip
-          && ipType(cached.ip) !== ipType(ip);
-        if (cacheSuspicious) {
+        // ✅ Defense-in-depth: bất kỳ thay đổi IP nào KHÔNG phải LAN_SAME_SUBNET
+        // đều phải query lại DB để chạy qua logic block/revoke đầy đủ.
+        const cacheChange = (cached.ip && ip) ? classifyIpChange(cached.ip, ip) : 'UNKNOWN';
+        const cacheMustRevalidate =
+          cacheChange === 'SUSPICIOUS' || cacheChange === 'LAN_DIFF_SUBNET';
+
+        if (cacheMustRevalidate) {
           cache.delete(tokenHash);
+          // rơi xuống bước 2 — query DB để enforce policy
         } else {
           return { valid: true, user_id: cached.user_id };
         }
@@ -166,39 +179,40 @@ module.exports = function createSessionModule({
         }
       };
       const ipChange = classifyIpChange(s.ip, ip);
+      const isAdmin = isAdminSession(s);
 
-      if (s.ip && ip && s.ip !== ip) {
-        const suspicious = ipType(s.ip) !== ipType(ip); // LAN ↔ WAN
-        const isAdmin = isAdminSession(s);
+      if (s.ip && ip && ipChange !== 'SAME' && ipChange !== 'UNKNOWN') {
+        // 🔴 SUSPICIOUS (LAN↔WAN, WAN→WAN khác) HOẶC LAN_DIFF_SUBNET → block + revoke
+        const mustBlock =
+          ipChange === 'SUSPICIOUS' || ipChange === 'LAN_DIFF_SUBNET';
 
-        if (suspicious && !isAdmin) {
-          // 🔴 IP nhảy LAN ↔ WAN → revoke + block + buộc re-auth
+        if (mustBlock && !isAdmin) {
           await revokeSession({
             token,
             revokedBy: 'SYSTEM',
-            reason: 'IP_CHANGED_SUSPICIOUS',
+            reason: `IP_CHANGED_${ipChange}`,   // ghi rõ loại thay đổi để audit
           }).catch((e) => console.error('[revokeSession]', e.message));
 
           logIpChange(
             'SESSION_IP_BLOCKED',
-            `TỪ CHỐI: IP thay đổi bất thường ${s.ip} (${ipType(s.ip)}) → ${ip} (${ipType(ip)})`
+            `TỪ CHỐI [${ipChange}]: IP thay đổi ${s.ip} (${ipType(s.ip)}) → ${ip} (${ipType(ip)})`
           );
 
           return {
             valid: false,
             reason: 'IP_CHANGED',
+            change_type: ipChange,
             requires_reauth: true,
           };
         }
 
-        // 🟢 Cùng loại IP (LAN→LAN hoặc WAN→WAN), hoặc admin → chỉ log
+        // 🟢 SAME không cần log. LAN_SAME_SUBNET hoặc admin bypass → chỉ log + update IP
         logIpChange(
           'SESSION_IP_CHANGED',
-          `IP thay đổi từ ${s.ip} (${ipType(s.ip)}) → ${ip} (${ipType(ip)})`
+          `[${ipChange}] IP thay đổi ${s.ip} (${ipType(s.ip)}) → ${ip} (${ipType(ip)})`
             + (isAdmin ? ' [admin bypass]' : '')
         );
 
-        // Cập nhật IP mới vào DB (await + log lỗi thay vì fire-and-forget)
         try {
           await pool.request()
             .input('tok', sql.Char(64), tokenHash)
@@ -220,10 +234,13 @@ module.exports = function createSessionModule({
       }
 
       // ─── 7. Cache ───
+      // Chỉ cache IP mới khi thay đổi là an toàn (SAME / LAN_SAME_SUBNET).
+      // Với LAN_DIFF_SUBNET hoặc SUSPICIOUS, code đã return ở trên (nếu !admin),
+      // còn nếu admin bypass thì vẫn cập nhật IP mới vì DB đã update.
       cache.set(tokenHash, {
         valid: true,
         user_id: s.user_id,
-        ip: (ipChange === 'LAN_SAME_SUBNET') ? ip : s.ip,
+        ip: (ipChange === 'SAME' || ipChange === 'LAN_SAME_SUBNET') ? ip : s.ip,
         cachedAt: Date.now(),
       });
       return { valid: true, user_id: s.user_id };
@@ -234,6 +251,11 @@ module.exports = function createSessionModule({
     }
   }
 
+  /**
+   * Revoke 1 session theo token (logout, IP change, force-kill).
+   * ✅ Targeted cache delete — KHÔNG bump lastGlobalInvalidation
+   *    (hot path, không được nuke cache của user khác).
+   */
   async function revokeSession({ token, revokedBy, reason }) {
     const tokenHash = hashToken(token);
     const pool = await getPool();
@@ -248,11 +270,15 @@ module.exports = function createSessionModule({
         WHERE token = @tok AND revoked = 0;
         SELECT @@ROWCOUNT AS n;
       `);
-    cache.delete(tokenHash);
-    lastGlobalInvalidation = Date.now();   // ✅ invalidate toàn bộ cache cũ
+
+    cache.delete(tokenHash);   // ✅ chỉ xoá entry của token này
     return r.recordset[0]?.n || 0;
   }
 
+  /**
+   * Revoke tất cả session của 1 user (đổi mật khẩu, admin kill toàn bộ).
+   * ✅ Targeted cache delete theo user_id, không bump global.
+   */
   async function revokeAllUserSessions(userId, revokedBy, reason) {
     const pool = await getPool();
     const r = await pool.request()
@@ -267,14 +293,18 @@ module.exports = function createSessionModule({
         SELECT @@ROWCOUNT AS n;
       `);
 
-    // Clear cache entries của user
+    // Clear cache entries của user — quét Map (không có index theo user_id)
     for (const [tok, val] of cache.entries()) {
       if (val.user_id === userId) cache.delete(tok);
     }
     return r.recordset[0]?.n || 0;
   }
 
-   async function killSessionById(sessionId, revokedBy, reason) {
+  /**
+   * Kill 1 session theo session_id (admin dashboard).
+   * ✅ OUTPUT INSERTED.token + targeted delete — không nuke toàn bộ cache.
+   */
+  async function killSessionById(sessionId, revokedBy, reason) {
     const pool = await getPool();
     const r = await pool.request()
       .input('sid', sql.UniqueIdentifier, sessionId)
@@ -284,16 +314,25 @@ module.exports = function createSessionModule({
         UPDATE USER_SESSION
         SET revoked = 1, revoked_at = GETDATE(),
             revoked_by = @rby, revoked_reason = @rsn
+        OUTPUT INSERTED.token
         WHERE session_id = @sid AND revoked = 0;
       `);
-    cache.clear();
-    return r.rowsAffected[0] || 0;
+
+    let affected = 0;
+    for (const row of r.recordset) {
+      const tok = String(row.token || '').trim().toLowerCase();
+      if (tok) {
+        cache.delete(tok);
+        affected += 1;
+      }
+    }
+    return affected;
   }
 
-    async function listActiveSessions(userId = null, idleTimeoutMinutes = 15) {
+  async function listActiveSessions(userId = null, idleTimeoutMinutes = 15) {
     const pool = await getPool();
     const req = pool.request();
-    
+
     // Mặc định coi là "offline" nếu không hoạt động trong 30 phút
     const timeout = parseInt(idleTimeoutMinutes, 10) || 30;
     req.input('idleTimeout', sql.Int, timeout);
@@ -316,8 +355,11 @@ module.exports = function createSessionModule({
     return (await req.query(q)).recordset;
   }
 
-
-    // ⏰ Tự động revoke các session idle quá lâu
+  /**
+   * ⏰ Tự động revoke các session idle quá lâu (cron).
+   * ✅ OUTPUT INSERTED.token + targeted delete — không nuke cache toàn hệ thống
+   *    mỗi phút. Với 1000 session idle, chỉ xoá đúng 1000 entry.
+   */
   async function revokeIdleSessions(idleTimeoutMinutes = 30, reason = 'IDLE_TIMEOUT') {
     const pool = await getPool();
     const r = await pool.request()
@@ -328,22 +370,37 @@ module.exports = function createSessionModule({
         SET revoked = 1,
             revoked_at = GETDATE(),
             revoked_reason = @reason
+        OUTPUT INSERTED.token
         WHERE revoked = 0
           AND expires_at > GETDATE()
           AND last_seen_at < DATEADD(MINUTE, -@timeout, GETDATE());
-        SELECT @@ROWCOUNT AS n;
       `);
-    const count = r.recordset[0]?.n || 0;
+
+    const count = r.recordset.length;
+    for (const row of r.recordset) {
+      const tok = String(row.token || '').trim().toLowerCase();
+      if (tok) cache.delete(tok);
+    }
+
     if (count > 0) {
       console.log(`[Session] 🔒 Auto-revoked ${count} session(s) idle > ${idleTimeoutMinutes} phút`);
-      cache.clear();
     }
+
     return count;
   }
 
-
   function invalidateTokenCache(token) {
     cache.delete(hashToken(token));
+  }
+
+  /**
+   * ⚠️ Bulk cache invalidation — CHỈ dùng khi không thể biết trước token
+   * (vd: emergency purge, migration, sự cố bảo mật toàn hệ thống).
+   * KHÔNG dùng trong logout / kill-by-id / idle-revoke vì đã targeted delete.
+   */
+  function invalidateAllCache() {
+    cache.clear();
+    lastGlobalInvalidation = Date.now();
   }
 
   return {
@@ -356,7 +413,8 @@ module.exports = function createSessionModule({
     listActiveSessions,
     revokeIdleSessions,
     invalidateTokenCache,
+    invalidateAllCache,
     // ✅ Export helpers để test
-    _helpers: { ipType, isSameSubnet24 },
+    _helpers: { ipType, isSameSubnet24, classifyIpChange },
   };
 };

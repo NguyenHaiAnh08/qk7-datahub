@@ -1,14 +1,34 @@
 /**
- * approval-workflow.js — Nguyên tắc 4 mắt cho hành động nguy hiểm
+ * approval-workflow.js — Nguyên tắc 4 mắt cho hành động nguy hiểm.
+ * Hỗ trợ STRICT_APPROVAL để chặn fail-open cho route write chưa khai báo quyền.
  */
-
-const fs = require('fs');
-const path = require('path');
 
 const PROTECTED_ADMIN_USER_ID = process.env.PROTECTED_ADMIN_USER_ID || 'USR-001';
 const PROTECTED_ADMIN_ROLE_ID = process.env.PROTECTED_ADMIN_ROLE_ID || 'ROL-01';
 
-// Route KHÔNG áp dụng duyệt
+// 'false' | 'dry-run' | 'true'
+const STRICT_MODE = (process.env.STRICT_APPROVAL || 'false').toLowerCase();
+const STRICT_APPROVAL = STRICT_MODE === 'true' || STRICT_MODE === 'dry-run';
+const STRICT_DRY_RUN = STRICT_MODE === 'dry-run';
+
+// Danh sách route được miễn strict (regex). VD: /api/guest/,/api/security/screenshot-alert
+const STRICT_ALLOWLIST = (process.env.STRICT_APPROVAL_ALLOWLIST || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((pattern) => {
+    try {
+      return new RegExp(pattern);
+    } catch (err) {
+      console.error(
+        `[approval] STRICT_APPROVAL_ALLOWLIST pattern không hợp lệ: "${pattern}" — ${err.message}`
+      );
+      return null;
+    }
+  })
+  .filter(Boolean);
+
+// Route không áp dụng duyệt
 const EXCLUDED_PATHS = [
   /^\/api\/admin\/approval-requests/,
   /^\/api\/admin\/protected-permissions/,
@@ -20,8 +40,8 @@ const EXCLUDED_PATHS = [
 // Path có handler execute riêng sau khi được duyệt
 const LECTURE_UPLOAD_PATH = /^\/api\/lectures\/upload-scorm$/;
 
-module.exports = function createApprovalWorkflow({ 
-  sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission 
+module.exports = function createApprovalWorkflow({
+  sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission,
 }) {
   let protectedSet = new Set();
   let codeToIdMap = new Map();
@@ -71,22 +91,18 @@ module.exports = function createApprovalWorkflow({
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Trích lecture_id để handler execute biết cập nhật bản ghi nào
-  // ─────────────────────────────────────────────────────────────
+  // Trích lecture_id từ body / query / target_summary
   function extractLectureId(request) {
     if (!request) throw new Error('extractLectureId: request rỗng');
 
-    // 1. http_body JSON (trường hợp JSON payload có lecture_id)
     if (request.http_body) {
       try {
         const body = JSON.parse(request.http_body);
         const id = body.lecture_id || body.lectureId;
         if (id) return id;
-      } catch { /* body không phải JSON — bỏ qua */ }
+      } catch { /* body không phải JSON */ }
     }
 
-    // 2. Query string trong http_path: /api/lectures/upload-scorm?lecture_id=...
     const qs = (request.http_path || '').split('?')[1] || '';
     if (qs) {
       const params = new URLSearchParams(qs);
@@ -94,7 +110,6 @@ module.exports = function createApprovalWorkflow({
       if (id) return id;
     }
 
-    // 3. target_summary dạng: "POST /api/lectures/upload-scorm lecture_id=LEC-xxx"
     const m = /lecture_id=([A-Za-z0-9_\-]+)/.exec(request.target_summary || '');
     if (m) return m[1];
 
@@ -103,15 +118,9 @@ module.exports = function createApprovalWorkflow({
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Execute sau khi DUYỆT: giải nén SCORM → PUBLISHED, xoá zip tạm
-  // ─────────────────────────────────────────────────────────────
-    async function executeLectureUpload(request, deps = {}) {
-    const {
-      getPool: gp = getPool,
-      sql: _sql = sql,
-    } = deps;
-
+  // Execute sau khi duyệt: giải nén SCORM → PUBLISHED, xoá ZIP tạm
+  async function executeLectureUpload(request, deps = {}) {
+    const { getPool: gp = getPool, sql: _sql = sql } = deps;
     const lectureId = extractLectureId(request);
     const pool = await gp();
 
@@ -133,19 +142,14 @@ module.exports = function createApprovalWorkflow({
       );
     }
 
-    // ✅ Gọi extractAndParse theo signature MỚI (object argument).
-    // Helper tự resolve thư mục đích từ title + createdAt + lectureId,
-    // tự giải nén, tự xoá ZIP tạm.
     const { extractAndParse } = require('./lecture-package-helper');
     const out = await extractAndParse({
       lectureId,
       pendingPath: lecture.pending_scorm_path,
-      title:       lecture.title,
-      createdAt:   lecture.created_at,
+      title: lecture.title,
+      createdAt: lecture.created_at,
     });
 
-    // ✅ out.entry_point đã là relPath đầy đủ:
-    //    uploads/bai-giang-so/YYYY/MM/<Ten_Bai_Giang>_<MaLecture>/index.html
     await pool.request()
       .input('id', _sql.VarChar(50), lectureId)
       .input('launch', _sql.NVarChar(500), out.entry_point)
@@ -168,9 +172,7 @@ module.exports = function createApprovalWorkflow({
     };
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Reject sau khi TỪ CHỐI: đánh dấu REJECTED, lưu lý do
-  // ─────────────────────────────────────────────────────────────
+  // Reject sau khi từ chối: đánh dấu REJECTED, lưu lý do
   async function rejectLectureUpload(request, reason, deps = {}) {
     const { getPool: gp = getPool, sql: _sql = sql } = deps;
     const lectureId = extractLectureId(request);
@@ -190,15 +192,13 @@ module.exports = function createApprovalWorkflow({
     return { lectureId, status: 'REJECTED' };
   }
 
-  // ─────────────────────────────────────────────────────────────
   // Dispatcher cho admin approve/reject endpoint
-  // ─────────────────────────────────────────────────────────────
   async function executeApprovedRequest(request, deps = {}) {
     const p = (request.http_path || '').split('?')[0];
     if (LECTURE_UPLOAD_PATH.test(p)) {
       return executeLectureUpload(request, deps);
     }
-    return null; // không có handler riêng — admin endpoint tự đánh dấu EXECUTED
+    return null;
   }
 
   async function rejectApprovedRequest(request, reason, deps = {}) {
@@ -213,9 +213,10 @@ module.exports = function createApprovalWorkflow({
     if (!['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) return next();
 
     const fullPath = (req.originalUrl || req.url || '').split('?')[0];
-    if (EXCLUDED_PATHS.some(rx => rx.test(fullPath))) return next();
+    if (EXCLUDED_PATHS.some((rx) => rx.test(fullPath))) return next();
     if (isProtectedAdmin(req.user)) return next();
 
+    // Cho phép thực thi lại request đã được duyệt (mã override)
     const overrideId = req.headers['x-approval-override'];
     if (overrideId) {
       try {
@@ -229,19 +230,53 @@ module.exports = function createApprovalWorkflow({
             .query(`UPDATE APPROVAL_REQUEST SET status='EXECUTING', executed_at=GETDATE() WHERE request_id=@rid`);
           return next();
         }
-      } catch (err) { console.error('[approval] override:', err.message); }
+      } catch (err) {
+        console.error('[approval] override:', err.message);
+      }
       return res.status(403).json({ error: 'Mã phê duyệt không hợp lệ hoặc đã dùng' });
     }
 
     const requiredPerm = getAutoRequiredPermission(req.method, fullPath);
-    if (!requiredPerm) return next();
+
+    // Route write không có trong AUTO_PERMISSIONS → chặn hoặc cảnh báo tùy STRICT_MODE
+    if (!requiredPerm) {
+      if (!STRICT_APPROVAL) return next();
+
+      if (STRICT_ALLOWLIST.some((rx) => rx.test(fullPath))) return next();
+
+      const userId = req.user?.user_id || 'ANONYMOUS';
+      const tag = STRICT_DRY_RUN ? 'STRICT-DRY' : 'STRICT';
+      console.warn(
+        `[approval][${tag}] ⛔ Route write chưa khai báo AUTO_PERMISSIONS: ` +
+        `${req.method} ${fullPath} (user=${userId}, ip=${getClientIp(req)})`
+      );
+
+      writeAccessLog({
+        userId: req.user?.user_id || null,
+        fileId: null,
+        action: STRICT_DRY_RUN ? 'APPROVAL_STRICT_WOULD_BLOCK' : 'APPROVAL_STRICT_BLOCKED',
+        ip: getClientIp(req),
+        note: `Route chưa khai báo quyền: ${req.method} ${fullPath}`,
+      }).catch(() => {});
+
+      if (STRICT_DRY_RUN) return next();
+
+      return res.status(403).json({
+        error:
+          'Thao tác bị chặn: Route chưa được khai báo quyền trong hệ thống. ' +
+          'Liên hệ Quản trị viên để bổ sung vào AUTO_PERMISSIONS hoặc STRICT_APPROVAL_ALLOWLIST.',
+        code: 'ROUTE_NOT_REGISTERED',
+        method: req.method,
+        path: fullPath,
+      });
+    }
 
     const protectedList = await loadProtectedPermissions();
     if (!protectedList.has(requiredPerm)) return next();
 
     const permId = codeToIdMap.get(requiredPerm) || requiredPerm;
 
-    // ─── Ghi lecture_id (nếu có) vào target_summary để execute giải nén đúng ───
+    // Ghi lecture_id (nếu có) để execute handler giải nén đúng bài giảng
     const lectureIdHint =
       req.lectureId ||
       (req.res && req.res.locals && req.res.locals.lectureId) ||
@@ -274,12 +309,12 @@ module.exports = function createApprovalWorkflow({
         .input('summary', sql.NVarChar(500), targetSummary)
         .input('status', sql.VarChar(20), 'PENDING')
         .query(`
-          INSERT INTO APPROVAL_REQUEST 
+          INSERT INTO APPROVAL_REQUEST
           (request_id, requester_id, requester_unit_id, required_permission, http_method, http_path, http_body, target_summary, status)
           VALUES (@rid, @uid, @req_unit, @perm, @method, @path, @body, @summary, @status)
         `);
 
-      // Chỉ ghi ACCESS_LOG cho tài liệu/admin, KHÔNG ghi cho bài giảng (uploads SCORM)
+      // Không ghi ACCESS_LOG cho bài giảng để tránh nhiễu
       if (!fullPath.startsWith('/api/lectures/')) {
         await writeAccessLog({
           userId: req.user.user_id, fileId: null, action: 'APPROVAL_REQUESTED',
@@ -298,6 +333,24 @@ module.exports = function createApprovalWorkflow({
       console.error('[approval] create:', err.message);
       return res.status(500).json({ error: 'Không thể tạo yêu cầu phê duyệt' });
     }
+  }
+
+  // Log mode strict khi khởi động để vận hành xác nhận
+  if (STRICT_APPROVAL) {
+    console.log(
+      `[approval] 🔒 STRICT_APPROVAL=${STRICT_DRY_RUN ? 'DRY-RUN' : 'ON'} — ` +
+      `route write chưa khai báo AUTO_PERMISSIONS sẽ ` +
+      `${STRICT_DRY_RUN ? 'bị LOG (vẫn cho qua)' : 'bị 403'}. ` +
+      `Allowlist: ${STRICT_ALLOWLIST.length} pattern(s)` +
+      (STRICT_ALLOWLIST.length === 0 && !STRICT_DRY_RUN
+        ? ' ⚠️  (rỗng — mọi route chưa khai báo sẽ bị chặn)'
+        : '')
+    );
+  } else {
+    console.log(
+      '[approval] ⚠️  STRICT_APPROVAL=OFF — route write chưa khai báo AUTO_PERMISSIONS sẽ BYPASS. ' +
+      'Bật STRICT_APPROVAL=dry-run ở staging để thu thập inventory trước khi bật true.'
+    );
   }
 
   return {

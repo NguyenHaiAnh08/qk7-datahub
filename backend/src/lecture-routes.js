@@ -698,7 +698,10 @@ module.exports = function createLectureRoutes({
         }
         try {
           const jwt = require('jsonwebtoken');
-          const JWT_SECRET = process.env.JWT_SECRET || 'QK7-DEV-SECRET-CHANGE-IN-PROD-XXX';
+          const JWT_SECRET = process.env.JWT_SECRET;
+          if (!JWT_SECRET || JWT_SECRET.length < 32) {
+            throw new Error('[FATAL] JWT_SECRET missing or < 32 chars');
+          }
           const decoded = jwt.verify(fpToken, JWT_SECRET);
           if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
 

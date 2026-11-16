@@ -63,6 +63,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [showScanModal, setShowScanModal] = useState(false);
   const modalContainerRef = React.useRef<HTMLDivElement>(null);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  // 📍 Lưu vị trí cuộn trang để khôi phục chính xác 100% khi đóng xem tài liệu, chống nhảy lên đầu trang
+  const savedScrollYRef = React.useRef<number>(0);
 
   // 🖊️ Bút dạ quang ghi chú (Hỗ trợ toàn diện từ Cấp 1 đến Cấp 5)
   const [isHighlighterActive, setIsHighlighterActive] = useState<boolean>(false);
@@ -82,16 +84,55 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const canDownload = !document || (docLevel <= 2 && docLevel <= clearanceLevel);
   const isSecretLevel = docLevel >= 3;
 
-  // 🔒 Khóa cuộn trang web cha (document-desk) để loại bỏ 100% thanh cuộn kép (double scrollbar)
+  // 🖥️ Tự động kích hoạt chế độ Toàn màn hình (Fullscreen) đồng nhất cho toàn hệ thống
   useEffect(() => {
     if (!open || typeof window === 'undefined') return;
+    try {
+      if (!window.document.fullscreenElement) {
+        const targetElem = modalContainerRef.current || window.document.documentElement;
+        if (targetElem && targetElem.requestFullscreen) {
+          targetElem.requestFullscreen().catch(() => {
+            window.document.documentElement.requestFullscreen().catch(() => {});
+          });
+        }
+      }
+    } catch (_) {}
+  }, [open]);
+
+  // 🔒 Khóa cuộn trang web cha và bảo toàn vị trí cuộn ban đầu (Chống tuyệt đối nhảy lên đầu trang khi đóng)
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+    // Ghi nhớ chính xác tọa độ cuộn trước khi mở modal
+    const currentScrollY =
+      window.scrollY ||
+      window.pageYOffset ||
+      window.document.documentElement.scrollTop ||
+      window.document.body.scrollTop ||
+      0;
+    savedScrollYRef.current = currentScrollY;
+
+    // Khóa cuộn trang web cha để triệt tiêu tuyệt đối thanh cuộn kép và cuộn xuyên tầng
     const prevBodyOverflow = window.document.body.style.overflow;
     const prevHtmlOverflow = window.document.documentElement.style.overflow;
     window.document.body.style.overflow = 'hidden';
     window.document.documentElement.style.overflow = 'hidden';
+
     return () => {
       window.document.body.style.overflow = prevBodyOverflow;
       window.document.documentElement.style.overflow = prevHtmlOverflow;
+      // Khôi phục chính xác vị trí cuộn cho người dùng
+      const targetY = savedScrollYRef.current;
+      if (targetY > 0 && typeof window !== 'undefined') {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+        });
+        setTimeout(() => {
+          window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+        }, 50);
+        setTimeout(() => {
+          window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+        }, 180);
+      }
     };
   }, [open]);
 
@@ -336,6 +377,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   };
 
   const handleClose = () => {
+    const targetY = savedScrollYRef.current;
     setShowScanModal(false);
     clearBiometricSession();
     setIsHighlighterActive(false);
@@ -349,6 +391,19 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       }
     } catch (_) {}
     onClose();
+
+    // 📍 Đảm bảo khôi phục vị trí cuộn trang chính xác ngay khi đóng
+    if (targetY > 0 && typeof window !== 'undefined') {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+      });
+      setTimeout(() => {
+        window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+      }, 50);
+      setTimeout(() => {
+        window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+      }, 180);
+    }
   };
 
   return (
@@ -356,7 +411,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       <div
         key="preview-backdrop"
         ref={modalContainerRef}
-        className={`fixed inset-0 z-50 flex flex-col w-screen h-screen bg-white dark:bg-slate-900 overflow-hidden ${
+        className={`fixed inset-0 z-[70] flex flex-col w-full h-full bg-white dark:bg-slate-900 overflow-hidden overscroll-contain ${
           isSecretLevel ? 'select-none' : 'select-text'
         }`}
       >
@@ -558,6 +613,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 <PdfPagesViewer
                   blobUrl={blobUrl}
                   fileId={document.file_id}
+                  initialPage={page}
                   securityLevel={docLevel}
                   isHighlighterActive={isHighlighterActive}
                   highlighterColor={highlighterColor}

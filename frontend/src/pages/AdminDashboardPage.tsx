@@ -44,6 +44,7 @@ import {
   ChevronUp,
   Database,
   Fingerprint,
+  Sparkles,
 } from 'lucide-react';
 
 import { TrashPage } from './TrashPage';
@@ -337,6 +338,15 @@ export const AdminDashboardPage: React.FC = () => {
     published: number;
     pending: number;
     draft: number;
+    liveSchedulesCount: number;
+    liveStudentsCount: number;
+    liveVenueName?: string;
+    subjectsCount: number;
+    classesCount: number;
+    venuesCount: number;
+    scormCount: number;
+    secretCount: number;
+    readinessRate: number;
   } | null>(null);
   const [loadingLectureStats, setLoadingLectureStats] = useState(false);
   const [isDataSectionExpanded, setIsDataSectionExpanded] = useState(true);
@@ -556,18 +566,64 @@ const pinPendingCount = useMemo(
   const loadLectureStats = async () => {
     setLoadingLectureStats(true);
     try {
-      const res = await lectureService.list();
-      const items = res?.items || [];
+      const [lecturesRes, liveRes, subjectsRes, classesRes, venuesRes] = await Promise.allSettled([
+        lectureService.list(),
+        lectureService.getLiveSchedules(),
+        lectureService.getSubjects(),
+        lectureService.getClasses(),
+        lectureService.getVenues(),
+      ]);
+
+      const items = lecturesRes.status === 'fulfilled' ? lecturesRes.value?.items || [] : [];
       const active = items.filter((l: any) => l.status !== 'DELETED');
+      const total = active.length;
+      const published = active.filter((l: any) => l.status === 'PUBLISHED').length;
+      const pending = active.filter((l: any) => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length;
+      const draft = active.filter((l: any) => l.status === 'DRAFT' || l.status === 'REJECTED').length;
+      const scormCount = active.filter((l: any) => Boolean(l.scorm_entry_point || l.content_type === 'SCORM')).length;
+      const secretCount = active.filter((l: any) => (l.security_level_id || 1) >= 3).length;
+      const readinessRate = total > 0 ? Math.round((published / total) * 100) : 0;
+
+      const liveItems = liveRes.status === 'fulfilled' ? liveRes.value?.items || [] : [];
+      const liveSchedulesCount = liveItems.length;
+      const liveStudentsCount = liveItems.reduce((acc: number, curr: any) => acc + (curr.student_count || 0), 0);
+      const liveVenueName = liveItems.length > 0 ? (liveItems[0].venue_name || liveItems[0].class_name) : undefined;
+
+      const subjectsCount = subjectsRes.status === 'fulfilled' ? (subjectsRes.value || []).length : 0;
+      const classesCount = classesRes.status === 'fulfilled' ? (classesRes.value || []).length : 0;
+      const venuesCount = venuesRes.status === 'fulfilled' ? (venuesRes.value || []).length : 0;
+
       setLectureStats({
-        total: active.length,
-        published: active.filter((l: any) => l.status === 'PUBLISHED').length,
-        pending: active.filter((l: any) => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length,
-        draft: active.filter((l: any) => l.status === 'DRAFT' || l.status === 'REJECTED').length,
+        total,
+        published,
+        pending,
+        draft,
+        liveSchedulesCount,
+        liveStudentsCount,
+        liveVenueName,
+        subjectsCount,
+        classesCount,
+        venuesCount,
+        scormCount,
+        secretCount,
+        readinessRate,
       });
     } catch (err: any) {
       console.warn('Không thể nạp thống kê bài giảng số:', err);
-      setLectureStats({ total: 0, published: 0, pending: 0, draft: 0 });
+      setLectureStats({
+        total: 0,
+        published: 0,
+        pending: 0,
+        draft: 0,
+        liveSchedulesCount: 0,
+        liveStudentsCount: 0,
+        subjectsCount: 0,
+        classesCount: 0,
+        venuesCount: 0,
+        scormCount: 0,
+        secretCount: 0,
+        readinessRate: 0,
+      });
     } finally {
       setLoadingLectureStats(false);
     }
@@ -1218,68 +1274,180 @@ const pinPendingCount = useMemo(
 
                 {/* Nội dung Khung Bài giảng số */}
                 {isLectureSectionExpanded ? (
-                  <div className={
-                    isIPadLandscape
-                      ? 'grid grid-cols-4 gap-3 animate-in fade-in duration-200'
-                      : isIPadPortrait
-                        ? 'grid grid-cols-2 gap-3 animate-in fade-in duration-200'
-                        : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4 animate-in fade-in duration-200'
-                  }>
-                    <StatCard
-                      label="Tổng số bài giảng"
-                      loading={loadingLectureStats || !lectureStats}
-                      value={lectureStats?.total ?? "—"}
-                      icon={<BookOpen className="w-6 h-6" />}
-                      color="blue"
-                      subtext="Toàn bộ phân hệ quản lý"
-                      delay={0.0}
-                      refreshKey={overviewRefreshKey}
-                    />
-                    <StatCard
-                      label="Sẵn sàng giảng dạy"
-                      loading={loadingLectureStats || !lectureStats}
-                      value={lectureStats?.published ?? "—"}
-                      icon={<CheckCircle2 className="w-6 h-6" />}
-                      color="emerald"
-                      subtext="Đã xuất bản (Published)"
-                      delay={0.05}
-                      refreshKey={overviewRefreshKey}
-                    />
-                    <StatCard
-                      label="Đang chờ duyệt 2 tầng"
-                      loading={loadingLectureStats || !lectureStats}
-                      value={lectureStats?.pending ?? "—"}
-                      icon={<Clock className="w-6 h-6" />}
-                      color="amber"
-                      subtext="Cấp Khoa & BGH phê duyệt"
-                      delay={0.1}
-                      refreshKey={overviewRefreshKey}
-                    />
-                    <StatCard
-                      label="Bản nháp / Cần sửa"
-                      loading={loadingLectureStats || !lectureStats}
-                      value={lectureStats?.draft ?? "—"}
-                      icon={<FileText className="w-6 h-6" />}
-                      color="purple"
-                      subtext="Đang biên soạn & hoàn thiện"
-                      delay={0.15}
-                      refreshKey={overviewRefreshKey}
-                    />
+                  <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200">
+                    {/* TẦNG 1: TACTICAL LIVE STATUS BAR (Nhịp đập Giảng đường & Tác chiến Số) */}
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-gradient-to-r from-slate-50 via-slate-50/80 to-blue-50/40 dark:from-slate-950/80 dark:via-slate-900/60 dark:to-blue-950/20 border border-slate-200/80 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      {/* Chip 1: Trực chiến Giảng đường (Radar Pulse) */}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {lectureStats && lectureStats.liveSchedulesCount > 0 ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-semibold shrink-0">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                            </span>
+                            <span>ĐANG LÊN LỚP ({lectureStats.liveSchedulesCount})</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-semibold shrink-0">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                            <span>GIẢNG ĐƯỜNG TRỰC CHIẾN</span>
+                          </span>
+                        )}
+                        <span className="text-slate-600 dark:text-slate-300 font-medium truncate text-xs">
+                          {lectureStats && lectureStats.liveSchedulesCount > 0
+                            ? `${lectureStats.liveSchedulesCount} tiết giảng trực tuyến • ${lectureStats.liveStudentsCount} học viên${lectureStats.liveVenueName ? ` (${lectureStats.liveVenueName})` : ''}`
+                            : 'Hệ thống phòng học sẵn sàng nạp phiên giảng dạy mới'}
+                        </span>
+                      </div>
+
+                      {/* Các chỉ số mini tác chiến bên phải */}
+                      <div className="flex items-center gap-3.5 flex-wrap text-[11px] shrink-0 text-slate-500 dark:text-slate-400">
+                        {/* Mini Gauge: Tỷ lệ sẵn sàng */}
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">Sẵn sàng huấn luyện:</span>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-16 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                                style={{ width: `${lectureStats?.readinessRate ?? 0}%` }}
+                              />
+                            </div>
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{lectureStats?.readinessRate ?? 0}%</span>
+                          </div>
+                        </div>
+
+                        <span className="hidden md:inline text-slate-300 dark:text-slate-700">|</span>
+
+                        {/* Chip Giáo án Cấp Mật */}
+                        <div className="flex items-center gap-1.5" title="Giáo án tác chiến Cấp 3 (Mật) & Cấp 4 (Tối Mật) yêu cầu 2FA vân tay">
+                          <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Giáo án Mật:</span>
+                          <b className="font-mono text-slate-800 dark:text-slate-200">{lectureStats?.secretCount ?? 0} bài (2FA)</b>
+                        </div>
+
+                        <span className="hidden md:inline text-slate-300 dark:text-slate-700">|</span>
+
+                        {/* Chip SCORM Tương tác */}
+                        <div className="flex items-center gap-1.5" title="Gói bài giảng điện tử chuẩn SCORM đa phương tiện tương tác">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Gói SCORM:</span>
+                          <b className="font-mono text-slate-800 dark:text-slate-200">{lectureStats?.scormCount ?? 0} tương tác</b>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* TẦNG 2: LƯỚI 6 THẺ KPI TÁC CHIẾN (Bố cục 3 thẻ trên, 3 thẻ dưới) */}
+                    <div className={
+                      isIPadLandscape
+                        ? 'grid grid-cols-3 gap-3 sm:gap-3.5'
+                        : isIPadPortrait
+                          ? 'grid grid-cols-2 sm:grid-cols-3 gap-3'
+                          : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4'
+                    }>
+                      <StatCard
+                        label="Tổng số bài giảng"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.total ?? "—"}
+                        icon={<BookOpen className="w-5 h-5" />}
+                        color="blue"
+                        subtext="Toàn bộ phân hệ quản lý"
+                        delay={0.0}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Sẵn sàng giảng dạy"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.published ?? "—"}
+                        icon={<CheckCircle2 className="w-5 h-5" />}
+                        color="emerald"
+                        subtext="Đã xuất bản (Published)"
+                        delay={0.05}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Đang chờ duyệt 2 tầng"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.pending ?? "—"}
+                        icon={<Clock className="w-5 h-5" />}
+                        color="amber"
+                        subtext="Cấp Khoa & BGH phê duyệt"
+                        delay={0.1}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Bản nháp / Cần sửa"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.draft ?? "—"}
+                        icon={<FileText className="w-5 h-5" />}
+                        color="purple"
+                        subtext="Đang biên soạn & hoàn thiện"
+                        delay={0.15}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Môn học Quân sự"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats?.subjectsCount ?? "—"}
+                        icon={<Award className="w-5 h-5" />}
+                        color="cyan"
+                        subtext="Chương trình đào tạo"
+                        delay={0.2}
+                        refreshKey={overviewRefreshKey}
+                      />
+                      <StatCard
+                        label="Lớp & Giảng đường"
+                        loading={loadingLectureStats || !lectureStats}
+                        value={lectureStats ? `${lectureStats.classesCount} / ${lectureStats.venuesCount}` : "—"}
+                        icon={<Users className="w-5 h-5" />}
+                        color="indigo"
+                        subtext="Lớp đào tạo / Phòng học"
+                        delay={0.25}
+                        refreshKey={overviewRefreshKey}
+                      />
+                    </div>
                   </div>
                 ) : (
-                  <div className="py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-white/[0.04] text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between flex-wrap gap-2">
-                    <span className="font-medium">
-                      Tổng số: <b className="text-slate-800 dark:text-slate-200">{lectureStats?.total ?? '—'}</b> • 
-                      Sẵn sàng: <b className="text-emerald-700 dark:text-emerald-400">{lectureStats?.published ?? '—'}</b> • 
-                      Chờ duyệt: <b className="text-amber-700 dark:text-amber-400">{lectureStats?.pending ?? '—'}</b> • 
-                      Bản nháp: <b className="text-purple-700 dark:text-purple-400">{lectureStats?.draft ?? '—'}</b>
-                    </span>
+                  <div className="py-2.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-white/[0.04] text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between flex-wrap gap-2.5">
+                    <div className="flex items-center gap-2 flex-wrap font-medium">
+                      <span>
+                        Tổng số: <b className="text-slate-800 dark:text-slate-200 font-mono">{lectureStats?.total ?? '—'}</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Sẵn sàng: <b className="text-emerald-700 dark:text-emerald-400 font-mono">{lectureStats?.published ?? '—'} ({lectureStats?.readinessRate ?? 0}%)</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Chờ duyệt: <b className="text-amber-700 dark:text-amber-400 font-mono">{lectureStats?.pending ?? '—'}</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Bản nháp: <b className="text-purple-700 dark:text-purple-400 font-mono">{lectureStats?.draft ?? '—'}</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Môn học: <b className="text-cyan-700 dark:text-cyan-400 font-mono">{lectureStats?.subjectsCount ?? '—'}</b>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Lớp/Phòng: <b className="text-indigo-700 dark:text-indigo-400 font-mono">{lectureStats?.classesCount ?? '—'}/{lectureStats?.venuesCount ?? '—'}</b>
+                      </span>
+                      {lectureStats && lectureStats.liveSchedulesCount > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                            Đang lên lớp: {lectureStats.liveSchedulesCount}
+                          </span>
+                        </>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setIsLectureSectionExpanded(true)}
-                      className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                      className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer select-none"
                     >
-                      Bấm để xem chi tiết
+                      Mở rộng bảng chỉ số HUD →
                     </button>
                   </div>
                 )}

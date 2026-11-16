@@ -489,7 +489,7 @@ export const AIChatWidget: React.FC = () => {
           </div>
 
           {/* DANH SÁCH TIN NHẮN */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3.5 scrollbar-thin">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -510,8 +510,8 @@ export const AIChatWidget: React.FC = () => {
                     }
                   `}
                 >
-                  {/* Nội dung tin nhắn (hỗ trợ markdown đơn giản) */}
-                  <div className="whitespace-pre-wrap font-sans">
+                  {/* Nội dung tin nhắn (hỗ trợ markdown đơn giản, tương phản cao cho người dùng) */}
+                  <div className={`whitespace-pre-wrap font-sans ${msg.sender === 'user' ? '!text-white font-medium select-text' : ''}`}>
                     {msg.text.split('\n').map((line, lIdx) => (
                       <p key={lIdx} className={lIdx > 0 ? 'mt-1.5' : ''}>
                         {renderFormattedText(line)}
@@ -728,16 +728,23 @@ export const AIChatWidget: React.FC = () => {
                 }
               `}
             >
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSend();
+                onChange={(e) => {
+                  setInputText(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`;
                 }}
-                placeholder="Tra cứu văn thư hoặc hỏi đáp tác chiến..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Tra cứu văn thư hoặc hỏi đáp tác chiến... (Shift+Enter để xuống dòng)"
                 className={`
-                  flex-1 bg-transparent text-xs focus:outline-none px-1
+                  flex-1 bg-transparent text-xs focus:outline-none px-1 resize-none max-h-[100px] py-1.5 scrollbar-thin
                   ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}
                 `}
                 disabled={loading}
@@ -747,7 +754,7 @@ export const AIChatWidget: React.FC = () => {
                 onClick={() => handleSend()}
                 disabled={loading || !inputText.trim()}
                 className={`
-                  w-8 h-8 rounded-full flex items-center justify-center text-white transition-all
+                  w-8 h-8 rounded-full flex items-center justify-center text-white transition-all shrink-0 mb-0.5
                   ${
                     inputText.trim() && !loading
                       ? 'bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] active:scale-95 shadow-sm border border-amber-500/30'

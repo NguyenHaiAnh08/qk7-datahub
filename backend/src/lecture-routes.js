@@ -857,13 +857,13 @@ module.exports = function createLectureRoutes({
     }
   });
 
-  // API Buộc kết thúc (Dành cho Chỉ huy/Admin xử lý ca treo của người khác)
+  // API Buộc kết thúc (Dành cho Quản trị viên Admin kết thúc ca tại phòng giám sát)
   router.post('/schedules/:id/force-end', requireAuth, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
-      if (!roles.includes('ROL-01') && !roles.includes('ROL-02') && !roles.includes('ROL-06')) {
-        return res.status(403).json({ error: 'Chỉ Chỉ huy/Admin mới có quyền buộc kết thúc ca của người khác.' });
+      if (!roles.includes('ROL-01')) {
+        return res.status(403).json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền kết thúc ca tại phòng giám sát.' });
       }
 
       const result = await endScheduleInternal({
@@ -873,7 +873,7 @@ module.exports = function createLectureRoutes({
       });
 
       await logAudit(req, 'SCHEDULE_FORCE_END',
-        `Chỉ huy/Admin buộc kết thúc ca ${result.schedule_id} (${result.duration_minutes} phút)`);
+        `Quản trị viên (Admin) kết thúc ca ${result.schedule_id} (${result.duration_minutes} phút)`);
       res.json({ success: true, ...result });
     } catch (err) {
       if (err.code === 'NOT_FOUND') return res.status(404).json({ error: err.message });

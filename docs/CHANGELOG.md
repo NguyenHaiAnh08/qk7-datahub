@@ -4,6 +4,26 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.6.5-ai-chat-drawer-pdf-viewer-and-admin-stats-upgrade] — 2026-11-16
+
+### 1. Nâng Cấp Toàn Diện Ngăn Trợ Lý AI RAG (AI Chat Drawer Suite)
+- **Giao diện Ngăn kéo AI Chat ([`AIChatDrawer.tsx`](../frontend/src/components/ai-chat/AIChatDrawer.tsx) & [`AIChatWidget.tsx`](../frontend/src/components/ai-chat/AIChatWidget.tsx)):**
+  - Mở rộng trải nghiệm ngăn kéo tương tác trượt từ mép màn hình, phân chia khu vực điều khiển thông minh, hiển thị nguồn tài liệu trích dẫn kèm số trang chi tiết.
+  - Tối ưu hóa hiệu năng render hội thoại trực tiếp và hiệu ứng chuyển động Anti-AI-Slop.
+- **Dịch vụ Hậu tầng Trí tuệ Nhân tạo:**
+  - Đồng bộ cập nhật [`boxchat/core/agent_tutor.py`](../boxchat/core/agent_tutor.py) và [`backend/src/ai-routes.js`](../backend/src/ai-routes.js), bảo đảm lọc dữ liệu theo cấp độ bảo mật nghiêm ngặt.
+
+### 2. Tối Ưu Hóa Trình Đọc PDF & Xem Trước Văn Bản Bảo Mật
+- **Trình đọc trang PDF nâng cao ([`PdfPagesViewer.tsx`](../frontend/src/components/document-desk/PdfPagesViewer.tsx) & [`DocumentPreviewModal.tsx`](../frontend/src/components/document-desk/DocumentPreviewModal.tsx)):**
+  - Tích hợp cuộn mượt và lazy-render trang tài liệu bảo mật, tối ưu hóa kích thước hiển thị và tích hợp cơ chế chống chụp màn hình.
+  - Tinh chỉnh hiển thị thẻ tài liệu [`DocumentCard.tsx`](../frontend/src/components/portal/DocumentCard.tsx) trên Cổng thông tin số.
+
+### 3. Tinh Chỉnh Chỉ Số Bảng Điều Khiển Quản Trị & Giám Sát Giảng Dạy
+- Hoàn thiện thẻ chỉ số [`StatCard.tsx`](../frontend/src/components/dashboard/StatCard.tsx) và giao diện tổng quan [`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx).
+- Tinh chỉnh giao diện bảng điều khiển giám sát giảng dạy thời gian thực [`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx) và [`Header.tsx`](../frontend/src/components/common/Header.tsx).
+
+---
+
 ## [v1.6.4-admin-dashboard-catalogs-and-theme-enhancements] — 2026-11-15
 
 ### 1. Nâng Cấp Bảng Điều Khiển Chỉ Huy & Quản Trị Hệ Thống (Admin Dashboard Suite)

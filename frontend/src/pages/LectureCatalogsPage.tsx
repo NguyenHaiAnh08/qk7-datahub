@@ -173,7 +173,7 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
     setForm({
       active: true,
       security_level_id: 2,
-      course_year: new Date().getFullYear(),
+      course_year: '',
       room_type: 'LECTURE_HALL',
     });
     setModalOpen(true);
@@ -676,8 +676,6 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
                           <option value={1}>Cấp 1 - Công khai</option>
                           <option value={2}>Cấp 2 - Nội bộ</option>
                           <option value={3}>Cấp 3 - Mật</option>
-                          <option value={4}>Cấp 4 - Tối Mật</option>
-                          <option value={5}>Cấp 5 - Tuyệt Mật</option>
                         </select>
                       </div>
                       <div className="sm:col-span-2">
@@ -724,10 +722,10 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
                       />
                       <FormInput
                         label="Khóa đào tạo"
-                        type="number"
+                        type="text"
                         value={form.course_year || ''}
-                        onChange={(val) => setForm({ ...form, course_year: Number(val) || null })}
-                        placeholder="VD: 2026"
+                        onChange={(val) => setForm({ ...form, course_year: val })}
+                        placeholder="Ví dụ 2026 hoặc K21"
                         icon={Calendar}
                       />
                       <div className="sm:col-span-2">

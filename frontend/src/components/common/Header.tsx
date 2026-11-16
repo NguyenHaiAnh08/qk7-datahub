@@ -824,8 +824,8 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 shadow-sm ring-2 ring-emerald-500/20'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-500/40'
               }`}
-              title="Trợ lý AI - Dữ liệu Số Quân Khu 7"
-              aria-label="Mở Trợ lý AI Dữ liệu Số Quân Khu 7"
+              title="Trợ lý AI - Trung Tâm dữ liệu số"
+              aria-label="Mở Trợ lý AI - Trung Tâm dữ liệu số"
             >
               <Bot className="w-4 h-4 text-emerald-600 dark:text-emerald-400 transition-transform duration-200 hover:scale-110" />
               <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
@@ -1005,8 +1005,8 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 shadow-sm ring-2 ring-emerald-500/20'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-500/40'
               }`}
-              title="Trợ lý AI - Dữ liệu Số Quân Khu 7"
-              aria-label="Mở Trợ lý AI Dữ liệu Số Quân Khu 7"
+              title="Trợ lý AI - Trung Tâm dữ liệu số"
+              aria-label="Mở Trợ lý AI - Trung Tâm dữ liệu số"
             >
               <Bot className="w-4 h-4 text-emerald-600 dark:text-emerald-400 transition-transform duration-200 hover:scale-110" />
               <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">

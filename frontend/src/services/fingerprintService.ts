@@ -36,15 +36,15 @@ export interface EnrollStatusResponse {
   state: string;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Local Agent URLs — phần cứng ZKTeco ZK9500 giao tiếp qua agent loopback (127.0.0.1:9001)
-// Tự động thích ứng giao thức (HTTP/HTTPS) hoặc ghi đè qua biến môi trường VITE_FINGERPRINT_AGENT_URL
-// ─────────────────────────────────────────────────────────────
+// Local Fingerprint Agent chạy trên loopback (HTTPS nếu có cert, ngược lại HTTP).
+// getLocalDeviceId() tự thử cả https/http; có thể ép bằng VITE_FINGERPRINT_AGENT_URL.
+const AGENT_BASE_OVERRIDE =
+  (import.meta.env.VITE_FINGERPRINT_AGENT_URL as string) || '';
 
-const LOCAL_AGENT_PROTO = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https:' : 'http:';
-const AGENT_BASE = (import.meta.env.VITE_FINGERPRINT_AGENT_URL as string) || `${LOCAL_AGENT_PROTO}//127.0.0.1:9001`;
-const DEVICE_ID_URL = `${AGENT_BASE}/device-id`;
-const ENROLL_STATUS_URL = `${AGENT_BASE}/enroll-status`;
+// Nhớ địa chỉ Local Agent đã phản hồi thành công để lần sau không thử sai giao thức.
+let lastWorkingAgentUrl = '';
+
+
 
 // ─────────────────────────────────────────────────────────────
 // Service
@@ -57,52 +57,100 @@ export const fingerprintService = {
    * - Trên iPad Air M4 (hoặc khi Local Agent chưa bật): Tự động fallback sang Express Gateway (:8000)
    *   gọi /api/admin/fingerprint/agents để lấy máy quét ZK9500 đang trực tuyến tại Server/bàn thuyết trình.
    */
-    async getLocalDeviceId(timeoutMs: number = 1500): Promise<string> {
-    const isIPad =
-      typeof document !== 'undefined' &&
-      (document.documentElement.getAttribute('data-device-mode') === 'ipad' ||
-        (typeof navigator !== 'undefined' &&
-          (navigator.maxTouchPoints >= 2 ||
-            /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
-            (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1))));
 
-    // 1. Thử gọi Local Agent (Máy trạm có cắm ZK9500)
-    if (!isIPad) {
-      try {
-        const res = await Promise.race([
-          fetch(DEVICE_ID_URL, { signal: AbortSignal.timeout(timeoutMs) }),
-          new Promise<Response>((_, reject) =>
-            setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs + 500)
-          ),
-        ]);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.device_id) return data.device_id;
-        }
-      } catch {
-        // Agent offline -> Fallback sang Gateway
-      }
-    }
+async getLocalDeviceId(timeoutMs: number = 2500): Promise<string> {
+  const isHttpsPage =
+    typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-    // 2. Fallback cho iPad hoặc máy trạm không cài Agent
+  const isIPad =
+    typeof document !== 'undefined' &&
+    (
+      document.documentElement.getAttribute('data-device-mode') === 'ipad' ||
+      (
+        typeof navigator !== 'undefined' &&
+        (
+          navigator.maxTouchPoints >= 2 ||
+          /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+          (
+            /Macintosh/i.test(navigator.userAgent) &&
+            navigator.maxTouchPoints > 1
+          )
+        )
+      )
+    );
+
+  const fetchGatewayAgents = async (): Promise<string[]> => {
     try {
-      const serverAgents = await Promise.race([
-        http<{ items: Array<{ device_id: string }> }>(
-          '/api/fingerprint/agents-online',
-          { method: 'GET', skipErrorNotification: true, signal: AbortSignal.timeout(3000) }
-        ),
-        new Promise<{ items: Array<{ device_id: string }> }>((_, reject) =>
-          setTimeout(() => reject(new Error('TIMEOUT')), 3500)
-        ),
-      ]);
+      const res = await http<{ items: Array<{ device_id: string }> }>(
+        '/api/fingerprint/agents-online',
+        {
+          method: 'GET',
+          skipErrorNotification: true,
+          silent: true,
+          signal: AbortSignal.timeout(Math.min(timeoutMs, 3000)),
+        }
+      );
+      return (res?.items ?? [])
+        .map((i) => (typeof i?.device_id === 'string' ? i.device_id.trim() : ''))
+        .filter(Boolean);
+    } catch (error) {
+      console.warn('[Fingerprint] Không lấy được danh sách agent từ Gateway:', error);
+      return [];
+    }
+  };
 
-      if (serverAgents?.items?.length > 0 && serverAgents.items[0].device_id) {
-        return serverAgents.items[0].device_id;
-      }
-    } catch {}
-
+  // iPad/điện thoại không có đầu đọc cục bộ: dùng đầu đọc online tại Server/bàn thuyết trình.
+  if (isIPad) {
+    const agents = await fetchGatewayAgents();
+    if (agents.length > 0) return agents[0];
     throw new Error('AGENT_NOT_RUNNING');
-  },
+  }
+
+  // PC: LUÔN ưu tiên Local Agent của chính máy này (127.0.0.1) để nhiều máy con
+  // cùng kết nối 1 Server mà không bị gán nhầm đầu đọc của máy khác.
+  const override = AGENT_BASE_OVERRIDE.replace(/\/+$/, '');
+  const candidates = Array.from(
+    new Set(
+      [
+        lastWorkingAgentUrl,
+        override,
+        'https://127.0.0.1:9001',
+        ...(isHttpsPage ? [] : ['http://127.0.0.1:9001']),
+      ].filter(Boolean)
+    )
+  );
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(`${url}/device-id`, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(Math.min(timeoutMs, 1500)),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (typeof data?.device_id === 'string' && data.device_id.trim()) {
+        lastWorkingAgentUrl = url;
+        return data.device_id.trim();
+      }
+    } catch (_) {
+      // thử ứng viên tiếp theo
+    }
+  }
+
+  // Fallback: chỉ dùng Gateway khi có DUY NHẤT 1 agent online (tránh chọn nhầm máy khác).
+  const agents = await fetchGatewayAgents();
+  if (agents.length === 1) return agents[0];
+  if (agents.length > 1) {
+    console.warn('[Fingerprint] Có nhiều agent online nhưng Local Agent của máy này không phản hồi.');
+  }
+
+  throw new Error('AGENT_NOT_RUNNING');
+},
+
 
   /**
    * Xác thực vân tay cho 1 file cụ thể.

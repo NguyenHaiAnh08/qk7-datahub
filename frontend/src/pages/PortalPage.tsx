@@ -27,7 +27,7 @@ import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData, Unit } from '../types';
-import { getMainIssuingUnits, getSchoolDepartmentsTree } from '../utils/unitTree';
+import { getMainIssuingUnits, getSchoolDepartmentsTree, isSchoolUnitId, findSchoolUnit } from '../utils/unitTree';
 import { useDebounce } from '../hooks/useDebounce';
 
 const ITEMS_PER_PAGE = 30;
@@ -133,12 +133,13 @@ export const PortalPage: React.FC = () => {
       let queryUnit: string | undefined = undefined;
       let includeChildren: boolean | undefined = undefined;
 
-      if (selectedUnit === 'TQS') {
+      const isSchool = isSchoolUnitId(selectedUnit, meta.units);
+      if (isSchool) {
         if (selectedDepartment) {
           queryUnit = selectedDepartment;
           includeChildren = true;
         } else {
-          queryUnit = 'TQS';
+          queryUnit = selectedUnit;
           includeChildren = true;
         }
       } else if (selectedUnit) {
@@ -174,12 +175,16 @@ export const PortalPage: React.FC = () => {
 
   // Xử lý lọc dữ liệu tương tác từ Radar Tiến Độ Phòng Ban
   const handleSelectDepartmentFromRadar = (unitId: string, isDeptOfTqs: boolean) => {
+    const schoolUnit = findSchoolUnit(meta.units);
+    const schoolId = schoolUnit?.unit_id || 'TQS-QK7';
+    const isSchool = isSchoolUnitId(selectedUnit, meta.units);
+
     if (isDeptOfTqs) {
-      if (selectedDepartment === unitId && selectedUnit === 'TQS') {
+      if (selectedDepartment === unitId && isSchool) {
         setSelectedDepartment('');
         setSelectedUnit('');
       } else {
-        setSelectedUnit('TQS');
+        setSelectedUnit(schoolId);
         setSelectedDepartment(unitId);
       }
     } else {
@@ -445,7 +450,7 @@ export const PortalPage: React.FC = () => {
 
               {/* Col 3: Ô chọn phòng ban (Nằm ở Cột 3 - ĐỐI DIỆN VÀ NẰM NGAY DƯỚI Ô "Đơn vị ban hành") */}
               <div>
-                {selectedUnit === 'TQS' ? (
+                {isSchoolUnitId(selectedUnit, meta.units) ? (
                   <div className="animate-in fade-in duration-200">
                     <select
                       id="portal-department-select"

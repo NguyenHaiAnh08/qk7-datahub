@@ -37,6 +37,9 @@
 29. [Sự cố 29: HuggingFace Hub ngầm gọi mạng kiểm tra cập nhật (phone-home) và timeout khi tải code thực thi từ xa (`trust_remote_code=True`) trong mạng Air-Gapped](#sự-cố-29-huggingface-hub-ngầm-gọi-mạng-kiểm-tra-cập-nhật-phone-home-và-timeout-khi-tải-code-thực-thi-từ-xa-trust_remote_codetrue-trong-mạng-air-gapped)
 30. [Sự cố 30: PaddleOCR tự động kiểm tra phiên bản và truy vấn DNS `paddleocr.bj.bcebos.com` gây lag/treo hoặc văng lỗi trong mạng Air-Gapped/VLAN nội bộ](#sự-cố-30-paddleocr-tự-động-kiểm-tra-phiên-bản-và-truy-vấn-dns-paddleocrbjbceboscom-gây-lagtreo-hoặc-văng-lỗi-trong-mạng-air-gappedvlan-nội-bộ)
 31. [Sự cố 31: Uvicorn OCR Microservice gán cứng lắng nghe loopback `127.0.0.1` gây cô lập máy chủ trong VLAN (`192.168.1.0/24`) và chiến lược điều phối suy luận thích ứng (Adaptive Fallback) bảo đảm SLA < 10s](#sự-cố-31-uvicorn-ocr-microservice-gán-cứng-lắng-nghe-loopback-127001-gây-cô-lập-máy-chủ-trong-vlan-1921681024-và-chiến-lược-điều-phối-suy-luận-thích-ứng-adaptive-fallback-bảo-đảm-sla--10s)
+32. [Sự cố 32: Lỗi Frontend 500 khi kết nối Gateway do lệch cấu hình giao thức HTTP/HTTPS Proxy của Vite Dev Server](#sự-cố-32-lỗi-frontend-500-khi-kết-nối-gateway-do-lệch-cấu-hình-giao-thức-httphttps-proxy-của-vite-dev-server)
+33. [Sự cố 33: Lỗi Gateway 500 khi xác thực 2FA Quản trị viên do thiếu bảng CSDL `ADMIN_2FA_TICKET` và bypass cơ chế kiểm tra vân tay](#sự-cố-33-lỗi-gateway-500-khi-xác-thực-2fa-quản-trị-viên-do-thiếu-bảng-csdl-admin_2fa_ticket-và-bypass-cơ-chế-kiểm-tra-vân-tay)
+34. [Sự cố 34: Lỗi Antigravity IDE báo "customizations failed to load: yaml unmarshal error" do chứa metadata không chuẩn schema](#sự-cố-34-lỗi-antigravity-ide-báo-customizations-failed-to-load-yaml-unmarshal-error-do-chứa-metadata-không-chuẩn-schema)
 
 ---
 
@@ -782,3 +785,78 @@
          )
      ```
      Khi máy chủ có GPU CUDA, hệ thống sử dụng sức mạnh tối đa của `MonkeyOCRv2` để bóc tách cấu trúc biểu bảng phức tạp. Khi chạy trên CPU, hệ thống tự động định tuyến sang `PaddleOCR` (PP-OCRv4), hoàn thành quá trình OCR trong **4.64s** với độ tin cậy **95.4%**, đáp ứng tuyệt đối tiêu chuẩn nghiệp vụ quân sự.
+
+---
+
+### Sự cố 32: Lỗi Frontend 500 khi kết nối Gateway do lệch cấu hình giao thức HTTP/HTTPS Proxy của Vite Dev Server
+
+* **Triệu chứng:**
+  Khi truy cập Frontend qua Vite (`http://localhost:5173`), thực hiện đăng nhập hoặc gọi bất kỳ API nào, trình duyệt báo lỗi:
+  ```text
+  POST http://localhost:5173/api/auth/login 500 (Internal Server Error)
+  [Đăng nhập thất bại]: Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend đang chạy!
+  ```
+  Trong khi console Backend Gateway `:8000` vẫn đang hiển thị hoạt động bình thường trên `https://localhost:8000`.
+
+* **Nguyên nhân gốc rễ:**
+  Khi kích hoạt chế độ HTTPS (`USE_HTTPS=true`), Backend Gateway Express chuyển sang giao thức bảo mật TLS/HTTPS trên cổng `:8000`. Tuy nhiên, cấu hình Vite Dev Server (`frontend/vite.config.ts`) được cấu hình mặc định proxy tới `http://localhost:8000` (HTTP thuần) và chưa bật bỏ qua chứng chỉ số tự ký nội bộ (`secure: false`). Do đó, Vite gặp lỗi bắt tay TLS (TLS Handshake ECONNRESET/EPROTO) và trả về mã lỗi 500 cho trình duyệt.
+
+* **Cách khắc phục triệt để:**
+  Nâng cấp cấu hình proxy trong [`frontend/vite.config.ts`](../../frontend/vite.config.ts):
+  1. Thêm cơ chế tự động đọc cấu hình `USE_HTTPS` từ biến môi trường hoặc tệp `backend/.env`.
+  2. Tự động chuyển đổi `target` sang `https://localhost:8000` (HTTP) và `wss://localhost:8000` (WebSocket) khi backend chạy HTTPS.
+  3. Bật tùy chọn `secure: false` trong cấu hình proxy để cho phép kết nối an toàn với chứng chỉ nội bộ self-signed mà không bị ngắt kết nối.
+
+---
+
+### Sự cố 33: Lỗi Gateway 500 khi xác thực 2FA Quản trị viên do thiếu bảng CSDL `ADMIN_2FA_TICKET` và bypass cơ chế kiểm tra vân tay
+
+* **Triệu chứng:**
+  1. Khi tài khoản quản trị tối cao (`USR-001`) đăng nhập, hệ thống phát sinh lỗi:
+     ```text
+     SQL ERROR: Invalid object name 'ADMIN_2FA_TICKET'
+     ```
+  2. Trước đó, tài khoản `USR-001` khi chưa đăng ký vân tay có thể đăng nhập trực tiếp mà không bị kiểm tra sinh trắc học bắt buộc, vi phạm nghiêm trọng chính sách Zero Trust.
+
+* **Nguyên nhân gốc rễ:**
+  1. Hàm cấp vé xác thực 2FA tạm thời `issueAdmin2FATicket()` trong `backend/server.js` thực hiện ghi vào bảng `ADMIN_2FA_TICKET`, nhưng cơ sở dữ liệu `QK7_ThuVienSo` trên SQL Server chưa được khởi tạo bảng này.
+  2. Logic fallback cũ cho phép người dùng đăng nhập bằng mật khẩu khi chưa có bản ghi vân tay (`has_fingerprint = 0`), tạo ra lỗ hổng bỏ qua 2FA.
+
+* **Cách khắc phục triệt để:**
+  1. Khởi tạo bảng `ADMIN_2FA_TICKET` trong SQL Server với cấu trúc chuẩn:
+     ```sql
+     CREATE TABLE ADMIN_2FA_TICKET (
+       ticket_id NVARCHAR(64) PRIMARY KEY,
+       user_id NVARCHAR(50) NOT NULL,
+       device_id NVARCHAR(100) NULL,
+       ip_address NVARCHAR(50) NULL,
+       expires_at DATETIME2 NOT NULL,
+       used_at DATETIME2 NULL,
+       created_at DATETIME2 DEFAULT SYSUTCDATETIME()
+     );
+     CREATE INDEX IX_ADMIN_2FA_TICKET_user ON ADMIN_2FA_TICKET(user_id);
+     CREATE INDEX IX_ADMIN_2FA_TICKET_expires ON ADMIN_2FA_TICKET(expires_at);
+     ```
+  2. Loại bỏ hoàn toàn logic bypass trong [`backend/server.js`](../../backend/server.js), bắt buộc 100% tài khoản Quản trị viên phải có bản ghi vân tay hợp lệ trong `USER_FINGERPRINT` và phải trải qua bước quét vân tay 2FA (HTTP 202) trước khi cấp JWT.
+
+---
+
+### Sự cố 34: Lỗi Antigravity IDE báo "customizations failed to load: yaml unmarshal error" do chứa metadata không chuẩn schema
+
+* **Triệu chứng:**
+  Khi mở IDE hoặc khởi tạo tác vụ, Antigravity hiển thị cảnh báo đỏ:
+  ```text
+  12 customizations failed to load
+  Skill release-status/SKILL.md failed to parse frontmatter: yaml: line 2: did not find expected key
+  Skill security-advisor/SKILL.md failed to parse frontmatter: yaml: line 2: did not find expected key
+  3 customizations failed to load
+  Skill hec-ovi-ocr-skill/SKILL.md failed to decode frontmatter: yaml: unmarshal errors: line 14: cannot unmarshal !!str `author:...` into workflowparse.SkillMetadataConfig
+  ```
+
+* **Nguyên nhân gốc rễ:**
+  Trình phân tích cú pháp YAML của Antigravity (`workflowparse.SkillMetadataConfig`) yêu cầu cấu trúc frontmatter nghiêm ngặt, chỉ chấp nhận hai trường bắt buộc là `name:` và `description:`. Một số skill bên thứ ba được import từ các hệ thống khác chứa các trường không tương thích như `metadata:`, `author:`, `license:`, `compatibility:`, `allowed-tools:`... gây lỗi giải mã cấu trúc dữ liệu Go.
+
+* **Cách khắc phục triệt để:**
+  Rà soát và chuẩn hóa toàn bộ các tệp `SKILL.md` trong `.agents/skills/`:
+  1. Giữ nguyên trường `name:` và `description:` trong khối YAML Frontmatter chuẩn (`---`).
+  2. Di chuyển toàn bộ các thông tin bổ trợ (tác giả, phiên bản, giấy phép, công cụ cho phép) xuống phần thân Markdown (Body), bảo đảm 100% tuân thủ đặc tả kỹ thuật của Antigravity.

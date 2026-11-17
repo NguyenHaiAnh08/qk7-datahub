@@ -59,7 +59,7 @@ async function getSubtreeUnits(unitId) {
   if (!unitId) return [];
   const pool = await getPool();
   const res = await pool.request()
-    .input('unit_id', sql.VarChar(50), unitId)
+    .input('unit_id', sql.NVarChar(50), unitId)
     .query(`
       WITH Subtree AS (
         SELECT unit_id FROM UNIT WHERE unit_id = @unit_id

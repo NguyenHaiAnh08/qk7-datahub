@@ -97,74 +97,122 @@ def free_port(port: int):
     except Exception as e:
         print(f"[Agent] ⚠️ Lỗi kiểm tra cổng {port}: {e}")
 
+
 def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None):
+    from urllib.parse import urlsplit
+
     free_port(port)
 
     class Handler(http.server.BaseHTTPRequestHandler):
+        def _send_json(self, status_code, data):
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+
+            self.send_response(status_code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_OPTIONS(self):
             self.send_response(204)
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "*")
             self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Access-Control-Max-Age", "600")
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
         def do_GET(self):
-            if self.path == "/device-id":
-                body = json.dumps({"device_id": device_id, "service": "qk7-fingerprint-agent"}).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Private-Network", "true")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-            elif self.path == "/health":
-                body = json.dumps({"ok": True}).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Private-Network", "true")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-            elif self.path == "/enroll-status":
-                status = agent_ref.get_enroll_status() if agent_ref else {
-                    "enrolling": False, "step": 0, "total": 3, "state": "idle"
-                }
-                body = json.dumps(status).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "*")
-                self.send_header("Access-Control-Allow-Private-Network", "true")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-            else:
-                self.send_response(404)
-                self.end_headers()
+            # Bỏ query string để /device-id?test=1 vẫn nhận đúng route.
+            path = urlsplit(self.path).path.rstrip("/") or "/"
 
-        def log_message(self, *args):
+            if path == "/device-id":
+                self._send_json(200, {
+                    "device_id": device_id,
+                    "service": "qk7-fingerprint-agent"
+                })
+
+            elif path == "/health":
+                self._send_json(200, {
+                    "ok": True,
+                    "service": "qk7-fingerprint-agent"
+                })
+
+            elif path == "/enroll-status":
+                status = (
+                    agent_ref.get_enroll_status()
+                    if agent_ref
+                    else {
+                        "enrolling": False,
+                        "step": 0,
+                        "total": 3,
+                        "state": "idle"
+                    }
+                )
+                self._send_json(200, status)
+
+            else:
+                self._send_json(404, {
+                    "error": "NOT_FOUND",
+                    "path": path
+                })
+
+        def log_message(self, format, *args):
             pass
 
     server = None
+
+    cert_file = os.path.join(_HERE, "cert.pem")
+    key_file = os.path.join(_HERE, "private-key.pem")
+    if not os.path.exists(cert_file):
+        cert_file = os.path.join(_HERE, "..", "backend", "certs", "cert.pem")
+        key_file = os.path.join(_HERE, "..", "backend", "certs", "private-key.pem")
+
     for attempt in range(3):
         try:
             free_port(port)
-            server = http.server.HTTPServer((host, port), Handler)
-            t = threading.Thread(target=server.serve_forever, daemon=True)
+            server = http.server.ThreadingHTTPServer((host, port), Handler)
+            is_https = False
+            if os.path.exists(cert_file) and os.path.exists(key_file):
+                try:
+                    ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                    ssl_ctx.load_cert_chain(certfile=cert_file, keyfile=key_file)
+                    server.socket = ssl_ctx.wrap_socket(server.socket, server_side=True)
+                    is_https = True
+                except Exception as e:
+                    print(f"[Agent] ⚠️ Không kích hoạt được HTTPS cho Device-id server: {e}")
+
+            t = threading.Thread(
+                target=server.serve_forever,
+                daemon=True
+            )
             t.start()
-            print(f"[Agent] Device-id server: http://{host}:{port}/device-id")
+
+            protocol = "https" if is_https else "http"
+            print(
+                f"[Agent] Device-id server: "
+                f"{protocol}://{host}:{port}/device-id"
+            )
             return server
+
         except OSError as e:
             if attempt < 2:
-                print(f"[Agent] ⚠️ Cổng {port} chưa sẵn sàng ({e}), đang thử kill và mở lại lần {attempt + 2}...")
+                print(
+                    f"[Agent] ⚠️ Cổng {port} chưa sẵn sàng ({e}), "
+                    f"đang thử mở lại lần {attempt + 2}..."
+                )
                 free_port(port)
                 time.sleep(1.5)
             else:
-                print(f"[Agent] ❌ Không mở được {host}:{port}: {e}.")
+                print(
+                    f"[Agent] ❌ Không mở được {host}:{port}: {e}."
+                )
                 return None
 
 class FingerprintAgent:
@@ -280,11 +328,13 @@ class FingerprintAgent:
                 except ssl.SSLError as e:
                     print(f"[Agent] ❌ Lỗi SSL: {e}")
                     print(f"[Agent]    Kiểm tra: file 'rootCA.pem' có trong {_HERE}?")
+                except (ConnectionRefusedError, OSError) as e:
+                    print(f"[Agent] ⚠️ Backend Gateway (:8000) chưa sẵn sàng ({e}). Đang chờ Backend khởi động...")
                 except Exception as e:
                     print(f"[Agent] Session error: {type(e).__name__}: {e}")
 
                 if self.running:
-                    delay = min(3 * (2 ** retry_count), 30)
+                    delay = min(2 * (retry_count + 1), 6)
                     print(f"[Agent] Reconnect sau {delay}s...")
                     await asyncio.sleep(delay)
                     retry_count += 1
@@ -293,13 +343,33 @@ class FingerprintAgent:
                 self._idle_task.cancel()
 
     async def _session(self):
-        url = f"{BACKEND_WS_URL}?device_id={self.device_id}&bridge_token={BRIDGE_TOKEN}"
+        candidate_urls = [BACKEND_WS_URL]
+        if "127.0.0.1" not in BACKEND_WS_URL and "localhost" not in BACKEND_WS_URL:
+            # Fallback sang localhost nếu đang chạy trên cùng máy với Gateway
+            local_fallback = BACKEND_WS_URL.replace("192.168.1.229", "127.0.0.1")
+            if ":8000" in BACKEND_WS_URL and local_fallback == BACKEND_WS_URL:
+                local_fallback = "wss://127.0.0.1:8000/ws/fingerprint"
+            candidate_urls.append(local_fallback)
 
         connect_kwargs = {"ping_interval": None}
         if self.ssl_context is not None:
             connect_kwargs["ssl"] = self.ssl_context
 
-        async with websockets.connect(url, **connect_kwargs) as ws:
+        ws = None
+        last_error = None
+        for target_url in candidate_urls:
+            url = f"{target_url}?device_id={self.device_id}&bridge_token={BRIDGE_TOKEN}"
+            try:
+                ws = await websockets.connect(url, **connect_kwargs)
+                break
+            except (ConnectionRefusedError, OSError) as e:
+                last_error = e
+                continue
+
+        if ws is None:
+            raise last_error or ConnectionRefusedError("Không thể kết nối WebSocket Gateway")
+
+        async with ws:
             print(f"[Agent] ✅ WS connected ({'wss' if USE_TLS else 'ws'}://...)")
             async for raw in ws:
                 try:
@@ -597,15 +667,22 @@ def main():
 
     def _stop(*_):
         agent.running = False
-        agent.svc.close()
-        sys.exit(0)
+        try:
+            agent.svc.close()
+        except Exception:
+            pass
 
     signal.signal(signal.SIGINT, _stop)
 
     try:
         asyncio.run(agent.run())
+    except (KeyboardInterrupt, SystemExit):
+        pass
     finally:
-        agent.svc.close()
+        try:
+            agent.svc.close()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()

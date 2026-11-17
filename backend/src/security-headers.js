@@ -34,7 +34,7 @@ function createSecurityHeadersMiddleware() {
         "img-src 'self' blob: data:",
         "media-src 'self' blob: data:",
         "font-src 'self' blob: data:",
-        "connect-src 'self' blob: data: ws: wss:",
+        "connect-src 'self' blob: data: ws: wss: https://127.0.0.1:9001 https://localhost:9001",
         "frame-ancestors 'self'",
         "object-src 'none'",
         "base-uri 'self'"
@@ -52,14 +52,14 @@ function createSecurityHeadersMiddleware() {
         "img-src 'self' data: blob:",
         "media-src 'self' data: blob:",
         "font-src 'self' data:",
-        "connect-src 'self' blob: data: ws: wss:",
+        "connect-src 'self' blob: data: ws: wss: https://127.0.0.1:9001 https://localhost:9001",
         "frame-ancestors 'self'",
         "form-action 'self'",
         "base-uri 'self'",
         "object-src 'none'",
         "upgrade-insecure-requests",
       ];
-      res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
+res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
 
       if (isFramedPdfView) {
         res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -71,7 +71,7 @@ function createSecurityHeadersMiddleware() {
     // 4. Permissions-Policy — Findings #14, #17, #20, #23, #26, #29, #32, #35
     res.setHeader(
       'Permissions-Policy',
-      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), autoplay=(self), fullscreen=(self)'
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), autoplay=(self), fullscreen=(self), loopback-network=(self), local-network=(self)'
     );
 
     // 5. Cross-Origin-Opener-Policy (COOP) — Findings #15, #18, #21, #24, #27, #30, #33, #36
@@ -93,4 +93,3 @@ function createSecurityHeadersMiddleware() {
 module.exports = {
   createSecurityHeadersMiddleware,
 };
-

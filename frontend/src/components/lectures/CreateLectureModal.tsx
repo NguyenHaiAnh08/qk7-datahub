@@ -333,7 +333,7 @@ export const CreateLectureModal: React.FC<Props> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <span className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   <Hash className="w-3 h-3 text-slate-400" />
                   Mã bài giảng
                 </span>
@@ -347,7 +347,7 @@ export const CreateLectureModal: React.FC<Props> = ({
               </div>
 
               <div>
-                <span className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   <BookOpen className="w-3 h-3 text-slate-400" />
                   Môn học <span className="text-rose-500">*</span>
                 </span>

@@ -12,6 +12,9 @@ import {
   CreateQuizPayload,
   ScormTrackingData,
   ScormCommitPayload,
+  RadarOverviewResponse,
+  RadarFloorPlanResponse,
+  RadarRoomDetailResponse,
 } from '../types/lecture';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -260,6 +263,94 @@ export const lectureService = {
   async getFacultyLectures(facultyUnitId: string): Promise<{ total: number; items: Lecture[] }> {
     return http(`/api/lectures/faculty/${encodeURIComponent(facultyUnitId)}`);
   },
+<<<<<<< HEAD
+=======
+
+  // ─── ADMIN CRUD — LECTURE CATALOGS ───
+  async adminListSubjects(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/subjects');
+  },
+  async adminCreateSubject(data: any): Promise<{ success: boolean; subject_id: string }> {
+    return http('/api/admin/lectures/subjects', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateSubject(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/subjects/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteSubject(id: string): Promise<{ success: boolean; soft_deleted?: boolean; note?: string }> {
+    return http(`/api/admin/lectures/subjects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async adminListClasses(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/classes');
+  },
+  async adminCreateClass(data: any): Promise<{ success: boolean; class_id: string }> {
+    return http('/api/admin/lectures/classes', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateClass(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/classes/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteClass(id: string): Promise<{ success: boolean; soft_deleted?: boolean; note?: string }> {
+    return http(`/api/admin/lectures/classes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async adminListClassrooms(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/classrooms');
+  },
+  async adminCreateClassroom(data: any): Promise<{ success: boolean; room_id: string }> {
+    return http('/api/admin/lectures/classrooms', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateClassroom(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/classrooms/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteClassroom(id: string): Promise<{ success: boolean; soft_deleted?: boolean }> {
+    return http(`/api/admin/lectures/classrooms/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  // ─── QK7 LECTURE HALL RADAR ───
+  async getRadarOverview(): Promise<RadarOverviewResponse> {
+    return http('/api/lectures/radar/overview');
+  },
+
+  async getRadarFloorPlan(params: {
+    building_code?: string;
+    floor_number?: number;
+    time_shift?: string;
+  } = {}): Promise<RadarFloorPlanResponse> {
+    const p = new URLSearchParams();
+    if (params.building_code) p.set('building_code', params.building_code);
+    if (params.floor_number) p.set('floor_number', String(params.floor_number));
+    if (params.time_shift) p.set('time_shift', params.time_shift);
+    const qs = p.toString();
+    return http(`/api/lectures/radar/floor-plan${qs ? `?${qs}` : ''}`);
+  },
+
+  async getRadarRoomDetail(roomId: string): Promise<RadarRoomDetailResponse> {
+    return http(`/api/lectures/radar/rooms/${encodeURIComponent(roomId)}/detail`);
+  },
+
+  async toggleRoomMaintenance(
+    roomId: string,
+    data: { is_maintenance: boolean; maintenance_reason?: string }
+  ): Promise<{ success: boolean; is_maintenance: boolean; maintenance_reason?: string }> {
+    return http(`/api/lectures/radar/rooms/${encodeURIComponent(roomId)}/maintenance`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(data),
+    });
+  },
+>>>>>>> eefdd9dfdf8e59304137e7f9ceaad64f1c1d2fb8
 };
 
 export default lectureService;

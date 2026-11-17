@@ -1,10 +1,7 @@
 /* <!-- AI Chat Drawer Component --> */
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Spin,
-  Tooltip,
-} from 'antd';
+import { Spin, Tooltip } from 'antd';
 import {
   Bot,
   X,
@@ -14,7 +11,14 @@ import {
   FileText,
   Shield,
   ExternalLink,
-
+  Fingerprint,
+  Maximize2,
+  Info,
+  CheckCircle2,
+  ChevronRight,
+  ShieldAlert,
+  ShieldCheck,
+  Quote,
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,7 +29,6 @@ import { toast } from '../common/Toast';
 import { FingerprintScanModal } from '../users/FingerprintScanModal';
 import { DocumentPreviewModal } from '../document-desk/DocumentPreviewModal';
 import { DocumentItem } from '../../types';
-import { Fingerprint } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -100,7 +103,7 @@ export const AIChatDrawer: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Tự động cuộn xuống cuối khi có tin nhắn mới
   const scrollToBottom = () => {
@@ -115,6 +118,46 @@ export const AIChatDrawer: React.FC = () => {
       checkServiceStatus();
     }
   }, [isChatOpen, messages]);
+
+  // 🔒 Khóa cuộn trang web cha khi mở Chatbox, bảo toàn vị trí cuộn & triệt tiêu cuộn xuyên tầng (Scroll Chaining)
+  useEffect(() => {
+    if (!isChatOpen || typeof window === 'undefined') return;
+
+    // Ghi nhớ chính xác vị trí cuộn trang hiện tại
+    const currentScrollY =
+      window.scrollY ||
+      window.pageYOffset ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0;
+
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyPaddingRight = document.body.style.paddingRight;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
+    // Tính độ rộng thanh cuộn để bù paddingRight, chống giật layout (layout shift)
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    // Khóa cuộn tuyệt đối trang chính bên dưới
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.paddingRight = prevBodyPaddingRight;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+
+      // Khôi phục vị trí cuộn mượt mà chính xác cho người dùng
+      if (currentScrollY > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: currentScrollY, behavior: 'instant' });
+        });
+      }
+    };
+  }, [isChatOpen]);
 
   // Đóng Drawer bằng phím ESC và dọn dẹp phiên sinh trắc học
   useEffect(() => {
@@ -162,7 +205,6 @@ export const AIChatDrawer: React.FC = () => {
     }
   };
 
-  // ✅ SỬA: Thêm tham số fileIdOverride để truyền file_id lên Backend kiểm tra chéo token
   const handleSend = async (
     customPrompt?: string,
     tokenOverride?: string,
@@ -183,7 +225,12 @@ export const AIChatDrawer: React.FC = () => {
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, userMsg]);
-      if (!customPrompt) setInputText('');
+      if (!customPrompt) {
+        setInputText('');
+        if (inputRef.current) {
+          inputRef.current.style.height = 'auto';
+        }
+      }
     }
 
     setLoading(true);
@@ -205,7 +252,7 @@ export const AIChatDrawer: React.FC = () => {
         query: textToSend,
         history,
         fingerprint_token: activeToken,
-        file_id: fileIdOverride, // ✅ Truyền file_id lên Backend
+        file_id: fileIdOverride,
       });
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
@@ -243,6 +290,7 @@ export const AIChatDrawer: React.FC = () => {
     }
   };
 
+  // 🖥️ Khi bấm vào xem tài liệu trích dẫn: Tự động kích hoạt Toàn màn hình (Full Screen) 100%
   const handleOpenPdf = (
     fileId: string,
     page: number = 1,
@@ -251,6 +299,13 @@ export const AIChatDrawer: React.FC = () => {
     secName?: string,
     requiresBio: boolean = false
   ) => {
+    // Kích hoạt Fullscreen ngay lập tức trong user gesture event
+    try {
+      if (typeof window !== 'undefined' && !window.document.fullscreenElement) {
+        window.document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch (_) {}
+
     // Nếu mở file khác với file đã quét vân tay hoặc token đã quá 5 phút -> reset token
     const activeToken = getActiveFpToken(fileId);
     if (!activeToken && fileId !== targetScanFileId) {
@@ -287,9 +342,6 @@ export const AIChatDrawer: React.FC = () => {
     setScanModalOpen(false);
     const validToken = token || '';
     if (validToken) {
-      // ✅ BẢO MẬT P0: CHỈ LƯU VÀO STATE NỘI BỘ CỦA CHATBOX KÈM THỜI HẠN 5 PHÚT.
-      // TUYỆT ĐỐI KHÔNG LƯU VÀO sessionStorage per-file `qk7_fp_token_${targetScanFileId}`
-      // ĐỂ TRÁNH RÒ RỈ SANG CÁC TRANG NGOÀI (Bàn làm việc, Danh mục, Đơn vị của tôi).
       const expiresAt = Date.now() + 5 * 60 * 1000;
       setFpToken(validToken);
       setFpTokenExpiresAt(expiresAt);
@@ -303,31 +355,37 @@ export const AIChatDrawer: React.FC = () => {
     const queryToRetry = lastQuery || lastUserQueryRef.current || inputText.trim();
     if (queryToRetry) {
       setLoading(true);
-      // ✅ SỬA: Truyền targetScanFileId vào để Backend kiểm tra chéo token-file
       await handleSend(queryToRetry, validToken, true, targetScanFileId);
     } else if (targetScanFileId) {
       handleOpenPdf(targetScanFileId, 1, targetScanDocCode, undefined, 'Cấp 3 - Mật');
     }
   };
 
+  // Các câu hỏi gợi ý tác chiến nhanh
+  const quickPrompts = [
+    'Quy định phân cấp bảo mật tài liệu 5 cấp độ',
+    'Hướng dẫn sử dụng máy quét vân tay ZKTeco ZK9500',
+    'Chính sách lưu trữ và tải văn bản Cấp 3 (Mật)',
+  ];
+
   return (
     <>
       <AnimatePresence>
         {isChatOpen && (
           <div key="ai-chat-drawer-container" className="fixed inset-0 z-50 overflow-hidden select-none">
-            {/* 1. LỚP PHỦ MỜ BACKDROP (backdrop-blur-md bg-black/50 z-50) */}
+            {/* 1. LỚP PHỦ MỜ BACKDROP (backdrop-blur-sm bg-black/50 z-50) */}
             <motion.div
               key="ai-drawer-backdrop"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
+              transition={{ duration: 0.22 }}
               onClick={handleCloseChat}
-              className="fixed inset-0 bg-black/50 backdrop-blur-md cursor-pointer"
+              className="fixed inset-0 bg-black/50 backdrop-blur-xs cursor-pointer"
               aria-label="Đóng khung chat trợ lý AI"
             />
 
-            {/* 2. KHUNG CHAT TRƯỢT PHẢI (SLIDE-OVER DRAWER) */}
+            {/* 2. KHUNG CHAT TRƯỢT PHẢI (SLIDE-OVER DRAWER) - Đục 100%, không bị ám xám từ backdrop */}
             <motion.div
               key="ai-drawer-panel"
               initial={{ x: '100%' }}
@@ -339,37 +397,48 @@ export const AIChatDrawer: React.FC = () => {
                 stiffness: 300,
                 mass: 0.85,
               }}
-              className="fixed top-0 right-0 bottom-0 w-full sm:w-[380px] md:w-[420px] max-w-full flex flex-col bg-white/95 dark:bg-[#0c1322]/95 backdrop-blur-xl border-l border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden z-50"
+              className="fixed top-0 right-0 bottom-0 w-full sm:w-[520px] md:w-[620px] lg:w-[700px] max-w-full flex flex-col bg-[#f8fafc] dark:bg-[#0b1120] border-l border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden z-50"
             >
-              {/* HEADER KHUNG CHAT */}
-              <div className="px-4 py-3.5 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
-                <div className="flex items-center space-x-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center text-white shadow-xs shrink-0">
-                    <Bot className="w-4 h-4 stroke-[2.2]" />
+              {/* HEADER KHUNG CHAT SANG TRỌNG & TƯƠI SÁNG Ở LIGHT MODE */}
+              <div className="px-5 py-3.5 flex items-center justify-between border-b border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f172a] shrink-0 shadow-2xs">
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#14532d] via-[#166534] to-[#15803d] border border-amber-400/40 flex items-center justify-center text-white shadow-xs shrink-0">
+                    <Bot className="w-5 h-5 stroke-[2.2]" />
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center space-x-1.5">
-                      <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
-                        Trợ lý AI - Dữ liệu Số QK7
+                    <div className="flex items-center space-x-2">
+                      {/* ĐỔI TIÊU ĐỀ: Trợ lý AI - Trung Tâm dữ liệu số */}
+                      <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
+                        Trợ lý AI - Trung Tâm dữ liệu số
                       </h3>
                       <span
-                        className={`inline-block w-2 h-2 rounded-full shrink-0 ${
-                          aiStatus === 'online' ? 'bg-emerald-500' : 'bg-amber-500'
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                          aiStatus === 'online'
+                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
                         }`}
                         title={aiStatus === 'online' ? 'DeepTutor Vector DB Sẵn Sàng' : 'Smart SQL Fallback'}
-                      />
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            aiStatus === 'online' ? 'bg-emerald-500' : 'bg-amber-500'
+                          }`}
+                        />
+                        <span>{aiStatus === 'online' ? 'DeepTutor RAG' : 'SQL Fallback'}</span>
+                      </span>
                     </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate flex items-center space-x-1">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center space-x-1.5 mt-0.5">
                       <span>Trường Quân Sự QK7</span>
                       <span>•</span>
-                      <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                      <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                         {user?.clearance_name || `Cấp ${user?.clearance_level_id || 1}`}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1.5">
                   <Tooltip title="Làm mới hội thoại" placement="bottom">
                     <button
                       type="button"
@@ -380,17 +449,17 @@ export const AIChatDrawer: React.FC = () => {
                           badge: 'AI-RESET',
                         });
                       }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
+                      className="p-2 rounded-xl text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                       aria-label="Làm mới hội thoại"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
+                      <RotateCcw className="w-4 h-4" />
                     </button>
                   </Tooltip>
 
                   <button
                     type="button"
                     onClick={handleCloseChat}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
+                    className="p-2 rounded-xl text-slate-500 hover:text-rose-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                     aria-label="Đóng khung chat (ESC)"
                     title="Đóng (Esc)"
                   >
@@ -399,21 +468,43 @@ export const AIChatDrawer: React.FC = () => {
                 </div>
               </div>
 
-              {/* DANH SÁCH TIN NHẮN (BONG BÓNG CHAT) */}
-              <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-3.5 scrollbar-thin select-text">
+              {/* DANH SÁCH TIN NHẮN (NỀN SÁNG SỦA SLATE-50 / SLATE-100, BONG BÓNG TRẮNG TINH KHÔI) */}
+              <div
+                className={`flex-1 ${
+                  previewOpen ? 'overflow-hidden' : 'overflow-y-auto'
+                } p-4 sm:p-5 space-y-4 scrollbar-thin select-text bg-[#f8fafc] dark:bg-[#0b1120] overscroll-contain`}
+              >
                 {/* Lời chào & gợi ý câu hỏi khi chưa có tin nhắn */}
                 {messages.length === 0 && (
-                  <div className="py-6 px-3 text-center space-y-4">
-                    <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
-                      <Sparkles className="w-6 h-6 stroke-[2]" />
+                  <div className="py-8 px-4 text-center space-y-5">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
+                      <Sparkles className="w-7 h-7 stroke-[2]" />
                     </div>
-                    <div className="space-y-1">
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
-                        Sẵn sàng hỗ trợ tác chiến & tra cứu
+                    <div className="space-y-1.5 max-w-sm mx-auto">
+                      <h4 className="font-bold text-base text-slate-900 dark:text-white">
+                        Trung Tâm Trợ Lý AI Tác Chiến QK7
                       </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
-                        Đồng chí có thể đặt câu hỏi về quy định, kế hoạch huấn luyện hoặc văn bản được phân quyền.
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Hệ thống tra cứu thông minh tích hợp RAG, vector hóa dữ liệu quân sự và kiểm soát phân cấp bí mật 5 cấp độ.
                       </p>
+                    </div>
+
+                    {/* Khối gợi ý câu hỏi nhanh */}
+                    <div className="space-y-2 pt-2 text-left max-w-md mx-auto">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
+                        Gợi ý tra cứu nhanh:
+                      </div>
+                      {quickPrompts.map((prompt, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSend(prompt)}
+                          className="w-full text-left p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-emerald-500 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 text-xs text-slate-700 dark:text-slate-300 font-medium transition-all duration-150 flex items-center justify-between group cursor-pointer shadow-2xs"
+                        >
+                          <span className="truncate pr-2">{prompt}</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -422,25 +513,62 @@ export const AIChatDrawer: React.FC = () => {
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                    className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} min-w-0 max-w-full`}
                   >
+                    {/* Header nhỏ hiển thị vai trò */}
+                    <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                      {msg.sender === 'user' ? (
+                        <span className="text-[11px] font-extrabold text-emerald-800 dark:text-emerald-400 tracking-wider">
+                          {user?.full_name || user?.username || 'Đồng chí'}
+                        </span>
+                      ) : (
+                        /* ĐỔI TÊN VAI TRÒ: Đồng chí Trợ lý AI */
+                        <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-900 dark:text-emerald-400 tracking-wide">
+                          <Bot className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>Đồng chí Trợ lý AI</span>
+                        </div>
+                      )}
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500">
+                        {msg.timestamp}
+                      </span>
+                    </div>
+
+                    {/* Khung nội dung tin nhắn */}
                     <div
-                      className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed shadow-xs ${
+                      className={`w-fit max-w-[96%] sm:max-w-[92%] rounded-2xl p-4 sm:p-5 shadow-xs overflow-hidden break-words ${
                         msg.sender === 'user'
-                          ? 'bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] text-white rounded-tr-xs border border-emerald-600/30'
+                          ? 'bg-[#15803d] dark:bg-[#166534] !text-white rounded-tr-xs border border-emerald-400/50 text-xs sm:text-[13px] leading-relaxed shadow-sm'
                           : isDark
-                          ? 'bg-[#111827] text-slate-100 border border-emerald-800/40 rounded-tl-xs'
-                          : 'bg-[#f0fdf4] text-slate-900 border border-[#86efac] rounded-tl-xs'
+                          ? 'bg-[#111827] text-slate-100 border border-slate-800 rounded-tl-xs shadow-sm'
+                          : 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs shadow-sm'
                       }`}
                     >
-                      {/* Nội dung tin nhắn */}
-                      <div className="whitespace-pre-wrap font-sans">
-                        {renderFormattedText(msg.text)}
-                      </div>
+                      {/* Nội dung tin nhắn: User dùng plain text tương phản cao, AI dùng Structured Renderer có ngắt dòng tự nhiên */}
+                      {msg.sender === 'user' ? (
+                        <div className="whitespace-pre-wrap font-sans !text-white font-medium select-text">
+                          {msg.text}
+                        </div>
+                      ) : (
+                        <AIMessageRenderer
+                          text={msg.text}
+                          onOpenPage={(p) => {
+                            const matchingCit = msg.citations?.find((c) => c.page === p) || msg.citations?.[0];
+                            if (matchingCit) {
+                              handleOpenPdf(
+                                matchingCit.file_id,
+                                p,
+                                matchingCit.document_code,
+                                matchingCit.title,
+                                matchingCit.security_level_name
+                              );
+                            }
+                          }}
+                        />
+                      )}
 
-                      {/* NÚT QUÉT VÂN TAY NẾU CÓ CỜ requires_biometric (chỉ hiện khi chưa có token) */}
+                      {/* NÚT QUÉT VÂN TAY NẾU CÓ CỜ requires_biometric */}
                       {msg.requires_biometric && (
-                        <div className="mt-2.5">
+                        <div className="mt-3.5">
                           <button
                             type="button"
                             onClick={() => {
@@ -451,58 +579,87 @@ export const AIChatDrawer: React.FC = () => {
                               setTargetScanDocCode(code);
                               setScanModalOpen(true);
                             }}
-                            className="w-full min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all duration-200 bg-gradient-to-r from-[#991b1b] via-[#b91c1c] to-[#d97706] hover:from-[#b91c1c] hover:to-[#f59e0b] text-white shadow-md active:scale-[0.98] border border-amber-400/40 cursor-pointer"
+                            className="w-full min-h-[46px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-2.5 transition-all duration-200 bg-gradient-to-r from-[#991b1b] via-[#b91c1c] to-[#d97706] hover:from-[#b91c1c] hover:to-[#f59e0b] text-white shadow-md active:scale-[0.98] border border-amber-400/40 cursor-pointer"
                           >
-                            <Fingerprint className="w-4 h-4 text-amber-300 animate-pulse flex-shrink-0" />
-                            <span>Quét vân tay để nhận câu trả lời</span>
+                            <Fingerprint className="w-5 h-5 text-amber-300 animate-pulse flex-shrink-0" />
+                            <span>Quét vân tay ZK9500 để giải mã câu trả lời</span>
                           </button>
                         </div>
                       )}
 
-                      {/* Căn cứ trích dẫn văn bản & Thao tác */}
+                      {/* CĂN CỨ VĂN BẢN TRÍCH DẪN & NÚT XEM TOÀN MÀN HÌNH */}
                       {msg.citations && msg.citations.length > 0 && (
-                        <div className="mt-2.5 pt-2 border-t border-emerald-500/20 dark:border-emerald-700/30 space-y-1.5">
-                          <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
-                            <FileText className="w-3 h-3" />
-                            <span>Căn cứ văn bản trích dẫn:</span>
+                        <div className="mt-4 pt-3.5 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div className="text-[11px] font-extrabold tracking-wider uppercase text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                              <span>Căn cứ văn bản trích dẫn ({msg.citations.length})</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                              Chạm để mở Toàn màn hình
+                            </span>
                           </div>
 
-                          {msg.citations.map((c, cIdx) => (
-                            <div key={cIdx} className="space-y-1">
+                          <div className="grid grid-cols-1 gap-2">
+                            {msg.citations.map((c, cIdx) => (
                               <button
+                                key={cIdx}
                                 type="button"
-                                onClick={() => handleOpenPdf(c.file_id, c.page, c.document_code, c.title, c.security_level_name, Boolean(c.requires_biometric))}
-                                className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-medium flex items-center justify-between transition-all cursor-pointer ${
+                                onClick={() =>
+                                  handleOpenPdf(
+                                    c.file_id,
+                                    c.page,
+                                    c.document_code,
+                                    c.title,
+                                    c.security_level_name,
+                                    Boolean(c.requires_biometric)
+                                  )
+                                }
+                                className={`w-full text-left p-3 rounded-xl border transition-all duration-150 cursor-pointer flex items-center justify-between gap-3 group/cit ${
                                   isDark
-                                    ? 'bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700/50'
-                                    : 'bg-white hover:bg-emerald-50/80 text-emerald-900 border border-emerald-200'
+                                    ? 'bg-slate-900/90 hover:bg-slate-800 border-slate-700/60 hover:border-emerald-500/60'
+                                    : 'bg-slate-50 hover:bg-emerald-50/70 border-slate-200 hover:border-emerald-300'
                                 }`}
-                                title="Bấm để mở văn bản tại trang trích dẫn"
+                                title="Bấm để xem văn bản toàn màn hình (Full Screen)"
                               >
-                                <span className="truncate flex-1">
-                                  📄 Trang {c.page || 1} • {c.title || c.document_code || c.file_id}
-                                </span>
-                                <ExternalLink className="w-3 h-3 ml-1 text-slate-400 shrink-0" />
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                                    <FileText className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-600/20 shrink-0">
+                                        {c.document_code || 'VĂN BẢN'}
+                                      </span>
+                                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 px-1.5 py-0.2 rounded bg-emerald-500/10 shrink-0">
+                                        Trang {c.page || 1}
+                                      </span>
+                                    </div>
+                                    <div className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover/cit:text-emerald-600 dark:group-hover/cit:text-emerald-400 transition-colors mt-0.5">
+                                      {c.title || c.document_code || 'Văn bản bảo mật'}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold shrink-0 shadow-xs group-hover/cit:scale-105 transition-transform">
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">Toàn màn hình</span>
+                                </div>
                               </button>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
-
-                    <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 px-1">
-                      {msg.timestamp}
-                    </span>
                   </div>
                 ))}
 
-
                 {/* Trạng thái đang tải câu trả lời */}
                 {loading && (
-                  <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 pl-2 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/20 animate-pulse">
+                  <div className="flex items-center space-x-3 text-xs text-emerald-800 dark:text-emerald-400 p-3 bg-white dark:bg-emerald-950/30 rounded-2xl border border-emerald-500/30 shadow-xs animate-pulse">
                     <Spin size="small" />
-                    <span className="font-medium">
-                      {lastQuery ? 'Đang lấy câu trả lời...' : 'Trợ lý AI đang tra cứu kho dữ liệu số...'}
+                    <span className="font-semibold">
+                      {lastQuery ? 'Đang giải mã và lập báo cáo câu trả lời...' : 'Trợ lý AI đang truy vấn kho dữ liệu số...'}
                     </span>
                   </div>
                 )}
@@ -510,25 +667,32 @@ export const AIChatDrawer: React.FC = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* THANH NHẬP LIỆU GHIM CỐ ĐỊNH Ở ĐÁY */}
-              <div className="p-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/90 shrink-0">
+              {/* THANH NHẬP LIỆU GHIM CỐ ĐỊNH Ở ĐÁY (SẠCH SẼ, SÁNG SỦA Ở LIGHT MODE) */}
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] shrink-0 shadow-2xs">
                 <div
-                  className={`flex items-center rounded-2xl px-3 py-1.5 border transition-all duration-200 ${
+                  className={`flex items-end rounded-2xl px-3.5 py-2 border transition-all duration-200 ${
                     isDark
                       ? 'bg-[#111827] border-slate-700 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-600/25'
                       : 'bg-slate-50 border-slate-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20'
                   }`}
                 >
-                  <input
+                  <textarea
                     ref={inputRef}
-                    type="text"
+                    rows={1}
                     value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSend();
+                    onChange={(e) => {
+                      setInputText(e.target.value);
+                      e.target.style.height = 'auto';
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                     }}
-                    placeholder="Tra cứu văn thư hoặc hỏi đáp tác chiến..."
-                    className="flex-1 bg-transparent text-xs focus:outline-none px-1 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="Tra cứu quy định, văn thư, hỏi đáp kế hoạch tác chiến..."
+                    className="flex-1 bg-transparent text-xs sm:text-sm focus:outline-none px-1 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none max-h-[120px] py-1.5 scrollbar-thin"
                     disabled={loading}
                   />
 
@@ -536,19 +700,19 @@ export const AIChatDrawer: React.FC = () => {
                     type="button"
                     onClick={() => handleSend()}
                     disabled={loading || !inputText.trim()}
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer ${
+                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer shrink-0 mb-0.5 ${
                       inputText.trim() && !loading
-                        ? 'bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:scale-105 active:scale-95 shadow-xs border border-amber-400/40'
+                        ? 'bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:scale-105 active:scale-95 shadow-sm border border-amber-400/40'
                         : 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-400'
                     }`}
                     title="Gửi câu hỏi (Enter)"
                     aria-label="Gửi câu hỏi"
                   >
-                    <Send className="w-3.5 h-3.5" />
+                    <Send className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5">
-                  Nhấn Enter để gửi • Esc để đóng
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-2">
+                  Nhấn Enter để gửi • Shift + Enter để xuống dòng • Esc để đóng khung chat
                 </div>
               </div>
             </motion.div>
@@ -567,36 +731,334 @@ export const AIChatDrawer: React.FC = () => {
         open={previewOpen}
         document={previewDoc}
         page={previewPage}
+        isAiCitation={true}
         initialToken={getActiveFpToken(previewDoc?.file_id)}
         onClose={() => {
           setPreviewOpen(false);
-          // Không xóa fpToken nội bộ của Chatbox để duy trì token 5 phút trong phiên trò chuyện Chatbox
-          // Người dùng có thể tiếp tục hỏi hoặc xem lại trích dẫn trong thời hạn 5 phút
         }}
       />
     </>
   );
 };
 
-function renderFormattedText(text: string): React.ReactNode {
+// ==========================================
+// 🎨 BỘ RENDERER CẤU TRÚC CHO TIN NHẮN TRỢ LÝ AI
+// ==========================================
+interface AIMessageRendererProps {
+  text: string;
+  onOpenPage?: (page: number) => void;
+}
+
+/**
+ * Tiền xử lý ngắt câu thông minh:
+ * Tách biệt Lời chào báo cáo, Căn cứ pháp lý, và Giới thiệu nội dung thành các dòng/câu độc lập
+ * Mang lại trải nghiệm như một người trợ lý quân sự đang trực tiếp nhắn tin trao đổi với người dùng.
+ */
+function preprocessConversationFlow(rawText: string): string {
+  if (!rawText) return '';
+  let text = rawText;
+
+  // 1. Nhận diện dạng dồn cục:
+  // "Báo cáo [Đồng chí ...], căn cứ theo [Số hiệu] (...), tại Trang [X] [p.X], nội dung quy định như sau:"
+  // -> Tách thành 3 câu rõ ràng, mỗi câu trên một dòng riêng:
+  text = text.replace(
+    /(Báo cáo [^\n,;.]+?)[,;.]\s*(căn cứ theo\s+[\s\S]+?\[p\.\d+\])[,;.]\s*(nội dung quy định như sau:?)/i,
+    '$1.\n\n$2.\n\n$3\n'
+  );
+
+  // 2. Nếu là dạng ngắn hơn: "Báo cáo ..., căn cứ theo ..."
+  text = text.replace(
+    /(Báo cáo [^\n,;.]+?)[,;.]\s+(căn cứ theo)/i,
+    '$1.\n\nCăn cứ theo'
+  );
+
+  // 3. Nếu là dạng: "... tại Trang X [p.X], nội dung quy định như sau:"
+  text = text.replace(
+    /(\[p\.\d+\])[,;.]\s*(nội dung quy định như sau:?)/i,
+    '$1.\n\n$2\n'
+  );
+
+  return text;
+}
+
+const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({ text, onOpenPage }) => {
   if (!text) return null;
-  const parts = text.split(/(\*\*[^*]+\*\*|\[p\.\d+\])/g);
+
+  // Tiền xử lý ngắt câu đối thoại tự nhiên
+  const formattedText = preprocessConversationFlow(text);
+
+  // Phân tích và chia nhỏ toàn bộ văn bản thành các khối cấu trúc trực quan
+  const lines = formattedText.split('\n');
+  const blocks: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // 1. Nhận diện Bảng Markdown (| Header 1 | Header 2 | ...)
+    if (trimmed.startsWith('|') && trimmed.endsWith('|') && i + 1 < lines.length && lines[i + 1].includes('---')) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+
+      const headerCols = tableLines[0]
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim());
+
+      const dataRows = tableLines.slice(2).map((tl) =>
+        tl
+          .split('|')
+          .slice(1, -1)
+          .map((c) => c.trim())
+      );
+
+      blocks.push(
+        <div
+          key={`table-${i}`}
+          className="my-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/80 shadow-xs"
+        >
+          <table className="w-full text-xs text-left border-collapse">
+            <thead className="bg-slate-100 dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 text-[11px] font-bold uppercase tracking-wider">
+              <tr>
+                {headerCols.map((h, hIdx) => (
+                  <th key={hIdx} className="px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-700">
+                    {renderInlineFormatted(h, onOpenPage)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
+              {dataRows.map((row, rIdx) => (
+                <tr
+                  key={rIdx}
+                  className="hover:bg-emerald-500/5 transition-colors odd:bg-transparent even:bg-slate-500/[0.03]"
+                >
+                  {row.map((cell, cIdx) => (
+                    <td key={cIdx} className="px-3.5 py-2.5 leading-relaxed font-sans">
+                      {renderInlineFormatted(cell, onOpenPage)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    // 2. Nhận diện Khối mã lệnh Code Block (``` ... ```)
+    if (trimmed.startsWith('```')) {
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // Bỏ qua dòng ``` đóng
+      blocks.push(
+        <div
+          key={`code-${i}`}
+          className="my-3 rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950 text-slate-200 font-mono text-[11px] shadow-xs"
+        >
+          <div className="px-3.5 py-1.5 bg-slate-900 border-b border-slate-800 text-[10px] text-slate-400 font-sans flex items-center justify-between font-semibold">
+            <span>DỮ LIỆU ĐẶC TẢ / MÃ LỆNH</span>
+          </div>
+          <pre className="p-3.5 overflow-x-auto scrollbar-thin font-mono leading-relaxed">
+            {codeLines.join('\n')}
+          </pre>
+        </div>
+      );
+      continue;
+    }
+
+    // 3. Nhận diện Tiêu đề H3 (### ...)
+    if (trimmed.startsWith('### ')) {
+      const headingText = trimmed.replace(/^###\s+/, '');
+      blocks.push(
+        <div
+          key={`h3-${i}`}
+          className="flex items-center gap-2 mt-4 mb-1.5 pb-1 border-b border-emerald-500/20 text-emerald-950 dark:text-emerald-300 font-bold text-xs sm:text-sm"
+        >
+          <span className="w-1.5 h-3.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+          <span>{renderInlineFormatted(headingText, onOpenPage)}</span>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // 4. Nhận diện Tiêu đề H2 (## ...)
+    if (trimmed.startsWith('## ')) {
+      const headingText = trimmed.replace(/^##\s+/, '');
+      blocks.push(
+        <div
+          key={`h2-${i}`}
+          className="flex items-center gap-2 mt-5 mb-2 text-slate-900 dark:text-white font-extrabold text-sm sm:text-base"
+        >
+          <span className="w-2 h-4 rounded-full bg-amber-500 shrink-0" />
+          <span>{renderInlineFormatted(headingText, onOpenPage)}</span>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // 5. Nhận diện Tiêu đề H1 (# ...)
+    if (trimmed.startsWith('# ')) {
+      const headingText = trimmed.replace(/^#\s+/, '');
+      blocks.push(
+        <div
+          key={`h1-${i}`}
+          className="text-base sm:text-lg font-black text-slate-900 dark:text-white uppercase tracking-wide mt-5 mb-2.5 pb-1 border-b-2 border-emerald-600"
+        >
+          {renderInlineFormatted(headingText, onOpenPage)}
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // 6. Nhận diện Khối trích dẫn văn bản / Bằng chứng (> ...)
+    if (trimmed.startsWith('> ') || trimmed === '>') {
+      const quoteLines: string[] = [];
+      while (i < lines.length && (lines[i].trim().startsWith('> ') || lines[i].trim() === '>')) {
+        quoteLines.push(lines[i].trim().replace(/^>\s*/, ''));
+        i++;
+      }
+      blocks.push(
+        <div
+          key={`quote-${i}`}
+          className="my-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border-l-4 border-emerald-600 dark:border-emerald-500 text-xs text-slate-800 dark:text-slate-200 leading-relaxed flex items-start gap-2.5 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs"
+        >
+          <Quote className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5 opacity-80" />
+          <div className="flex-1 space-y-1 font-sans">
+            {quoteLines.map((ql, qIdx) => (
+              <div key={qIdx}>{renderInlineFormatted(ql, onOpenPage)}</div>
+            ))}
+          </div>
+        </div>
+      );
+      continue;
+    }
+
+    // 7. Nhận diện Danh sách gạch đầu dòng (- hoặc *)
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      const bulletItems: string[] = [];
+      while (i < lines.length && (lines[i].trim().startsWith('- ') || lines[i].trim().startsWith('* '))) {
+        bulletItems.push(lines[i].trim().replace(/^[-*]\s+/, ''));
+        i++;
+      }
+      blocks.push(
+        <ul key={`ul-${i}`} className="my-2.5 space-y-2 pl-1">
+          {bulletItems.map((item, bIdx) => (
+            <li
+              key={bIdx}
+              className="flex items-start gap-2.5 text-xs sm:text-[13px] text-slate-700 dark:text-slate-200 leading-relaxed"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 mt-2 shrink-0" />
+              <div className="flex-1">{renderInlineFormatted(item, onOpenPage)}</div>
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    // 8. Nhận diện Danh sách đánh số (1., 2., ...)
+    if (/^\d+\.\s+/.test(trimmed)) {
+      const numItems: { num: string; text: string }[] = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+        const match = lines[i].trim().match(/^(\d+)\.\s+(.*)$/);
+        if (match) {
+          numItems.push({ num: match[1], text: match[2] });
+        }
+        i++;
+      }
+      blocks.push(
+        <ol key={`ol-${i}`} className="my-2.5 space-y-2 pl-1">
+          {numItems.map((item, nIdx) => (
+            <li
+              key={nIdx}
+              className="flex items-start gap-2.5 text-xs sm:text-[13px] text-slate-700 dark:text-slate-200 leading-relaxed"
+            >
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 mt-0.5 shrink-0">
+                {item.num}
+              </span>
+              <div className="flex-1">{renderInlineFormatted(item.text, onOpenPage)}</div>
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    // 9. Dòng trống
+    if (!trimmed) {
+      i++;
+      continue;
+    }
+
+    // 10. Đoạn văn thông thường (Tách biệt rõ ràng, dễ đọc)
+    blocks.push(
+      <p
+        key={`p-${i}`}
+        className="text-xs sm:text-[13px] leading-relaxed text-slate-800 dark:text-slate-200 my-2 break-words"
+      >
+        {renderInlineFormatted(trimmed, onOpenPage)}
+      </p>
+    );
+    i++;
+  }
+
+  return <div className="space-y-1">{blocks}</div>;
+};
+
+// Hàm phân tích định dạng nội tuyến: In đậm, Mã nội tuyến, Trang trích dẫn
+function renderInlineFormatted(
+  text: string,
+  onOpenPage?: (page: number) => void
+): React.ReactNode {
+  if (!text) return null;
+
+  // Regex nhận diện **in đậm**, `mã`, [p.XX]
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\[p\.\d+\])/g;
+  const parts = text.split(regex);
+
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return (
-        <strong key={index} className="font-semibold text-emerald-800 dark:text-emerald-300">
+        <strong key={index} className="font-bold text-emerald-950 dark:text-emerald-300">
           {part.slice(2, -2)}
         </strong>
       );
     }
-    if (/^\[p\.\d+\]$/.test(part)) {
+    if (part.startsWith('`') && part.endsWith('`')) {
       return (
-        <span
+        <code
           key={index}
-          className="inline-block px-1.5 py-0.5 mx-0.5 rounded text-amber-800 bg-amber-500/10 border border-amber-600/25 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/25 font-mono text-[11px]"
+          className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-emerald-700 dark:text-emerald-400 border border-black/5 dark:border-white/10 break-all font-semibold"
         >
-          {part}
-        </span>
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    if (/^\[p\.\d+\]$/.test(part)) {
+      const pageNum = parseInt(part.replace(/[^\d]/g, ''), 10);
+      return (
+        <button
+          key={index}
+          type="button"
+          onClick={() => onOpenPage?.(pageNum)}
+          className="inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 rounded-md text-[10px] font-bold font-mono text-amber-900 bg-amber-500/15 border border-amber-600/30 dark:text-amber-300 dark:bg-amber-500/20 hover:bg-amber-500/30 transition-colors cursor-pointer align-baseline"
+          title={`Bấm để mở xem Toàn màn hình tại trang ${pageNum}`}
+        >
+          📄 Trang {pageNum}
+        </button>
       );
     }
     return part;

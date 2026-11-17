@@ -153,7 +153,7 @@ export const LecturesPage: React.FC = () => {
   const canForceEnd = useMemo(() => {
     if (isAdmin) return true;
     const roles = user?.roles || [];
-    return roles.includes('ROL-01') || roles.includes('ROL-02') || roles.includes('ROL-06');
+    return roles.includes('ROL-01');
   }, [user, isAdmin]);
 
   // ── Load subjects ──
@@ -832,6 +832,7 @@ export const LecturesPage: React.FC = () => {
             <LiveMonitorPanel
               currentUserId={user?.user_id}
               canForceEnd={canForceEnd}
+              isAdmin={isAdmin}
             />
           )}
 

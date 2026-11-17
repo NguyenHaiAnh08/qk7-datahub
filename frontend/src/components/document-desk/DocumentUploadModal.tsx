@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock,
@@ -72,9 +72,22 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [error, setError] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // ── Cây đơn vị cho TreeSelect ──
+  // ── Cây đơn vị cho TreeSelect (Chỉ mở cấp Gốc & Nhà trường để gọn gàng) ──
   const unitTree = useMemo(() => buildUnitTree(units), [units]);
-  const rootUnitKeys = useMemo(() => unitTree.map((node) => String(node.key)), [unitTree]);
+  const rootUnitKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const root of unitTree) {
+      if (root.children && root.children.length > 0) {
+        keys.push(String(root.key));
+        for (const child of root.children) {
+          if (child.children && child.children.length > 0) {
+            keys.push(String(child.key));
+          }
+        }
+      }
+    }
+    return keys;
+  }, [unitTree]);
   const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
 
   useEffect(() => {

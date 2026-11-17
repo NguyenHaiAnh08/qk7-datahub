@@ -654,7 +654,7 @@ class AgentTutor:
                 "   - Nội dung văn bản: Trích xuất trung thực nội dung thể hiện trong thân văn bản (kể cả khi văn bản ghi nội dung thử nghiệm như 'NỘI DUNG DEMO').\n"
                 "   - Số hiệu, ngày tháng năm, trích yếu: Nêu chính xác theo thông tin ghi trên văn bản.\n"
                 "3. TUYỆT ĐỐI KHÔNG tự bịa đặt, suy đoán ngoài văn bản, không nhầm lẫn thể loại văn bản khác.\n"
-                f"4. Tác phong xưng hô chuẩn mực điều lệnh Quân đội nhân dân Việt Nam: Mở đầu câu trả lời đúng 1 lần duy nhất bằng '{salutation}'. TUYỆT ĐỐI KHÔNG lặp lại họ tên, cấp bậc hoặc chức vụ sau lời chào này.\n"
+                f"4. Tác phong xưng hô và trình bày chuẩn mực điều lệnh Quân đội: Mở đầu câu trả lời bằng lời chào riêng biệt '{salut_clean}.'. Sau đó xuống dòng nêu rõ căn cứ văn bản và nội dung quy định theo từng câu ngắn gọn, dứt khoát, không dồn thành đoạn dài lê thê.\n"
                 "5. Mọi luận điểm, số liệu, trích dẫn bắt buộc phải kèm theo số trang chính xác dạng [p.X] ngay sau nội dung được trích xuất.\n"
                 f"6. Chỉ khi 100% danh sách bằng chứng hoàn toàn không có thông tin liên quan đến câu hỏi, mới trả lời duy nhất câu: '{NO_DATA_FALLBACK_MESSAGE}'. Nếu đã trích xuất được thông tin, TUYỆT ĐỐI KHÔNG chèn thêm câu từ chối này vào cuối câu trả lời.\n"
                 f"7. Nếu câu hỏi đề cập đến một số hiệu văn bản cụ thể mà số hiệu đó KHÔNG CÓ trong DANH SÁCH BẰNG CHỨNG, TUYỆT ĐỐI KHÔNG được suy đoán bừa (như tự nhận là Quân khu 7 hay bất kỳ cơ quan nào). Phải trả lời đúng mẫu từ chối quy định.\n"
@@ -768,9 +768,13 @@ class AgentTutor:
         sentences = [s.strip() for s in raw_text.split(".") if len(s.strip()) > 15]
         highlight_text = ". ".join(sentences[:3]) + "." if sentences else raw_text[:300] + "..."
 
+        # Tách rời câu mở đầu thành các câu hội thoại dứt khoát như người đang nhắn tin trực tiếp
+        salut_clean = salutation.rstrip(",. ").strip()
         answer_parts = [
-            f"{salutation} căn cứ theo **{doc_code}** (*{title}*), tại **Trang {page} [p.{page}]**, nội dung quy định như sau:",
-            f"\n> \"{highlight_text}\" [p.{page}]"
+            f"{salut_clean}.",
+            f"Căn cứ theo **{doc_code}** (*{title}*), tại **Trang {page} [p.{page}]**.",
+            "Nội dung quy định như sau:\n",
+            f"> \"{highlight_text}\" [p.{page}]"
         ]
 
         # Nếu có thêm tài liệu hỗ trợ khác trang

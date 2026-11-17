@@ -51,7 +51,7 @@ export interface TrainingClass {
   class_name: string;
   unit_id: string;
   unit_name?: string;
-  course_year?: number;
+  course_year?: number | string;
   student_total?: number;
   active: boolean;
 }
@@ -165,4 +165,98 @@ export interface ScormCommitPayload {
   score_raw?: number | null;
   suspend_data?: string | null;
 }
+
+// ─── QK7 LECTURE HALL RADAR ───
+export type RadarRoomStatus =
+  | 'AVAILABLE'    // Trống / Sẵn sàng
+  | 'IN_SESSION'   // Đang giảng dạy
+  | 'UPCOMING'     // Sắp có ca
+  | 'MAINTENANCE'  // Bảo trì / Tạm khóa
+  | 'ALERT'        // Cảnh báo / Quá giờ
+  | 'UNKNOWN';     // Không xác định
+
+export interface RadarKpis {
+  total_rooms: number;
+  in_session: number;
+  available: number;
+  upcoming: number;
+  maintenance: number;
+  alert: number;
+}
+
+export interface RadarBuilding {
+  building_code: string;
+  building_name: string;
+  total_rooms: number;
+  in_session_count: number;
+  maintenance_count: number;
+  floors: number[];
+}
+
+export interface RadarOverviewResponse {
+  kpis: RadarKpis;
+  buildings: RadarBuilding[];
+  server_time: string;
+}
+
+export interface RadarSessionSummary {
+  schedule_id: string;
+  lecture_id: string;
+  lecture_title: string;
+  security_level_id?: number;
+  is_restricted?: boolean;
+  presenter_id: string;
+  presenter_name: string;
+  presenter_rank?: string;
+  presenter_position?: string;
+  class_id?: string;
+  class_name: string;
+  student_count?: number;
+  duration_minutes?: number;
+  start_time: string;
+  end_time?: string;
+  status?: ScheduleStatus;
+  slide_index?: number;
+  slide_total?: number;
+  scorm_progress?: number;
+  is_hanging?: boolean;
+  content_type?: ContentType;
+  subject_name?: string;
+  unit_name?: string;
+  note?: string;
+}
+
+export interface RadarClassroom {
+  room_id: string;
+  room_name: string;
+  room_type: string;
+  capacity: number;
+  building_name?: string;
+  building_code: string;
+  floor_number: number;
+  grid_col: number;
+  grid_row: number;
+  is_maintenance: boolean;
+  maintenance_reason?: string | null;
+  display_order: number;
+  computed_status: RadarRoomStatus;
+  current_session?: RadarSessionSummary | null;
+  upcoming_session?: RadarSessionSummary | null;
+}
+
+export interface RadarFloorPlanResponse {
+  building_code: string;
+  building_name: string;
+  floor_number: number;
+  time_shift: 'live' | 'morning' | 'afternoon' | 'evening';
+  rooms: RadarClassroom[];
+  server_time: string;
+}
+
+export interface RadarRoomDetailResponse {
+  room: RadarClassroom;
+  current_session: RadarSessionSummary | null;
+  today_schedules: RadarSessionSummary[];
+}
+
 

@@ -4,6 +4,178 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.7.3-db-connection-pool-and-fingerprint-resilience] — 2026-11-17
+
+### 1. Tối Ưu Hóa Connection Pool SQL Server Chống Drop Socket ([`backend/src/db.js`](../backend/src/db.js))
+- Nâng số kết nối tối thiểu thường trực (`min`) từ 2 lên 5 connection.
+- Tăng thời gian kết nối rảnh (`idleTimeoutMillis`) từ 30,000ms (30 giây) lên 120,000ms (2 phút), giảm thiểu đáng kể chi phí bắt tay kết nối lại khi có yêu cầu đột biến từ người dùng.
+
+### 2. Nâng Cao Độ Ổn Định Của Fingerprint Agent & ZKTeco SDK ([`fingerprint/`](../fingerprint/))
+- **Cơ chế Retry Khởi tạo Driver ([`fingerprint/zk_service.py`](../fingerprint/zk_service.py)):**
+  - Bổ sung cơ chế retry 3 lần kèm khoảng nghỉ `time.sleep()` cho hàm `load_sdk()` của `ZK9500Service`, khắc phục triệt để lỗi driver ZKTeco chưa kịp giải phóng tài nguyên từ tiến trình trước.
+- **Xử lý Ngoại lệ Kết nối & Đóng Tài nguyên ([`fingerprint/agent.py`](../fingerprint/agent.py)):**
+  - Bắt rõ ràng `ConnectionRefusedError` và `OSError`, in thông báo thân thiện: *"Backend Gateway (:8000) chưa sẵn sàng. Đang chờ Backend khởi động..."* thay vì quăng lỗi unhandled.
+  - Bọc khối `try-except` an toàn cho hàm đóng thiết bị `agent.svc.close()` khi ngắt dịch vụ bằng `Ctrl+C` hoặc `SIGINT`.
+- **Tự động Kiểm tra Cổng Gateway ([`fingerprint/.bat`](../fingerprint/.bat)):**
+  - Tích hợp kiểm tra nhanh cổng `:8000` bằng PowerShell `Test-NetConnection`, hiển thị cảnh báo trực quan cho kỹ thuật viên trước khi chạy `agent.py`.
+
+---
+
+## [v1.7.2-admin-2fa-enforcement-and-monitor-stability] — 2026-11-17
+
+### 1. Khắc Phục Cơ Chế Xác Thực Sinh Trắc Học & Bắt Buộc 2FA Cho Quản Trị Viên (Admin 2FA Enforce)
+- **Siết chặt luồng đăng nhập Quản trị viên ([`backend/server.js`](../backend/server.js)):**
+  - Xóa bỏ hoàn toàn nhánh bypass cho phép `USR-001` đăng nhập chỉ bằng mật khẩu khi chưa có vân tay.
+  - Bắt buộc 100% tài khoản Quản trị viên (kể cả Quản trị tối cao `USR-001`) phải xác thực 2FA qua mã phản hồi HTTP 202 (`require_admin_fp: true`) và vé xác thực tạm thời `temp_ticket`.
+- **Khởi tạo và tích hợp Bảng CSDL Quản lý Vé 2FA (`ADMIN_2FA_TICKET`):**
+  - Tạo bảng `ADMIN_2FA_TICKET` kèm các chỉ mục `IX_ADMIN_2FA_TICKET_user`, `IX_ADMIN_2FA_TICKET_expires`, giải quyết triệt để lỗi máy chủ 500 (`Invalid object name 'ADMIN_2FA_TICKET'`) khi issue vé 2FA.
+  - Kích hoạt mẫu vân tay hợp lệ cho tài khoản `USR-001` trong bảng `USER_FINGERPRINT`.
+
+### 2. Khắc Phục Lỗi Giám Sát Bài Giảng Trực Tiếp & Đồng Bộ Giao Thức Proxy
+- **Sửa lỗi truy vấn CSDL trong API Live Monitor ([`backend/src/lecture-extended-routes.js`](../backend/src/lecture-extended-routes.js)):**
+  - Chuyển đổi truy vấn cột `s.session_type` sang biểu thức tương thích `CASE WHEN s.is_self_study = 1 THEN 'SELF_STUDY' ELSE 'TEACHER_LED' END AS session_type`, ngăn chặn lỗi SQL `Invalid column name 'session_type'`.
+- **Đồng bộ hóa Giao thức Vite Dev Server Proxy ([`frontend/vite.config.ts`](../frontend/vite.config.ts)):**
+  - Bổ sung hàm `detectBackendTargets()` tự động nhận diện chế độ `USE_HTTPS` để điều hướng proxy mượt mà giữa `https://localhost:8000` (WSS) và `http://localhost:8000` (WS), loại bỏ lỗi ngắt kết nối TLS khi chạy ở chế độ bảo mật cao.
+
+### 3. Chuẩn Hóa YAML Frontmatter Toàn Bộ Agent Skills
+- **Khắc phục lỗi nạp Customizations trong Antigravity IDE ([`.agents/skills/`](../.agents/skills/)):**
+  - Rà soát và chuẩn hóa 17 tệp `SKILL.md` theo đặc tả kỹ thuật nghiêm ngặt của Antigravity (`name` và `description` độc quyền trong frontmatter block).
+  - Loại bỏ các trường lỗi unmarshal Go (`metadata:`, `author:`, `license:`, `allowed-tools:`, `compatibility:`...), giải quyết triệt để cảnh báo đỏ `"12 customizations failed to load"` và `"3 customizations failed to load"`.
+
+---
+
+## [v1.7.1-fingerprint-agent-https-mixed-content-and-watermark-font-fix] — 2026-11-17
+
+### 1. Khắc Phục Lỗi Kết Nối Máy Quét Vân Tay Qua HTTPS & Mixed Content (Fingerprint HTTPS Suite)
+- **Hỗ trợ SSL/TLS & Đa luồng cho Local Agent ([`fingerprint/agent.py`](../fingerprint/agent.py)):**
+  - Tích hợp `ssl_ctx.wrap_socket` cho `device-id` HTTP server tại cổng `:9001` sử dụng chứng chỉ số nội bộ (`cert.pem`, `private-key.pem`), cho phép trình duyệt truy cập an toàn qua `https://127.0.0.1:9001` mà không bị lỗi Mixed Content.
+  - Chuyển đổi sang `http.server.ThreadingHTTPServer` để xử lý các yêu cầu đọc trạng thái vân tay song song không gây nghẽn kết nối.
+- **Tối ưu hóa Lấy Định Danh Thiết Bị ([`frontend/src/services/fingerprintService.ts`](../frontend/src/services/fingerprintService.ts)):**
+  - Khi ứng dụng chạy trên nền tảng HTTPS hoặc trên iPad, dịch vụ tự động ưu tiên truy vấn danh sách máy quét trực tuyến qua Gateway API (`/api/fingerprint/agents-online`), loại bỏ hoàn toàn việc bị trình duyệt chặn kết nối không an toàn (Mixed Content Block).
+  - Bổ sung fallback kiểm tra trực tiếp endpoint HTTPS nội bộ `https://127.0.0.1:9001/device-id` trước khi kết luận thiết bị chưa sẵn sàng.
+- **Nâng Cấp Cấu Hình Bảo Mật & CSP ([`backend/src/security-headers.js`](../backend/src/security-headers.js) & [`backend/server.js`](../backend/server.js)):**
+  - Bổ sung `https://127.0.0.1:9001` và `https://localhost:9001` vào chỉ thị `connect-src` trong Content Security Policy (CSP).
+  - Mở rộng Permissions-Policy hỗ trợ `loopback-network=(self), local-network=(self)`.
+  - Mở quyền truy cập công khai (public endpoint) cho `GET /api/fingerprint/agents-online` và `GET /api/fingerprint/device-id` để phục vụ xác thực sinh trắc học vân tay ngay từ màn hình đăng nhập.
+
+### 2. Sửa Lỗi Tải Phông Chữ & Đóng Dấu Bản Quyền PDF Quân Sự
+- **Đóng dấu Watermark PDF Tiếng Việt ([`backend/src/pdfWatermarkServer.js`](../backend/src/pdfWatermarkServer.js)):**
+  - Xây dựng cơ chế tìm kiếm phông chữ đa nền tảng (`LiberationSans-Regular.ttf`, `Roboto-Regular.ttf`, `C:\Windows\Fonts\arial.ttf`) giúp khắc phục lỗi crash khi máy chủ không tìm thấy file font chữ mặc định.
+  - Sửa lỗi cú pháp export module ở cuối tệp.
+
+---
+
+## [v1.7.0-qk7-lecture-hall-radar-and-classroom-monitoring] — 2026-11-17
+
+### 1. Radar Giám Sát Giảng Đường & Lớp Học Thời Gian Thực (QK7 Lecture Hall Radar Suite)
+- **Giao diện Radar Tác chiến Thời gian thực ([`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx)):**
+  - Trực quan hóa bản đồ giảng đường theo khu tòa nhà (H1, H2, HT, PM) và theo từng tầng (Floor grid layout) với tọa độ hàng/cột ma trận phòng học.
+  - Phân loại trạng thái phòng học quân sự tức thì: Đang giảng dạy (`ONGOING`, viền nhấp nháy, telemetry tiến độ slide/SCORM thời gian thực, cảnh báo ca treo/vượt giờ), Sắp diễn ra (`SCHEDULED`), Phòng trống (`IDLE`), Đang bảo trì kỹ thuật (`MAINTENANCE`).
+  - Tích hợp ngăn kéo (Drawer) chi tiết phòng học: Lịch trình giảng dạy trong ngày, thông tin giảng viên, lớp học viên, môn học, phân cấp mật và chuyên cần.
+  - Cho phép Quản trị viên / Chỉ huy / Trưởng bộ môn trực tiếp kích hoạt chế độ bảo trì phòng kèm lý do bảo trì.
+- **Hạ tầng Dịch vụ & API Radar Giảng đường ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js)):**
+  - `GET /api/lectures/radar/overview`: Cung cấp chỉ số tổng quan, tỷ lệ sử dụng phòng, danh sách khu & tầng.
+  - `GET /api/lectures/radar/buildings/:buildingCode`: Truy vấn lưới phòng học theo tầng và ca học tương ứng.
+  - `GET /api/lectures/radar/rooms/:roomId/detail`: Lấy chi tiết phòng học, ca học hiện tại và toàn bộ lịch trong ngày.
+  - `POST /api/lectures/radar/rooms/:roomId/maintenance`: Chuyển đổi trạng thái bảo trì phòng học, ghi nhận nhật ký kiểm toán `CLASSROOM_MAINTENANCE_TOGGLE`.
+  - **Bảo mật 5 Cấp Độ Mật (`sanitizeSessionForClearance`):** Tự động che dấu và mã hóa tiêu đề bài giảng nếu độ mật bài giảng vượt quá cấp độ của người giám sát (`[Tài liệu có độ mật cao - Đã mã hóa]`).
+- **Kịch bản Migration CSDL ([`backend/src/migrate-radar.js`](../backend/src/migrate-radar.js)):**
+  - Bổ sung các cột định vị không gian và cấu hình: `building_code`, `floor_number`, `grid_col`, `grid_row`, `is_maintenance`, `maintenance_reason`, `display_order` vào bảng `CLASSROOM`.
+- **Dịch vụ Frontend & Kiểu Dữ Liệu:**
+  - Mở rộng [`lectureService.ts`](../frontend/src/services/lectureService.ts) và [`lecture.ts`](../frontend/src/types/lecture.ts) với đầy đủ interface Radar.
+- **Tinh Chỉnh Các Trình Xem & Modal:**
+  - Tối ưu hóa [`AIChatDrawer.tsx`](../frontend/src/components/ai-chat/AIChatDrawer.tsx), [`AIChatWidget.tsx`](../frontend/src/components/ai-chat/AIChatWidget.tsx), [`DocumentPreviewModal.tsx`](../frontend/src/components/document-desk/DocumentPreviewModal.tsx), [`PdfPagesViewer.tsx`](../frontend/src/components/document-desk/PdfPagesViewer.tsx).
+
+---
+
+## [v1.6.7-military-unit-hierarchy-and-catalogs-treeselect] — 2026-11-16
+
+### 1. Chuẩn Hóa Trọng Số Phân Cấp & Cây Đơn Vị Quân Sự (Military Unit Hierarchy Suite)
+- **Chuẩn hóa Trọng số Sắp xếp Quân sự ([`unitTree.tsx`](../frontend/src/utils/unitTree.tsx) & [`UnitTreeTable.tsx`](../frontend/src/components/dashboard/UnitTreeTable.tsx)):**
+  - Xây dựng hàm `getMilitaryUnitSortWeight` áp dụng quy chuẩn phân cấp thứ bậc quân đội: Quân khu 7 -> Nhà trường / Viện -> Sư đoàn 5 -> Ban Chỉ huy -> Trung đoàn -> Cơ quan Đảng / UBKT Đảng (nằm trên Ban Giám hiệu) -> Ban Giám hiệu -> Các Phòng chức năng (Đào tạo, Chính trị, Hậu cần - Kỹ thuật, Tham mưu - Hành chính) -> Các Tiểu đoàn 1..5 -> Các Khoa giáo viên -> Trung tâm (Trung Tâm GDQP & AN) -> Lớp học viên / Lớp đào tạo -> Đại đội, Bộ môn, Ban, Tổ -> Khối cơ quan Trung ương / Bộ.
+  - Bổ sung danh mục phân loại đơn vị mới: `trung_tam` (Trung tâm) với biểu tượng `Compass`, Badge Violet tác chiến, tích hợp vào các dropdown và bộ lọc phân loại.
+  - Tối ưu cơ chế mở rộng mặc định gọn gàng: Chỉ mở Level 0 (Quân khu) và Level 1 (Nhà trường/Sư đoàn), thu gọn các cấp sâu hơn để tránh quá tải giao diện.
+- **Nhận Diện Đa Mã Định Danh Đơn Vị Nhà Trường:**
+  - Nâng cấp `isSchoolUnitId` và `findSchoolUnit` hỗ trợ đa mã nhận diện (`TQS-QK7`, `TQS`, `U-TQS` hoặc tên trường) đồng bộ trên [`PortalPage.tsx`](../frontend/src/pages/PortalPage.tsx), [`DocumentDeskPage.tsx`](../frontend/src/pages/DocumentDeskPage.tsx), [`DocumentFilters.tsx`](../frontend/src/components/document-desk/DocumentFilters.tsx), và [`SchoolOverviewSection.tsx`](../frontend/src/components/portal/SchoolOverviewSection.tsx).
+
+### 2. Nâng Cấp Quản Trị Danh Mục Bài Giảng & TreeSelect Đơn Vị (Lecture Catalogs Suite)
+- **Tích hợp TreeSelect Cây Đơn vị ([`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx)):**
+  - Thay thế input text thông thường bằng `TreeSelect` trực quan cho "Đơn vị phụ trách" (Môn học) và "Đơn vị quản lý" (Lớp học đào tạo).
+  - Hỗ trợ tìm kiếm nhanh, hiển thị cấu trúc cây đa tầng, nút xóa và tùy chỉnh icon switcher thu gọn/mở rộng.
+- **Ràng Buộc Cấp Độ Bảo Mật Môn Học (Security Constraints):**
+  - Frontend: Bắt buộc người dùng chọn Cấp độ bảo mật khi tạo mới hoặc cập nhật môn học (không cho phép để trống).
+  - Backend ([`backend/src/admin-routes.js`](../backend/src/admin-routes.js)): Ràng buộc giá trị cấp độ bảo mật môn học nằm trong khoảng từ Cấp 1 (Công khai) đến Cấp 3 (Mật), ngăn chặn chỉ định vượt cấp trái thẩm quyền.
+
+---
+
+## [v1.6.6-unit-tree-and-admin-unit-management-upgrade] — 2026-11-16
+
+### 1. Nâng Cấp Quản Lý Cây Đơn Vị Quân Sự (Unit Tree & Organization Suite)
+- **Giao diện Cây Đơn vị Trực quan ([`UnitTreeTable.tsx`](../frontend/src/components/dashboard/UnitTreeTable.tsx)):**
+  - Cải tiến bảng danh mục đơn vị dạng cây phân cấp (tree-table), hỗ trợ đóng/mở nhánh, hiển thị cấp bậc, đơn vị cha/con, tìm kiếm nhanh và thao tác thêm/sửa/xóa trực tiếp.
+  - Tích hợp và đồng bộ trạng thái cây đơn vị với bảng điều khiển [`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx).
+- **Chuẩn Hóa Dữ Liệu & API Quản Trị Đơn Vị:**
+  - Mở rộng các endpoint quản trị cây đơn vị trong [`backend/src/admin-routes.js`](../backend/src/admin-routes.js).
+  - Chuẩn hóa kiểu dữ liệu định danh đơn vị sang `sql.NVarChar(50)` đồng bộ trên toàn bộ các route và middleware: [`backend/src/approval-workflow.js`](../backend/src/approval-workflow.js), [`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js), [`backend/src/lecture-extended-routes.js`](../backend/src/lecture-extended-routes.js), [`backend/src/unit-scope.js`](../backend/src/unit-scope.js), [`backend/src/scorm-package-routes.js`](../backend/src/scorm-package-routes.js).
+
+---
+
+## [v1.6.5-ai-chat-drawer-pdf-viewer-and-admin-stats-upgrade] — 2026-11-16
+
+### 1. Nâng Cấp Toàn Diện Ngăn Trợ Lý AI RAG (AI Chat Drawer Suite)
+- **Giao diện Ngăn kéo AI Chat ([`AIChatDrawer.tsx`](../frontend/src/components/ai-chat/AIChatDrawer.tsx) & [`AIChatWidget.tsx`](../frontend/src/components/ai-chat/AIChatWidget.tsx)):**
+  - Mở rộng trải nghiệm ngăn kéo tương tác trượt từ mép màn hình, phân chia khu vực điều khiển thông minh, hiển thị nguồn tài liệu trích dẫn kèm số trang chi tiết.
+  - Tối ưu hóa hiệu năng render hội thoại trực tiếp và hiệu ứng chuyển động Anti-AI-Slop.
+- **Dịch vụ Hậu tầng Trí tuệ Nhân tạo:**
+  - Đồng bộ cập nhật [`boxchat/core/agent_tutor.py`](../boxchat/core/agent_tutor.py) và [`backend/src/ai-routes.js`](../backend/src/ai-routes.js), bảo đảm lọc dữ liệu theo cấp độ bảo mật nghiêm ngặt.
+
+### 2. Tối Ưu Hóa Trình Đọc PDF & Xem Trước Văn Bản Bảo Mật
+- **Trình đọc trang PDF nâng cao ([`PdfPagesViewer.tsx`](../frontend/src/components/document-desk/PdfPagesViewer.tsx) & [`DocumentPreviewModal.tsx`](../frontend/src/components/document-desk/DocumentPreviewModal.tsx)):**
+  - Tích hợp cuộn mượt và lazy-render trang tài liệu bảo mật, tối ưu hóa kích thước hiển thị và tích hợp cơ chế chống chụp màn hình.
+  - Tinh chỉnh hiển thị thẻ tài liệu [`DocumentCard.tsx`](../frontend/src/components/portal/DocumentCard.tsx) trên Cổng thông tin số.
+
+### 3. Tinh Chỉnh Chỉ Số Bảng Điều Khiển Quản Trị & Giám Sát Giảng Dạy
+- Hoàn thiện thẻ chỉ số [`StatCard.tsx`](../frontend/src/components/dashboard/StatCard.tsx) và giao diện tổng quan [`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx).
+- Tinh chỉnh giao diện bảng điều khiển giám sát giảng dạy thời gian thực [`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx) và [`Header.tsx`](../frontend/src/components/common/Header.tsx).
+
+---
+
+## [v1.6.4-admin-dashboard-catalogs-and-theme-enhancements] — 2026-11-15
+
+### 1. Nâng Cấp Bảng Điều Khiển Chỉ Huy & Quản Trị Hệ Thống (Admin Dashboard Suite)
+- **Đại tu màn hình Admin Dashboard ([`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx)):**
+  - Mở rộng giao diện điều khiển với các bảng số liệu, biểu đồ phân bố, trạng thái dịch vụ thời gian thực và quản trị tài nguyên toàn trường.
+  - Tối ưu hóa hiệu năng render bảng dữ liệu và nâng cấp trải nghiệm người dùng theo tiêu chuẩn bản sắc quân đội.
+- **Nâng Cấp Quản Trị Danh Mục & Cấu Hình Phân Quyền Bảo Vệ:**
+  - Hoàn thiện giao diện [`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx) phục vụ phân loại giáo trình bài giảng.
+  - Bổ sung màn hình quản lý phân quyền được bảo vệ [`ProtectedPermissionsConfigPage.tsx`](../frontend/src/pages/ProtectedPermissionsConfigPage.tsx) và hàng đợi phê duyệt [`ApprovalQueuePage.tsx`](../frontend/src/pages/ApprovalQueuePage.tsx).
+
+### 2. Tối Ưu Hóa Khởi Tạo Chủ Đề & Chống Chớp Giao Diện (Theme Initialization)
+- Cập nhật [`theme-init.js`](../frontend/public/theme-init.js) và [`backend/public/theme-init.js`](../backend/public/theme-init.js) thực thi trước khi tải DOM để loại bỏ hiện tượng Flash of Unstyled Content (FOUC).
+- Hoàn thiện thanh điều hướng bên [`Sidebar.tsx`](../frontend/src/components/common/Sidebar.tsx), hộp thoại xác nhận [`ConfirmDialog.tsx`](../frontend/src/components/common/ConfirmDialog.tsx) và modal so sánh phê duyệt [`ApprovalDiffModal.tsx`](../frontend/src/components/document-desk/ApprovalDiffModal.tsx).
+
+---
+
+## [v1.6.3-lecture-catalogs-and-fingerprint-enhancement] — 2026-11-15
+
+### 1. Phân Hệ Quản Lý Danh Mục Bài Giảng Số (Lecture Catalogs System)
+- **Giao diện Quản trị Danh mục Bài giảng:**
+  - Bổ sung màn hình chuyên trách [`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx) phục vụ phân loại, tổ chức danh mục bài giảng khoa học và trực quan.
+  - Tích hợp mục danh mục vào thanh điều hướng bên [`Sidebar.tsx`](../frontend/src/components/common/Sidebar.tsx) và trung tâm chỉ huy [`AdminDashboardPage.tsx`](../frontend/src/pages/AdminDashboardPage.tsx).
+- **Hạ tầng Dữ liệu & API Backend:**
+  - Bổ sung script migration [`upgrade_lecture_catalogs.cjs`](../backend/migrations/upgrade_lecture_catalogs.cjs) nâng cấp cấu trúc bảng danh mục bài giảng.
+  - Bổ sung các endpoint quản trị danh mục trong [`backend/src/admin-routes.js`](../backend/src/admin-routes.js) và khai báo phân quyền chặt chẽ trong [`backend/src/route-permissions.js`](../backend/src/route-permissions.js).
+
+### 2. Tinh Chỉnh Xác Thực Sinh Trắc Học & Quản Trị Bài Giảng
+- Nâng cấp modal quét vân tay [`FingerprintScanModal.tsx`](../frontend/src/components/users/FingerprintScanModal.tsx) và [`fingerprintService.ts`](../frontend/src/services/fingerprintService.ts) tăng độ ổn định khi giao tiếp máy quét ZKTeco.
+- Cải tiến modal bắt đầu phiên giảng dạy [`StartSessionModal.tsx`](../frontend/src/components/lectures/StartSessionModal.tsx) và dịch vụ bài giảng [`lectureService.ts`](../frontend/src/services/lectureService.ts).
+
+### 3. Tối Ưu Hóa & Sửa Lỗi Tiện Ích Gộp Mã Nguồn (`scripts/mergecode.py` v5.1.1)
+- Khắc phục lỗi thiếu đối số `files` tại hàm `_write_summary()` trong `scripts/mergecode.py`.
+- Bổ sung mẫu `mergecode*.txt` vào [`.gitignore`](../.gitignore) và loại bỏ tệp dump `mergecode_full.txt` (4.7 MB) khỏi kho mã nguồn Git, bảo đảm tuân thủ Hiến pháp Kỷ luật Thư mục của dự án.
+
+---
+
 ## [v1.6.2-lecture-session-and-db-optimization] — 2026-11-14
 
 ### 1. Tối Ưu Hóa Kết Nối Cơ Sở Dữ Liệu & Quản Lý Phiên (Database & Session Optimization)

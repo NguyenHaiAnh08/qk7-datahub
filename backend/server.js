@@ -2863,13 +2863,28 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       replacedFile = true;
     }
 
+    // Kiểm tra tính hợp lệ của issuing_unit_id chống lỗi FK_DOC_UNIT
+    let cleanUnitId = null;
+    if (issuing_unit_id && typeof issuing_unit_id === 'string' && issuing_unit_id.trim()) {
+      const uCheck = await pool.request()
+        .input('chk_unit', sql.VarChar(50), issuing_unit_id.trim())
+        .query(`SELECT 1 FROM UNIT WHERE unit_id = @chk_unit`);
+      if (uCheck.recordset.length > 0) {
+        cleanUnitId = issuing_unit_id.trim();
+      } else {
+        cleanUnitId = oldDoc.issuing_unit_id || null;
+      }
+    } else {
+      cleanUnitId = oldDoc.issuing_unit_id || null;
+    }
+
     const reqUpdate = pool.request()
       .input('file_id', sql.VarChar(50), fileId)
       .input('document_code', sql.NVarChar(100), document_code || null)
       .input('title', sql.NVarChar(500), title.trim())
       .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
       .input('issued_date', sql.Date, issued_date || null)
-      .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+      .input('issuing_unit_id', sql.VarChar(50), cleanUnitId)
       .input('signer', sql.NVarChar(100), signer || null)
       .input('summary', sql.NVarChar(sql.MAX), summary || null)
       .input('security_level_id', sql.Int, parseInt(security_level_id, 10))

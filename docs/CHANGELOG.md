@@ -4,6 +4,21 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.7.4-document-unit-fk-guard-and-schedule-note-resilience] — 2026-11-17
+
+### 1. Phòng Vệ Khóa Ngoại Đơn Vị Ban Hành Khi Chỉnh Sửa Văn Bản ([`backend/server.js`](../backend/server.js))
+- Tại `PUT /api/documents/:fileId`: Bổ sung bước kiểm tra tính tồn tại của `issuing_unit_id` trong bảng `UNIT` trước khi thực thi truy vấn UPDATE.
+- Nếu mã đơn vị gửi lên không hợp lệ hoặc đã bị thay đổi, tự động fallback về `oldDoc.issuing_unit_id` hoặc `null`, ngăn chặn hoàn toàn lỗi sập giao dịch do vi phạm ràng buộc khóa ngoại `FK_DOC_UNIT`.
+
+### 2. Khắc Phục Lỗi Cột Ghi Chú Lịch Giảng Dạy & Tự Động Migration ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js) & [`backend/src/migrate-radar.js`](../backend/src/migrate-radar.js))
+- Bổ sung hàm kiểm tra tương thích `hasColumn(pool, 'TEACHING_SCHEDULE', 'note')` và gán `${hasNote ? 's.note' : 'NULL AS note'}`, ngăn chặn lỗi SQL `Invalid column name 'note'` khi xem chi tiết radar phòng học trên các phiên bản CSDL chưa cập nhật cột.
+- Bổ sung bước tự động thêm cột `note NVARCHAR(500) NULL` vào `TEACHING_SCHEDULE` trong kịch bản di chuyển `migrate-radar.js`.
+
+### 3. Đồng Bộ Dữ Liệu Kho Vector RAG ([`boxchat/local_storage/qdrant_data/metadata_chunks.json`](../boxchat/local_storage/qdrant_data/metadata_chunks.json))
+- Dọn dẹp các chunk metadata của tài liệu thử nghiệm đã xóa, bảo đảm kho vector đồng bộ với CSDL.
+
+---
+
 ## [v1.7.3-db-connection-pool-and-fingerprint-resilience] — 2026-11-17
 
 ### 1. Tối Ưu Hóa Connection Pool SQL Server Chống Drop Socket ([`backend/src/db.js`](../backend/src/db.js))

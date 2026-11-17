@@ -1,7 +1,7 @@
-import { PDFDocument, rgb, degrees } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+const { PDFDocument, rgb, degrees } = require('pdf-lib');
+const fontkit = require('@pdf-lib/fontkit');
+const fs = require('node:fs/promises');
+const path = require('node:path');
 
 let fontBytesPromise = null;
 
@@ -21,7 +21,7 @@ function safeText(value) {
     .trim();
 }
 
-export function formatServerDateTime(date = new Date()) {
+function formatServerDateTime(date = new Date()) {
   return new Intl.DateTimeFormat('vi-VN', {
     timeZone: 'Asia/Ho_Chi_Minh',
     year: 'numeric',
@@ -44,7 +44,7 @@ export function formatServerDateTime(date = new Date()) {
  * @param {number} [meta.opacity]
  * @returns {Promise<Buffer>}
  */
-export async function stampPdfWatermark(
+async function stampPdfWatermark(
   inputBuffer,
   { userDisplayName, timeStr, traceId, opacity = 0.18 }
 ) {
@@ -110,4 +110,9 @@ export async function stampPdfWatermark(
 
   const bytes = await pdfDoc.save({ useObjectStreams: true });
   return Buffer.from(bytes);
+  
+  module.exports = {
+  stampPdfWatermark,
+  formatServerDateTime,
+};
 }

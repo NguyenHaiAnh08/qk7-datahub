@@ -97,17 +97,108 @@ def free_port(port: int):
     except Exception as e:
         print(f"[Agent] ⚠️ Lỗi kiểm tra cổng {port}: {e}")
 
+
 def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None):
+    from urllib.parse import urlsplit
+
     free_port(port)
 
     class Handler(http.server.BaseHTTPRequestHandler):
+        def _send_json(self, status_code, data):
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+
+            self.send_response(status_code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_OPTIONS(self):
             self.send_response(204)
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "*")
             self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Access-Control-Max-Age", "600")
+            self.send_header("Content-Length", "0")
             self.end_headers()
+
+        def do_GET(self):
+            # Bỏ query string để /device-id?test=1 vẫn nhận đúng route.
+            path = urlsplit(self.path).path.rstrip("/") or "/"
+
+            if path == "/device-id":
+                self._send_json(200, {
+                    "device_id": device_id,
+                    "service": "qk7-fingerprint-agent"
+                })
+
+            elif path == "/health":
+                self._send_json(200, {
+                    "ok": True,
+                    "service": "qk7-fingerprint-agent"
+                })
+
+            elif path == "/enroll-status":
+                status = (
+                    agent_ref.get_enroll_status()
+                    if agent_ref
+                    else {
+                        "enrolling": False,
+                        "step": 0,
+                        "total": 3,
+                        "state": "idle"
+                    }
+                )
+                self._send_json(200, status)
+
+            else:
+                self._send_json(404, {
+                    "error": "NOT_FOUND",
+                    "path": path
+                })
+
+        def log_message(self, format, *args):
+            pass
+
+    server = None
+
+    for attempt in range(3):
+        try:
+            free_port(port)
+            server = http.server.ThreadingHTTPServer((host, port), Handler)
+
+            t = threading.Thread(
+                target=server.serve_forever,
+                daemon=True
+            )
+            t.start()
+
+            print(
+                f"[Agent] Device-id server: "
+                f"http://{host}:{port}/device-id"
+            )
+            return server
+
+        except OSError as e:
+            if attempt < 2:
+                print(
+                    f"[Agent] ⚠️ Cổng {port} chưa sẵn sàng ({e}), "
+                    f"đang thử mở lại lần {attempt + 2}..."
+                )
+                free_port(port)
+                time.sleep(1.5)
+            else:
+                print(
+                    f"[Agent] ❌ Không mở được {host}:{port}: {e}."
+                )
+                return None
+
 
         def do_GET(self):
             if self.path == "/device-id":

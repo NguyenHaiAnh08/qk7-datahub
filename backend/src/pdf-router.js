@@ -23,7 +23,7 @@ const pdfjsLibPromise = import('pdfjs-dist/legacy/build/pdf.mjs');
 const {
     stampPdfWatermark,
     formatServerDateTime,
-} = require('../services/pdfWatermarkServer.js');
+} = require('./pdfWatermarkServer.js');
 
 // ============================================================
 // 1. PDF CLASSIFIER

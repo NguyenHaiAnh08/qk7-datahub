@@ -1,16 +1,15 @@
 ---
 name: design-md
-description: |
-  Create and manage DESIGN.md files. Useful for capturing design direction, tokens, and visual rules in a single source of truth.
+description: Must read ANTIGRAVITY_MASTER_BRAIN.md before executing tasks. Create and manage DESIGN.md files. Useful for capturing design direction, tokens, and visual rules in a single source of truth.
 triggers:
-  - "design.md"
-  - "design doc"
-  - "design tokens doc"
-  - "visual rules doc"
+- design.md
+- design doc
+- design tokens doc
+- visual rules doc
 od:
   mode: design-system
   category: design-systems
-  upstream: "https://github.com/google-labs-code/skills"
+  upstream: https://github.com/google-labs-code/skills
 ---
 
 # design-md

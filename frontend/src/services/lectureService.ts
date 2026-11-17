@@ -12,6 +12,9 @@ import {
   CreateQuizPayload,
   ScormTrackingData,
   ScormCommitPayload,
+  RadarOverviewResponse,
+  RadarFloorPlanResponse,
+  RadarRoomDetailResponse,
 } from '../types/lecture';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -311,6 +314,39 @@ export const lectureService = {
   },
   async adminDeleteClassroom(id: string): Promise<{ success: boolean; soft_deleted?: boolean }> {
     return http(`/api/admin/lectures/classrooms/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  // ─── QK7 LECTURE HALL RADAR ───
+  async getRadarOverview(): Promise<RadarOverviewResponse> {
+    return http('/api/lectures/radar/overview');
+  },
+
+  async getRadarFloorPlan(params: {
+    building_code?: string;
+    floor_number?: number;
+    time_shift?: string;
+  } = {}): Promise<RadarFloorPlanResponse> {
+    const p = new URLSearchParams();
+    if (params.building_code) p.set('building_code', params.building_code);
+    if (params.floor_number) p.set('floor_number', String(params.floor_number));
+    if (params.time_shift) p.set('time_shift', params.time_shift);
+    const qs = p.toString();
+    return http(`/api/lectures/radar/floor-plan${qs ? `?${qs}` : ''}`);
+  },
+
+  async getRadarRoomDetail(roomId: string): Promise<RadarRoomDetailResponse> {
+    return http(`/api/lectures/radar/rooms/${encodeURIComponent(roomId)}/detail`);
+  },
+
+  async toggleRoomMaintenance(
+    roomId: string,
+    data: { is_maintenance: boolean; maintenance_reason?: string }
+  ): Promise<{ success: boolean; is_maintenance: boolean; maintenance_reason?: string }> {
+    return http(`/api/lectures/radar/rooms/${encodeURIComponent(roomId)}/maintenance`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(data),
+    });
   },
 };
 

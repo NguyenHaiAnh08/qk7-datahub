@@ -4,6 +4,29 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.7.0-qk7-lecture-hall-radar-and-classroom-monitoring] — 2026-11-17
+
+### 1. Radar Giám Sát Giảng Đường & Lớp Học Thời Gian Thực (QK7 Lecture Hall Radar Suite)
+- **Giao diện Radar Tác chiến Thời gian thực ([`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx)):**
+  - Trực quan hóa bản đồ giảng đường theo khu tòa nhà (H1, H2, HT, PM) và theo từng tầng (Floor grid layout) với tọa độ hàng/cột ma trận phòng học.
+  - Phân loại trạng thái phòng học quân sự tức thì: Đang giảng dạy (`ONGOING`, viền nhấp nháy, telemetry tiến độ slide/SCORM thời gian thực, cảnh báo ca treo/vượt giờ), Sắp diễn ra (`SCHEDULED`), Phòng trống (`IDLE`), Đang bảo trì kỹ thuật (`MAINTENANCE`).
+  - Tích hợp ngăn kéo (Drawer) chi tiết phòng học: Lịch trình giảng dạy trong ngày, thông tin giảng viên, lớp học viên, môn học, phân cấp mật và chuyên cần.
+  - Cho phép Quản trị viên / Chỉ huy / Trưởng bộ môn trực tiếp kích hoạt chế độ bảo trì phòng kèm lý do bảo trì.
+- **Hạ tầng Dịch vụ & API Radar Giảng đường ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js)):**
+  - `GET /api/lectures/radar/overview`: Cung cấp chỉ số tổng quan, tỷ lệ sử dụng phòng, danh sách khu & tầng.
+  - `GET /api/lectures/radar/buildings/:buildingCode`: Truy vấn lưới phòng học theo tầng và ca học tương ứng.
+  - `GET /api/lectures/radar/rooms/:roomId/detail`: Lấy chi tiết phòng học, ca học hiện tại và toàn bộ lịch trong ngày.
+  - `POST /api/lectures/radar/rooms/:roomId/maintenance`: Chuyển đổi trạng thái bảo trì phòng học, ghi nhận nhật ký kiểm toán `CLASSROOM_MAINTENANCE_TOGGLE`.
+  - **Bảo mật 5 Cấp Độ Mật (`sanitizeSessionForClearance`):** Tự động che dấu và mã hóa tiêu đề bài giảng nếu độ mật bài giảng vượt quá cấp độ của người giám sát (`[Tài liệu có độ mật cao - Đã mã hóa]`).
+- **Kịch bản Migration CSDL ([`backend/src/migrate-radar.js`](../backend/src/migrate-radar.js)):**
+  - Bổ sung các cột định vị không gian và cấu hình: `building_code`, `floor_number`, `grid_col`, `grid_row`, `is_maintenance`, `maintenance_reason`, `display_order` vào bảng `CLASSROOM`.
+- **Dịch vụ Frontend & Kiểu Dữ Liệu:**
+  - Mở rộng [`lectureService.ts`](../frontend/src/services/lectureService.ts) và [`lecture.ts`](../frontend/src/types/lecture.ts) với đầy đủ interface Radar.
+- **Tinh Chỉnh Các Trình Xem & Modal:**
+  - Tối ưu hóa [`AIChatDrawer.tsx`](../frontend/src/components/ai-chat/AIChatDrawer.tsx), [`AIChatWidget.tsx`](../frontend/src/components/ai-chat/AIChatWidget.tsx), [`DocumentPreviewModal.tsx`](../frontend/src/components/document-desk/DocumentPreviewModal.tsx), [`PdfPagesViewer.tsx`](../frontend/src/components/document-desk/PdfPagesViewer.tsx).
+
+---
+
 ## [v1.6.7-military-unit-hierarchy-and-catalogs-treeselect] — 2026-11-16
 
 ### 1. Chuẩn Hóa Trọng Số Phân Cấp & Cây Đơn Vị Quân Sự (Military Unit Hierarchy Suite)

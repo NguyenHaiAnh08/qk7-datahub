@@ -81,7 +81,7 @@ module.exports = function createLectureExtendedRoutes({
         if (own.recordset.length === 0) return res.status(403).json({ error: 'Không có quyền' });
 
         const { question_text, option_a, option_b, option_c, option_d,
-                correct_answer, explanation, slide_index, points, question_order } = req.body;
+          correct_answer, explanation, slide_index, points, question_order } = req.body;
         await pool.request()
           .input('id', sql.VarChar(50), req.params.questionId)
           .input('lid', sql.VarChar(50), req.params.lectureId)
@@ -199,7 +199,8 @@ module.exports = function createLectureExtendedRoutes({
           SELECT
             s.schedule_id, s.lecture_id, s.presenter_id, s.class_id,
             s.venue_name, s.student_count, s.start_time, s.status,
-            s.session_type, s.slide_index, s.slide_total, s.scorm_progress,
+            CASE WHEN s.is_self_study = 1 THEN 'SELF_STUDY' ELSE 'TEACHER_LED' END AS session_type,
+            s.slide_index, s.slide_total, s.scorm_progress,
             DATEDIFF(MINUTE, s.start_time, GETDATE()) AS duration_minutes,
             CASE WHEN DATEDIFF(MINUTE, s.start_time, GETDATE()) > 240 THEN 1 ELSE 0 END AS is_hanging,
             l.lecture_code, l.title AS lecture_title, l.content_type,
@@ -238,9 +239,9 @@ module.exports = function createLectureExtendedRoutes({
         await pool.request()
           .input('sid', sql.VarChar(50), req.params.scheduleId)
           .input('uid', sql.VarChar(50), req.user.user_id)
-          .input('si',  sql.Int, slide_index)
-          .input('st',  sql.Int, slide_total ?? null)
-          .input('sp',  sql.Float, scorm_progress ?? null)
+          .input('si', sql.Int, slide_index)
+          .input('st', sql.Int, slide_total ?? null)
+          .input('sp', sql.Float, scorm_progress ?? null)
           .query(`UPDATE TEACHING_SCHEDULE
                   SET slide_index=@si, slide_total=@st, scorm_progress=@sp
                   WHERE schedule_id=@sid AND presenter_id=@uid AND status='ONGOING'`);

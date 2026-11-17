@@ -4,6 +4,29 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.7.2-admin-2fa-enforcement-and-monitor-stability] — 2026-11-17
+
+### 1. Khắc Phục Cơ Chế Xác Thực Sinh Trắc Học & Bắt Buộc 2FA Cho Quản Trị Viên (Admin 2FA Enforce)
+- **Siết chặt luồng đăng nhập Quản trị viên ([`backend/server.js`](../backend/server.js)):**
+  - Xóa bỏ hoàn toàn nhánh bypass cho phép `USR-001` đăng nhập chỉ bằng mật khẩu khi chưa có vân tay.
+  - Bắt buộc 100% tài khoản Quản trị viên (kể cả Quản trị tối cao `USR-001`) phải xác thực 2FA qua mã phản hồi HTTP 202 (`require_admin_fp: true`) và vé xác thực tạm thời `temp_ticket`.
+- **Khởi tạo và tích hợp Bảng CSDL Quản lý Vé 2FA (`ADMIN_2FA_TICKET`):**
+  - Tạo bảng `ADMIN_2FA_TICKET` kèm các chỉ mục `IX_ADMIN_2FA_TICKET_user`, `IX_ADMIN_2FA_TICKET_expires`, giải quyết triệt để lỗi máy chủ 500 (`Invalid object name 'ADMIN_2FA_TICKET'`) khi issue vé 2FA.
+  - Kích hoạt mẫu vân tay hợp lệ cho tài khoản `USR-001` trong bảng `USER_FINGERPRINT`.
+
+### 2. Khắc Phục Lỗi Giám Sát Bài Giảng Trực Tiếp & Đồng Bộ Giao Thức Proxy
+- **Sửa lỗi truy vấn CSDL trong API Live Monitor ([`backend/src/lecture-extended-routes.js`](../backend/src/lecture-extended-routes.js)):**
+  - Chuyển đổi truy vấn cột `s.session_type` sang biểu thức tương thích `CASE WHEN s.is_self_study = 1 THEN 'SELF_STUDY' ELSE 'TEACHER_LED' END AS session_type`, ngăn chặn lỗi SQL `Invalid column name 'session_type'`.
+- **Đồng bộ hóa Giao thức Vite Dev Server Proxy ([`frontend/vite.config.ts`](../frontend/vite.config.ts)):**
+  - Bổ sung hàm `detectBackendTargets()` tự động nhận diện chế độ `USE_HTTPS` để điều hướng proxy mượt mà giữa `https://localhost:8000` (WSS) và `http://localhost:8000` (WS), loại bỏ lỗi ngắt kết nối TLS khi chạy ở chế độ bảo mật cao.
+
+### 3. Chuẩn Hóa YAML Frontmatter Toàn Bộ Agent Skills
+- **Khắc phục lỗi nạp Customizations trong Antigravity IDE ([`.agents/skills/`](../.agents/skills/)):**
+  - Rà soát và chuẩn hóa 17 tệp `SKILL.md` theo đặc tả kỹ thuật nghiêm ngặt của Antigravity (`name` và `description` độc quyền trong frontmatter block).
+  - Loại bỏ các trường lỗi unmarshal Go (`metadata:`, `author:`, `license:`, `allowed-tools:`, `compatibility:`...), giải quyết triệt để cảnh báo đỏ `"12 customizations failed to load"` và `"3 customizations failed to load"`.
+
+---
+
 ## [v1.7.1-fingerprint-agent-https-mixed-content-and-watermark-font-fix] — 2026-11-17
 
 ### 1. Khắc Phục Lỗi Kết Nối Máy Quét Vân Tay Qua HTTPS & Mixed Content (Fingerprint HTTPS Suite)

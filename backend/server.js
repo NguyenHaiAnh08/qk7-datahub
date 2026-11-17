@@ -972,35 +972,18 @@ async function handleLogin(req, res) {
       const hasFingerprint = user.has_fingerprint === 1;
 
       if (!hasFingerprint) {
-        if (isProtectedAdmin) {
-          // USR-001 chưa enroll → cho qua password-only để enroll admin khác
-          console.warn(
-            `[SECURITY] ⚠️ USR-001 chưa enroll vân tay — đăng nhập không 2FA. ` +
-            `Yêu cầu enroll ngay qua giao diện Quản lý Người dùng.`
-          );
-          await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN_NO_FP_WARNING', ip,
-            note: 'Quản trị tối cao đăng nhập không 2FA (chưa enroll vân tay) — yêu cầu enroll'
-          });
-          // Không return — rơi xuống nhánh cấp JWT bên dưới
-
-        } else {
-          // Admin tạm thời chưa có vân tay → CHẶN đăng nhập
-          await writeAccessLog({
-            userId: user.user_id, fileId: null,
-            action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
-            note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin ` +
-                  `nhưng chưa enroll vân tay — từ chối đăng nhập`
-          });
-          return res.status(403).json({
-            error: 'Tài khoản của bạn được gán vai trò Quản trị viên nhưng chưa đăng ký vân tay. ' +
-                   'Vui lòng liên hệ Quản trị viên tối cao (USR-001) để đăng ký vân tay trước khi đăng nhập.',
-            code: 'ADMIN_FINGERPRINT_REQUIRED',
-            needs_enroll: true,
-            enroll_via: PROTECTED_ADMIN_USER_ID,
-          });
-        }
+        // [STRICT SECURITY] Mọi tài khoản Admin (kể cả USR-001) BẮT BUỘC phải có vân tay 2FA
+        await writeAccessLog({
+          userId: user.user_id, fileId: null,
+          action: 'LOGIN_ADMIN_NO_FP_BLOCKED', ip,
+          note: `Tài khoản ${user.user_id} (roles=${userRoles.join(',')}) có quyền Admin nhưng chưa enroll vân tay — từ chối đăng nhập`
+        });
+        return res.status(403).json({
+          error: 'Tài khoản Quản trị viên bắt buộc phải xác thực vân tay 2FA nhưng chưa được đăng ký mẫu vân tay.',
+          code: 'ADMIN_FINGERPRINT_REQUIRED',
+          needs_enroll: true,
+          enroll_via: PROTECTED_ADMIN_USER_ID,
+        });
       } else {
         // Đã có vân tay → yêu cầu quét qua 202
         await writeLoginAttempt({ ip, username, result: 'LOGIN_1FA_SUCCESS' });

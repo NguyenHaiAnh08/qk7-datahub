@@ -622,6 +622,8 @@ app.use('/api', async (req, res, next) => {
     req.path === '/auth/login/admin-fp-verify' || // ✅ Thêm route xác thực vân tay Admin
     req.path === '/health' ||
     req.path === '/meta' ||
+    req.path === '/fingerprint/agents-online' || // công khai: token cũ/hết hạn không được làm 401
+    req.path === '/fingerprint/device-id' ||
     req.path.startsWith('/test-http-error');
   if (isPublic) return next();
 

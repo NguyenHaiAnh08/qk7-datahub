@@ -1006,6 +1006,424 @@ module.exports = function createLectureRoutes({
     }
   });
 
+  // ═════════════════════════════════════════════════════════════
+  // PHẦN 3B — QK7 LECTURE HALL RADAR (REAL-TIME CLASSROOM MONITORING)
+  // ═════════════════════════════════════════════════════════════
+
+  const BUILDING_NAMES = {
+    H1: 'Khu Giảng đường H1',
+    H2: 'Khu Giảng đường H2',
+    HT: 'Khu Hội trường Quân sự',
+    PM: 'Khu Công nghệ / Phòng máy',
+  };
+
+  function sanitizeSessionForClearance(session, userClearance) {
+    if (!session) return null;
+    const isRestricted = session.security_level_id && session.security_level_id > userClearance;
+    return {
+      ...session,
+      lecture_title: isRestricted ? '[Tài liệu có độ mật cao - Đã mã hóa]' : session.lecture_title,
+      is_restricted: Boolean(isRestricted),
+    };
+  }
+
+  // 1. Radar Overview: KPIs + Danh sách các Khu & Tầng
+  router.get('/radar/overview', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+    try {
+      const pool = await getPool();
+      const roles = await resolveUserRoles(pool, req.user);
+      const isAdmin = roles.includes('ROL-01');
+      const isCommander = roles.includes('ROL-02');
+      const deptHead = await isDeptHead(pool, req.user);
+
+      if (!isAdmin && !isCommander && !deptHead) {
+        return res.status(403).json({ error: 'Chỉ BGH / Admin / Trưởng bộ môn mới được giám sát giảng đường' });
+      }
+
+      const userClearance = req.user.clearance_level_id || 1;
+
+      // Toàn bộ phòng học đang hoạt động
+      const roomsResult = await pool.request().query(`
+        SELECT room_id, room_name, room_type, capacity, building_name, building_code,
+               floor_number, grid_col, grid_row, is_maintenance, maintenance_reason, display_order
+        FROM CLASSROOM WITH (NOLOCK)
+        WHERE active = 1
+        ORDER BY building_code, floor_number, display_order
+      `);
+      const allRooms = roomsResult.recordset;
+
+      // Các ca đang diễn ra (ONGOING)
+      const ongoingResult = await pool.request().query(`
+        SELECT s.schedule_id, s.lecture_id, s.room_id, s.venue_name, s.presenter_id,
+               s.start_time, s.slide_index, s.slide_total, s.scorm_progress, s.student_count,
+               s.class_id,
+               FLOOR(DATEDIFF(SECOND, s.start_time, GETDATE()) / 60.0) AS duration_minutes,
+               CASE WHEN DATEDIFF(MINUTE, s.start_time, GETDATE()) > ${HANGING_THRESHOLD_MINUTES}
+                    THEN 1 ELSE 0 END AS is_hanging,
+               l.title AS lecture_title, l.security_level_id,
+               u.full_name AS presenter_name, u.[rank] AS presenter_rank, u.[position] AS presenter_position,
+               c.class_name
+        FROM TEACHING_SCHEDULE s WITH (NOLOCK)
+        JOIN DIGITAL_LECTURE l WITH (NOLOCK) ON l.lecture_id = s.lecture_id
+        JOIN [USER] u WITH (NOLOCK) ON u.user_id = s.presenter_id
+        JOIN TRAINING_CLASS c WITH (NOLOCK) ON c.class_id = s.class_id
+        WHERE s.status = 'ONGOING'
+      `);
+      const ongoingSessions = ongoingResult.recordset;
+
+      // Các ca sắp diễn ra trong vòng 2 giờ
+      const upcomingResult = await pool.request().query(`
+        SELECT s.schedule_id, s.lecture_id, s.room_id, s.venue_name, s.presenter_id,
+               s.start_time, s.class_id,
+               l.title AS lecture_title, l.security_level_id,
+               u.full_name AS presenter_name, u.[rank] AS presenter_rank,
+               c.class_name
+        FROM TEACHING_SCHEDULE s WITH (NOLOCK)
+        JOIN DIGITAL_LECTURE l WITH (NOLOCK) ON l.lecture_id = s.lecture_id
+        JOIN [USER] u WITH (NOLOCK) ON u.user_id = s.presenter_id
+        JOIN TRAINING_CLASS c WITH (NOLOCK) ON c.class_id = s.class_id
+        WHERE s.status = 'SCHEDULED'
+          AND s.start_time > GETDATE()
+          AND s.start_time <= DATEADD(HOUR, 2, GETDATE())
+      `);
+      const upcomingSessions = upcomingResult.recordset;
+
+      const sessionByRoomId = new Map();
+      const upcomingByRoomId = new Map();
+
+      for (const s of ongoingSessions) {
+        const key = s.room_id || allRooms.find(r => r.room_name === s.venue_name)?.room_id;
+        if (key && !sessionByRoomId.has(key)) {
+          sessionByRoomId.set(key, sanitizeSessionForClearance(s, userClearance));
+        }
+      }
+
+      for (const s of upcomingSessions) {
+        const key = s.room_id || allRooms.find(r => r.room_name === s.venue_name)?.room_id;
+        if (key && !upcomingByRoomId.has(key)) {
+          upcomingByRoomId.set(key, sanitizeSessionForClearance(s, userClearance));
+        }
+      }
+
+      const total_rooms = allRooms.length;
+      let in_session = 0;
+      let maintenance = 0;
+      let alert = 0;
+      let upcoming = 0;
+
+      for (const r of allRooms) {
+        if (r.is_maintenance) {
+          maintenance++;
+        } else if (sessionByRoomId.has(r.room_id)) {
+          in_session++;
+          if (sessionByRoomId.get(r.room_id).is_hanging === 1) alert++;
+        } else if (upcomingByRoomId.has(r.room_id)) {
+          upcoming++;
+        }
+      }
+      const available = Math.max(0, total_rooms - in_session - maintenance);
+
+      const buildingsMap = new Map();
+      for (const r of allRooms) {
+        const bCode = r.building_code || 'H1';
+        if (!buildingsMap.has(bCode)) {
+          buildingsMap.set(bCode, {
+            building_code: bCode,
+            building_name: BUILDING_NAMES[bCode] || r.building_name || `Khu ${bCode}`,
+            total_rooms: 0,
+            in_session_count: 0,
+            maintenance_count: 0,
+            floors: new Set(),
+          });
+        }
+        const b = buildingsMap.get(bCode);
+        b.total_rooms++;
+        b.floors.add(r.floor_number || 1);
+        if (sessionByRoomId.has(r.room_id)) b.in_session_count++;
+        if (r.is_maintenance) b.maintenance_count++;
+      }
+
+      const buildings = Array.from(buildingsMap.values()).map(b => ({
+        ...b,
+        floors: Array.from(b.floors).sort((x, y) => x - y),
+      }));
+
+      res.json({
+        kpis: {
+          total_rooms,
+          in_session,
+          available,
+          upcoming,
+          maintenance,
+          alert,
+        },
+        buildings,
+        server_time: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[GET /api/lectures/radar/overview]', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 2. Radar Floor Plan: Sơ đồ phòng học và trạng thái theo Khu và Tầng
+  router.get('/radar/floor-plan', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+    try {
+      const pool = await getPool();
+      const roles = await resolveUserRoles(pool, req.user);
+      const isAdmin = roles.includes('ROL-01');
+      const isCommander = roles.includes('ROL-02');
+      const deptHead = await isDeptHead(pool, req.user);
+
+      if (!isAdmin && !isCommander && !deptHead) {
+        return res.status(403).json({ error: 'Chỉ BGH / Admin / Trưởng bộ môn mới được giám sát giảng đường' });
+      }
+
+      const userClearance = req.user.clearance_level_id || 1;
+      const buildingCode = String(req.query.building_code || 'H1').trim();
+      const floorNumber = parseInt(req.query.floor_number || '1', 10);
+      const timeShift = String(req.query.time_shift || 'live').toLowerCase();
+
+      const rReq = pool.request()
+        .input('b', sql.VarChar(20), buildingCode)
+        .input('f', sql.Int, floorNumber);
+
+      const roomsRes = await rReq.query(`
+        SELECT room_id, room_name, room_type, capacity, building_name, building_code,
+               floor_number, grid_col, grid_row, is_maintenance, maintenance_reason, display_order
+        FROM CLASSROOM WITH (NOLOCK)
+        WHERE active = 1 AND building_code = @b AND floor_number = @f
+        ORDER BY display_order, grid_row, grid_col
+      `);
+      const rooms = roomsRes.recordset;
+
+      let sessionQuery = `
+        SELECT s.schedule_id, s.lecture_id, s.room_id, s.venue_name, s.presenter_id,
+               s.start_time, s.end_time, s.status, s.slide_index, s.slide_total, s.scorm_progress,
+               s.student_count, s.class_id,
+               FLOOR(DATEDIFF(SECOND, s.start_time, GETDATE()) / 60.0) AS duration_minutes,
+               CASE WHEN DATEDIFF(MINUTE, s.start_time, GETDATE()) > ${HANGING_THRESHOLD_MINUTES}
+                    THEN 1 ELSE 0 END AS is_hanging,
+               l.title AS lecture_title, l.security_level_id,
+               u.full_name AS presenter_name, u.[rank] AS presenter_rank, u.[position] AS presenter_position,
+               c.class_name
+        FROM TEACHING_SCHEDULE s WITH (NOLOCK)
+        JOIN DIGITAL_LECTURE l WITH (NOLOCK) ON l.lecture_id = s.lecture_id
+        JOIN [USER] u WITH (NOLOCK) ON u.user_id = s.presenter_id
+        JOIN TRAINING_CLASS c WITH (NOLOCK) ON c.class_id = s.class_id
+        WHERE 1 = 1
+      `;
+
+      if (timeShift === 'live') {
+        sessionQuery += ` AND s.status = 'ONGOING'`;
+      } else {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (timeShift === 'morning') {
+          sessionQuery += ` AND s.start_time >= '${todayStr} 07:00:00' AND s.start_time <= '${todayStr} 11:30:00'`;
+        } else if (timeShift === 'afternoon') {
+          sessionQuery += ` AND s.start_time >= '${todayStr} 13:30:00' AND s.start_time <= '${todayStr} 17:00:00'`;
+        } else if (timeShift === 'evening') {
+          sessionQuery += ` AND s.start_time >= '${todayStr} 19:00:00' AND s.start_time <= '${todayStr} 21:30:00'`;
+        }
+      }
+
+      const sessionsRes = await pool.request().query(sessionQuery);
+      const allSessions = sessionsRes.recordset;
+
+      const upcomingRes = await pool.request().query(`
+        SELECT s.schedule_id, s.lecture_id, s.room_id, s.venue_name, s.presenter_id,
+               s.start_time, s.class_id,
+               l.title AS lecture_title, l.security_level_id,
+               u.full_name AS presenter_name, u.[rank] AS presenter_rank,
+               c.class_name
+        FROM TEACHING_SCHEDULE s WITH (NOLOCK)
+        JOIN DIGITAL_LECTURE l WITH (NOLOCK) ON l.lecture_id = s.lecture_id
+        JOIN [USER] u WITH (NOLOCK) ON u.user_id = s.presenter_id
+        JOIN TRAINING_CLASS c WITH (NOLOCK) ON c.class_id = s.class_id
+        WHERE s.status = 'SCHEDULED'
+          AND s.start_time > GETDATE()
+          AND s.start_time <= DATEADD(HOUR, 2, GETDATE())
+      `);
+      const upcomingSessions = upcomingRes.recordset;
+
+      const resultRooms = rooms.map((room) => {
+        const session = allSessions.find(
+          (s) => s.room_id === room.room_id || (!s.room_id && s.venue_name === room.room_name)
+        );
+        const upcoming = upcomingSessions.find(
+          (s) => s.room_id === room.room_id || (!s.room_id && s.venue_name === room.room_name)
+        );
+
+        let computed_status = 'AVAILABLE';
+        if (room.is_maintenance) {
+          computed_status = 'MAINTENANCE';
+        } else if (session) {
+          if (session.status === 'ONGOING' && session.is_hanging === 1) {
+            computed_status = 'ALERT';
+          } else {
+            computed_status = 'IN_SESSION';
+          }
+        } else if (upcoming) {
+          computed_status = 'UPCOMING';
+        }
+
+        return {
+          ...room,
+          computed_status,
+          current_session: session ? sanitizeSessionForClearance(session, userClearance) : null,
+          upcoming_session: upcoming ? sanitizeSessionForClearance(upcoming, userClearance) : null,
+        };
+      });
+
+      res.json({
+        building_code: buildingCode,
+        building_name: BUILDING_NAMES[buildingCode] || `Khu ${buildingCode}`,
+        floor_number: floorNumber,
+        time_shift: timeShift,
+        rooms: resultRooms,
+        server_time: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[GET /api/lectures/radar/floor-plan]', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3. Radar Room Detail: Chi tiết giảng đường cho Inspector
+  router.get('/radar/rooms/:roomId/detail', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+    try {
+      const pool = await getPool();
+      const roles = await resolveUserRoles(pool, req.user);
+      const isAdmin = roles.includes('ROL-01');
+      const isCommander = roles.includes('ROL-02');
+      const deptHead = await isDeptHead(pool, req.user);
+
+      if (!isAdmin && !isCommander && !deptHead) {
+        return res.status(403).json({ error: 'Chỉ BGH / Admin / Trưởng bộ môn mới được xem chi tiết' });
+      }
+
+      const userClearance = req.user.clearance_level_id || 1;
+      const roomId = req.params.roomId;
+
+      const roomRes = await pool.request()
+        .input('rid', sql.VarChar(50), roomId)
+        .query(`
+          SELECT room_id, room_name, room_type, capacity, building_name, building_code,
+                 floor_number, grid_col, grid_row, is_maintenance, maintenance_reason, display_order
+          FROM CLASSROOM WITH (NOLOCK)
+          WHERE room_id = @rid AND active = 1
+        `);
+
+      if (roomRes.recordset.length === 0) {
+        return res.status(404).json({ error: 'Không tìm thấy phòng học' });
+      }
+      const room = roomRes.recordset[0];
+      room.building_name = BUILDING_NAMES[room.building_code] || room.building_name;
+
+      const sessionRes = await pool.request()
+        .input('rid', sql.VarChar(50), roomId)
+        .input('vname', sql.NVarChar(100), room.room_name)
+        .query(`
+          SELECT s.schedule_id, s.lecture_id, s.room_id, s.venue_name, s.presenter_id,
+                 s.start_time, s.end_time, s.status, s.slide_index, s.slide_total, s.scorm_progress,
+                 s.student_count, s.class_id, s.note,
+                 FLOOR(DATEDIFF(SECOND, s.start_time, GETDATE()) / 60.0) AS duration_minutes,
+                 CASE WHEN DATEDIFF(MINUTE, s.start_time, GETDATE()) > ${HANGING_THRESHOLD_MINUTES}
+                      THEN 1 ELSE 0 END AS is_hanging,
+                 l.title AS lecture_title, l.security_level_id, l.content_type,
+                 sub.name AS subject_name,
+                 u.full_name AS presenter_name, u.[rank] AS presenter_rank, u.[position] AS presenter_position,
+                 c.class_name, c.student_total AS class_student_total,
+                 un.name AS unit_name
+          FROM TEACHING_SCHEDULE s WITH (NOLOCK)
+          JOIN DIGITAL_LECTURE l WITH (NOLOCK) ON l.lecture_id = s.lecture_id
+          JOIN SUBJECT sub WITH (NOLOCK) ON sub.subject_id = l.subject_id
+          JOIN [USER] u WITH (NOLOCK) ON u.user_id = s.presenter_id
+          JOIN TRAINING_CLASS c WITH (NOLOCK) ON c.class_id = s.class_id
+          LEFT JOIN UNIT un WITH (NOLOCK) ON un.unit_id = c.unit_id
+          WHERE (s.room_id = @rid OR s.venue_name = @vname) AND s.status = 'ONGOING'
+        `);
+
+      const current_session = sessionRes.recordset[0]
+        ? sanitizeSessionForClearance(sessionRes.recordset[0], userClearance)
+        : null;
+
+      const todayRes = await pool.request()
+        .input('rid', sql.VarChar(50), roomId)
+        .input('vname', sql.NVarChar(100), room.room_name)
+        .query(`
+          SELECT s.schedule_id, s.lecture_id, s.start_time, s.end_time, s.status,
+                 l.title AS lecture_title, l.security_level_id,
+                 u.full_name AS presenter_name, c.class_name
+          FROM TEACHING_SCHEDULE s WITH (NOLOCK)
+          JOIN DIGITAL_LECTURE l WITH (NOLOCK) ON l.lecture_id = s.lecture_id
+          JOIN [USER] u WITH (NOLOCK) ON u.user_id = s.presenter_id
+          JOIN TRAINING_CLASS c WITH (NOLOCK) ON c.class_id = s.class_id
+          WHERE (s.room_id = @rid OR s.venue_name = @vname)
+            AND CAST(s.start_time AS DATE) = CAST(GETDATE() AS DATE)
+          ORDER BY s.start_time ASC
+        `);
+
+      const today_schedules = todayRes.recordset.map((s) =>
+        sanitizeSessionForClearance(s, userClearance)
+      );
+
+      res.json({
+        room,
+        current_session,
+        today_schedules,
+      });
+    } catch (err) {
+      console.error('[GET /api/lectures/radar/rooms/:roomId/detail]', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 4. Bật / Tắt trạng thái Bảo trì cho phòng học (Admin / Chỉ huy / Trưởng BM)
+  router.post('/radar/rooms/:roomId/maintenance', requireAuth, async (req, res) => {
+    try {
+      const pool = await getPool();
+      const roles = await resolveUserRoles(pool, req.user);
+      const isAdmin = roles.includes('ROL-01');
+      const isCommander = roles.includes('ROL-02');
+      const deptHead = await isDeptHead(pool, req.user);
+
+      if (!isAdmin && !isCommander && !deptHead) {
+        return res.status(403).json({ error: 'Chỉ Quản trị viên hoặc Chỉ huy mới có quyền cập nhật trạng thái bảo trì' });
+      }
+
+      const roomId = req.params.roomId;
+      const isMaintenance = Boolean(req.body.is_maintenance);
+      const maintenanceReason = req.body.maintenance_reason ? String(req.body.maintenance_reason).trim() : null;
+
+      await pool.request()
+        .input('rid', sql.VarChar(50), roomId)
+        .input('im', sql.Bit, isMaintenance ? 1 : 0)
+        .input('mr', sql.NVarChar(255), isMaintenance ? (maintenanceReason || 'Bảo trì kỹ thuật định kỳ') : null)
+        .query(`
+          UPDATE CLASSROOM
+          SET is_maintenance = @im, maintenance_reason = @mr
+          WHERE room_id = @rid
+        `);
+
+      await logAudit(
+        req,
+        'CLASSROOM_MAINTENANCE_TOGGLE',
+        `${isMaintenance ? 'BẬT' : 'TẮT'} bảo trì phòng ${roomId}: ${maintenanceReason || 'N/A'}`
+      );
+
+      res.json({
+        success: true,
+        room_id: roomId,
+        is_maintenance: isMaintenance,
+        maintenance_reason: isMaintenance ? maintenanceReason : null,
+      });
+    } catch (err) {
+      console.error('[POST /api/lectures/radar/rooms/:roomId/maintenance]', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // History — query chính TEACHING_SCHEDULE
   router.get('/schedules/history', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
     try {

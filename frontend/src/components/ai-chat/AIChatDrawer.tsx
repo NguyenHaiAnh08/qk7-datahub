@@ -731,6 +731,7 @@ export const AIChatDrawer: React.FC = () => {
         open={previewOpen}
         document={previewDoc}
         page={previewPage}
+        isAiCitation={true}
         initialToken={getActiveFpToken(previewDoc?.file_id)}
         onClose={() => {
           setPreviewOpen(false);

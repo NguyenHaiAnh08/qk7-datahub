@@ -18,6 +18,7 @@ export interface PdfPagesViewerProps {
   blobUrl: string;
   fileId: string;
   initialPage?: number;
+  isAiCitation?: boolean;
   securityLevel?: number;
   isHighlighterActive: boolean;
   highlighterColor: string;
@@ -29,6 +30,7 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
   blobUrl,
   fileId,
   initialPage = 1,
+  isAiCitation = false,
   securityLevel = 1,
   isHighlighterActive,
   highlighterColor,
@@ -287,7 +289,7 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
                 key={`pdf-page-${pageNum}`}
                 pdfDoc={pdfDocRef.current}
                 pageNum={pageNum}
-                isCitedPage={pageNum === initialPage && initialPage > 0}
+                isCitedPage={Boolean(isAiCitation) && pageNum === initialPage && initialPage > 0}
                 securityLevel={securityLevel}
                 targetWidth={targetWidth}
                 originalWidth={originalDim.width}

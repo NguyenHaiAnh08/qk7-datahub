@@ -39,6 +39,7 @@ export interface DocumentPreviewModalProps {
   userClearanceLevel?: number;
   initialToken?: string | null;
   page?: number;
+  isAiCitation?: boolean;
   onClose: () => void;
 }
 
@@ -48,6 +49,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   userClearanceLevel: propClearanceLevel,
   initialToken: propInitialToken,
   page = 1,
+  isAiCitation = false,
   onClose,
 }) => {
   const { user, logout } = useAuth();
@@ -614,6 +616,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   blobUrl={blobUrl}
                   fileId={document.file_id}
                   initialPage={page}
+                  isAiCitation={isAiCitation}
                   securityLevel={docLevel}
                   isHighlighterActive={isHighlighterActive}
                   highlighterColor={highlighterColor}

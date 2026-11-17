@@ -7,9 +7,27 @@ let fontBytesPromise = null;
 
 async function loadFontBytes() {
   if (!fontBytesPromise) {
-    fontBytesPromise = fs.readFile(
-      path.join(process.cwd(), 'assets/fonts/Roboto-Regular.ttf')
-    );
+    const candidatePaths = [
+      path.join(__dirname, '../public/standard_fonts/LiberationSans-Regular.ttf'),
+      path.join(process.cwd(), 'public/standard_fonts/LiberationSans-Regular.ttf'),
+      path.join(process.cwd(), 'backend/public/standard_fonts/LiberationSans-Regular.ttf'),
+      path.join(process.cwd(), 'assets/fonts/Roboto-Regular.ttf'),
+      'C:\\Windows\\Fonts\\arial.ttf',
+    ];
+
+    fontBytesPromise = (async () => {
+      for (const p of candidatePaths) {
+        try {
+          const bytes = await fs.readFile(p);
+          return bytes;
+        } catch (_) {
+          // Thử tiếp đường dẫn dự phòng
+        }
+      }
+      throw new Error(
+        'Không tìm thấy font chữ TrueType (.ttf) hỗ trợ đóng dấu PDF tiếng Việt'
+      );
+    })();
   }
   return fontBytesPromise;
 }
@@ -110,9 +128,9 @@ async function stampPdfWatermark(
 
   const bytes = await pdfDoc.save({ useObjectStreams: true });
   return Buffer.from(bytes);
-  
-  module.exports = {
+}
+
+module.exports = {
   stampPdfWatermark,
   formatServerDateTime,
 };
-}

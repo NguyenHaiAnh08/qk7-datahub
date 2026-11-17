@@ -242,14 +242,18 @@ async function classifyPdf(buffer, options = {}) {
         // PDF.js cleanup
         // ----------------------------------------------------
 
-        if (doc) {
+        if (doc && typeof doc.destroy === 'function') {
             await doc.destroy().catch(err => {
                 console.warn(
                     '[pdf-router] Document cleanup error:',
                     err.message
                 );
             });
-        } else if (loadingTask) {
+        }
+        if (doc && typeof doc.cleanup === 'function') {
+            await doc.cleanup().catch(() => {});
+        }
+        if (loadingTask && typeof loadingTask.destroy === 'function') {
             await loadingTask.destroy().catch(() => {});
         }
     }

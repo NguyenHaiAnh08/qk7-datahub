@@ -1773,11 +1773,19 @@ res.json({
 });
 
 // ═══════════════════════════════════════════════════════════════
-// FINGERPRINT AGENTS — PUBLIC endpoint (fix iPad cấp 3)
+// FINGERPRINT AGENTS — PUBLIC endpoint (fix iPad & Admin 2FA Login)
 // ═══════════════════════════════════════════════════════════════
-app.get('/api/fingerprint/agents-online', requireAuth, (req, res) => {
+app.get('/api/fingerprint/agents-online', (req, res) => {
   const agents = listAgents();
   res.json({ items: agents.map((a) => ({ device_id: a.device_id })) });
+});
+
+app.get('/api/fingerprint/device-id', (req, res) => {
+  const agents = listAgents();
+  if (agents.length > 0) {
+    return res.json({ device_id: agents[0].device_id, service: 'qk7-fingerprint-gateway' });
+  }
+  return res.status(503).json({ error: 'Chưa kết nối máy quét vân tay.', code: 'AGENT_OFFLINE' });
 });
 
 // ═══════════════════════════════════════════════════════════════

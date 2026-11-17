@@ -60,6 +60,9 @@ export const fingerprintService = {
    */
 
 async getLocalDeviceId(timeoutMs: number = 2500): Promise<string> {
+  const isHttps =
+    typeof window !== 'undefined' && window.location.protocol === 'https:';
+
   const isIPad =
     typeof document !== 'undefined' &&
     (
@@ -77,56 +80,106 @@ async getLocalDeviceId(timeoutMs: number = 2500): Promise<string> {
       )
     );
 
-  // 1. Máy tính: ưu tiên lấy Device ID trực tiếp từ Agent localhost.
-  if (!isIPad) {
+  // 1. Nếu website chạy qua HTTPS hoặc trên iPad: Luôn lấy qua Gateway (/api/fingerprint/agents-online)
+  // để tránh việc trình duyệt chặn Mixed Content (HTTPS -> HTTP loopback 9001) và CSP.
+  if (isHttps || isIPad) {
     try {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(
-        () => controller.abort(),
-        timeoutMs
+      const serverAgents = await http<{
+        items: Array<{ device_id: string }>;
+      }>(
+        '/api/fingerprint/agents-online',
+        {
+          method: 'GET',
+          skipErrorNotification: true,
+          silent: true,
+          signal: AbortSignal.timeout(Math.min(timeoutMs, 3000)),
+        }
       );
 
-      let res: Response;
+      const deviceId = serverAgents?.items?.find(
+        (item) =>
+          typeof item?.device_id === 'string' &&
+          item.device_id.trim().length > 0
+      )?.device_id;
 
+      if (deviceId) {
+        return deviceId.trim();
+      }
+    } catch (error) {
+      console.warn(
+        '[Fingerprint] Không lấy được Device ID từ Gateway:',
+        error
+      );
+    }
+
+    // Nếu chạy HTTPS trên PC, thử trực tiếp HTTPS loopback 9001 trước khi ném lỗi
+    if (!isIPad) {
       try {
-        res = await fetch(DEVICE_ID_URL, {
+        const localRes = await fetch('https://127.0.0.1:9001/device-id', {
           method: 'GET',
           mode: 'cors',
           credentials: 'omit',
           cache: 'no-store',
-          headers: {
-            Accept: 'application/json',
-          },
-          signal: controller.signal,
+          signal: AbortSignal.timeout(1000),
         });
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-
-      if (!res.ok) {
-        throw new Error(`AGENT_HTTP_${res.status}`);
-      }
-
-      const data = await res.json();
-
-      if (
-        typeof data?.device_id === 'string' &&
-        data.device_id.trim().length > 0
-      ) {
-        return data.device_id.trim();
-      }
-
-      throw new Error('AGENT_DEVICE_ID_EMPTY');
-    } catch (error) {
-      console.warn(
-        '[Fingerprint] Không lấy được Device ID từ Local Agent:',
-        error
-      );
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.device_id) return localData.device_id.trim();
+        }
+      } catch (_) {}
     }
+
+    // Nếu chạy HTTPS mà Gateway và local agent đều chưa online, ném lỗi rõ ràng
+    throw new Error('AGENT_NOT_RUNNING');
   }
 
-  // 2. Fallback cho iPad hoặc máy không lấy được Device ID local.
-  // Endpoint này có thể yêu cầu đăng nhập; không bỏ qua xác thực.
+  // 2. Dành riêng cho môi trường HTTP dev thuần (localhost:5173 / localhost:8000 không có SSL)
+  try {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      timeoutMs
+    );
+
+    let res: Response;
+
+    try {
+      res = await fetch(DEVICE_ID_URL, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+
+    if (!res.ok) {
+      throw new Error(`AGENT_HTTP_${res.status}`);
+    }
+
+    const data = await res.json();
+
+    if (
+      typeof data?.device_id === 'string' &&
+      data.device_id.trim().length > 0
+    ) {
+      return data.device_id.trim();
+    }
+
+    throw new Error('AGENT_DEVICE_ID_EMPTY');
+  } catch (error) {
+    console.warn(
+      '[Fingerprint] Không lấy được Device ID từ Local Agent loopback:',
+      error
+    );
+  }
+
+  // 3. Fallback cho HTTP dev nếu loopback không chạy nhưng Gateway đã kết nối WS
   try {
     const serverAgents = await http<{
       items: Array<{ device_id: string }>;
@@ -136,7 +189,7 @@ async getLocalDeviceId(timeoutMs: number = 2500): Promise<string> {
         method: 'GET',
         skipErrorNotification: true,
         silent: true,
-        signal: AbortSignal.timeout(3500),
+        signal: AbortSignal.timeout(2000),
       }
     );
 
@@ -149,12 +202,7 @@ async getLocalDeviceId(timeoutMs: number = 2500): Promise<string> {
     if (deviceId) {
       return deviceId.trim();
     }
-  } catch (error) {
-    console.warn(
-      '[Fingerprint] Không lấy được Device ID từ Backend fallback:',
-      error
-    );
-  }
+  } catch (_) {}
 
   throw new Error('AGENT_NOT_RUNNING');
 },

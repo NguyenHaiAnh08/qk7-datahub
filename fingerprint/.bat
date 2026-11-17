@@ -17,7 +17,7 @@ if not exist "agent.py" (
 if not exist ".env" (
     echo [LOI] Khong tim thay file .env.
     echo Vui long tao file .env voi noi dung:
-    echo   BACKEND_WS_URL=ws://127.0.0.1:8000/ws/fingerprint
+    echo   BACKEND_WS_URL=wss://127.0.0.1:8000/ws/fingerprint
     echo   BRIDGE_TOKEN=REPLACE_WITH_YOUR_FINGERPRINT_BRIDGE_TOKEN
     pause
     exit /b 1

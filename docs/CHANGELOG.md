@@ -4,6 +4,27 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.7.1-fingerprint-agent-https-mixed-content-and-watermark-font-fix] — 2026-11-17
+
+### 1. Khắc Phục Lỗi Kết Nối Máy Quét Vân Tay Qua HTTPS & Mixed Content (Fingerprint HTTPS Suite)
+- **Hỗ trợ SSL/TLS & Đa luồng cho Local Agent ([`fingerprint/agent.py`](../fingerprint/agent.py)):**
+  - Tích hợp `ssl_ctx.wrap_socket` cho `device-id` HTTP server tại cổng `:9001` sử dụng chứng chỉ số nội bộ (`cert.pem`, `private-key.pem`), cho phép trình duyệt truy cập an toàn qua `https://127.0.0.1:9001` mà không bị lỗi Mixed Content.
+  - Chuyển đổi sang `http.server.ThreadingHTTPServer` để xử lý các yêu cầu đọc trạng thái vân tay song song không gây nghẽn kết nối.
+- **Tối ưu hóa Lấy Định Danh Thiết Bị ([`frontend/src/services/fingerprintService.ts`](../frontend/src/services/fingerprintService.ts)):**
+  - Khi ứng dụng chạy trên nền tảng HTTPS hoặc trên iPad, dịch vụ tự động ưu tiên truy vấn danh sách máy quét trực tuyến qua Gateway API (`/api/fingerprint/agents-online`), loại bỏ hoàn toàn việc bị trình duyệt chặn kết nối không an toàn (Mixed Content Block).
+  - Bổ sung fallback kiểm tra trực tiếp endpoint HTTPS nội bộ `https://127.0.0.1:9001/device-id` trước khi kết luận thiết bị chưa sẵn sàng.
+- **Nâng Cấp Cấu Hình Bảo Mật & CSP ([`backend/src/security-headers.js`](../backend/src/security-headers.js) & [`backend/server.js`](../backend/server.js)):**
+  - Bổ sung `https://127.0.0.1:9001` và `https://localhost:9001` vào chỉ thị `connect-src` trong Content Security Policy (CSP).
+  - Mở rộng Permissions-Policy hỗ trợ `loopback-network=(self), local-network=(self)`.
+  - Mở quyền truy cập công khai (public endpoint) cho `GET /api/fingerprint/agents-online` và `GET /api/fingerprint/device-id` để phục vụ xác thực sinh trắc học vân tay ngay từ màn hình đăng nhập.
+
+### 2. Sửa Lỗi Tải Phông Chữ & Đóng Dấu Bản Quyền PDF Quân Sự
+- **Đóng dấu Watermark PDF Tiếng Việt ([`backend/src/pdfWatermarkServer.js`](../backend/src/pdfWatermarkServer.js)):**
+  - Xây dựng cơ chế tìm kiếm phông chữ đa nền tảng (`LiberationSans-Regular.ttf`, `Roboto-Regular.ttf`, `C:\Windows\Fonts\arial.ttf`) giúp khắc phục lỗi crash khi máy chủ không tìm thấy file font chữ mặc định.
+  - Sửa lỗi cú pháp export module ở cuối tệp.
+
+---
+
 ## [v1.7.0-qk7-lecture-hall-radar-and-classroom-monitoring] — 2026-11-17
 
 ### 1. Radar Giám Sát Giảng Đường & Lớp Học Thời Gian Thực (QK7 Lecture Hall Radar Suite)

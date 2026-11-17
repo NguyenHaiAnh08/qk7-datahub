@@ -4,6 +4,23 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.7.3-db-connection-pool-and-fingerprint-resilience] — 2026-11-17
+
+### 1. Tối Ưu Hóa Connection Pool SQL Server Chống Drop Socket ([`backend/src/db.js`](../backend/src/db.js))
+- Nâng số kết nối tối thiểu thường trực (`min`) từ 2 lên 5 connection.
+- Tăng thời gian kết nối rảnh (`idleTimeoutMillis`) từ 30,000ms (30 giây) lên 120,000ms (2 phút), giảm thiểu đáng kể chi phí bắt tay kết nối lại khi có yêu cầu đột biến từ người dùng.
+
+### 2. Nâng Cao Độ Ổn Định Của Fingerprint Agent & ZKTeco SDK ([`fingerprint/`](../fingerprint/))
+- **Cơ chế Retry Khởi tạo Driver ([`fingerprint/zk_service.py`](../fingerprint/zk_service.py)):**
+  - Bổ sung cơ chế retry 3 lần kèm khoảng nghỉ `time.sleep()` cho hàm `load_sdk()` của `ZK9500Service`, khắc phục triệt để lỗi driver ZKTeco chưa kịp giải phóng tài nguyên từ tiến trình trước.
+- **Xử lý Ngoại lệ Kết nối & Đóng Tài nguyên ([`fingerprint/agent.py`](../fingerprint/agent.py)):**
+  - Bắt rõ ràng `ConnectionRefusedError` và `OSError`, in thông báo thân thiện: *"Backend Gateway (:8000) chưa sẵn sàng. Đang chờ Backend khởi động..."* thay vì quăng lỗi unhandled.
+  - Bọc khối `try-except` an toàn cho hàm đóng thiết bị `agent.svc.close()` khi ngắt dịch vụ bằng `Ctrl+C` hoặc `SIGINT`.
+- **Tự động Kiểm tra Cổng Gateway ([`fingerprint/.bat`](../fingerprint/.bat)):**
+  - Tích hợp kiểm tra nhanh cổng `:8000` bằng PowerShell `Test-NetConnection`, hiển thị cảnh báo trực quan cho kỹ thuật viên trước khi chạy `agent.py`.
+
+---
+
 ## [v1.7.2-admin-2fa-enforcement-and-monitor-stability] — 2026-11-17
 
 ### 1. Khắc Phục Cơ Chế Xác Thực Sinh Trắc Học & Bắt Buộc 2FA Cho Quản Trị Viên (Admin 2FA Enforce)

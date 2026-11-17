@@ -26,6 +26,9 @@ if not exist ".env" (
 echo [OK] Da tim thay file .env cau hinh ket noi agent.
 echo.
 
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $c = Test-NetConnection -ComputerName 127.0.0.1 -Port 8000 -WarningAction SilentlyContinue; if (!$c.TcpTestSucceeded) { Write-Host '[CANH BAO] Backend Gateway (:8000) chua bat. Hay khoi dong Backend truoc (chay s.bat o thu muc goc).' -ForegroundColor Yellow } else { Write-Host '[OK] Da phat hien Backend Gateway (:8000) dang hoat dong.' -ForegroundColor Green } } catch {}"
+echo.
+
 echo Dang khoi dong Fingerprint Agent...
 python agent.py
 

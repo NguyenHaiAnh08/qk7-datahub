@@ -51,22 +51,29 @@ class ZK9500Service:
     def load_sdk(self) -> Tuple[bool, str]:
         if not _PYZKFP_OK:
             return False, f"pyzkfp không import được: {_IMPORT_ERR}"
-        try:
-            self.zk = ZKFP2()
+        last_err = ""
+        for attempt in range(3):
             try:
-                self.zk.Terminate()
-            except Exception:
-                pass
-            self.zk.Init()
-            self.sdk_loaded = True
-            if getattr(self.zk, "width", None):
-                self.width = int(self.zk.width)
-            if getattr(self.zk, "height", None):
-                self.height = int(self.zk.height)
-            return True, "SDK đã load"
-        except Exception as e:
-            self.sdk_loaded = False
-            return False, f"Init SDK lỗi: {e}"
+                self.zk = ZKFP2()
+                try:
+                    self.zk.Terminate()
+                except Exception:
+                    pass
+                time.sleep(0.3)
+                self.zk.Init()
+                self.sdk_loaded = True
+                if getattr(self.zk, "width", None):
+                    self.width = int(self.zk.width)
+                if getattr(self.zk, "height", None):
+                    self.height = int(self.zk.height)
+                return True, "SDK đã load"
+            except Exception as e:
+                last_err = str(e)
+                if attempt < 2:
+                    time.sleep(0.8)
+                    continue
+                self.sdk_loaded = False
+                return False, f"Init SDK lỗi: {last_err}"
 
     def open_device(self) -> Tuple[bool, str]:
         """Mở thiết bị (Lazy Open). Nếu lần đóng trước đã Terminate → Init lại."""

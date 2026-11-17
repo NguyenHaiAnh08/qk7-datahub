@@ -328,6 +328,8 @@ class FingerprintAgent:
                 except ssl.SSLError as e:
                     print(f"[Agent] ❌ Lỗi SSL: {e}")
                     print(f"[Agent]    Kiểm tra: file 'rootCA.pem' có trong {_HERE}?")
+                except (ConnectionRefusedError, OSError) as e:
+                    print(f"[Agent] ⚠️ Backend Gateway (:8000) chưa sẵn sàng ({e}). Đang chờ Backend khởi động...")
                 except Exception as e:
                     print(f"[Agent] Session error: {type(e).__name__}: {e}")
 
@@ -665,15 +667,22 @@ def main():
 
     def _stop(*_):
         agent.running = False
-        agent.svc.close()
-        sys.exit(0)
+        try:
+            agent.svc.close()
+        except Exception:
+            pass
 
     signal.signal(signal.SIGINT, _stop)
 
     try:
         asyncio.run(agent.run())
+    except (KeyboardInterrupt, SystemExit):
+        pass
     finally:
-        agent.svc.close()
+        try:
+            agent.svc.close()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()

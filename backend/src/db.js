@@ -21,7 +21,7 @@ const config = {
     useUTC:                 false,
     cancelTimeout:          15000, // Tăng thời gian chờ hủy từ 5s lên 15s để chống rớt socket khi SQL Server bận
   },
-  pool: { max: 25, min: 2, idleTimeoutMillis: 30000 },
+  pool: { max: 25, min: 5, idleTimeoutMillis: 120000 },
   connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000', 10),
   requestTimeout:    parseInt(process.env.DB_REQUEST_TIMEOUT || '30000', 10)
 };

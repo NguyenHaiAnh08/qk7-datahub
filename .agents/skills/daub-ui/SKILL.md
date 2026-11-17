@@ -1,18 +1,10 @@
 ---
 name: daub-ui
-description: >-
-  Build, preview and verify UI with DAUB (daub.dev), a drop-in CSS + JS component library
-  with 91 components and 21 theme families. Covers three paths: plain HTML with db-* classes,
-  json-render or OpenUI Lang specs rendered by daub-render.js, and the hosted DAUB MCP server
-  (generate_ui, validate_spec, render_spec, parse_openui, get_block_library). Includes the rules
-  that prevent broken renders, 266 ready-made blocks, playground share links, a verify loop, and
-  Jev recipes for picking components, blocks and themes. Use when the user mentions DAUB,
-  daub.dev, daub-ui, db- classes, the DAUB playground or MCP, json-render or OpenUI specs, or
-  asks for a themed dashboard, landing page, form or settings screen without a build step.
+description: 'Must read ANTIGRAVITY_MASTER_BRAIN.md before executing tasks. Build, preview and verify UI with DAUB (daub.dev), a drop-in CSS + JS component library with 91 components and 21 theme families. Covers three paths: plain HTML with db-* classes, json-render or OpenUI Lang specs rendered by daub-render.js, and the hosted DAUB MCP server (generate_ui, validate_spec, render_spec, parse_openui, get_block_library). Includes the rules that prevent broken renders, 266 ready-made blocks, playground share links, a verify loop, and Jev recipes for picking components, blocks and themes. Use when the user mentions DAUB, daub.dev, daub-ui, db- classes, the DAUB playground or MCP, json-render or OpenUI specs, or asks for a themed dashboard, landing page, form or settings screen without a build step.'
 license: MIT
 compatibility: Any agent that reads files and runs shell or HTTP. The MCP path needs network access to daub.dev. Jev recipes need an OpenRouter API key.
 metadata:
-  daub-version: "3.20.6"
+  daub-version: 3.20.6
   homepage: https://daub.dev
 ---
 

@@ -809,6 +809,83 @@ module.exports = (app, deps) => {
         }
     });
 
+    // PUT — thay toàn bộ vai trò của user trong 1 transaction (DELETE cũ + INSERT mới)
+    app.put('/api/admin/users/:id/roles', async (req, res) => {
+        const userId = req.params.id;
+        const { roles, expires_at } = req.body || {};
+        if (!Array.isArray(roles) || roles.some(r => typeof r !== 'string' || !r.trim())) {
+            return res.status(400).json({ error: 'roles phải là mảng role_id hợp lệ', code: 'INVALID_ROLES' });
+        }
+        const newRoles = [...new Set(roles.map(r => r.trim()))];
+        let tx;
+        try {
+            const pool = await getPool();
+            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+
+            const userChk = await pool.request().input('u', sql.VarChar(50), userId)
+                .query(`SELECT user_id FROM [USER] WHERE user_id = @u`);
+            if (!userChk.recordset.length) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+            const curRes = await pool.request().input('u', sql.VarChar(50), userId)
+                .query(`SELECT role_id FROM USER_ROLE WHERE user_id = @u`);
+            const currentRoles = curRes.recordset.map(r => r.role_id);
+            const targetIsAdmin = currentRoles.includes('ROL-01');
+            const touchesAdmin = targetIsAdmin !== newRoles.includes('ROL-01');
+
+            if (!callerIsAdmin) {
+                if (targetIsAdmin) return res.status(403).json({ error: 'Người dùng có vai trò Quản trị viên, không thể sửa', code: 'ADMIN_ROLE_LOCKED' });
+                if (touchesAdmin) return res.status(403).json({ error: 'Chỉ Admin mới có thể gán vai trò Admin (ROL-01)', code: 'PERMISSION_DENIED' });
+                if (userId === req.user.user_id) return res.status(403).json({ error: 'Không thể tự thay đổi vai trò của chính mình', code: 'PERMISSION_DENIED' });
+            }
+
+            if (newRoles.length) {
+                const valid = await pool.request().query(`SELECT role_id FROM [ROLE]`);
+                const known = new Set(valid.recordset.map(r => r.role_id));
+                const bad = newRoles.filter(r => !known.has(r));
+                if (bad.length) return res.status(400).json({ error: `Vai trò không tồn tại: ${bad.join(', ')}`, code: 'ROLE_NOT_FOUND' });
+            }
+
+            let finalExpiresAt = null;
+            if (expires_at) {
+                finalExpiresAt = new Date(expires_at);
+                if (isNaN(finalExpiresAt.getTime())) return res.status(400).json({ error: 'Ngày hết hạn không hợp lệ.', code: 'INVALID_EXPIRY' });
+                finalExpiresAt.setHours(23, 59, 59, 999);
+                if (finalExpiresAt <= new Date()) return res.status(400).json({ error: 'Ngày hết hạn phải lớn hơn thời điểm hiện tại.', code: 'INVALID_EXPIRY' });
+            }
+
+            tx = new sql.Transaction(pool);
+            await tx.begin();
+            try {
+                await new sql.Request(tx).input('u', sql.VarChar(50), userId)
+                    .query(`DELETE FROM USER_ROLE WHERE user_id = @u`);
+                for (const rid of newRoles) {
+                    await new sql.Request(tx)
+                        .input('u', sql.VarChar(50), userId)
+                        .input('r', sql.VarChar(50), rid)
+                        .input('exp', sql.DateTime, finalExpiresAt)
+                        .query(`INSERT INTO USER_ROLE (user_id, role_id, expires_at) VALUES (@u, @r, @exp)`);
+                }
+                await tx.commit();
+            } catch (dbErr) {
+                try { await tx.rollback(); } catch (_) {}
+                if (dbErr.message.includes('The transaction ended in the trigger') || dbErr.message.includes('Không thể gỡ vai trò Admin')) {
+                    return res.status(403).json({
+                        error: 'Hệ thống từ chối thay đổi. Tài khoản này đang giữ vai trò Quản trị viên cuối cùng hoặc bị khóa bởi quy tắc bảo vệ.',
+                        code: 'TRIGGER_BLOCKED',
+                    });
+                }
+                throw dbErr;
+            }
+
+            await log(req, 'ASSIGN_ROLE', `Đặt vai trò của ${userId}: [${currentRoles.join(', ')}] → [${newRoles.join(', ')}]`);
+            _invalidateUser(userId);
+            res.json({ success: true, roles: newRoles, expires_at: finalExpiresAt });
+        } catch (e) {
+            console.error('[set-user-roles]', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
         app.delete('/api/admin/users/:id/roles/:roleId', async (req, res) => {
         try {
             const userId = req.params.id;

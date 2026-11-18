@@ -76,6 +76,7 @@ const AUTO_PERMISSIONS = {
     // ─── NHÓM 1 + 2 (EDIT luôn phải duyệt) ───
     [/^\/api\/admin\/users\/[^/]+$/,                     'USER_EDIT'],
     [/^\/api\/admin\/users\/[^/]+\/credentials$/,        'USER_CREDENTIALS'],      // Reset password → duyệt
+    [/^\/api\/admin\/users\/[^/]+\/roles$/,              'USER_ROLE_ASSIGN'],      // Đặt lại toàn bộ role → duyệt
     [/^\/api\/admin\/roles\/[^/]+$/,                     'ROLE_EDIT'],
     [/^\/api\/admin\/permissions\/[^/]+$/,               'PERMISSION_EDIT'],
     [/^\/api\/admin\/units\/[^/]+$/,                     'UNIT_EDIT'],             // ← TÁCH

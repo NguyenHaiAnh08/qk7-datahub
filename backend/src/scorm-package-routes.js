@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const { sql, getPool } = require('./db');
 
-module.exports = function createScormPackageRoutes({ requireAuth, requirePermission }) {
+module.exports = function createScormPackageRoutes({ requireAuth, requirePermission, writeAccessLog, getClientIp }) {
   const router = express.Router();
 
   const SCORM_ROOT = path.join(__dirname, '..', 'uploads', 'scorm');
@@ -466,29 +466,78 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
   }
 
   // ────────────────────────────────────────────────────────────────────
-  // Handler upload tệp giáo án PDF cho bài giảng số hóa
-  // Lưu vào uploads/YYYY/MM/, tạo bản ghi DOCUMENT và gắn document_id vào DIGITAL_LECTURE
+  // Tệp giáo án PDF của bài giảng số — TÁCH BIỆT HOÀN TOÀN với bảng DOCUMENT (Dữ liệu số).
+  // Thông tin tệp nằm ngay trong DIGITAL_LECTURE: pdf_path / pdf_name / pdf_size / pdf_sha256.
+  // Xem tệp qua GET /api/lectures/:lectureId/pdf (kiểm tra quyền theo chính bài giảng).
   // ────────────────────────────────────────────────────────────────────
+  const UPLOADS_ROOT = path.resolve(__dirname, '..', 'uploads');
+
+  // Chỉ cho phép thao tác trên tệp nằm trong thư mục uploads (chống path traversal)
+  const resolveUploadPath = (relPath) => {
+    if (!relPath) return null;
+    const abs = path.resolve(__dirname, '..', relPath);
+    return abs.startsWith(UPLOADS_ROOT + path.sep) ? abs : null;
+  };
+
+  const removeUploadFile = (relPath) => {
+    try {
+      const abs = resolveUploadPath(relPath);
+      if (abs && fs.existsSync(abs)) fs.unlinkSync(abs);
+    } catch (e) {
+      console.warn('[PDF] Không xóa được tệp cũ:', relPath, e.message);
+    }
+  };
+
+  const isPdfFile = (absPath) => {
+    let fd;
+    try {
+      fd = fs.openSync(absPath, 'r');
+      const buf = Buffer.alloc(5);
+      fs.readSync(fd, buf, 0, 5, 0);
+      return buf.toString('latin1') === '%PDF-';
+    } catch {
+      return false;
+    } finally {
+      if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ }
+    }
+  };
+
   async function handlePdfUpload(req, res) {
     const lectureId = req.params.lectureId;
+    const dropTemp = () => { if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); };
+    let movedAbs = null;
     try {
       if (!req.file) return res.status(400).json({ error: 'Thiếu tệp .pdf' });
 
       const pool = await getPool();
       const lr = await pool.request()
         .input('lid', sql.VarChar(50), lectureId)
-        .query(`SELECT lecture_id, title, security_level_id, faculty_unit_id, author_id, status FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
+        .query(`SELECT lecture_id, title, author_id, status, pdf_path FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
 
       if (lr.recordset.length === 0) {
-        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        dropTemp();
         return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       }
 
       const lec = lr.recordset[0];
       const isAdmin = (req.user.roles || []).includes('ROL-01');
       if (!isAdmin && lec.author_id !== req.user.user_id) {
-        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        dropTemp();
         return res.status(403).json({ error: 'Chỉ tác giả mới được tải lên tệp giáo án' });
+      }
+      // Chỉ được thay tệp khi bài giảng còn là bản nháp / bị từ chối — nếu không, tác giả
+      // có thể đổi nội dung bài đã duyệt/đã xuất bản mà không qua quy trình duyệt 2 tầng.
+      if (!['DRAFT', 'REJECTED'].includes(lec.status)) {
+        dropTemp();
+        return res.status(409).json({
+          error: 'Chỉ được thay tệp giáo án khi bài giảng ở trạng thái Bản nháp hoặc Bị từ chối',
+          code: 'LECTURE_NOT_EDITABLE',
+          status: lec.status,
+        });
+      }
+      if (!isPdfFile(req.file.path)) {
+        dropTemp();
+        return res.status(400).json({ error: 'Tệp tải lên không phải PDF hợp lệ' });
       }
 
       const fileBuffer = fs.readFileSync(req.file.path);
@@ -497,64 +546,134 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
 
       const now = new Date();
       const yyyymmdd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-      const fileId = `DOC-LEC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-      
+
       const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
       const folderName = `${sanitizeFolderName(lec.title || 'Bai_Giang')}_${lectureId}`;
       const { absPath: baseAbsPath, relPath: baseRelPath } = getModuleUploadPath(MODULES.LECTURES, now, folderName);
-      
+
       const fileName = `${yyyymmdd}_LECTURE_${lectureId}_${sha256.slice(0, 8)}.pdf`;
       const relPath = `${baseRelPath}/${fileName}`;
       const absPath = path.join(baseAbsPath, fileName);
 
       fs.mkdirSync(path.dirname(absPath), { recursive: true });
       moveFileSafe(req.file.path, absPath);
+      movedAbs = absPath;
 
-      // 1. Thêm vào bảng DOCUMENT để có thể xem và trình chiếu qua stream /api/files/:fileId/view
-      await pool.request()
-        .input('fid', sql.VarChar(100), fileId)
-        .input('code', sql.NVarChar(100), `BG-${lectureId}`)
-        .input('title', sql.NVarChar(500), lec.title)
-        .input('unit_id', sql.NVarChar(50), lec.faculty_unit_id || null)
-        .input('sec_id', sql.Int, lec.security_level_id || 2)
-        .input('orig_name', sql.NVarChar(500), req.file.originalname)
-        .input('stored_path', sql.NVarChar(500), relPath)
-        .input('file_size', sql.BigInt, fileSize)
-        .input('sha256', sql.Char(64), sha256)
-        .input('uploaded_by', sql.VarChar(50), req.user.user_id)
-        .input('summary', sql.NVarChar(sql.MAX), `Tài liệu bài giảng điện tử: ${lec.title}`)
-        .query(`
-          INSERT INTO DOCUMENT (
-            file_id, document_code, title, doc_type_id, issued_date, issuing_unit_id,
-            signer, summary, security_level_id, original_name, stored_path, mime_type,
-            file_size, sha256, uploaded_by
-          ) VALUES (
-            @fid, @code, @title, NULL, GETDATE(), @unit_id,
-            NULL, @summary, @sec_id, @orig_name, @stored_path, 'application/pdf',
-            @file_size, @sha256, @uploaded_by
-          )
-        `);
-
-      // 2. Cập nhật document_id vào DIGITAL_LECTURE
       await pool.request()
         .input('lid', sql.VarChar(50), lectureId)
-        .input('doc_id', sql.VarChar(50), fileId)
+        .input('p', sql.NVarChar(500), relPath)
+        .input('n', sql.NVarChar(255), String(req.file.originalname || fileName).slice(0, 255))
+        .input('s', sql.BigInt, fileSize)
+        .input('h', sql.Char(64), sha256)
         .query(`
           UPDATE DIGITAL_LECTURE
-          SET document_id = @doc_id, content_type = 'PDF', updated_at = GETDATE()
+          SET pdf_path = @p, pdf_name = @n, pdf_size = @s, pdf_sha256 = @h,
+              content_type = 'PDF', document_id = NULL, updated_at = GETDATE()
           WHERE lecture_id = @lid
         `);
+      movedAbs = null; // đã ghi DB thành công → không cần hoàn tác
+
+      // Thay tệp: xóa tệp cũ (nếu khác đường dẫn mới)
+      if (lec.pdf_path && lec.pdf_path !== relPath) removeUploadFile(lec.pdf_path);
 
       res.json({
         success: true,
-        file_id: fileId,
-        stored_path: relPath,
-        message: 'Đã lưu tệp giáo án PDF và gắn vào bài giảng thành công'
+        has_pdf: true,
+        pdf_name: req.file.originalname,
+        pdf_size: fileSize,
+        message: 'Đã lưu tệp giáo án PDF cho bài giảng'
       });
     } catch (e) {
       console.error('[PDF upload]', e);
-      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      dropTemp();
+      if (movedAbs && fs.existsSync(movedAbs)) { try { fs.unlinkSync(movedAbs); } catch { /* ignore */ } }
       res.status(500).json({ error: e.message });
+    }
+  }
+
+  // GET /api/lectures/:lectureId/pdf — phát tệp PDF giáo án (inline, không cho tải về)
+  async function servePdf(req, res) {
+    const lectureId = req.params.lectureId;
+    try {
+      const pool = await getPool();
+      const lr = await pool.request()
+        .input('lid', sql.VarChar(50), lectureId)
+        .query(`SELECT lecture_id, status, security_level_id, author_id, pdf_path, pdf_name
+                FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
+      const lec = lr.recordset[0];
+      if (!lec || !lec.pdf_path) return res.status(404).json({ error: 'Bài giảng chưa có tệp PDF' });
+
+      const roles = req.user.roles || [];
+      const isAdmin = roles.includes('ROL-01');
+      const isAuthor = lec.author_id === req.user.user_id;
+      const isReviewer = (req.user.permissions || []).includes('LECTURE_APPROVE');
+
+      if (lec.status === 'DELETED' && !isAdmin) {
+        return res.status(404).json({ error: 'Bài giảng không tồn tại' });
+      }
+      if (lec.status !== 'PUBLISHED' && !isAdmin && !isAuthor && !isReviewer) {
+        return res.status(404).json({ error: 'Bài giảng chưa được xuất bản' });
+      }
+      if (lec.security_level_id > (req.user.clearance_level_id || 1)) {
+        return res.status(403).json({ error: 'Không đủ cấp bảo mật' });
+      }
+
+      // Cấp 3+: cần token vân tay đúng bài giảng, HOẶC đang là người giảng của một ca ONGOING
+      // (mở ca đã bắt buộc token vân tay khớp lecture_id — xem POST /api/lectures/schedules).
+      if (lec.security_level_id >= 3) {
+        let ok = false;
+        const fpToken = req.headers['x-fingerprint-token'] || req.query.fp;
+        if (fpToken) {
+          try {
+            const decoded = require('jsonwebtoken').verify(String(fpToken), process.env.JWT_SECRET);
+            ok = decoded.purpose === 'file_access'
+              && decoded.file_id === lectureId
+              && decoded.user_id === req.user.user_id
+              && (lec.security_level_id < 4 || !!decoded.pin_verified);
+          } catch { ok = false; }
+        }
+        if (!ok) {
+          const ongoing = await pool.request()
+            .input('lid', sql.VarChar(50), lectureId)
+            .input('uid', sql.VarChar(50), req.user.user_id)
+            .query(`SELECT TOP 1 1 AS x FROM TEACHING_SCHEDULE
+                    WHERE lecture_id = @lid AND presenter_id = @uid AND status = 'ONGOING'`);
+          ok = ongoing.recordset.length > 0;
+        }
+        if (!ok) {
+          return res.status(403).json({
+            error: 'Bài giảng Cấp 3+ yêu cầu xác thực vân tay hoặc đang trong ca giảng của bạn',
+            require_fingerprint: true,
+          });
+        }
+      }
+
+      const abs = resolveUploadPath(lec.pdf_path);
+      if (!abs || !abs.toLowerCase().endsWith('.pdf') || !fs.existsSync(abs)) {
+        return res.status(404).json({ error: 'Tệp PDF không còn trên hệ thống lưu trữ' });
+      }
+      if (fs.lstatSync(abs).isSymbolicLink()) {
+        return res.status(403).json({ error: 'Không thể truy cập tệp' });
+      }
+
+      if (typeof writeAccessLog === 'function') {
+        writeAccessLog({
+          userId: req.user.user_id,
+          fileId: null, // ACCESS_LOG.file_id có FK sang DOCUMENT → không dùng cho bài giảng
+          action: 'LECTURE_PDF_VIEW',
+          ip: typeof getClientIp === 'function' ? getClientIp(req) : req.ip,
+          note: `Xem PDF bài giảng ${lectureId}`,
+        }).catch(() => {});
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(lec.pdf_name || 'giao-an.pdf')}"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      fs.createReadStream(abs).pipe(res);
+    } catch (e) {
+      console.error('[PDF serve]', e);
+      if (!res.headersSent) res.status(500).json({ error: e.message });
     }
   }
 
@@ -574,6 +693,10 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
   router.post('/:lectureId/pdf/upload',
     requireAuth, requirePermission('LECTURE_CREATE'),
     uploadPdf.single('file'), handlePdfUpload);
+
+  // Xem PDF giáo án (tách biệt khỏi /api/files của Dữ liệu số)
+  router.get('/:lectureId/pdf',
+    requireAuth, requirePermission('LECTURE_VIEW'), servePdf);
 
   // Launch
   router.get('/:lectureId/scorm/launch',

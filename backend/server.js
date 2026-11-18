@@ -962,14 +962,26 @@ async function handleLogin(req, res) {
 
     // ═══════════════════════════════════════════════════════════
     // ✅ BƯỚC 2: 2FA VÂN TAY CHO **MỌI** TÀI KHOẢN ADMIN
-    // - USR-001 (Quản trị tối cao): bắt buộc nếu đã enroll, cảnh báo nếu chưa
-    // - Admin tạm thời (được gán ROL-01): BẮT BUỘC phải có vân tay
+    // - Mọi admin (kể cả USR-001) BẮT BUỘC có vân tay
+    // - Ngoại lệ duy nhất: ADMIN_BOOTSTRAP_NO_FP=true cho USR-001 khi chưa có vân tay (DB mới)
     // ═══════════════════════════════════════════════════════════
     const PROTECTED_ADMIN_ROLE_ID = process.env.PROTECTED_ADMIN_ROLE_ID || 'ROL-01';
     const isProtectedAdmin = user.user_id === PROTECTED_ADMIN_USER_ID;
     const hasAdminRole = userRoles.includes(PROTECTED_ADMIN_ROLE_ID);
 
-    if (isProtectedAdmin || hasAdminRole) {
+    // Bootstrap (DB mới): chỉ USR-001, chỉ khi CHƯA có vân tay active, và chỉ khi bật cờ trong .env.
+    // Sau khi enroll vân tay xong, has_fingerprint=1 → 2FA bắt buộc trở lại dù cờ còn bật.
+    const bootstrapNoFp = process.env.ADMIN_BOOTSTRAP_NO_FP === 'true'
+      && isProtectedAdmin && user.has_fingerprint !== 1;
+    if (bootstrapNoFp) {
+      console.warn(`[SECURITY] ⚠️ ADMIN_BOOTSTRAP_NO_FP: ${user.user_id} đăng nhập không cần vân tay (chưa enroll). Hãy enroll vân tay rồi tắt cờ.`);
+      await writeAccessLog({
+        userId: user.user_id, fileId: null, action: 'LOGIN_ADMIN_BOOTSTRAP', ip,
+        note: 'Đăng nhập admin lần đầu bằng mật khẩu (ADMIN_BOOTSTRAP_NO_FP=true, chưa có vân tay)',
+      });
+    }
+
+    if (!bootstrapNoFp && (isProtectedAdmin || hasAdminRole)) {
       // Dùng luôn user.has_fingerprint đã load trong query đầu
       const hasFingerprint = user.has_fingerprint === 1;
 
@@ -2046,6 +2058,7 @@ app.get('/api/documents', async (req, res) => {
       JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
       WHERE d.security_level_id <= @clearance
         AND d.deleted_at IS NULL
+        AND d.file_id NOT LIKE 'DOC-LEC-%'
     `;
     r.input('clearance', sql.Int, req.user.clearance_level_id);
     if (req.query.q) {
@@ -2126,6 +2139,7 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
       WHERE d.security_level_id <= @clearance
         AND d.issuing_unit_id IN (${unitParams})
         AND d.deleted_at IS NULL
+        AND d.file_id NOT LIKE 'DOC-LEC-%'
     `;
     r.input('clearance', sql.Int, req.user.clearance_level_id);
     if (req.query.q) {
@@ -3950,7 +3964,7 @@ app.use('/api/lectures', requireAuth, require('./src/lecture-extended-routes')({
 }));
 
 app.use('/api/lectures', requireAuth, require('./src/scorm-package-routes')({
-  requireAuth, requirePermission
+  requireAuth, requirePermission, writeAccessLog, getClientIp
 }));
 
 // ═══════════════════════════════════════════════════════════════

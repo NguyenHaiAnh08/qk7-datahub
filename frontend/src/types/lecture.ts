@@ -26,7 +26,12 @@ export interface Lecture {
   security_name?: string;
   content_type: ContentType;
   scorm_entry_point?: string;
+  /** @deprecated PDF bài giảng không còn nằm trong bảng DOCUMENT — dùng has_pdf */
   document_id?: string;
+  /** Bài giảng đã có tệp PDF giáo án (xem qua GET /api/lectures/:id/pdf) */
+  has_pdf?: boolean;
+  pdf_name?: string;
+  pdf_size?: number;
   quiz_count?: number;
   status: LectureStatus;
   reject_reason?: string;
@@ -100,7 +105,6 @@ export interface CreateLecturePayload {
   security_level_id?: number;
   content_type?: ContentType;
   scorm_entry_point?: string;
-  document_id?: string;
 }
 
 export interface StartSchedulePayload {

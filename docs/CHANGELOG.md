@@ -4,18 +4,16 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
-## [v1.7.4-document-unit-fk-guard-and-schedule-note-resilience] — 2026-11-17
+## [v1.8.0-fingerprint-e2e-channel] — 2026-11-18
 
-### 1. Phòng Vệ Khóa Ngoại Đơn Vị Ban Hành Khi Chỉnh Sửa Văn Bản ([`backend/server.js`](../backend/server.js))
-- Tại `PUT /api/documents/:fileId`: Bổ sung bước kiểm tra tính tồn tại của `issuing_unit_id` trong bảng `UNIT` trước khi thực thi truy vấn UPDATE.
-- Nếu mã đơn vị gửi lên không hợp lệ hoặc đã bị thay đổi, tự động fallback về `oldDoc.issuing_unit_id` hoặc `null`, ngăn chặn hoàn toàn lỗi sập giao dịch do vi phạm ràng buộc khóa ngoại `FK_DOC_UNIT`.
-
-### 2. Khắc Phục Lỗi Cột Ghi Chú Lịch Giảng Dạy & Tự Động Migration ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js) & [`backend/src/migrate-radar.js`](../backend/src/migrate-radar.js))
-- Bổ sung hàm kiểm tra tương thích `hasColumn(pool, 'TEACHING_SCHEDULE', 'note')` và gán `${hasNote ? 's.note' : 'NULL AS note'}`, ngăn chặn lỗi SQL `Invalid column name 'note'` khi xem chi tiết radar phòng học trên các phiên bản CSDL chưa cập nhật cột.
-- Bổ sung bước tự động thêm cột `note NVARCHAR(500) NULL` vào `TEACHING_SCHEDULE` trong kịch bản di chuyển `migrate-radar.js`.
-
-### 3. Đồng Bộ Dữ Liệu Kho Vector RAG ([`boxchat/local_storage/qdrant_data/metadata_chunks.json`](../boxchat/local_storage/qdrant_data/metadata_chunks.json))
-- Dọn dẹp các chunk metadata của tài liệu thử nghiệm đã xóa, bảo đảm kho vector đồng bộ với CSDL.
+### Kênh Backend ↔ Fingerprint Agent mã hóa & xác thực ở tầng ứng dụng
+- **Vấn đề:** diệt virus/proxy ký lại HTTPS (Kaspersky...) làm agent trên một số máy báo lỗi chứng chỉ, không kết nối được backend `:8000`.
+- **Giải pháp** ([`backend/src/agent-crypto.js`](../backend/src/agent-crypto.js), [`backend/src/fingerprint-ws.js`](../backend/src/fingerprint-ws.js), [`fingerprint/agent.py`](../fingerprint/agent.py)):
+  - Xác thực 2 chiều bằng thách đố HMAC-SHA256 (`proto=2`); `BRIDGE_TOKEN` không còn gửi qua mạng/URL.
+  - Mọi tin nhắn mã hóa AES-256-GCM, khóa phiên riêng mỗi kết nối, số thứ tự chống phát lại.
+  - Agent chấp nhận lỗi xác minh chuỗi chứng chỉ TLS (trừ khi `AGENT_STRICT_TLS=true`) vì dữ liệu đã được bảo vệ độc lập.
+  - Tương thích tạm thời với agent cũ; tắt bằng `AGENT_ALLOW_LEGACY=false` khi mọi máy con đã cập nhật.
+- **Triển khai:** cập nhật Backend trước, rồi build lại bộ cài (`python build_setup.py --server <IP>`) và cài lại trên máy con. Agent bản mới cần `cryptography` (đã thêm vào `requirements.txt`).
 
 ---
 

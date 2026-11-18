@@ -105,3 +105,10 @@ tools/gitleaks/
 
 
 
+
+# Fingerprint agent build artifacts & secrets
+fingerprint/build_cfg/
+fingerprint/build_tmp/
+fingerprint/private-key.pem
+fingerprint/cert.pem.bak
+fingerprint/build_tmp_setup/

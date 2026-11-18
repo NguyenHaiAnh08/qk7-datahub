@@ -22,8 +22,24 @@ if hasattr(sys.stderr, 'reconfigure'):
 import websockets
 from dotenv import load_dotenv
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+# Khi đóng gói exe (PyInstaller onefile):
+#   _HERE    = thư mục chứa file .exe  → nơi đặt device_id.txt, .env/rootCA.pem ghi đè
+#   _RES_DIR = thư mục giải nén tạm    → cấu hình/chứng chỉ nhúng sẵn trong exe
+_FROZEN = getattr(sys, "frozen", False)
+_RES_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+_HERE = os.path.dirname(sys.executable) if _FROZEN else os.path.dirname(os.path.abspath(__file__))
+
+def _find_file(name: str) -> str:
+    """Ưu tiên file cạnh exe (ghi đè được), sau đó file nhúng trong exe."""
+    for base in (_HERE, _RES_DIR):
+        p = os.path.join(base, name)
+        if os.path.exists(p):
+            return p
+    return os.path.join(_HERE, name)
+
+# .env cạnh exe thắng .env nhúng (load_dotenv không ghi đè biến đã có)
 load_dotenv(os.path.join(_HERE, ".env"))
+load_dotenv(os.path.join(_RES_DIR, ".env"))
 
 BACKEND_WS_URL = os.getenv("BACKEND_WS_URL", "ws://localhost:8000/ws/fingerprint")
 BRIDGE_TOKEN = os.getenv("BRIDGE_TOKEN", "")
@@ -42,7 +58,94 @@ if not BRIDGE_TOKEN or len(BRIDGE_TOKEN) < 16:
 
 from zk_service import ZK9500Service
 
-DEVICE_ID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "device_id.txt")
+DEVICE_ID_FILE = os.path.join(_HERE, "device_id.txt")
+
+import base64 as _b64
+import hashlib as _hashlib
+import hmac as _hmac
+
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+# Nếu đặt AGENT_STRICT_TLS=true: bắt buộc chứng chỉ TLS hợp lệ (không chấp nhận diệt virus/proxy ký lại).
+# Mặc định: nếu xác minh chứng chỉ thất bại (diệt virus quét HTTPS...), vẫn kết nối vì kênh đã được
+# xác thực 2 chiều bằng HMAC và mã hóa AES-256-GCM ở tầng ứng dụng (xem backend/src/agent-crypto.js).
+STRICT_TLS = os.getenv("AGENT_STRICT_TLS", "false").lower() == "true"
+
+
+def _hm(key: str, data: str) -> bytes:
+    return _hmac.new(key.encode("utf-8"), data.encode("utf-8"), _hashlib.sha256).digest()
+
+
+class SecureWS:
+    """Bọc websocket: mã hóa/giải mã mọi tin nhắn (AES-256-GCM + seq chống phát lại).
+    Giữ nguyên giao diện send(str) / async for / recv() nên code xử lý cũ không phải sửa."""
+
+    def __init__(self, ws, key: bytes):
+        self._ws = ws
+        self._it = None
+        self._aes = AESGCM(key)
+        self._send_seq = 0
+        self._recv_seq = 0
+
+    async def send(self, text: str):
+        self._send_seq += 1
+        pt = json.dumps({"s": self._send_seq, "d": json.loads(text)}, ensure_ascii=False).encode("utf-8")
+        iv = os.urandom(12)
+        ct = self._aes.encrypt(iv, pt, b"a2s")  # ciphertext || tag(16)
+        await self._ws.send(json.dumps({"e": _b64.b64encode(iv + ct).decode()}))
+
+    def _open(self, raw) -> str:
+        buf = _b64.b64decode(json.loads(raw)["e"])
+        pt = self._aes.decrypt(buf[:12], buf[12:], b"s2a")
+        obj = json.loads(pt.decode("utf-8"))
+        if not isinstance(obj.get("s"), int) or obj["s"] <= self._recv_seq:
+            raise ValueError("seq không hợp lệ (phát lại?)")
+        self._recv_seq = obj["s"]
+        return json.dumps(obj["d"], ensure_ascii=False)
+
+    async def recv(self) -> str:
+        return self._open(await self._ws.recv())
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self) -> str:
+        while True:
+            if self._it is None:
+                self._it = self._ws.__aiter__()
+            raw = await self._it.__anext__()  # StopAsyncIteration khi đóng kết nối
+            try:
+                return self._open(raw)
+            except Exception as e:
+                print(f"[Agent] ⚠️ Bỏ qua gói tin không hợp lệ: {type(e).__name__}")
+                continue
+
+
+async def secure_handshake(ws, device_id: str) -> "SecureWS":
+    """Xác thực 2 chiều bằng HMAC; BRIDGE_TOKEN không bao giờ gửi qua mạng."""
+    challenge = json.loads(await asyncio.wait_for(ws.recv(), 8))
+    if challenge.get("type") != "challenge" or not challenge.get("nonce"):
+        raise ConnectionError("Server không hỗ trợ giao thức bảo mật mới — hãy cập nhật Backend.")
+    nonce = challenge["nonce"]
+    cnonce = _b64.b64encode(os.urandom(16)).decode()
+    proof = _hm(BRIDGE_TOKEN, f"qk7-agent-auth|{nonce}|{device_id}").hex()
+    await ws.send(json.dumps({"type": "auth", "cnonce": cnonce, "proof": proof}))
+
+    reply = json.loads(await asyncio.wait_for(ws.recv(), 8))
+    expect = _hm(BRIDGE_TOKEN, f"qk7-server-auth|{nonce}|{cnonce}|{device_id}")
+    if reply.get("type") != "auth_ok" or not _hmac.compare_digest(bytes.fromhex(reply.get("proof", "")), expect):
+        raise ConnectionError("Server không xác thực được (sai BRIDGE_TOKEN hoặc server giả mạo).")
+    key = _hm(BRIDGE_TOKEN, f"qk7-session|{nonce}|{cnonce}|{device_id}")
+    return SecureWS(ws, key)
+
+
+def build_relaxed_ssl_context():
+    """TLS không xác minh chứng chỉ — CHỈ dùng khi kênh đã được bảo vệ ở tầng ứng dụng."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
 
 def build_ssl_context():
     if not USE_TLS:
@@ -52,7 +155,7 @@ def build_ssl_context():
 
     ca_path = CA_CERT_PATH
     if not os.path.isabs(ca_path):
-        ca_path = os.path.join(_HERE, ca_path)
+        ca_path = _find_file(ca_path)
 
     if os.path.exists(ca_path):
         try:
@@ -74,8 +177,11 @@ def get_or_create_device_id() -> str:
             if did:
                 return did
     did = "DEV-" + str(uuid.uuid4())
-    with open(DEVICE_ID_FILE, "w", encoding="utf-8") as f:
-        f.write(did)
+    try:
+        with open(DEVICE_ID_FILE, "w", encoding="utf-8") as f:
+            f.write(did)
+    except OSError as e:
+        print(f"[Agent] ⚠️ Không ghi được {DEVICE_ID_FILE}: {e}")
     return did
 
 def free_port(port: int):
@@ -104,6 +210,9 @@ def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None)
     free_port(port)
 
     class Handler(http.server.BaseHTTPRequestHandler):
+        # Ngắt kết nối rảnh (Chrome preconnect) để không giữ luồng vô hạn.
+        timeout = 10
+
         def _send_json(self, status_code, data):
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
@@ -116,7 +225,10 @@ def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.wfile.write(body)
+            except (ssl.SSLError, ConnectionError, OSError):
+                pass  # trình duyệt đã hủy/đóng kết nối — không phải lỗi
 
         def do_OPTIONS(self):
             self.send_response(204)
@@ -166,10 +278,32 @@ def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None)
         def log_message(self, format, *args):
             pass
 
+    class _Server(http.server.ThreadingHTTPServer):
+        """Bắt tay TLS ở luồng riêng của từng kết nối, không chặn vòng lặp accept."""
+        daemon_threads = True
+        ssl_ctx = None
+
+        def process_request_thread(self, request, client_address):
+            if self.ssl_ctx is not None:
+                try:
+                    request.settimeout(5)
+                    request = self.ssl_ctx.wrap_socket(request, server_side=True)
+                    request.settimeout(None)
+                except (ssl.SSLError, OSError):
+                    self.shutdown_request(request)
+                    return
+            super().process_request_thread(request, client_address)
+
+        def handle_error(self, request, client_address):
+            exc = sys.exc_info()[1]
+            if isinstance(exc, (ssl.SSLError, ConnectionError, TimeoutError, OSError)):
+                return  # client ngắt giữa chừng: bỏ qua, không in traceback
+            super().handle_error(request, client_address)
+
     server = None
 
-    cert_file = os.path.join(_HERE, "cert.pem")
-    key_file = os.path.join(_HERE, "private-key.pem")
+    cert_file = _find_file("cert.pem")
+    key_file = _find_file("private-key.pem")
     if not os.path.exists(cert_file):
         cert_file = os.path.join(_HERE, "..", "backend", "certs", "cert.pem")
         key_file = os.path.join(_HERE, "..", "backend", "certs", "private-key.pem")
@@ -177,13 +311,13 @@ def start_device_id_server(device_id: str, host: str, port: int, agent_ref=None)
     for attempt in range(3):
         try:
             free_port(port)
-            server = http.server.ThreadingHTTPServer((host, port), Handler)
+            server = _Server((host, port), Handler)
             is_https = False
             if os.path.exists(cert_file) and os.path.exists(key_file):
                 try:
                     ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                     ssl_ctx.load_cert_chain(certfile=cert_file, keyfile=key_file)
-                    server.socket = ssl_ctx.wrap_socket(server.socket, server_side=True)
+                    server.ssl_ctx = ssl_ctx
                     is_https = True
                 except Exception as e:
                     print(f"[Agent] ⚠️ Không kích hoạt được HTTPS cho Device-id server: {e}")
@@ -308,6 +442,10 @@ class FingerprintAgent:
         print(f"[Agent] Load SDK: {msg}")
         if not ok:
             print("❌ Không load được SDK.")
+            print("   Kiểm tra: đã cài driver ZKTeco chưa? đã cắm USB đầu đọc ZK9500 chưa?")
+            if _FROZEN:
+                print("   (Cửa sổ tự đóng sau 60 giây — mở lại ứng dụng sau khi cắm đầu đọc.)")
+                time.sleep(60)
             return
 
         # ★ Khởi động idle watchdog
@@ -358,20 +496,40 @@ class FingerprintAgent:
         ws = None
         last_error = None
         for target_url in candidate_urls:
-            url = f"{target_url}?device_id={self.device_id}&bridge_token={BRIDGE_TOKEN}"
+            # proto=2: xác thực bằng thách đố HMAC (không gửi token trong URL)
+            url = f"{target_url}?device_id={self.device_id}&proto=2"
             try:
-                ws = await websockets.connect(url, **connect_kwargs)
+                try:
+                    ws = await websockets.connect(url, **connect_kwargs)
+                except ssl.SSLCertVerificationError as e:
+                    if STRICT_TLS or not USE_TLS:
+                        raise
+                    print(f"[Agent] ⚠️ Không xác minh được chứng chỉ TLS ({e.verify_message}).")
+                    print("[Agent]    Có thể diệt virus/proxy đang quét HTTPS. Vẫn tiếp tục vì kênh đã được "
+                          "xác thực HMAC + mã hóa AES-256-GCM ở tầng ứng dụng.")
+                    relaxed = dict(connect_kwargs, ssl=build_relaxed_ssl_context())
+                    ws = await websockets.connect(url, **relaxed)
                 break
             except (ConnectionRefusedError, OSError) as e:
                 last_error = e
+                if isinstance(e, ssl.SSLError):
+                    raise
                 continue
 
         if ws is None:
             raise last_error or ConnectionRefusedError("Không thể kết nối WebSocket Gateway")
 
         async with ws:
-            print(f"[Agent] ✅ WS connected ({'wss' if USE_TLS else 'ws'}://...)")
-            async for raw in ws:
+            try:
+                secure = await secure_handshake(ws, self.device_id)
+            except websockets.exceptions.ConnectionClosed as e:
+                if getattr(e, "code", None) == 4001 or "bridge token" in str(e).lower():
+                    print("[Agent] ❌ Server đóng kết nối ngay khi xác thực (mã 4001). Hai nguyên nhân có thể:")
+                    print("[Agent]    1) Backend trên Server là BẢN CŨ, chưa cập nhật/khởi động lại → cập nhật Backend rồi restart.")
+                    print("[Agent]    2) BRIDGE_TOKEN trong agent khác Server → build lại bộ cài với token đúng.")
+                raise
+            print(f"[Agent] ✅ WS connected ({'wss' if USE_TLS else 'ws'}://...) 🔐 kênh mã hóa E2E")
+            async for raw in secure:
                 try:
                     msg = json.loads(raw)
                 except Exception:
@@ -379,19 +537,19 @@ class FingerprintAgent:
                 t = msg.get("type")
                 if t == "ping":
                     try:
-                        await ws.send(json.dumps({"type": "pong"}))
+                        await secure.send(json.dumps({"type": "pong"}))
                     except Exception:
                         pass
                 elif t == "scan_request":
                     self._cancel_event.set()
                     new_event = threading.Event()
                     self._cancel_event = new_event
-                    asyncio.create_task(self._handle_scan(ws, msg, new_event))
+                    asyncio.create_task(self._handle_scan(secure, msg, new_event))
                 elif t == "enroll_request":
                     self._cancel_event.set()
                     new_event = threading.Event()
                     self._cancel_event = new_event
-                    asyncio.create_task(self._handle_enroll(ws, msg, new_event))
+                    asyncio.create_task(self._handle_enroll(secure, msg, new_event))
 
     # ─────────────────────────── Handlers ───────────────────────────
 
@@ -438,30 +596,50 @@ class FingerprintAgent:
 
             print(f"[Agent] 👉 Đặt tay lên máy quét...")
 
-            # ★ BƯỚC 3 — Quét + so khớp
+            # ★ BƯỚC 3 — Quét + so khớp (tối đa MAX_TRIES lần chụp trong thời gian cho phép:
+            #   một lần chụp xấu/ấn nhẹ không nên làm hỏng cả phiên xác thực)
             stored = base64.b64decode(template_b64)
-            scanned = await asyncio.to_thread(
-                self.svc.wait_for_finger, timeout, cancel_event
-            )
+            MAX_TRIES = 3
+            deadline = time.time() + timeout
+            matched, score = False, 0
+            captured_any = False
+            for attempt in range(1, MAX_TRIES + 1):
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    break
+                scanned = await asyncio.to_thread(
+                    self.svc.wait_for_finger, remaining, cancel_event
+                )
 
-            if cancel_event.is_set():
-                print(f"[Agent] ⏹️ Scan {job_id} bị hủy bởi job mới.")
-                await ws.send(json.dumps({
-                    "type": "scan_result", "job_id": job_id,
-                    "match": False, "score": 0, "error": "CANCELLED",
-                }))
-                return
+                if cancel_event.is_set():
+                    print(f"[Agent] ⏹️ Scan {job_id} bị hủy bởi job mới.")
+                    await ws.send(json.dumps({
+                        "type": "scan_result", "job_id": job_id,
+                        "match": False, "score": 0, "error": "CANCELLED",
+                    }))
+                    return
 
-            if scanned is None:
+                if scanned is None:
+                    break
+                captured_any = True
+
+                matched, score = await asyncio.to_thread(
+                    self.svc.compare_templates, stored, scanned
+                )
+                if matched:
+                    break
+                if attempt < MAX_TRIES and deadline - time.time() > 3:
+                    print(f"[Agent] ⚠️ Lần {attempt}/{MAX_TRIES} không khớp (score={score}). "
+                          f"Nhấc tay ra, đặt lại NGÓN ĐÃ ĐĂNG KÝ, ấn chắc và đặt phẳng...")
+                    await asyncio.sleep(1.0)  # chờ người dùng nhấc tay
+
+            if not captured_any:
                 await ws.send(json.dumps({
                     "type": "scan_result", "job_id": job_id,
                     "match": False, "score": 0, "error": "TIMEOUT",
                 }))
                 return
 
-            matched, score = await asyncio.to_thread(
-                self.svc.compare_templates, stored, scanned
-            )
             print(f"[Agent] {'✅' if matched else '❌'} {job_id}: match={matched} score={score}")
             await ws.send(json.dumps({
                 "type": "scan_result", "job_id": job_id,
@@ -659,7 +837,33 @@ class FingerprintAgent:
                 except Exception as rel_err:
                     print(f"[Agent] ⚠️ enroll release_device error: {rel_err}")
 
+def ensure_ca_trusted():
+    """Exe chạy lần đầu: cài rootCA.pem vào kho tin cậy của người dùng Windows
+    để trình duyệt tin HTTPS của agent (127.0.0.1:9001) và của Server.
+    Chỉ chạy 1 lần (marker .ca_installed); Windows có thể hiện hộp thoại xác nhận."""
+    if not (_FROZEN and sys.platform == "win32"):
+        return
+    marker = os.path.join(_HERE, ".ca_installed")
+    ca = _find_file("rootCA.pem")
+    if os.path.exists(marker) or not os.path.exists(ca):
+        return
+    try:
+        import subprocess
+        r = subprocess.run(["certutil", "-user", "-addstore", "Root", ca],
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode == 0:
+            print("[Agent] 🔐 Đã cài rootCA vào kho tin cậy của người dùng.")
+            try:
+                open(marker, "w").write("ok")
+            except OSError:
+                pass
+        else:
+            print("[Agent] ⚠️ Chưa cài được rootCA (bạn có thể đã bấm 'No'). Lần sau sẽ hỏi lại.")
+    except Exception as e:
+        print(f"[Agent] ⚠️ Lỗi cài rootCA: {e}")
+
 def main():
+    ensure_ca_trusted()
     device_id = get_or_create_device_id()
     ssl_ctx = build_ssl_context()
     agent = FingerprintAgent(device_id, ssl_context=ssl_ctx)

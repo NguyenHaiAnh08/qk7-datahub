@@ -72,6 +72,44 @@ async function getSubtreeUnits(unitId) {
   return res.recordset.map(r => r.unit_id);
 }
 
+/**
+ * Lấy danh sách unit_id của đơn vị và toàn bộ cây con, đồng thời THỪA KẾ toàn bộ đơn vị cha
+ * (dừng lại trước Trường Quân sự Quân khu 7 hoặc Quân khu 7).
+ * Phục vụ cơ chế: đơn vị con thừa kế tài liệu từ đơn vị cha (VD: CNTT thừa kế từ TM-HC).
+ */
+async function getUnitWithInheritedUnits(unitId) {
+  if (!unitId) return [];
+  const pool = await getPool();
+  const subtreeRes = await pool.request()
+    .input('unit_id', sql.NVarChar(50), unitId)
+    .query(`
+      WITH Subtree AS (
+        SELECT unit_id FROM UNIT WHERE unit_id = @unit_id
+        UNION ALL
+        SELECT u.unit_id FROM UNIT u
+        JOIN Subtree s ON u.parent_id = s.unit_id
+      )
+      SELECT unit_id FROM Subtree
+    `);
+  const unitIds = new Set(subtreeRes.recordset.map(r => r.unit_id));
+
+  let curId = unitId;
+  let guard = 0;
+  while (curId && guard < 10) {
+    const parentRes = await pool.request()
+      .input('uid', sql.NVarChar(50), curId)
+      .query('SELECT parent_id FROM UNIT WHERE unit_id = @uid');
+    const pId = parentRes.recordset[0]?.parent_id;
+    if (!pId || pId === 'TQS-QK7' || pId === 'TQS' || pId === 'U-TQS' || pId === 'QK7') {
+      break;
+    }
+    unitIds.add(pId);
+    curId = pId;
+    guard++;
+  }
+  return Array.from(unitIds);
+}
+
 async function getRootUnitId() {
   const pool = await getPool();
   const res = await pool.request().query(
@@ -83,6 +121,7 @@ async function getRootUnitId() {
 module.exports = {
   getUserUnitScope,
   getSubtreeUnits,
+  getUnitWithInheritedUnits,
   getRootUnitId,
   resolveUserUnitId,
   resolveUserRoles,

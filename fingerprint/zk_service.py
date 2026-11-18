@@ -304,6 +304,8 @@ class ZK9500Service:
                 threshold = int(os.getenv("MATCH_SCORE_THRESHOLD", "45"))
                 matched = (fid == TEMP_ID)
                 final_score = int(score) if matched else 0
+                print(f"[compare] fid={fid} raw_score={score} threshold={threshold} "
+                      f"tpl_stored={len(t1_bytes)}B tpl_scanned={len(t2_bytes)}B")
                 return (matched and final_score >= threshold, final_score)
             finally:
                 if cached:

@@ -38,6 +38,14 @@ async function migrateRadar() {
     console.log('+ Đã thêm cột display_order');
   }
 
+  // Bổ sung cột note vào TEACHING_SCHEDULE nếu chưa có
+  const schCols = await pool.request().query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='TEACHING_SCHEDULE'");
+  const schColNames = schCols.recordset.map(c => c.COLUMN_NAME);
+  if (!schColNames.includes('note')) {
+    await pool.request().query("ALTER TABLE TEACHING_SCHEDULE ADD note NVARCHAR(500) NULL");
+    console.log('+ Đã thêm cột note vào TEACHING_SCHEDULE');
+  }
+
   // 2. Danh sách phòng học thực tế Trường Quân sự Quân khu 7
   const classrooms = [
     // Khu nhà H1 - Tầng 1

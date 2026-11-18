@@ -13,6 +13,7 @@ export const ROUTE_PATHS = {
   ADMIN_TRASH: '/admin/trash',
   ADMIN_SESSIONS: '/admin/sessions',
   LECTURES: '/lectures',
+  CLASSROOMS: '/classrooms',
   MATERIALS: '/materials',
   LIBRARY: '/library',
   ERROR_400: '/400',

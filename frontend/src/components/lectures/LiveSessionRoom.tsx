@@ -4,7 +4,7 @@ import {
   GraduationCap, Building2, User, CheckCircle2, X
 } from 'lucide-react';
 import { Lecture, TeachingSchedule } from '../../types/lecture';
-import { http } from '../../services/http';
+import { http, getAuthHeaders } from '../../services/http';
 
 interface Props {
   open: boolean;
@@ -31,7 +31,8 @@ const computeElapsed = (startIso: string): number => {
 // Build URL trình chiếu kèm tệp lựa chọn
 const buildLaunchUrl = (lecture: Lecture, selectedFile?: string): string => {
   if (lecture.content_type === 'PDF') {
-    return lecture.document_id ? `/api/files/${lecture.document_id}/view` : '';
+    // PDF được nạp bằng fetch (kèm header xác thực) rồi hiển thị qua Blob URL — xem effect pdfUrl.
+    return '';
   }
   const token = sessionStorage.getItem('qk7_token');
   const queryParts: string[] = [];
@@ -53,6 +54,8 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
   const [modes, setModes] = useState<ModeItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [reloadKey, setReloadKey] = useState<number>(0);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
+  const [pdfError, setPdfError] = useState<string>('');
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastSentProgress = useRef<{ index: number; total: number } | null>(null);
@@ -68,6 +71,49 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
     setModes([]);
     lastSentProgress.current = null;
   }, [lecture?.lecture_id]);
+
+  // Nạp PDF giáo án: GET /api/lectures/:id/pdf (kèm Authorization + token vân tay của bài giảng nếu có)
+  // → Blob URL. Không dùng <iframe src=...> trực tiếp vì iframe không gửi được header xác thực.
+  useEffect(() => {
+    if (!open || lecture.content_type !== 'PDF' || !lecture.has_pdf) {
+      setPdfUrl('');
+      return;
+    }
+    const ctrl = new AbortController();
+    let objectUrl = '';
+    setPdfError('');
+    setPdfUrl('');
+    setIframeLoaded(false);
+
+    (async () => {
+      try {
+        const headers: Record<string, string> = { ...getAuthHeaders() };
+        try {
+          const fp = sessionStorage.getItem(`qk7_fp_lecture_${lecture.lecture_id}`);
+          if (fp) headers['X-Fingerprint-Token'] = fp;
+        } catch { /* sessionStorage bị chặn */ }
+
+        const r = await fetch(`/api/lectures/${encodeURIComponent(lecture.lecture_id)}/pdf`, {
+          headers,
+          signal: ctrl.signal,
+        });
+        if (!r.ok) {
+          let msg = `Không tải được tệp PDF (HTTP ${r.status})`;
+          try { const j = await r.json(); if (j?.error) msg = j.error; } catch { /* không phải JSON */ }
+          throw new Error(msg);
+        }
+        objectUrl = URL.createObjectURL(await r.blob());
+        setPdfUrl(objectUrl);
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') setPdfError(e?.message || 'Không tải được tệp PDF');
+      }
+    })();
+
+    return () => {
+      ctrl.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [open, lecture.lecture_id, lecture.content_type, lecture.has_pdf, reloadKey]);
 
   // Lưu trạng thái ca dạy vào localStorage theo presenter_id để phục hồi khi F5 biệt lập theo từng tài khoản
   useEffect(() => {
@@ -411,14 +457,30 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
   // ── Hàm render nội dung dựa trên loại file ──
   const renderContent = () => {
     if (lecture.content_type === 'PDF') {
-      if (!lecture.document_id) {
+      if (!lecture.has_pdf) {
         return (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-950 p-6 text-center">
             <AlertTriangle className="w-12 h-12 text-amber-500 animate-bounce" />
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Chưa tìm thấy tệp tài liệu PDF</h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md">
-              Bài giảng này chưa được gắn mã tệp tài liệu số hóa (document_id). Vui lòng cập nhật tệp giáo án trong mục chỉnh sửa bài giảng.
+              Bài giảng này chưa có tệp giáo án PDF. Vui lòng tải lên tệp giáo án trong mục chỉnh sửa bài giảng.
             </p>
+          </div>
+        );
+      }
+      if (pdfError) {
+        return (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-950 p-6 text-center">
+            <AlertTriangle className="w-12 h-12 text-red-500" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Không mở được tệp PDF</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md">{pdfError}</p>
+            <button
+              type="button"
+              onClick={() => setReloadKey((k) => k + 1)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Thử lại
+            </button>
           </div>
         );
       }
@@ -430,13 +492,13 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
               <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Đang nạp tài liệu giáo án PDF...</p>
             </div>
           )}
-          <iframe
+          {pdfUrl && <iframe
             key={`pdf-${reloadKey}`}
-            src={`/api/files/${lecture.document_id}/view`}
+            src={pdfUrl}
             onLoad={() => setIframeLoaded(true)}
             className="w-full h-full border-0 bg-white dark:bg-slate-900"
             title="PDF Viewer"
-          />
+          />}
         </div>
       );
     }

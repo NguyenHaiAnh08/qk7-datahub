@@ -4,6 +4,72 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.2-classrooms-subsystem-and-unit-inheritance] — 2026-11-18
+
+### 1. Phân Hệ Giảng Đường Độc Lập & Giám Sát Mặt Bằng Trực Quan (Classrooms Subsystem)
+- **Xây dựng Màn hình Phân Hệ Giảng Đường ([`ClassroomsPage.tsx`](../frontend/src/pages/ClassroomsPage.tsx)):**
+  - Khởi tạo trang chuyên biệt `/classrooms` phục vụ hiển thị sơ đồ mặt bằng giảng đường, điều hành ca dạy trực tiếp và giám sát telemetry phòng học.
+  - Tích hợp vào hệ sinh thái định tuyến [`ecosystem.routes.tsx`](../frontend/src/routes/modules/ecosystem.routes.tsx) và định nghĩa hằng số `ROUTE_PATHS.CLASSROOMS` trong [`routePaths.ts`](../frontend/src/routes/routePaths.ts).
+  - Bổ sung nút điều hướng "Giảng đường" (Icon `School`) trên thanh điều hướng trung tâm [`Header.tsx`](../frontend/src/components/common/Header.tsx).
+- **Tối ưu Bảng Giám Sát Radar ([`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx)):**
+  - Tinh chỉnh layout responsive hiển thị trực tiếp cho desktop ($\ge 1200\text{px}$) và drawer compact ($< 1200\text{px}$).
+  - Bổ sung nút đóng inspector trực quan và nâng cao độ tương phản màu sắc.
+
+### 2. Cơ Chế Thừa Kế Văn Bản Đơn Vị Con & Phân Cấp Quân Sự (Unit Document Inheritance)
+- **Hạ tầng Dịch vụ & Phân quyền ([`backend/src/unit-scope.js`](../backend/src/unit-scope.js) & [`backend/server.js`](../backend/server.js)):**
+  - Xây dựng hàm `getUnitWithInheritedUnits`: Cho phép đơn vị con cấp dưới tự động thừa kế tài liệu từ các đơn vị cha trực thuộc (ví dụ Tổ CNTT thừa kế văn bản từ Phòng Tham mưu - Hành chính), dừng lại ở cấp Nhà trường/Quân khu.
+  - Endpoint `/api/documents/my-unit` trả về `parent_name` và áp dụng `getUnitWithInheritedUnits`.
+  - Hỗ trợ mã `BGH-TQSQK` và `U-BGH` trong bộ lọc tài liệu Ban Giám hiệu.
+- **Giao diện Người dùng ([`MyUnitPage.tsx`](../frontend/src/pages/MyUnitPage.tsx) & [`SchoolOverviewSection.tsx`](../frontend/src/components/portal/SchoolOverviewSection.tsx)):**
+  - Hiển thị tiêu đề đơn vị ghép chuẩn quân sự (`{Đơn vị con} - {Đơn vị cha}`).
+  - Radar tiến độ phòng ban chỉ hiển thị các đơn vị trực thuộc cấp 1 của Nhà trường (tránh cuộn 79 đơn vị nhỏ), tổng hợp văn bản của toàn bộ đơn vị con cháu và sắp xếp theo phân cấp quân sự `getMilitaryUnitSortWeight`.
+
+### 3. Chuẩn Hóa Nhận Diện Thương Hiệu "Văn Bản Số" (Branding Standardization)
+- Đồng bộ nhãn điều hướng "Dữ liệu số" $\rightarrow$ "Văn bản số" trên [`Header.tsx`](../frontend/src/components/common/Header.tsx), [`DataHubSubNav.tsx`](../frontend/src/components/common/DataHubSubNav.tsx) và mẫu báo cáo Excel [`exportAuditReportExcel.ts`](../frontend/src/utils/exportAuditReportExcel.ts).
+- Cập nhật màu nền hệ thống chuẩn xám quân sự `#e2e8f0` / `bg-slate-200` tại [`index.html`](../frontend/index.html) và [`index.css`](../frontend/src/index.css).
+
+---
+
+## [v1.8.1-lecture-pdf-decoupled] — 2026-11-18
+
+### Tách PDF bài giảng số khỏi Dữ liệu số (bảng `DOCUMENT`)
+- **Vấn đề:** upload PDF bài giảng tạo thêm một dòng `DOCUMENT` (`DOC-LEC-…`) → bài giảng hiện bên Dữ liệu số, lọt vào tìm kiếm AI / thống kê / thùng rác / kiểm tra trùng; mức bảo mật và vòng đời lệch với bài giảng.
+- **Thay đổi:**
+  - `DIGITAL_LECTURE` có thêm `pdf_path`, `pdf_name`, `pdf_size`, `pdf_sha256`; không còn ghi vào `DOCUMENT`.
+  - Endpoint mới `GET /api/lectures/:id/pdf` (quyền theo chính bài giảng: trạng thái, cấp bảo mật; Cấp 3+ cần token vân tay đúng `lecture_id` hoặc đang là người giảng của ca ONGOING).
+  - Upload PDF chỉ cho `DRAFT`/`REJECTED`; thay tệp thì xóa tệp cũ; xóa vĩnh viễn bài giảng xóa luôn tệp PDF.
+  - `PUT /api/lectures/:id` giữ nguyên trường không gửi (trước đây xóa mất liên kết PDF).
+  - Frontend `LiveSessionRoom` nạp PDF bằng `fetch` → Blob URL.
+- **Triển khai:** chạy `node backend/migrations/decouple_lecture_pdf.cjs` (có `--dry-run`) **trước** khi khởi động lại backend.
+
+## [v1.8.0-fingerprint-e2e-channel] — 2026-11-18
+
+### Kênh Backend ↔ Fingerprint Agent mã hóa & xác thực ở tầng ứng dụng
+- **Vấn đề:** diệt virus/proxy ký lại HTTPS (Kaspersky...) làm agent trên một số máy báo lỗi chứng chỉ, không kết nối được backend `:8000`.
+- **Giải pháp** ([`backend/src/agent-crypto.js`](../backend/src/agent-crypto.js), [`backend/src/fingerprint-ws.js`](../backend/src/fingerprint-ws.js), [`fingerprint/agent.py`](../fingerprint/agent.py)):
+  - Xác thực 2 chiều bằng thách đố HMAC-SHA256 (`proto=2`); `BRIDGE_TOKEN` không còn gửi qua mạng/URL.
+  - Mọi tin nhắn mã hóa AES-256-GCM, khóa phiên riêng mỗi kết nối, số thứ tự chống phát lại.
+  - Agent chấp nhận lỗi xác minh chuỗi chứng chỉ TLS (trừ khi `AGENT_STRICT_TLS=true`) vì dữ liệu đã được bảo vệ độc lập.
+  - Tương thích tạm thời với agent cũ; tắt bằng `AGENT_ALLOW_LEGACY=false` khi mọi máy con đã cập nhật.
+- **Triển khai:** cập nhật Backend trước, rồi build lại bộ cài (`python build_setup.py --server <IP>`) và cài lại trên máy con. Agent bản mới cần `cryptography` (đã thêm vào `requirements.txt`).
+
+---
+
+## [v1.7.4-document-unit-fk-guard-and-schedule-note-resilience] — 2026-11-17
+
+### 1. Phòng Vệ Khóa Ngoại Đơn Vị Ban Hành Khi Chỉnh Sửa Văn Bản ([`backend/server.js`](../backend/server.js))
+- Tại `PUT /api/documents/:fileId`: Bổ sung bước kiểm tra tính tồn tại của `issuing_unit_id` trong bảng `UNIT` trước khi thực thi truy vấn UPDATE.
+- Nếu mã đơn vị gửi lên không hợp lệ hoặc đã bị thay đổi, tự động fallback về `oldDoc.issuing_unit_id` hoặc `null`, ngăn chặn hoàn toàn lỗi sập giao dịch do vi phạm ràng buộc khóa ngoại `FK_DOC_UNIT`.
+
+### 2. Khắc Phục Lỗi Cột Ghi Chú Lịch Giảng Dạy & Tự Động Migration ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js) & [`backend/src/migrate-radar.js`](../backend/src/migrate-radar.js))
+- Bổ sung hàm kiểm tra tương thích `hasColumn(pool, 'TEACHING_SCHEDULE', 'note')` và gán `${hasNote ? 's.note' : 'NULL AS note'}`, ngăn chặn lỗi SQL `Invalid column name 'note'` khi xem chi tiết radar phòng học trên các phiên bản CSDL chưa cập nhật cột.
+- Bổ sung bước tự động thêm cột `note NVARCHAR(500) NULL` vào `TEACHING_SCHEDULE` trong kịch bản di chuyển `migrate-radar.js`.
+
+### 3. Đồng Bộ Dữ Liệu Kho Vector RAG ([`boxchat/local_storage/qdrant_data/metadata_chunks.json`](../boxchat/local_storage/qdrant_data/metadata_chunks.json))
+- Dọn dẹp các chunk metadata của tài liệu thử nghiệm đã xóa, bảo đảm kho vector đồng bộ với CSDL.
+
+---
+
 ## [v1.7.3-db-connection-pool-and-fingerprint-resilience] — 2026-11-17
 
 ### 1. Tối Ưu Hóa Connection Pool SQL Server Chống Drop Socket ([`backend/src/db.js`](../backend/src/db.js))

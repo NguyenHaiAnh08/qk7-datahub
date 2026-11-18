@@ -21,9 +21,9 @@ export interface SpotlightTourProps {
 export const DEFAULT_GUEST_STEPS: SpotlightTourStep[] = [
   {
     target: '#tour-nav-portal',
-    title: 'Không gian Dữ liệu số',
+    title: 'Không gian Văn bản số',
     badge: 'Bước 01 / 06 · Điều hướng chính',
-    description: 'Khu vực chuyển đổi và tra cứu kho tài nguyên dữ liệu số công khai của Trường Quân sự Quân khu 7 dành cho đại biểu và cán bộ.',
+    description: 'Khu vực chuyển đổi và tra cứu kho tài nguyên văn bản số công khai của Trường Quân sự Quân khu 7 dành cho đại biểu và cán bộ.',
     placement: 'bottom',
   },
   {

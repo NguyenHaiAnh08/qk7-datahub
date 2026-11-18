@@ -671,7 +671,7 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
   // STANDALONE LAYOUT (truy cập /admin/sessions trực tiếp qua URL)
   // ═══════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 flex flex-col font-sans transition-colors duration-200">
       <Header activeNav="admin" title="Trường Quân Sự Quân Khu 7" subtitle="Trung tâm dữ liệu số" />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-5">

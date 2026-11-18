@@ -680,7 +680,7 @@ export const AIChatWidget: React.FC = () => {
               <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/20 animate-pulse">
                 <Spin size="small" />
                 <span className="font-medium">
-                  {lastQuery ? 'Đang lấy câu trả lời...' : 'Trợ lý AI đang tra cứu kho dữ liệu số...'}
+                  {lastQuery ? 'Đang lấy câu trả lời...' : 'Trợ lý AI đang tra cứu kho văn bản số...'}
                 </span>
               </div>
             )}

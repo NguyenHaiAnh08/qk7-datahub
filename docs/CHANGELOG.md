@@ -4,6 +4,18 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.1-lecture-pdf-decoupled] — 2026-11-18
+
+### Tách PDF bài giảng số khỏi Dữ liệu số (bảng `DOCUMENT`)
+- **Vấn đề:** upload PDF bài giảng tạo thêm một dòng `DOCUMENT` (`DOC-LEC-…`) → bài giảng hiện bên Dữ liệu số, lọt vào tìm kiếm AI / thống kê / thùng rác / kiểm tra trùng; mức bảo mật và vòng đời lệch với bài giảng.
+- **Thay đổi:**
+  - `DIGITAL_LECTURE` có thêm `pdf_path`, `pdf_name`, `pdf_size`, `pdf_sha256`; không còn ghi vào `DOCUMENT`.
+  - Endpoint mới `GET /api/lectures/:id/pdf` (quyền theo chính bài giảng: trạng thái, cấp bảo mật; Cấp 3+ cần token vân tay đúng `lecture_id` hoặc đang là người giảng của ca ONGOING).
+  - Upload PDF chỉ cho `DRAFT`/`REJECTED`; thay tệp thì xóa tệp cũ; xóa vĩnh viễn bài giảng xóa luôn tệp PDF.
+  - `PUT /api/lectures/:id` giữ nguyên trường không gửi (trước đây xóa mất liên kết PDF).
+  - Frontend `LiveSessionRoom` nạp PDF bằng `fetch` → Blob URL.
+- **Triển khai:** chạy `node backend/migrations/decouple_lecture_pdf.cjs` (có `--dry-run`) **trước** khi khởi động lại backend.
+
 ## [v1.8.0-fingerprint-e2e-channel] — 2026-11-18
 
 ### Kênh Backend ↔ Fingerprint Agent mã hóa & xác thực ở tầng ứng dụng

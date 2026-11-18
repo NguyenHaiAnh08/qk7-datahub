@@ -159,6 +159,8 @@ module.exports = function createLectureRoutes({
         SELECT l.lecture_id, l.lecture_code, l.title, l.subject_id, l.author_id,
                l.faculty_unit_id, l.security_level_id, l.content_type, l.scorm_entry_point,
                l.document_id, l.status, l.reject_reason, l.created_at, l.updated_at,
+               CAST(CASE WHEN l.pdf_path IS NOT NULL THEN 1 ELSE 0 END AS BIT) AS has_pdf,
+               l.pdf_name, l.pdf_size,
                s.name AS subject_name,
                u.full_name AS author_name, u.[rank] AS author_rank,
                un.name AS faculty_name,
@@ -248,6 +250,10 @@ module.exports = function createLectureRoutes({
       if (!inScope(scope, lec.faculty_unit_id) && lec.author_id !== req.user.user_id) {
         return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
       }
+      // Không lộ đường dẫn lưu trữ nội bộ ra client — chỉ báo có/không có PDF
+      lec.has_pdf = !!lec.pdf_path;
+      delete lec.pdf_path;
+      delete lec.pdf_sha256;
       res.json(lec);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -256,7 +262,7 @@ module.exports = function createLectureRoutes({
     try {
       const {
         title, subject_id, lecture_code, security_level_id,
-        content_type, scorm_entry_point, document_id,
+        content_type, scorm_entry_point,
       } = req.body || {};
       if (!title || !subject_id) return res.status(400).json({ error: 'Thiếu tiêu đề hoặc môn học' });
 
@@ -283,14 +289,13 @@ module.exports = function createLectureRoutes({
         .input('security_level_id', sql.Int, security_level_id || 2)
         .input('content_type', sql.VarChar(20), ctype)
         .input('scorm_entry_point', sql.NVarChar(255), scorm_entry_point || null)
-        .input('document_id', sql.VarChar(50), document_id || null)
         .query(`
           INSERT INTO DIGITAL_LECTURE (
             lecture_id, lecture_code, title, subject_id, author_id, faculty_unit_id,
-            security_level_id, content_type, scorm_entry_point, document_id
+            security_level_id, content_type, scorm_entry_point
           ) VALUES (
             @id, @code, @title, @subject_id, @author_id, @faculty_unit_id,
-            @security_level_id, @content_type, @scorm_entry_point, @document_id
+            @security_level_id, @content_type, @scorm_entry_point
           )
         `);
 
@@ -311,7 +316,7 @@ module.exports = function createLectureRoutes({
       const pool = await getPool();
       const check = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .query(`SELECT status, author_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT status, author_id, content_type FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lec = check.recordset[0];
       if (lec.author_id !== req.user.user_id && !(req.user.roles || []).includes('ROL-01')) {
@@ -321,25 +326,29 @@ module.exports = function createLectureRoutes({
         return res.status(400).json({ error: 'Không thể sửa bài giảng đang chờ duyệt hoặc đã xuất bản' });
       }
 
-      const { title, subject_id, security_level_id, content_type, scorm_entry_point, document_id } = req.body || {};
-      const ctype = String(content_type || 'PDF').toUpperCase();
+      const { title, subject_id, security_level_id, content_type, scorm_entry_point } = req.body || {};
+      // Trường nào client không gửi thì GIỮ NGUYÊN giá trị cũ (COALESCE) — tránh xóa nhầm
+      // scorm_entry_point khi form sửa không đính kèm lại tệp. Tệp PDF chỉ đổi qua POST /:id/pdf/upload.
+      const ctype = String(content_type || lec.content_type || 'PDF').toUpperCase();
       if (!['PDF', 'HTML5', 'SCORM'].includes(ctype)) {
         return res.status(400).json({ error: 'Loại nội dung không hợp lệ' });
       }
 
       await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .input('title', sql.NVarChar(500), title)
-        .input('subject_id', sql.VarChar(50), subject_id)
-        .input('security_level_id', sql.Int, security_level_id)
+        .input('title', sql.NVarChar(500), title ?? null)
+        .input('subject_id', sql.VarChar(50), subject_id ?? null)
+        .input('security_level_id', sql.Int, security_level_id ?? null)
         .input('content_type', sql.VarChar(20), ctype)
         .input('scorm_entry_point', sql.NVarChar(255), scorm_entry_point || null)
-        .input('document_id', sql.VarChar(50), document_id || null)
         .query(`
           UPDATE DIGITAL_LECTURE
-          SET title = @title, subject_id = @subject_id, security_level_id = @security_level_id,
-              content_type = @content_type, scorm_entry_point = @scorm_entry_point,
-              document_id = @document_id, updated_at = GETDATE()
+          SET title = COALESCE(@title, title),
+              subject_id = COALESCE(@subject_id, subject_id),
+              security_level_id = COALESCE(@security_level_id, security_level_id),
+              content_type = @content_type,
+              scorm_entry_point = COALESCE(@scorm_entry_point, scorm_entry_point),
+              updated_at = GETDATE()
           WHERE lecture_id = @id
         `);
       await logAudit(req, 'LECTURE_UPDATE', `Sửa bài giảng ${lectureId}`, lectureId);
@@ -423,7 +432,7 @@ module.exports = function createLectureRoutes({
       // Lấy thông tin để xóa file vật lý
       const check = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .query(`SELECT title, created_at, status, pending_scorm_path FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT title, created_at, status, pending_scorm_path, pdf_path FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
 
       if (check.recordset.length === 0 || check.recordset[0].status !== 'DELETED') {
         return res.status(400).json({ error: 'Chỉ có thể xóa vĩnh viễn bài giảng đang ở trong thùng rác' });
@@ -469,6 +478,22 @@ module.exports = function createLectureRoutes({
         if (fs.existsSync(pendingAbs)) fs.unlinkSync(pendingAbs);
       }
 
+      // Tệp PDF giáo án: xóa đúng đường dẫn đã lưu (có thể nằm ở thư mục tháng/tiêu đề khác
+      // với thư mục tính từ created_at ở trên), rồi dọn thư mục nếu đã trống.
+      if (lec.pdf_path) {
+        const uploadsRoot = path.resolve(__dirname, '..', 'uploads');
+        const pdfAbs = path.resolve(__dirname, '..', lec.pdf_path);
+        if (pdfAbs.startsWith(uploadsRoot + path.sep)) {
+          try {
+            if (fs.existsSync(pdfAbs)) fs.unlinkSync(pdfAbs);
+            const dir = path.dirname(pdfAbs);
+            if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+          } catch (e) {
+            console.warn('[lecture purge] Không xóa được PDF:', lec.pdf_path, e.message);
+          }
+        }
+      }
+
       await logAudit(req, 'LECTURE_PURGE', `Xóa vĩnh viễn bài giảng ${lectureId} khỏi hệ thống`, lectureId);
       res.json({ success: true });
     } catch (err) {
@@ -486,7 +511,7 @@ module.exports = function createLectureRoutes({
         .input('id', sql.VarChar(50), lectureId)
         .query(`SELECT status, faculty_unit_id, content_type,
                        pending_scorm_path, scorm_entry_point,
-                       title, created_at, document_id
+                       title, created_at, pdf_path
                 FROM DIGITAL_LECTURE WHERE lecture_id = @id`);                 // [1]
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
 
@@ -553,9 +578,9 @@ module.exports = function createLectureRoutes({
             });
           }
         } else if (lec.content_type === 'PDF') {
-          if (!lec.document_id) {
+          if (!lec.pdf_path) {
             return res.status(400).json({
-              error: 'Bài giảng PDF chưa có tệp tài liệu đính kèm (thiếu document_id)',
+              error: 'Bài giảng PDF chưa có tệp tài liệu đính kèm (chưa tải lên tệp PDF)',
               code: 'NO_DOCUMENT',
             });
           }
@@ -673,7 +698,7 @@ module.exports = function createLectureRoutes({
       // Kiểm tra bài giảng
       const lecCheck = await pool.request()
         .input('lid', sql.VarChar(50), lecture_id)
-        .query(`SELECT status, title, security_level_id, document_id, faculty_unit_id
+        .query(`SELECT status, title, security_level_id, faculty_unit_id
                 FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
       if (lecCheck.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lecture = lecCheck.recordset[0];

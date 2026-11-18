@@ -4,6 +4,19 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.0-fingerprint-e2e-channel] — 2026-11-18
+
+### Kênh Backend ↔ Fingerprint Agent mã hóa & xác thực ở tầng ứng dụng
+- **Vấn đề:** diệt virus/proxy ký lại HTTPS (Kaspersky...) làm agent trên một số máy báo lỗi chứng chỉ, không kết nối được backend `:8000`.
+- **Giải pháp** ([`backend/src/agent-crypto.js`](../backend/src/agent-crypto.js), [`backend/src/fingerprint-ws.js`](../backend/src/fingerprint-ws.js), [`fingerprint/agent.py`](../fingerprint/agent.py)):
+  - Xác thực 2 chiều bằng thách đố HMAC-SHA256 (`proto=2`); `BRIDGE_TOKEN` không còn gửi qua mạng/URL.
+  - Mọi tin nhắn mã hóa AES-256-GCM, khóa phiên riêng mỗi kết nối, số thứ tự chống phát lại.
+  - Agent chấp nhận lỗi xác minh chuỗi chứng chỉ TLS (trừ khi `AGENT_STRICT_TLS=true`) vì dữ liệu đã được bảo vệ độc lập.
+  - Tương thích tạm thời với agent cũ; tắt bằng `AGENT_ALLOW_LEGACY=false` khi mọi máy con đã cập nhật.
+- **Triển khai:** cập nhật Backend trước, rồi build lại bộ cài (`python build_setup.py --server <IP>`) và cài lại trên máy con. Agent bản mới cần `cryptography` (đã thêm vào `requirements.txt`).
+
+---
+
 ## [v1.7.3-db-connection-pool-and-fingerprint-resilience] — 2026-11-17
 
 ### 1. Tối Ưu Hóa Connection Pool SQL Server Chống Drop Socket ([`backend/src/db.js`](../backend/src/db.js))

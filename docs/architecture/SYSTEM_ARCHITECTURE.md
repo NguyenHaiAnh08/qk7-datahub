@@ -1595,3 +1595,33 @@ Tại `backend/src/lecture-package-helper.js`, gói ZIP SCORM/HTML5 bắt buộc
 - **Neutral (Tím Thư Viện):** `#722ED1` — Màu thương hiệu truyền thống của hệ thống Trung tâm Thư viện số QK7.
 - **Typography:** `Be Vietnam Pro` (văn bản hành chính) + `JetBrains Mono` (`font-mono tabular-nums` cho số liệu tọa độ, quân số, mật mã).
 
+---
+
+## 34. Kiến Trúc Phân Hệ Giảng Đường, Thừa Kế Đơn Vị Con & Phân Tách PDF Bài Giảng (v1.8.1 - v1.8.2)
+
+### 34.1. Phân Tách Tệp PDF Bài Giảng Khỏi Kho Dữ Liệu Số (`DOCUMENT`)
+- **Vấn đề giải quyết:** Trước phiên bản v1.8.1, việc tải lên tệp PDF bài giảng tạo thêm một bản ghi trong bảng `DOCUMENT` (`DOC-LEC-...`), gây xung đột vòng đời, lẫn lộn chỉ mục tìm kiếm RAG và sai lệch thống kê văn bản số toàn trường.
+- **Giải pháp kiến trúc:**
+  - Mở rộng bảng `DIGITAL_LECTURE` với các trường lưu trữ vật lý độc lập: `pdf_path`, `pdf_name`, `pdf_size`, `pdf_sha256`.
+  - Toàn bộ thao tác tải lên, cập nhật và xem PDF bài giảng chuyển giao sang endpoint chuyên trách: `GET /api/lectures/:id/pdf` và `POST /api/lectures/:id/pdf/upload`.
+  - Giữ vững 3 tầng bảo mật: Văn bản bài giảng Cấp 3-5 bắt buộc token vân tay `lecture_id` hoặc giảng viên đang trong phiên giảng dạy hoạt động (`ONGOING`).
+  - Hỗ trợ di chuyển an toàn với kịch bản `backend/migrations/decouple_lecture_pdf.cjs`.
+
+### 34.2. Phân Hệ Giảng Đường Độc Lập (`ClassroomsPage.tsx` - `/classrooms`)
+- **Mục tiêu:** Cung cấp không gian điều hành tập trung cho công tác quản trị giảng đường, phân bổ lớp học và điều phối ca giảng trực tiếp trên một mặt bằng tổng thể.
+- **Kiến trúc định tuyến & Điều hướng:**
+  - Hằng số định tuyến `ROUTE_PATHS.CLASSROOMS = '/classrooms'` trong `frontend/src/routes/routePaths.ts`.
+  - Tích hợp vào hệ sinh thái định tuyến `ecosystem.routes.tsx`.
+  - Bổ sung nút điều hướng trực quan "Giảng đường" (Icon `School`) trên thanh điều hướng trung tâm `Header.tsx`.
+- **Giám sát Radar & Viễn trắc Telemetry:**
+  - Tích hợp `LiveMonitorPanel.tsx` với khả năng co giãn linh hoạt: dạng cột bên phải trên màn hình máy tính ($\ge 1200\text{px}$) và Drawer thu gọn trên thiết bị cảm ứng / màn hình nhỏ ($< 1200\text{px}$).
+
+### 34.3. Cơ Chế Thừa Kế Văn Bản Đơn Vị Con & Phân Cấp Quân Sự
+- **Hạ tầng Dịch vụ (`backend/src/unit-scope.js`):**
+  - Xây dựng hàm `getUnitWithInheritedUnits(unitId)`: Cho phép cán bộ thuộc đơn vị con (ví dụ Tổ CNTT) tự động kế thừa và khai thác văn bản do đơn vị cha trực thuộc (ví dụ Phòng Tham mưu - Hành chính) ban hành, dừng lại trước cấp Nhà trường/Quân khu.
+  - Phân loại và tối ưu hóa bộ lọc Ban Giám hiệu qua tiền tố mã đơn vị `BGH-TQSQK` và `U-BGH`.
+- **Giao diện Người dùng (`MyUnitPage.tsx` & `SchoolOverviewSection.tsx`):**
+  - Hiển thị danh xưng đơn vị kép chuẩn quân sự (`{Tên đơn vị con} - {Tên đơn vị cha}`).
+  - Bảng tổng hợp số hóa toàn trường chỉ nhóm theo các đơn vị cấp 1 trực thuộc Nhà trường, tổng hợp số liệu của toàn bộ đơn vị con cháu và sắp xếp theo trọng số quân sự `getMilitaryUnitSortWeight`.
+
+

@@ -1323,13 +1323,15 @@ module.exports = function createLectureRoutes({
       const room = roomRes.recordset[0];
       room.building_name = BUILDING_NAMES[room.building_code] || room.building_name;
 
+      const hasNote = await hasColumn(pool, 'TEACHING_SCHEDULE', 'note');
+
       const sessionRes = await pool.request()
         .input('rid', sql.VarChar(50), roomId)
         .input('vname', sql.NVarChar(100), room.room_name)
         .query(`
           SELECT s.schedule_id, s.lecture_id, s.room_id, s.venue_name, s.presenter_id,
                  s.start_time, s.end_time, s.status, s.slide_index, s.slide_total, s.scorm_progress,
-                 s.student_count, s.class_id, s.note,
+                 s.student_count, s.class_id, ${hasNote ? 's.note' : 'NULL AS note'},
                  FLOOR(DATEDIFF(SECOND, s.start_time, GETDATE()) / 60.0) AS duration_minutes,
                  CASE WHEN DATEDIFF(MINUTE, s.start_time, GETDATE()) > ${HANGING_THRESHOLD_MINUTES}
                       THEN 1 ELSE 0 END AS is_hanging,

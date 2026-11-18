@@ -34,7 +34,7 @@ const {
 } = require('./src/fingerprint-ws');
 
 const {
-  getUserUnitScope, getSubtreeUnits, getRootUnitId,
+  getUserUnitScope, getSubtreeUnits, getUnitWithInheritedUnits, getRootUnitId,
   resolveUserUnitId, resolveUserRoles,
 } = require('./src/unit-scope');
 
@@ -2056,8 +2056,8 @@ app.get('/api/documents', async (req, res) => {
     if (req.query.title) { query += ` AND d.title LIKE N'%' + @title + N'%'`; r.input('title', sql.NVarChar(500), req.query.title); }
     if (req.query.type) { query += ` AND d.doc_type_id = @type`; r.input('type', sql.VarChar(20), req.query.type); }
     if (req.query.unit) {
-      if (req.query.unit === 'U-BGH') {
-        query += ` AND (d.issuing_unit_id = 'U-BGH' OR d.issuing_unit_id = 'TQS' OR d.issuing_unit_id = 'U-TQS')`;
+      if (req.query.unit === 'U-BGH' || req.query.unit === 'BGH-TQSQK') {
+        query += ` AND (d.issuing_unit_id IN ('BGH-TQSQK', 'U-BGH', 'TQS', 'TQS-QK7', 'U-TQS'))`;
       } else if (req.query.include_children === 'true' || req.query.include_children === '1') {
         const subtree = await getSubtreeUnits(req.query.unit);
         if (subtree.length > 0) {
@@ -2108,12 +2108,12 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
     }
     if (!targetUnitId) return res.status(400).json({ error: 'Không xác định được đơn vị.' });
 
-    const subtreeUnitIds = await getSubtreeUnits(targetUnitId);
-    if (subtreeUnitIds.length === 0) return res.status(404).json({ error: `Đơn vị ${targetUnitId} không tồn tại.`, not_found: true });
+    const queryUnitIds = await getUnitWithInheritedUnits(targetUnitId);
+    if (queryUnitIds.length === 0) return res.status(404).json({ error: `Đơn vị ${targetUnitId} không tồn tại.`, not_found: true });
 
     const r = pool.request();
-    const unitParams = subtreeUnitIds.map((_, i) => `@u${i}`).join(',');
-    subtreeUnitIds.forEach((u, i) => r.input(`u${i}`, sql.VarChar(50), u));
+    const unitParams = queryUnitIds.map((_, i) => `@u${i}`).join(',');
+    queryUnitIds.forEach((u, i) => r.input(`u${i}`, sql.VarChar(50), u));
 
     let query = `
       SELECT d.file_id, d.document_code, d.title, d.doc_type_id, dt.name AS doc_type_name,
@@ -2149,13 +2149,18 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
 
     const unitRes = await pool.request()
       .input('uid', sql.VarChar(50), targetUnitId)
-      .query(`SELECT unit_id, name, parent_id FROM UNIT WHERE unit_id = @uid`);
+      .query(`
+        SELECT u.unit_id, u.name, u.parent_id, p.name AS parent_name
+        FROM UNIT u
+        LEFT JOIN UNIT p ON p.unit_id = u.parent_id
+        WHERE u.unit_id = @uid
+      `);
 
     res.json({
       total: result.recordset.length,
       items: result.recordset,
       unit: unitRes.recordset[0] || { unit_id: targetUnitId, name: targetUnitId },
-      subtree_unit_ids: subtreeUnitIds,
+      subtree_unit_ids: queryUnitIds,
       can_select_unit: canSelectUnit,
       selected_unit_id: targetUnitId,
     });

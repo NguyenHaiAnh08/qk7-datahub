@@ -659,7 +659,7 @@ export const AIChatDrawer: React.FC = () => {
                   <div className="flex items-center space-x-3 text-xs text-emerald-800 dark:text-emerald-400 p-3 bg-white dark:bg-emerald-950/30 rounded-2xl border border-emerald-500/30 shadow-xs animate-pulse">
                     <Spin size="small" />
                     <span className="font-semibold">
-                      {lastQuery ? 'Đang giải mã và lập báo cáo câu trả lời...' : 'Trợ lý AI đang truy vấn kho dữ liệu số...'}
+                      {lastQuery ? 'Đang giải mã và lập báo cáo câu trả lời...' : 'Trợ lý AI đang truy vấn kho văn bản số...'}
                     </span>
                   </div>
                 )}

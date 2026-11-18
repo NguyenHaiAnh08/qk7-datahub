@@ -55,8 +55,8 @@ export const DataHubSubNav: React.FC<DataHubSubNavProps> = ({ activeTab }) => {
   return (
     <div className="w-full flex items-center justify-start overflow-x-auto pb-1 scrollbar-none select-none">
       <nav
-        aria-label="Thanh điều hướng phân hệ Dữ liệu số"
-        className="bg-slate-100/90 dark:bg-slate-900/80 border border-slate-200/90 dark:border-slate-800 backdrop-blur-md rounded-xl p-1 inline-flex items-center gap-1 mb-4 shadow-xs max-w-full"
+        aria-label="Thanh điều hướng phân hệ Văn bản số"
+        className="bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-800 backdrop-blur-md rounded-2xl p-1.5 inline-flex items-center gap-1.5 mb-5 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.12),0_2px_6px_-1px_rgba(0,0,0,0.07)] dark:shadow-[0_4px_20px_-2px_rgba(0,0,0,0.5)] max-w-full"
       >
         {visibleTabs.map((tab) => {
           const isSelected = activeTab === tab.key;
@@ -68,16 +68,16 @@ export const DataHubSubNav: React.FC<DataHubSubNavProps> = ({ activeTab }) => {
               to={tab.to}
               aria-current={isSelected ? 'page' : undefined}
               title={tab.description}
-              className={`relative px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm flex items-center gap-2 transition-colors duration-150 cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`relative px-3.5 sm:px-4.5 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-2 transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 ${
                 isSelected
-                  ? 'bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/60 border border-transparent font-medium'
+                  ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 font-bold shadow-[0_2px_8px_rgba(16,185,129,0.22)] scale-[1.01]'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent font-medium'
               }`}
             >
               <IconComponent
                 className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
                   isSelected
-                    ? 'text-emerald-600 dark:text-emerald-400 scale-105'
+                    ? 'text-emerald-700 dark:text-emerald-400 scale-105'
                     : 'text-slate-500 dark:text-slate-400'
                 }`}
               />

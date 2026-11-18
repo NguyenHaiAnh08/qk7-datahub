@@ -12,7 +12,6 @@ import { lectureService } from '../services/lectureService';
 import { LectureCard } from '../components/lectures/LectureCard';
 import { CreateLectureModal } from '../components/lectures/CreateLectureModal';
 import { StartSessionModal } from '../components/lectures/StartSessionModal';
-import { LiveMonitorPanel } from '../components/lectures/LiveMonitorPanel';
 import { TeachingHistoryPanel } from '../components/lectures/TeachingHistoryPanel';
 import { LectureDetailModal } from '../components/lectures/LectureDetailModal';
 import { LiveSessionRoom } from '../components/lectures/LiveSessionRoom';
@@ -23,7 +22,7 @@ import { RollingNumber } from '../components/common/RollingNumber';
 import { FingerprintScanModal } from '../components/users/FingerprintScanModal';
 import { Lecture, LectureStatus, Subject, TeachingSchedule } from '../types/lecture';
 
-type TabKey = 'list' | 'live' | 'history';
+type TabKey = 'list' | 'history';
 
 // ── Cụm KPI Telemetry Cards chuẩn Quân Đội (Đồng bộ hiệu ứng Rolling cơ học Tổng Quan) ──
 const TacticalKpiCard: React.FC<{
@@ -465,7 +464,6 @@ export const LecturesPage: React.FC = () => {
 
   const tabs: { key: TabKey; label: string; icon: any; visible: boolean; badge?: string }[] = [
     { key: 'list',    label: 'Danh sách bài giảng',  icon: BookOpen, visible: true },
-    { key: 'live',    label: 'Giám sát giảng đường', icon: Radio,    visible: canMonitor, badge: 'Live Radar' },
     { key: 'history', label: 'Lịch sử giảng dạy',    icon: Clock,    visible: true },
   ];
   const visibleTabs = tabs.filter(t => t.visible);
@@ -477,7 +475,7 @@ export const LecturesPage: React.FC = () => {
   }, [visibleTabs, activeTab]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
 
       {/* Màn hình trình chiếu phòng học: đè lên toàn bộ khi có ca dạy đang diễn ra */}
       {activeSession && currentLecture && (
@@ -491,9 +489,9 @@ export const LecturesPage: React.FC = () => {
 
       {/* Wrapper chính */}
       <div className={activeSession ? 'hidden' : 'contents'}>
-        <Header activeNav="lectures" title="Trường Quân Sự Quân Khu 7" subtitle="Hệ sinh thái số" />
+        <Header activeNav="lectures" title="Trường Quân Sự Quân Khu 7" subtitle="Trung tâm dữ liệu số" />
 
-        <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 w-full max-w-7xl mx-auto space-y-6">
 
           {/* Hero Header trang nghiêm chuẩn Quân đội */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-[#111827] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
@@ -511,7 +509,7 @@ export const LecturesPage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Quản trị bài giảng điện tử, quy trình duyệt 2 tầng và radar giám sát giảng đường — Trường Quân Sự Quân Khu 7
+                  Quản trị bài giảng điện tử, quy trình duyệt 2 tầng và sơ đồ giám sát giảng đường — Trường Quân Sự Quân Khu 7
                 </p>
               </div>
             </div>
@@ -827,16 +825,7 @@ export const LecturesPage: React.FC = () => {
             </div>
           )}
 
-          {/* ── TAB 2: GIÁM SÁT GIẢNG ĐƯỜNG TRỰC TIẾP ── */}
-          {activeTab === 'live' && canMonitor && (
-            <LiveMonitorPanel
-              currentUserId={user?.user_id}
-              canForceEnd={canForceEnd}
-              isAdmin={isAdmin}
-            />
-          )}
-
-          {/* ── TAB 3: LỊCH SỬ GIẢNG DẠY ── */}
+          {/* ── TAB 2: LỊCH SỬ GIẢNG DẠY ── */}
           {activeTab === 'history' && <TeachingHistoryPanel />}
         </main>
       </div>

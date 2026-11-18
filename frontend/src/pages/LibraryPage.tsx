@@ -4,11 +4,11 @@ import { ModuleUnderDevelopment } from '../components/common/ModuleUnderDevelopm
 
 export const LibraryPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white transition-colors duration-200">
       <Header
         activeNav="library"
         title="Trường Quân Sự Quân Khu 7"
-        subtitle="Hệ sinh thái số"
+        subtitle="Trung tâm dữ liệu số"
       />
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto flex items-center justify-center">
         <ModuleUnderDevelopment module="library" />

@@ -164,7 +164,7 @@ export const UsersPage: React.FC = () => {
   }, [usersList, userSearch]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
       <Header
         activeNav="admin"
         title="Trường Quân Sự Quân Khu 7"

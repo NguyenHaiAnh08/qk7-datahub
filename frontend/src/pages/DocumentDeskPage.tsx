@@ -290,7 +290,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
   }, [documents, currentPage]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
       {/* Header */}
       <Header
         activeNav="desk"
@@ -300,7 +300,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
       {/* Main Container */}
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
-        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
+        {/* Tactical Sub-Navigation Phân hệ Văn bản số */}
         <DataHubSubNav activeTab="desk" />
         {/* Top Action & Title Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

@@ -12,6 +12,7 @@ import {
   MonitorPlay,
   Layers,
   Library,
+  School,
   LogOut,
   ChevronDown,
   Menu,
@@ -40,7 +41,7 @@ interface HeaderProps {
   title?: string;
   subtitle?: string;
   showClock?: boolean;
-  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'materials' | 'library' | 'data';
+  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'classrooms' | 'materials' | 'library' | 'data';
   onToggleMobileMenu?: () => void;
 }
 
@@ -138,7 +139,7 @@ export function checkUserCanAccessAdmin(
 // COMPONENT: Cụm Nút Điều Hướng 5 Phân Hệ (Morphing Pill: Icon -> Chữ Đẩy Ra)
 // ══════════════════════════════════════════════════════════════════════
 const NavigationGlider: React.FC<{
-  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'materials' | 'library' | 'data';
+  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'classrooms' | 'materials' | 'library' | 'data';
 }> = ({ activeNav: explicitActiveNav }) => {
   const { user, isAdmin, hasPermission } = useAuth();
   const canAccessAdmin = useMemo(() => checkUserCanAccessAdmin(user, isAdmin, hasPermission), [user, isAdmin, hasPermission]);
@@ -175,6 +176,7 @@ const NavigationGlider: React.FC<{
       return 'portal';
     }
     if (path.startsWith(ROUTE_PATHS.LECTURES)) return 'lectures';
+    if (path.startsWith(ROUTE_PATHS.CLASSROOMS)) return 'classrooms';
     if (path.startsWith(ROUTE_PATHS.MATERIALS)) return 'materials';
     if (path.startsWith(ROUTE_PATHS.LIBRARY)) return 'library';
     if (path.startsWith(ROUTE_PATHS.ADMIN)) return 'admin';
@@ -187,7 +189,7 @@ const NavigationGlider: React.FC<{
     {
       key: 'portal',
       to: ROUTE_PATHS.PORTAL,
-      label: 'Dữ liệu số',
+      label: 'Văn bản số',
       icon: BookOpen,
       tourId: 'tour-nav-portal',
       visible: true,
@@ -200,11 +202,18 @@ const NavigationGlider: React.FC<{
       visible: true,
     },
     {
+      key: 'classrooms',
+      to: ROUTE_PATHS.CLASSROOMS,
+      label: 'Giảng đường',
+      icon: School,
+      visible: true,
+    },
+    {
       key: 'materials',
       to: ROUTE_PATHS.MATERIALS,
       label: 'Học liệu số',
       icon: Layers,
-      visible: true,
+      visible: false, // Tạm thời ẩn theo yêu cầu
     },
     {
       key: 'library',
@@ -505,7 +514,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
         >
           <BookOpen className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 mr-2" />
-          <span>Dữ liệu số</span>
+          <span>Văn bản số</span>
         </Link>
 
         {user && user.user_id !== 'GUEST' && (
@@ -546,6 +555,18 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <MonitorPlay className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
           <span>Bài giảng số</span>
+        </Link>
+
+        <Link
+          to={ROUTE_PATHS.CLASSROOMS}
+          onClick={() => {
+            setUserPopoverOpen(false);
+            setDropdownOpen(false);
+          }}
+          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+        >
+          <School className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+          <span>Giảng đường</span>
         </Link>
 
         <Link

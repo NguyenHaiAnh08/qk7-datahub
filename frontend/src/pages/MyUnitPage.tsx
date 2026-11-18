@@ -38,7 +38,7 @@ export const MyUnitPage: React.FC = () => {
 
   const [selectedUnitId, setSelectedUnitId] = useState<string>(() => user?.unit_id || '');
   const [canSelectUnit, setCanSelectUnit] = useState(false);
-  const [currentUnit, setCurrentUnit] = useState<{ unit_id: string; name: string } | null>(() => {
+  const [currentUnit, setCurrentUnit] = useState<{ unit_id: string; name: string; parent_id?: string; parent_name?: string } | null>(() => {
     if (user?.unit_id && user?.unit_name) {
       return { unit_id: user.unit_id, name: user.unit_name };
     }
@@ -291,6 +291,47 @@ export const MyUnitPage: React.FC = () => {
       ? 'Tối mật'
       : 'Tuyệt mật');
 
+  // Xác định đơn vị cha nếu là đơn vị con cấp dưới của một phòng ban trực thuộc Nhà trường
+  const parentUnit = useMemo(() => {
+    const curId = currentUnit?.unit_id || user?.unit_id;
+    if (!curId) return null;
+
+    // 1. Kiểm tra từ currentUnit nếu backend đã trả parent_name
+    const currentAny = currentUnit as any;
+    if (currentAny?.parent_name && currentAny?.parent_id) {
+      const pid = currentAny.parent_id;
+      if (pid !== 'TQS-QK7' && pid !== 'TQS' && pid !== 'U-TQS' && pid !== 'QK7') {
+        return { unit_id: pid, name: currentAny.parent_name };
+      }
+    }
+
+    // 2. Tra cứu từ meta.units
+    if (meta.units && meta.units.length > 0) {
+      const cur = meta.units.find((u) => u.unit_id === curId);
+      if (cur && cur.parent_id) {
+        if (
+          cur.parent_id !== 'TQS-QK7' &&
+          cur.parent_id !== 'TQS' &&
+          cur.parent_id !== 'U-TQS' &&
+          cur.parent_id !== 'QK7'
+        ) {
+          const p = meta.units.find((u) => u.unit_id === cur.parent_id);
+          if (p) return p;
+        }
+      }
+    }
+
+    return null;
+  }, [currentUnit, user?.unit_id, meta.units]);
+
+  const unitHeadingTitle = useMemo(() => {
+    const baseName = currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7';
+    if (parentUnit && parentUnit.name && parentUnit.name.toLowerCase() !== baseName.toLowerCase()) {
+      return `${baseName} - ${parentUnit.name}`;
+    }
+    return baseName;
+  }, [currentUnit?.name, user?.unit_name, parentUnit]);
+
   // Dữ liệu văn bản dùng tính toán thống kê (ưu tiên toàn bộ văn bản của đơn vị)
   const targetDocs = allUnitDocuments.length > 0 ? allUnitDocuments : documents;
 
@@ -353,7 +394,7 @@ export const MyUnitPage: React.FC = () => {
   }, [meta.types, targetDocs]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       <Header
         activeNav="myunit"
         title="Trường Quân Sự Quân Khu 7"
@@ -361,7 +402,7 @@ export const MyUnitPage: React.FC = () => {
       />
 
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
-        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
+        {/* Tactical Sub-Navigation Phân hệ Văn bản số */}
         <DataHubSubNav activeTab="myunit" />
         {/* Banner */}
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -376,7 +417,7 @@ export const MyUnitPage: React.FC = () => {
                 <span className="text-slate-600 dark:text-slate-300">Đơn vị trực thuộc</span>
               </div>
               <h1 className="text-lg font-bold text-slate-900 dark:text-white truncate mt-0.5">
-                {currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
+                {unitHeadingTitle}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Hệ thống hiển thị theo đơn vị của bạn.

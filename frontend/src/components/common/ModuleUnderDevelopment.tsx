@@ -381,7 +381,7 @@ export const ModuleUnderDevelopment: React.FC<ModuleUnderDevelopmentProps> = ({
             className={`inline-flex items-center gap-2.5 px-6 py-2.5 rounded-xl ${theme.ctaButton} font-bold text-xs sm:text-sm border transition-all duration-200 active:scale-95 cursor-pointer select-none`}
           >
             <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
-            <span>← Quay về phân hệ Dữ liệu số</span>
+            <span>← Quay về phân hệ Văn bản số</span>
           </button>
         </div>
 

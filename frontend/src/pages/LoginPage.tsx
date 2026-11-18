@@ -101,7 +101,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+    <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full bg-slate-200 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
       {/* ══════════════════════════════════════════════════════════════════
           LỚP z-0 (ĐÁY): THẺ VIDEO NỀN CÔNG NGHỆ CHẠY VÒNG LẶP (HTML5 VIDEO)
           ══════════════════════════════════════════════════════════════════ */}

@@ -61,7 +61,7 @@ export interface NavGroup {
 /**
  * Cấu trúc phân nhóm Navigation Sidebar chuẩn kiến trúc QK7 DataHub:
  * 1. ĐIỀU HÀNH CHUNG: Tổng quan
- * 2. PHÂN HỆ DỮ LIỆU SỐ: Phê duyệt yêu cầu, Loại văn bản
+ * 2. PHÂN HỆ VĂN BẢN SỐ: Phê duyệt yêu cầu, Loại văn bản
  * 3. PHÂN HỆ BÀI GIẢNG SỐ: Môn học, Lớp học, Giảng đường
  * 4. PHÂN HỆ HỌC LIỆU SỐ (sẵn sàng kiến trúc mở rộng)
  * 5. PHÂN HỆ THƯ VIỆN SỐ (sẵn sàng kiến trúc mở rộng)
@@ -76,7 +76,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 'digital_data',
-    title: 'Dữ liệu số',
+    title: 'Văn bản số',
     items: [
       { id: 'approvals', label: 'Phê duyệt yêu cầu', icon: Bell, permission: 'APPROVAL_VALIDATE' },
       { id: 'doctypes',  label: 'Loại văn bản',      icon: FileText, permission: 'DOCTYPE_VIEW' },

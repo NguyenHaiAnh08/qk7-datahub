@@ -4,6 +4,32 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.2-classrooms-subsystem-and-unit-inheritance] — 2026-11-18
+
+### 1. Phân Hệ Giảng Đường Độc Lập & Giám Sát Mặt Bằng Trực Quan (Classrooms Subsystem)
+- **Xây dựng Màn hình Phân Hệ Giảng Đường ([`ClassroomsPage.tsx`](../frontend/src/pages/ClassroomsPage.tsx)):**
+  - Khởi tạo trang chuyên biệt `/classrooms` phục vụ hiển thị sơ đồ mặt bằng giảng đường, điều hành ca dạy trực tiếp và giám sát telemetry phòng học.
+  - Tích hợp vào hệ sinh thái định tuyến [`ecosystem.routes.tsx`](../frontend/src/routes/modules/ecosystem.routes.tsx) và định nghĩa hằng số `ROUTE_PATHS.CLASSROOMS` trong [`routePaths.ts`](../frontend/src/routes/routePaths.ts).
+  - Bổ sung nút điều hướng "Giảng đường" (Icon `School`) trên thanh điều hướng trung tâm [`Header.tsx`](../frontend/src/components/common/Header.tsx).
+- **Tối ưu Bảng Giám Sát Radar ([`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx)):**
+  - Tinh chỉnh layout responsive hiển thị trực tiếp cho desktop ($\ge 1200\text{px}$) và drawer compact ($< 1200\text{px}$).
+  - Bổ sung nút đóng inspector trực quan và nâng cao độ tương phản màu sắc.
+
+### 2. Cơ Chế Thừa Kế Văn Bản Đơn Vị Con & Phân Cấp Quân Sự (Unit Document Inheritance)
+- **Hạ tầng Dịch vụ & Phân quyền ([`backend/src/unit-scope.js`](../backend/src/unit-scope.js) & [`backend/server.js`](../backend/server.js)):**
+  - Xây dựng hàm `getUnitWithInheritedUnits`: Cho phép đơn vị con cấp dưới tự động thừa kế tài liệu từ các đơn vị cha trực thuộc (ví dụ Tổ CNTT thừa kế văn bản từ Phòng Tham mưu - Hành chính), dừng lại ở cấp Nhà trường/Quân khu.
+  - Endpoint `/api/documents/my-unit` trả về `parent_name` và áp dụng `getUnitWithInheritedUnits`.
+  - Hỗ trợ mã `BGH-TQSQK` và `U-BGH` trong bộ lọc tài liệu Ban Giám hiệu.
+- **Giao diện Người dùng ([`MyUnitPage.tsx`](../frontend/src/pages/MyUnitPage.tsx) & [`SchoolOverviewSection.tsx`](../frontend/src/components/portal/SchoolOverviewSection.tsx)):**
+  - Hiển thị tiêu đề đơn vị ghép chuẩn quân sự (`{Đơn vị con} - {Đơn vị cha}`).
+  - Radar tiến độ phòng ban chỉ hiển thị các đơn vị trực thuộc cấp 1 của Nhà trường (tránh cuộn 79 đơn vị nhỏ), tổng hợp văn bản của toàn bộ đơn vị con cháu và sắp xếp theo phân cấp quân sự `getMilitaryUnitSortWeight`.
+
+### 3. Chuẩn Hóa Nhận Diện Thương Hiệu "Văn Bản Số" (Branding Standardization)
+- Đồng bộ nhãn điều hướng "Dữ liệu số" $\rightarrow$ "Văn bản số" trên [`Header.tsx`](../frontend/src/components/common/Header.tsx), [`DataHubSubNav.tsx`](../frontend/src/components/common/DataHubSubNav.tsx) và mẫu báo cáo Excel [`exportAuditReportExcel.ts`](../frontend/src/utils/exportAuditReportExcel.ts).
+- Cập nhật màu nền hệ thống chuẩn xám quân sự `#e2e8f0` / `bg-slate-200` tại [`index.html`](../frontend/index.html) và [`index.css`](../frontend/src/index.css).
+
+---
+
 ## [v1.8.1-lecture-pdf-decoupled] — 2026-11-18
 
 ### Tách PDF bài giảng số khỏi Dữ liệu số (bảng `DOCUMENT`)

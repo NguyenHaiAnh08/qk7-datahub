@@ -47,8 +47,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isWidescreen = windowWidth >= 1600;
-  const isLaptop = windowWidth >= 1200 && windowWidth < 1600;
+  const isDesktop = windowWidth >= 1200;
   const isCompact = windowWidth < 1200;
 
   // View mode: 'radar' (Sơ đồ mặt bằng) | 'list' (Danh sách ca dạy)
@@ -175,7 +174,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
   // Load Room Detail when a room is selected
   const handleSelectRoom = async (roomId: string) => {
     setSelectedRoomId(roomId);
-    if (!isWidescreen) {
+    if (!isDesktop) {
       setDrawerOpen(true);
     }
     setLoadingDetail(true);
@@ -189,13 +188,11 @@ export const LiveMonitorPanel: React.FC<Props> = ({
     }
   };
 
-  // Close Inspector Drawer
-  const handleCloseDrawer = () => {
+  // Close Inspector (Both Drawer & Docked Column)
+  const handleCloseInspector = () => {
     setDrawerOpen(false);
-    if (!isWidescreen) {
-      setSelectedRoomId(null);
-      setRoomDetail(null);
-    }
+    setSelectedRoomId(null);
+    setRoomDetail(null);
   };
 
   // Handle End Schedule
@@ -366,7 +363,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
       {/* ═════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* KPI 1: Tổng phòng học */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-3.5 shadow-2xs flex items-center gap-3">
+        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center shrink-0 text-sky-600 dark:text-sky-400">
             <School className="w-5 h-5" />
           </div>
@@ -382,7 +379,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
         </div>
 
         {/* KPI 2: Đang giảng dạy */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-emerald-500/40 dark:border-emerald-500/30 p-3.5 shadow-2xs flex items-center gap-3 relative overflow-hidden bg-gradient-to-br from-emerald-50/40 to-transparent dark:from-emerald-950/20">
+        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-emerald-500/50 dark:border-emerald-500/30 p-3.5 shadow-xs flex items-center gap-3 relative overflow-hidden bg-gradient-to-br from-emerald-50/50 to-transparent dark:from-emerald-950/20">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400 relative">
             <Radio className="w-5 h-5 animate-pulse" />
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
@@ -400,7 +397,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
         </div>
 
         {/* KPI 3: Phòng trống */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-3.5 shadow-2xs flex items-center gap-3">
+        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="w-5 h-5" />
           </div>
@@ -416,7 +413,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
         </div>
 
         {/* KPI 4: Sắp có ca */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-3.5 shadow-2xs flex items-center gap-3">
+        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
             <Clock className="w-5 h-5" />
           </div>
@@ -432,10 +429,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
         </div>
 
         {/* KPI 5: Bảo trì & Cảnh báo */}
-        <div className={`col-span-2 sm:col-span-1 rounded-2xl border p-3.5 shadow-2xs flex items-center gap-3 ${
+        <div className={`col-span-2 sm:col-span-1 rounded-2xl border p-3.5 shadow-xs flex items-center gap-3 ${
           kpis.alert > 0
             ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-400 dark:border-rose-800/60'
-            : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-white/[0.08]'
+            : 'bg-white dark:bg-[#111827] border-slate-200/90 dark:border-white/[0.08]'
         }`}>
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
             kpis.alert > 0
@@ -461,63 +458,48 @@ export const LiveMonitorPanel: React.FC<Props> = ({
       </div>
 
       {/* ═════════════════════════════════════════════════════════════ */}
-      {/* 2. OPERATIONS CONTROL BAR (SHIFT TABS + RADAR/LIST SWITCH)   */}
+      {/* 2. OPERATIONS CONTROL BAR (LIVE STATUS + VIEW SWITCH)         */}
       {/* ═════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#111827] p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-2xs flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Time Shift Selector */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mr-1">
-            Ca trực:
+      <div className="bg-white dark:bg-[#111827] p-3 sm:p-4 rounded-2xl border border-slate-200/90 dark:border-white/[0.08] shadow-xs flex flex-wrap items-center justify-between gap-3">
+        {/* Left: Real-time Live Status Badge */}
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
           </span>
-          {[
-            { key: 'live', label: 'Hiện tại (Live)', icon: Radio },
-            { key: 'morning', label: 'Ca sáng (07h-11h30)', icon: Clock },
-            { key: 'afternoon', label: 'Ca chiều (13h30-17h)', icon: Clock },
-            { key: 'evening', label: 'Ca tối (19h-21h30)', icon: Clock },
-          ].map((shift) => {
-            const Icon = shift.icon;
-            const active = timeShift === shift.key;
-            return (
-              <button
-                key={shift.key}
-                type="button"
-                onClick={() => setTimeShift(shift.key as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer border ${
-                  active
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                    : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 ${active && shift.key === 'live' ? 'animate-pulse' : ''}`} />
-                <span>{shift.label}</span>
-              </button>
-            );
-          })}
+          <span className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white uppercase tracking-wider">
+            Giám Sát Giảng Đường Trực Tiếp (Live)
+          </span>
+          {lastUpdate && (
+            <span className="hidden sm:inline-block text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+              • Cập nhật {lastUpdate.toLocaleTimeString('vi-VN')}
+            </span>
+          )}
         </div>
 
         {/* Right: View Mode Toggle & Refresh Button */}
         <div className="flex items-center gap-2 ml-auto">
           {/* View mode toggle */}
-          <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
             <button
               type="button"
               onClick={() => setViewMode('radar')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                 viewMode === 'radar'
-                  ? 'bg-white dark:bg-[#111827] text-emerald-700 dark:text-emerald-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white dark:bg-[#111827] text-emerald-700 dark:text-emerald-400 shadow-xs border border-slate-200/60 dark:border-transparent'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Sơ đồ Radar</span>
+              <span>Sơ đồ giảng đường</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('list')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                 viewMode === 'list'
-                  ? 'bg-white dark:bg-[#111827] text-emerald-700 dark:text-emerald-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white dark:bg-[#111827] text-emerald-700 dark:text-emerald-400 shadow-xs border border-slate-200/60 dark:border-transparent'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <List className="w-3.5 h-3.5" />
@@ -530,7 +512,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
             type="button"
             onClick={refreshAll}
             disabled={loading}
-            className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+            className="p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50"
             title={lastUpdate ? `Cập nhật lần cuối: ${lastUpdate.toLocaleTimeString('vi-VN')}` : 'Làm mới'}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -604,9 +586,9 @@ export const LiveMonitorPanel: React.FC<Props> = ({
           {/* Main 3-Column or 2-Column Responsive Container */}
           <div className="flex items-start gap-4">
             {/* ── COLUMN 1: MASTER (KHU VỰC / TÒA NHÀ) — Visible on Desktop (>= 1200px) ── */}
-            {!isCompact && (
-              <div className={`${isWidescreen ? 'w-72' : 'w-60'} shrink-0 sticky top-4 space-y-3`}>
-                <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-4 shadow-2xs">
+            {isDesktop && (
+              <div className="w-60 shrink-0 sticky top-4 space-y-3">
+                <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 shadow-xs">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/[0.04]">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
@@ -631,7 +613,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                           className={`rounded-xl border p-3 transition-all cursor-pointer ${
                             active
                               ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-500 shadow-sm'
-                              : 'bg-slate-50/50 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 border-slate-200 dark:border-white/[0.06]'
+                              : 'bg-slate-50/90 hover:bg-white dark:bg-slate-900/40 dark:hover:bg-slate-800/60 border-slate-200/90 dark:border-white/[0.06] shadow-2xs hover:shadow-xs'
                           }`}
                           onClick={() => {
                             setSelectedBuilding(b.building_code);
@@ -694,7 +676,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
             {/* ── COLUMN 2: DETAIL (SƠ ĐỒ PHÒNG HỌC KIỂU RẠP CHIẾU PHIM) ── */}
             <div className="flex-1 min-w-0 space-y-4">
-              <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-4 sm:p-5 shadow-2xs">
+              <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 sm:p-5 shadow-xs">
                 {/* Header Sơ Đồ */}
                 <div className="flex flex-wrap items-center justify-between pb-4 border-b border-slate-100 dark:border-white/[0.04] gap-2">
                   <div className="flex items-center gap-2.5">
@@ -731,16 +713,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* SÂN KHẤU / MÀN CHIẾU TRUNG TÂM (Aesthetic Cinema / Military Stage Indicator) */}
-                <div className="my-5 relative text-center">
-                  <div className="h-2 w-3/4 mx-auto bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent rounded-full blur-[1px]" />
-                  <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold tracking-widest text-slate-500 dark:text-slate-400 uppercase -mt-2.5 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                    <Monitor className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>HÀNG BỤC GIẢNG & MÀN HÌNH ĐIỀU HÀNH CHÍNH</span>
-                  </div>
-                </div>
-
-                {/* GRID CÁC PHÒNG HỌC (THE CINEMA SEAT RADAR GRID) */}
+                {/* GRID CÁC PHÒNG HỌC (SƠ ĐỒ MẶT BẰNG GIẢNG ĐƯỜNG) */}
                 {floorRooms.length === 0 ? (
                   <div className="py-12">
                     <TacticalEmptyState
@@ -751,7 +724,12 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                     />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
+                  <div
+                    className="grid gap-3.5 mt-4"
+                    style={{
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                    }}
+                  >
                     {floorRooms.map((room) => {
                       const isSelected = selectedRoomId === room.room_id;
                       const status = room.computed_status;
@@ -764,7 +742,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                           onClick={() => handleSelectRoom(room.room_id)}
                           className={`rounded-2xl border p-4 transition-all duration-200 flex flex-col justify-between cursor-pointer relative group ${
                             isSelected
-                              ? 'ring-2 ring-amber-400 ring-offset-2 dark:ring-offset-[#111827] shadow-lg scale-[1.01]'
+                              ? 'ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-[#111827] shadow-lg scale-[1.01] border-emerald-500'
                               : 'hover:shadow-md hover:-translate-y-0.5'
                           } ${
                             status === 'IN_SESSION'
@@ -775,60 +753,64 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                               ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400/60'
                               : status === 'MAINTENANCE'
                               ? 'bg-slate-100/80 dark:bg-slate-900/60 border-slate-300 dark:border-slate-700 opacity-80'
-                              : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-white/[0.08] hover:border-emerald-500/50'
+                              : 'bg-slate-50/90 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-900 border-slate-200/90 dark:border-white/[0.08] hover:border-emerald-500/50 shadow-2xs hover:shadow-xs'
                           }`}
                         >
                           {/* Room Header: Code, Name, Capacity */}
                           <div>
                             <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 font-mono shadow-2xs ${
                                   status === 'IN_SESSION'
-                                    ? 'bg-emerald-500 text-white shadow-xs'
+                                    ? 'bg-emerald-600 text-white shadow-xs'
                                     : status === 'ALERT'
                                     ? 'bg-rose-600 text-white animate-pulse'
                                     : status === 'MAINTENANCE'
                                     ? 'bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200'
+                                    : status === 'UPCOMING'
+                                    ? 'bg-amber-500 text-white shadow-xs'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700'
                                 }`}>
-                                  {room.room_id.slice(-3)}
+                                  {room.room_id.replace(/^RM-|^H\d+-/i, '') || room.room_id.slice(-3)}
                                 </div>
-                                <div>
-                                  <div className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                                    <span>{room.room_name}</span>
+                                <div className="min-w-0">
+                                  <div className="font-extrabold text-sm text-slate-900 dark:text-white truncate" title={room.room_name}>
+                                    {room.room_name}
                                   </div>
-                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                    <Users className="w-3 h-3" />
-                                    <span>Sức chứa: <strong>{room.capacity}</strong> HV</span>
+                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium">
+                                    <Users className="w-3 h-3 shrink-0" />
+                                    <span>Sức chứa: <strong className="font-mono text-slate-700 dark:text-slate-300">{room.capacity}</strong> HV</span>
                                   </div>
                                 </div>
                               </div>
 
                               {/* Status Badge */}
-                              {status === 'IN_SESSION' ? (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                  ĐANG DẠY
-                                </span>
-                              ) : status === 'ALERT' ? (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 flex items-center gap-1 animate-pulse">
-                                  <AlertTriangle className="w-3 h-3 text-rose-600" />
-                                  TREO CA
-                                </span>
-                              ) : status === 'UPCOMING' ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
-                                  SẮP HỌC
-                                </span>
-                              ) : status === 'MAINTENANCE' ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 flex items-center gap-1">
-                                  <Wrench className="w-3 h-3" />
-                                  BẢO TRÌ
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                                  TRỐNG
-                                </span>
-                              )}
+                              <div className="shrink-0">
+                                {status === 'IN_SESSION' ? (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 flex items-center gap-1.5 whitespace-nowrap">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                    ĐANG DẠY
+                                  </span>
+                                ) : status === 'ALERT' ? (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 flex items-center gap-1 whitespace-nowrap animate-pulse">
+                                    <AlertTriangle className="w-3 h-3 text-rose-600" />
+                                    TREO CA
+                                  </span>
+                                ) : status === 'UPCOMING' ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 whitespace-nowrap">
+                                    SẮP HỌC
+                                  </span>
+                                ) : status === 'MAINTENANCE' ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 flex items-center gap-1 whitespace-nowrap">
+                                    <Wrench className="w-3 h-3" />
+                                    BẢO TRÌ
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
+                                    TRỐNG
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             {/* Session Information Snippet */}
@@ -897,17 +879,20 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                             {/* Available Empty Cue */}
                             {status === 'AVAILABLE' && (
-                              <div className="mt-3 py-2 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                              <div className="mt-3 py-2 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-900/40 border border-dashed border-slate-200/90 dark:border-slate-800 rounded-xl">
                                 <span>Phòng sẵn sàng tiếp nhận ca dạy</span>
                               </div>
                             )}
                           </div>
 
                           {/* Footer Action Hint */}
-                          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-white/[0.04] flex items-center justify-between text-[11px] text-slate-400">
-                            <span>Vị trí: [Hàng {room.grid_row}, Cột {room.grid_col}]</span>
-                            <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                              Chi tiết <ArrowRight className="w-3 h-3" />
+                          <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-[11px] text-slate-400">
+                            <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">
+                              Hàng {room.grid_row} • Cột {room.grid_col}
+                            </span>
+                            <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform whitespace-nowrap shrink-0">
+                              <span>Chi tiết</span>
+                              <ArrowRight className="w-3 h-3" />
                             </span>
                           </div>
                         </div>
@@ -918,25 +903,25 @@ export const LiveMonitorPanel: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* ── COLUMN 3: INSPECTOR (DOCK PANEL ON >= 1600PX) ── */}
-            {isWidescreen && (
-              <div className="w-96 shrink-0 sticky top-4 space-y-3">
-                {activeRoom ? (
-                  <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-5 shadow-2xs space-y-4">
-                    {/* Header */}
-                    <div className="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-white/[0.04]">
-                      <div>
-                        <div className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 tracking-wider">
-                          03. Chi Tiết Giảng Đường
-                        </div>
-                        <h4 className="font-black text-base text-slate-900 dark:text-white mt-0.5">
-                          {activeRoom.room_name}
-                        </h4>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          {activeRoom.building_name} • Tầng {activeRoom.floor_number} • Sức chứa {activeRoom.capacity} HV
-                        </div>
+            {/* ── COLUMN 3: INSPECTOR (DOCK PANEL ON >= 1200PX) ── */}
+            {isDesktop && activeRoom && (
+              <div className="w-80 lg:w-84 shrink-0 sticky top-4 space-y-3 animate-in fade-in slide-in-from-right-4 duration-200">
+                <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 sm:p-5 shadow-xs space-y-4">
+                  {/* Header */}
+                  <div className="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-white/[0.04]">
+                    <div className="min-w-0 pr-2">
+                      <div className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 tracking-wider">
+                        03. Chi Tiết Giảng Đường
                       </div>
+                      <h4 className="font-black text-base text-slate-900 dark:text-white mt-0.5 truncate">
+                        {activeRoom.room_name}
+                      </h4>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                        {activeRoom.building_name} • Tầng {activeRoom.floor_number} • Sức chứa {activeRoom.capacity} HV
+                      </div>
+                    </div>
 
+                    <div className="flex items-center gap-1 shrink-0">
                       {/* Maintenance Toggle Button */}
                       {isAdministrator && (
                         <button
@@ -945,7 +930,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                             setMaintDialogTarget(activeRoom);
                             setMaintReason(activeRoom.maintenance_reason || '');
                           }}
-                          className={`p-2 rounded-xl text-xs font-bold border transition ${
+                          className={`p-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
                             activeRoom.is_maintenance
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
                               : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
@@ -955,7 +940,18 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                           <Wrench className="w-4 h-4" />
                         </button>
                       )}
+
+                      {/* Close button */}
+                      <button
+                        type="button"
+                        onClick={handleCloseInspector}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                        title="Đóng bảng chi tiết"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
+                  </div>
 
                     {/* Active Session in Inspector */}
                     {roomDetail?.current_session ? (
@@ -1072,47 +1068,35 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-6 shadow-2xs text-center space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-                      <LayoutGrid className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                        Chưa chọn phòng học
-                      </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Bấm vào một phòng học bất kỳ trên sơ đồ để xem thông tin điều hành, sĩ số học viên và tiến độ bài giảng.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
           </div>
 
-          {/* ── INSPECTOR DRAWER FOR LAPTOP & COMPACT (< 1600PX) ── */}
-          {!isWidescreen && drawerOpen && activeRoom && (
+          {/* ── INSPECTOR DRAWER FOR COMPACT (< 1200PX) ── */}
+          {!isDesktop && drawerOpen && activeRoom && (
             <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
               {/* Backdrop */}
               <div
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
-                onClick={handleCloseDrawer}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+                onClick={handleCloseInspector}
               />
 
               {/* Drawer Container */}
-              <div className="relative w-full max-w-md bg-white dark:bg-[#111827] h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-300 border-l border-slate-200 dark:border-slate-800">
+              <div
+                className="relative w-full max-w-md bg-white dark:bg-[#111827] h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-200 border-l border-slate-200 dark:border-slate-800 ml-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {/* Drawer Header */}
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold shrink-0">
                       <Building2 className="w-5 h-5" />
                     </div>
-                    <div>
-                      <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                    <div className="min-w-0">
+                      <h3 className="font-extrabold text-base text-slate-900 dark:text-white truncate">
                         {activeRoom.room_name}
                       </h3>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
                         {activeRoom.building_name} • Tầng {activeRoom.floor_number} • {activeRoom.capacity} HV
                       </div>
                     </div>
@@ -1120,8 +1104,9 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                   <button
                     type="button"
-                    onClick={handleCloseDrawer}
-                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                    onClick={handleCloseInspector}
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer shrink-0"
+                    title="Đóng bảng chi tiết"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1289,7 +1274,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
             <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
               <TacticalEmptyState
                 title="Tất cả các giảng đường hiện đang trống"
-                description="Hiện không có ca giảng dạy nào đang diễn ra trong phân hệ. Ca học sẽ tự động xuất hiện trên Radar khi giảng viên bấm 'Mở ca dạy' từ danh sách bài giảng đã xuất bản."
+                description="Hiện không có ca giảng dạy nào đang diễn ra trong phân hệ. Ca học sẽ tự động xuất hiện trên Sơ đồ giảng đường khi giảng viên bấm 'Mở ca dạy' từ danh sách bài giảng đã xuất bản."
                 icon={<Monitor className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />}
                 onRefresh={refreshAll}
               />
@@ -1472,7 +1457,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
             {!maintDialogTarget.is_maintenance ? (
               <div className="space-y-3">
                 <p className="text-xs text-slate-600 dark:text-slate-300">
-                  Khi chuyển sang trạng thái bảo trì, giảng đường sẽ hiển thị khóa trên radar và tạm thời không thể tiếp nhận ca dạy mới.
+                  Khi chuyển sang trạng thái bảo trì, giảng đường sẽ hiển thị khóa trên sơ đồ giảng đường và tạm thời không thể tiếp nhận ca dạy mới.
                 </p>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">

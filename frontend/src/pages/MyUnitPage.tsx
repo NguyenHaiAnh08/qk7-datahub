@@ -5,7 +5,6 @@ import {
   LayoutGrid, List, BarChart2, ChevronDown, Shield, FileText, Clock,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
-import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { toast } from '../components/common/Toast';
 import { UnitOverviewStrip } from '../components/portal/UnitOverviewStrip';
 import { DistributionChart } from '../components/dashboard/DistributionChart';
@@ -402,8 +401,6 @@ export const MyUnitPage: React.FC = () => {
       />
 
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
-        {/* Tactical Sub-Navigation Phân hệ Văn bản số */}
-        <DataHubSubNav activeTab="myunit" />
         {/* Banner */}
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">

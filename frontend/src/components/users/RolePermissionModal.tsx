@@ -4,7 +4,7 @@ import {
   Shield, Search, CheckCircle2, ChevronDown, ChevronRight,
   X, Save, AlertTriangle,
   FileText, Users, KeyRound, ShieldAlert, BookOpen, Fingerprint,
-  Activity, Bot, Settings, Monitor, MonitorPlay,
+  Activity, Bot, Settings, Monitor, MonitorPlay, Gauge,
 } from 'lucide-react';
 
 import { permissionService } from '../../services/permissionService';
@@ -35,6 +35,7 @@ const GROUP_CONFIG: Record<string, {
   AUDIT:       { label: 'Kiểm toán',  icon: Activity,    color: 'text-indigo-700 dark:text-indigo-400',   bg: 'bg-indigo-50 dark:bg-indigo-500/10',   border: 'border-indigo-200 dark:border-indigo-500/30' },
   AI:          { label: 'Trợ lý AI',  icon: Bot,         color: 'text-teal-700 dark:text-teal-400',       bg: 'bg-teal-50 dark:bg-teal-500/10',       border: 'border-teal-200 dark:border-teal-500/30' },
   SYSTEM:      { label: 'Hệ thống',   icon: Settings,    color: 'text-slate-700 dark:text-slate-400',     bg: 'bg-slate-100 dark:bg-slate-700/40',    border: 'border-slate-300 dark:border-slate-600/40' },
+  COMMAND:     { label: 'Chỉ huy',    icon: Gauge,       color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/30' },
   SESSION:     { label: 'Phiên',      icon: Monitor,     color: 'text-lime-700 dark:text-lime-400',       bg: 'bg-lime-50 dark:bg-lime-500/10',       border: 'border-lime-200 dark:border-lime-500/30' },
 };
 

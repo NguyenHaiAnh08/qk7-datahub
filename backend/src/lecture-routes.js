@@ -20,10 +20,17 @@ const HANGING_THRESHOLD_MINUTES = 4 * 60; // 4 giờ
 module.exports = function createLectureRoutes({
   requireAuth,
   requirePermission,
+  requireAnyPermission,
   writeAccessLog,
   getClientIp,
 }) {
   const router = express.Router();
+
+  // API ĐỌC của phần giám sát (sơ đồ giảng đường, ca đang diễn ra): chỉ huy thuần chỉ có
+  // COMMAND_VIEW (không có LECTURE_VIEW) vẫn xem được. Kiểm tra vai trò trong từng handler giữ nguyên.
+  const monitorReadGuard = typeof requireAnyPermission === 'function'
+    ? requireAnyPermission(['LECTURE_VIEW', 'COMMAND_VIEW'])
+    : requirePermission('LECTURE_VIEW');
 
   const getIp = (req) => {
     if (typeof getClientIp === 'function') return getClientIp(req);
@@ -676,14 +683,66 @@ module.exports = function createLectureRoutes({
   // PHẦN 3 — TEACHING SCHEDULE (Ca giảng dạy)
   // ═════════════════════════════════════════════════════════════
 
+  // Danh sách giảng đường CHỌN ĐƯỢC khi mở ca (thay cho ô nhập tay): phòng đang hoạt động,
+  // kèm khu, sức chứa, trạng thái bảo trì và có ca đang diễn ra hay không.
+  router.get('/catalogs/rooms', requireAuth, async (req, res) => {
+    try {
+      const pool = await getPool();
+      const catalog = await loadBuildingCatalog(pool);
+      const catalogByCode = new Map(catalog.map((b) => [b.building_code, b]));
+      const inactiveCodes = new Set(catalog.filter((b) => !b.active).map((b) => b.building_code));
+
+      const r = await pool.request().query(`
+        SELECT c.room_id, c.room_name, c.room_type, c.capacity, c.building_code, c.building_name,
+               c.floor_number, c.display_order, c.is_maintenance, c.maintenance_reason,
+               CAST(CASE WHEN EXISTS (
+                 SELECT 1 FROM TEACHING_SCHEDULE s
+                 WHERE s.status = 'ONGOING' AND (s.room_id = c.room_id OR s.venue_name = c.room_name)
+               ) THEN 1 ELSE 0 END AS BIT) AS is_busy
+        FROM CLASSROOM c
+        WHERE c.active = 1
+        ORDER BY c.building_code, c.floor_number, c.display_order, c.room_name
+      `);
+
+      const items = r.recordset
+        .filter((x) => !inactiveCodes.has(x.building_code || 'H1'))
+        .map((x) => {
+          const code = x.building_code || 'H1';
+          const cat = catalogByCode.get(code);
+          return {
+            room_id: x.room_id,
+            room_name: x.room_name,
+            room_type: x.room_type,
+            capacity: x.capacity,
+            building_code: code,
+            building_name: cat?.building_name || x.building_name || `Khu ${code}`,
+            building_order: cat?.display_order ?? 999,
+            is_maintenance: !!x.is_maintenance,
+            maintenance_reason: x.maintenance_reason || null,
+            is_busy: !!x.is_busy,
+          };
+        })
+        .sort((a, b) => a.building_order - b.building_order || a.building_code.localeCompare(b.building_code));
+
+      res.json({ items });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   // Bắt đầu ca
   router.post('/schedules/start', requireAuth, requirePermission('SCHEDULE_START'), async (req, res) => {
     try {
-      const { lecture_id, class_id, venue_name, student_count, session_type, note } = req.body || {};
+      const { lecture_id, class_id, room_id, student_count, session_type, note } = req.body || {};
       const stype = String(session_type || 'TEACHER_LED').toUpperCase();
 
-      if (!lecture_id || !class_id || !venue_name) {
-        return res.status(400).json({ error: 'Thiếu bài giảng, lớp hoặc giảng đường' });
+      if (!lecture_id || !class_id) {
+        return res.status(400).json({ error: 'Thiếu bài giảng hoặc lớp' });
+      }
+      // Giảng đường phải chọn từ danh sách (mã phòng), không nhận tên gõ tay để sơ đồ giám sát luôn khớp
+      if (!room_id) {
+        return res.status(400).json({
+          error: 'Vui lòng chọn giảng đường từ danh sách',
+          code: 'ROOM_REQUIRED',
+        });
       }
       if (!['TEACHER_LED', 'SELF_STUDY'].includes(stype)) {
         return res.status(400).json({ error: 'Loại ca dạy không hợp lệ' });
@@ -745,11 +804,33 @@ module.exports = function createLectureRoutes({
         }
       }
 
-      // Kiểm tra giảng đường trống
+      // Giảng đường phải có thật, đang hoạt động, khu không bị tắt và không bảo trì
+      const roomRes = await pool.request()
+        .input('rid', sql.VarChar(50), String(room_id))
+        .query(`SELECT room_id, room_name, building_code, is_maintenance, maintenance_reason, active
+                FROM CLASSROOM WHERE room_id = @rid`);
+      const room = roomRes.recordset[0];
+      if (!room || !room.active) {
+        return res.status(400).json({ error: 'Giảng đường không tồn tại hoặc đã ngừng sử dụng', code: 'ROOM_NOT_FOUND' });
+      }
+      const buildingCatalogStart = await loadBuildingCatalog(pool);
+      if (buildingCatalogStart.some((b) => b.building_code === (room.building_code || 'H1') && !b.active)) {
+        return res.status(400).json({ error: 'Khu của giảng đường này đã ngừng sử dụng', code: 'BUILDING_INACTIVE' });
+      }
+      if (room.is_maintenance) {
+        return res.status(409).json({
+          error: `Giảng đường đang bảo trì${room.maintenance_reason ? `: ${room.maintenance_reason}` : ''}`,
+          code: 'ROOM_MAINTENANCE',
+        });
+      }
+      const venue_name = room.room_name; // tên hiển thị lấy từ danh mục, không tin dữ liệu client
+
+      // Kiểm tra giảng đường trống (theo mã phòng; kèm tên để bắt các ca cũ ghi tên tự do)
       const busy = await pool.request()
+        .input('rid', sql.VarChar(50), room.room_id)
         .input('v', sql.NVarChar(100), venue_name)
         .query(`SELECT TOP 1 schedule_id FROM TEACHING_SCHEDULE
-                WHERE venue_name = @v AND status = 'ONGOING'`);
+                WHERE status = 'ONGOING' AND (room_id = @rid OR venue_name = @v)`);
       if (busy.recordset.length > 0) {
         return res.status(409).json({
           error: 'Giảng đường đang có ca giảng dạy khác chưa kết thúc',
@@ -761,6 +842,7 @@ module.exports = function createLectureRoutes({
       const hasSessionType = await hasColumn(pool, 'TEACHING_SCHEDULE', 'session_type');
       const hasCurrentPage = await hasColumn(pool, 'TEACHING_SCHEDULE', 'current_page');
       const hasNote = await hasColumn(pool, 'TEACHING_SCHEDULE', 'note');
+      const hasRoomId = await hasColumn(pool, 'TEACHING_SCHEDULE', 'room_id');
 
       const scheduleId = 'SCH-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
       const presenterId = req.user.user_id;
@@ -775,6 +857,10 @@ module.exports = function createLectureRoutes({
         .input('v', sql.NVarChar(100), venue_name)
         .input('cnt', sql.Int, sc);
 
+      if (hasRoomId) {
+        columns.push('room_id'); values.push('@rid');
+        request.input('rid', sql.VarChar(50), room.room_id);
+      }
       if (hasSessionType) {
         columns.push('session_type'); values.push('@stype');
         request.input('stype', sql.VarChar(20), stype);
@@ -795,7 +881,7 @@ module.exports = function createLectureRoutes({
       await logAudit(
         req,
         'SCHEDULE_START',
-        `Bắt đầu ca ${stype}: "${lecture.title}" | sĩ số=${sc} | venue=${venue_name}`,
+        `Bắt đầu ca ${stype}: "${lecture.title}" | sĩ số=${sc} | phòng=${room.room_id} (${venue_name})`,
         lecture_id
       );
 
@@ -803,6 +889,8 @@ module.exports = function createLectureRoutes({
         success: true,
         schedule_id: scheduleId,
         session_type: hasSessionType ? stype : 'TEACHER_LED',
+        room_id: room.room_id,
+        venue_name,
         start_time: new Date().toISOString(),
       });
     } catch (err) {
@@ -961,7 +1049,7 @@ module.exports = function createLectureRoutes({
   });
 
   // Live Monitor — LECTURE_VIEW + role check
-  router.get('/schedules/live', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/schedules/live', requireAuth, monitorReadGuard, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
@@ -1038,12 +1126,18 @@ module.exports = function createLectureRoutes({
   // PHẦN 3B — QK7 LECTURE HALL RADAR (REAL-TIME CLASSROOM MONITORING)
   // ═════════════════════════════════════════════════════════════
 
-  const BUILDING_NAMES = {
-    H1: 'Khu Giảng đường H1',
-    H2: 'Khu Giảng đường H2',
-    HT: 'Khu Hội trường Quân sự',
-    PM: 'Khu Công nghệ / Phòng máy',
-  };
+  // Danh mục khu lấy từ bảng CLASSROOM_BUILDING (quản lý trong Quản trị, không còn viết cứng).
+  // Chưa có bảng (chưa chạy migration) → trả [] và dùng tên ghi kèm từng phòng.
+  async function loadBuildingCatalog(pool) {
+    try {
+      const r = await pool.request().query(
+        `SELECT building_code, building_name, display_order, active
+         FROM CLASSROOM_BUILDING ORDER BY display_order, building_code`);
+      return r.recordset;
+    } catch (_) {
+      return [];
+    }
+  }
 
   function sanitizeSessionForClearance(session, userClearance) {
     if (!session) return null;
@@ -1056,7 +1150,7 @@ module.exports = function createLectureRoutes({
   }
 
   // 1. Radar Overview: KPIs + Danh sách các Khu & Tầng
-  router.get('/radar/overview', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/radar/overview', requireAuth, monitorReadGuard, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
@@ -1078,7 +1172,11 @@ module.exports = function createLectureRoutes({
         WHERE active = 1
         ORDER BY building_code, floor_number, display_order
       `);
-      const allRooms = roomsResult.recordset;
+      // Khu đã bị tắt thì ẩn cả các phòng của khu đó khỏi sơ đồ và KPI
+      const buildingCatalog = await loadBuildingCatalog(pool);
+      const catalogByCode = new Map(buildingCatalog.map((b) => [b.building_code, b]));
+      const inactiveCodes = new Set(buildingCatalog.filter((b) => !b.active).map((b) => b.building_code));
+      const allRooms = roomsResult.recordset.filter((r) => !inactiveCodes.has(r.building_code || 'H1'));
 
       // Các ca đang diễn ra (ONGOING)
       const ongoingResult = await pool.request().query(`
@@ -1151,18 +1249,26 @@ module.exports = function createLectureRoutes({
       }
       const available = Math.max(0, total_rooms - in_session - maintenance);
 
+      const makeBuilding = (code, name) => ({
+        building_code: code,
+        building_name: name,
+        total_rooms: 0,
+        in_session_count: 0,
+        maintenance_count: 0,
+        floors: new Set(),
+      });
       const buildingsMap = new Map();
+      // Khu trong danh mục (đang bật) luôn hiện, kể cả khi chưa có phòng nào
+      for (const c of buildingCatalog) {
+        if (c.active) buildingsMap.set(c.building_code, makeBuilding(c.building_code, c.building_name));
+      }
       for (const r of allRooms) {
         const bCode = r.building_code || 'H1';
         if (!buildingsMap.has(bCode)) {
-          buildingsMap.set(bCode, {
-            building_code: bCode,
-            building_name: BUILDING_NAMES[bCode] || r.building_name || `Khu ${bCode}`,
-            total_rooms: 0,
-            in_session_count: 0,
-            maintenance_count: 0,
-            floors: new Set(),
-          });
+          buildingsMap.set(
+            bCode,
+            makeBuilding(bCode, catalogByCode.get(bCode)?.building_name || r.building_name || `Khu ${bCode}`)
+          );
         }
         const b = buildingsMap.get(bCode);
         b.total_rooms++;
@@ -1195,7 +1301,7 @@ module.exports = function createLectureRoutes({
   });
 
   // 2. Radar Floor Plan: Sơ đồ phòng học và trạng thái theo Khu và Tầng
-  router.get('/radar/floor-plan', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/radar/floor-plan', requireAuth, monitorReadGuard, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
@@ -1305,7 +1411,9 @@ module.exports = function createLectureRoutes({
 
       res.json({
         building_code: buildingCode,
-        building_name: BUILDING_NAMES[buildingCode] || `Khu ${buildingCode}`,
+        building_name:
+          (await loadBuildingCatalog(pool)).find((b) => b.building_code === buildingCode)?.building_name
+          || `Khu ${buildingCode}`,
         floor_number: floorNumber,
         time_shift: timeShift,
         rooms: resultRooms,
@@ -1318,7 +1426,7 @@ module.exports = function createLectureRoutes({
   });
 
   // 3. Radar Room Detail: Chi tiết giảng đường cho Inspector
-  router.get('/radar/rooms/:roomId/detail', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/radar/rooms/:roomId/detail', requireAuth, monitorReadGuard, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
@@ -1346,7 +1454,9 @@ module.exports = function createLectureRoutes({
         return res.status(404).json({ error: 'Không tìm thấy phòng học' });
       }
       const room = roomRes.recordset[0];
-      room.building_name = BUILDING_NAMES[room.building_code] || room.building_name;
+      room.building_name =
+        (await loadBuildingCatalog(pool)).find((b) => b.building_code === room.building_code)?.building_name
+        || room.building_name;
 
       const hasNote = await hasColumn(pool, 'TEACHING_SCHEDULE', 'note');
 

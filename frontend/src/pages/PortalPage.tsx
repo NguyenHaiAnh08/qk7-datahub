@@ -14,7 +14,6 @@ import {
   FileCheck,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
-import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { toast } from '../components/common/Toast';
 import { SecurityBanner } from '../components/portal/SecurityBanner';
 import { SchoolOverviewSection } from '../components/portal/SchoolOverviewSection';
@@ -308,8 +307,6 @@ export const PortalPage: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
-        {/* Tactical Sub-Navigation Phân hệ Văn bản số */}
-        <DataHubSubNav activeTab="portal" />
         {/* Security Banner */}
         <SecurityBanner
           user={user}

@@ -29,8 +29,10 @@ import { Unit } from '../types/user';
 import { unitService } from '../services/unitService';
 import { buildUnitTree, filterSchoolUnits } from '../utils/unitTree';
 import { lectureService } from '../services/lectureService';
+import { ClassroomBuilding } from '../types/lecture';
 import { toast } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { useAuth } from '../hooks/useAuth';
 
 type CatalogType = 'subjects' | 'classes' | 'classrooms';
 
@@ -128,6 +130,10 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
   const [submitting, setSubmitting] = useState(false);
   const [deleteItem, setDeleteItem] = useState<any | null>(null);
 
+  // ── Khu giảng đường (chỉ dùng ở danh mục Giảng đường) ──
+  const { hasPermission } = useAuth();
+  const [buildings, setBuildings] = useState<ClassroomBuilding[]>([]);
+
   // ── Cây đơn vị cho TreeSelect (Đơn vị phụ trách môn học & Đơn vị quản lý lớp học) ──
   const [availableUnits, setAvailableUnits] = useState<Unit[]>([]);
 
@@ -198,11 +204,22 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
     }
   };
 
+  const loadBuildings = async () => {
+    try {
+      const res = await lectureService.adminListBuildings();
+      setBuildings((res.items || []).filter((b) => b.active));
+    } catch {
+      // Chưa có bảng khu (chưa chạy migration) → form dùng ô nhập tay như cũ
+      setBuildings([]);
+    }
+  };
+
   useEffect(() => {
     setSearchQuery('');
     setStatusFilter('all');
     setRoomTypeFilter('all');
     load();
+    if (catalogType === 'classrooms') loadBuildings();
     /* eslint-disable-next-line */
   }, [catalogType]);
 
@@ -238,6 +255,7 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
       security_level_id: '',
       course_year: '',
       room_type: 'LECTURE_HALL',
+      building_code: '',
       faculty_unit_id: '',
       unit_id: '',
     });
@@ -973,13 +991,34 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
                         placeholder="VD: Giảng đường A1"
                         icon={Building2}
                       />
-                      <FormInput
-                        label="Tòa nhà / Khu vực"
-                        value={form.building_name || ''}
-                        onChange={(val) => setForm({ ...form, building_name: val })}
-                        placeholder="VD: Khu A"
-                        icon={Building}
-                      />
+                      {buildings.length > 0 ? (
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            Khu giảng đường <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            required
+                            value={form.building_code || ''}
+                            onChange={(e) => setForm({ ...form, building_code: e.target.value })}
+                            className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30"
+                          >
+                            <option value="">— Chọn khu —</option>
+                            {buildings.map((b) => (
+                              <option key={b.building_code} value={b.building_code}>
+                                {b.building_name} ({b.building_code})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <FormInput
+                          label="Tòa nhà / Khu vực"
+                          value={form.building_name || ''}
+                          onChange={(val) => setForm({ ...form, building_name: val })}
+                          placeholder="VD: Khu A"
+                          icon={Building}
+                        />
+                      )}
                       <div>
                         <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                           Loại phòng

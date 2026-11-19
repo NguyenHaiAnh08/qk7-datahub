@@ -22,6 +22,7 @@ import {
   BookOpen,
   GraduationCap,
   Building2,
+  Landmark,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
@@ -89,6 +90,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
       { id: 'lec-subjects',   label: 'Môn học',     icon: BookOpen,     permission: 'SUBJECT_VIEW' },
       { id: 'lec-classes',    label: 'Lớp học',     icon: GraduationCap, permission: 'CLASS_VIEW' },
       { id: 'lec-classrooms', label: 'Giảng đường', icon: Building2,    permission: 'CLASSROOM_VIEW' },
+      { id: 'lec-buildings',  label: 'Khu giảng đường', icon: Landmark, permission: 'CLASSROOM_VIEW' },
     ],
   },
   /*

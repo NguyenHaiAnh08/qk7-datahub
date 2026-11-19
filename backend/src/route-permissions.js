@@ -13,6 +13,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/creatable-roles$/,           'USER_VIEW'],
     [/^\/api\/admin\/users\/[^/]+\/roles$/,       'USER_VIEW'],
     [/^\/api\/admin\/users\/[^/]+\/permissions$/, 'USER_VIEW'],
+    [/^\/api\/command\/overview$/,                'COMMAND_VIEW'],
     [/^\/api\/admin\/roles$/,                     'ROLE_VIEW'],
     [/^\/api\/admin\/roles\/[^/]+\/permissions$/, 'ROLE_VIEW'],
     [/^\/api\/admin\/permissions$/,               'PERMISSION_VIEW'],
@@ -36,6 +37,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/lectures\/subjects$/,    'SUBJECT_VIEW'],
     [/^\/api\/admin\/lectures\/classes$/,     'CLASS_VIEW'],
     [/^\/api\/admin\/lectures\/classrooms$/,  'CLASSROOM_VIEW'],
+    [/^\/api\/admin\/lectures\/buildings$/,   'CLASSROOM_VIEW'],
   ],
 
   POST: [
@@ -60,6 +62,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/lectures\/subjects$/,    'SUBJECT_MANAGE'],
     [/^\/api\/admin\/lectures\/classes$/,     'CLASS_MANAGE'],
     [/^\/api\/admin\/lectures\/classrooms$/,  'CLASSROOM_MANAGE'],
+    [/^\/api\/admin\/lectures\/buildings$/,   'CLASSROOM_MANAGE'],
 
     // ─── LECTURES ───
     [/^\/api\/lectures\/upload-scorm$/,           'LECTURE_CREATE'],
@@ -89,6 +92,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
     [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
     [/^\/api\/admin\/lectures\/classrooms\/[^/]+$/,  'CLASSROOM_MANAGE'],
+    [/^\/api\/admin\/lectures\/buildings\/[^/]+$/,   'CLASSROOM_MANAGE'],
   ],
 
   DELETE: [
@@ -114,6 +118,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
     [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
     [/^\/api\/admin\/lectures\/classrooms\/[^/]+$/,  'CLASSROOM_MANAGE'],
+    [/^\/api\/admin\/lectures\/buildings\/[^/]+$/,   'CLASSROOM_MANAGE'],
   ],
 };
 

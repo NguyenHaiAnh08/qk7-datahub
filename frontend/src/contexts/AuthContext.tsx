@@ -92,7 +92,12 @@ export const getDestinationByRole = (user?: User | null): string => {
     return ROUTE_PATHS.DESK; // Trả về /document-desk
   }
 
-  // 4. Các trường hợp còn lại (Trợ lý, Chỉ huy, Cán bộ thường) -> Về Cổng thông tin
+  // 3b. Chỉ huy (có quyền COMMAND_VIEW, không thao tác văn bản) -> Giảng đường (có tổng quan hệ thống)
+  if (user.permissions?.includes('COMMAND_VIEW')) {
+    return ROUTE_PATHS.CLASSROOMS;
+  }
+
+  // 4. Các trường hợp còn lại (Trợ lý, Cán bộ thường) -> Về Cổng thông tin
   return ROUTE_PATHS.PORTAL;
 };
 

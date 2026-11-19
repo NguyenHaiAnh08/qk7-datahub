@@ -22,6 +22,10 @@ export interface Lecture {
   author_rank?: string;
   faculty_unit_id: string;
   faculty_name?: string;
+  /** Bài của đơn vị ngang cấp (cùng đơn vị cha) — được xem và mở ca */
+  peer_unit?: boolean;
+  /** Được mở ca dạy: bài thuộc đơn vị của mình hoặc cùng khoa (không chỉ tác giả) */
+  can_teach?: boolean;
   security_level_id: number;
   security_name?: string;
   content_type: ContentType;

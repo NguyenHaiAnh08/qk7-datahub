@@ -66,6 +66,20 @@ const AUTO_PERMISSIONS = {
 
     // ─── LECTURES ───
     [/^\/api\/lectures\/upload-scorm$/,           'LECTURE_CREATE'],
+    [/^\/api\/lectures$/,                         'LECTURE_CREATE'],
+    [/^\/api\/lectures\/[^/]+\/submit$/,          'LECTURE_CREATE'],
+    [/^\/api\/lectures\/[^/]+\/(scorm|html5|pdf)\/upload$/, 'LECTURE_CREATE'],
+    [/^\/api\/lectures\/[^/]+\/approve$/,         'LECTURE_APPROVE'],
+    [/^\/api\/lectures\/[^/]+\/reject$/,          'LECTURE_APPROVE'],
+    [/^\/api\/lectures\/[^/]+\/restore$/,         'LECTURE_DELETE'],
+    [/^\/api\/lectures\/[^/]+\/quiz$/,            'LECTURE_QUIZ_MANAGE'],
+    [/^\/api\/lectures\/schedules\/start$/,       'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/end$/,  'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/scorm\/commit$/, 'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/quiz\/[^/]+\/activate$/, 'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/force-end$/, 'SCHEDULE_FORCE_END'],
+    // Bật/tắt bảo trì phòng: handler tự kiểm tra vai trò (Admin/Chỉ huy/Trưởng khoa)
+    [/^\/api\/lectures\/radar\/rooms\/[^/]+\/maintenance$/, 'CLASSROOM_VIEW'],
 
     // ─── NHÓM 2 (quan trọng — CREATE thì OK, EDIT/DELETE phải duyệt) ───
     [/^\/api\/admin\/units$/,                            'UNIT_CREATE'],           // ← TÁCH riêng
@@ -88,6 +102,10 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/ranks\/[^/]+$/,                     'RANK_EDIT'],             // ← TÁCH
     [/^\/api\/admin\/positions\/[^/]+$/,                 'POSITION_EDIT'],         // ← TÁCH
     [/^\/api\/admin\/unit-aliases\/[^/]+$/,              'UNIT_ALIAS_EDIT'],       // ← TÁCH
+    [/^\/api\/lectures\/schedules\/[^/]+\/progress$/, 'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/slide$/,    'SCHEDULE_START'],
+    [/^\/api\/lectures\/[^/]+\/quiz\/[^/]+$/,         'LECTURE_QUIZ_MANAGE'],
+    [/^\/api\/lectures\/[^/]+$/,                      'LECTURE_CREATE'],
     [/^\/api\/documents\/[^/]+$/,                 'DOC_EDIT'],
     [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
     [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
@@ -113,6 +131,9 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/sessions\/user\/[^/]+$/,            'SESSION_KILL'],
     [/^\/api\/admin\/sessions\/[^/]+$/,                  'SESSION_KILL'],
     [/^\/api\/admin\/protected-permissions\/[^/]+$/,     'ROLE_EDIT'],
+    [/^\/api\/lectures\/[^/]+\/purge$/,           'LECTURE_DELETE'],
+    [/^\/api\/lectures\/[^/]+\/quiz\/[^/]+$/,     'LECTURE_QUIZ_MANAGE'],
+    [/^\/api\/lectures\/[^/]+$/,                  'LECTURE_DELETE'],
     [/^\/api\/documents\/[^/]+\/purge$/,          'DOC_PURGE'],
     [/^\/api\/documents\/[^/]+$/,                 'DOC_DELETE'],
     [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],

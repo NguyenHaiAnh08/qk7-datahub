@@ -47,6 +47,12 @@ const SECURITY_LEVEL_LABELS: Record<number, { label: string; cls: string }> = {
 
 export interface LectureCardProps {
   lecture: Lecture;
+  /**
+   * 'list'    — trang Danh sách: chỉ Xem chi tiết + Mở ca dạy (không thao tác CRUD/duyệt)
+   * 'compose' — trang Soạn & duyệt: chỉnh sửa, gửi duyệt, duyệt, xóa/khôi phục (không mở ca)
+   * Không truyền = hiện đủ như trước.
+   */
+  mode?: 'list' | 'compose';
   viewMode: 'grid' | 'table';
   currentUserId?: string;
   isAdmin: boolean;
@@ -66,7 +72,7 @@ export interface LectureCardProps {
 }
 
 export const LectureCard: React.FC<LectureCardProps> = ({
-  lecture, viewMode, currentUserId, isAdmin, canApprove, canArchive, canStartSchedule, canEdit,
+  lecture, mode, viewMode, currentUserId, isAdmin, canApprove, canArchive, canStartSchedule, canEdit,
   onSubmit, onApprove, onReject, onSoftDelete, onRestore, onPurge, onEdit, onView, onStartSession,
 }) => {
   const statusCfg = STATUS_STYLES[lecture.status] || STATUS_STYLES.DRAFT;
@@ -82,9 +88,11 @@ export const LectureCard: React.FC<LectureCardProps> = ({
 
   type Action = { label: string; icon: typeof FileText; onClick: () => void; cls: string };
   const actions: Action[] = [];
+  const allowTeach = mode !== 'compose';
+  const allowManage = mode !== 'list';
 
   // 1. Mở ca dạy khi đã PUBLISHED (Ưu tiên số 1 theo yêu cầu chỉ huy)
-  if (isPublished && isAuthor && canStartSchedule) {
+  if (allowTeach && isPublished && isAuthor && canStartSchedule) {
     actions.push({
       label: 'Mở ca dạy',
       icon: Play,
@@ -94,7 +102,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   }
 
   // 2. Chỉnh sửa & Gửi duyệt khi là DRAFT / REJECTED
-  if (isAuthor && isDraftOrRejected && canEdit) {
+  if (allowManage && isAuthor && isDraftOrRejected && canEdit) {
     actions.push({
       label: 'Chỉnh sửa',
       icon: Edit,
@@ -110,7 +118,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   }
 
   // 3. Quyền phê duyệt 2 tầng (Chỉ huy Khoa / Đào tạo / BGH)
-  if (canApprove) {
+  if (allowManage && canApprove) {
     if (isPendingFaculty) {
       actions.push(
         { label: 'Duyệt Khoa', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600' },
@@ -134,7 +142,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   });
 
   // 5. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn
-  if (canArchive) {
+  if (allowManage && canArchive) {
     if (isDeleted) {
       // Đang trong thùng rác → Khôi phục + Xoá vĩnh viễn
       actions.push(

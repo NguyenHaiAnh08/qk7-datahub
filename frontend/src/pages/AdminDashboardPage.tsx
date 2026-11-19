@@ -4,6 +4,7 @@ import { Drawer } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PinManageModal } from '../components/users/PinManageModal';
 import { LectureCatalogsPage } from './LectureCatalogsPage';
+import { LectureBuildingsPage } from './LectureBuildingsPage';
 
 
 import {
@@ -203,6 +204,8 @@ const PERMISSION_GROUPS = [
   { value: 'AI',          label: '🤖 Trợ lý AI' },
   { value: 'SYSTEM',      label: '⚙️ Hệ thống' },
   { value: 'SESSION',     label: '🖥️ Phiên' },
+  { value: 'LECTURE',     label: '🎓 Bài giảng' },
+  { value: 'COMMAND',     label: '📊 Chỉ huy' },
 ];
 
 const PERMISSION_TONES = [
@@ -789,15 +792,22 @@ const pinPendingCount = useMemo(
     try {
       if (selectedUser?.user_id) {
         // 1. Tách role_id, roles, expires_at ra khỏi object để không gửi nhầm lên API updateUser
-        const { role_id, roles, expires_at, ...updateData } = userData;
+        const { role_id, roles: newRoleIds, expires_at, ...updateData } = userData;
 
         // 2. Cập nhật thông tin cơ bản (Tên, chức vụ, đơn vị, độ mật...)
         await usersApi.updateUser(selectedUser.user_id, updateData);
 
         // 3. ✅ ATOMIC: Cập nhật vai trò qua 1 endpoint PUT duy nhất (nếu có thay đổi)
         // Server wrap DELETE cũ + INSERT mới trong transaction → tránh trạng thái mất role giữa chừng
-        const currentRole = selectedUser.roles?.[0] || null;
-        if (role_id !== undefined && role_id !== currentRole) {
+        const currentRoles = selectedUser.roles || [];
+        if (Array.isArray(newRoleIds)) {
+          // Nhiều vai trò: chỉ gọi khi tập vai trò thực sự đổi; server giữ nguyên các vai trò không đổi
+          const same =
+            newRoleIds.length === currentRoles.length && newRoleIds.every((r) => currentRoles.includes(r));
+          if (!same) {
+            await usersApi.setUserRoles(selectedUser.user_id, newRoleIds, expires_at ?? null);
+          }
+        } else if (role_id !== undefined && role_id !== (currentRoles[0] || null)) {
           const newRoles = role_id ? [role_id] : [];
           await usersApi.setUserRoles(selectedUser.user_id, newRoles, expires_at ?? null);
         }
@@ -2648,6 +2658,7 @@ const pinPendingCount = useMemo(
           {activeTab === 'lec-subjects'   && <LectureCatalogsPage catalogType="subjects" />}
           {activeTab === 'lec-classes'    && <LectureCatalogsPage catalogType="classes" />}
           {activeTab === 'lec-classrooms' && <LectureCatalogsPage catalogType="classrooms" />}
+          {activeTab === 'lec-buildings'  && <LectureBuildingsPage />}
         </main>
       </div>
 

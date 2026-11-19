@@ -809,7 +809,9 @@ module.exports = (app, deps) => {
         }
     });
 
-    // PUT — thay toàn bộ vai trò của user trong 1 transaction (DELETE cũ + INSERT mới)
+    // PUT — đặt tập vai trò của user trong 1 transaction. Quyền của user = HỢP quyền của mọi vai trò.
+    // Vai trò đang giữ được GIỮ NGUYÊN (kể cả hạn dùng riêng); chỉ gỡ vai trò không còn trong danh sách
+    // và thêm vai trò mới (expires_at nếu có chỉ áp cho vai trò mới thêm).
     app.put('/api/admin/users/:id/roles', async (req, res) => {
         const userId = req.params.id;
         const { roles, expires_at } = req.body || {};
@@ -856,9 +858,17 @@ module.exports = (app, deps) => {
             tx = new sql.Transaction(pool);
             await tx.begin();
             try {
-                await new sql.Request(tx).input('u', sql.VarChar(50), userId)
-                    .query(`DELETE FROM USER_ROLE WHERE user_id = @u`);
+                // 1) Gỡ các vai trò không còn trong danh sách mới
+                const delReq = new sql.Request(tx).input('u', sql.VarChar(50), userId);
+                let delSql = `DELETE FROM USER_ROLE WHERE user_id = @u`;
+                if (newRoles.length) {
+                    const names = newRoles.map((rid, i) => { delReq.input(`k${i}`, sql.VarChar(50), rid); return `@k${i}`; });
+                    delSql += ` AND role_id NOT IN (${names.join(',')})`;
+                }
+                await delReq.query(delSql);
+                // 2) Thêm vai trò mới (vai trò đã có thì giữ nguyên)
                 for (const rid of newRoles) {
+                    if (currentRoles.includes(rid)) continue;
                     await new sql.Request(tx)
                         .input('u', sql.VarChar(50), userId)
                         .input('r', sql.VarChar(50), rid)
@@ -2609,34 +2619,73 @@ app.delete('/api/admin/lectures/classes/:id', async (req, res) => {
 });
 
 // ── GIẢNG ĐƯỜNG ──
+// Tra khu theo mã trong bảng CLASSROOM_BUILDING (null nếu không có hoặc chưa tạo bảng)
+async function findBuilding(pool, code) {
+  if (!code) return null;
+  try {
+    const r = await pool.request().input('c', sql.VarChar(20), String(code))
+      .query(`SELECT building_code, building_name, active FROM CLASSROOM_BUILDING WHERE building_code = @c`);
+    return r.recordset[0] || null;
+  } catch (_) { return null; }
+}
+
 app.get('/api/admin/lectures/classrooms', async (req, res) => {
   try {
     const pool = await getPool();
-    const r = await pool.request().query(`
-      SELECT room_id, room_name, building_name, room_type, capacity, description, active
-      FROM CLASSROOM
-      ORDER BY active DESC, room_name
-    `);
+    let r;
+    try {
+      // Tên khu lấy từ danh mục khu (CLASSROOM_BUILDING)
+      r = await pool.request().query(`
+        SELECT c.room_id, c.room_name, c.building_code,
+               COALESCE(b.building_name, c.building_name) AS building_name,
+               c.room_type, c.capacity, c.description, c.active
+        FROM CLASSROOM c
+        LEFT JOIN CLASSROOM_BUILDING b ON b.building_code = c.building_code
+        ORDER BY c.active DESC, c.room_name
+      `);
+    } catch (_) {
+      // Chưa chạy migration create_classroom_building → giữ cách đọc cũ
+      r = await pool.request().query(`
+        SELECT room_id, room_name, building_code, building_name, room_type, capacity, description, active
+        FROM CLASSROOM
+        ORDER BY active DESC, room_name
+      `);
+    }
     res.json({ total: r.recordset.length, items: r.recordset });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/lectures/classrooms', async (req, res) => {
   try {
-    const { room_id, room_name, building_name, room_type, capacity, description } = req.body;
+    const { room_id, room_name, building_name, building_code, room_type, capacity, description } = req.body;
     if (!room_id || !room_name) return res.status(400).json({ error: 'Thiếu room_id hoặc room_name' });
     const validTypes = ['LECTURE_HALL', 'COMPUTER_LAB', 'SEMINAR'];
     const rt = validTypes.includes(room_type) ? room_type : 'LECTURE_HALL';
     const pool = await getPool();
-    await pool.request()
+
+    // Có chọn khu → phải là khu có thật; tên khu lấy từ danh mục (không tin tên client gửi lên)
+    let bCode = null, bName = building_name || null;
+    if (building_code) {
+      const b = await findBuilding(pool, building_code);
+      if (!b) return res.status(400).json({ error: `Khu "${building_code}" không tồn tại`, code: 'BUILDING_NOT_FOUND' });
+      bCode = b.building_code; bName = b.building_name;
+    }
+
+    const request = pool.request()
       .input('id', sql.VarChar(50), room_id)
       .input('name', sql.NVarChar(100), room_name)
-      .input('bld', sql.NVarChar(100), building_name || null)
+      .input('bld', sql.NVarChar(100), bName)
       .input('type', sql.VarChar(30), rt)
       .input('cap', sql.Int, capacity || null)
-      .input('desc', sql.NVarChar(500), description || null)
-      .query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, room_type, capacity, description, active)
+      .input('desc', sql.NVarChar(500), description || null);
+    if (bCode) {
+      request.input('bcode', sql.VarChar(20), bCode);
+      await request.query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, building_code, room_type, capacity, description, active)
+              VALUES (@id, @name, @bld, @bcode, @type, @cap, @desc, 1)`);
+    } else {
+      await request.query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, room_type, capacity, description, active)
               VALUES (@id, @name, @bld, @type, @cap, @desc, 1)`);
+    }
     await log(req, 'LECTURE_CLASSROOM_CREATE', `Tạo giảng đường ${room_id} - ${room_name}`);
     res.json({ success: true, room_id });
   } catch (e) {
@@ -2647,14 +2696,23 @@ app.post('/api/admin/lectures/classrooms', async (req, res) => {
 
 app.put('/api/admin/lectures/classrooms/:id', async (req, res) => {
   try {
-    const { room_name, building_name, room_type, capacity, description, active } = req.body;
+    const { room_name, building_name, building_code, room_type, capacity, description, active } = req.body;
     const validTypes = ['LECTURE_HALL', 'COMPUTER_LAB', 'SEMINAR'];
     const rt = validTypes.includes(room_type) ? room_type : null;
     const pool = await getPool();
+
+    let bCode = null, bName = building_name || null;
+    if (building_code) {
+      const b = await findBuilding(pool, building_code);
+      if (!b) return res.status(400).json({ error: `Khu "${building_code}" không tồn tại`, code: 'BUILDING_NOT_FOUND' });
+      bCode = b.building_code; bName = b.building_name;
+    }
+
     const r = await pool.request()
       .input('id', sql.VarChar(50), req.params.id)
       .input('name', sql.NVarChar(100), room_name)
-      .input('bld', sql.NVarChar(100), building_name || null)
+      .input('bld', sql.NVarChar(100), bName)
+      .input('bcode', sql.VarChar(20), bCode)
       .input('type', sql.VarChar(30), rt)
       .input('cap', sql.Int, capacity || null)
       .input('desc', sql.NVarChar(500), description || null)
@@ -2662,6 +2720,7 @@ app.put('/api/admin/lectures/classrooms/:id', async (req, res) => {
       .query(`UPDATE CLASSROOM SET
               room_name = @name,
               building_name = @bld,
+              building_code = COALESCE(@bcode, building_code),
               room_type = COALESCE(@type, room_type),
               capacity = @cap,
               description = @desc,
@@ -2688,6 +2747,100 @@ app.delete('/api/admin/lectures/classrooms/:id', async (req, res) => {
       .query(`DELETE FROM CLASSROOM WHERE room_id = @id`);
     await log(req, 'LECTURE_CLASSROOM_DELETE', `Xóa giảng đường ${req.params.id}`);
     res.json({ success: true, soft_deleted: false });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── KHU GIẢNG ĐƯỜNG (CLASSROOM_BUILDING) — quản lý thay cho danh sách viết cứng ──
+const BUILDING_CODE_RE = /^[A-Za-z0-9_-]{1,20}$/;
+
+app.get('/api/admin/lectures/buildings', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT b.building_code, b.building_name, b.display_order, b.active,
+             (SELECT COUNT(*) FROM CLASSROOM c WHERE c.building_code = b.building_code) AS room_count
+      FROM CLASSROOM_BUILDING b
+      ORDER BY b.display_order, b.building_code
+    `);
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) {
+    const missing = /Invalid object name 'CLASSROOM_BUILDING'/i.test(e.message);
+    res.status(500).json({
+      error: missing
+        ? 'Chưa có bảng CLASSROOM_BUILDING. Hãy chạy migration create_classroom_building.'
+        : e.message,
+      code: missing ? 'BUILDING_TABLE_MISSING' : undefined,
+    });
+  }
+});
+
+app.post('/api/admin/lectures/buildings', async (req, res) => {
+  try {
+    const code = String(req.body.building_code || '').trim().toUpperCase();
+    const name = String(req.body.building_name || '').trim();
+    const order = Number.isFinite(Number(req.body.display_order)) ? Math.trunc(Number(req.body.display_order)) : 0;
+    if (!BUILDING_CODE_RE.test(code)) {
+      return res.status(400).json({ error: 'Mã khu chỉ gồm chữ, số, "-" hoặc "_" (tối đa 20 ký tự)' });
+    }
+    if (!name || name.length > 100) return res.status(400).json({ error: 'Tên khu bắt buộc, tối đa 100 ký tự' });
+    const pool = await getPool();
+    await pool.request()
+      .input('c', sql.VarChar(20), code)
+      .input('n', sql.NVarChar(100), name)
+      .input('o', sql.Int, order)
+      .query(`INSERT INTO CLASSROOM_BUILDING (building_code, building_name, display_order, active)
+              VALUES (@c, @n, @o, 1)`);
+    await log(req, 'LECTURE_BUILDING_CREATE', `Tạo khu giảng đường ${code} - ${name}`);
+    res.json({ success: true, building_code: code });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'Mã khu đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/buildings/:code', async (req, res) => {
+  try {
+    const name = String(req.body.building_name || '').trim();
+    const order = Number.isFinite(Number(req.body.display_order)) ? Math.trunc(Number(req.body.display_order)) : 0;
+    if (!name || name.length > 100) return res.status(400).json({ error: 'Tên khu bắt buộc, tối đa 100 ký tự' });
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('c', sql.VarChar(20), req.params.code)
+      .input('n', sql.NVarChar(100), name)
+      .input('o', sql.Int, order)
+      .input('a', sql.Bit, req.body.active === false ? 0 : 1)
+      .query(`UPDATE CLASSROOM_BUILDING
+              SET building_name = @n, display_order = @o, active = @a
+              WHERE building_code = @c`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy khu' });
+    // Giữ tên khu ghi kèm từng phòng đồng bộ với danh mục khu
+    await pool.request()
+      .input('c', sql.VarChar(20), req.params.code)
+      .input('n', sql.NVarChar(100), name)
+      .query(`UPDATE CLASSROOM SET building_name = @n WHERE building_code = @c`);
+    await log(req, 'LECTURE_BUILDING_UPDATE', `Sửa khu giảng đường ${req.params.code}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/buildings/:code', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request().input('c', sql.VarChar(20), req.params.code)
+      .query(`SELECT COUNT(*) AS n FROM CLASSROOM WHERE building_code = @c`);
+    const n = used.recordset[0].n;
+    if (n > 0) {
+      return res.status(409).json({
+        error: `Khu còn ${n} phòng học. Hãy chuyển hoặc xóa các phòng đó trước, hoặc tắt khu thay vì xóa.`,
+        code: 'BUILDING_NOT_EMPTY',
+        room_count: n,
+      });
+    }
+    const r = await pool.request().input('c', sql.VarChar(20), req.params.code)
+      .query(`DELETE FROM CLASSROOM_BUILDING WHERE building_code = @c`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy khu' });
+    await log(req, 'LECTURE_BUILDING_DELETE', `Xóa khu giảng đường ${req.params.code}`);
+    res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

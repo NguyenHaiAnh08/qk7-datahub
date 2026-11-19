@@ -15,6 +15,8 @@ import {
   RadarOverviewResponse,
   RadarFloorPlanResponse,
   RadarRoomDetailResponse,
+  ClassroomBuilding,
+  LectureRoomOption,
 } from '../types/lecture';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -28,6 +30,11 @@ export const lectureService = {
 
   async getClasses(): Promise<TrainingClass[]> {
     const res: any = await http('/api/lectures/catalogs/classes');
+    return res?.items || [];
+  },
+
+  async getRooms(): Promise<LectureRoomOption[]> {
+    const res: any = await http('/api/lectures/catalogs/rooms');
     return res?.items || [];
   },
 
@@ -314,6 +321,35 @@ export const lectureService = {
   },
   async adminDeleteClassroom(id: string): Promise<{ success: boolean; soft_deleted?: boolean }> {
     return http(`/api/admin/lectures/classrooms/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  // ── Khu giảng đường (CLASSROOM_BUILDING) ──
+  async adminListBuildings(): Promise<{ total: number; items: ClassroomBuilding[] }> {
+    return http('/api/admin/lectures/buildings');
+  },
+  async adminCreateBuilding(data: {
+    building_code: string;
+    building_name: string;
+    display_order?: number;
+  }): Promise<{ success: boolean; building_code: string }> {
+    return http('/api/admin/lectures/buildings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateBuilding(
+    code: string,
+    data: { building_name: string; display_order?: number; active?: boolean }
+  ): Promise<{ success: boolean }> {
+    return http(`/api/admin/lectures/buildings/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteBuilding(code: string): Promise<{ success: boolean }> {
+    return http(`/api/admin/lectures/buildings/${encodeURIComponent(code)}`, { method: 'DELETE' });
   },
 
   // ─── QK7 LECTURE HALL RADAR ───

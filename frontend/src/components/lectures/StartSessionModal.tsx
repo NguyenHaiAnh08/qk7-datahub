@@ -3,7 +3,7 @@ import { X, Play, Loader2 } from 'lucide-react';
 import { lectureService } from '../../services/lectureService';
 import { toast } from '../common/Toast';
 import { useAuth } from '../../hooks/useAuth';
-import { Lecture, TrainingClass, SessionType, TeachingSchedule } from '../../types/lecture';
+import { Lecture, TrainingClass, SessionType, TeachingSchedule, LectureRoomOption } from '../../types/lecture';
 
 interface Props {
   open: boolean;
@@ -15,9 +15,11 @@ interface Props {
 export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onStarted }) => {
   const { user } = useAuth();
   const [classes, setClasses] = useState<TrainingClass[]>([]);
-  const [venues, setVenues] = useState<{ venue_name: string; usage_count: number }[]>([]);
+  const [rooms, setRooms] = useState<LectureRoomOption[]>([]);
+  const [roomsLoaded, setRoomsLoaded] = useState(false);
   const [classId, setClassId] = useState('');
-  const [venue, setVenue] = useState('');
+  const [buildingCode, setBuildingCode] = useState('');
+  const [roomId, setRoomId] = useState('');
   const [studentCount, setStudentCount] = useState<string>('');
   const [sessionType, setSessionType] = useState<SessionType>('TEACHER_LED');
   const [note, setNote] = useState('');
@@ -30,22 +32,56 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
     [classes, classId]
   );
 
-  // Load catalogs (classes + venues) khi modal mở
+  const selectedRoom = useMemo(
+    () => rooms.find((r) => r.room_id === roomId) || null,
+    [rooms, roomId]
+  );
+
+  // Danh sách khu (giữ thứ tự backend trả về) kèm số phòng còn dùng được
+  const buildingOptions = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; total: number; free: number }>();
+    for (const r of rooms) {
+      if (!map.has(r.building_code)) {
+        map.set(r.building_code, { code: r.building_code, name: r.building_name, total: 0, free: 0 });
+      }
+      const b = map.get(r.building_code)!;
+      b.total += 1;
+      if (!r.is_busy && !r.is_maintenance) b.free += 1;
+    }
+    return Array.from(map.values());
+  }, [rooms]);
+
+  // Chỉ phòng thuộc khu đã chọn (tên phòng có thể trùng giữa các khu nên phải chọn khu trước)
+  const roomsOfBuilding = useMemo(
+    () => rooms.filter((r) => r.building_code === buildingCode),
+    [rooms, buildingCode]
+  );
+
+  // Chỉ có đúng 1 khu → tự chọn sẵn
+  useEffect(() => {
+    if (buildingOptions.length === 1 && !buildingCode) setBuildingCode(buildingOptions[0].code);
+  }, [buildingOptions, buildingCode]);
+
+  // Load catalogs (classes + rooms) khi modal mở
   useEffect(() => {
     if (!open) return;
-    Promise.all([lectureService.getClasses(), lectureService.getVenues()])
-      .then(([cls, vns]) => {
+    setRoomsLoaded(false);
+    Promise.all([lectureService.getClasses(), lectureService.getRooms()])
+      .then(([cls, rms]) => {
         setClasses(Array.isArray(cls) ? cls : []);
-        setVenues(Array.isArray(vns) ? vns : []);
+        setRooms(Array.isArray(rms) ? rms : []);
+        setRoomsLoaded(true);
       })
       .catch((err: any) => {
         console.error('[StartSessionModal catalogs]', err);
         toast.error('Không thể tải danh sách lớp / giảng đường');
         setClasses([]);
-        setVenues([]);
+        setRooms([]);
+        setRoomsLoaded(true);
       });
     setClassId('');
-    setVenue('');
+    setBuildingCode('');
+    setRoomId('');
     setStudentCount('');
     setSessionType('TEACHER_LED');
     setNote('');
@@ -69,7 +105,8 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
     e.preventDefault();
     setError('');
     if (!classId) return setError('Vui lòng chọn lớp học');
-    if (!venue.trim()) return setError('Vui lòng nhập giảng đường');
+    if (!buildingCode) return setError('Vui lòng chọn khu giảng đường');
+    if (!selectedRoom) return setError('Vui lòng chọn giảng đường từ danh sách');
 
     setSubmitting(true);
     const tokenKey = `qk7_fp_lecture_${lecture.lecture_id}`;
@@ -96,7 +133,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
         {
           lecture_id: lecture.lecture_id,
           class_id: classId,
-          venue_name: venue.trim(),
+          room_id: selectedRoom!.room_id,
           student_count: count,
           session_type: sessionType,
           note: note.trim() || undefined,
@@ -123,7 +160,7 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
         class_name: selectedClass?.class_name,
         class_student_total: selectedClass?.student_total,   // ⭐ Đính kèm sĩ số chính thức
 
-        venue_name: venue.trim(),
+        venue_name: selectedRoom!.room_name,
         student_count: count,
         session_type: sessionType,
         note: note.trim() || undefined,
@@ -215,23 +252,62 @@ export const StartSessionModal: React.FC<Props> = ({ open, lecture, onClose, onS
             </select>
           </div>
 
-          <div>
-            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Giảng đường <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              list="venues-list"
-              value={venue}
-              onChange={e => setVenue(e.target.value)}
-              placeholder="VD: Giảng đường A1"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:opacity-0"
-            />
-            <datalist id="venues-list">
-              {venues.map(v => (
-                <option key={v.venue_name} value={v.venue_name} />
-              ))}
-            </datalist>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Khu giảng đường <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={buildingCode}
+                onChange={(e) => { setBuildingCode(e.target.value); setRoomId(''); }}
+                required
+                disabled={roomsLoaded && rooms.length === 0}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 disabled:opacity-60"
+              >
+                <option value="">{roomsLoaded ? '— Chọn khu —' : 'Đang tải danh sách...'}</option>
+                {buildingOptions.map((b) => (
+                  <option key={b.code} value={b.code}>
+                    {b.name} ({b.free}/{b.total} phòng trống)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Giảng đường <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={roomId}
+                onChange={(e) => setRoomId(e.target.value)}
+                required
+                disabled={!buildingCode}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 disabled:opacity-60"
+              >
+                <option value="">{buildingCode ? '— Chọn phòng —' : 'Chọn khu trước'}</option>
+                {roomsOfBuilding.map((r) => {
+                  const blocked = r.is_maintenance || r.is_busy;
+                  const tag = r.is_maintenance ? ' — đang bảo trì' : r.is_busy ? ' — đang có ca' : '';
+                  return (
+                    <option key={r.room_id} value={r.room_id} disabled={blocked}>
+                      {r.room_name}{r.capacity ? ` (${r.capacity} chỗ)` : ''}{tag}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+          <div className="-mt-2">
+            {roomsLoaded && rooms.length === 0 && (
+              <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">
+                Chưa có giảng đường nào được cấu hình. Liên hệ quản trị viên để thêm trong mục Giảng đường.
+              </p>
+            )}
+            {selectedRoom?.capacity != null && Number(studentCount) > selectedRoom.capacity && (
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                Sĩ số vượt sức chứa của phòng ({selectedRoom.capacity} chỗ).
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

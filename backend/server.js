@@ -3958,9 +3958,10 @@ app.use('/api/ai', requireAuth, aiLimiter, require('./src/ai-routes')({
 }));
 
 app.use('/api/lectures', requireAuth, require('./src/lecture-routes')({
-  requireAuth, 
-  requirePermission, 
-  writeAccessLog, 
+  requireAuth,
+  requirePermission,
+  requireAnyPermission,
+  writeAccessLog,
   getClientIp
 }));
 
@@ -3971,6 +3972,9 @@ app.use('/api/lectures', requireAuth, require('./src/lecture-extended-routes')({
 app.use('/api/lectures', requireAuth, require('./src/scorm-package-routes')({
   requireAuth, requirePermission, writeAccessLog, getClientIp
 }));
+
+// Không gian chỉ huy: số liệu giám sát tổng hợp, chỉ đọc (quyền COMMAND_VIEW)
+app.use('/api/command', requireAuth, require('./src/command-routes')({ requirePermission }));
 
 // ═══════════════════════════════════════════════════════════════
 // ERROR HANDLER & SPA FALLBACK

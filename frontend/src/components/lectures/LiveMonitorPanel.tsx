@@ -3,7 +3,7 @@ import {
   Radio, RefreshCw, AlertTriangle, Clock, Users, Building2, User,
   Square, ShieldAlert, Monitor, CheckCircle2,
   X, Wrench, Calendar, ExternalLink, ShieldCheck, MapPin,
-  LayoutGrid, List, Check, School, ArrowRight,
+  LayoutGrid, List, School, ArrowRight,
   Flame, Lock, HelpCircle
 } from 'lucide-react';
 import { lectureService } from '../../services/lectureService';
@@ -48,7 +48,6 @@ export const LiveMonitorPanel: React.FC<Props> = ({
   }, []);
 
   const isDesktop = windowWidth >= 1200;
-  const isCompact = windowWidth < 1200;
 
   // View mode: 'radar' (Sơ đồ mặt bằng) | 'list' (Danh sách ca dạy)
   const [viewMode, setViewMode] = useState<'radar' | 'list'>('radar');
@@ -66,8 +65,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
     alert: 0,
   });
   const [buildings, setBuildings] = useState<RadarBuilding[]>([]);
-  const [selectedBuilding, setSelectedBuilding] = useState<string>('H1');
-  const [selectedFloor, setSelectedFloor] = useState<number>(1);
+  // null = chưa chọn khu nào: chỉ hiện danh sách khu kèm số phòng trống/bận; bấm vào khu mới hiện sơ đồ phòng
+  const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
   const [floorRooms, setFloorRooms] = useState<RadarClassroom[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
@@ -111,32 +110,45 @@ export const LiveMonitorPanel: React.FC<Props> = ({
       if (res?.kpis) setKpis(res.kpis);
       if (res?.buildings) {
         setBuildings(res.buildings);
-        // Default to first building if current not in list
-        if (res.buildings.length > 0 && !res.buildings.some((b) => b.building_code === selectedBuilding)) {
-          setSelectedBuilding(res.buildings[0].building_code);
-          setSelectedFloor(res.buildings[0].floors[0] || 1);
-        }
+        // Khu đang chọn không còn trong danh sách → bỏ chọn
+        setSelectedBuilding((prev) =>
+          prev && res.buildings.some((b) => b.building_code === prev) ? prev : null
+        );
       }
       setLastUpdate(new Date());
     } catch (err) {
       console.error('Load radar overview failed:', err);
     }
-  }, [selectedBuilding]);
+  }, []);
 
   // Load Floor Plan
+  // Chuỗi các tầng của khu đang chọn (ổn định theo giá trị để không làm đổi identity của loadFloorPlan mỗi lần làm mới)
+  const floorsKey = useMemo(
+    () => (selectedBuilding ? (buildings.find((b) => b.building_code === selectedBuilding)?.floors || []).join(',') : ''),
+    [buildings, selectedBuilding]
+  );
+
   const loadFloorPlan = useCallback(async () => {
-    if (!selectedBuilding) return;
+    if (!selectedBuilding) {
+      setFloorRooms([]);
+      return;
+    }
+    const floors = floorsKey ? floorsKey.split(',').map(Number) : [1];
     try {
-      const res = await lectureService.getRadarFloorPlan({
-        building_code: selectedBuilding,
-        floor_number: selectedFloor,
-        time_shift: timeShift,
-      });
-      setFloorRooms(res?.rooms || []);
+      const results = await Promise.all(
+        floors.map((fl) =>
+          lectureService.getRadarFloorPlan({
+            building_code: selectedBuilding,
+            floor_number: fl,
+            time_shift: timeShift,
+          })
+        )
+      );
+      setFloorRooms(results.flatMap((r) => r?.rooms || []));
     } catch (err) {
       console.error('Load floor plan failed:', err);
     }
-  }, [selectedBuilding, selectedFloor, timeShift]);
+  }, [selectedBuilding, floorsKey, timeShift]);
 
   // Load Legacy Live Schedules
   const loadLegacySessions = useCallback(async () => {
@@ -166,7 +178,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
     return () => clearInterval(timer);
   }, [refreshAll, loadOverview, loadFloorPlan, loadLegacySessions]);
 
-  // Reload floor plan when building, floor or shift changes
+  // Reload floor plan when building or shift changes
   useEffect(() => {
     loadFloorPlan();
   }, [loadFloorPlan]);
@@ -245,7 +257,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
   // Current active building object
   const currentBuilding = useMemo(() => {
-    return buildings.find((b) => b.building_code === selectedBuilding) || buildings[0];
+    return selectedBuilding ? buildings.find((b) => b.building_code === selectedBuilding) : undefined;
   }, [buildings, selectedBuilding]);
 
   // Selected room object from current floor
@@ -526,154 +538,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
       {/* ═════════════════════════════════════════════════════════════ */}
       {viewMode === 'radar' && (
         <div>
-          {/* Top Building Switcher on Small Screens (< 1200px) */}
-          {isCompact && (
-            <div className="mb-4 bg-white dark:bg-[#111827] p-3 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-2xs space-y-3">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                {buildings.map((b) => {
-                  const active = selectedBuilding === b.building_code;
-                  return (
-                    <button
-                      key={b.building_code}
-                      type="button"
-                      onClick={() => {
-                        setSelectedBuilding(b.building_code);
-                        setSelectedFloor(b.floors[0] || 1);
-                      }}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-2 transition cursor-pointer border ${
-                        active
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      <Building2 className="w-3.5 h-3.5" />
-                      <span>{b.building_name}</span>
-                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                        active ? 'bg-emerald-700 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                      }`}>
-                        {b.in_session_count > 0 ? `${b.in_session_count} đang dạy` : `${b.total_rooms}p`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Floors of selected building on Compact */}
-              {currentBuilding && currentBuilding.floors.length > 1 && (
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.04]">
-                  <span className="text-xs font-semibold text-slate-500">Chọn tầng:</span>
-                  <div className="flex items-center gap-1.5">
-                    {currentBuilding.floors.map((fl) => (
-                      <button
-                        key={fl}
-                        type="button"
-                        onClick={() => setSelectedFloor(fl)}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer border ${
-                          selectedFloor === fl
-                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent shadow-xs'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        Tầng {fl}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Main 3-Column or 2-Column Responsive Container */}
           <div className="flex items-start gap-4">
-            {/* ── COLUMN 1: MASTER (KHU VỰC / TÒA NHÀ) — Visible on Desktop (>= 1200px) ── */}
-            {isDesktop && (
-              <div className="w-60 shrink-0 sticky top-4 space-y-3">
-                <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 shadow-xs">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/[0.04]">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                        <Building2 className="w-4 h-4" />
-                      </div>
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
-                        01. Khu Giảng Đường
-                      </h4>
-                    </div>
-                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 font-mono bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-                      {buildings.length} khu
-                    </span>
-                  </div>
-
-                  {/* List of Buildings */}
-                  <div className="space-y-2 mt-3">
-                    {buildings.map((b) => {
-                      const active = selectedBuilding === b.building_code;
-                      return (
-                        <div
-                          key={b.building_code}
-                          className={`rounded-xl border p-3 transition-all cursor-pointer ${
-                            active
-                              ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-500 shadow-sm'
-                              : 'bg-slate-50/90 hover:bg-white dark:bg-slate-900/40 dark:hover:bg-slate-800/60 border-slate-200/90 dark:border-white/[0.06] shadow-2xs hover:shadow-xs'
-                          }`}
-                          onClick={() => {
-                            setSelectedBuilding(b.building_code);
-                            setSelectedFloor(b.floors[0] || 1);
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className={`font-bold text-sm ${
-                              active ? 'text-emerald-900 dark:text-emerald-300' : 'text-slate-800 dark:text-slate-200'
-                            }`}>
-                              {b.building_name}
-                            </span>
-                            {active && <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
-                          </div>
-
-                          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2">
-                            <span>{b.total_rooms} phòng học</span>
-                            {b.in_session_count > 0 ? (
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                {b.in_session_count} đang dạy
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">Đang trống</span>
-                            )}
-                          </div>
-
-                          {/* Floor Tabs if active */}
-                          {active && b.floors.length > 1 && (
-                            <div className="mt-3 pt-2.5 border-t border-emerald-200/60 dark:border-emerald-800/40 flex items-center gap-1.5">
-                              <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-400">
-                                Tầng:
-                              </span>
-                              {b.floors.map((fl) => (
-                                <button
-                                  key={fl}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedFloor(fl);
-                                  }}
-                                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition ${
-                                    selectedFloor === fl
-                                      ? 'bg-emerald-600 text-white shadow-2xs'
-                                      : 'bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-white'
-                                  }`}
-                                >
-                                  Tầng {fl}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* ── COLUMN 2: DETAIL (SƠ ĐỒ PHÒNG HỌC KIỂU RẠP CHIẾU PHIM) ── */}
             <div className="flex-1 min-w-0 space-y-4">
               <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 sm:p-5 shadow-xs">
@@ -685,13 +551,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                     </div>
                     <div>
                       <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2">
-                        <span>02. Sơ Đồ Giảng Đường: {currentBuilding?.building_name}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold">
-                          Tầng {selectedFloor}
-                        </span>
+                        <span>Sơ Đồ Giảng Đường{currentBuilding ? `: ${currentBuilding.building_name}` : ''}</span>
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Mô phỏng mặt bằng trực quan — bấm chọn phòng để kiểm tra sĩ số, tiến độ và điều hành
+                        Chọn khu giảng đường để xem các phòng — bấm vào phòng để kiểm tra sĩ số và tiến độ
                       </p>
                     </div>
                   </div>
@@ -699,7 +562,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   {/* Status Legends */}
                   <div className="flex items-center gap-2 flex-wrap text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Đang dạy
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Bận (đang dạy)
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" /> Trống
@@ -713,12 +576,76 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   </div>
                 </div>
 
+                {/* CHỌN KHU GIẢNG ĐƯỜNG — mỗi khu hiện tổng phòng / trống / bận */}
+                <div className="mt-4 flex flex-wrap gap-2.5" role="tablist" aria-label="Chọn khu giảng đường">
+                  {buildings.map((b) => {
+                    const busy = b.in_session_count;
+                    const free = Math.max(0, b.total_rooms - busy - b.maintenance_count);
+                    const active = selectedBuilding === b.building_code;
+                    return (
+                      <button
+                        key={b.building_code}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => setSelectedBuilding(active ? null : b.building_code)}
+                        className={`min-h-[44px] text-left rounded-xl border px-3.5 py-2.5 transition cursor-pointer ${
+                          active
+                            ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 ring-1 ring-emerald-600/40'
+                            : 'border-slate-200 dark:border-white/10 bg-slate-50 hover:bg-white dark:bg-slate-900/50 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                          <Building2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
+                          {b.building_name}
+                        </span>
+                        <span className="mt-1 flex items-center gap-3 text-xs font-mono tabular-nums">
+                          <span className="text-slate-700 dark:text-slate-300">{b.total_rooms} phòng</span>
+                          <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                            <span className="w-2 h-2 rounded-full bg-slate-400" /> {free} trống
+                          </span>
+                          <span className="flex items-center gap-1 font-bold text-red-700 dark:text-red-400">
+                            <span className="w-2 h-2 rounded-full bg-red-500" /> {busy} bận
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* TỔNG HỢP CỦA KHU ĐANG CHỌN */}
+                {currentBuilding && (() => {
+                  const busy = currentBuilding.in_session_count;
+                  const maint = currentBuilding.maintenance_count;
+                  const free = Math.max(0, currentBuilding.total_rooms - busy - maint);
+                  return (
+                    <div className="mt-3 grid grid-cols-3 gap-2.5 max-w-xl" aria-live="polite">
+                      <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tổng số phòng</div>
+                        <div className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-white">{currentBuilding.total_rooms}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-300 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Trống</div>
+                        <div className="text-xl font-bold font-mono tabular-nums text-slate-700 dark:text-slate-200">{free}</div>
+                      </div>
+                      <div className="rounded-xl border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 px-3 py-2">
+                        <div className="text-[11px] font-semibold text-red-700 dark:text-red-400">Bận</div>
+                        <div className="text-xl font-bold font-mono tabular-nums text-red-700 dark:text-red-400">{busy}</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* GRID CÁC PHÒNG HỌC (SƠ ĐỒ MẶT BẰNG GIẢNG ĐƯỜNG) */}
-                {floorRooms.length === 0 ? (
+                {!currentBuilding ? (
+                  <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                    Chọn một khu giảng đường ở trên để xem sơ đồ các phòng.
+                  </div>
+                ) : floorRooms.length === 0 ? (
                   <div className="py-12">
                     <TacticalEmptyState
-                      title="Không có phòng học nào ở tầng này"
-                      description="Chưa cấu hình phòng học nào thuộc khu vực và tầng hiện tại."
+                      title="Không có phòng học nào trong khu này"
+                      description="Chưa cấu hình phòng học nào thuộc khu vực hiện tại."
                       icon={<School className="w-10 h-10 text-slate-400" />}
                       onRefresh={loadFloorPlan}
                     />
@@ -746,14 +673,14 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                               : 'hover:shadow-md hover:-translate-y-0.5'
                           } ${
                             status === 'IN_SESSION'
-                              ? 'bg-gradient-to-br from-emerald-50/80 to-teal-50/40 dark:from-emerald-950/40 dark:to-teal-950/20 border-emerald-500/60 shadow-emerald-500/5'
+                              ? 'bg-red-50/80 dark:bg-red-950/30 border-red-500/60'
                               : status === 'ALERT'
                               ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-500/60 shadow-rose-500/5'
                               : status === 'UPCOMING'
                               ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400/60'
                               : status === 'MAINTENANCE'
                               ? 'bg-slate-100/80 dark:bg-slate-900/60 border-slate-300 dark:border-slate-700 opacity-80'
-                              : 'bg-slate-50/90 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-900 border-slate-200/90 dark:border-white/[0.08] hover:border-emerald-500/50 shadow-2xs hover:shadow-xs'
+                              : 'bg-slate-100 hover:bg-slate-50 dark:bg-slate-800/50 dark:hover:bg-slate-800 border-slate-300 dark:border-white/[0.08] shadow-2xs hover:shadow-xs'
                           }`}
                         >
                           {/* Room Header: Code, Name, Capacity */}
@@ -762,7 +689,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 font-mono shadow-2xs ${
                                   status === 'IN_SESSION'
-                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    ? 'bg-red-600 text-white shadow-xs'
                                     : status === 'ALERT'
                                     ? 'bg-rose-600 text-white animate-pulse'
                                     : status === 'MAINTENANCE'
@@ -787,9 +714,9 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                               {/* Status Badge */}
                               <div className="shrink-0">
                                 {status === 'IN_SESSION' ? (
-                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 flex items-center gap-1.5 whitespace-nowrap">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                    ĐANG DẠY
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300 border border-red-300 dark:border-red-500/40 flex items-center gap-1.5 whitespace-nowrap">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                    BẬN
                                   </span>
                                 ) : status === 'ALERT' ? (
                                   <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 flex items-center gap-1 whitespace-nowrap animate-pulse">
@@ -806,7 +733,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                     BẢO TRÌ
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600 dark:bg-slate-700/60 dark:text-slate-300 border border-slate-300 dark:border-slate-600 whitespace-nowrap">
                                     TRỐNG
                                   </span>
                                 )}
@@ -815,12 +742,12 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                             {/* Session Information Snippet */}
                             {session && (
-                              <div className="mt-3 p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-emerald-200/80 dark:border-white/[0.06] space-y-1.5 text-xs">
+                              <div className="mt-3 p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-red-200/80 dark:border-white/[0.06] space-y-1.5 text-xs">
                                 <div className="font-bold text-slate-900 dark:text-white line-clamp-1 flex items-center gap-1.5">
                                   {session.is_restricted ? (
                                     <ShieldCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                                   ) : (
-                                    <Monitor className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                    <Monitor className="w-3.5 h-3.5 text-red-600 shrink-0" />
                                   )}
                                   <span className="truncate">{session.lecture_title}</span>
                                 </div>
@@ -828,7 +755,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                   <span className="truncate">
                                     GV: <strong className="text-slate-800 dark:text-slate-200">{session.presenter_rank ? `${session.presenter_rank} ` : ''}{session.presenter_name}</strong>
                                   </span>
-                                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold shrink-0">
+                                  <span className="font-mono text-red-700 dark:text-red-400 font-bold shrink-0">
                                     {session.student_count || 0} HV
                                   </span>
                                 </div>
@@ -844,7 +771,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                     <div className="pt-1">
                                       <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                                         <div
-                                          className="h-full bg-emerald-500 rounded-full transition-all"
+                                          className="h-full bg-red-500 rounded-full transition-all"
                                           style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
                                         />
                                       </div>

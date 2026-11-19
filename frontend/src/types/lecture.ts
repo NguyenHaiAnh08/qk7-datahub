@@ -41,6 +41,15 @@ export interface Lecture {
   updated_at: string;
 }
 
+/** Khu giảng đường (bảng CLASSROOM_BUILDING) — quản lý trong Quản trị */
+export interface ClassroomBuilding {
+  building_code: string;
+  building_name: string;
+  display_order: number;
+  active: boolean;
+  room_count: number;
+}
+
 export interface Subject {
   subject_id: string;
   subject_code?: string;
@@ -110,10 +119,25 @@ export interface CreateLecturePayload {
 export interface StartSchedulePayload {
   lecture_id: string;
   class_id: string;
-  venue_name: string;
+  /** Mã giảng đường, chọn từ danh sách (không nhập tay) */
+  room_id: string;
   student_count: number;
   session_type?: SessionType;
   note?: string;
+}
+
+/** Giảng đường chọn được khi mở ca (GET /api/lectures/catalogs/rooms) */
+export interface LectureRoomOption {
+  room_id: string;
+  room_name: string;
+  room_type?: string;
+  capacity?: number | null;
+  building_code: string;
+  building_name: string;
+  is_maintenance: boolean;
+  maintenance_reason?: string | null;
+  /** Đang có ca giảng dạy diễn ra trong phòng */
+  is_busy: boolean;
 }
 
 export interface HistoryKpi {

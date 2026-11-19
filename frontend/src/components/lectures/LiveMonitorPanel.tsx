@@ -613,29 +613,6 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   })}
                 </div>
 
-                {/* TỔNG HỢP CỦA KHU ĐANG CHỌN */}
-                {currentBuilding && (() => {
-                  const busy = currentBuilding.in_session_count;
-                  const maint = currentBuilding.maintenance_count;
-                  const free = Math.max(0, currentBuilding.total_rooms - busy - maint);
-                  return (
-                    <div className="mt-3 grid grid-cols-3 gap-2.5 max-w-xl" aria-live="polite">
-                      <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 px-3 py-2">
-                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tổng số phòng</div>
-                        <div className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-white">{currentBuilding.total_rooms}</div>
-                      </div>
-                      <div className="rounded-xl border border-slate-300 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 px-3 py-2">
-                        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Trống</div>
-                        <div className="text-xl font-bold font-mono tabular-nums text-slate-700 dark:text-slate-200">{free}</div>
-                      </div>
-                      <div className="rounded-xl border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 px-3 py-2">
-                        <div className="text-[11px] font-semibold text-red-700 dark:text-red-400">Bận</div>
-                        <div className="text-xl font-bold font-mono tabular-nums text-red-700 dark:text-red-400">{busy}</div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
                 {/* GRID CÁC PHÒNG HỌC (SƠ ĐỒ MẶT BẰNG GIẢNG ĐƯỜNG) */}
                 {!currentBuilding ? (
                   <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">

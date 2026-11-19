@@ -58,7 +58,7 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
   process.exit(1);
 }
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
-const FINGERPRINT_TOKEN_EXPIRES_IN = '5m';
+const FINGERPRINT_TOKEN_EXPIRES_IN = process.env.FINGERPRINT_TOKEN_EXPIRES_IN || '5m';
 const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN;
 if (!BRIDGE_TOKEN || BRIDGE_TOKEN.length < 32) {
   console.error('[FATAL] BRIDGE_TOKEN chưa set hoặc < 32 ký tự. Dừng server.');

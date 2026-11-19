@@ -13,7 +13,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');         
 const { sql, getPool } = require('./db');
-const { getLectureScope, bindUnitIn, inScope } = require('./lecture-scope');
+const { getLectureScope, bindUnitIn, inScope, isPeerUnit } = require('./lecture-scope');
 
 const HANGING_THRESHOLD_MINUTES = 4 * 60; // 4 giờ
 
@@ -190,7 +190,7 @@ module.exports = function createLectureRoutes({
       `;
       r.input('clearance', sql.Int, clearance);
 
-      const scope = await getLectureScope({ userId, roles, deptHead });
+      const scope = await getLectureScope({ userId, roles, deptHead, includeSiblings: true });
       if (!scope.all) {
         const inList = bindUnitIn(r, scope.unitIds);
         if (deptHead || roles.includes('ROL-02')) {
@@ -214,6 +214,10 @@ module.exports = function createLectureRoutes({
 
       query += ` ORDER BY l.created_at DESC`;
       const result = await r.query(query);
+      result.recordset.forEach((row) => { row.peer_unit = isPeerUnit(scope, row.faculty_unit_id);
+        // Được mở ca: bài thuộc đơn vị mình / cùng khoa (không còn giới hạn tác giả)
+        row.can_teach = inScope(scope, row.faculty_unit_id) || row.author_id === userId;
+      });
       res.json({ total: result.recordset.length, items: result.recordset });
     } catch (err) {
       console.error('[GET /api/lectures]', err);
@@ -252,7 +256,7 @@ module.exports = function createLectureRoutes({
       }
       const roles = await resolveUserRoles(pool, req.user);
       const scope = await getLectureScope({
-        userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
+        userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), includeSiblings: true,
       });
       if (!inScope(scope, lec.faculty_unit_id) && lec.author_id !== req.user.user_id) {
         return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
@@ -764,7 +768,7 @@ module.exports = function createLectureRoutes({
       {
         const roles = await resolveUserRoles(pool, req.user);
         const scope = await getLectureScope({
-          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
+          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), includeSiblings: true,
         });
         if (!inScope(scope, lecture.faculty_unit_id)) {
           return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
@@ -794,9 +798,10 @@ module.exports = function createLectureRoutes({
           if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
 
           // Xác thực chéo: token phải khớp đúng bài giảng VÀ đúng user đang đăng nhập
-          if (decoded.file_id !== lecture.lecture_id) throw new Error('Token không khớp bài giảng');
+          if (decoded.file_id !== String(lecture_id).trim()) throw new Error('Token không khớp bài giảng');
           if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
         } catch (err) {
+          console.warn('[POST schedules/start] token vân tay bị từ chối:', err.name, '-', err.message);
           return res.status(403).json({
             error: 'Phiên xác thực vân tay không hợp lệ hoặc đã hết hạn. Vui lòng quét lại.',
             require_fingerprint: true,

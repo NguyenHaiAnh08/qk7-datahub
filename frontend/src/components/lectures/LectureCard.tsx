@@ -92,7 +92,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   const allowManage = mode !== 'list';
 
   // 1. Mở ca dạy khi đã PUBLISHED (Ưu tiên số 1 theo yêu cầu chỉ huy)
-  if (allowTeach && isPublished && isAuthor && canStartSchedule) {
+  if (allowTeach && isPublished && (isAuthor || lecture.can_teach) && canStartSchedule) {
     actions.push({
       label: 'Mở ca dạy',
       icon: Play,

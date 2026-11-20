@@ -63,6 +63,21 @@ const LECTURE_UPLOAD_PATH = /^\/api\/lectures\/upload-scorm$/;
 const VIEW_GATE_MODE = (process.env.APPROVAL_VIEW_GATE || 'true').toLowerCase();
 // Một lần duyệt cho phép xem đối tượng đó trong N phút (một trang gọi nhiều API cùng đối tượng)
 const VIEW_GRANT_MINUTES = parseInt(process.env.APPROVAL_VIEW_GRANT_MINUTES || '60', 10);
+// Trần số yêu cầu đang chờ duyệt của MỖI người (chặn tràn hàng đợi)
+const MAX_PENDING_PER_USER = parseInt(process.env.APPROVAL_MAX_PENDING_PER_USER || '200', 10);
+
+// Khóa tuần tự theo khóa (user+thao tác): các request song song cùng thao tác xếp hàng,
+// request sau thấy yêu cầu của request trước nên không chèn thêm bản trùng.
+const keyLocks = new Map();
+async function acquireKeyLock(key) {
+  const prev = keyLocks.get(key) || Promise.resolve();
+  let release;
+  const next = new Promise((r) => { release = r; });
+  const tail = prev.then(() => next);
+  keyLocks.set(key, tail);
+  await prev;
+  return () => { release(); if (keyLocks.get(key) === tail) keyLocks.delete(key); };
+}
 // Bị từ chối thì trong N phút không tạo yêu cầu mới (tránh spam người duyệt)
 const VIEW_REJECT_COOLDOWN_MINUTES = parseInt(process.env.APPROVAL_VIEW_REJECT_COOLDOWN_MINUTES || '10', 10);
 
@@ -283,6 +298,7 @@ module.exports = function createApprovalWorkflow({
    * `codes` = các quyền người dùng đang giữ cho route này (chỉ cần 1 quyền không khóa là qua).
    */
   async function enforceViewGate(req, res, codes) {
+    let releaseLock = null;
     try {
       if (VIEW_GATE_MODE === 'false') return true;
       if (!['GET', 'HEAD'].includes(req.method)) return true;
@@ -301,6 +317,8 @@ module.exports = function createApprovalWorkflow({
       const code = list[0];
       const permId = codeToIdMap.get(code) || codeToIdMap.get(PROTECTION_ALIASES[code]) || code;
 
+      // Trang thường bắn nhiều GET song song: xếp hàng để chỉ tạo 1 yêu cầu xem
+      releaseLock = await acquireKeyLock(`V|${user.user_id}|${fullPath}|${permId}`);
       const pool = await getPool();
       const last = (await pool.request()
         .input('uid', sql.VarChar(50), user.user_id)
@@ -363,6 +381,8 @@ module.exports = function createApprovalWorkflow({
       // Fail-closed: lỗi kiểm tra thì KHÔNG cho xem dữ liệu đang bị khóa bảo vệ
       res.status(503).json({ error: 'Không kiểm tra được trạng thái phê duyệt. Vui lòng thử lại.', code: 'APPROVAL_GATE_ERROR' });
       return false;
+    } finally {
+      if (releaseLock) releaseLock();
     }
   }
 
@@ -478,6 +498,7 @@ module.exports = function createApprovalWorkflow({
     const requestId = 'APV-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const bodyJson = (req.is('application/json') && req.body) ? JSON.stringify(req.body) : null;
 
+    const releaseLock = await acquireKeyLock(`W|${req.user.user_id}|${req.method}|${normPath(fullPath)}|${permId}`);
     try {
       const pool = await getPool();
 
@@ -485,6 +506,38 @@ module.exports = function createApprovalWorkflow({
         .input('uid', sql.VarChar(50), req.user.user_id)
         .query(`SELECT unit_id FROM [USER] WHERE user_id = @uid`);
       const requesterUnitId = userRes.recordset[0]?.unit_id || null;
+
+      // CHỐNG CHỒNG YÊU CẦU (1): cùng người + cùng thao tác + cùng nội dung đang chờ duyệt
+      // → trả lại yêu cầu cũ, không tạo thêm (bấm đúp / thử lại / bấm lại khi đang chờ).
+      const pending = (await pool.request()
+        .input('uid', sql.VarChar(50), req.user.user_id)
+        .input('perm', sql.VarChar(50), permId)
+        .input('method', sql.VarChar(10), req.method)
+        .query(`SELECT request_id, http_path, http_body FROM APPROVAL_REQUEST
+                WHERE requester_id = @uid AND status = 'PENDING'
+                  AND required_permission = @perm AND http_method = @method
+                ORDER BY created_at DESC`)).recordset;
+
+      const myBody = canonicalBody(req.body);
+      const dup = pending.find((p) =>
+        normPath(p.http_path) === normPath(fullPath) && canonicalBody(p.http_body) === myBody);
+      if (dup) {
+        return res.status(202).json({
+          code: 'APPROVAL_REQUIRED',
+          request_id: dup.request_id,
+          duplicate: true,
+          message: 'Thao tác này đã được gửi và đang chờ phê duyệt, không tạo yêu cầu mới.',
+          required_permission: requiredPerm,
+        });
+      }
+
+      // CHỐNG CHỒNG YÊU CẦU (2): trần số yêu cầu đang chờ của mỗi người
+      if (pending.length >= MAX_PENDING_PER_USER) {
+        return res.status(429).json({
+          error: `Bạn đang có ${pending.length} yêu cầu chờ duyệt (tối đa ${MAX_PENDING_PER_USER}). Vui lòng chờ cấp trên duyệt bớt rồi gửi tiếp.`,
+          code: 'APPROVAL_QUEUE_FULL',
+        });
+      }
 
       await pool.request()
         .input('rid', sql.VarChar(50), requestId)
@@ -520,6 +573,8 @@ module.exports = function createApprovalWorkflow({
     } catch (err) {
       console.error('[approval] create:', err.message);
       return res.status(500).json({ error: 'Không thể tạo yêu cầu phê duyệt' });
+    } finally {
+      releaseLock();
     }
   }
 

@@ -191,11 +191,12 @@ module.exports = function createLectureRoutes({
       `;
       r.input('clearance', sql.Int, clearance);
 
+      let scope = null;
       if (isGuest) {
         // Đại biểu / Khách chỉ được xem các bài giảng đã xuất bản (PUBLISHED) và ở mức bảo mật Cấp 1 (Công khai)
         query += ` AND l.status = 'PUBLISHED' AND l.security_level_id = 1`;
       } else {
-        const scope = await getLectureScope({ userId, roles, deptHead, includeSiblings: true });
+        scope = await getLectureScope({ userId, roles, deptHead, includeSiblings: true });
         if (!scope.all) {
           const inList = bindUnitIn(r, scope.unitIds);
           if (deptHead || roles.includes('ROL-02')) {
@@ -220,7 +221,9 @@ module.exports = function createLectureRoutes({
 
       query += ` ORDER BY l.created_at DESC`;
       const result = await r.query(query);
-      result.recordset.forEach((row) => { row.peer_unit = isPeerUnit(scope, row.faculty_unit_id);
+      result.recordset.forEach((row) => {
+        if (!scope) { row.peer_unit = false; row.can_teach = false; return; } // Khách: chỉ xem
+        row.peer_unit = isPeerUnit(scope, row.faculty_unit_id);
         // Được mở ca: bài thuộc đơn vị mình / cùng khoa (không còn giới hạn tác giả)
         row.can_teach = inScope(scope, row.faculty_unit_id) || row.author_id === userId;
       });

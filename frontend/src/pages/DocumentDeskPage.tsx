@@ -10,6 +10,7 @@ import { DocumentUploadModal } from '../components/document-desk/DocumentUploadM
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
+import { approvalService } from '../services/approvalService';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAuth } from '../hooks/useAuth';
 import { isUserAdmin } from '../contexts/AuthContext';
@@ -49,6 +50,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<DocumentItem | null>(null);
   const [proposalsModalOpen, setProposalsModalOpen] = useState(false);
   const [pendingProposals, setPendingProposals] = useState<PendingProposalItem[]>([]);
+  const [ownerWaiting, setOwnerWaiting] = useState(0);
 
   const canApproveProposals = useMemo(() => {
     if (!user) return false;
@@ -71,6 +73,12 @@ const canUpload = hasPermission('DOC_UPLOAD');
       setPendingProposals(res.items || []);
     } catch (e) {
       console.error('[loadPendingProposals]', e);
+    }
+    try {
+      const o = await approvalService.awaitingOwner();
+      setOwnerWaiting((o.items || []).length);
+    } catch {
+      setOwnerWaiting(0);
     }
   }, []);
 
@@ -322,9 +330,9 @@ const canUpload = hasPermission('DOC_UPLOAD');
           >
             <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             <span>Đề Xuất Chờ Duyệt</span>
-            {pendingProposals.length > 0 && (
+            {pendingProposals.length + ownerWaiting > 0 && (
               <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">
-                {pendingProposals.length}
+                {pendingProposals.length + ownerWaiting}
               </span>
             )}
           </button>

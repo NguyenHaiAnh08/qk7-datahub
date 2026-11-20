@@ -21,9 +21,46 @@ export interface ApprovalRequest {
   document_code?: string;
   doc_title?: string;
   proposal_data?: any;
+  /** WAITING_OWNER: đề xuất sửa văn bản đang chờ người đăng xem (có thể rút lại) */
+  stage?: 'WAITING_OWNER';
+}
+
+/** Đề xuất sửa văn bản của đơn vị khác đang chờ NGƯỜI ĐĂNG xem trước */
+export interface OwnerReviewProposal {
+  proposal_id: string;
+  file_id: string;
+  requester_id: string;
+  requester_name?: string;
+  requester_rank?: string;
+  requester_position?: string;
+  requester_unit_name?: string;
+  note?: string;
+  created_at: string;
+  auto_forward_at?: string;
+  new_original_name?: string | null;
+  document_code?: string; current_document_code?: string;
+  title?: string; current_title?: string;
+  signer?: string; current_signer?: string;
+  summary?: string; current_summary?: string;
+  issued_date?: string; current_issued_date?: string;
+  security_level_id?: number; current_security_level_id?: number;
+  doc_type_id?: string; current_doc_type_id?: string;
+  issuing_unit_id?: string; current_issuing_unit_id?: string;
 }
 
 export const approvalService = {
+  awaitingOwner: () => http<{ total: number; items: OwnerReviewProposal[]; enabled: boolean }>(
+    '/api/documents/proposals/awaiting-owner'
+  ),
+  ownerForward: (id: string, note?: string) => http(`/api/documents/proposals/${encodeURIComponent(id)}/owner-forward`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note: note || '' }),
+  }),
+  withdrawProposal: (id: string) => http(`/api/documents/proposals/${encodeURIComponent(id)}/withdraw`, { method: 'POST' }),
+  ownerReject: (id: string, reason: string) => http(`/api/documents/proposals/${encodeURIComponent(id)}/owner-reject`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  }),
   listPending: () => http<{ total: number; items: ApprovalRequest[] }>(
     `/api/admin/approval-requests?status=PENDING`
   ),

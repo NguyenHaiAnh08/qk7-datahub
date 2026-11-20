@@ -22,7 +22,7 @@ const ecosystemRoutes: RouteModuleExport = {
     {
       path: ROUTE_PATHS.LECTURES,
       element: (
-        <ProtectedRoute requiredPermission="LECTURE_VIEW">
+        <ProtectedRoute requiredPermission="LECTURE_VIEW" allowGuest={true}>
           <LecturesPage key="list" mode="list" />
         </ProtectedRoute>
       ),

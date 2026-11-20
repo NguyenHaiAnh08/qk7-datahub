@@ -38,9 +38,11 @@ interface PanelPos { left: number; top: number }
 const HOVER_CLOSE_DELAY = 150;
 
 const itemBase =
-  'relative flex items-center gap-2 px-3.5 h-11 text-[15px] font-semibold whitespace-nowrap select-none cursor-pointer transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-300';
-const itemIdle = 'text-white/90 hover:text-white hover:bg-white/10';
-const itemActive = 'text-amber-300 bg-black/15 shadow-[inset_0_-3px_0_0_#fbbf24]';
+  'group relative flex items-center gap-2 px-3.5 sm:px-4 h-11 rounded-t-lg text-[14px] sm:text-[15px] font-semibold whitespace-nowrap select-none cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600 dark:focus-visible:outline-amber-300';
+const itemIdle =
+  'text-slate-600 hover:text-emerald-800 hover:bg-slate-100/80 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60';
+const itemActive =
+  'text-emerald-800 bg-emerald-50/90 shadow-[inset_0_-3px_0_0_#166534] dark:text-amber-300 dark:bg-slate-800/80 dark:shadow-[inset_0_-3px_0_0_#fbbf24] font-bold';
 
 export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiveNav, canAccessAdmin }) => {
   const { user, hasPermission, hasAnyPermission } = useAuth();
@@ -78,7 +80,7 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
     const isGuest = !user || user.user_id === 'GUEST';
     const hasUnit = !isGuest && Boolean(user?.unit_id || user?.unit_name);
     const canDesk = hasPermission('DOC_UPLOAD') || hasPermission('DOC_EDIT') || hasPermission('DOC_PARSE');
-    const canLectures = Boolean(hasPermission('LECTURE_VIEW'));
+    const canLectures = Boolean(hasPermission('LECTURE_VIEW') || isGuest);
     // Trang Giám sát dành riêng cho chỉ huy/quản lý (quyền COMMAND_VIEW), không mở theo LECTURE_VIEW
     const canMonitor = Boolean(hasPermission('COMMAND_VIEW'));
     const canCompose = Boolean(hasAnyPermission(['LECTURE_CREATE', 'LECTURE_APPROVE', 'LECTURE_DELETE']));
@@ -123,32 +125,34 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
         icon: MonitorPlay,
         to: ROUTE_PATHS.LECTURES,
         visible: canLectures,
-        children: [
-          {
-            key: 'lectures-list',
-            label: 'Danh sách bài giảng',
-            description: 'Tra cứu bài đã xuất bản và mở ca giảng',
-            to: ROUTE_PATHS.LECTURES,
-            visible: canLectures,
-            isActive: (p) => p === ROUTE_PATHS.LECTURES,
-          },
-          {
-            key: 'lectures-compose',
-            label: 'Soạn và duyệt bài giảng',
-            description: 'Soạn mới, gửi duyệt, phê duyệt, thùng rác',
-            to: ROUTE_PATHS.LECTURES_COMPOSE,
-            visible: canCompose,
-            isActive: (p) => p.startsWith(ROUTE_PATHS.LECTURES_COMPOSE),
-          },
-          {
-            key: 'lectures-history',
-            label: 'Lịch sử giảng dạy',
-            description: 'Các ca đã giảng và thời lượng',
-            to: ROUTE_PATHS.LECTURES_HISTORY,
-            visible: canLectures,
-            isActive: (p) => p.startsWith(ROUTE_PATHS.LECTURES_HISTORY),
-          },
-        ],
+        children: isGuest
+          ? undefined
+          : [
+              {
+                key: 'lectures-list',
+                label: 'Danh sách bài giảng',
+                description: 'Tra cứu bài đã xuất bản và mở ca giảng',
+                to: ROUTE_PATHS.LECTURES,
+                visible: canLectures,
+                isActive: (p) => p === ROUTE_PATHS.LECTURES,
+              },
+              {
+                key: 'lectures-compose',
+                label: 'Soạn và duyệt bài giảng',
+                description: 'Soạn mới, gửi duyệt, phê duyệt, thùng rác',
+                to: ROUTE_PATHS.LECTURES_COMPOSE,
+                visible: canCompose,
+                isActive: (p) => p.startsWith(ROUTE_PATHS.LECTURES_COMPOSE),
+              },
+              {
+                key: 'lectures-history',
+                label: 'Lịch sử giảng dạy',
+                description: 'Các ca đã giảng và thời lượng',
+                to: ROUTE_PATHS.LECTURES_HISTORY,
+                visible: canLectures && !isGuest,
+                isActive: (p) => p.startsWith(ROUTE_PATHS.LECTURES_HISTORY),
+              },
+            ],
       },
       {
         key: 'classrooms',
@@ -196,8 +200,12 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
     const btn = buttonRefs.current[key];
     if (btn) {
       const rect = btn.getBoundingClientRect();
-      const panelWidth = Math.min(320, window.innerWidth - 8);
-      setPos({ left: Math.max(4, Math.min(rect.left, window.innerWidth - panelWidth - 4)), top: rect.bottom });
+      const panelWidth = Math.min(320, window.innerWidth - 16);
+      const targetLeft = rect.left + rect.width / 2 - panelWidth / 2;
+      setPos({
+        left: Math.max(8, Math.min(targetLeft, window.innerWidth - panelWidth - 8)),
+        top: rect.bottom + 2,
+      });
     }
     setOpenKey(key);
   };
@@ -256,9 +264,9 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
     <>
       <nav
         aria-label="Điều hướng hệ thống"
-        className="sticky top-[calc(4rem+env(safe-area-inset-top,0px))] z-30 w-full bg-[#166534] dark:bg-[#0b2a1a] border-b border-black/20 dark:border-white/10 shadow-sm select-none"
+        className="sticky top-[calc(3.75rem+env(safe-area-inset-top,0px))] sm:top-[calc(4rem+env(safe-area-inset-top,0px))] z-30 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-xs select-none transition-colors duration-200"
       >
-        <div className="max-w-[1780px] mx-auto px-2 sm:px-4 lg:px-6 flex items-stretch gap-0.5 overflow-x-auto no-scrollbar">
+        <div className="max-w-[1780px] mx-auto px-2 sm:px-4 lg:px-6 flex items-stretch justify-start sm:justify-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar">
           {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeKey === item.key;
@@ -270,12 +278,19 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
               return (
                 <Link
                   key={item.key}
+                  id={`tour-nav-${item.key}`}
                   to={kids[0]?.to || item.to}
                   aria-current={isActive ? 'page' : undefined}
                   className={cls}
                   onClick={closeMenu}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      isActive
+                        ? 'text-emerald-700 dark:text-amber-400'
+                        : 'text-slate-500 group-hover:text-emerald-700 dark:text-slate-400 dark:group-hover:text-slate-200'
+                    }`}
+                  />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -285,6 +300,7 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
             return (
               <button
                 key={item.key}
+                id={`tour-nav-${item.key}`}
                 type="button"
                 ref={(el) => { buttonRefs.current[item.key] = el; }}
                 aria-haspopup="menu"
@@ -302,9 +318,23 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
                   }
                 }}
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <Icon
+                  className={`w-4 h-4 shrink-0 transition-colors ${
+                    isActive
+                      ? 'text-emerald-700 dark:text-amber-400'
+                      : 'text-slate-500 group-hover:text-emerald-700 dark:text-slate-400 dark:group-hover:text-slate-200'
+                  }`}
+                />
                 <span>{item.label}</span>
-                <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                    isOpen ? 'rotate-180' : ''
+                  } ${
+                    isActive
+                      ? 'text-emerald-700 dark:text-amber-400'
+                      : 'text-slate-400 group-hover:text-emerald-700 dark:text-slate-400 dark:group-hover:text-slate-200'
+                  }`}
+                />
               </button>
             );
           })}
@@ -328,7 +358,7 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
                 onPointerEnter={(e) => { if (e.pointerType === 'mouse') clearCloseTimer(); }}
                 onPointerLeave={(e) => { if (e.pointerType === 'mouse') scheduleClose(); }}
                 onKeyDown={onPanelKeyDown}
-                className="fixed z-[60] w-[min(20rem,calc(100vw-0.5rem))] rounded-b-xl overflow-hidden border border-t-0 border-slate-200 dark:border-white/10 bg-white dark:bg-[#111827] shadow-xl"
+                className="fixed z-[60] w-[min(20rem,calc(100vw-1rem))] rounded-xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xl"
               >
                 {openChildren.map((child) => {
                   const active = child.isActive(path, search);
@@ -339,10 +369,10 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
                       role="menuitem"
                       aria-current={active ? 'page' : undefined}
                       onClick={closeMenu}
-                      className={`block px-4 py-3 min-h-[44px] border-b border-slate-200/80 dark:border-white/10 last:border-b-0 border-l-[3px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600 ${
+                      className={`block px-4 py-3 min-h-[44px] border-b border-slate-100 dark:border-slate-800/80 last:border-b-0 border-l-[3px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600 dark:focus-visible:outline-amber-400 ${
                         active
-                          ? 'bg-emerald-50 dark:bg-emerald-500/10 text-[#166534] dark:text-emerald-400 border-l-amber-500'
-                          : 'text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-white/5 border-l-transparent'
+                          ? 'bg-emerald-50/90 dark:bg-slate-800/90 text-[#166534] dark:text-amber-300 border-l-emerald-600 dark:border-l-amber-400 font-medium'
+                          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 border-l-transparent'
                       }`}
                     >
                       <span className="block text-[15px] font-semibold leading-tight">{child.label}</span>

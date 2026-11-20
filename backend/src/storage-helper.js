@@ -3,10 +3,10 @@ const path = require('path');
 const fs = require('fs');
 
 const MODULES = {
-  DOCUMENTS: 'du-lieu-so',
-  LECTURES: 'bai-giang-so',
-  MATERIALS: 'hoc-lieu-so',
-  LIBRARY: 'thu-vien-so',
+  DOCUMENTS: 'van-ban-so', // Văn bản số: lưu trữ uploads/van-ban-so/YYYY/MM/
+  LECTURES: 'bai-giang-so',  // Bài giảng số: lưu trữ uploads/bai-giang-so/YYYY/MM/
+  MATERIALS: 'hoc-lieu-so', // Học liệu số
+  LIBRARY: 'thu-vien-so',   // Thư viện số: lưu trữ uploads/thu-vien-so/YYYY/MM/
 };
 
 /**

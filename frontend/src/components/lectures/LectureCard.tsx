@@ -2,7 +2,7 @@ import React from 'react';
 import {
   FileText, Layers, FileCode, Send, Check, X,
   Play, Trash2, Hash, User, AlertTriangle, Edit, RotateCcw, Eye,
-  HelpCircle, Shield, CheckCircle2, Clock
+  HelpCircle, Shield, CheckCircle2, Clock, BookOpen
 } from 'lucide-react';
 import { Lecture, ContentType, LectureStatus } from '../../types/lecture';
 
@@ -68,12 +68,13 @@ export interface LectureCardProps {
   onPurge: () => void;        // 🆕 — xoá vĩnh viễn
   onEdit: () => void;
   onView: () => void;
+  onRead?: () => void;
   onStartSession: () => void;
 }
 
 export const LectureCard: React.FC<LectureCardProps> = ({
   lecture, mode, viewMode, currentUserId, isAdmin, canApprove, canArchive, canStartSchedule, canEdit,
-  onSubmit, onApprove, onReject, onSoftDelete, onRestore, onPurge, onEdit, onView, onStartSession,
+  onSubmit, onApprove, onReject, onSoftDelete, onRestore, onPurge, onEdit, onView, onRead, onStartSession,
 }) => {
   const statusCfg = STATUS_STYLES[lecture.status] || STATUS_STYLES.DRAFT;
   const secCfg = SECURITY_LEVEL_LABELS[lecture.security_level_id] || SECURITY_LEVEL_LABELS[2];
@@ -91,7 +92,17 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   const allowTeach = mode !== 'compose';
   const allowManage = mode !== 'list';
 
-  // 1. Mở ca dạy khi đã PUBLISHED (Ưu tiên số 1 theo yêu cầu chỉ huy)
+  // 1a. Đọc / Xem bài giảng khi đã PUBLISHED (Dành cho tất cả mọi người bao gồm Đại biểu)
+  if (isPublished && onRead) {
+    actions.push({
+      label: 'Đọc bài giảng',
+      icon: BookOpen,
+      onClick: onRead,
+      cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs'
+    });
+  }
+
+  // 1b. Mở ca dạy khi đã PUBLISHED (Ưu tiên giảng viên đứng lớp)
   if (allowTeach && isPublished && isAuthor && canStartSchedule) {
     actions.push({
       label: 'Mở ca dạy',
@@ -121,14 +132,14 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   if (allowManage && canApprove) {
     if (isPendingFaculty) {
       actions.push(
-        { label: 'Duyệt Khoa', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600' },
-        { label: 'Từ chối',    icon: X,     onClick: onReject,  cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
+        { label: 'Duyệt', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
+        { label: 'Từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
       );
     }
     if (isPendingTraining) {
       actions.push(
-        { label: 'Duyệt BGH', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600' },
-        { label: 'Từ chối',   icon: X,     onClick: onReject,  cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
+        { label: 'Duyệt', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
+        { label: 'Từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
       );
     }
   }
@@ -141,8 +152,9 @@ export const LectureCard: React.FC<LectureCardProps> = ({
     cls: 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
   });
 
-  // 5. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn
-  if (allowManage && canArchive) {
+  // 5. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn (KHÔNG hiển thị khi bài giảng đang chờ duyệt hoặc đã duyệt xuất bản)
+  const isPendingApproval = isPendingFaculty || isPendingTraining;
+  if (allowManage && canArchive && !isPendingApproval && !isPublished) {
     if (isDeleted) {
       // Đang trong thùng rác → Khôi phục + Xoá vĩnh viễn
       actions.push(
@@ -160,7 +172,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
         },
       );
     } else {
-      // Đang hoạt động bình thường → Xoá mềm (màu đỏ theo yêu cầu)
+      // Đang hoạt động bình thường → Xoá mềm
       actions.push({
         label: 'Xóa',
         icon: Trash2,

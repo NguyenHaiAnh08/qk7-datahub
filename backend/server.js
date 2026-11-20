@@ -133,6 +133,10 @@ const {
 // ═══════════════════════════════════════════════════════════════
 // [FIX CWE-1021 / CWE-79 / FINDINGS #5-#36] Middleware bảo mật tập trung (HSTS, CSP Nonce, Permissions-Policy, COOP, CORP)
 app.use(createSecurityHeadersMiddleware());
+// Đo thời gian API (log [SLOW], tổng kết định kỳ, GET /api/admin/perf)
+const perfTiming = require('./src/perf-timing');
+app.use(perfTiming.middleware());
+perfTiming.startSummary();
 // [FIX CWE-942] Whitelist Origin CORS - Khong dung wildcard cho API van ban quan su
 const defaultCorsOrigins = [
   'http://localhost:5173',
@@ -908,10 +912,21 @@ async function checkAndBlockIp(ip, reason = 'username_not_found') {
 const SINGLE_SESSION_PER_USER = String(process.env.SINGLE_SESSION_PER_USER || 'true').toLowerCase() !== 'false';
 
 // Trả về true nếu đã trả lỗi 409 (caller phải dừng), false nếu được phép tiếp tục
+// Phiên chỉ được coi là "đang có người dùng" nếu có hoạt động trong N phút gần nhất.
+// Tắt trình duyệt mà chưa đăng xuất → sau N phút người khác đăng nhập được (nhịp tim 60s giữ phiên khi còn mở).
+const ACCOUNT_IN_USE_WINDOW_MINUTES = parseInt(process.env.ACCOUNT_IN_USE_WINDOW_MINUTES || '3', 10);
+
 async function rejectIfAccountInUse(req, res, userId, ip) {
   if (!SINGLE_SESSION_PER_USER) return false;
-  const live = await listActiveSessions(userId, SESSION_IDLE_TIMEOUT_MINUTES);
-  if (!live || live.length === 0) return false;
+  const live = await listActiveSessions(userId, ACCOUNT_IN_USE_WINDOW_MINUTES);
+  if (!live || live.length === 0) {
+    // Không còn ai dùng: thu hồi các phiên cũ còn sót (chưa tới hạn idle) để không tồn tại 2 phiên song song
+    const leftovers = await listActiveSessions(userId, SESSION_IDLE_TIMEOUT_MINUTES);
+    if (leftovers && leftovers.length > 0) {
+      await revokeAllUserSessions(userId, userId, 'REPLACED_BY_NEW_LOGIN');
+    }
+    return false;
+  }
 
   const ua = String(req.headers['user-agent'] || '').slice(0, 255);
   const otherDevice = live.filter((s) => !(s.ip === ip && String(s.user_agent || '') === ua));
@@ -1618,6 +1633,14 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Nhịp tim nhẹ: trình duyệt đang mở gọi định kỳ để phiên được tính là "đang dùng"
+// (requireAuth tự cập nhật last_seen_at). Đóng trình duyệt → dừng gọi → hết cửa sổ ACCOUNT_IN_USE_WINDOW_MINUTES.
+app.get('/api/admin/perf', requireAuth, perfTiming.reportHandler);
+
+app.get('/api/auth/ping', requireAuth, (req, res) => {
+  res.json({ ok: true });
 });
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
@@ -2926,6 +2949,28 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     if (!isAdmin && (!isOwner || editLocked)) {
       // Kho dữ liệu chung: bất kỳ ai có quyền DOC_EDIT đều được đề xuất sửa, không giới hạn theo đơn vị ban hành.
       // Đề xuất vẫn phải chờ duyệt mới áp dụng.
+
+      // Mỗi văn bản chỉ có MỘT đề xuất đang chờ tại một thời điểm: tránh hai người cùng sửa,
+      // đề xuất duyệt sau ghi đè đề xuất duyệt trước mà không ai hay biết.
+      const activeProp = await pool.request()
+        .input('fid', sql.VarChar(50), fileId)
+        .query(`SELECT TOP 1 p.proposal_id, p.status, p.requester_id, u.full_name AS requester_name
+                FROM DOCUMENT_REVISION_PROPOSAL p
+                LEFT JOIN [USER] u ON u.user_id = p.requester_id
+                WHERE p.file_id = @fid AND p.status IN ('PENDING_OWNER', 'PENDING')
+                ORDER BY p.created_at DESC`);
+      if (activeProp.recordset.length > 0) {
+        const ap = activeProp.recordset[0];
+        const mine = ap.requester_id === req.user.user_id;
+        return res.status(409).json({
+          error: mine
+            ? 'Bạn đã gửi đề xuất sửa văn bản này và đang chờ duyệt. Hãy rút lại đề xuất cũ nếu muốn gửi bản mới.'
+            : `Văn bản này đã có đề xuất sửa đang chờ duyệt (do ${ap.requester_name || ap.requester_id} gửi). Vui lòng chờ đề xuất đó được xử lý rồi gửi đề xuất mới.`,
+          code: 'PROPOSAL_ALREADY_PENDING',
+          proposal_id: ap.proposal_id,
+          proposal_status: ap.status,
+        });
+      }
 
       let newStoredPath = null;
       let newOriginalName = null;

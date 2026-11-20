@@ -25,7 +25,7 @@ const show = (v: unknown, isDate = false): string => {
   return String(v);
 };
 
-export const OwnerReviewSection: React.FC<{ onChanged?: () => void }> = ({ onChanged }) => {
+export const OwnerReviewSection: React.FC<{ onChanged?: () => void; onCount?: (n: number) => void }> = ({ onChanged, onCount }) => {
   const [items, setItems] = useState<OwnerReviewProposal[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<OwnerReviewProposal | null>(null);
@@ -35,10 +35,12 @@ export const OwnerReviewSection: React.FC<{ onChanged?: () => void }> = ({ onCha
     try {
       const res = await approvalService.awaitingOwner();
       setItems(res.items || []);
+      onCount?.((res.items || []).length);
     } catch {
       setItems([]);
+      onCount?.(0);
     }
-  }, []);
+  }, [onCount]);
 
   useEffect(() => {
     load();

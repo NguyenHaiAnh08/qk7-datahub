@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types/user';
 import { authService } from '../services/authService';
+import { http } from '../services/http';
 import { ROUTE_PATHS } from '../routes/routePaths';
 
 interface AuthContextType {
@@ -135,6 +136,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       refreshProfile().catch(() => {});
     }
   }, [refreshProfile]);
+
+  // Nhịp tim: báo máy chủ "trình duyệt còn mở" mỗi 60s để phiên không bị coi là bỏ trống
+  // (tắt trình duyệt mà chưa đăng xuất → sau vài phút người khác đăng nhập được).
+  const heartbeatUserId = user?.user_id;
+  useEffect(() => {
+    if (!heartbeatUserId || heartbeatUserId === 'GUEST') return;
+    const beat = () => {
+      http('/api/auth/ping', { method: 'GET', silent: true, skipErrorNotification: true } as any).catch(() => {});
+    };
+    const t = setInterval(beat, 60_000);
+    return () => clearInterval(t);
+  }, [heartbeatUserId]);
 
   useEffect(() => {
     const handleExpired = () => {

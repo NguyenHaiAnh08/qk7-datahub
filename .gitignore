@@ -118,3 +118,7 @@ fingerprint/build_tmp/
 fingerprint/private-key.pem
 fingerprint/cert.pem.bak
 fingerprint/build_tmp_setup/
+
+# Goi trien khai
+QK7_release/
+deploy/https/may-chu/mkcert.exe

@@ -465,8 +465,10 @@ async function writeAccessLog({ userId, fileId, action, ip, note = null }) {
 // DEPENDENCY INJECTION — Permissions / Sessions / Config
 // ═══════════════════════════════════════════════════════════════
 const createPermissionsModule = require('./src/permissions');
+let viewGateRef = null; // gán sau khi khởi tạo approval workflow (tránh phụ thuộc vòng)
 const perms = createPermissionsModule({
   sql, getPool, writeAccessLog, getClientIp,
+  getViewGate: () => viewGateRef,
 });
 const {
   getUserPermissions,
@@ -700,9 +702,34 @@ app.use('/api', async (req, res, next) => {
 // ============================================================
 // 2. SETUP APPROVAL WORKFLOW — NGAY SAU MIDDLEWARE JWT
 // ============================================================
-const { approvalInterceptor } = createApprovalWorkflow({
-  sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission
+const { approvalInterceptor, enforceViewGate, isPermissionLocked } = createApprovalWorkflow({
+  sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission, getUserPermissions,
 });
+viewGateRef = enforceViewGate;
+
+// Đơn vị ban hành phải có thật trong UNIT, nếu không INSERT văn bản/đề xuất sẽ vỡ FK_DOC_UNIT / FK_PROPOSAL_UNIT
+async function unitExists(unitId) {
+  const id = String(unitId || '').trim();
+  if (!id) return true; // rỗng = không khai báo, để luồng cũ xử lý
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('u', sql.NVarChar(50), id)
+    .query('SELECT 1 AS ok FROM UNIT WHERE unit_id = @u');
+  return r.recordset.length > 0;
+}
+const INVALID_UNIT_RESPONSE = (id) => ({
+  error: `Đơn vị ban hành "${String(id).trim()}" không có trong danh mục đơn vị (có thể đã bị đổi mã hoặc xóa). Vui lòng chọn lại đơn vị.`,
+  code: 'INVALID_ISSUING_UNIT',
+});
+
+// Gate quyền XEM cho các route văn bản tự kiểm tra bên trong (không dùng requirePermission).
+// Chỉ áp dụng cho người dùng thật đang GIỮ quyền đó; Đại biểu (GUEST) không bị ảnh hưởng.
+async function docViewGate(req, res, code) {
+  if (!req.user?.is_authenticated || req.user.user_id === 'GUEST') return true;
+  const held = await getUserPermissions(req.user.user_id);
+  if (!held.includes(code)) return true;
+  return enforceViewGate(req, res, [code]);
+}
 
 app.use('/api', approvalInterceptor);
 
@@ -831,6 +858,43 @@ async function checkAndBlockIp(ip, reason = 'username_not_found') {
 // ═══════════════════════════════════════════════════════════════
 // AUTH ROUTES
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// CHẶN ĐĂNG NHẬP ĐỒNG THỜI CÙNG 1 TÀI KHOẢN
+// - Nếu tài khoản đang có phiên hoạt động (chưa thu hồi, chưa hết hạn, còn hoạt động
+//   trong SESSION_IDLE_TIMEOUT_MINUTES) → người đăng nhập sau bị từ chối (409 ACCOUNT_IN_USE).
+// - Cùng IP + cùng trình duyệt (đóng tab, đăng nhập lại trên cùng máy) → coi là cùng người:
+//   cho vào và thu hồi phiên cũ.
+// - Tắt bằng SINGLE_SESSION_PER_USER=false (vd: tài khoản demo cho khách thử đồng thời).
+// ═══════════════════════════════════════════════════════════════
+const SINGLE_SESSION_PER_USER = String(process.env.SINGLE_SESSION_PER_USER || 'true').toLowerCase() !== 'false';
+
+// Trả về true nếu đã trả lỗi 409 (caller phải dừng), false nếu được phép tiếp tục
+async function rejectIfAccountInUse(req, res, userId, ip) {
+  if (!SINGLE_SESSION_PER_USER) return false;
+  const live = await listActiveSessions(userId, SESSION_IDLE_TIMEOUT_MINUTES);
+  if (!live || live.length === 0) return false;
+
+  const ua = String(req.headers['user-agent'] || '').slice(0, 255);
+  const otherDevice = live.filter((s) => !(s.ip === ip && String(s.user_agent || '') === ua));
+  if (otherDevice.length === 0) {
+    await revokeAllUserSessions(userId, userId, 'RELOGIN_SAME_DEVICE');
+    return false;
+  }
+
+  const since = new Date(otherDevice[0].created_at);
+  const hh = String(since.getHours()).padStart(2, '0');
+  const mm = String(since.getMinutes()).padStart(2, '0');
+  await writeAccessLog({
+    userId, fileId: null, action: 'LOGIN_BLOCKED_IN_USE', ip,
+    note: `Đăng nhập bị từ chối: tài khoản đang được dùng ở phiên khác (IP ${otherDevice[0].ip || '?'})`,
+  });
+  res.status(409).json({
+    error: `Tài khoản đang có người sử dụng (đăng nhập từ ${hh}:${mm}). Vui lòng thử lại sau hoặc liên hệ quản trị viên.`,
+    code: 'ACCOUNT_IN_USE',
+  });
+  return true;
+}
+
 async function handleLogin(req, res) {
   const ipInfo = getClientIpInfo(req);
   const ip = ipInfo.normalized;
@@ -959,6 +1023,9 @@ async function handleLogin(req, res) {
     await pool.request()
       .input('uid', sql.VarChar(50), user.user_id)
       .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL, last_failed_at = NULL, status = 'active' WHERE user_id = @uid`);
+
+    // Mật khẩu đã đúng → kiểm tra tài khoản có đang được người khác sử dụng không
+    if (await rejectIfAccountInUse(req, res, user.user_id, ip)) return;
 
     // ═══════════════════════════════════════════════════════════
     // ✅ BƯỚC 2: 2FA VÂN TAY CHO **MỌI** TÀI KHOẢN ADMIN
@@ -1309,6 +1376,8 @@ app.post('/api/auth/login/admin-fp-verify',
       const mult = { s: 1000, m: 60000, h: 3600000, d: 86400000 }[match[2].toLowerCase()] || 3600000;
       ttlMs = n * mult;
     }
+
+    if (await rejectIfAccountInUse(req, res, user.user_id, ip)) return;
 
     await createSession({
       userId: user.user_id,
@@ -2042,6 +2111,7 @@ app.get('/api/meta', async (req, res) => {
 // DOCUMENT ROUTES
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/documents', async (req, res) => {
+  if (!(await docViewGate(req, res, 'DOC_VIEW'))) return;
   try {
     const pool = await getPool();
     const r = pool.request();
@@ -2076,14 +2146,14 @@ app.get('/api/documents', async (req, res) => {
         if (subtree.length > 0) {
           const params = subtree.map((_, i) => `@u_${i}`);
           query += ` AND d.issuing_unit_id IN (${params.join(', ')})`;
-          subtree.forEach((uId, i) => r.input(`u_${i}`, sql.VarChar(50), uId));
+          subtree.forEach((uId, i) => r.input(`u_${i}`, sql.NVarChar(50), uId));
         } else {
           query += ` AND d.issuing_unit_id = @unit`;
-          r.input('unit', sql.VarChar(50), req.query.unit);
+          r.input('unit', sql.NVarChar(50), req.query.unit);
         }
       } else {
         query += ` AND d.issuing_unit_id = @unit`;
-        r.input('unit', sql.VarChar(50), req.query.unit);
+        r.input('unit', sql.NVarChar(50), req.query.unit);
       }
     }
     if (req.query.from) { query += ` AND d.issued_date >= @from`; r.input('from', sql.Date, req.query.from); }
@@ -2126,7 +2196,7 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
 
     const r = pool.request();
     const unitParams = queryUnitIds.map((_, i) => `@u${i}`).join(',');
-    queryUnitIds.forEach((u, i) => r.input(`u${i}`, sql.VarChar(50), u));
+    queryUnitIds.forEach((u, i) => r.input(`u${i}`, sql.NVarChar(50), u));
 
     let query = `
       SELECT d.file_id, d.document_code, d.title, d.doc_type_id, dt.name AS doc_type_name,
@@ -2162,7 +2232,7 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
     const result = await r.query(query);
 
     const unitRes = await pool.request()
-      .input('uid', sql.VarChar(50), targetUnitId)
+      .input('uid', sql.NVarChar(50), targetUnitId)
       .query(`
         SELECT u.unit_id, u.name, u.parent_id, p.name AS parent_name
         FROM UNIT u
@@ -2207,6 +2277,7 @@ app.get('/api/documents/trash', requireAuth, requirePermission('DOC_TRASH_VIEW')
 });
 
 app.get('/api/documents/:fileId', async (req, res) => {
+  if (!(await docViewGate(req, res, 'DOC_VIEW'))) return;
   try {
     const pool = await getPool();
     const r = await pool.request()
@@ -2461,6 +2532,10 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       signer, summary, security_level_id,
     } = req.body;
 
+    if (!(await unitExists(issuing_unit_id))) {
+      return res.status(400).json(INVALID_UNIT_RESPONSE(issuing_unit_id));
+    }
+
     // ─────────────────────────────────────────────────────────────
     // 1. Validate đầu vào cơ bản
     // ─────────────────────────────────────────────────────────────
@@ -2592,14 +2667,16 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
     // ─────────────────────────────────────────────────────────────
     // 5. Nhánh Maker-Checker: Cán bộ nghiệp vụ → chờ Chỉ huy/Admin duyệt
     // ─────────────────────────────────────────────────────────────
-    if (!isAdmin && !isCommander) {
+    // Quyền DOC_UPLOAD đang bị khóa duyệt → cả Chỉ huy cũng phải chờ duyệt (Admin vẫn lưu thẳng)
+    const uploadLocked = await isPermissionLocked('DOC_UPLOAD');
+    if (!isAdmin && (!isCommander || uploadLocked)) {
       await pool.request()
         .input('file_id', sql.VarChar(50), fileId)
         .input('document_code', sql.NVarChar(100), cleanDocumentCode || null)
         .input('title', sql.NVarChar(500), title.trim())
         .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
         .input('issued_date', sql.Date, issued_date || null)
-        .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+        .input('issuing_unit_id', sql.NVarChar(50), issuing_unit_id || null)
         .input('signer', sql.NVarChar(100), signer || null)
         .input('summary', sql.NVarChar(sql.MAX), summary || null)
         .input('security_level_id', sql.Int, requestedLevel)
@@ -2628,7 +2705,7 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
         .input('title', sql.NVarChar(500), title.trim())
         .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
         .input('issued_date', sql.Date, issued_date || null)
-        .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+        .input('issuing_unit_id', sql.NVarChar(50), issuing_unit_id || null)
         .input('signer', sql.NVarChar(100), signer || null)
         .input('summary', sql.NVarChar(sql.MAX), summary || null)
         .input('sec_id', sql.Int, requestedLevel)
@@ -2681,7 +2758,7 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
       .input('title', sql.NVarChar(500), title.trim())
       .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
       .input('issued_date', sql.Date, issued_date || null)
-      .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+      .input('issuing_unit_id', sql.NVarChar(50), issuing_unit_id || null)
       .input('signer', sql.NVarChar(100), signer || null)
       .input('summary', sql.NVarChar(sql.MAX), summary || null)
       .input('security_level_id', sql.Int, requestedLevel)
@@ -2750,6 +2827,9 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     } = req.body;
     if (!title || !title.trim()) return res.status(400).json({ error: 'Thiếu trích yếu' });
     if (!security_level_id) return res.status(400).json({ error: 'Thiếu mức bảo mật' });
+    if (!(await unitExists(issuing_unit_id))) {
+      return res.status(400).json(INVALID_UNIT_RESPONSE(issuing_unit_id));
+    }
 
     const userRoles = await resolveUserRoles(req.user);
     const isAdmin =
@@ -2761,19 +2841,11 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     const isOwner = (oldDoc.uploaded_by && oldDoc.uploaded_by === req.user.user_id);
 
     // Ràng buộc nghiệp vụ: Nếu Trợ lý, Văn thư, Cơ yếu, IT sửa file do NGƯỜI KHÁC đăng -> Chuyển vào trạng thái treo (PENDING)
-    if (!isAdmin && !isOwner) {
-      // ✅ Quyền Chỉnh sửa cục bộ (Local Edit Rule):
-      // Người dùng thuộc đơn vị nào (VD: Phòng Tham mưu - Hành chính) thì được phép tạo yêu cầu chỉnh sửa tài liệu của đơn vị đó.
-      const userUnitId = await resolveUserUnitId(req.user);
-      if (oldDoc.issuing_unit_id && userUnitId && userUnitId !== 'TQS') {
-        const allowedUnits = await getSubtreeUnits(userUnitId);
-        const isSameUnit = (oldDoc.issuing_unit_id === userUnitId || allowedUnits.includes(oldDoc.issuing_unit_id));
-        if (!isSameUnit) {
-          return res.status(403).json({
-            error: 'Quy tắc chỉnh sửa cục bộ: Bạn chỉ được phép đề xuất chỉnh sửa văn bản thuộc đơn vị công tác của mình.',
-          });
-        }
-      }
+    // Quyền DOC_EDIT đang bị khóa duyệt → cả người đăng cũng phải gửi đề xuất (Admin vẫn sửa thẳng)
+    const editLocked = await isPermissionLocked('DOC_EDIT');
+    if (!isAdmin && (!isOwner || editLocked)) {
+      // Kho dữ liệu chung: bất kỳ ai có quyền DOC_EDIT đều được đề xuất sửa, không giới hạn theo đơn vị ban hành.
+      // Đề xuất vẫn phải chờ duyệt mới áp dụng.
 
       let newStoredPath = null;
       let newOriginalName = null;
@@ -2801,6 +2873,21 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       }
 
       const proposalId = 'PROP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+
+      // Đề xuất sửa văn bản của NGƯỜI KHÁC: người đăng xem trước rồi mới chuyển lên chỉ huy.
+      // Bỏ qua bước này nếu: người đề xuất là chỉ huy, người đăng không còn khả dụng, hoặc chưa chạy migration.
+      let proposalStatus = 'PENDING';
+      let ownerId = null;
+      if (oldDoc.uploaded_by && oldDoc.uploaded_by !== req.user.user_id
+          && !userRoles.includes('ROL-02') && (await ownerFlowReady())) {
+        const ownerOk = await pool.request()
+          .input('o', sql.VarChar(50), oldDoc.uploaded_by)
+          .query(`SELECT 1 AS ok FROM [USER] WHERE user_id = @o AND status = 'active'`);
+        if (ownerOk.recordset.length > 0) {
+          proposalStatus = 'PENDING_OWNER';
+          ownerId = oldDoc.uploaded_by;
+        }
+      }
       await pool.request()
         .input('pid', sql.VarChar(50), proposalId)
         .input('fid', sql.VarChar(50), fileId)
@@ -2809,7 +2896,7 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
         .input('title', sql.NVarChar(500), title.trim())
         .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
         .input('issued_date', sql.Date, issued_date || null)
-        .input('issuing_unit_id', sql.VarChar(50), issuing_unit_id || null)
+        .input('issuing_unit_id', sql.NVarChar(50), issuing_unit_id || null)
         .input('signer', sql.NVarChar(100), signer || null)
         .input('summary', sql.NVarChar(sql.MAX), summary || null)
         .input('sec_id', sql.Int, parseInt(security_level_id, 10))
@@ -2818,6 +2905,7 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
         .input('new_mime', sql.VarChar(100), newMimeType)
         .input('new_size', sql.BigInt, newFileSize)
         .input('new_sha', sql.Char(64), newSha256)
+        .input('pstatus', sql.VarChar(20), proposalStatus)
         .input('note', sql.NVarChar(500), req.body.note || req.body.proposal_note || 'Đề xuất chuẩn hóa thông tin văn bản')
         .query(`
           INSERT INTO DOCUMENT_REVISION_PROPOSAL (
@@ -2831,9 +2919,16 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
             @doc_code, @title, @doc_type_id, @issued_date, @issuing_unit_id,
             @signer, @summary, @sec_id,
             @new_path, @new_name, @new_mime, @new_size, @new_sha,
-            'PENDING', @note, GETDATE(), GETDATE()
+            @pstatus, @note, GETDATE(), GETDATE()
           )
         `);
+
+      if (ownerId) {
+        await pool.request()
+          .input('pid', sql.VarChar(50), proposalId)
+          .input('owner', sql.VarChar(50), ownerId)
+          .query('UPDATE DOCUMENT_REVISION_PROPOSAL SET owner_id = @owner WHERE proposal_id = @pid');
+      }
 
       await writeAccessLog({
         userId: req.user.user_id, fileId, action: 'PROPOSAL_CREATED',
@@ -2845,7 +2940,10 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
         success: true,
         pending_approval: true,
         proposal_id: proposalId,
-        message: 'Đề xuất chỉnh sửa đã được chuyển vào trạng thái chờ duyệt bởi Chỉ huy / Quản trị viên.',
+        awaiting_owner: Boolean(ownerId),
+        message: ownerId
+          ? 'Đề xuất đã gửi tới người đăng văn bản xem xét, sau đó được chuyển lên cấp trên duyệt.'
+          : 'Đề xuất chỉnh sửa đã được chuyển vào trạng thái chờ duyệt bởi Chỉ huy / Quản trị viên.',
       });
     }
 
@@ -2886,7 +2984,7 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     let cleanUnitId = null;
     if (issuing_unit_id && typeof issuing_unit_id === 'string' && issuing_unit_id.trim()) {
       const uCheck = await pool.request()
-        .input('chk_unit', sql.VarChar(50), issuing_unit_id.trim())
+        .input('chk_unit', sql.NVarChar(50), issuing_unit_id.trim())
         .query(`SELECT 1 FROM UNIT WHERE unit_id = @chk_unit`);
       if (uCheck.recordset.length > 0) {
         cleanUnitId = issuing_unit_id.trim();
@@ -2903,7 +3001,7 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       .input('title', sql.NVarChar(500), title.trim())
       .input('doc_type_id', sql.VarChar(20), doc_type_id || null)
       .input('issued_date', sql.Date, issued_date || null)
-      .input('issuing_unit_id', sql.VarChar(50), cleanUnitId)
+      .input('issuing_unit_id', sql.NVarChar(50), cleanUnitId)
       .input('signer', sql.NVarChar(100), signer || null)
       .input('summary', sql.NVarChar(sql.MAX), summary || null)
       .input('security_level_id', sql.Int, parseInt(security_level_id, 10))
@@ -2952,8 +3050,197 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
 // ─────────────────────────────────────────────────────────────
 // PROPOSALS MANAGEMENT (Đề xuất sửa đổi tài liệu chờ duyệt)
 // ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// ĐỀ XUẤT SỬA VĂN BẢN CỦA ĐƠN VỊ KHÁC — BƯỚC NGƯỜI ĐĂNG XEM TRƯỚC
+//   Người đề xuất → PENDING_OWNER (người đăng A xem) → A chuyển lên → PENDING (chỉ huy duyệt)
+//   - A từ chối (kèm lý do) → REJECTED, người đề xuất thấy lý do
+//   - Quá PROPOSAL_OWNER_REVIEW_DAYS ngày, hoặc A bị khóa/không còn → tự chuyển lên chỉ huy
+//   - Chưa chạy migration add_proposal_owner_review.cjs → tính năng tự tắt (luồng cũ)
+// ═══════════════════════════════════════════════════════════════
+const OWNER_REVIEW_DAYS = parseInt(process.env.PROPOSAL_OWNER_REVIEW_DAYS || '7', 10);
+let ownerFlowCache = { ready: false, at: 0 };
+
+async function ownerFlowReady() {
+  if (Date.now() - ownerFlowCache.at < 60 * 1000) return ownerFlowCache.ready;
+  let ready = false;
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT COL_LENGTH('DOCUMENT_REVISION_PROPOSAL', 'owner_id') AS c,
+             (SELECT COUNT(*) FROM sys.check_constraints
+              WHERE parent_object_id = OBJECT_ID('DOCUMENT_REVISION_PROPOSAL')
+                AND definition LIKE '%PENDING_OWNER%') AS k`);
+    ready = Boolean(r.recordset[0].c) && r.recordset[0].k > 0;
+  } catch (err) {
+    console.warn('[proposal-owner] kiểm tra migration lỗi:', err.message);
+  }
+  ownerFlowCache = { ready, at: Date.now() };
+  return ready;
+}
+
+// Tự chuyển lên chỉ huy các đề xuất quá hạn hoặc người đăng không còn khả dụng
+async function escalateStaleOwnerProposals() {
+  try {
+    if (!(await ownerFlowReady())) return 0;
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('d', sql.Int, OWNER_REVIEW_DAYS)
+      .query(`
+        UPDATE p SET status = 'PENDING', owner_decision = 'AUTO', owner_decided_at = GETDATE(),
+               owner_note = N'Tự chuyển lên cấp trên (người đăng không phản hồi hoặc không khả dụng)',
+               updated_at = GETDATE()
+        FROM DOCUMENT_REVISION_PROPOSAL p
+        LEFT JOIN [USER] o ON o.user_id = p.owner_id
+        WHERE p.status = 'PENDING_OWNER'
+          AND (p.created_at < DATEADD(DAY, -@d, GETDATE()) OR o.user_id IS NULL OR o.status <> 'active');
+        SELECT @@ROWCOUNT AS n;`);
+    return r.recordset[0].n;
+  } catch (err) {
+    console.error('[proposal-owner] escalate:', err.message);
+    return 0;
+  }
+}
+setInterval(() => { escalateStaleOwnerProposals(); }, 60 * 60 * 1000);
+
+// Đề xuất đang chờ người đăng (là tôi) xem
+app.get('/api/documents/proposals/awaiting-owner', requireAuth, async (req, res) => {
+  try {
+    if (!(await ownerFlowReady())) return res.json({ total: 0, items: [], enabled: false });
+    await escalateStaleOwnerProposals();
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('me', sql.VarChar(50), req.user.user_id)
+      .query(`
+        SELECT p.proposal_id, p.file_id, p.requester_id, p.note, p.created_at, p.status,
+               p.document_code, p.title, p.signer, p.summary, p.issued_date, p.security_level_id,
+               p.doc_type_id, p.issuing_unit_id, p.new_original_name,
+               d.document_code AS current_document_code, d.title AS current_title,
+               d.signer AS current_signer, d.summary AS current_summary, d.issued_date AS current_issued_date,
+               d.security_level_id AS current_security_level_id, d.doc_type_id AS current_doc_type_id,
+               d.issuing_unit_id AS current_issuing_unit_id,
+               u.full_name AS requester_name, u.[rank] AS requester_rank, u.[position] AS requester_position,
+               ru.name AS requester_unit_name,
+               DATEADD(DAY, ${OWNER_REVIEW_DAYS}, p.created_at) AS auto_forward_at
+        FROM DOCUMENT_REVISION_PROPOSAL p
+        JOIN DOCUMENT d ON d.file_id = p.file_id
+        JOIN [USER] u ON u.user_id = p.requester_id
+        LEFT JOIN UNIT ru ON ru.unit_id = u.unit_id
+        WHERE p.status = 'PENDING_OWNER' AND p.owner_id = @me
+        ORDER BY p.created_at DESC`);
+    res.json({ total: r.recordset.length, items: r.recordset, enabled: true });
+  } catch (err) {
+    console.error('[GET proposals awaiting-owner]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Người đề xuất tự rút lại đề xuất khi nó còn chờ người đăng xem (gửi nhầm...)
+app.post('/api/documents/proposals/:proposalId/withdraw', requireAuth, async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('pid', sql.VarChar(50), req.params.proposalId)
+      .query(`SELECT proposal_id, file_id, requester_id, status FROM DOCUMENT_REVISION_PROPOSAL WHERE proposal_id = @pid`);
+    const p = r.recordset[0];
+    if (!p) return res.status(404).json({ error: 'Không tìm thấy đề xuất' });
+    if (p.requester_id !== req.user.user_id) {
+      return res.status(403).json({ error: 'Chỉ người đề xuất mới được rút lại đề xuất' });
+    }
+    if (p.status !== 'PENDING_OWNER') {
+      return res.status(409).json({
+        error: 'Chỉ rút lại được khi đề xuất còn chờ người đăng xem. Đề xuất này đã được xử lý hoặc đã chuyển lên cấp trên.',
+        code: 'CANNOT_WITHDRAW',
+      });
+    }
+    const u = await pool.request()
+      .input('pid', sql.VarChar(50), p.proposal_id)
+      .query(`UPDATE DOCUMENT_REVISION_PROPOSAL SET status = 'CANCELLED', updated_at = GETDATE()
+              WHERE proposal_id = @pid AND status = 'PENDING_OWNER'; SELECT @@ROWCOUNT AS n;`);
+    if (u.recordset[0].n === 0) {
+      return res.status(409).json({ error: 'Đề xuất vừa được người đăng xử lý, không thể rút lại', code: 'CANNOT_WITHDRAW' });
+    }
+    await writeAccessLog({
+      userId: req.user.user_id, fileId: p.file_id, action: 'PROPOSAL_WITHDRAWN',
+      ip: getClientIp(req), note: `Người đề xuất rút lại đề xuất ${p.proposal_id}`,
+    });
+    res.json({ success: true, proposal_id: p.proposal_id, status: 'CANCELLED' });
+  } catch (err) {
+    console.error('[POST proposals withdraw]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+async function loadOwnerProposal(req, res) {
+  const r = await (await getPool()).request()
+    .input('pid', sql.VarChar(50), req.params.proposalId)
+    .query(`SELECT proposal_id, file_id, owner_id, status FROM DOCUMENT_REVISION_PROPOSAL WHERE proposal_id = @pid`);
+  const p = r.recordset[0];
+  if (!p) { res.status(404).json({ error: 'Không tìm thấy đề xuất' }); return null; }
+  if (p.owner_id !== req.user.user_id) {
+    res.status(403).json({ error: 'Chỉ người đăng văn bản mới xử lý được bước này', code: 'NOT_DOCUMENT_OWNER' });
+    return null;
+  }
+  if (p.status !== 'PENDING_OWNER') {
+    res.status(409).json({ error: `Đề xuất không còn ở trạng thái chờ người đăng (hiện: ${p.status})` });
+    return null;
+  }
+  return p;
+}
+
+// A chuyển đề xuất lên cấp trên duyệt
+app.post('/api/documents/proposals/:proposalId/owner-forward', requireAuth, async (req, res) => {
+  try {
+    const p = await loadOwnerProposal(req, res);
+    if (!p) return;
+    const note = String(req.body?.note || '').trim().slice(0, 500) || null;
+    await (await getPool()).request()
+      .input('pid', sql.VarChar(50), p.proposal_id)
+      .input('note', sql.NVarChar(500), note)
+      .query(`UPDATE DOCUMENT_REVISION_PROPOSAL
+              SET status = 'PENDING', owner_decision = 'FORWARDED', owner_decided_at = GETDATE(),
+                  owner_note = @note, updated_at = GETDATE()
+              WHERE proposal_id = @pid AND status = 'PENDING_OWNER'`);
+    await writeAccessLog({
+      userId: req.user.user_id, fileId: p.file_id, action: 'PROPOSAL_OWNER_FORWARD',
+      ip: getClientIp(req), note: `Người đăng chuyển đề xuất ${p.proposal_id} lên cấp trên duyệt`,
+    });
+    res.json({ success: true, proposal_id: p.proposal_id, status: 'PENDING' });
+  } catch (err) {
+    console.error('[POST owner-forward]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// A từ chối đề xuất (bắt buộc ghi lý do)
+app.post('/api/documents/proposals/:proposalId/owner-reject', requireAuth, async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim().slice(0, 500);
+    if (!reason) return res.status(400).json({ error: 'Cần ghi lý do từ chối' });
+    const p = await loadOwnerProposal(req, res);
+    if (!p) return;
+    await (await getPool()).request()
+      .input('pid', sql.VarChar(50), p.proposal_id)
+      .input('me', sql.VarChar(50), req.user.user_id)
+      .input('reason', sql.NVarChar(500), reason)
+      .query(`UPDATE DOCUMENT_REVISION_PROPOSAL
+              SET status = 'REJECTED', owner_decision = 'REJECTED', owner_decided_at = GETDATE(),
+                  owner_note = @reason, reviewed_by = @me, reviewed_at = GETDATE(),
+                  review_note = @reason, updated_at = GETDATE()
+              WHERE proposal_id = @pid AND status = 'PENDING_OWNER'`);
+    await writeAccessLog({
+      userId: req.user.user_id, fileId: p.file_id, action: 'PROPOSAL_OWNER_REJECT',
+      ip: getClientIp(req), note: `Người đăng từ chối đề xuất ${p.proposal_id}: ${reason}`,
+    });
+    res.json({ success: true, proposal_id: p.proposal_id, status: 'REJECTED' });
+  } catch (err) {
+    console.error('[POST owner-reject]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_VIEW'), async (req, res) => {
   try {
+    await escalateStaleOwnerProposals();
     const pool = await getPool();
     const userRoles = await resolveUserRoles(req.user);
     const isAdmin =
@@ -3005,7 +3292,7 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
         const params = targetUnits.map((_, i) => `@u_${i}`);
         // ✅ Lọc theo u.unit_id (Đơn vị người đề xuất) HOẶC d.issuing_unit_id (Đơn vị của văn bản)
         query += ` AND (u.unit_id IN (${params.join(', ')}) OR d.issuing_unit_id IN (${params.join(', ')}))`;
-        targetUnits.forEach((uId, i) => r.input(`u_${i}`, sql.VarChar(50), uId));
+        targetUnits.forEach((uId, i) => r.input(`u_${i}`, sql.NVarChar(50), uId));
       } else {
         query += ` AND 1 = 0`;
       }
@@ -3082,7 +3369,7 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
     .input('title', sql.NVarChar(500), prop.title)
     .input('type', sql.VarChar(20), prop.doc_type_id || null)
     .input('issued', sql.Date, prop.issued_date || null)
-    .input('unit', sql.VarChar(50), prop.issuing_unit_id || null)
+    .input('unit', sql.NVarChar(50), prop.issuing_unit_id || null)
     .input('signer', sql.NVarChar(100), prop.signer || null)
     .input('summary', sql.NVarChar(sql.MAX), prop.summary || null)
     .input('level', sql.Int, prop.security_level_id)
@@ -3393,6 +3680,9 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       is_guest: true,
     };
   }
+
+  // Tầng 2: quyền xem/tải bị khóa bảo vệ → cần duyệt cho đúng tài liệu này
+  if (!(await docViewGate(req, res, isDownload ? 'DOC_DOWNLOAD' : 'DOC_VIEW'))) return;
 
   try {
     const pool = await getPool();

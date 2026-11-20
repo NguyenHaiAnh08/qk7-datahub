@@ -34,14 +34,69 @@ const EXCLUDED_PATHS = [
   /^\/api\/admin\/protected-permissions/,
   /^\/api\/auth\//,
   /^\/api\/admin\/creatable-roles$/,
-  /^\/api\/documents(\/|$)/,
+  // Văn bản: chỉ miễn các route có luồng đề xuất riêng. Xóa mềm / khôi phục / xóa vĩnh viễn
+  // (DELETE|POST restore) ĐI QUA bộ chặn duyệt khi quyền DOC_DELETE/DOC_RESTORE/DOC_PURGE bị khóa.
+  /^\/api\/documents\/upload$/,
+  /^\/api\/documents\/parse$/,
+  /^\/api\/documents\/proposals(\/|$)/,
+];
+
+// PUT /api/documents/:id (sửa văn bản) có luồng đề xuất riêng → miễn
+const isExcludedWrite = (method, fullPath) =>
+  EXCLUDED_PATHS.some((rx) => rx.test(fullPath))
+  || (method === 'PUT' && /^\/api\/documents\/[^/]+$/.test(fullPath));
+
+// Route không bao giờ bị khóa xem: trang duyệt phải luôn mở được, nếu không người duyệt bị khóa vòng
+const VIEW_GATE_EXCLUDED = [
+  /^\/api\/admin\/approval-requests/,
+  /^\/api\/admin\/protected-permissions/,
+  /^\/api\/my-approval-requests/,
+  /^\/api\/auth\//,
+  /^\/api\/admin\/creatable-roles$/,
 ];
 
 // Path có handler execute riêng sau khi được duyệt
 const LECTURE_UPLOAD_PATH = /^\/api\/lectures\/upload-scorm$/;
 
+// ─── Khóa bảo vệ cho quyền XEM/ĐỌC (GET) ───
+// APPROVAL_VIEW_GATE: 'true' (mặc định) | 'dry-run' (chỉ ghi log) | 'false' (tắt)
+const VIEW_GATE_MODE = (process.env.APPROVAL_VIEW_GATE || 'true').toLowerCase();
+// Một lần duyệt cho phép xem đối tượng đó trong N phút (một trang gọi nhiều API cùng đối tượng)
+const VIEW_GRANT_MINUTES = parseInt(process.env.APPROVAL_VIEW_GRANT_MINUTES || '60', 10);
+// Bị từ chối thì trong N phút không tạo yêu cầu mới (tránh spam người duyệt)
+const VIEW_REJECT_COOLDOWN_MINUTES = parseInt(process.env.APPROVAL_VIEW_REJECT_COOLDOWN_MINUTES || '10', 10);
+
+// Quyền tách nhỏ (CREATE/EDIT/DELETE) thừa hưởng khóa của quyền *_MANAGE
+const PROTECTION_ALIASES = {
+  UNIT_CREATE: 'UNIT_MANAGE', UNIT_EDIT: 'UNIT_MANAGE', UNIT_DELETE: 'UNIT_MANAGE',
+  DOCTYPE_CREATE: 'DOCTYPE_MANAGE', DOCTYPE_EDIT: 'DOCTYPE_MANAGE', DOCTYPE_DELETE: 'DOCTYPE_MANAGE',
+  RANK_CREATE: 'RANK_MANAGE', RANK_EDIT: 'RANK_MANAGE', RANK_DELETE: 'RANK_MANAGE',
+  POSITION_CREATE: 'POSITION_MANAGE', POSITION_EDIT: 'POSITION_MANAGE', POSITION_DELETE: 'POSITION_MANAGE',
+  UNIT_ALIAS_CREATE: 'UNIT_ALIAS_MANAGE', UNIT_ALIAS_EDIT: 'UNIT_ALIAS_MANAGE', UNIT_ALIAS_DELETE: 'UNIT_ALIAS_MANAGE',
+};
+
+// So sánh nội dung body (bỏ qua thứ tự khóa) giữa yêu cầu đã duyệt và request thực thi
+function canonicalBody(v) {
+  if (v === undefined || v === null || v === '') return '{}';
+  let obj = v;
+  if (typeof v === 'string') {
+    try { obj = JSON.parse(v); } catch { return v; }
+  }
+  const sortKeys = (o) => {
+    if (Array.isArray(o)) return o.map(sortKeys);
+    if (o && typeof o === 'object') {
+      return Object.keys(o).sort().reduce((acc, k) => { acc[k] = sortKeys(o[k]); return acc; }, {});
+    }
+    return o;
+  };
+  const out = JSON.stringify(sortKeys(obj));
+  return out === undefined ? '{}' : out;
+}
+
+const normPath = (p) => (String(p || '').split('?')[0].replace(/\/+$/, '') || '/');
+
 module.exports = function createApprovalWorkflow({
-  sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission,
+  sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission, getUserPermissions,
 }) {
   let protectedSet = new Set();
   let codeToIdMap = new Map();
@@ -209,31 +264,148 @@ module.exports = function createApprovalWorkflow({
     return null;
   }
 
+  // Quyền có đang bị admin khóa duyệt không (dùng cho luồng văn bản có đề xuất riêng)
+  async function isPermissionLocked(code) {
+    await loadProtectedPermissions();
+    return isCodeProtected(code);
+  }
+
+  function isCodeProtected(code) {
+    if (protectedSet.has(code)) return true;
+    const alias = PROTECTION_ALIASES[code];
+    return Boolean(alias && protectedSet.has(alias));
+  }
+
+  /**
+   * TẦNG 2 cho quyền XEM/ĐỌC (GET/HEAD): nếu quyền đang bị admin khóa bảo vệ thì
+   * người dùng phải được duyệt cho đúng đối tượng (đường dẫn) này mới xem được.
+   * Trả về true nếu cho đi tiếp; false nếu đã trả lời 403 (VIEW_APPROVAL_REQUIRED).
+   * `codes` = các quyền người dùng đang giữ cho route này (chỉ cần 1 quyền không khóa là qua).
+   */
+  async function enforceViewGate(req, res, codes) {
+    try {
+      if (VIEW_GATE_MODE === 'false') return true;
+      if (!['GET', 'HEAD'].includes(req.method)) return true;
+      const user = req.user;
+      if (!user || !user.is_authenticated || user.user_id === 'GUEST') return true;
+      if (isProtectedAdmin(user)) return true;
+
+      const fullPath = normPath(req.originalUrl || req.url);
+      // /api/documents KHÔNG miễn ở đây (miễn của bộ chặn GHI chỉ vì văn bản có luồng đề xuất riêng)
+      if (VIEW_GATE_EXCLUDED.some((rx) => rx.test(fullPath))) return true;
+
+      const list = (Array.isArray(codes) ? codes : [codes]).filter(Boolean);
+      if (list.length === 0) return true;
+      await loadProtectedPermissions();
+      if (list.some((c) => !isCodeProtected(c))) return true;
+      const code = list[0];
+      const permId = codeToIdMap.get(code) || codeToIdMap.get(PROTECTION_ALIASES[code]) || code;
+
+      const pool = await getPool();
+      const last = (await pool.request()
+        .input('uid', sql.VarChar(50), user.user_id)
+        .input('perm', sql.VarChar(50), permId)
+        .input('path', sql.VarChar(500), fullPath)
+        .query(`SELECT TOP 1 request_id, status, reviewed_at, review_note
+                FROM APPROVAL_REQUEST
+                WHERE requester_id = @uid AND http_method = 'GET'
+                  AND required_permission = @perm AND http_path = @path
+                ORDER BY created_at DESC`)).recordset[0];
+
+      const minutesSince = (d) => (Date.now() - new Date(d).getTime()) / 60000;
+      if (last && ['APPROVED', 'EXECUTED'].includes(last.status)
+          && last.reviewed_at && minutesSince(last.reviewed_at) <= VIEW_GRANT_MINUTES) {
+        return true;
+      }
+
+      if (VIEW_GATE_MODE === 'dry-run') {
+        console.warn(`[approval][VIEW-DRY] user=${user.user_id} cần duyệt để xem ${fullPath} (quyền ${code})`);
+        return true;
+      }
+
+      if (last && last.status === 'PENDING') {
+        res.status(403).json({
+          error: `Quyền ${code} đang được khóa bảo vệ. Yêu cầu xem ${fullPath} (${last.request_id}) đang chờ cấp trên duyệt.`,
+          code: 'VIEW_APPROVAL_REQUIRED', state: 'PENDING', request_id: last.request_id, required_permission: code,
+        });
+        return false;
+      }
+      if (last && last.status === 'REJECTED' && last.reviewed_at
+          && minutesSince(last.reviewed_at) <= VIEW_REJECT_COOLDOWN_MINUTES) {
+        res.status(403).json({
+          error: `Yêu cầu xem đã bị từ chối${last.review_note ? `: ${last.review_note}` : ''}.`,
+          code: 'VIEW_APPROVAL_REQUIRED', state: 'REJECTED', request_id: last.request_id, required_permission: code,
+        });
+        return false;
+      }
+
+      const unitRes = await pool.request()
+        .input('uid', sql.VarChar(50), user.user_id)
+        .query(`SELECT unit_id FROM [USER] WHERE user_id = @uid`);
+      const requestId = 'APV-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+      await pool.request()
+        .input('rid', sql.VarChar(50), requestId)
+        .input('uid', sql.VarChar(50), user.user_id)
+        .input('unit', sql.NVarChar(50), unitRes.recordset[0]?.unit_id || null)
+        .input('perm', sql.VarChar(50), permId)
+        .input('path', sql.VarChar(500), fullPath)
+        .input('summary', sql.NVarChar(500), `XEM ${fullPath} (quyền ${code})`)
+        .query(`INSERT INTO APPROVAL_REQUEST
+                (request_id, requester_id, requester_unit_id, required_permission, http_method, http_path, target_summary, status)
+                VALUES (@rid, @uid, @unit, @perm, 'GET', @path, @summary, 'PENDING')`);
+      res.status(403).json({
+        error: `Quyền ${code} đang được khóa bảo vệ. Đã gửi yêu cầu xem ${fullPath} (${requestId}) tới cấp trên, vui lòng chờ duyệt.`,
+        code: 'VIEW_APPROVAL_REQUIRED', state: 'PENDING', request_id: requestId, required_permission: code,
+      });
+      return false;
+    } catch (err) {
+      console.error('[approval] enforceViewGate:', err.message);
+      // Fail-closed: lỗi kiểm tra thì KHÔNG cho xem dữ liệu đang bị khóa bảo vệ
+      res.status(503).json({ error: 'Không kiểm tra được trạng thái phê duyệt. Vui lòng thử lại.', code: 'APPROVAL_GATE_ERROR' });
+      return false;
+    }
+  }
+
   async function approvalInterceptor(req, res, next) {
     if (!['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) return next();
 
     const fullPath = (req.originalUrl || req.url || '').split('?')[0];
-    if (EXCLUDED_PATHS.some((rx) => rx.test(fullPath))) return next();
+    if (isExcludedWrite(req.method, fullPath)) return next();
     if (isProtectedAdmin(req.user)) return next();
 
-    // Cho phép thực thi lại request đã được duyệt (mã override)
+    // Cho phép thực thi lại request đã được duyệt (mã override).
+    // Mã chỉ dùng được đúng 1 lần, đúng phương thức + đường dẫn + nội dung của yêu cầu gốc,
+    // và chỉ bởi người yêu cầu hoặc người đã duyệt.
     const overrideId = req.headers['x-approval-override'];
     if (overrideId) {
       try {
         const pool = await getPool();
         const r = await pool.request()
           .input('rid', sql.VarChar(50), overrideId)
-          .query(`SELECT status FROM APPROVAL_REQUEST WHERE request_id = @rid`);
-        if (r.recordset.length > 0 && r.recordset[0].status === 'APPROVED') {
-          await pool.request()
+          .query(`SELECT status, requester_id, reviewed_by, http_method, http_path, http_body
+                  FROM APPROVAL_REQUEST WHERE request_id = @rid`);
+        const row = r.recordset[0];
+        const callerId = req.user?.user_id;
+        const matches = row
+          && row.status === 'APPROVED'
+          && String(row.http_method).toUpperCase() === req.method
+          && normPath(row.http_path) === normPath(fullPath)
+          && (callerId === row.requester_id || callerId === row.reviewed_by)
+          && canonicalBody(row.http_body) === canonicalBody(req.body);
+        if (matches) {
+          const u = await pool.request()
             .input('rid', sql.VarChar(50), overrideId)
-            .query(`UPDATE APPROVAL_REQUEST SET status='EXECUTING', executed_at=GETDATE() WHERE request_id=@rid`);
-          return next();
+            .query(`UPDATE APPROVAL_REQUEST SET status='EXECUTING', executed_at=GETDATE()
+                    WHERE request_id=@rid AND status='APPROVED';
+                    SELECT @@ROWCOUNT AS n;`);
+          if (u.recordset[0].n === 1) return next();
+        } else if (row) {
+          console.warn(`[approval] override ${overrideId} bị từ chối: không khớp yêu cầu gốc (user=${callerId}, ${req.method} ${fullPath})`);
         }
       } catch (err) {
         console.error('[approval] override:', err.message);
       }
-      return res.status(403).json({ error: 'Mã phê duyệt không hợp lệ hoặc đã dùng' });
+      return res.status(403).json({ error: 'Mã phê duyệt không hợp lệ, không khớp thao tác hoặc đã dùng' });
     }
 
     const requiredPerm = getAutoRequiredPermission(req.method, fullPath);
@@ -272,9 +444,25 @@ module.exports = function createApprovalWorkflow({
     }
 
     const protectedList = await loadProtectedPermissions();
-    if (!protectedList.has(requiredPerm)) return next();
+    if (!isCodeProtected(requiredPerm)) return next();
 
-    const permId = codeToIdMap.get(requiredPerm) || requiredPerm;
+    // TẦNG 1: người gọi phải có quyền thì mới được xin duyệt. Không có quyền → 403 ngay.
+    if (typeof getUserPermissions === 'function') {
+      const held = await getUserPermissions(req.user?.user_id);
+      if (!held.includes(requiredPerm)) {
+        writeAccessLog({
+          userId: req.user?.user_id || null, fileId: null, action: 'PERMISSION_DENIED',
+          ip: getClientIp(req), note: `Thiếu quyền: ${requiredPerm} (${req.method} ${fullPath})`,
+        }).catch(() => {});
+        return res.status(403).json({
+          error: `Bạn không có quyền thực hiện thao tác này (thiếu: ${requiredPerm})`,
+          code: 'PERMISSION_DENIED',
+          required_permission: requiredPerm,
+        });
+      }
+    }
+
+    const permId = codeToIdMap.get(requiredPerm) || codeToIdMap.get(PROTECTION_ALIASES[requiredPerm]) || requiredPerm;
 
     // Ghi lecture_id (nếu có) để execute handler giải nén đúng bài giảng
     const lectureIdHint =
@@ -355,6 +543,8 @@ module.exports = function createApprovalWorkflow({
 
   return {
     approvalInterceptor,
+    enforceViewGate,
+    isPermissionLocked,
     loadProtectedPermissions,
     isProtectedAdmin,
     extractLectureId,

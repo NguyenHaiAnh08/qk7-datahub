@@ -32,6 +32,9 @@ const formatRequestAction = (method: string, path: string): string => {
   const m = method.toUpperCase();
   const cleanPath = path.split('?')[0];
 
+  // Yêu cầu XEM (quyền đọc bị khóa bảo vệ)
+  if (m === 'GET') return `Xin phép xem: ${cleanPath}`;
+
   // ✅ Nhận diện yêu cầu cấp PIN
   if (cleanPath.includes('/pin') || cleanPath.includes('generate-pin')) {
     return `Yêu cầu cấp mã PIN bảo mật`;
@@ -289,6 +292,18 @@ export const ApprovalQueuePage: React.FC = () => {
     setProcessing(true);
     try {
       await approvalService.approve(selected.request_id);
+
+      // Yêu cầu XEM: duyệt xong là người dùng tự xem được (cấp quyền theo thời hạn), không chạy lại API
+      if (String(selected.http_method).toUpperCase() === 'GET') {
+        toast.success(`Đã cho phép xem (${selected.request_id})`, {
+          title: 'ĐÃ DUYỆT',
+          badge: 'APPROVED',
+        });
+        setSelected(null);
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
 
       const isPinRequest = selected.http_path.includes('/pin') || selected.required_permission === 'PIN_GENERATE';
 

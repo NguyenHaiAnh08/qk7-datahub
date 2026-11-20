@@ -41,7 +41,7 @@ module.exports = (app, deps) => {
     
 
     const approvalModule = require('./approval-workflow')({
-        sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission,
+        sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission, getUserPermissions,
     });
     const { approvalInterceptor, loadProtectedPermissions, isProtectedAdmin } = approvalModule;
 
@@ -106,13 +106,16 @@ module.exports = (app, deps) => {
           WHERE p.requester_id = @uid
         `;
         if (status === 'PENDING_REJECTED') {
-          propQuery += ` AND p.status IN ('PENDING', 'REJECTED')`;
+          propQuery += ` AND p.status IN ('PENDING_OWNER', 'PENDING', 'REJECTED')`;
         } else if (status === 'APPROVED') {
           propQuery += ` AND p.status IN ('APPROVED', 'EXECUTED')`;
+        } else if (status === 'PENDING') {
+          propQuery += ` AND p.status IN ('PENDING_OWNER', 'PENDING')`;
         } else if (status !== 'ALL') {
           propQuery += ` AND p.status = @pstatus`;
           propReq.input('pstatus', sql.VarChar(20), status);
         }
+        propQuery += ` AND p.status <> 'CANCELLED'`; // đề xuất đã rút lại không hiện trong danh sách
         propQuery += ` ORDER BY p.created_at DESC`;
         const propResult = await propReq.query(propQuery);
 
@@ -126,12 +129,13 @@ module.exports = (app, deps) => {
             http_method: 'PUT',
             http_path: `/api/documents/${p.file_id}`,
             target_summary: `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
-            status: p.status,
+            status: p.status === 'PENDING_OWNER' ? 'PENDING' : p.status,
+            stage: p.status === 'PENDING_OWNER' ? 'WAITING_OWNER' : undefined,
             reviewed_by: p.reviewed_by,
             reviewed_at: p.reviewed_at,
             review_note: p.review_note,
             created_at: p.created_at,
-            request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+            request_reason: (p.status === 'PENDING_OWNER' ? '[Đang chờ người đăng văn bản xem xét] ' : '') + (p.note || 'Đề xuất chuẩn hóa thông tin văn bản'),
             document_code: docCodeDisplay,
             doc_title: p.title,
           };
@@ -191,7 +195,11 @@ module.exports = (app, deps) => {
 
         try {
             const codes = await getUserPermissions(req.user.user_id);
-            if (codes.includes(requiredPerm)) return next();
+            if (codes.includes(requiredPerm)) {
+                // Tầng 2: quyền XEM bị khóa bảo vệ → cần được duyệt cho đối tượng này
+                if (!(await approvalModule.enforceViewGate(req, res, [requiredPerm]))) return;
+                return next();
+            }
             return res.status(403).json({
                 error: `Bạn không có quyền thực hiện thao tác này (thiếu: ${requiredPerm})`,
                 code: 'PERMISSION_DENIED',
@@ -2211,14 +2219,17 @@ module.exports = (app, deps) => {
             if (id.startsWith('PROP-')) {
                 const checkProp = await pool.request()
                     .input('pid', sql.VarChar(50), id)
-                    .query(`SELECT u.unit_id
+                    .query(`SELECT u.unit_id, d.issuing_unit_id AS doc_unit_id
                             FROM DOCUMENT_REVISION_PROPOSAL p
                             JOIN [USER] u ON u.user_id = p.requester_id
+                            LEFT JOIN DOCUMENT d ON d.file_id = p.file_id
                             WHERE p.proposal_id = @pid AND p.status = 'PENDING'`);
                 if (checkProp.recordset.length === 0) {
                     return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
                 }
-                const hasPermission = await canUserApproveRequest(req, checkProp.recordset[0].unit_id);
+                // Chỉ huy đơn vị của NGƯỜI ĐỀ XUẤT hoặc của đơn vị BAN HÀNH văn bản đều được duyệt
+                const hasPermission = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
+                    || (checkProp.recordset[0].doc_unit_id && await canUserApproveRequest(req, checkProp.recordset[0].doc_unit_id));
                 if (!hasPermission) {
                     return res.status(403).json({ error: 'Bạn không có thẩm quyền duyệt đề xuất của đơn vị này' });
                 }
@@ -2274,14 +2285,17 @@ module.exports = (app, deps) => {
             if (id.startsWith('PROP-')) {
                 const checkProp = await pool.request()
                     .input('pid', sql.VarChar(50), id)
-                    .query(`SELECT u.unit_id
+                    .query(`SELECT u.unit_id, d.issuing_unit_id AS doc_unit_id
                             FROM DOCUMENT_REVISION_PROPOSAL p
                             JOIN [USER] u ON u.user_id = p.requester_id
+                            LEFT JOIN DOCUMENT d ON d.file_id = p.file_id
                             WHERE p.proposal_id = @pid AND p.status = 'PENDING'`);
                 if (checkProp.recordset.length === 0) {
                     return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
                 }
-                const hasPermission = await canUserApproveRequest(req, checkProp.recordset[0].unit_id);
+                // Chỉ huy đơn vị của NGƯỜI ĐỀ XUẤT hoặc của đơn vị BAN HÀNH văn bản đều được duyệt
+                const hasPermission = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
+                    || (checkProp.recordset[0].doc_unit_id && await canUserApproveRequest(req, checkProp.recordset[0].doc_unit_id));
                 if (!hasPermission) {
                     return res.status(403).json({ error: 'Bạn không có thẩm quyền từ chối đề xuất của đơn vị này' });
                 }

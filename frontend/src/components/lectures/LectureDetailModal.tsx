@@ -6,6 +6,7 @@ interface Props {
   open: boolean;
   lecture: Lecture | null;
   onClose: () => void;
+  onOpenReader?: () => void;
 }
 
 const STATUS_CONFIG: Record<LectureStatus, { label: string; color: string; bg: string; border: string }> = {
@@ -24,7 +25,7 @@ const FORMAT_CONFIG: Record<string, { label: string; badge: string }> = {
   HTML5: { label: 'Tương tác HTML5', badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
 };
 
-export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose }) => {
+export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose, onOpenReader }) => {
   if (!open || !lecture) return null;
 
   const statusCfg = STATUS_CONFIG[lecture.status] || STATUS_CONFIG.DRAFT;
@@ -222,10 +223,25 @@ export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose }) 
         </div>
 
         {/* Footer */}
-        <div className="p-3 px-5 border-t border-slate-200 dark:border-white/[0.08] flex items-center justify-end bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="p-3 px-5 border-t border-slate-200 dark:border-white/[0.08] flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+          <div>
+            {lecture.status === 'PUBLISHED' && onOpenReader && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenReader();
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-[#166534] to-[#15803d] hover:from-[#15803d] hover:to-[#16a34a] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Đọc bài giảng</span>
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-semibold transition active:scale-[0.98] min-h-[38px]"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition active:scale-[0.98] min-h-[36px]"
           >
             Đóng
           </button>

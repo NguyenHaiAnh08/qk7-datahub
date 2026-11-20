@@ -588,36 +588,38 @@ export const PortalPage: React.FC = () => {
         </div>
 
         {/* Document Content View */}
-        {viewMode === 'grid' ? (
-          <PortalDocumentList
-            documents={paginatedDocs}
-            userClearanceLevel={user?.clearance_level_id || 1}
-            loading={loading}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={documents.length}
-            searchQuery={searchQuery}
-            onClearFilters={handleClearFilters}
-            onPageChange={setCurrentPage}
-            onPreview={(doc) => setPreviewDoc(doc)}
-            onDownload={handleDownload}
-            onCancelDownload={handleCancelDownload}
-          />
-        ) : (
-          <DocumentTable
-            documents={paginatedDocs}
-            userClearanceLevel={user?.clearance_level_id || 1}
-            loading={loading}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={documents.length}
-            onClearFilters={handleClearFilters}
-            onPageChange={setCurrentPage}
-            onPreview={(doc) => setPreviewDoc(doc)}
-            onDownload={handleDownload}
-            onCancelDownload={handleCancelDownload}
-          />
-        )}
+        <div id="tour-document-list">
+          {viewMode === 'grid' ? (
+            <PortalDocumentList
+              documents={paginatedDocs}
+              userClearanceLevel={user?.clearance_level_id || 1}
+              loading={loading}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={documents.length}
+              searchQuery={searchQuery}
+              onClearFilters={handleClearFilters}
+              onPageChange={setCurrentPage}
+              onPreview={(doc) => setPreviewDoc(doc)}
+              onDownload={handleDownload}
+              onCancelDownload={handleCancelDownload}
+            />
+          ) : (
+            <DocumentTable
+              documents={paginatedDocs}
+              userClearanceLevel={user?.clearance_level_id || 1}
+              loading={loading}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={documents.length}
+              onClearFilters={handleClearFilters}
+              onPageChange={setCurrentPage}
+              onPreview={(doc) => setPreviewDoc(doc)}
+              onDownload={handleDownload}
+              onCancelDownload={handleCancelDownload}
+            />
+          )}
+        </div>
       </main>
 
       {/* Preview Modal */}

@@ -12,6 +12,7 @@ export interface ProtectedRouteProps {
   redirectToLogin?: string;
   requiredPermission?: string;        // ⭐ MỚI
   requiredAnyOf?: string[];           // ⭐ MỚI
+  allowGuest?: boolean;               // ⭐ Cho phép phiên Đại biểu truy cập tài nguyên công khai
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
@@ -22,11 +23,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   redirectToLogin = ROUTE_PATHS.LOGIN,
   requiredPermission,
   requiredAnyOf,
+  allowGuest = false,
 }) => {
   const { user, isAuthenticated, isAdmin, isStaff, hasPermission, hasAnyPermission } = useAuth();
   const location = useLocation();
 
-  if (!isAuthenticated || !user || user.user_id === 'GUEST') {
+  if ((!isAuthenticated || !user || user.user_id === 'GUEST') && !allowGuest) {
     return <Navigate to={redirectToLogin} state={{ from: location }} replace />;
   }
 

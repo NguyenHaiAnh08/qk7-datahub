@@ -103,7 +103,7 @@ module.exports = function createLectureRoutes({
   // PHẦN 1 — CATALOGS
   // ═════════════════════════════════════════════════════════════
 
-  router.get('/catalogs/subjects', requireAuth, async (req, res) => {
+  router.get('/catalogs/subjects', async (req, res) => {
     try {
       const pool = await getPool();
       const result = await pool.request().query(`
@@ -117,7 +117,7 @@ module.exports = function createLectureRoutes({
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  router.get('/catalogs/classes', requireAuth, async (req, res) => {
+  router.get('/catalogs/classes', async (req, res) => {
     try {
       const pool = await getPool();
       const result = await pool.request().query(`
@@ -132,7 +132,7 @@ module.exports = function createLectureRoutes({
   });
 
   // Gợi ý giảng đường từ lịch sử (vì không có bảng HALL)
-  router.get('/catalogs/venues', requireAuth, async (req, res) => {
+  router.get('/catalogs/venues', async (req, res) => {
     try {
       const pool = await getPool();
       const result = await pool.request().query(`
@@ -150,17 +150,18 @@ module.exports = function createLectureRoutes({
   // PHẦN 2 — LECTURE CRUD + APPROVAL 2 TẦNG
   // ═════════════════════════════════════════════════════════════
 
-  router.get('/', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/', async (req, res) => {
     try {
       const pool = await getPool();
       const r = pool.request();
-      const userId = req.user.user_id;
-      const roles = await resolveUserRoles(pool, req.user);
+      const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST' || req.user.user_id === 'ANONYMOUS';
+      const userId = req.user?.user_id || 'GUEST';
+      const roles = isGuest ? [] : await resolveUserRoles(pool, req.user);
       const isAdmin = roles.includes('ROL-01');
       const isCommander = roles.includes('ROL-02');
-      const deptHead = await isDeptHead(pool, req.user);
+      const deptHead = isGuest ? false : await isDeptHead(pool, req.user);
       
-      const clearance = req.user.clearance_level_id || 1;
+      const clearance = req.user?.clearance_level_id || 1;
 
       let query = `
         SELECT l.lecture_id, l.lecture_code, l.title, l.subject_id, l.author_id,
@@ -190,23 +191,28 @@ module.exports = function createLectureRoutes({
       `;
       r.input('clearance', sql.Int, clearance);
 
-      const scope = await getLectureScope({ userId, roles, deptHead, includeSiblings: true });
-      if (!scope.all) {
-        const inList = bindUnitIn(r, scope.unitIds);
-        if (deptHead || roles.includes('ROL-02')) {
-          query += ` AND (l.faculty_unit_id IN (${inList}) OR l.author_id = @selfId)`;
-        } else {
-          query += ` AND (l.status = 'PUBLISHED' OR l.author_id = @selfId OR l.faculty_unit_id IN (${inList}))`;
-        }
-        r.input('selfId', sql.VarChar(50), userId);
-      }
-
-      if (req.query.status) {
-        query += ` AND l.status = @status`;
-        r.input('status', sql.VarChar(30), req.query.status);
+      if (isGuest) {
+        // Đại biểu / Khách chỉ được xem các bài giảng đã xuất bản (PUBLISHED) và ở mức bảo mật Cấp 1 (Công khai)
+        query += ` AND l.status = 'PUBLISHED' AND l.security_level_id = 1`;
       } else {
-        // Mặc định: Ẩn các bài giảng đã bị xóa mềm
-        query += ` AND l.status != 'DELETED'`;
+        const scope = await getLectureScope({ userId, roles, deptHead, includeSiblings: true });
+        if (!scope.all) {
+          const inList = bindUnitIn(r, scope.unitIds);
+          if (deptHead || roles.includes('ROL-02')) {
+            query += ` AND (l.faculty_unit_id IN (${inList}) OR l.author_id = @selfId)`;
+          } else {
+            query += ` AND (l.status = 'PUBLISHED' OR l.author_id = @selfId OR l.faculty_unit_id IN (${inList}))`;
+          }
+          r.input('selfId', sql.VarChar(50), userId);
+        }
+
+        if (req.query.status) {
+          query += ` AND l.status = @status`;
+          r.input('status', sql.VarChar(30), req.query.status);
+        } else {
+          // Mặc định: Ẩn các bài giảng đã bị xóa mềm
+          query += ` AND l.status != 'DELETED'`;
+        }
       }
       if (req.query.subject_id)       { query += ` AND l.subject_id = @subId`;      r.input('subId', sql.VarChar(50), req.query.subject_id); }
       if (req.query.faculty_unit_id)  { query += ` AND l.faculty_unit_id = @fac`;   r.input('fac', sql.NVarChar(50), req.query.faculty_unit_id); }
@@ -225,9 +231,12 @@ module.exports = function createLectureRoutes({
     }
   });
 
-  router.get('/:id', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/:id', async (req, res) => {
     try {
       const pool = await getPool();
+      const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST' || req.user.user_id === 'ANONYMOUS';
+      const clearance = req.user?.clearance_level_id || 1;
+
       const r = await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
         .query(`
@@ -251,15 +260,23 @@ module.exports = function createLectureRoutes({
         `);
       if (r.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lec = r.recordset[0];
-      if (lec.security_level_id > (req.user.clearance_level_id || 1)) {
+      if (lec.security_level_id > clearance) {
         return res.status(403).json({ error: 'Không đủ cấp bảo mật để xem bài giảng này' });
       }
-      const roles = await resolveUserRoles(pool, req.user);
-      const scope = await getLectureScope({
-        userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), includeSiblings: true,
-      });
-      if (!inScope(scope, lec.faculty_unit_id) && lec.author_id !== req.user.user_id) {
-        return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
+      if (isGuest) {
+        if (lec.status !== 'PUBLISHED' || lec.security_level_id !== 1) {
+          return res.status(403).json({ error: 'Đại biểu chỉ được xem các bài giảng công khai đã xuất bản' });
+        }
+      } else {
+        const roles = await resolveUserRoles(pool, req.user);
+        const isAdmin = roles.includes('ROL-01');
+        const scope = await getLectureScope({
+          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), includeSiblings: true,
+        });
+        const isPublished = (lec.status === 'PUBLISHED');
+        if (!isPublished && !isAdmin && !inScope(scope, lec.faculty_unit_id) && lec.author_id !== req.user.user_id) {
+          return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
+        }
       }
       // Không lộ đường dẫn lưu trữ nội bộ ra client — chỉ báo có/không có PDF
       lec.has_pdf = !!lec.pdf_path;
@@ -689,7 +706,7 @@ module.exports = function createLectureRoutes({
 
   // Danh sách giảng đường CHỌN ĐƯỢC khi mở ca (thay cho ô nhập tay): phòng đang hoạt động,
   // kèm khu, sức chứa, trạng thái bảo trì và có ca đang diễn ra hay không.
-  router.get('/catalogs/rooms', requireAuth, async (req, res) => {
+  router.get('/catalogs/rooms', async (req, res) => {
     try {
       const pool = await getPool();
       const catalog = await loadBuildingCatalog(pool);

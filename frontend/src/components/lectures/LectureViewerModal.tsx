@@ -1,0 +1,253 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { X, BookOpen, Shield, Maximize2, Minimize2, AlertTriangle, RefreshCw, FileText, Layers, ExternalLink } from 'lucide-react';
+import { Lecture } from '../../types/lecture';
+import { getAuthHeaders } from '../../services/http';
+
+interface Props {
+  open: boolean;
+  lecture: Lecture | null;
+  onClose: () => void;
+}
+
+interface ModeItem {
+  id: string;
+  title: string;
+  file: string;
+}
+
+export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) => {
+  const [fullscreen, setFullscreen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string>('');
+  const [modes, setModes] = useState<ModeItem[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string>('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Nạp PDF nếu là dạng PDF
+  useEffect(() => {
+    if (!open || !lecture || lecture.content_type !== 'PDF') {
+      setPdfBlobUrl('');
+      return;
+    }
+
+    let active = true;
+    let objUrl = '';
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const headers: Record<string, string> = { ...getAuthHeaders() };
+        try {
+          const fp = sessionStorage.getItem(`qk7_fp_lecture_${lecture.lecture_id}`);
+          if (fp) headers['X-Fingerprint-Token'] = fp;
+        } catch {}
+
+        const res = await fetch(`/api/lectures/${encodeURIComponent(lecture.lecture_id)}/pdf`, { headers });
+        if (!res.ok) {
+          let msg = `Không thể tải tệp PDF (Mã lỗi ${res.status})`;
+          try {
+            const j = await res.json();
+            if (j?.error) msg = j.error;
+          } catch {}
+          throw new Error(msg);
+        }
+
+        const blob = await res.blob();
+        if (!active) return;
+        objUrl = URL.createObjectURL(blob);
+        setPdfBlobUrl(objUrl);
+        setLoading(false);
+      } catch (err: any) {
+        if (!active) return;
+        setError(err?.message || 'Lỗi khi tải tài liệu PDF bài giảng');
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+      if (objUrl) URL.revokeObjectURL(objUrl);
+    };
+  }, [open, lecture?.lecture_id, lecture?.content_type, reloadKey]);
+
+  // Nạp danh sách modes nếu là SCORM/HTML5
+  useEffect(() => {
+    if (!open || !lecture || lecture.content_type === 'PDF') {
+      setModes([]);
+      setSelectedFile('');
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const headers: Record<string, string> = { ...getAuthHeaders() };
+        const res = await fetch(`/api/lectures/${encodeURIComponent(lecture.lecture_id)}/modes`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (active && data?.modes && data.modes.length > 0) {
+            setModes(data.modes);
+            const home = data.modes.find((m: ModeItem) => m.id === 'index' || m.file === 'index.html');
+            setSelectedFile(home ? home.file : data.current_entry || data.modes[0].file);
+          }
+        }
+      } catch {
+        // Fallback: dùng entry mặc định
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [open, lecture?.lecture_id, lecture?.content_type]);
+
+  if (!open || !lecture) return null;
+
+  const buildLaunchUrl = () => {
+    const token = sessionStorage.getItem('qk7_token');
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    if (selectedFile) params.set('file', selectedFile);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const type = lecture.content_type === 'SCORM' ? 'scorm' : 'html5';
+    return `/api/lectures/${encodeURIComponent(lecture.lecture_id)}/${type}/launch${qs}`;
+  };
+
+  const isPdf = lecture.content_type === 'PDF';
+  const iframeSrc = isPdf ? pdfBlobUrl : buildLaunchUrl();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+      <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/[0.08] rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
+        fullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-5xl h-[88vh]'
+      }`}>
+        {/* Header */}
+        <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-white/[0.08] flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/90 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              {isPdf ? (
+                <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                  {lecture.title}
+                </h3>
+                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-semibold shrink-0">
+                  {lecture.lecture_code || 'BÀI GIẢNG'}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold shrink-0">
+                  {lecture.content_type}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                {lecture.subject_name ? `Môn: ${lecture.subject_name}` : ''}
+                {lecture.author_name ? ` · Tác giả: ${lecture.author_name}` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Bộ chọn mode nếu có nhiều file html */}
+            {modes.length > 1 && (
+              <div className="hidden sm:flex items-center gap-1 mr-2 bg-slate-200/60 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                {modes.map(m => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setSelectedFile(m.file)}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold transition ${
+                      selectedFile === m.file
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {m.title}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setReloadKey(k => k + 1)}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              title="Tải lại nội dung"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFullscreen(!fullscreen)}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition hidden sm:flex"
+              title={fullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
+            >
+              {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              aria-label="Đóng"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content Viewer Body */}
+        <div className="flex-1 min-h-0 bg-slate-950/5 dark:bg-slate-950/40 relative">
+          {loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/80 dark:bg-slate-900/80 z-10 backdrop-blur-xs">
+              <RefreshCw className="w-7 h-7 text-emerald-600 dark:text-emerald-400 animate-spin" />
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                Đang chuẩn bị nội dung bài giảng điện tử...
+              </p>
+            </div>
+          )}
+
+          {error ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                Không thể hiển thị bài giảng
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={() => setReloadKey(k => k + 1)}
+                className="mt-2 px-4 py-2 bg-[#166534] hover:bg-[#14532d] text-white rounded-xl text-xs font-bold transition"
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : iframeSrc ? (
+            <iframe
+              key={`${iframeSrc}-${reloadKey}`}
+              src={iframeSrc}
+              className="w-full h-full border-0 bg-white dark:bg-slate-900"
+              title={lecture.title}
+              onLoad={() => setLoading(false)}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+};

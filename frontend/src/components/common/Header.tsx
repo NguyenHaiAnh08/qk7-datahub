@@ -619,6 +619,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             <div
+              id="tour-nav-brand"
               className="flex items-center gap-2.5 cursor-pointer group shrink-0"
               onClick={() => navigate(canAccessAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
             >
@@ -790,6 +791,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           <div
+            id="tour-nav-brand-pc"
             className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group shrink-0"
             onClick={() => navigate(canAccessAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
           >
@@ -827,11 +829,11 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <div className="shrink-0">
+          <div id="tour-device-switch" className="shrink-0">
             <DeviceModeSwitch compact />
           </div>
 
-          <div className="shrink-0">
+          <div id="tour-theme-toggle" className="shrink-0">
             <ThemeToggle />
           </div>
 

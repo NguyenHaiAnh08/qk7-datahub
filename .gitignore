@@ -45,6 +45,12 @@ backend/uploads/lectures/*
 !backend/uploads/lectures/.gitkeep
 backend/uploads/temp/*
 !backend/uploads/temp/.gitkeep
+backend/uploads/van-ban-so/**
+!backend/uploads/van-ban-so/.gitkeep
+backend/uploads/bai-giang-so/**
+!backend/uploads/bai-giang-so/.gitkeep
+backend/uploads/thu-vien-so/**
+!backend/uploads/thu-vien-so/.gitkeep
 backend/uploads/**/20261113_LECTURE_*
 backend/uploads/**/*_LECTURE_*
 

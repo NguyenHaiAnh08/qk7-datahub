@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Radio, RefreshCw, AlertTriangle, Clock, Users, Building2, User,
   Square, ShieldAlert, Monitor, CheckCircle2,
@@ -167,14 +167,22 @@ export const LiveMonitorPanel: React.FC<Props> = ({
     setLoading(false);
   }, [loadOverview, loadFloorPlan, loadLegacySessions]);
 
-  // Initial and Periodic Refresh
+  const selectedRoomIdRef = useRef<string | null>(null);
+  selectedRoomIdRef.current = selectedRoomId;
+
+  // Initial and Periodic Refresh (2s pulse đồng bộ tiến độ thời gian thực siêu tốc)
   useEffect(() => {
     refreshAll();
     const timer = setInterval(() => {
       loadOverview();
       loadFloorPlan();
       loadLegacySessions();
-    }, 6000); // 6s pulse
+      if (selectedRoomIdRef.current) {
+        lectureService.getRadarRoomDetail(selectedRoomIdRef.current).then((res) => {
+          setRoomDetail(res);
+        }).catch(() => {});
+      }
+    }, 2000); // 2s pulse
     return () => clearInterval(timer);
   }, [refreshAll, loadOverview, loadFloorPlan, loadLegacySessions]);
 
@@ -265,6 +273,28 @@ export const LiveMonitorPanel: React.FC<Props> = ({
     return floorRooms.find((r) => r.room_id === selectedRoomId) || roomDetail?.room;
   }, [floorRooms, selectedRoomId, roomDetail]);
 
+  // ─── LIVE SYNCHRONIZED SESSION ───
+  // Đồng bộ thời gian thực giữa Danh sách ca dạy (sessions) và Chi tiết giảng đường (roomDetail)
+  const activeSession = useMemo(() => {
+    if (!activeRoom) return undefined;
+    const fromLive = sessions.find((s) =>
+      (roomDetail?.current_session?.schedule_id && s.schedule_id === roomDetail.current_session.schedule_id) ||
+      (s.room_id && s.room_id === activeRoom.room_id) ||
+      (s.venue_name && activeRoom.room_name && s.venue_name.trim().toLowerCase() === activeRoom.room_name.trim().toLowerCase())
+    );
+    if (fromLive) {
+      return {
+        ...(roomDetail?.current_session || {}),
+        ...fromLive,
+        slide_index: fromLive.slide_index ?? roomDetail?.current_session?.slide_index,
+        slide_total: fromLive.slide_total ?? roomDetail?.current_session?.slide_total,
+        scorm_progress: fromLive.scorm_progress ?? roomDetail?.current_session?.scorm_progress,
+        current_page: fromLive.current_page ?? roomDetail?.current_session?.current_page,
+      };
+    }
+    return roomDetail?.current_session;
+  }, [activeRoom, sessions, roomDetail]);
+
   // ─── HELPER: TIẾN ĐỘ BÀI GIẢNG ĐẲNG CẤP (DÙNG CHUNG TOÀN HỆ THỐNG) ───
   const renderLectureProgressBox = (session: {
     slide_index?: number;
@@ -329,8 +359,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
           />
         </div>
 
-        {/* Dòng trạng thái: Tiến độ ca dạy: 54% | 100% Hoàn thành */}
-        <div className="flex items-center justify-between text-xs">
+        {/* Dòng trạng thái: Tiến độ ca dạy */}
+        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/60 dark:border-slate-800/60 gap-2">
           {isDone ? (
             <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
@@ -338,17 +368,17 @@ export const LiveMonitorPanel: React.FC<Props> = ({
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-              <span className="text-slate-600 dark:text-slate-400 font-medium">Tiến độ ca dạy:</span>
+              <span className="text-slate-600 dark:text-slate-400 font-medium">Tiến độ:</span>
               <strong className="font-extrabold font-mono text-sky-600 dark:text-sky-400 text-xs sm:text-sm">
                 {percent}%
               </strong>
               {isRunning && (
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse ml-0.5" />
+                <span className="w-2 h-2 rounded-full bg-sky-500 animate-ping inline-block" />
               )}
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0">
             {session.is_hanging ? (
               <span className="text-rose-600 dark:text-rose-400 animate-pulse font-extrabold flex items-center gap-1 text-[10px]">
                 ⚠️ CẢNH BÁO QUÁ GIỜ
@@ -358,9 +388,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                 ✓ Sẵn sàng kết thúc ca
               </span>
             ) : (
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                Đã dạy {elapsedMinutes} phút
-              </span>
+              <span>Đã dạy {elapsedMinutes} phút</span>
             )}
           </div>
         </div>
@@ -371,9 +399,9 @@ export const LiveMonitorPanel: React.FC<Props> = ({
   return (
     <div className="space-y-4">
       {/* ═════════════════════════════════════════════════════════════ */}
-      {/* 1. TOP OPERATIONAL KPI BAR (5 QUÂN KHU KPI METRICS)         */}
+      {/* 1. TOP OPERATIONAL KPI BAR (4 KPI METRICS CHUẨN)            */}
       {/* ═════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* KPI 1: Tổng phòng học */}
         <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center shrink-0 text-sky-600 dark:text-sky-400">
@@ -424,24 +452,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* KPI 4: Sắp có ca */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
-              Sắp có ca
-            </div>
-            <div className="text-xl font-black text-amber-700 dark:text-amber-400 font-mono mt-0.5">
-              {kpis.upcoming}
-              <span className="text-xs font-normal text-slate-400 ml-1">chuẩn bị</span>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 5: Bảo trì & Cảnh báo */}
-        <div className={`col-span-2 sm:col-span-1 rounded-2xl border p-3.5 shadow-xs flex items-center gap-3 ${
+        {/* KPI 4: Bảo trì / Cảnh báo */}
+        <div className={`rounded-2xl border p-3.5 shadow-xs flex items-center gap-3 ${
           kpis.alert > 0
             ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-400 dark:border-rose-800/60'
             : 'bg-white dark:bg-[#111827] border-slate-200/90 dark:border-white/[0.08]'
@@ -560,15 +572,12 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   </div>
 
                   {/* Status Legends */}
-                  <div className="flex items-center gap-2 flex-wrap text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  <div className="flex items-center gap-2.5 flex-wrap text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Bận (đang dạy)
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" /> Đang dạy
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" /> Trống
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Sắp có ca
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-400 border border-slate-500" /> Bảo trì
@@ -576,8 +585,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* CHỌN KHU GIẢNG ĐƯỜNG — mỗi khu hiện tổng phòng / trống / bận */}
-                <div className="mt-4 flex flex-wrap gap-2.5" role="tablist" aria-label="Chọn khu giảng đường">
+                {/* CHỌN KHU GIẢNG ĐƯỜNG — mỗi khu hiện tổng phòng / trống / đang dạy */}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" role="tablist" aria-label="Chọn khu giảng đường">
                   {buildings.map((b) => {
                     const busy = b.in_session_count;
                     const free = Math.max(0, b.total_rooms - busy - b.maintenance_count);
@@ -589,23 +598,23 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                         role="tab"
                         aria-selected={active}
                         onClick={() => setSelectedBuilding(active ? null : b.building_code)}
-                        className={`min-h-[44px] text-left rounded-xl border px-3.5 py-2.5 transition cursor-pointer ${
+                        className={`min-h-[48px] text-left rounded-xl border p-3 transition cursor-pointer flex flex-col justify-between ${
                           active
-                            ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 ring-1 ring-emerald-600/40'
+                            ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 ring-1 ring-emerald-600/40 shadow-xs'
                             : 'border-slate-200 dark:border-white/10 bg-slate-50 hover:bg-white dark:bg-slate-900/50 dark:hover:bg-slate-800'
                         }`}
                       >
-                        <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                        <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white truncate">
                           <Building2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
-                          {b.building_name}
+                          <span className="truncate">{b.building_name}</span>
                         </span>
-                        <span className="mt-1 flex items-center gap-3 text-xs font-mono tabular-nums">
+                        <span className="mt-1.5 flex items-center justify-between text-xs font-mono tabular-nums border-t border-slate-200/60 dark:border-white/[0.04] pt-1">
                           <span className="text-slate-700 dark:text-slate-300">{b.total_rooms} phòng</span>
                           <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
                             <span className="w-2 h-2 rounded-full bg-slate-400" /> {free} trống
                           </span>
-                          <span className="flex items-center gap-1 font-bold text-red-700 dark:text-red-400">
-                            <span className="w-2 h-2 rounded-full bg-red-500" /> {busy} bận
+                          <span className="flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" /> {busy} đang dạy
                           </span>
                         </span>
                       </button>
@@ -629,71 +638,69 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   </div>
                 ) : (
                   <div
-                    className="grid gap-3.5 mt-4"
+                    className="grid gap-4 sm:gap-4.5 mt-4"
                     style={{
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                     }}
                   >
                     {floorRooms.map((room) => {
                       const isSelected = selectedRoomId === room.room_id;
-                      const status = room.computed_status;
-                      const session = room.current_session;
+                      const session = sessions.find((s) =>
+                        (room.current_session?.schedule_id && s.schedule_id === room.current_session.schedule_id) ||
+                        (s.room_id && s.room_id === room.room_id) ||
+                        (s.venue_name && room.room_name && s.venue_name.trim().toLowerCase() === room.room_name.trim().toLowerCase())
+                      ) || room.current_session;
+                      const status = session ? 'IN_SESSION' : room.computed_status;
                       const upcoming = room.upcoming_session;
 
                       return (
                         <div
                           key={room.room_id}
                           onClick={() => handleSelectRoom(room.room_id)}
-                          className={`rounded-2xl border p-4 transition-all duration-200 flex flex-col justify-between cursor-pointer relative group ${
+                          className={`rounded-2xl border p-4 sm:p-4.5 transition-all duration-200 flex flex-col justify-between cursor-pointer relative group ${
                             isSelected
                               ? 'ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-[#111827] shadow-lg scale-[1.01] border-emerald-500'
                               : 'hover:shadow-md hover:-translate-y-0.5'
                           } ${
                             status === 'IN_SESSION'
-                              ? 'bg-red-50/80 dark:bg-red-950/30 border-red-500/60'
+                              ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-500/60'
                               : status === 'ALERT'
                               ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-500/60 shadow-rose-500/5'
                               : status === 'UPCOMING'
                               ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400/60'
                               : status === 'MAINTENANCE'
                               ? 'bg-slate-100/80 dark:bg-slate-900/60 border-slate-300 dark:border-slate-700 opacity-80'
-                              : 'bg-slate-100 hover:bg-slate-50 dark:bg-slate-800/50 dark:hover:bg-slate-800 border-slate-300 dark:border-white/[0.08] shadow-2xs hover:shadow-xs'
+                              : 'bg-white hover:bg-slate-50 dark:bg-slate-800/50 dark:hover:bg-slate-800 border-slate-200/90 dark:border-white/[0.08] shadow-2xs hover:shadow-xs'
                           }`}
                         >
-                          {/* Room Header: Code, Name, Capacity */}
                           <div>
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 font-mono shadow-2xs ${
+                            {/* Dòng 1: Mã Phòng & Tầng (bên trái) + Huy hiệu Trạng thái (bên phải) */}
+                            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-white/[0.06]">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs shrink-0 shadow-2xs ${
                                   status === 'IN_SESSION'
-                                    ? 'bg-red-600 text-white shadow-xs'
+                                    ? 'bg-emerald-600 text-white shadow-xs'
                                     : status === 'ALERT'
                                     ? 'bg-rose-600 text-white animate-pulse'
                                     : status === 'MAINTENANCE'
                                     ? 'bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                                     : status === 'UPCOMING'
                                     ? 'bg-amber-500 text-white shadow-xs'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700'
                                 }`}>
-                                  {room.room_id.replace(/^RM-|^H\d+-/i, '') || room.room_id.slice(-3)}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="font-extrabold text-sm text-slate-900 dark:text-white truncate" title={room.room_name}>
-                                    {room.room_name}
-                                  </div>
-                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium">
-                                    <Users className="w-3 h-3 shrink-0" />
-                                    <span>Sức chứa: <strong className="font-mono text-slate-700 dark:text-slate-300">{room.capacity}</strong> HV</span>
-                                  </div>
-                                </div>
+                                  {room.room_id.replace(/^RM-|^H\d+-/i, '') || room.room_id}
+                                </span>
+                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
+                                  Tầng {room.floor_number || 1}
+                                </span>
                               </div>
 
                               {/* Status Badge */}
                               <div className="shrink-0">
                                 {status === 'IN_SESSION' ? (
-                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300 border border-red-300 dark:border-red-500/40 flex items-center gap-1.5 whitespace-nowrap">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                                    BẬN
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 flex items-center gap-1.5 whitespace-nowrap shadow-2xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    ĐANG DẠY
                                   </span>
                                 ) : status === 'ALERT' ? (
                                   <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 flex items-center gap-1 whitespace-nowrap animate-pulse">
@@ -710,29 +717,40 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                     BẢO TRÌ
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600 dark:bg-slate-700/60 dark:text-slate-300 border border-slate-300 dark:border-slate-600 whitespace-nowrap">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
                                     TRỐNG
                                   </span>
                                 )}
                               </div>
                             </div>
 
+                            {/* Dòng 2: Tên Giảng Đường (Toàn bộ bề ngang thẻ — không bao giờ bị cắt xén) */}
+                            <div className="mt-2.5">
+                              <h4 className="font-extrabold text-base text-slate-900 dark:text-white leading-snug line-clamp-2" title={room.room_name}>
+                                {room.room_name}
+                              </h4>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-1 font-medium">
+                                <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>Sức chứa: <strong className="font-mono text-slate-800 dark:text-slate-200">{room.capacity ? `${room.capacity} học viên` : 'Chưa thiết lập'}</strong></span>
+                              </div>
+                            </div>
+
                             {/* Session Information Snippet */}
                             {session && (
-                              <div className="mt-3 p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-red-200/80 dark:border-white/[0.06] space-y-1.5 text-xs">
+                              <div className="mt-3 p-3 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-emerald-200/90 dark:border-white/[0.08] space-y-2 text-xs shadow-2xs">
                                 <div className="font-bold text-slate-900 dark:text-white line-clamp-1 flex items-center gap-1.5">
                                   {session.is_restricted ? (
                                     <ShieldCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                                   ) : (
-                                    <Monitor className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                                    <Monitor className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                   )}
                                   <span className="truncate">{session.lecture_title}</span>
                                 </div>
-                                <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
+                                <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 gap-2">
                                   <span className="truncate">
                                     GV: <strong className="text-slate-800 dark:text-slate-200">{session.presenter_rank ? `${session.presenter_rank} ` : ''}{session.presenter_name}</strong>
                                   </span>
-                                  <span className="font-mono text-red-700 dark:text-red-400 font-bold shrink-0">
+                                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold shrink-0 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
                                     {session.student_count || 0} HV
                                   </span>
                                 </div>
@@ -745,16 +763,18 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                     ? Math.round(((session.slide_index || 1) / session.slide_total) * 100)
                                     : 10;
                                   return (
-                                    <div className="pt-1">
-                                      <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="pt-1 space-y-1.5">
+                                      <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner">
                                         <div
-                                          className="h-full bg-red-500 rounded-full transition-all"
+                                          className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 rounded-full transition-all duration-500 shadow-xs"
                                           style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
                                         />
                                       </div>
-                                      <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-mono">
+                                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                                         <span>Đã dạy {session.duration_minutes || 0}p</span>
-                                        <span>Tiến độ {pct}%</span>
+                                        <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                                          {session.slide_total ? `Slide ${session.slide_index || 1}/${session.slide_total} • ` : ''}Tiến độ {pct}%
+                                        </span>
                                       </div>
                                     </div>
                                   );
@@ -764,7 +784,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                             {/* Upcoming Info */}
                             {!session && upcoming && (
-                              <div className="mt-3 p-2 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/40 text-xs space-y-1">
+                              <div className="mt-3 p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/40 text-xs space-y-1">
                                 <div className="font-bold text-amber-900 dark:text-amber-300 truncate">
                                   Ca tiếp theo: {upcoming.lecture_title}
                                 </div>
@@ -776,27 +796,28 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                             {/* Maintenance Reason */}
                             {status === 'MAINTENANCE' && (
-                              <div className="mt-3 p-2 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-400">
+                              <div className="mt-3 p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-400">
                                 <span className="font-medium">{room.maintenance_reason || 'Bảo trì kỹ thuật định kỳ'}</span>
                               </div>
                             )}
 
                             {/* Available Empty Cue */}
                             {status === 'AVAILABLE' && (
-                              <div className="mt-3 py-2 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-900/40 border border-dashed border-slate-200/90 dark:border-slate-800 rounded-xl">
-                                <span>Phòng sẵn sàng tiếp nhận ca dạy</span>
+                              <div className="mt-3 py-3 px-3 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/70 dark:bg-slate-900/40 border border-dashed border-slate-200/90 dark:border-slate-800 rounded-xl flex items-center justify-center gap-2">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span>Phòng sẵn sàng tiếp nhận ca giảng dạy</span>
                               </div>
                             )}
                           </div>
 
                           {/* Footer Action Hint */}
-                          <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-[11px] text-slate-400">
+                          <div className="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-[11px] text-slate-400">
                             <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">
                               Hàng {room.grid_row} • Cột {room.grid_col}
                             </span>
                             <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform whitespace-nowrap shrink-0">
                               <span>Chi tiết</span>
-                              <ArrowRight className="w-3 h-3" />
+                              <ArrowRight className="w-3.5 h-3.5" />
                             </span>
                           </div>
                         </div>
@@ -809,7 +830,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
             {/* ── COLUMN 3: INSPECTOR (DOCK PANEL ON >= 1200PX) ── */}
             {isDesktop && activeRoom && (
-              <div className="w-80 lg:w-84 shrink-0 sticky top-4 space-y-3 animate-in fade-in slide-in-from-right-4 duration-200">
+              <div className="w-84 lg:w-92 xl:w-96 shrink-0 sticky top-4 space-y-3 animate-in fade-in slide-in-from-right-4 duration-200">
                 <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 sm:p-5 shadow-xs space-y-4">
                   {/* Header */}
                   <div className="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-white/[0.04]">
@@ -820,8 +841,12 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                       <h4 className="font-black text-base text-slate-900 dark:text-white mt-0.5 truncate">
                         {activeRoom.room_name}
                       </h4>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                        {activeRoom.building_name} • Tầng {activeRoom.floor_number} • Sức chứa {activeRoom.capacity} HV
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">{activeRoom.building_name}</span>
+                        <span>•</span>
+                        <span>Tầng {activeRoom.floor_number}</span>
+                        <span>•</span>
+                        <span className="font-mono font-medium">Sức chứa {activeRoom.capacity} HV</span>
                       </div>
                     </div>
 
@@ -857,22 +882,22 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                     </div>
                   </div>
 
-                    {/* Active Session in Inspector */}
-                    {roomDetail?.current_session ? (
+                    {/* Active Session in Inspector (Đồng bộ thời gian thực siêu tốc) */}
+                    {activeSession ? (
                       <div className="space-y-3">
                         <div className="p-3.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-300/80 dark:border-emerald-800/40 space-y-2">
                           <div className="flex items-center justify-between text-xs font-bold text-emerald-900 dark:text-emerald-300">
                             <span className="flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                              ĐANG DIỄN RA
+                              ĐANG GIẢNG BÀI
                             </span>
-                            <span className="font-mono">
-                              Đã dạy {roomDetail.current_session.duration_minutes || 0} phút
+                            <span className="font-mono text-emerald-700 dark:text-emerald-400">
+                              Đã dạy {activeSession.duration_minutes || 0} phút
                             </span>
                           </div>
 
                           <div className="font-black text-sm text-slate-900 dark:text-white">
-                            {roomDetail.current_session.lecture_title}
+                            {activeSession.lecture_title}
                           </div>
 
                           {/* Presenter & Class */}
@@ -880,26 +905,26 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                             <div className="flex items-center justify-between">
                               <span className="text-slate-500">Giảng viên:</span>
                               <strong className="text-slate-900 dark:text-white">
-                                {roomDetail.current_session.presenter_rank ? `${roomDetail.current_session.presenter_rank} ` : ''}
-                                {roomDetail.current_session.presenter_name}
+                                {activeSession.presenter_rank ? `${activeSession.presenter_rank} ` : ''}
+                                {activeSession.presenter_name}
                               </strong>
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-slate-500">Lớp học:</span>
                               <strong className="text-slate-900 dark:text-white">
-                                {roomDetail.current_session.class_name}
+                                {activeSession.class_name}
                               </strong>
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-slate-500">Sĩ số tham gia:</span>
                               <strong className="font-mono text-emerald-700 dark:text-emerald-400">
-                                {roomDetail.current_session.student_count || 0} học viên
+                                {activeSession.student_count || 0} học viên
                               </strong>
                             </div>
                           </div>
 
                           {/* 🆕 TIẾN ĐỘ BÀI GIẢNG ĐẲNG CẤP TRÊN INSPECTOR */}
-                          {renderLectureProgressBox(roomDetail.current_session)}
+                          {renderLectureProgressBox(activeSession)}
                         </div>
 
                         {/* Inspector Actions */}
@@ -908,7 +933,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                const s = roomDetail.current_session!;
+                                const s = activeSession;
                                 setConfirmTarget({
                                   scheduleId: s.schedule_id,
                                   lectureTitle: s.lecture_title,
@@ -917,7 +942,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                   isForce: true,
                                 });
                               }}
-                              disabled={endingId === roomDetail.current_session.schedule_id}
+                              disabled={endingId === activeSession.schedule_id}
                               className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800/40 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50"
                             >
                               <Square className="w-3.5 h-3.5 fill-current" />
@@ -1023,7 +1048,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                       <RefreshCw className="w-6 h-6 animate-spin text-emerald-600" />
                       <span className="text-xs">Đang tải dữ liệu giảng đường...</span>
                     </div>
-                  ) : roomDetail?.current_session ? (
+                  ) : activeSession ? (
                     <div className="space-y-4">
                       {/* Active Session Card */}
                       <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-300/80 dark:border-emerald-800/40 space-y-3">
@@ -1033,12 +1058,12 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                             ĐANG GIẢNG BÀI
                           </span>
                           <span className="font-mono">
-                            Đã dạy {roomDetail.current_session.duration_minutes || 0} phút
+                            Đã dạy {activeSession.duration_minutes || 0} phút
                           </span>
                         </div>
 
                         <div className="font-black text-base text-slate-900 dark:text-white">
-                          {roomDetail.current_session.lecture_title}
+                          {activeSession.lecture_title}
                         </div>
 
                         {/* Details */}
@@ -1046,26 +1071,26 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                           <div className="flex items-center justify-between">
                             <span className="text-slate-500">Giảng viên:</span>
                             <strong className="text-slate-900 dark:text-white">
-                              {roomDetail.current_session.presenter_rank ? `${roomDetail.current_session.presenter_rank} ` : ''}
-                              {roomDetail.current_session.presenter_name}
+                              {activeSession.presenter_rank ? `${activeSession.presenter_rank} ` : ''}
+                              {activeSession.presenter_name}
                             </strong>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-slate-500">Lớp học:</span>
                             <strong className="text-slate-900 dark:text-white">
-                              {roomDetail.current_session.class_name}
+                              {activeSession.class_name}
                             </strong>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-slate-500">Sĩ số học viên:</span>
                             <strong className="font-mono text-emerald-700 dark:text-emerald-400">
-                              {roomDetail.current_session.student_count || 0} học viên
+                              {activeSession.student_count || 0} học viên
                             </strong>
                           </div>
                         </div>
 
                         {/* 🆕 TIẾN ĐỘ BÀI GIẢNG ĐẲNG CẤP TRÊN DRAWER */}
-                        {renderLectureProgressBox(roomDetail.current_session)}
+                        {renderLectureProgressBox(activeSession)}
                       </div>
 
                       {/* End button for admin */}
@@ -1073,7 +1098,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            const s = roomDetail.current_session!;
+                            const s = activeSession;
                             setConfirmTarget({
                               scheduleId: s.schedule_id,
                               lectureTitle: s.lecture_title,
@@ -1082,7 +1107,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                               isForce: true,
                             });
                           }}
-                          disabled={endingId === roomDetail.current_session.schedule_id}
+                          disabled={endingId === activeSession.schedule_id}
                           className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800/40 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer disabled:opacity-50"
                         >
                           <Square className="w-4 h-4 fill-current" />

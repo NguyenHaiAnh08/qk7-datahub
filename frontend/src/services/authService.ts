@@ -307,6 +307,15 @@ export const authService = {
     Object.values(STORAGE_KEYS).forEach((key) => {
       sessionStorage.removeItem(key);
     });
+    // Xóa sạch cookie phiên cũ để chống gửi cookie hết hạn gây lỗi HTTP 401
+    if (typeof document !== 'undefined') {
+      try {
+        const expiredCookies = ['qk7_session', 'qk7_token', 'token'];
+        expiredCookies.forEach((c) => {
+          document.cookie = `${c}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
+        });
+      } catch (_) {}
+    }
     // Xóa sạch toàn bộ token vân tay tài liệu còn lưu trong sessionStorage
     if (typeof window !== 'undefined') {
       try {

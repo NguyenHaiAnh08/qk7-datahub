@@ -16,6 +16,7 @@ import { CreateLectureModal } from '../components/lectures/CreateLectureModal';
 import { StartSessionModal } from '../components/lectures/StartSessionModal';
 import { TeachingHistoryPanel } from '../components/lectures/TeachingHistoryPanel';
 import { LectureDetailModal } from '../components/lectures/LectureDetailModal';
+import { LectureViewerModal } from '../components/lectures/LectureViewerModal';
 import { LiveSessionRoom } from '../components/lectures/LiveSessionRoom';
 import { RejectReasonModal } from '../components/lectures/RejectReasonModal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -129,6 +130,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [startSessionLecture, setStartSessionLecture] = useState<Lecture | null>(null);
   const [viewingLecture, setViewingLecture] = useState<Lecture | null>(null);
+  const [readingLecture, setReadingLecture] = useState<Lecture | null>(null);
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
 
   // Trạng thái chờ quét vân tay để mở ca dạy đối với bài giảng Cấp 3+
@@ -496,8 +498,13 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
 
   const meta = PAGE_META[mode];
   const HeroIcon = mode === 'history' ? Clock : mode === 'compose' ? FileText : BookOpen;
+  const isGuest = !user || user.user_id === 'GUEST';
 
-  if (mode === 'list' && searchParams.get('tab') === 'history') {
+  if (isGuest && mode === 'history') {
+    return <Navigate to={ROUTE_PATHS.LECTURES} replace />;
+  }
+
+  if (!isGuest && mode === 'list' && searchParams.get('tab') === 'history') {
     return <Navigate to={ROUTE_PATHS.LECTURES_HISTORY} replace />;
   }
 
@@ -569,6 +576,21 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
               )}
             </div>
           </div>
+
+          {/* Thông báo chế độ Đại biểu tham quan */}
+          {(user?.user_id === 'GUEST' || !user || !user.user_id) && (
+            <div className="px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-300">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="font-medium">
+                  <strong>Chế độ Đại biểu tham quan:</strong> Đồng chí đang xem các bài giảng điện tử đã xuất bản ở cấp độ <strong>Công khai (Cấp 1)</strong> của Trường Quân sự Quân khu 7.
+                </span>
+              </div>
+              <span className="hidden sm:inline-block font-mono text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-md font-bold uppercase shrink-0">
+                Chỉ đọc
+              </span>
+            </div>
+          )}
 
           {/* Cụm KPI Telemetry Cards tích hợp RollingNumber cuộn số cơ học như Tổng Quan */}
           {mode === 'compose' && (
@@ -782,6 +804,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                       onPurge={() => handlePurge(lec)}
                       onEdit={() => handleEditClick(lec)}
                       onView={() => setViewingLecture(lec)}
+                      onRead={() => setReadingLecture(lec)}
                       onStartSession={() => {
                         // KIỂM TRA CẤP ĐỘ BẢO MẬT
                         if (lec.security_level_id >= 3) {
@@ -879,6 +902,18 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
         open={!!viewingLecture}
         lecture={viewingLecture}
         onClose={() => setViewingLecture(null)}
+        onOpenReader={() => {
+          if (viewingLecture) {
+            setReadingLecture(viewingLecture);
+          }
+        }}
+      />
+
+      {/* Modal Đọc / Xem Bài Giảng Số Trực Tuyến */}
+      <LectureViewerModal
+        open={!!readingLecture}
+        lecture={readingLecture}
+        onClose={() => setReadingLecture(null)}
       />
 
       {/* Modal từ chối phê duyệt (thay thế window.prompt) */}

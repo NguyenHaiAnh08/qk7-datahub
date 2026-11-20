@@ -14,8 +14,9 @@ export const HttpErrorListener: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ FIX: Dùng Ref để chặn spam Toast 403 (giới hạn 1 lần / 2 giây)
+  // ✅ FIX: Dùng Ref để chặn spam Toast 403 & 401 (giới hạn 1 lần / 2 giây)
   const last403TimeRef = useRef<number>(0);
+  const last401TimeRef = useRef<number>(0);
 
   useEffect(() => {
     const handleHttpError = (event: Event) => {
@@ -36,7 +37,18 @@ export const HttpErrorListener: React.FC = () => {
       const isGuest = currentUser?.user_id === 'GUEST';
 
       // === 401: session hết hạn — clear + redirect ===
-      if (status === 401 && !isLoginRequest && !isGuest) {
+      if (status === 401) {
+        if (isGuest || isLoginRequest) {
+          // Phiên khách hoặc login sai không bao giờ ném lỗi phiên hết hạn
+          return;
+        }
+
+        const now = Date.now();
+        if (now - last401TimeRef.current < 2000) {
+          return;
+        }
+        last401TimeRef.current = now;
+
         try {
           authService.clearSession();
         } catch {
@@ -66,6 +78,10 @@ export const HttpErrorListener: React.FC = () => {
       if (isAlreadyOnErrorPage) return;
 
       switch (status) {
+        case 401:
+          // Đã xử lý ở trên, không hiển thị popup mặc định
+          break;
+
         case 403: {
           // ✅ FIX: Chặn spam 403 (chỉ hiện 1 lần trong 2 giây)
           const now = Date.now();

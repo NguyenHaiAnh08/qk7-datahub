@@ -78,6 +78,8 @@ export interface TrainingClass {
 export interface TeachingSchedule {
   schedule_id: string;
   lecture_id: string;
+  room_id?: string;
+  is_restricted?: boolean;
   lecture_title?: string;
   subject_name?: string;
   presenter_id: string;
@@ -253,6 +255,7 @@ export interface RadarSessionSummary {
   slide_index?: number;
   slide_total?: number;
   scorm_progress?: number;
+  current_page?: number;
   is_hanging?: boolean;
   content_type?: ContentType;
   subject_name?: string;

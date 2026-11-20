@@ -13,18 +13,32 @@ module.exports = function createLectureExtendedRoutes({
   // Dùng LECTURE_QUIZ_QUESTION + LECTURE_QUIZ_ATTEMPT
   // ══════════════════════════════════════════════════════════
 
-  router.get('/:lectureId/quiz', requireAuth, requirePermission('LECTURE_VIEW'),
-    async (req, res) => {
-      try {
-        const pool = await getPool();
-        const r = await pool.request()
+  router.get('/:lectureId/quiz', async (req, res) => {
+    try {
+      const pool = await getPool();
+      const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST';
+      if (isGuest) {
+        const check = await pool.request()
           .input('lid', sql.VarChar(50), req.params.lectureId)
-          .query(`SELECT * FROM LECTURE_QUIZ_QUESTION
-                  WHERE lecture_id = @lid AND active = 1
-                  ORDER BY question_order, question_id`);
-        res.json({ total: r.recordset.length, items: r.recordset });
-      } catch (e) { res.status(500).json({ error: e.message }); }
-    });
+          .query(`SELECT status, security_level_id FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
+        const lec = check.recordset[0];
+        if (!lec || lec.status !== 'PUBLISHED' || lec.security_level_id !== 1) {
+          return res.status(403).json({ error: 'Đại biểu chỉ được xem câu hỏi bài giảng công khai' });
+        }
+      } else {
+        const perms = req.user?.permissions || [];
+        if (!perms.includes('LECTURE_VIEW')) {
+          return res.status(403).json({ error: 'Bạn không có quyền LECTURE_VIEW' });
+        }
+      }
+      const r = await pool.request()
+        .input('lid', sql.VarChar(50), req.params.lectureId)
+        .query(`SELECT * FROM LECTURE_QUIZ_QUESTION
+                WHERE lecture_id = @lid AND active = 1
+                ORDER BY question_order, question_id`);
+      res.json({ total: r.recordset.length, items: r.recordset });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
 
   router.post('/:lectureId/quiz', requireAuth, requirePermission('LECTURE_QUIZ_MANAGE'),
     async (req, res) => {

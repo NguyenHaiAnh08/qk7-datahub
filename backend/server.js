@@ -629,40 +629,71 @@ app.use('/api', async (req, res, next) => {
     req.path.startsWith('/test-http-error');
   if (isPublic) return next();
 
+  const isGuestMode = req.headers['x-guest-mode'] === 'true';
+
   let rawToken = null;
+  let tokenSource = null;
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     rawToken = authHeader.slice(7).trim();
+    tokenSource = 'header';
   } else if (req.query && req.query.token) {
     rawToken = String(req.query.token).trim();
+    tokenSource = 'query';
   } else if (req.headers['x-access-token']) {
     rawToken = String(req.headers['x-access-token']).trim();
-  } else if (req.headers.cookie) {
+    tokenSource = 'header';
+  } else if (!isGuestMode && req.headers.cookie) {
     const match = req.headers.cookie.match(/(?:^|;\s*)(?:qk7_session|qk7_token|token)=([^;]+)/);
-    if (match) rawToken = decodeURIComponent(match[1]).trim();
+    if (match) {
+      rawToken = decodeURIComponent(match[1]).trim();
+      tokenSource = 'cookie';
+    }
   }
 
-    if (!rawToken) {
-    // ✅ P1-2: Anonymous KHÔNG có quyền gì
-    // - clearance=1 để không phá logic query hiện có (1 = Cấp Công khai)
-    // - permissions=[] để requirePermission chặn mọi thao tác ghi
-    // - KHÔNG set is_guest (chỉ Guest Session mới có is_guest=true)
+  // Helper gán người dùng Khách / Đại biểu vãng lai an toàn (chỉ Cấp 1 Công khai)
+  const assignGuestUser = () => {
     req.user = {
-      user_id: 'ANONYMOUS',
-      full_name: 'Khách',
+      user_id: 'GUEST',
+      full_name: 'Đại biểu',
       clearance_level_id: 1,
-      roles: [],
-      permissions: [],
+      roles: ['DELEGATE'],
+      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD', 'LECTURE_VIEW'],
       is_authenticated: false,
+      is_guest: true,
       is_anonymous: true,
     };
+  };
+
+  if (!rawToken || isGuestMode) {
+    assignGuestUser();
     return next();
   }
+  const isPublicGetEndpoint =
+    req.method === 'GET' &&
+    (req.path === '/api/documents' ||
+     req.path === '/api/meta' ||
+     req.path === '/api/health' ||
+     req.path.startsWith('/api/files/') ||
+     req.path.startsWith('/api/lectures')) &&
+    !req.path.includes('/my-unit') &&
+    !req.path.includes('/trash') &&
+    !req.path.includes('/proposals');
+
   try {
     const decoded = jwt.verify(rawToken, JWT_SECRET);
 
     const sess = await validateSession({ token: rawToken, ip: getClientIp(req) });
     if (!sess.valid) {
+      // Nếu token chỉ nằm ở cookie (trình duyệt tự đính kèm cookie cũ) hoặc đang gọi endpoint công khai, fallback sang Guest thay vì ném 401
+      if (tokenSource === 'cookie' || isPublicGetEndpoint) {
+        res.clearCookie('qk7_session');
+        res.clearCookie('qk7_token');
+        res.clearCookie('token');
+        assignGuestUser();
+        return next();
+      }
+
       // ✅ IP_CHANGED → yêu cầu re-auth (khác với SESSION_INVALID thông thường)
       if (sess.reason === 'IP_CHANGED' || sess.requires_reauth) {
         return res.status(401).json({
@@ -695,6 +726,13 @@ app.use('/api', async (req, res, next) => {
     };
     return next();
   } catch (err) {
+    if (tokenSource === 'cookie' || isPublicGetEndpoint) {
+      res.clearCookie('qk7_session');
+      res.clearCookie('qk7_token');
+      res.clearCookie('token');
+      assignGuestUser();
+      return next();
+    }
     return res.status(401).json({ error: 'Token không hợp lệ hoặc hết hạn', code: 'TOKEN_INVALID' });
   }
 });
@@ -2091,10 +2129,32 @@ app.get('/api/test-http-error/:code', (req, res) => {
 app.get('/api/meta', async (req, res) => {
   try {
     const pool = await getPool();
+
+    // Lấy cấp độ bảo mật của user (nếu đã đăng nhập hoặc gửi Bearer token)
+    let userClearance = null;
+    if (req.user?.is_authenticated) {
+      userClearance = req.user.clearance_level_id || 1;
+    } else {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7).trim();
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET);
+          if (decoded && decoded.clearance_level_id) {
+            userClearance = decoded.clearance_level_id;
+          }
+        } catch (_) {}
+      }
+    }
+
+    const levelQuery = (userClearance && !req.query.all)
+      ? `SELECT level_id, code, name FROM SECURITY_LEVEL WHERE level_id <= ${parseInt(userClearance, 10)} ORDER BY level_id`
+      : `SELECT level_id, code, name FROM SECURITY_LEVEL ORDER BY level_id`;
+
     const [types, units, levels, ranks, positions] = await Promise.all([
       pool.request().query(`SELECT type_id, name, description FROM DOCUMENT_TYPE ORDER BY name`),
       pool.request().query(`SELECT u.unit_id, u.name, u.parent_id, u.unit_type, p.name AS parent_name FROM UNIT u LEFT JOIN UNIT p ON p.unit_id = u.parent_id ORDER BY u.name`),
-      pool.request().query(`SELECT level_id, code, name FROM SECURITY_LEVEL ORDER BY level_id`),
+      pool.request().query(levelQuery),
       pool.request().query(`SELECT rank_id, name, sort_order FROM MILITARY_RANK WHERE active = 1 ORDER BY sort_order, name`),
       pool.request().query(`SELECT position_id, name, sort_order FROM MILITARY_POSITION WHERE active = 1 ORDER BY sort_order, name`),
     ]);
@@ -2631,7 +2691,7 @@ app.post('/api/documents/upload', requireAuth, requirePermission('DOC_UPLOAD'), 
 
     // ─────────────────────────────────────────────────────────────
     // 4. Chuẩn bị đường dẫn lưu trữ
-    // [STORAGE-HELPER] Cấu trúc: uploads/du-lieu-so/YYYY/MM/<file>.pdf
+    // [STORAGE-HELPER] Cấu trúc: uploads/van-ban-so/YYYY/MM/<file>.pdf
     // ─────────────────────────────────────────────────────────────
     const { getModuleUploadPath, MODULES } = require('./src/storage-helper');
 
@@ -2831,6 +2891,11 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       return res.status(400).json(INVALID_UNIT_RESPONSE(issuing_unit_id));
     }
 
+    const requestedLevel = parseInt(security_level_id, 10);
+    if (isNaN(requestedLevel) || requestedLevel < 1 || requestedLevel > 5) {
+      return res.status(400).json({ error: 'Mức bảo mật không hợp lệ (phải từ 1 đến 5).' });
+    }
+
     const userRoles = await resolveUserRoles(req.user);
     const isAdmin =
       userRoles.includes('ROL-01') ||
@@ -2839,6 +2904,20 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
       (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
     const isOwner = (oldDoc.uploaded_by && oldDoc.uploaded_by === req.user.user_id);
+
+    // ✅ Enforce clearance level: Người dùng không được phép cập nhật tài liệu vượt mức bảo mật của mình
+    if (!isAdmin && requestedLevel > (req.user?.clearance_level_id || 1)) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId,
+        action: 'UPDATE_DENIED_CLEARANCE',
+        ip: getClientIp(req),
+        note: `Cố cập nhật tài liệu Cấp ${requestedLevel} nhưng clearance chỉ ${req.user?.clearance_level_id || 1}`,
+      });
+      return res.status(403).json({
+        error: `Bạn chỉ được phân loại tài liệu Cấp ${req.user?.clearance_level_id || 1} trở xuống.`,
+        code: 'CLEARANCE_EXCEEDED',
+      });
+    }
 
     // Ràng buộc nghiệp vụ: Nếu Trợ lý, Văn thư, Cơ yếu, IT sửa file do NGƯỜI KHÁC đăng -> Chuyển vào trạng thái treo (PENDING)
     // Quyền DOC_EDIT đang bị khóa duyệt → cả người đăng cũng phải gửi đề xuất (Admin vẫn sửa thẳng)
@@ -2856,12 +2935,14 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
       if (req.file) {
         newSha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
         const sha8 = newSha256.slice(0, 8);
-        const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+        const { getModuleUploadPath: getModPath, MODULES: modConsts } = require('./src/storage-helper');
+        const { yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
           docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
         });
         const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
-        const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
-        const absPath = safePathJoin(ROOT_DIR, relPath);
+        const { absPath: folderAbsPath, relPath: folderRelPath } = getModPath(modConsts.DOCUMENTS, new Date());
+        const relPath = `${folderRelPath}/${fileName}`;
+        const absPath = path.join(folderAbsPath, fileName);
         if (absPath) {
           fs.mkdirSync(path.dirname(absPath), { recursive: true });
           fs.writeFileSync(absPath, req.file.buffer);
@@ -2955,15 +3036,17 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     let replacedFile = false;
 
     if (req.file) {
-      const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+      const { getModuleUploadPath: getModPath, MODULES: modConsts } = require('./src/storage-helper');
+      const { yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
         docTypeId: doc_type_id, documentCode: document_code, fallbackId: fileId,
       });
       sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
       const sha8 = sha256.slice(0, 8);
       const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
-      const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
+      const { absPath: folderAbsPath, relPath: folderRelPath } = getModPath(modConsts.DOCUMENTS, new Date());
+      const relPath = `${folderRelPath}/${fileName}`;
+      const absPath = path.join(folderAbsPath, fileName);
       if (!validateStoredPath(relPath)) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
-      const absPath = safePathJoin(ROOT_DIR, relPath);
       if (!absPath) return res.status(400).json({ error: 'Đường dẫn không hợp lệ' });
 
       fs.mkdirSync(path.dirname(absPath), { recursive: true });
@@ -3332,13 +3415,15 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
   let replacedFile = false;
 
   if (prop.new_stored_path) {
-    const { yyyy, mm, yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
+    const { getModuleUploadPath: getModPath, MODULES: modConsts } = require('./src/storage-helper');
+    const { yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
       docTypeId: prop.doc_type_id, documentCode: prop.document_code, fallbackId: prop.file_id,
     });
     const sha8 = (prop.new_sha256 || '00000000').slice(0, 8);
     const fileName = `${yyyymmdd}_${typeSafe}_${codeSafe}_${sha8}.pdf`;
-    const relPath = `uploads/${yyyy}/${mm}/${fileName}`;
-    const absPath = safePathJoin(ROOT_DIR, relPath);
+    const { absPath: folderAbsPath, relPath: folderRelPath } = getModPath(modConsts.DOCUMENTS, new Date());
+    const relPath = `${folderRelPath}/${fileName}`;
+    const absPath = path.join(folderAbsPath, fileName);
     const propAbs = safePathJoin(ROOT_DIR, prop.new_stored_path);
 
     if (absPath && propAbs && fs.existsSync(propAbs)) {
@@ -3673,7 +3758,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     req.user = {
       user_id: 'GUEST',
       full_name: 'Đại biểu',
-      clearance_level_id: 2, // Cho phép đại biểu xem và tải tài liệu Cấp 1 & 2
+      clearance_level_id: 1, // Đại biểu chỉ được duy nhất là công khai (Cấp 1)
       roles: ['DELEGATE'],
       permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
       is_authenticated: false,
@@ -3811,6 +3896,18 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     }
 
     let filePath = safePathJoin(ROOT_DIR, doc.stored_path);
+    if (!filePath || !fs.existsSync(filePath)) {
+      // [FALLBACK RESOLVER] Tương thích ngược/xuôi giữa uploads/2026/ và uploads/van-ban-so/2026/
+      if (doc.stored_path && doc.stored_path.startsWith('uploads/2026/')) {
+        const altRel = doc.stored_path.replace('uploads/2026/', 'uploads/van-ban-so/2026/');
+        const altPath = safePathJoin(ROOT_DIR, altRel);
+        if (altPath && fs.existsSync(altPath)) filePath = altPath;
+      } else if (doc.stored_path && doc.stored_path.startsWith('uploads/van-ban-so/2026/')) {
+        const altRel = doc.stored_path.replace('uploads/van-ban-so/2026/', 'uploads/2026/');
+        const altPath = safePathJoin(ROOT_DIR, altRel);
+        if (altPath && fs.existsSync(altPath)) filePath = altPath;
+      }
+    }
     if (!filePath || !fs.existsSync(filePath)) {
       const sha8 = doc.sha256 ? String(doc.sha256).trim().slice(0, 8) : null;
       const fb = findPdfBySha8(PDF_ROOT, sha8, 5);
@@ -4247,7 +4344,7 @@ app.use('/api/ai', requireAuth, aiLimiter, require('./src/ai-routes')({
   JWT_SECRET,
 }));
 
-app.use('/api/lectures', requireAuth, require('./src/lecture-routes')({
+app.use('/api/lectures', require('./src/lecture-routes')({
   requireAuth,
   requirePermission,
   requireAnyPermission,
@@ -4255,11 +4352,11 @@ app.use('/api/lectures', requireAuth, require('./src/lecture-routes')({
   getClientIp
 }));
 
-app.use('/api/lectures', requireAuth, require('./src/lecture-extended-routes')({
+app.use('/api/lectures', require('./src/lecture-extended-routes')({
   requireAuth, requirePermission, writeAccessLog, getClientIp,
 }));
 
-app.use('/api/lectures', requireAuth, require('./src/scorm-package-routes')({
+app.use('/api/lectures', require('./src/scorm-package-routes')({
   requireAuth, requirePermission, writeAccessLog, getClientIp
 }));
 

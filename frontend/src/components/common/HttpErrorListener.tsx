@@ -28,16 +28,17 @@ export const HttpErrorListener: React.FC = () => {
       if (detail.url?.includes('/fingerprint/')) return;
 
       const { status, message, url, autoRedirect } = detail;
+      const statusNum = Number(status);
 
       // 401 trên chính request login = sai mật khẩu — KHÔNG redirect để user nhập lại
       const isLoginRequest = url?.includes('/auth/login');
 
       // Nếu đang là khách (Guest), không cần redirect khi 401 (do API yêu cầu auth)
       const currentUser = authService.getCurrentSession();
-      const isGuest = currentUser?.user_id === 'GUEST';
+      const isGuest = !currentUser || currentUser?.user_id === 'GUEST';
 
       // === 401: session hết hạn — clear + redirect ===
-      if (status === 401) {
+      if (statusNum === 401) {
         if (isGuest || isLoginRequest) {
           // Phiên khách hoặc login sai không bao giờ ném lỗi phiên hết hạn
           return;
@@ -66,18 +67,18 @@ export const HttpErrorListener: React.FC = () => {
 
       // Không hiển thị popup nếu đang ở trang lỗi tương ứng
       const isAlreadyOnErrorPage =
-        location.pathname === `/error/${status}` ||
-        location.pathname === `/${status}` ||
-        (location.pathname === ROUTE_PATHS.LOGIN && status === 401);
+        location.pathname === `/error/${statusNum}` ||
+        location.pathname === `/${statusNum}` ||
+        (location.pathname === ROUTE_PATHS.LOGIN && statusNum === 401);
 
       if (autoRedirect) {
-        navigate(`/error/${status}`, { state: { message, code: status, url } });
+        navigate(`/error/${statusNum}`, { state: { message, code: statusNum, url } });
         return;
       }
 
       if (isAlreadyOnErrorPage) return;
 
-      switch (status) {
+      switch (statusNum) {
         case 401:
           // Đã xử lý ở trên, không hiển thị popup mặc định
           break;

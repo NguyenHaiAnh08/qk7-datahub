@@ -3,6 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/web/pdf_viewer.css';
 import { Loader2 } from 'lucide-react';
+import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -24,6 +25,9 @@ export interface PdfPagesViewerProps {
   highlighterColor: string;
   onStrokeCountChange?: (count: number) => void;
   highlighterRef?: React.MutableRefObject<{ undo: () => void; clear: () => void; getStrokeCount: () => number } | null>;
+  onReadingProgressChange?: (progress: ReadingProgress) => void;
+  viewerRef?: React.MutableRefObject<{ scrollToPage: (page: number) => void; scrollToTop: () => void; scrollToNext: () => void } | null>;
+  showFloatingProgressRing?: boolean;
 }
 
 export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
@@ -36,11 +40,17 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
   highlighterColor,
   onStrokeCountChange,
   highlighterRef,
+  onReadingProgressChange,
+  viewerRef,
+  showFloatingProgressRing = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number }[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(initialPage || 1);
+  const [readingPercent, setReadingPercent] = useState<number>(0);
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
 
   // Đo chiều rộng hiển thị chuẩn của container để tính toán kích thước trang đồng nhất 100% từ frame đầu tiên
   const [targetWidth, setTargetWidth] = useState<number>(() => {
@@ -232,16 +242,239 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
     };
   }, [loading, numPages, initialPage, fileId, targetWidth]);
 
+  const onReadingProgressChangeRef = useRef(onReadingProgressChange);
+  useEffect(() => {
+    onReadingProgressChangeRef.current = onReadingProgressChange;
+  }, [onReadingProgressChange]);
+
+  const hasInitializedRef = useRef<string | null>(null);
+  // Cờ dành riêng cho tài liệu 1 trang không có thanh cuộn (vừa khít màn hình) sau khi đã xem xong
+  const singlePageCompletedRef = useRef<boolean>(false);
+
+  // Cuộn mượt đến trang chỉ định
+  const scrollToPage = useCallback((pageNum: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const targetPage = Math.min(Math.max(1, pageNum), numPages);
+    const pageEl = container.querySelector(`[data-page="${targetPage}"]`) as HTMLElement;
+    if (pageEl) {
+      const containerRect = container.getBoundingClientRect();
+      const pageRect = pageEl.getBoundingClientRect();
+      const targetTop = container.scrollTop + (pageRect.top - containerRect.top) - 16;
+      container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    }
+  }, [numPages]);
+
+  // Cuộn về đầu trang (Trang 1)
+  const scrollToTop = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      if (container && container.scrollTop > 0) {
+        container.scrollTop = 0;
+      }
+    }, 350);
+  }, []);
+
+  // Cuộn xuống cuối trang (dành cho tài liệu 1 trang hoặc muốn xem nhanh khối ký duyệt)
+  const scrollToBottom = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+  }, []);
+
+  // Cuộn đến trang tiếp theo
+  const scrollToNext = useCallback(() => {
+    if (currentPage < numPages) {
+      scrollToPage(currentPage + 1);
+    } else {
+      scrollToTop();
+    }
+  }, [currentPage, numPages, scrollToPage, scrollToTop]);
+
+  // Expose các hàm điều hướng qua viewerRef
+  useEffect(() => {
+    if (!viewerRef) return;
+    viewerRef.current = {
+      scrollToPage,
+      scrollToTop,
+      scrollToNext,
+      scrollToBottom,
+    } as any;
+  }, [viewerRef, scrollToPage, scrollToTop, scrollToNext, scrollToBottom]);
+
+  // Xử lý cuộn & Scroll-Spy nhận diện trang và tiến độ đọc chuẩn UX/UI
+  const handleScroll = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || numPages <= 0) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const maxScroll = Math.max(0, scrollHeight - clientHeight);
+
+    // Scroll-Spy: Dùng BoundingClientRect so với tầm mắt người đọc (35% từ trên container xuống)
+    const containerRect = container.getBoundingClientRect();
+    const targetY = containerRect.top + containerRect.height * 0.35;
+
+    const pageEls = container.querySelectorAll<HTMLElement>('[data-page]');
+    let detectedPage = 1;
+
+    for (let i = 0; i < pageEls.length; i++) {
+      const el = pageEls[i];
+      const rect = el.getBoundingClientRect();
+      if (rect.top <= targetY && rect.bottom >= targetY) {
+        detectedPage = parseInt(el.getAttribute('data-page') || '1', 10);
+        break;
+      }
+      if (rect.top > targetY) {
+        detectedPage = Math.max(1, parseInt(el.getAttribute('data-page') || '1', 10) - 1);
+        break;
+      }
+      if (i === pageEls.length - 1) {
+        detectedPage = numPages;
+      }
+    }
+
+    let percent = 0;
+    let completed = false;
+
+    // A. XỬ LÝ CHO TÀI LIỆU CÓ 1 TRANG (numPages === 1)
+    // Người dùng mở tài liệu ban đầu BẮT BUỘC ở 0% (hoặc đang đọc).
+    // Chỉ khi cuộn xuống tới cuối trang (chạm khối ký duyệt, con dấu) mới tính ĐÃ ĐỌC XONG (100%).
+    // Khi người dùng cuộn ngược lên lại thì cập nhật đúng vị trí cuộn hiện tại, không giữ cố định 100%.
+    if (numPages === 1) {
+      if (maxScroll > 15) {
+        const isAtBottom = (scrollTop + clientHeight >= scrollHeight - 35) || (maxScroll > 0 && (scrollTop / maxScroll) >= 0.94);
+
+        if (isAtBottom) {
+          percent = 100;
+          completed = true;
+        } else if (scrollTop <= 15) {
+          percent = 0;
+          completed = false;
+        } else {
+          const scrollRatio = scrollTop / maxScroll;
+          percent = Math.min(99, Math.max(1, Math.round(scrollRatio * 100)));
+          completed = false;
+        }
+      } else {
+        // Trang ngắn vừa vặn màn hình không cần thanh cuộn
+        if (singlePageCompletedRef.current) {
+          percent = 100;
+          completed = true;
+        } else {
+          percent = 0;
+          completed = false;
+        }
+      }
+    } else {
+      // B. XỬ LÝ CHO TÀI LIỆU NHIỀU TRANG (numPages > 1)
+      // Theo dõi thời gian thực vị trí trang người dùng đang đọc:
+      // Khi cuộn ngược về các trang trước (ví dụ trang 37/121), lập tức hiển thị "Trang 37/121 (30%)".
+      // Chỉ khi cuộn đến sát đáy trang cuối cùng mới hiển thị "Đã đọc xong (100%)".
+      const isAtBottom = (scrollTop + clientHeight >= scrollHeight - 35) || (detectedPage === numPages && maxScroll > 0 && (scrollTop / maxScroll) >= 0.96);
+
+      if (isAtBottom) {
+        percent = 100;
+        completed = true;
+      } else if (scrollTop <= 15 && detectedPage === 1) {
+        percent = 0;
+        completed = false;
+      } else {
+        const pageRatio = (detectedPage - 1) / Math.max(1, numPages - 1);
+        const scrollRatio = maxScroll > 0 ? scrollTop / maxScroll : 0;
+        const blended = pageRatio * 0.7 + scrollRatio * 0.3;
+        percent = Math.min(99, Math.max(1, Math.round(blended * 100)));
+        completed = false;
+      }
+    }
+
+    const finalCompleted = percent === 100;
+    setCurrentPage(detectedPage);
+    setReadingPercent(percent);
+    setIsCompleted(finalCompleted);
+
+    onReadingProgressChangeRef.current?.({
+      currentPage: detectedPage,
+      totalPages: numPages,
+      percent,
+      isCompleted: finalCompleted,
+    });
+  }, [numPages]);
+
+  // Thông báo tiến độ khởi tạo khi nạp xong tài liệu (chỉ chạy 1 lần khi đổi fileId hoặc khi numPages tải xong)
+  useEffect(() => {
+    if (numPages > 0 && hasInitializedRef.current !== fileId) {
+      hasInitializedRef.current = fileId;
+      singlePageCompletedRef.current = false;
+      const initialProg = {
+        currentPage: initialPage || 1,
+        totalPages: numPages,
+        percent: 0,
+        isCompleted: false,
+      };
+      setCurrentPage(initialProg.currentPage);
+      setReadingPercent(0);
+      setIsCompleted(false);
+      onReadingProgressChangeRef.current?.(initialProg);
+    }
+  }, [numPages, initialPage, fileId]);
+
+  // Dành riêng cho tài liệu 1 trang vừa khít khung nhìn (không có thanh cuộn)
+  // Sau 3.5s đọc hoặc khi người dùng cuộn con lăn xuống dưới, hệ thống tự động ghi nhận hoàn thành
+  useEffect(() => {
+    if (numPages !== 1) return;
+    const checkTimer = setTimeout(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+      if (maxScroll <= 15 && !singlePageCompletedRef.current) {
+        singlePageCompletedRef.current = true;
+        setReadingPercent(100);
+        setIsCompleted(true);
+        onReadingProgressChangeRef.current?.({
+          currentPage: 1,
+          totalPages: 1,
+          percent: 100,
+          isCompleted: true,
+        });
+      }
+    }, 3500);
+
+    return () => clearTimeout(checkTimer);
+  }, [numPages, fileId]);
+
   return (
-    <div
-      ref={containerRef}
-      className={`w-full h-full overflow-y-auto overscroll-contain scrollbar-thin bg-slate-100 dark:bg-slate-950 flex flex-col items-center py-6 px-2 sm:px-4 relative transition-colors ${
-        isHighSecurity ? 'select-none' : 'select-text'
-      }`}
-      style={{
-        scrollbarWidth: 'thin',
-      }}
-    >
+    <div className="relative w-full h-full overflow-hidden flex flex-col">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        onWheel={(e) => {
+          if (numPages === 1 && !singlePageCompletedRef.current && e.deltaY > 0) {
+            const container = containerRef.current;
+            if (container) {
+              const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+              if (maxScroll <= 15) {
+                singlePageCompletedRef.current = true;
+                setReadingPercent(100);
+                setIsCompleted(true);
+                onReadingProgressChangeRef.current?.({
+                  currentPage: 1,
+                  totalPages: 1,
+                  percent: 100,
+                  isCompleted: true,
+                });
+              }
+            }
+          }
+        }}
+        className={`w-full h-full overflow-y-auto overscroll-contain scrollbar-thin bg-slate-100 dark:bg-slate-950 flex flex-col items-center py-6 px-2 sm:px-4 relative transition-colors ${
+          isHighSecurity ? 'select-none' : 'select-text'
+        }`}
+        style={{
+          scrollbarWidth: 'thin',
+        }}
+      >
       <style>{`
         .textLayer {
           position: absolute;
@@ -314,6 +547,27 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
             );
           })}
         </div>
+      )}
+      </div>
+
+      {/* ⭕ Floating Scroll-Spy Reading Completion Ring */}
+      {showFloatingProgressRing && numPages > 0 && !loading && (
+        <DocumentReadingRing
+          currentPage={currentPage}
+          totalPages={numPages}
+          percent={readingPercent}
+          isCompleted={isCompleted}
+          variant="floating"
+          onClick={() => {
+            if (isCompleted || currentPage > 1 || readingPercent > 0) {
+              scrollToTop();
+            } else if (numPages === 1) {
+              scrollToBottom();
+            } else {
+              scrollToNext();
+            }
+          }}
+        />
       )}
     </div>
   );

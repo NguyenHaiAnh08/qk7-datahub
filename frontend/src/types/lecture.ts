@@ -104,6 +104,7 @@ export interface TeachingSchedule {
   is_hanging?: boolean;
   quiz_activated_count?: number;
   quiz_total_count?: number;
+  content_type?: string;
 }
 
 export interface LectureListFilters {

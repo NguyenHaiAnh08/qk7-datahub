@@ -691,9 +691,10 @@ app.use('/api', async (req, res, next) => {
     if (!sess.valid) {
       // Nếu token chỉ nằm ở cookie (trình duyệt tự đính kèm cookie cũ) hoặc đang gọi endpoint công khai, fallback sang Guest thay vì ném 401
       if (tokenSource === 'cookie' || isPublicGetEndpoint) {
-        res.clearCookie('qk7_session');
-        res.clearCookie('qk7_token');
-        res.clearCookie('token');
+        const clearOpts = { path: '/', httpOnly: true, secure: COOKIE_SECURE, sameSite: 'strict' };
+        res.clearCookie('qk7_session', clearOpts);
+        res.clearCookie('qk7_token', clearOpts);
+        res.clearCookie('token', clearOpts);
         assignGuestUser();
         return next();
       }
@@ -1168,7 +1169,7 @@ async function handleLogin(req, res) {
     user.has_fingerprint = user.has_fingerprint === 1;
 
     const token = jwt.sign(
-      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles },
+      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles, jti: crypto.randomUUID() },
       JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
     );
 
@@ -1418,7 +1419,7 @@ app.post('/api/auth/login/admin-fp-verify',
     user.role_names = rolesRes.recordset.map((x) => x.name);
 
     const token = jwt.sign(
-      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles },
+      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles, jti: crypto.randomUUID() },
       JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
     );
 
@@ -1619,15 +1620,15 @@ app.post('/api/pin/request', requireAuth, pinLimiter, async (req, res) => {
 
 app.post('/api/auth/logout', requireAuth, async (req, res) => {
   try {
-    await revokeSession({
-      token: req.user.raw_token,
-      revokedBy: req.user.user_id,
-      reason: 'LOGOUT',
-    });
+    await revokeAllUserSessions(req.user.user_id, req.user.user_id, 'LOGOUT');
     await writeAccessLog({
       userId: req.user.user_id, fileId: null, action: 'LOGOUT',
       ip: getClientIp(req), note: 'Đăng xuất chủ động',
     });
+    const clearOpts = { path: '/', httpOnly: true, secure: COOKIE_SECURE, sameSite: 'strict' };
+    res.clearCookie('qk7_session', clearOpts);
+    res.clearCookie('qk7_token', clearOpts);
+    res.clearCookie('token', clearOpts);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

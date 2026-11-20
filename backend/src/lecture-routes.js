@@ -192,6 +192,7 @@ module.exports = function createLectureRoutes({
       r.input('clearance', sql.Int, clearance);
 
       let scope = null;
+      let scope = { all: false, unitIds: [] };
       if (isGuest) {
         // Đại biểu / Khách chỉ được xem các bài giảng đã xuất bản (PUBLISHED) và ở mức bảo mật Cấp 1 (Công khai)
         query += ` AND l.status = 'PUBLISHED' AND l.security_level_id = 1`;
@@ -226,6 +227,8 @@ module.exports = function createLectureRoutes({
         row.peer_unit = isPeerUnit(scope, row.faculty_unit_id);
         // Được mở ca: bài thuộc đơn vị mình / cùng khoa (không còn giới hạn tác giả)
         row.can_teach = inScope(scope, row.faculty_unit_id) || row.author_id === userId;
+        row.peer_unit = isGuest ? false : isPeerUnit(scope, row.faculty_unit_id);
+        row.can_teach = isGuest ? false : (inScope(scope, row.faculty_unit_id) || row.author_id === userId);
       });
       res.json({ total: result.recordset.length, items: result.recordset });
     } catch (err) {

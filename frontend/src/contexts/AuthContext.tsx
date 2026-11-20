@@ -107,6 +107,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const navigate = useNavigate();
 
   const saveUserSession = useCallback((userData: User) => {
+    try {
+      sessionStorage.removeItem('qk7_guest_mode');
+    } catch (_) {}
     authService.saveSession(userData);
     setUser(userData);
   }, []);
@@ -148,6 +151,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const handleExpired = () => {
+      try {
+        sessionStorage.removeItem('qk7_guest_mode');
+      } catch (_) {}
       authService.clearSession();
       setUser(null);
       navigate(ROUTE_PATHS.LOGIN, { replace: true });
@@ -164,6 +170,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           sessionStorage.removeItem('qk7_screenshot_violation_count');
           sessionStorage.removeItem('qk7_account_locked_screenshot');
+          sessionStorage.removeItem('qk7_guest_mode');
         } catch (_) {}
       }
       return res.user;
@@ -172,9 +179,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [saveUserSession]);
 
   const logout = useCallback(async () => {
-    await authService.logout();
+    try {
+      await authService.logout();
+    } catch (_) {}
+    try {
+      sessionStorage.removeItem('qk7_guest_mode');
+    } catch (_) {}
+    authService.clearSession();
     setUser(null);
-    navigate(ROUTE_PATHS.LOGIN);
+    navigate(ROUTE_PATHS.LOGIN, { replace: true });
 
     if (typeof window !== 'undefined') {
       try {
@@ -183,6 +196,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .forEach(k => sessionStorage.removeItem(k));
         sessionStorage.removeItem('qk7_screenshot_violation_count');
         sessionStorage.removeItem('qk7_account_locked_screenshot');
+        sessionStorage.removeItem('qk7_guest_mode');
 
         // Dọn dẹp an toàn các phiên bài giảng số trong localStorage khi đăng xuất
         Object.keys(localStorage)
@@ -194,6 +208,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const continueAsGuest = useCallback(() => {
     authService.clearSession();
+    try {
+      sessionStorage.setItem('qk7_guest_mode', 'true');
+    } catch (_) {}
     const guest: User = {
       user_id: 'GUEST',
       full_name: 'Đại biểu',

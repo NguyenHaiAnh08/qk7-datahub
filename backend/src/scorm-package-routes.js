@@ -685,6 +685,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(lec.pdf_name || 'giao-an.pdf')}"`);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
       fs.createReadStream(abs).pipe(res);
     } catch (e) {
       console.error('[PDF serve]', e);

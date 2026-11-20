@@ -74,9 +74,9 @@ export const DEMO_ACCOUNTS: Record<
   it: {
     id: 'USR-006',
     title: 'Nhân viên IT',
-    subtitle: 'Cấp 1 • Công khai • Kỹ thuật hệ thống',
-    label: 'Nhân viên IT - Nguyễn Hải Anh (USR-006 - Cấp 1)',
-    roleName: 'Nhân viên IT',
+    subtitle: 'Cấp 5 • Quản trị viên (2FA)',
+    label: 'Quản trị viên / IT - Nguyễn Hải Anh (USR-006 - Cấp 5)',
+    roleName: 'Quản trị viên / IT',
   },
   admin: {
     id: 'USR-001',

@@ -96,10 +96,10 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
       {totalPages > 1 && (
         <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 shadow-sm">
           <div>
-            Hiển thị trang{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{currentPage}</span> /{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{totalPages}</span> (Tổng{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{totalItems}</span> tài liệu)
+            Đang hiển thị tài liệu{' '}
+            <strong className="font-bold text-slate-900 dark:text-white">{(currentPage - 1) * 30 + 1} - {Math.min(currentPage * 30, totalItems)}</strong> /{' '}
+            <strong className="font-bold text-emerald-700 dark:text-emerald-400">{totalItems}</strong> tài liệu
+            {' '}(Trang <strong className="font-bold text-slate-900 dark:text-white">{currentPage}</strong>/{totalPages})
           </div>
           <div className="flex items-center space-x-1">
             <button

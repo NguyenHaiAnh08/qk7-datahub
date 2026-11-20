@@ -303,10 +303,12 @@ export const authService = {
     try {
       localStorage.removeItem(STORAGE_KEYS.TOKEN);
       localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem('qk7_guest_mode');
     } catch (_) {}
     Object.values(STORAGE_KEYS).forEach((key) => {
       sessionStorage.removeItem(key);
     });
+    sessionStorage.removeItem('qk7_guest_mode');
     // Xóa sạch cookie phiên cũ để chống gửi cookie hết hạn gây lỗi HTTP 401
     if (typeof document !== 'undefined') {
       try {
@@ -331,23 +333,16 @@ export const authService = {
 
   /**
    * Lấy user hiện tại từ sessionStorage (không gọi API).
-   * Trả GUEST nếu chưa đăng nhập.
-   *
-   * ⚠️ Trả về permissions đúng trạng thái:
-   *   - Có mảng: dùng luôn (fast path).
-   *   - Undefined: AuthContext sẽ tự gọi `getMe()` để bù (slow path).
-   *   - GUEST: `permissions: []` — không có quyền gì.
+   * Trả về null nếu chưa đăng nhập và không bật Guest mode.
+   * Chỉ trả về GUEST khi cờ qk7_guest_mode được bật rõ ràng.
    */
-  getCurrentSession: (): User => {
+  getCurrentSession: (): User | null => {
     // ─── 1. Primary: JSON blob ───
     const rawUser = sessionStorage.getItem(STORAGE_KEYS.USER);
     if (rawUser) {
       try {
         const parsed = JSON.parse(rawUser);
-        if (parsed && parsed.user_id) {
-          // Chuẩn hoá: JSON.stringify đã bỏ key undefined → có thể thiếu.
-          // Không set mặc định ở đây để AuthContext phân biệt được
-          // "undefined" (chưa biết) vs "[]" (đã biết rỗng).
+        if (parsed && parsed.user_id && parsed.user_id !== 'GUEST') {
           return {
             ...parsed,
             roles: parsed.roles,
@@ -360,43 +355,49 @@ export const authService = {
       }
     }
 
-    // ─── 2. Fallback: GUEST ───
-    const userId = sessionStorage.getItem(STORAGE_KEYS.USERNAME);
-    if (!userId || userId === 'GUEST') {
+    // ─── 2. Explicit GUEST mode — CHỈ KHI người dùng bấm 'Đại biểu tham quan' ───
+    const isGuestExplicit = sessionStorage.getItem('qk7_guest_mode') === 'true';
+    if (isGuestExplicit) {
       return {
         user_id: 'GUEST',
         full_name: 'Đại biểu',
-        clearance_level_id: 2,
-        clearance_name: 'Nội bộ',
+        clearance_level_id: 1,
+        clearance_name: 'Công khai',
         roles: ['DELEGATE'],
         role_names: ['Đại biểu'],
-        permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
+        permissions: ['DOC_VIEW', 'DOC_DOWNLOAD', 'LECTURE_VIEW'],
       };
     }
 
-    // ─── 3. Fallback: đọc từng key (JSON blob hỏng) ───
-    return {
-      user_id: userId,
-      username:
-        sessionStorage.getItem(STORAGE_KEYS.USER_LOGIN) || userId.toLowerCase(),
-      full_name: sessionStorage.getItem(STORAGE_KEYS.NAME) || userId,
-      clearance_level_id: parseInt(
-        sessionStorage.getItem(STORAGE_KEYS.LEVEL) || '1',
-        10,
-      ),
-      unit_id: sessionStorage.getItem(STORAGE_KEYS.UNIT) || undefined,
-      unit_name: sessionStorage.getItem(STORAGE_KEYS.UNIT_NAME) || undefined,
-      position: sessionStorage.getItem(STORAGE_KEYS.POSITION) || undefined,
-      rank_name: sessionStorage.getItem(STORAGE_KEYS.RANK) || undefined,
-      clearance_name:
-        sessionStorage.getItem(STORAGE_KEYS.CLEARANCE_NAME) || undefined,
-      clearance_code:
-        sessionStorage.getItem(STORAGE_KEYS.CLEARANCE_CODE) || undefined,
-      status: sessionStorage.getItem(STORAGE_KEYS.STATUS) || 'active',
-      roles: readJsonArray(STORAGE_KEYS.ROLES),
-      role_names: readJsonArray(STORAGE_KEYS.ROLE_NAMES),
-      permissions: readJsonArray(STORAGE_KEYS.PERMISSIONS), // ⭐ NEW
-    };
+    // ─── 3. Fallback: đọc từng key nếu có user_id thật ───
+    const userId = sessionStorage.getItem(STORAGE_KEYS.USERNAME);
+    if (userId && userId !== 'GUEST') {
+      return {
+        user_id: userId,
+        username:
+          sessionStorage.getItem(STORAGE_KEYS.USER_LOGIN) || userId.toLowerCase(),
+        full_name: sessionStorage.getItem(STORAGE_KEYS.NAME) || userId,
+        clearance_level_id: parseInt(
+          sessionStorage.getItem(STORAGE_KEYS.LEVEL) || '1',
+          10,
+        ),
+        unit_id: sessionStorage.getItem(STORAGE_KEYS.UNIT) || undefined,
+        unit_name: sessionStorage.getItem(STORAGE_KEYS.UNIT_NAME) || undefined,
+        position: sessionStorage.getItem(STORAGE_KEYS.POSITION) || undefined,
+        rank_name: sessionStorage.getItem(STORAGE_KEYS.RANK) || undefined,
+        clearance_name:
+          sessionStorage.getItem(STORAGE_KEYS.CLEARANCE_NAME) || undefined,
+        clearance_code:
+          sessionStorage.getItem(STORAGE_KEYS.CLEARANCE_CODE) || undefined,
+        status: sessionStorage.getItem(STORAGE_KEYS.STATUS) || 'active',
+        roles: readJsonArray(STORAGE_KEYS.ROLES),
+        role_names: readJsonArray(STORAGE_KEYS.ROLE_NAMES),
+        permissions: readJsonArray(STORAGE_KEYS.PERMISSIONS),
+      };
+    }
+
+    // Chưa đăng nhập và không bật Guest mode → Trả về null
+    return null;
   },
 
   /**

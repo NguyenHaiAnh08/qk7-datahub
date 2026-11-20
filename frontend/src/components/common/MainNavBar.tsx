@@ -38,11 +38,11 @@ interface PanelPos { left: number; top: number }
 const HOVER_CLOSE_DELAY = 150;
 
 const itemBase =
-  'group relative flex items-center gap-2 px-3.5 sm:px-4 h-11 rounded-t-lg text-[14px] sm:text-[15px] font-semibold whitespace-nowrap select-none cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600 dark:focus-visible:outline-amber-300';
+  'group relative flex items-center gap-2 px-3.5 sm:px-4 h-11 rounded-t-lg text-[14px] sm:text-[15px] font-black whitespace-nowrap select-none cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600 dark:focus-visible:outline-amber-300';
 const itemIdle =
-  'text-slate-600 hover:text-emerald-800 hover:bg-slate-100/80 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60';
+  'text-slate-950 hover:text-emerald-900 hover:bg-slate-100/90 dark:text-white dark:hover:text-amber-300 dark:hover:bg-slate-800/80';
 const itemActive =
-  'text-emerald-800 bg-emerald-50/90 shadow-[inset_0_-3px_0_0_#166534] dark:text-amber-300 dark:bg-slate-800/80 dark:shadow-[inset_0_-3px_0_0_#fbbf24] font-bold';
+  'text-emerald-950 bg-emerald-100/90 shadow-[inset_0_-3px_0_0_#15803d] dark:text-amber-300 dark:bg-slate-800 dark:shadow-[inset_0_-3px_0_0_#fbbf24] font-black';
 
 export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiveNav, canAccessAdmin }) => {
   const { user, hasPermission, hasAnyPermission } = useAuth();
@@ -200,7 +200,7 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
     const btn = buttonRefs.current[key];
     if (btn) {
       const rect = btn.getBoundingClientRect();
-      const panelWidth = Math.min(320, window.innerWidth - 16);
+      const panelWidth = Math.min(420, window.innerWidth - 16);
       const targetLeft = rect.left + rect.width / 2 - panelWidth / 2;
       setPos({
         left: Math.max(8, Math.min(targetLeft, window.innerWidth - panelWidth - 8)),
@@ -285,10 +285,10 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
                   onClick={closeMenu}
                 >
                   <Icon
-                    className={`w-4 h-4 shrink-0 transition-colors ${
+                    className={`w-4 h-4 shrink-0 transition-colors stroke-[2.2] ${
                       isActive
-                        ? 'text-emerald-700 dark:text-amber-400'
-                        : 'text-slate-500 group-hover:text-emerald-700 dark:text-slate-400 dark:group-hover:text-slate-200'
+                        ? 'text-emerald-800 dark:text-amber-400'
+                        : 'text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-amber-300'
                     }`}
                   />
                   <span>{item.label}</span>
@@ -319,20 +319,20 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
                 }}
               >
                 <Icon
-                  className={`w-4 h-4 shrink-0 transition-colors ${
+                  className={`w-4 h-4 shrink-0 transition-colors stroke-[2.2] ${
                     isActive
-                      ? 'text-emerald-700 dark:text-amber-400'
-                      : 'text-slate-500 group-hover:text-emerald-700 dark:text-slate-400 dark:group-hover:text-slate-200'
+                      ? 'text-emerald-800 dark:text-amber-400'
+                      : 'text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-amber-300'
                   }`}
                 />
                 <span>{item.label}</span>
                 <ChevronDown
-                  className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                  className={`w-4 h-4 shrink-0 transition-transform duration-200 stroke-[2.2] ${
                     isOpen ? 'rotate-180' : ''
                   } ${
                     isActive
-                      ? 'text-emerald-700 dark:text-amber-400'
-                      : 'text-slate-400 group-hover:text-emerald-700 dark:text-slate-400 dark:group-hover:text-slate-200'
+                      ? 'text-emerald-800 dark:text-amber-400'
+                      : 'text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-amber-300'
                   }`}
                 />
               </button>
@@ -358,7 +358,7 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
                 onPointerEnter={(e) => { if (e.pointerType === 'mouse') clearCloseTimer(); }}
                 onPointerLeave={(e) => { if (e.pointerType === 'mouse') scheduleClose(); }}
                 onKeyDown={onPanelKeyDown}
-                className="fixed z-[60] w-[min(20rem,calc(100vw-1rem))] rounded-xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xl"
+                className="fixed z-[60] w-max min-w-[24rem] max-w-[min(28rem,calc(100vw-1rem))] rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl"
               >
                 {openChildren.map((child) => {
                   const active = child.isActive(path, search);
@@ -369,15 +369,15 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
                       role="menuitem"
                       aria-current={active ? 'page' : undefined}
                       onClick={closeMenu}
-                      className={`block px-4 py-3 min-h-[44px] border-b border-slate-100 dark:border-slate-800/80 last:border-b-0 border-l-[3px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600 dark:focus-visible:outline-amber-400 ${
+                      className={`block px-4 py-3 min-h-[44px] border-b border-slate-200 dark:border-slate-800 last:border-b-0 border-l-[3px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600 dark:focus-visible:outline-amber-400 ${
                         active
-                          ? 'bg-emerald-50/90 dark:bg-slate-800/90 text-[#166534] dark:text-amber-300 border-l-emerald-600 dark:border-l-amber-400 font-medium'
-                          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 border-l-transparent'
+                          ? 'bg-emerald-50 dark:bg-slate-800/90 text-emerald-950 dark:text-amber-300 border-l-emerald-600 dark:border-l-amber-400 font-bold'
+                          : 'text-slate-950 dark:text-white hover:bg-slate-100/90 dark:hover:bg-slate-800/80 border-l-transparent'
                       }`}
                     >
-                      <span className="block text-[15px] font-semibold leading-tight">{child.label}</span>
+                      <span className="block text-[15px] font-black leading-tight text-slate-950 dark:text-white whitespace-nowrap">{child.label}</span>
                       {child.description && (
-                        <span className="block mt-0.5 text-xs text-slate-500 dark:text-slate-400 leading-snug">
+                        <span className="block mt-1 text-xs text-slate-800 dark:text-slate-200 font-bold leading-snug">
                           {child.description}
                         </span>
                       )}

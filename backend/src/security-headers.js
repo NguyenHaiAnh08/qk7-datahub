@@ -22,8 +22,8 @@ function createSecurityHeadersMiddleware() {
 
     // Kiểm tra xem request có phải là gói học liệu số hóa (SCORM/HTML5/PDF view trong iframe)
     const reqPath = req.path || '';
-    const isLecturePlayback = reqPath.includes('/scorm/') || reqPath.includes('/html5/') || reqPath.includes('/launch');
-    const isFramedPdfView = reqPath.startsWith('/api/files/') && reqPath.endsWith('/view');
+    const isLecturePlayback = reqPath.includes('/scorm/') || reqPath.includes('/html5/') || reqPath.includes('/launch') || reqPath.includes('/pdf');
+    const isFramedPdfView = (reqPath.startsWith('/api/files/') && reqPath.endsWith('/view')) || reqPath.includes('/pdf');
 
     if (isLecturePlayback) {
       // 3a. CSP chuyên dụng cho SCORM / HTML5 / ActivePresenter: cho phép engine player chạy trơn tru

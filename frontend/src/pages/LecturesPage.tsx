@@ -124,7 +124,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
   const [subjectFilter, setSubjectFilter] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 9;
+  const PAGE_SIZE = 30;
 
   // Modals
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -328,10 +328,10 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
     });
   }, [allLectures, statusFilter, subjectFilter, searchQuery, mode]);
 
-  // Tự động chuyển về trang 1 khi thay đổi điều kiện lọc
+  // Tự động chuyển về trang 1 khi thay đổi điều kiện lọc hoặc chế độ xem
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, subjectFilter, searchQuery]);
+  }, [mode, statusFilter, subjectFilter, searchQuery]);
 
   // ── Pagination ──
   const totalPages    = Math.max(1, Math.ceil(filteredLectures.length / PAGE_SIZE));
@@ -820,19 +820,19 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                 </div>
               )}
 
-              {/* Phân trang tinh gọn */}
+              {/* Phân trang tinh gọn chuẩn tối đa 30 bài giảng / trang */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
                   <div>
-                    Đang hiển thị trang <strong className="text-slate-800 dark:text-slate-200">{currentPage}</strong> / {totalPages}
-                    {' '}— Tổng số <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{filteredLectures.length}</strong> bài giảng
+                    Đang hiển thị bài <strong className="text-slate-800 dark:text-slate-200 font-bold">{(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredLectures.length)}</strong> / {filteredLectures.length}
+                    {' '}— Tổng số <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{filteredLectures.length}</strong> bài giảng (Trang {currentPage}/{totalPages})
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setPage(Math.max(1, currentPage - 1))}
                       disabled={currentPage <= 1}
-                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium"
+                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
                     >
                       Trang trước
                     </button>
@@ -843,7 +843,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                       type="button"
                       onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
                       disabled={currentPage >= totalPages}
-                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium"
+                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
                     >
                       Trang sau
                     </button>

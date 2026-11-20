@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, BookOpen, Shield, Maximize2, Minimize2, AlertTriangle, RefreshCw, FileText, Layers, ExternalLink } from 'lucide-react';
 import { Lecture } from '../../types/lecture';
 import { getAuthHeaders } from '../../services/http';
+import { PdfPagesViewer } from '../document-desk/PdfPagesViewer';
+import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
 
 interface Props {
   open: boolean;
@@ -24,8 +26,24 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [reloadKey, setReloadKey] = useState(0);
 
+  // ⭕ Vòng chỉ báo hoàn thành đọc tài liệu (Document Reading Completion Ring)
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress>({
+    currentPage: 1,
+    totalPages: 1,
+    percent: 0,
+    isCompleted: false,
+  });
+  const viewerRef = useRef<{ scrollToPage: (page: number) => void; scrollToTop: () => void; scrollToNext: () => void } | null>(null);
+
   // Nạp PDF nếu là dạng PDF
   useEffect(() => {
+    setReadingProgress({
+      currentPage: 1,
+      totalPages: 1,
+      percent: 0,
+      isCompleted: false,
+    });
+
     if (!open || !lecture || lecture.content_type !== 'PDF') {
       setPdfBlobUrl('');
       return;
@@ -156,6 +174,24 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* ⭕ Document Reading Completion Ring cho bài giảng dạng PDF */}
+            {isPdf && pdfBlobUrl && (
+              <DocumentReadingRing
+                currentPage={readingProgress.currentPage}
+                totalPages={readingProgress.totalPages}
+                percent={readingProgress.percent}
+                isCompleted={readingProgress.isCompleted}
+                variant="header"
+                onClick={() => {
+                  if (readingProgress.currentPage > 1 || readingProgress.percent > 0) {
+                    viewerRef.current?.scrollToTop();
+                  } else {
+                    viewerRef.current?.scrollToNext();
+                  }
+                }}
+              />
+            )}
+
             {/* Bộ chọn mode nếu có nhiều file html */}
             {modes.length > 1 && (
               <div className="hidden sm:flex items-center gap-1 mr-2 bg-slate-200/60 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
@@ -235,6 +271,21 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
                 Thử lại
               </button>
             </div>
+          ) : isPdf ? (
+            pdfBlobUrl ? (
+              <div className="w-full h-full relative overflow-hidden">
+                <PdfPagesViewer
+                  blobUrl={pdfBlobUrl}
+                  fileId={lecture.lecture_id}
+                  securityLevel={lecture.security_level_id || 1}
+                  isHighlighterActive={false}
+                  highlighterColor="#fbbf24"
+                  onReadingProgressChange={(prog) => setReadingProgress(prog)}
+                  viewerRef={viewerRef}
+                  showFloatingProgressRing={true}
+                />
+              </div>
+            ) : null
           ) : iframeSrc ? (
             <iframe
               key={`${iframeSrc}-${reloadKey}`}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Clock, RefreshCw, Calendar, User, Building2, Users, TrendingUp, History, GraduationCap
 } from 'lucide-react';
@@ -77,6 +77,20 @@ export const TeachingHistoryPanel: React.FC = () => {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 30;
+
+  // Tự động chuyển về trang 1 khi lọc theo thời gian mới
+  useEffect(() => {
+    setPage(1);
+  }, [fromDate, toDate]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedItems = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [items, currentPage]);
 
   const load = async () => {
     setLoading(true);
@@ -204,73 +218,106 @@ export const TeachingHistoryPanel: React.FC = () => {
           />
         </div>
       ) : (
-        <div className="space-y-2">
-          {items.map((s) => {
-            const presenterFull = [s.presenter_rank, s.presenter_name].filter(Boolean).join(' ') || s.presenter_name || 'Chưa xác định';
-            const venueLabel = s.venue_name || '1';
-            const classLabel = s.class_name || 'Học viên';
-            const studentCountLabel = s.student_count ?? 0;
+        <div className="space-y-3">
+          <div className="space-y-2">
+            {pagedItems.map((s) => {
+              const presenterFull = [s.presenter_rank, s.presenter_name].filter(Boolean).join(' ') || s.presenter_name || 'Chưa xác định';
+              const venueLabel = s.venue_name || '1';
+              const classLabel = s.class_name || 'Học viên';
+              const studentCountLabel = s.student_count ?? 0;
 
-            const startDate = s.start_time ? new Date(s.start_time) : null;
-            const startTimeStr = startDate ? startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-            const endDate = s.end_time
-              ? new Date(s.end_time)
-              : (startDate && s.duration_minutes
-                  ? new Date(startDate.getTime() + s.duration_minutes * 60000)
-                  : null);
-            const endTimeStr = endDate ? endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-            const dateStr = startDate ? startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+              const startDate = s.start_time ? new Date(s.start_time) : null;
+              const startTimeStr = startDate ? startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+              const endDate = s.end_time
+                ? new Date(s.end_time)
+                : (startDate && s.duration_minutes
+                    ? new Date(startDate.getTime() + s.duration_minutes * 60000)
+                    : null);
+              const endTimeStr = endDate ? endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+              const dateStr = startDate ? startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 
-            return (
-              <div
-                key={s.schedule_id}
-                className="bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-500/40 hover:shadow-xs transition-all"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-1" title={s.lecture_title}>
-                      {s.lecture_title}
-                    </span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 shrink-0">
-                      Hoàn thành
-                    </span>
+              return (
+                <div
+                  key={s.schedule_id}
+                  className="bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-500/40 hover:shadow-xs transition-all"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-1" title={s.lecture_title}>
+                        {s.lecture_title}
+                      </span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 shrink-0">
+                        Hoàn thành
+                      </span>
+                    </div>
+                    <div className="flex items-center flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-slate-400 mt-1.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Giảng viên: <strong className="font-bold text-slate-900 dark:text-white">{presenterFull}</strong></span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>Giảng đường: <strong className="font-bold text-slate-900 dark:text-white">{venueLabel}</strong></span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                        <span>Lớp: <strong className="font-bold text-slate-900 dark:text-white">{classLabel}</strong></span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                        <span>Sĩ số học viên tham gia: <strong className="font-bold text-slate-900 dark:text-white">{studentCountLabel}</strong></span>
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-slate-400 mt-1.5">
-                    <span className="inline-flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span>Giảng viên: <strong className="font-bold text-slate-900 dark:text-white">{presenterFull}</strong></span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span>Giảng đường: <strong className="font-bold text-slate-900 dark:text-white">{venueLabel}</strong></span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <GraduationCap className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
-                      <span>Lớp: <strong className="font-bold text-slate-900 dark:text-white">{classLabel}</strong></span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                      <span>Sĩ số học viên tham gia: <strong className="font-bold text-slate-900 dark:text-white">{studentCountLabel}</strong></span>
+
+                  <div className="flex items-center gap-3 shrink-0 text-xs">
+                    <div className="text-right flex flex-col items-end justify-center">
+                      <div className="font-mono text-sm font-bold text-slate-900 dark:text-white">
+                        {startTimeStr} - {endTimeStr}
+                      </div>
+                      <div className="font-mono text-xs font-bold text-slate-600 dark:text-slate-400 mt-0.5">
+                        {dateStr}
+                      </div>
+                    </div>
+                    <span className="font-mono font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 text-xs shadow-2xs">
+                      {s.duration_minutes || 0} phút
                     </span>
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <div className="flex items-center gap-3 shrink-0 text-xs">
-                  <div className="text-right flex flex-col items-end justify-center">
-                    <div className="font-mono text-sm font-bold text-slate-900 dark:text-white">
-                      {startTimeStr} - {endTimeStr}
-                    </div>
-                    <div className="font-mono text-xs font-bold text-slate-600 dark:text-slate-400 mt-0.5">
-                      {dateStr}
-                    </div>
-                  </div>
-                  <span className="font-mono font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 text-xs shadow-2xs">
-                    {s.duration_minutes || 0} phút
-                  </span>
-                </div>
+          {/* Phân trang chuẩn tối đa 30 ca / trang */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
+              <div>
+                Đang hiển thị ca <strong className="text-slate-800 dark:text-slate-200 font-bold">{(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, items.length)}</strong> / {items.length}
+                {' '}— Tổng số <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{items.length}</strong> ca giảng dạy (Trang {currentPage}/{totalPages})
               </div>
-            );
-          })}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage <= 1}
+                  className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
+                >
+                  Trang trước
+                </button>
+                <span className="px-2.5 font-bold font-mono text-emerald-700 dark:text-emerald-400">
+                  {currentPage}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
+                >
+                  Trang sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

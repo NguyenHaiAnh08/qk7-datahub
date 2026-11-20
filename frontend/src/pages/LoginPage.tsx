@@ -66,7 +66,7 @@ export const LoginPage: React.FC = () => {
     toast.success(`Chào mừng đồng chí ${loggedInUser.full_name || loggedInUser.user_id} đã đăng nhập thành công vào Trung Tâm Dữ Liệu Số.`, {
       title: 'XÁC THỰC THÀNH CÔNG',
       badge: loggedInUser.clearance_name || `CẤP ${loggedInUser.clearance_level_id || 1}`,
-      duration: 4000,
+      duration: 2000,
     });
 
     // Khi đăng nhập Admin thì vô thẳng admin-dashboard luôn

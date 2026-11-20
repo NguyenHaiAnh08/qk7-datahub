@@ -4,6 +4,41 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.3-reading-ring-building-manager-and-security-hardening] — 2026-11-20
+
+### 1. Vòng Chỉ Báo Hoàn Thành Đọc Tài Liệu (Document Reading Completion Ring - `DocumentReadingRing.tsx`)
+- **Tối ưu tương phản cao Dual-Theme UX/UI ([`DocumentReadingRing.tsx`](../frontend/src/components/common/DocumentReadingRing.tsx)):**
+  - Thiết kế vòng tiến độ SVG độ tương phản cao, chống chìm màu hoặc đè màu trên cả nền Sáng (Light Mode) và Tối (Dark Mode).
+  - 3 trạng thái nhận diện thị giác chuẩn quân sự:
+    1. *Chưa đọc (0%):* Viền nét mảnh rõ ràng, số trang in đậm đen/trắng nét cao.
+    2. *Đang đọc (1% - 99%):* Vòng tiến độ xanh ngọc lục bảo (Emerald) tương phản mạnh, hiển thị tỷ lệ % trang đã đọc sắc nét.
+    3. *Đã đọc hết (100%):* Huy hiệu xanh Emerald rực rỡ, biểu tượng tick ($\checkmark$) trắng tinh nổi bật kèm vòng phát quang nhẹ.
+- **Tích hợp sâu vào các khung hiển thị tài liệu:**
+  - Tích hợp vòng chỉ báo vào [`PdfPagesViewer.tsx`](../frontend/src/components/document-desk/PdfPagesViewer.tsx) và [`DocumentPreviewModal.tsx`](../frontend/src/components/document-desk/DocumentPreviewModal.tsx).
+  - Đồng bộ hiển thị tiến độ đọc tài liệu trực tiếp trên bảng danh sách [`PortalDocumentList.tsx`](../frontend/src/components/portal/PortalDocumentList.tsx) và [`DocumentTable.tsx`](../frontend/src/components/document-desk/DocumentTable.tsx).
+
+### 2. Đại Tu Phân Hệ Quản Lý Giảng Đường & Bảng Điều Khiển Giám Sát Radar
+- **Nâng cấp Bảng Quản Lý Khu Nhà & Phòng Học ([`BuildingManagerPanel.tsx`](../frontend/src/components/lectures/BuildingManagerPanel.tsx)):**
+  - Tái cấu trúc giao diện quản trị khu nhà, phòng học, mã phòng, loại giảng đường và cấu hình viễn trắc telemetry.
+  - Hỗ trợ thao tác thêm, sửa, xóa phòng học và trạng thái bảo trì thời gian thực.
+- **Tối ưu Bảng Giám Sát Giảng Đường Trực Tiếp ([`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx)):**
+  - Bổ sung chế độ toàn màn hình, bộ lọc thông minh theo tòa nhà và trạng thái phòng (Đang dạy / Trống / Bảo trì).
+  - Hiển thị trực quan sĩ số quân số, tên giảng viên, slide hiện tại và cảnh báo phiên học kéo dài.
+- **Cải tiến Phòng Học & Lịch Sử Giảng Dạy ([`LiveSessionRoom.tsx`](../frontend/src/components/lectures/LiveSessionRoom.tsx) & [`TeachingHistoryPanel.tsx`](../frontend/src/components/lectures/TeachingHistoryPanel.tsx)):**
+  - Đồng bộ trạng thái trình chiếu bài giảng điện tử và lưu vết lịch sử giảng dạy chính xác.
+
+### 3. Siết Chặt An Toàn Phiên, Bảo Mật Cookie & Phân Quyền Đại Biểu (Security Hardening)
+- **Quản lý Phiên & Xóa Sạch Cookie ([`backend/server.js`](../backend/server.js)):**
+  - Tại endpoint `POST /api/auth/logout`: Gọi `revokeAllUserSessions` thu hồi toàn bộ phiên hoạt động của người dùng trên toàn mạng.
+  - Cưỡng chế xóa cookie an toàn với các cờ nghiêm ngặt `{ path: '/', httpOnly: true, secure: true, sameSite: 'strict' }`.
+  - Bổ sung `jti: crypto.randomUUID()` vào JWT token khi đăng nhập và xác thực 2FA vân tay, ngăn chặn triệt để tấn công phát lại (Replay Attacks).
+- **Cô lập Quyền Hạn Đại Biểu ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js)):**
+  - Khóa hoàn toàn cờ `can_teach = false` và `peer_unit = false` đối với người dùng Khách/Đại biểu (`isGuest`), ngăn chặn mọi thao tác vượt quyền.
+- **Bảo Vệ Iframe & CSP ([`backend/src/security-headers.js`](../backend/src/security-headers.js) & [`backend/src/scorm-package-routes.js`](../backend/src/scorm-package-routes.js)):**
+  - Bổ sung `X-Frame-Options: SAMEORIGIN` và CSP cho phép nhúng an toàn tệp PDF giáo án qua endpoint `/api/lectures/:id/pdf` trong modal trình chiếu.
+
+---
+
 ## [v1.8.2-classrooms-subsystem-and-unit-inheritance] — 2026-11-18
 
 ### 1. Phân Hệ Giảng Đường Độc Lập & Giám Sát Mặt Bằng Trực Quan (Classrooms Subsystem)

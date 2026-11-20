@@ -82,6 +82,14 @@ export const LiveMonitorPanel: React.FC<Props> = ({
   // Legacy list sessions
   const [sessions, setSessions] = useState<TeachingSchedule[]>([]);
 
+  // Phân trang cho các phòng học trên Sơ đồ giảng đường (tối đa 30 phòng / trang)
+  const [roomPage, setRoomPage] = useState<number>(1);
+  const ROOMS_PAGE_SIZE = 30;
+
+  // Phân trang cho Lịch sử dạy học hôm nay của phòng (tối đa 30 ca / trang)
+  const [todayPage, setTodayPage] = useState<number>(1);
+  const TODAY_PAGE_SIZE = 30;
+
   // Common UI states
   const [loading, setLoading] = useState<boolean>(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -110,10 +118,12 @@ export const LiveMonitorPanel: React.FC<Props> = ({
       if (res?.kpis) setKpis(res.kpis);
       if (res?.buildings) {
         setBuildings(res.buildings);
-        // Khu đang chọn không còn trong danh sách → bỏ chọn
-        setSelectedBuilding((prev) =>
-          prev && res.buildings.some((b) => b.building_code === prev) ? prev : null
-        );
+        // Tự động ưu tiên chọn khu đang có ca dạy để người dùng thấy ngay
+        setSelectedBuilding((prev) => {
+          if (prev && res.buildings.some((b) => b.building_code === prev)) return prev;
+          const activeBuilding = res.buildings.find((b) => (b.in_session_count ?? 0) > 0);
+          return activeBuilding ? activeBuilding.building_code : res.buildings[0]?.building_code || null;
+        });
       }
       setLastUpdate(new Date());
     } catch (err) {
@@ -290,10 +300,38 @@ export const LiveMonitorPanel: React.FC<Props> = ({
         slide_total: fromLive.slide_total ?? roomDetail?.current_session?.slide_total,
         scorm_progress: fromLive.scorm_progress ?? roomDetail?.current_session?.scorm_progress,
         current_page: fromLive.current_page ?? roomDetail?.current_session?.current_page,
+        content_type: fromLive.content_type ?? roomDetail?.current_session?.content_type,
       };
     }
     return roomDetail?.current_session;
   }, [activeRoom, sessions, roomDetail]);
+
+  // Reset trang khi đổi khu giảng đường
+  useEffect(() => {
+    setRoomPage(1);
+  }, [selectedBuilding]);
+
+  // Reset trang lịch sử hôm nay khi chọn phòng khác
+  useEffect(() => {
+    setTodayPage(1);
+  }, [selectedRoomId]);
+
+  // Tính toán phân trang phòng học Sơ đồ giảng đường (tối đa 30 phòng / trang)
+  const totalRoomPages = Math.max(1, Math.ceil(floorRooms.length / ROOMS_PAGE_SIZE));
+  const currentRoomPage = Math.min(roomPage, totalRoomPages);
+  const pagedRooms = useMemo(() => {
+    const start = (currentRoomPage - 1) * ROOMS_PAGE_SIZE;
+    return floorRooms.slice(start, start + ROOMS_PAGE_SIZE);
+  }, [floorRooms, currentRoomPage]);
+
+  // Tính toán phân trang lịch sử dạy học hôm nay của phòng (tối đa 30 ca / trang)
+  const todaySchedulesList = useMemo(() => roomDetail?.today_schedules || [], [roomDetail]);
+  const totalTodayPages = Math.max(1, Math.ceil(todaySchedulesList.length / TODAY_PAGE_SIZE));
+  const currentTodayPage = Math.min(todayPage, totalTodayPages);
+  const pagedTodaySchedules = useMemo(() => {
+    const start = (currentTodayPage - 1) * TODAY_PAGE_SIZE;
+    return todaySchedulesList.slice(start, start + TODAY_PAGE_SIZE);
+  }, [todaySchedulesList, currentTodayPage]);
 
   // ─── HELPER: TIẾN ĐỘ BÀI GIẢNG ĐẲNG CẤP (DÙNG CHUNG TOÀN HỆ THỐNG) ───
   const renderLectureProgressBox = (session: {
@@ -304,6 +342,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
     start_time?: string;
     duration_minutes?: number;
     is_hanging?: boolean;
+    content_type?: string;
   }) => {
     const slidePercent = session.slide_total && session.slide_total > 0
       ? Math.round(((session.slide_index || 0) / session.slide_total) * 100)
@@ -319,10 +358,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
       : (session.duration_minutes || 0);
 
     return (
-      <div className="p-3.5 rounded-xl bg-slate-50/90 dark:bg-slate-900/80 border border-slate-200/90 dark:border-slate-800 space-y-2.5 shadow-2xs">
+      <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-2xs">
         {/* Tiêu đề tiến độ + Vị trí / Đoạn bài giảng đang dạy */}
         <div className="flex items-center justify-between text-xs font-semibold gap-2">
-          <span className="text-slate-800 dark:text-slate-200 flex items-center gap-1.5 font-bold">
+          <span className="text-slate-950 dark:text-white flex items-center gap-1.5 font-black">
             <Monitor className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             Tiến độ bài giảng
           </span>
@@ -330,23 +369,23 @@ export const LiveMonitorPanel: React.FC<Props> = ({
           {/* Đoạn bài giảng / Slide đang dạy */}
           <div className="flex items-center gap-1.5 shrink-0">
             {session.slide_total ? (
-              <span className="font-mono text-emerald-800 dark:text-emerald-300 text-[11px] font-bold tabular-nums bg-emerald-100/80 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-300/60 dark:border-emerald-600/40 shadow-2xs">
-                Đang dạy: Slide {session.slide_index || Math.max(1, Math.ceil((percent / 100) * session.slide_total))}/{session.slide_total}
+              <span className="font-mono text-emerald-800 dark:text-emerald-300 text-[11px] font-black tabular-nums bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-700/60 shadow-2xs">
+                Đang dạy: {session.content_type === 'PDF' ? 'Trang' : 'Slide'} {session.slide_index || Math.max(1, Math.ceil((percent / 100) * session.slide_total))}/{session.slide_total}
               </span>
             ) : isDone ? (
-              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+              <span className="text-[10px] font-black text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
                 Trọn bài
               </span>
             ) : (
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+              <span className="text-[10px] text-slate-700 dark:text-slate-300 font-mono font-bold">
                 {session.current_page ? `Trang ${session.current_page}` : 'Khởi động ca'}
               </span>
             )}
           </div>
         </div>
 
-        {/* Thanh Track Tiến độ gradient sống động có glow */}
-        <div className="w-full h-3 bg-slate-200/90 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 relative border border-slate-300/60 dark:border-slate-700/60 shadow-inner">
+        {/* Thanh Track Tiến độ gradient sống động có glow — từ xanh biển đến xanh lá */}
+        <div className="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 relative border border-slate-300 dark:border-slate-700 shadow-inner">
           <div
             style={{ width: `${Math.max(percent, isRunning ? 2 : 0)}%` }}
             className={`h-full rounded-full transition-all duration-700 ease-out relative ${
@@ -354,43 +393,55 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                 ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-400 shadow-xs'
                 : isRunning
                 ? 'bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 shadow-xs'
-                : 'bg-slate-300 dark:bg-slate-700'
+                : 'bg-slate-400 dark:bg-slate-600'
             }`}
           />
         </div>
 
-        {/* Dòng trạng thái: Tiến độ ca dạy */}
-        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/60 dark:border-slate-800/60 gap-2">
-          {isDone ? (
-            <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
-              <span>Tiến độ ca dạy: <strong className="font-extrabold font-mono text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm">100% Hoàn thành</strong></span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-              <span className="text-slate-600 dark:text-slate-400 font-medium">Tiến độ:</span>
-              <strong className="font-extrabold font-mono text-sky-600 dark:text-sky-400 text-xs sm:text-sm">
-                {percent}%
-              </strong>
-              {isRunning && (
-                <span className="w-2 h-2 rounded-full bg-sky-500 animate-ping inline-block" />
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0">
+        {/* Dòng trạng thái: Đã dạy X phút ĐƯỢC ĐƯA LÊN TRÊN DÒNG 100% Hoàn thành để tránh đè chữ */}
+        <div className="pt-1.5 border-t border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
+          {/* 1. DÒNG TRÊN: Thời gian ca dạy / Cảnh báo quá giờ */}
+          <div className="flex items-center justify-between text-[11px] font-mono">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Thời gian diễn ra:</span>
             {session.is_hanging ? (
-              <span className="text-rose-600 dark:text-rose-400 animate-pulse font-extrabold flex items-center gap-1 text-[10px]">
-                ⚠️ CẢNH BÁO QUÁ GIỜ
-              </span>
-            ) : isDone ? (
-              <span className="text-emerald-700 dark:text-emerald-400 font-bold text-[11px] bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700/50">
-                ✓ Sẵn sàng kết thúc ca
+              <span className="text-rose-600 dark:text-rose-400 animate-pulse font-black flex items-center gap-1 text-[10px] whitespace-nowrap">
+                ⚠️ CẢNH BÁO QUÁ GIỜ ({elapsedMinutes} phút)
               </span>
             ) : (
-              <span>Đã dạy {elapsedMinutes} phút</span>
+              <span className="text-slate-700 dark:text-slate-300 font-bold whitespace-nowrap">
+                Đã dạy {elapsedMinutes} phút
+              </span>
             )}
           </div>
+
+          {/* 2. DÒNG DƯỚI: Tiến độ ca dạy: 100% Hoàn thành */}
+          <div className="flex items-center justify-between gap-2">
+            {isDone ? (
+              <div className="flex items-center gap-1.5 font-black text-emerald-700 dark:text-emerald-400 whitespace-nowrap min-w-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5] shrink-0" />
+                <span className="whitespace-nowrap">Tiến độ ca dạy: <strong className="font-black font-mono text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm whitespace-nowrap">100% Hoàn thành</strong></span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 font-bold whitespace-nowrap min-w-0">
+                <span className="text-slate-900 dark:text-slate-200 font-bold whitespace-nowrap">Tiến độ ca dạy:</span>
+                <strong className="font-black font-mono text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm whitespace-nowrap">
+                  {percent}%
+                </strong>
+                {isRunning && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block shrink-0" />
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Khi 100% hoàn thành: Huy hiệu "✓ Sẵn sàng kết thúc ca" xuống dòng riêng biệt, vừa vặn khung thẻ */}
+          {isDone && (
+            <div className="pt-0.5 flex items-center justify-start">
+              <span className="text-emerald-800 dark:text-emerald-300 font-black text-xs bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700 inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap">
+                <span>✓ Sẵn sàng kết thúc ca</span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -403,51 +454,67 @@ export const LiveMonitorPanel: React.FC<Props> = ({
       {/* ═════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* KPI 1: Tổng phòng học */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
+        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center shrink-0 text-sky-600 dark:text-sky-400">
             <School className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
+            <div className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider truncate">
               Tổng phòng học
             </div>
-            <div className="text-xl font-black text-slate-900 dark:text-white font-mono mt-0.5">
+            <div className="text-xl font-black text-slate-950 dark:text-white font-mono mt-0.5">
               {kpis.total_rooms}
-              <span className="text-xs font-normal text-slate-400 ml-1">phòng</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 ml-1">phòng</span>
             </div>
           </div>
         </div>
 
         {/* KPI 2: Đang giảng dạy */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-emerald-500/50 dark:border-emerald-500/30 p-3.5 shadow-xs flex items-center gap-3 relative overflow-hidden bg-gradient-to-br from-emerald-50/50 to-transparent dark:from-emerald-950/20">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400 relative">
+        <div className={`rounded-2xl border-2 p-3.5 shadow-xs flex items-center gap-3 relative overflow-hidden ${
+          kpis.in_session > 0
+            ? 'bg-gradient-to-br from-rose-50/90 via-white to-rose-50/40 dark:from-rose-950/40 dark:via-[#111827] dark:to-rose-950/20 border-rose-500 dark:border-rose-500 shadow-rose-500/10'
+            : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-white/[0.08]'
+        }`}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 relative ${
+            kpis.in_session > 0
+              ? 'bg-rose-500/15 border border-rose-500/50 text-rose-600 dark:text-rose-400'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+          }`}>
             <Radio className="w-5 h-5 animate-pulse" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-600" />
+            {kpis.in_session > 0 && (
+              <>
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-600" />
+              </>
+            )}
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider truncate">
+            <div className={`text-[11px] font-black uppercase tracking-wider truncate ${
+              kpis.in_session > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-slate-800 dark:text-slate-200'
+            }`}>
               Đang giảng dạy
             </div>
-            <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 font-mono mt-0.5">
+            <div className={`text-xl font-black font-mono mt-0.5 ${
+              kpis.in_session > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-950 dark:text-white'
+            }`}>
               {kpis.in_session}
-              <span className="text-xs font-normal text-emerald-600/70 ml-1">ca học</span>
+              <span className={`text-xs font-bold ml-1 ${kpis.in_session > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-700 dark:text-slate-300'}`}>ca học</span>
             </div>
           </div>
         </div>
 
         {/* KPI 3: Phòng trống */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
+        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-3.5 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
+            <div className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider truncate">
               Phòng trống
             </div>
-            <div className="text-xl font-black text-slate-800 dark:text-slate-200 font-mono mt-0.5">
+            <div className="text-xl font-black text-slate-950 dark:text-white font-mono mt-0.5">
               {kpis.available}
-              <span className="text-xs font-normal text-slate-400 ml-1">sẵn sàng</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 ml-1">sẵn sàng</span>
             </div>
           </div>
         </div>
@@ -456,7 +523,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
         <div className={`rounded-2xl border p-3.5 shadow-xs flex items-center gap-3 ${
           kpis.alert > 0
             ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-400 dark:border-rose-800/60'
-            : 'bg-white dark:bg-[#111827] border-slate-200/90 dark:border-white/[0.08]'
+            : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-white/[0.08]'
         }`}>
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
             kpis.alert > 0
@@ -466,13 +533,13 @@ export const LiveMonitorPanel: React.FC<Props> = ({
             {kpis.alert > 0 ? <AlertTriangle className="w-5 h-5" /> : <Wrench className="w-5 h-5" />}
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
+            <div className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider truncate">
               Bảo trì / Cảnh báo
             </div>
-            <div className="text-xl font-black text-slate-800 dark:text-slate-200 font-mono mt-0.5">
+            <div className="text-xl font-black text-slate-950 dark:text-white font-mono mt-0.5">
               {kpis.maintenance}
               {kpis.alert > 0 && (
-                <span className="text-xs font-bold text-rose-600 dark:text-rose-400 ml-1">
+                <span className="text-xs font-black text-rose-600 dark:text-rose-400 ml-1">
                   ({kpis.alert} cảnh báo)
                 </span>
               )}
@@ -556,31 +623,31 @@ export const LiveMonitorPanel: React.FC<Props> = ({
             <div className="flex-1 min-w-0 space-y-4">
               <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 sm:p-5 shadow-xs">
                 {/* Header Sơ Đồ */}
-                <div className="flex flex-wrap items-center justify-between pb-4 border-b border-slate-100 dark:border-white/[0.04] gap-2">
+                <div className="flex flex-wrap items-center justify-between pb-4 border-b border-slate-200 dark:border-white/[0.08] gap-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold">
                       <LayoutGrid className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2">
+                      <h3 className="font-black text-sm sm:text-base text-slate-950 dark:text-white flex items-center gap-2">
                         <span>Sơ Đồ Giảng Đường{currentBuilding ? `: ${currentBuilding.building_name}` : ''}</span>
                       </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5 font-bold">
                         Chọn khu giảng đường để xem các phòng — bấm vào phòng để kiểm tra sĩ số và tiến độ
                       </p>
                     </div>
                   </div>
 
                   {/* Status Legends */}
-                  <div className="flex items-center gap-2.5 flex-wrap text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" /> Đang dạy
+                  <div className="flex items-center gap-3 flex-wrap text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <span className="flex items-center gap-1.5 font-black text-rose-600 dark:text-rose-400">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse" /> Đang dạy
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" /> Trống
+                    <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-600" /> Trống
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-400 border border-slate-500" /> Bảo trì
+                    <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-amber-600" /> Bảo trì
                     </span>
                   </div>
                 </div>
@@ -591,6 +658,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                     const busy = b.in_session_count;
                     const free = Math.max(0, b.total_rooms - busy - b.maintenance_count);
                     const active = selectedBuilding === b.building_code;
+                    const hasActiveSession = busy > 0;
                     return (
                       <button
                         key={b.building_code}
@@ -598,23 +666,36 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                         role="tab"
                         aria-selected={active}
                         onClick={() => setSelectedBuilding(active ? null : b.building_code)}
-                        className={`min-h-[48px] text-left rounded-xl border p-3 transition cursor-pointer flex flex-col justify-between ${
-                          active
-                            ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 ring-1 ring-emerald-600/40 shadow-xs'
+                        className={`min-h-[52px] text-left rounded-xl border-2 p-3 transition cursor-pointer flex flex-col justify-between relative ${
+                          active && hasActiveSession
+                            ? 'border-rose-500 bg-rose-50/80 dark:bg-rose-950/30 ring-2 ring-rose-500/40 shadow-sm'
+                            : active
+                            ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 ring-2 ring-emerald-600/40 shadow-sm'
+                            : hasActiveSession
+                            ? 'border-rose-400/80 hover:border-rose-500 bg-rose-50/35 hover:bg-rose-50/70 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 shadow-xs'
                             : 'border-slate-200 dark:border-white/10 bg-slate-50 hover:bg-white dark:bg-slate-900/50 dark:hover:bg-slate-800'
                         }`}
                       >
-                        <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white truncate">
-                          <Building2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
-                          <span className="truncate">{b.building_name}</span>
-                        </span>
-                        <span className="mt-1.5 flex items-center justify-between text-xs font-mono tabular-nums border-t border-slate-200/60 dark:border-white/[0.04] pt-1">
-                          <span className="text-slate-700 dark:text-slate-300">{b.total_rooms} phòng</span>
-                          <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
-                            <span className="w-2 h-2 rounded-full bg-slate-400" /> {free} trống
+                        <div className="flex items-center justify-between gap-1 w-full">
+                          <span className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white truncate">
+                            <Building2 className={`w-4 h-4 shrink-0 ${hasActiveSession ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`} />
+                            <span className="truncate">{b.building_name}</span>
                           </span>
-                          <span className="flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500" /> {busy} đang dạy
+                          {hasActiveSession && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs flex items-center gap-1.5 animate-pulse shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                              {busy} CA DẠY
+                            </span>
+                          )}
+                        </div>
+                        <span className="mt-2 flex items-center justify-between text-xs font-mono tabular-nums border-t border-slate-200 dark:border-white/[0.08] pt-1.5 w-full">
+                          <span className="text-slate-900 dark:text-slate-200 font-bold">{b.total_rooms} phòng</span>
+                          <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-medium">
+                            <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" /> {free} trống
+                          </span>
+                          <span className={`flex items-center gap-1 font-black ${hasActiveSession ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                            <span className={`w-2 h-2 rounded-full ${hasActiveSession ? 'bg-rose-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                            {busy} đang dạy
                           </span>
                         </span>
                       </button>
@@ -643,7 +724,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                       gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                     }}
                   >
-                    {floorRooms.map((room) => {
+                    {pagedRooms.map((room) => {
                       const isSelected = selectedRoomId === room.room_id;
                       const session = sessions.find((s) =>
                         (room.current_session?.schedule_id && s.schedule_id === room.current_session.schedule_id) ||
@@ -657,40 +738,42 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                         <div
                           key={room.room_id}
                           onClick={() => handleSelectRoom(room.room_id)}
-                          className={`rounded-2xl border p-4 sm:p-4.5 transition-all duration-200 flex flex-col justify-between cursor-pointer relative group ${
-                            isSelected
+                          className={`rounded-2xl border-2 p-4 sm:p-4.5 transition-all duration-200 flex flex-col justify-between cursor-pointer relative group ${
+                            isSelected && status === 'IN_SESSION'
+                              ? 'ring-3 ring-rose-500 ring-offset-2 dark:ring-offset-[#111827] shadow-xl scale-[1.01] border-rose-600'
+                              : isSelected
                               ? 'ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-[#111827] shadow-lg scale-[1.01] border-emerald-500'
                               : 'hover:shadow-md hover:-translate-y-0.5'
                           } ${
                             status === 'IN_SESSION'
-                              ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-500/60'
+                              ? 'bg-gradient-to-b from-rose-50/90 via-white to-rose-50/40 dark:from-rose-950/40 dark:via-[#111827] dark:to-rose-950/20 border-rose-500 dark:border-rose-500 shadow-md shadow-rose-500/10'
                               : status === 'ALERT'
                               ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-500/60 shadow-rose-500/5'
                               : status === 'UPCOMING'
                               ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400/60'
                               : status === 'MAINTENANCE'
                               ? 'bg-slate-100/80 dark:bg-slate-900/60 border-slate-300 dark:border-slate-700 opacity-80'
-                              : 'bg-white hover:bg-slate-50 dark:bg-slate-800/50 dark:hover:bg-slate-800 border-slate-200/90 dark:border-white/[0.08] shadow-2xs hover:shadow-xs'
+                              : 'bg-white hover:bg-slate-50 dark:bg-slate-800/50 dark:hover:bg-slate-800 border-slate-200 dark:border-white/[0.08] shadow-2xs hover:shadow-xs'
                           }`}
                         >
                           <div>
                             {/* Dòng 1: Mã Phòng & Tầng (bên trái) + Huy hiệu Trạng thái (bên phải) */}
-                            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-white/[0.06]">
+                            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200 dark:border-white/[0.08]">
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs shrink-0 shadow-2xs ${
+                                <span className={`px-2.5 py-1 rounded-lg font-mono font-black text-xs shrink-0 shadow-2xs ${
                                   status === 'IN_SESSION'
-                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    ? 'bg-rose-600 text-white shadow-xs'
                                     : status === 'ALERT'
                                     ? 'bg-rose-600 text-white animate-pulse'
                                     : status === 'MAINTENANCE'
-                                    ? 'bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                                    ? 'bg-slate-400 dark:bg-slate-700 text-slate-950 dark:text-slate-100'
                                     : status === 'UPCOMING'
                                     ? 'bg-amber-500 text-white shadow-xs'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-950 dark:text-white border border-slate-300 dark:border-slate-700'
                                 }`}>
                                   {room.room_id.replace(/^RM-|^H\d+-/i, '') || room.room_id}
                                 </span>
-                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                                   Tầng {room.floor_number || 1}
                                 </span>
                               </div>
@@ -698,26 +781,26 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                               {/* Status Badge */}
                               <div className="shrink-0">
                                 {status === 'IN_SESSION' ? (
-                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 flex items-center gap-1.5 whitespace-nowrap shadow-2xs">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-600 text-white border border-rose-700 flex items-center gap-1.5 whitespace-nowrap shadow-sm animate-pulse tracking-wide">
+                                    <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                                     ĐANG DẠY
                                   </span>
                                 ) : status === 'ALERT' ? (
-                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 flex items-center gap-1 whitespace-nowrap animate-pulse">
-                                    <AlertTriangle className="w-3 h-3 text-rose-600" />
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-600 text-white border border-rose-700 flex items-center gap-1 whitespace-nowrap animate-pulse">
+                                    <AlertTriangle className="w-3 h-3 text-white" />
                                     TREO CA
                                   </span>
                                 ) : status === 'UPCOMING' ? (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 whitespace-nowrap">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white border border-amber-600 whitespace-nowrap">
                                     SẮP HỌC
                                   </span>
                                 ) : status === 'MAINTENANCE' ? (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 flex items-center gap-1 whitespace-nowrap">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-300 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border border-slate-400 dark:border-slate-700 flex items-center gap-1 whitespace-nowrap">
                                     <Wrench className="w-3 h-3" />
                                     BẢO TRÌ
                                   </span>
                                 ) : (
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 whitespace-nowrap">
                                     TRỐNG
                                   </span>
                                 )}
@@ -726,31 +809,31 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                             {/* Dòng 2: Tên Giảng Đường (Toàn bộ bề ngang thẻ — không bao giờ bị cắt xén) */}
                             <div className="mt-2.5">
-                              <h4 className="font-extrabold text-base text-slate-900 dark:text-white leading-snug line-clamp-2" title={room.room_name}>
+                              <h4 className="font-black text-base text-slate-950 dark:text-white leading-snug line-clamp-2" title={room.room_name}>
                                 {room.room_name}
                               </h4>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-1 font-medium">
-                                <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                <span>Sức chứa: <strong className="font-mono text-slate-800 dark:text-slate-200">{room.capacity ? `${room.capacity} học viên` : 'Chưa thiết lập'}</strong></span>
+                              <div className="text-xs text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mt-1 font-bold">
+                                <Users className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
+                                <span>Sức chứa: <strong className="font-mono text-slate-950 dark:text-white font-black">{room.capacity ? `${room.capacity} học viên` : 'Chưa thiết lập'}</strong></span>
                               </div>
                             </div>
 
                             {/* Session Information Snippet */}
                             {session && (
-                              <div className="mt-3 p-3 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-emerald-200/90 dark:border-white/[0.08] space-y-2 text-xs shadow-2xs">
-                                <div className="font-bold text-slate-900 dark:text-white line-clamp-1 flex items-center gap-1.5">
+                              <div className="mt-3 p-3.5 rounded-xl bg-white dark:bg-slate-900 border-2 border-rose-500/80 dark:border-rose-500/80 space-y-2.5 text-xs shadow-sm shadow-rose-500/5">
+                                <div className="font-black text-slate-950 dark:text-white line-clamp-1 flex items-center gap-1.5">
                                   {session.is_restricted ? (
-                                    <ShieldCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <ShieldCheck className="w-4 h-4 text-amber-500 shrink-0" />
                                   ) : (
-                                    <Monitor className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                    <Monitor className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 animate-pulse" />
                                   )}
                                   <span className="truncate">{session.lecture_title}</span>
                                 </div>
-                                <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 gap-2">
+                                <div className="flex items-center justify-between text-[11px] text-slate-700 dark:text-slate-300 gap-2">
                                   <span className="truncate">
-                                    GV: <strong className="text-slate-800 dark:text-slate-200">{session.presenter_rank ? `${session.presenter_rank} ` : ''}{session.presenter_name}</strong>
+                                    GV: <strong className="text-slate-950 dark:text-white font-black">{session.presenter_rank ? `${session.presenter_rank} ` : ''}{session.presenter_name}</strong>
                                   </span>
-                                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold shrink-0 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
+                                  <span className="font-mono text-rose-700 dark:text-rose-300 font-black shrink-0 bg-rose-100/90 dark:bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-300 dark:border-rose-700/60 shadow-2xs">
                                     {session.student_count || 0} HV
                                   </span>
                                 </div>
@@ -764,16 +847,16 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                     : 10;
                                   return (
                                     <div className="pt-1 space-y-1.5">
-                                      <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner">
+                                      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner border border-slate-300 dark:border-slate-700">
                                         <div
                                           className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 rounded-full transition-all duration-500 shadow-xs"
                                           style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
                                         />
                                       </div>
-                                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                                        <span>Đã dạy {session.duration_minutes || 0}p</span>
-                                        <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                                          {session.slide_total ? `Slide ${session.slide_index || 1}/${session.slide_total} • ` : ''}Tiến độ {pct}%
+                                      <div className="flex items-center justify-between text-[11px] font-mono">
+                                        <span className="text-slate-900 dark:text-slate-200 font-bold">Đã dạy {session.duration_minutes || 0}p</span>
+                                        <span className="font-black text-emerald-700 dark:text-emerald-400">
+                                          {session.slide_total ? `${session.content_type === 'PDF' ? 'Trang' : 'Slide'} ${session.slide_index || 1}/${session.slide_total} • ` : ''}Tiến độ {pct}%
                                         </span>
                                       </div>
                                     </div>
@@ -785,10 +868,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                             {/* Upcoming Info */}
                             {!session && upcoming && (
                               <div className="mt-3 p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/40 text-xs space-y-1">
-                                <div className="font-bold text-amber-900 dark:text-amber-300 truncate">
+                                <div className="font-black text-amber-950 dark:text-amber-200 truncate">
                                   Ca tiếp theo: {upcoming.lecture_title}
                                 </div>
-                                <div className="text-[11px] text-amber-800 dark:text-amber-400 truncate">
+                                <div className="text-[11px] text-amber-900 dark:text-amber-300 font-bold truncate">
                                   GV: {upcoming.presenter_name} • {upcoming.class_name}
                                 </div>
                               </div>
@@ -796,14 +879,14 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                             {/* Maintenance Reason */}
                             {status === 'MAINTENANCE' && (
-                              <div className="mt-3 p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-400">
-                                <span className="font-medium">{room.maintenance_reason || 'Bảo trì kỹ thuật định kỳ'}</span>
+                              <div className="mt-3 p-2.5 rounded-xl bg-slate-200/80 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-200 font-bold">
+                                <span>{room.maintenance_reason || 'Bảo trì kỹ thuật định kỳ'}</span>
                               </div>
                             )}
 
                             {/* Available Empty Cue */}
                             {status === 'AVAILABLE' && (
-                              <div className="mt-3 py-3 px-3 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/70 dark:bg-slate-900/40 border border-dashed border-slate-200/90 dark:border-slate-800 rounded-xl flex items-center justify-center gap-2">
+                              <div className="mt-3 py-3 px-3 text-center text-xs text-slate-700 dark:text-slate-300 font-bold bg-white/70 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl flex items-center justify-center gap-2">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                                 <span>Phòng sẵn sàng tiếp nhận ca giảng dạy</span>
                               </div>
@@ -811,11 +894,13 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                           </div>
 
                           {/* Footer Action Hint */}
-                          <div className="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-[11px] text-slate-400">
-                            <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">
+                          <div className="mt-3.5 pt-2.5 border-t border-slate-200 dark:border-white/[0.08] flex items-center justify-between text-[11px]">
+                            <span className="font-mono text-[10px] text-slate-700 dark:text-slate-300 font-bold">
                               Hàng {room.grid_row} • Cột {room.grid_col}
                             </span>
-                            <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform whitespace-nowrap shrink-0">
+                            <span className={`font-black flex items-center gap-1 group-hover:translate-x-0.5 transition-transform whitespace-nowrap shrink-0 ${
+                              status === 'IN_SESSION' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'
+                            }`}>
                               <span>Chi tiết</span>
                               <ArrowRight className="w-3.5 h-3.5" />
                             </span>
@@ -823,6 +908,37 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Phân trang chuẩn Sơ đồ giảng đường (tối đa 30 phòng / trang, sang phòng 31 là trang 2) */}
+                {totalRoomPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
+                    <div>
+                      Đang hiển thị phòng <strong className="text-slate-800 dark:text-slate-200 font-bold">{(currentRoomPage - 1) * ROOMS_PAGE_SIZE + 1} - {Math.min(currentRoomPage * ROOMS_PAGE_SIZE, floorRooms.length)}</strong> / {floorRooms.length}
+                      {' '}— Khu <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{currentBuilding?.building_name || selectedBuilding}</strong> (Trang {currentRoomPage}/{totalRoomPages})
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setRoomPage(Math.max(1, currentRoomPage - 1))}
+                        disabled={currentRoomPage <= 1}
+                        className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
+                      >
+                        Trang trước
+                      </button>
+                      <span className="px-2.5 font-bold font-mono text-emerald-700 dark:text-emerald-400">
+                        {currentRoomPage}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRoomPage(Math.min(totalRoomPages, currentRoomPage + 1))}
+                        disabled={currentRoomPage >= totalRoomPages}
+                        className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
+                      >
+                        Trang sau
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -885,39 +1001,39 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                     {/* Active Session in Inspector (Đồng bộ thời gian thực siêu tốc) */}
                     {activeSession ? (
                       <div className="space-y-3">
-                        <div className="p-3.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-300/80 dark:border-emerald-800/40 space-y-2">
-                          <div className="flex items-center justify-between text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                        <div className="p-3.5 rounded-xl bg-rose-50/80 dark:bg-rose-950/40 border-2 border-rose-400/80 dark:border-rose-700/60 space-y-2.5 shadow-sm">
+                          <div className="flex items-center justify-between text-xs font-black text-rose-900 dark:text-rose-300">
                             <span className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
                               ĐANG GIẢNG BÀI
                             </span>
-                            <span className="font-mono text-emerald-700 dark:text-emerald-400">
+                            <span className="font-mono text-rose-700 dark:text-rose-400 font-bold">
                               Đã dạy {activeSession.duration_minutes || 0} phút
                             </span>
                           </div>
 
-                          <div className="font-black text-sm text-slate-900 dark:text-white">
+                          <div className="font-black text-base text-slate-950 dark:text-white">
                             {activeSession.lecture_title}
                           </div>
 
                           {/* Presenter & Class */}
-                          <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40 space-y-1.5 text-xs">
+                          <div className="pt-2 border-t border-rose-200/80 dark:border-rose-800/60 space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
-                              <span className="text-slate-500">Giảng viên:</span>
-                              <strong className="text-slate-900 dark:text-white">
+                              <span className="text-slate-700 dark:text-slate-300 font-bold">Giảng viên:</span>
+                              <strong className="text-slate-950 dark:text-white font-black">
                                 {activeSession.presenter_rank ? `${activeSession.presenter_rank} ` : ''}
                                 {activeSession.presenter_name}
                               </strong>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-slate-500">Lớp học:</span>
-                              <strong className="text-slate-900 dark:text-white">
+                              <span className="text-slate-700 dark:text-slate-300 font-bold">Lớp học:</span>
+                              <strong className="text-slate-950 dark:text-white font-black">
                                 {activeSession.class_name}
                               </strong>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-slate-500">Sĩ số tham gia:</span>
-                              <strong className="font-mono text-emerald-700 dark:text-emerald-400">
+                              <span className="text-slate-700 dark:text-slate-300 font-bold">Sĩ số tham gia:</span>
+                              <strong className="font-mono text-rose-700 dark:text-rose-400 font-black">
                                 {activeSession.student_count || 0} học viên
                               </strong>
                             </div>
@@ -968,10 +1084,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                       <div className="pt-3 border-t border-slate-100 dark:border-white/[0.04]">
                         <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Lịch sử / Kế hoạch hôm nay ({roomDetail.today_schedules.length})</span>
+                          <span>Lịch sử dạy học hôm nay ({roomDetail.today_schedules.length})</span>
                         </div>
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                          {roomDetail.today_schedules.map((ts) => (
+                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                          {pagedTodaySchedules.map((ts) => (
                             <div
                               key={ts.schedule_id}
                               className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-white/[0.04] text-xs flex items-center justify-between"
@@ -984,16 +1100,44 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                   {ts.presenter_name} • {ts.class_name}
                                 </div>
                               </div>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 border ${
                                 ts.status === 'ONGOING'
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
-                                  : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                  ? 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-700/60 font-black animate-pulse'
+                                  : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700/60 font-black'
                               }`}>
                                 {ts.status === 'ONGOING' ? 'Đang dạy' : 'Đã xong'}
                               </span>
                             </div>
                           ))}
                         </div>
+
+                        {/* Phân trang chuẩn Lịch sử dạy học hôm nay (tối đa 30 ca / trang, sang ca 31 là trang 2) */}
+                        {totalTodayPages > 1 && (
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 mt-2 border-t border-slate-100 dark:border-white/[0.04]">
+                            <span>Trang <strong className="text-slate-800 dark:text-slate-200 font-bold">{currentTodayPage}</strong>/{totalTodayPages} ({todaySchedulesList.length} ca)</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setTodayPage(Math.max(1, currentTodayPage - 1))}
+                                disabled={currentTodayPage <= 1}
+                                className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold cursor-pointer"
+                              >
+                                Trước
+                              </button>
+                              <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 px-1">
+                                {currentTodayPage}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setTodayPage(Math.min(totalTodayPages, currentTodayPage + 1))}
+                                disabled={currentTodayPage >= totalTodayPages}
+                                className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold cursor-pointer"
+                              >
+                                Sau
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1051,39 +1195,39 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   ) : activeSession ? (
                     <div className="space-y-4">
                       {/* Active Session Card */}
-                      <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-300/80 dark:border-emerald-800/40 space-y-3">
-                        <div className="flex items-center justify-between text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                      <div className="p-4 rounded-2xl bg-rose-50/80 dark:bg-rose-950/40 border-2 border-rose-400/80 dark:border-rose-700/60 space-y-3 shadow-sm">
+                        <div className="flex items-center justify-between text-xs font-black text-rose-900 dark:text-rose-300">
                           <span className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
                             ĐANG GIẢNG BÀI
                           </span>
-                          <span className="font-mono">
+                          <span className="font-mono text-rose-700 dark:text-rose-400 font-bold">
                             Đã dạy {activeSession.duration_minutes || 0} phút
                           </span>
                         </div>
 
-                        <div className="font-black text-base text-slate-900 dark:text-white">
+                        <div className="font-black text-base text-slate-950 dark:text-white">
                           {activeSession.lecture_title}
                         </div>
 
                         {/* Details */}
-                        <div className="space-y-2 pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40 text-xs">
+                        <div className="space-y-2 pt-2 border-t border-rose-200/80 dark:border-rose-800/60 text-xs">
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500">Giảng viên:</span>
-                            <strong className="text-slate-900 dark:text-white">
+                            <span className="text-slate-700 dark:text-slate-300 font-bold">Giảng viên:</span>
+                            <strong className="text-slate-950 dark:text-white font-black">
                               {activeSession.presenter_rank ? `${activeSession.presenter_rank} ` : ''}
                               {activeSession.presenter_name}
                             </strong>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500">Lớp học:</span>
-                            <strong className="text-slate-900 dark:text-white">
+                            <span className="text-slate-700 dark:text-slate-300 font-bold">Lớp học:</span>
+                            <strong className="text-slate-950 dark:text-white font-black">
                               {activeSession.class_name}
                             </strong>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500">Sĩ số học viên:</span>
-                            <strong className="font-mono text-emerald-700 dark:text-emerald-400">
+                            <span className="text-slate-700 dark:text-slate-300 font-bold">Sĩ số học viên:</span>
+                            <strong className="font-mono text-rose-700 dark:text-rose-400 font-black">
                               {activeSession.student_count || 0} học viên
                             </strong>
                           </div>
@@ -1159,10 +1303,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                     <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
                       <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
                         <Calendar className="w-4 h-4 text-slate-400" />
-                        <span>Kế hoạch đào tạo hôm nay</span>
+                        <span>Lịch sử dạy học hôm nay ({roomDetail.today_schedules.length})</span>
                       </h5>
-                      <div className="space-y-2">
-                        {roomDetail.today_schedules.map((ts) => (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {pagedTodaySchedules.map((ts) => (
                           <div
                             key={ts.schedule_id}
                             className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-white/[0.04] text-xs flex items-center justify-between"
@@ -1175,16 +1319,44 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                 {ts.presenter_name} • {ts.class_name}
                               </div>
                             </div>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 border ${
                               ts.status === 'ONGOING'
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
-                                : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                ? 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-700/60 font-black animate-pulse'
+                                : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700/60 font-black'
                             }`}>
                               {ts.status === 'ONGOING' ? 'Đang dạy' : 'Đã xong'}
                             </span>
                           </div>
                         ))}
                       </div>
+
+                      {/* Phân trang chuẩn Lịch sử dạy học hôm nay trong Drawer */}
+                      {totalTodayPages > 1 && (
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 mt-2 border-t border-slate-100 dark:border-white/[0.04]">
+                          <span>Trang <strong className="text-slate-800 dark:text-slate-200 font-bold">{currentTodayPage}</strong>/{totalTodayPages} ({todaySchedulesList.length} ca)</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setTodayPage(Math.max(1, currentTodayPage - 1))}
+                              disabled={currentTodayPage <= 1}
+                              className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold cursor-pointer"
+                            >
+                              Trước
+                            </button>
+                            <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 px-1">
+                              {currentTodayPage}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setTodayPage(Math.min(totalTodayPages, currentTodayPage + 1))}
+                              disabled={currentTodayPage >= totalTodayPages}
+                              className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold cursor-pointer"
+                            >
+                              Sau
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1217,36 +1389,36 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                 return (
                   <div
                     key={s.schedule_id}
-                    className={`bg-white dark:bg-[#111827] rounded-2xl border p-5 flex flex-col gap-3.5 transition-all shadow-xs relative ${
+                    className={`bg-white dark:bg-[#111827] rounded-2xl border-2 p-5 flex flex-col gap-3.5 transition-all shadow-xs relative ${
                       s.is_hanging
-                        ? 'border-amber-500/60 bg-amber-50/20 dark:bg-amber-950/10 shadow-amber-500/10'
-                        : 'border-slate-200 dark:border-white/[0.08] hover:border-emerald-500/40'
+                        ? 'border-amber-500/80 bg-amber-50/30 dark:bg-amber-950/20 shadow-amber-500/10'
+                        : 'border-rose-500/80 bg-gradient-to-br from-rose-50/40 via-white to-transparent dark:from-rose-950/20 dark:via-[#111827] shadow-sm'
                     }`}
                   >
                     {/* Giảng đường & Trạng thái */}
-                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 dark:border-white/[0.04] pb-3">
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-200 dark:border-white/[0.08] pb-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-700 dark:text-emerald-400 font-bold">
+                        <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-600 dark:text-rose-400 font-bold">
                           <Building2 className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                          <div className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                          <div className="font-black text-sm text-slate-950 dark:text-white truncate">
                             {s.venue_name.toLowerCase().startsWith('giảng đường') ? s.venue_name : `Giảng đường: ${s.venue_name}`}
                           </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                            Lớp: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{s.class_name || 'Học viên'}</strong>
+                          <div className="text-xs text-slate-700 dark:text-slate-300 truncate font-bold">
+                            Lớp: <strong className="text-slate-950 dark:text-white font-black">{s.class_name || 'Học viên'}</strong>
                           </div>
                         </div>
                       </div>
 
                       {s.is_hanging ? (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-400 dark:border-amber-500/40 shrink-0 flex items-center gap-1 animate-pulse">
+                        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-400 dark:border-amber-500/40 shrink-0 flex items-center gap-1 animate-pulse">
                           <AlertTriangle className="w-3 h-3 text-amber-600" />
                           CẢNH BÁO TREO CA
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 shrink-0 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-rose-600 text-white border border-rose-700 shrink-0 flex items-center gap-1.5 shadow-sm animate-pulse tracking-wide">
+                          <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                           ĐANG GIẢNG BÀI
                         </span>
                       )}
@@ -1254,25 +1426,25 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                     {/* Tiêu đề bài giảng */}
                     <div>
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1" title={s.lecture_title}>
+                      <h4 className="font-black text-sm text-slate-950 dark:text-white line-clamp-1" title={s.lecture_title}>
                         {s.lecture_title}
                       </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        Môn: {s.subject_name || 'Quân sự'}
+                      <p className="text-xs text-slate-700 dark:text-slate-300 truncate mt-0.5 font-bold">
+                        Môn: <strong className="text-slate-900 dark:text-white">{s.subject_name || 'Quân sự'}</strong>
                       </p>
                     </div>
 
                     {/* Thông tin chi tiết */}
                     <div className="space-y-2 text-xs">
                       <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.06] flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-300/40">
+                        <div className="w-7 h-7 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-300/40">
                           <User className="w-3.5 h-3.5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none uppercase tracking-wider">
+                          <span className="block text-[10px] text-slate-600 dark:text-slate-400 font-bold leading-none uppercase tracking-wider">
                             Cán bộ giảng dạy
                           </span>
-                          <span className={`font-bold text-slate-900 dark:text-white truncate block mt-0.5 text-xs ${isOwner ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>
+                          <span className={`font-black text-slate-950 dark:text-white truncate block mt-0.5 text-xs ${isOwner ? 'text-rose-600 dark:text-rose-400' : ''}`}>
                             {s.presenter_rank ? `${s.presenter_rank} ` : ''}{s.presenter_name}
                           </span>
                         </div>
@@ -1284,17 +1456,17 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                             <Users className="w-3.5 h-3.5" />
                           </div>
                           <div className="min-w-0">
-                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none uppercase tracking-wider">
+                            <span className="block text-[10px] text-slate-600 dark:text-slate-400 font-bold leading-none uppercase tracking-wider">
                               Sĩ số
                             </span>
-                            <span className="font-bold text-slate-800 dark:text-slate-200 font-mono truncate block mt-0.5 text-xs">
+                            <span className="font-black text-slate-950 dark:text-white font-mono truncate block mt-0.5 text-xs">
                               {s.student_count}
                               {s.class_student_total != null && (
                                 <span className="text-amber-600 dark:text-amber-400">
                                   {' / '}{s.class_student_total}
                                 </span>
                               )}
-                              <span className="font-normal text-slate-500 dark:text-slate-400"> HV</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-300"> HV</span>
                             </span>
                           </div>
                         </div>
@@ -1310,10 +1482,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                 <Clock className="w-3.5 h-3.5" />
                               </div>
                               <div className="min-w-0">
-                                <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none uppercase tracking-wider">
+                                <span className="block text-[10px] text-slate-600 dark:text-slate-400 font-bold leading-none uppercase tracking-wider">
                                   Thời lượng
                                 </span>
-                                <span className="font-bold text-slate-800 dark:text-slate-200 font-mono truncate block mt-0.5 text-xs">
+                                <span className="font-black text-slate-950 dark:text-white font-mono truncate block mt-0.5 text-xs">
                                   {elapsedMinutes} phút
                                 </span>
                               </div>

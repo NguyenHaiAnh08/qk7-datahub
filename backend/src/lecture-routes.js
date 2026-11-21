@@ -222,10 +222,6 @@ module.exports = function createLectureRoutes({
       query += ` ORDER BY l.created_at DESC`;
       const result = await r.query(query);
       result.recordset.forEach((row) => {
-        if (!scope) { row.peer_unit = false; row.can_teach = false; return; } // Khách: chỉ xem
-        row.peer_unit = isPeerUnit(scope, row.faculty_unit_id);
-        // Được mở ca: bài thuộc đơn vị mình / cùng khoa (không còn giới hạn tác giả)
-        row.can_teach = inScope(scope, row.faculty_unit_id) || row.author_id === userId;
         row.peer_unit = isGuest ? false : isPeerUnit(scope, row.faculty_unit_id);
         row.can_teach = isGuest ? false : (inScope(scope, row.faculty_unit_id) || row.author_id === userId);
       });

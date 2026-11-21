@@ -28,8 +28,8 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/sessions$/,                  'SESSION_VIEW'],
     [/^\/api\/admin\/sessions\/[^/]+$/,           'SESSION_VIEW'],
     [/^\/api\/admin\/sessions\/user\/[^/]+$/,     'SESSION_VIEW'],
-    [/^\/api\/admin\/approval-requests$/,         'AUDIT_VIEW'],
-    [/^\/api\/admin\/approval-requests\/[^/]+$/,  'AUDIT_VIEW'],
+    [/^\/api\/admin\/approval-requests$/,         'APPROVAL_VALIDATE'],
+    [/^\/api\/admin\/approval-requests\/[^/]+$/,  'APPROVAL_VALIDATE'],
     [/^\/api\/admin\/protected-permissions$/,     'ROLE_VIEW'],
     [/^\/api\/documents\/trash$/,                 'DOC_TRASH_VIEW'],
     [/^\/api\/documents\/my-unit$/,               'DOC_VIEW'],
@@ -50,7 +50,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/roles\/[^/]+\/permissions$/,        'ROLE_PERMISSION_ASSIGN'],// Đổi quyền role → duyệt
     [/^\/api\/admin\/permissions$/,                      'PERMISSION_CREATE'],
     [/^\/api\/admin\/security-levels$/,                  'SECLEVEL_MANAGE'],       // Đổi mức mật → duyệt
-    [/^\/api\/admin\/approval-requests\/[^/]+\/(approve|reject|mark-executed)$/, 'AUDIT_VIEW'],
+    [/^\/api\/admin\/approval-requests\/[^/]+\/(approve|reject|mark-executed)$/, 'APPROVAL_VALIDATE'],
     [/^\/api\/admin\/protected-permissions\/[^/]+$/,     'ROLE_EDIT'],
     [/^\/api\/documents\/upload$/,                'DOC_UPLOAD'],
     [/^\/api\/documents\/parse$/,                 'DOC_PARSE'],

@@ -191,7 +191,6 @@ module.exports = function createLectureRoutes({
       `;
       r.input('clearance', sql.Int, clearance);
 
-      let scope = null;
       let scope = { all: false, unitIds: [] };
       if (isGuest) {
         // Đại biểu / Khách chỉ được xem các bài giảng đã xuất bản (PUBLISHED) và ở mức bảo mật Cấp 1 (Công khai)

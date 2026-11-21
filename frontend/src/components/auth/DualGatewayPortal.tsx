@@ -114,10 +114,10 @@ export const DualGatewayPortal: React.FC<DualGatewayPortalProps> = ({
       <div className="hidden md:block relative w-full max-w-[980px] min-h-[620px] rounded-[28px] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.18)] border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all">
         {/* ── FORM BÊN TRÁI: TRUNG TÂM DỮ LIỆU SỐ ── */}
         <div
-          className={`absolute top-0 left-0 w-1/2 h-full p-6 sm:p-7 flex flex-col justify-center overflow-y-auto no-scrollbar bg-white dark:bg-slate-900 transition-all duration-700 ease-[cubic-bezier(0.76,0,0.24,1)] ${
+          className={`absolute top-0 left-0 w-1/2 h-full p-6 sm:p-7 flex flex-col justify-center overflow-y-auto no-scrollbar bg-white dark:bg-slate-900 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${
             activePortal === 'datahub'
-              ? 'translate-x-0 opacity-100 pointer-events-auto z-10 blur-0'
-              : 'translate-x-[20%] opacity-0 pointer-events-none z-1 blur-[2px]'
+              ? 'translate-x-0 opacity-100 pointer-events-auto visible z-10 blur-0'
+              : '-translate-x-8 opacity-0 pointer-events-none invisible z-0 blur-[1px]'
           }`}
         >
           {/* Header Form Trái */}
@@ -143,10 +143,10 @@ export const DualGatewayPortal: React.FC<DualGatewayPortalProps> = ({
 
         {/* ── FORM BÊN PHẢI: HỆ THỐNG QUẢN LÝ ĐÀO TẠO ── */}
         <div
-          className={`absolute top-0 left-0 w-1/2 h-full p-6 sm:p-7 flex flex-col justify-center overflow-y-auto no-scrollbar bg-white dark:bg-slate-900 transition-all duration-700 ease-[cubic-bezier(0.76,0,0.24,1)] ${
+          className={`absolute top-0 left-1/2 w-1/2 h-full p-6 sm:p-7 flex flex-col justify-center overflow-y-auto no-scrollbar bg-white dark:bg-slate-900 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${
             activePortal === 'training'
-              ? 'translate-x-[100%] opacity-100 pointer-events-auto z-20 blur-0'
-              : 'translate-x-0 opacity-0 pointer-events-none z-1 blur-[2px]'
+              ? 'translate-x-0 opacity-100 pointer-events-auto visible z-10 blur-0'
+              : 'translate-x-8 opacity-0 pointer-events-none invisible z-0 blur-[1px]'
           }`}
         >
           <TrainingLoginForm
@@ -160,13 +160,13 @@ export const DualGatewayPortal: React.FC<DualGatewayPortalProps> = ({
             4. TẤM OVERLAY TRƯỢT CHIẾN THUẬT (DOUBLE-SLIDER PARALLAX)
             ══════════════════════════════════════════════════════════════════ */}
         <div
-          className={`tactical-overlay-hud absolute top-0 left-1/2 w-1/2 h-full overflow-hidden z-40 transition-transform duration-800 ease-[cubic-bezier(0.76,0,0.24,1)] ${
+          className={`tactical-overlay-hud absolute top-0 left-1/2 w-1/2 h-full overflow-hidden z-30 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${
             activePortal === 'training' ? '-translate-x-full' : 'translate-x-0'
           }`}
         >
           {/* Lớp nền bên trong (Rộng 200%, dịch ngược chiều tạo hiệu ứng Parallax mượt) */}
           <div
-            className={`relative -left-full w-[200%] h-full transition-transform duration-800 ease-[cubic-bezier(0.76,0,0.24,1)] ${
+            className={`relative -left-full w-[200%] h-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${
               activePortal === 'training' ? 'translate-x-1/2' : 'translate-x-0'
             }`}
           >
@@ -185,14 +185,14 @@ export const DualGatewayPortal: React.FC<DualGatewayPortalProps> = ({
 
             {/* 2 Vòng tròn kính mờ lớn lệch pha (Neumorphic Glass Rings) */}
             <div
-              className={`absolute -top-16 -right-16 w-64 h-64 rounded-full border border-[#C5A880]/30 bg-white/[0.04] backdrop-blur-md pointer-events-none transition-transform duration-1000 ${
+              className={`absolute -top-16 -right-16 w-64 h-64 rounded-full border border-[#C5A880]/30 bg-white/[0.04] backdrop-blur-md pointer-events-none transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] ${
                 activePortal === 'training'
                   ? 'translate-x-8 translate-y-8 scale-110'
                   : 'translate-x-0 translate-y-0 scale-100'
               }`}
             />
             <div
-              className={`absolute -bottom-20 -left-20 w-80 h-80 rounded-full border border-[#C5A880]/25 bg-white/[0.04] backdrop-blur-md pointer-events-none transition-transform duration-1000 ${
+              className={`absolute -bottom-20 -left-20 w-80 h-80 rounded-full border border-[#C5A880]/25 bg-white/[0.04] backdrop-blur-md pointer-events-none transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] ${
                 activePortal === 'training'
                   ? '-translate-x-8 -translate-y-8 scale-110'
                   : 'translate-x-0 translate-y-0 scale-100'
@@ -242,7 +242,7 @@ export const DualGatewayPortal: React.FC<DualGatewayPortalProps> = ({
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
-
+              
             {/* ── NỬA TRÁI CỦA OVERLAY: Mời quay lại Trung Tâm Dữ Liệu Số (Hiện khi ở Training) ── */}
             <div className="absolute top-0 left-0 w-1/2 h-full flex flex-col items-center justify-center p-8 sm:p-10 text-white text-center select-none">
               <div className="w-16 h-16 rounded-3xl bg-white/10 border border-white/20 backdrop-blur-md flex items-center justify-center mb-4 shadow-xl shadow-emerald-950/40">

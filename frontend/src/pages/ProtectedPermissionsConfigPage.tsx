@@ -1,5 +1,5 @@
 // frontend/src/pages/ProtectedPermissionsConfigPage.tsx
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import {
   ShieldCheck,
   Lock,
@@ -14,6 +14,9 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  ArrowRight,
   FileText,
   Users,
   KeyRound,
@@ -320,6 +323,70 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
     }, {} as Record<string, any[]>);
   }, [perms]);
 
+  // ── Thao tác cuộn & chuyển phân hệ siêu mượt mà không khựng ──
+  const pillsContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const groupKeys = useMemo(() => Object.keys(rawGrouped), [rawGrouped]);
+  const allNavOptions = useMemo(() => ['all', ...groupKeys], [groupKeys]);
+
+  const checkScrollability = useCallback(() => {
+    const el = pillsContainerRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 6);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 6);
+  }, []);
+
+  useEffect(() => {
+    checkScrollability();
+    const el = pillsContainerRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkScrollability, { passive: true });
+    window.addEventListener('resize', checkScrollability);
+    return () => {
+      el.removeEventListener('scroll', checkScrollability);
+      window.removeEventListener('resize', checkScrollability);
+    };
+  }, [checkScrollability, rawGrouped]);
+
+  const scrollPills = (direction: 'left' | 'right') => {
+    if (!pillsContainerRef.current) return;
+    const distance = 260;
+    pillsContainerRef.current.scrollBy({
+      left: direction === 'left' ? -distance : distance,
+      behavior: 'smooth',
+    });
+  };
+
+  const selectGroupAndScroll = (grpKey: string) => {
+    setSelectedGroup(grpKey);
+    setTimeout(() => {
+      const btn = pillsContainerRef.current?.querySelector(`[data-group-key="${grpKey}"]`);
+      btn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }, 20);
+  };
+
+  const handleNextGroup = () => {
+    const currentIndex = allNavOptions.indexOf(selectedGroup);
+    const nextIndex = (currentIndex + 1) % allNavOptions.length;
+    selectGroupAndScroll(allNavOptions[nextIndex]);
+  };
+
+  const handlePrevGroup = () => {
+    const currentIndex = allNavOptions.indexOf(selectedGroup);
+    const prevIndex = (currentIndex - 1 + allNavOptions.length) % allNavOptions.length;
+    selectGroupAndScroll(allNavOptions[prevIndex]);
+  };
+
+  const nextGroupLabel = useMemo(() => {
+    const currentIndex = allNavOptions.indexOf(selectedGroup);
+    const nextKey = allNavOptions[(currentIndex + 1) % allNavOptions.length];
+    if (nextKey === 'all') return 'Tất cả phân hệ';
+    const meta = GROUP_META[nextKey];
+    return meta?.label ? meta.label.replace('Phân Hệ ', '') : nextKey;
+  }, [allNavOptions, selectedGroup]);
+
   // Bộ lọc dữ liệu theo từ khóa, trạng thái và phân hệ
   const filteredGrouped = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -542,43 +609,104 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Lọc theo Phân hệ Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar border-t border-slate-100 dark:border-slate-800/80">
-          <span className="text-[10.5px] uppercase font-bold text-slate-400 shrink-0 mr-1 flex items-center gap-1">
-            <Layers className="w-3 h-3" />
-            <span>Phân hệ:</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedGroup('all')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition cursor-pointer ${
-              selectedGroup === 'all'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            Tất cả phân hệ
-          </button>
-          {Object.keys(rawGrouped).map((grpKey) => {
-            const meta = GROUP_META[grpKey];
-            const count = rawGrouped[grpKey]?.length || 0;
-            const isSelected = selectedGroup === grpKey;
-            return (
+        {/* Lọc theo Phân hệ Pills với nút điều hướng siêu mượt */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-[10.5px] uppercase font-bold text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1.5 select-none pl-0.5">
+              <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Phân hệ:</span>
+            </span>
+
+            {/* Nút Cuộn Trái (Smooth Scroll Left) */}
+            <button
+              type="button"
+              onClick={() => scrollPills('left')}
+              disabled={!canScrollLeft}
+              className={`p-1.5 rounded-xl border transition-all duration-200 shrink-0 flex items-center justify-center cursor-pointer ${
+                canScrollLeft
+                  ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 shadow-2xs active:scale-95'
+                  : 'opacity-20 cursor-not-allowed border-transparent text-slate-400'
+              }`}
+              title="Cuộn danh sách phân hệ sang trái"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Vùng thanh cuộn chứa các Phân hệ Pills */}
+            <div
+              ref={pillsContainerRef}
+              className="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth no-scrollbar flex-1"
+            >
               <button
-                key={grpKey}
                 type="button"
-                onClick={() => setSelectedGroup(grpKey)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 flex items-center gap-1.5 transition cursor-pointer ${
-                  isSelected
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                data-group-key="all"
+                onClick={() => selectGroupAndScroll('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all duration-200 cursor-pointer active:scale-95 flex items-center gap-1.5 ${
+                  selectedGroup === 'all'
+                    ? 'bg-emerald-600 text-white shadow-xs border border-emerald-500'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/60'
                 }`}
               >
-                <span>{meta?.label ? meta.label.replace('Phân Hệ ', '') : grpKey}</span>
-                <span className="text-[10px] opacity-75 font-mono">({count})</span>
+                <span>Tất cả phân hệ</span>
               </button>
-            );
-          })}
+
+              {groupKeys.map((grpKey) => {
+                const meta = GROUP_META[grpKey];
+                const count = rawGrouped[grpKey]?.length || 0;
+                const isSelected = selectedGroup === grpKey;
+                return (
+                  <button
+                    key={grpKey}
+                    type="button"
+                    data-group-key={grpKey}
+                    onClick={() => selectGroupAndScroll(grpKey)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 transition-all duration-200 cursor-pointer active:scale-95 ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white shadow-xs border border-emerald-500'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/60'
+                    }`}
+                  >
+                    <span>{meta?.label ? meta.label.replace('Phân Hệ ', '') : grpKey}</span>
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                        isSelected
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Nút Cuộn Phải (Smooth Scroll Right) */}
+            <button
+              type="button"
+              onClick={() => scrollPills('right')}
+              disabled={!canScrollRight}
+              className={`p-1.5 rounded-xl border transition-all duration-200 shrink-0 flex items-center justify-center cursor-pointer ${
+                canScrollRight
+                  ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 shadow-2xs active:scale-95'
+                  : 'opacity-20 cursor-not-allowed border-transparent text-slate-400'
+              }`}
+              title="Cuộn danh sách phân hệ sang phải"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Nút hành động trực tiếp: Chuyển sang phân hệ tiếp theo */}
+            <button
+              type="button"
+              onClick={handleNextGroup}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black text-emerald-800 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 border border-emerald-300 dark:border-emerald-700/70 transition-all duration-200 cursor-pointer active:scale-95 shrink-0 shadow-2xs group"
+              title={`Chuyển sang: ${nextGroupLabel}`}
+            >
+              <span>Phân hệ tiếp theo</span>
+              <ArrowRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
         </div>
       </div>
 

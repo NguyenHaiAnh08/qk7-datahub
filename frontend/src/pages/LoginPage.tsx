@@ -144,7 +144,7 @@ export const LoginPage: React.FC = () => {
           LỚP z-15: AMBIENT SYNC GRADIENT ĐỔI MÀU ÁNH SÁNG THEO PORTAL
           ══════════════════════════════════════════════════════════════════ */}
       <div
-        className={`fixed inset-0 pointer-events-none transition-all duration-700 z-15 ${
+        className={`fixed inset-0 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] z-15 ${
           activePortal === 'datahub'
             ? 'bg-gradient-to-tr from-emerald-950/30 via-transparent to-amber-900/20'
             : 'bg-gradient-to-tr from-slate-950/45 via-blue-950/25 to-indigo-900/30'

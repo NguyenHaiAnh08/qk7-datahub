@@ -4,6 +4,33 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.4-dual-gateway-portal-refinement-and-ux-pagination] — 2026-11-21
+
+### 1. Cổng Xác Thực Kép Trượt Động: Khắc Phục Dính Hậu & Nâng Cấp Tốc Độ Chuyển Động (`DualGatewayPortal.tsx` & `LoginPage.tsx`)
+- **Triệt tiêu dính hậu (Ghosting / Bleed-Through) bằng Cô lập Không gian Vật lý ([`DualGatewayPortal.tsx`](../frontend/src/components/auth/DualGatewayPortal.tsx)):**
+  - Khắc phục lỗi Form Đào tạo trượt ngược về nửa trái (`translate-x-0`) đè lên Form Dữ Liệu Số khi chuyển portal.
+  - Cố định Form Dữ Liệu Số ở nửa trái (`left-0 w-1/2`), Form Đào Tạo ở nửa phải (`left-1/2 w-1/2`), không bao giờ xâm lấn không gian của nhau.
+  - Tích hợp chốt chặn `visible` khi active và `invisible` (`visibility: hidden`) khi inactive, chuẩn hóa z-index: Form active (`z-10`), Form inactive (`z-0`), Overlay HUD (`z-30`).
+- **Tối ưu tốc độ & nâng cấp đường cong gia tốc siêu mượt ([`DualGatewayPortal.tsx`](../frontend/src/components/auth/DualGatewayPortal.tsx) & [`LoginPage.tsx`](../frontend/src/pages/LoginPage.tsx)):**
+  - Rút ngắn thời gian trượt từ `700ms` xuống **`500ms`** (`duration-500`) trên toàn bộ form, tấm trượt overlay HUD, nền parallax và lớp phủ ánh sáng môi trường `Ambient Sync`.
+  - Nâng cấp đường cong gia tốc sang **`cubic-bezier(0.25, 1, 0.5, 1)`** khởi động tức thì không độ trễ và giảm tốc mượt mà khi vào vị trí đích.
+  - Tinh chỉnh 2 vòng tròn kính mờ Neumorphic Glass Rings sang `700ms` tạo hiệu ứng quán tính sống động, kết thúc đồng pha với giao diện.
+
+### 2. Tối Ưu Bảng Quản Trị Giảng Đường & Phân Trang Thông Minh (`BuildingManagerPanel.tsx`)
+- **Phân trang khu giảng đường ([`BuildingManagerPanel.tsx`](../frontend/src/components/lectures/BuildingManagerPanel.tsx)):**
+  - Quy định hiển thị tối đa 30 khu giảng đường / trang, khu thứ 31 tự động chuyển sang trang 2.
+  - Bổ sung thanh điều khiển phân trang trực quan: hiển thị dải khu đang xem, tổng số khu, số trang hiện tại / tổng trang, nút *Trang trước*, nhãn số trang nổi bật và nút *Trang sau*.
+  - Tự động reset về trang 1 khi thay đổi từ khóa tìm kiếm, bộ lọc trạng thái hoặc chế độ hiển thị (Grid / Table).
+
+### 3. Tối Ưu Điều Hướng Phân Hệ Bài Giảng & Phân Quyền Đặc Quyền (`LectureCatalogsPage.tsx` & `ProtectedPermissionsConfigPage.tsx`)
+- **Thanh cuộn phân hệ bài giảng số ([`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx)):**
+  - Bổ sung nút cuộn ngang mượt mà (Trái / Phải) và nút hành động *Phân hệ tiếp theo* kèm hiển thị nhãn phân hệ kế tiếp.
+  - Tự động cuộn định tâm (scrollIntoView) vào phân hệ được chọn.
+- **Trình cấu hình phân quyền đặc quyền ([`ProtectedPermissionsConfigPage.tsx`](../frontend/src/pages/ProtectedPermissionsConfigPage.tsx)):**
+  - Tích hợp điều hướng cuộn ngang phân hệ, nút chuyển phân hệ kế tiếp và hiển thị thẻ phân quyền độ tương phản cao.
+
+---
+
 ## [v1.8.3-reading-ring-building-manager-and-security-hardening] — 2026-11-20
 
 ### 1. Vòng Chỉ Báo Hoàn Thành Đọc Tài Liệu (Document Reading Completion Ring - `DocumentReadingRing.tsx`)

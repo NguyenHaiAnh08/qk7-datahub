@@ -22,6 +22,8 @@ import {
   Monitor,
   Presentation,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TreeSelect } from 'antd';
@@ -247,6 +249,28 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
       return matchPk || matchName || matchCode || matchBuilding || matchUnit;
     });
   }, [items, searchQuery, statusFilter, roomTypeFilter, cfg, catalogType]);
+
+  // ── Phân trang: tối đa 30 bản ghi / trang, bản ghi thứ 31 sang trang 2 ──
+  const PAGE_SIZE = 30;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [catalogType, searchQuery, statusFilter, roomTypeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedItems = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredItems.slice(start, start + PAGE_SIZE);
+  }, [filteredItems, currentPage]);
+
+  const itemUnitName =
+    catalogType === 'subjects'
+      ? 'môn học'
+      : catalogType === 'classes'
+      ? 'lớp học'
+      : 'giảng đường';
 
   const openCreate = () => {
     setEditing(null);
@@ -498,7 +522,7 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((row) => {
+                pagedItems.map((row) => {
                   const pkVal = row[cfg.pkField];
                   const isActive = row.active !== false;
 
@@ -672,6 +696,49 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
             </tbody>
           </table>
         </div>
+
+        {/* ── THANH PHÂN TRANG: Tối đa 30 bản ghi / trang, bản ghi thứ 31 sang trang 2 ── */}
+        {filteredItems.length > 0 && totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400 bg-white dark:bg-[#111827] px-4 py-3 border-t border-slate-200 dark:border-white/[0.08]">
+            <div>
+              Đang hiển thị bản ghi{' '}
+              <strong className="text-slate-900 dark:text-white font-bold font-mono">
+                {(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredItems.length)}
+              </strong>{' '}
+              / <span className="font-mono">{filteredItems.length}</span> — Tổng số{' '}
+              <strong className="text-emerald-700 dark:text-emerald-400 font-bold font-mono">
+                {filteredItems.length}
+              </strong>{' '}
+              {itemUnitName} (Trang <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{currentPage}/{totalPages}</span>)
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer flex items-center gap-1 active:scale-95"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Trang trước</span>
+              </button>
+
+              <span className="px-3 py-1 font-bold font-mono text-xs rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
+                {currentPage} / {totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer flex items-center gap-1 active:scale-95"
+              >
+                <span>Trang sau</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── 5. COMPACT RESPONSIVE MODAL (THÊM MỚI / CHỈNH SỬA) ── */}

@@ -81,6 +81,23 @@ async getLocalDeviceId(timeoutMs: number = 2500): Promise<string> {
 
   const fetchGatewayAgents = async (): Promise<string[]> => {
     try {
+      // 1. Thử trực tiếp endpoint /api/fingerprint/device-id
+      try {
+        const direct = await http<{ device_id: string }>(
+          '/api/fingerprint/device-id',
+          {
+            method: 'GET',
+            skipErrorNotification: true,
+            silent: true,
+            signal: AbortSignal.timeout(Math.min(timeoutMs, 1500)),
+          }
+        );
+        if (direct?.device_id && typeof direct.device_id === 'string' && direct.device_id.trim()) {
+          return [direct.device_id.trim()];
+        }
+      } catch (_) {}
+
+      // 2. Dự phòng danh sách /api/fingerprint/agents-online
       const res = await http<{ items: Array<{ device_id: string }> }>(
         '/api/fingerprint/agents-online',
         {
@@ -141,11 +158,13 @@ async getLocalDeviceId(timeoutMs: number = 2500): Promise<string> {
     }
   }
 
-  // Fallback: chỉ dùng Gateway khi có DUY NHẤT 1 agent online (tránh chọn nhầm máy khác).
+  // Fallback: Lấy qua Gateway khi Local Agent chưa phản hồi trực tiếp (vd: trình duyệt chặn mixed content HTTPS)
   const agents = await fetchGatewayAgents();
-  if (agents.length === 1) return agents[0];
-  if (agents.length > 1) {
-    console.warn('[Fingerprint] Có nhiều agent online nhưng Local Agent của máy này không phản hồi.');
+  if (agents.length > 0) {
+    if (agents.length > 1) {
+      console.warn('[Fingerprint] Có nhiều agent online, tự động chọn agent đầu tiên:', agents[0]);
+    }
+    return agents[0];
   }
 
   throw new Error('AGENT_NOT_RUNNING');

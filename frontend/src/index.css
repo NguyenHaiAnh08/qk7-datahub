@@ -2314,6 +2314,91 @@ html.dark .qk7-sidebar-tooltip .ant-tooltip-arrow:before {
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
 }
 
+/* =========================================================================
+   Dual-Gateway Tactical Overlay & Portal Isolation (Preserve Contrast in Light & Dark Mode)
+   ========================================================================= */
+.tactical-overlay-hud h1,
+.tactical-overlay-hud h2,
+.tactical-overlay-hud h3,
+.tactical-overlay-hud h4,
+html:not(.dark) .tactical-overlay-hud h1,
+html:not(.dark) .tactical-overlay-hud h2,
+html:not(.dark) .tactical-overlay-hud h3,
+html:not(.dark) .tactical-overlay-hud h4 {
+  color: #ffffff !important;
+}
+
+.tactical-overlay-hud p,
+html:not(.dark) .tactical-overlay-hud p,
+.tactical-overlay-hud .overlay-subtext,
+html:not(.dark) .tactical-overlay-hud .overlay-subtext {
+  color: rgba(241, 245, 249, 0.92) !important;
+}
+
+.tactical-overlay-hud .overlay-chip,
+html:not(.dark) .tactical-overlay-hud .overlay-chip {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+.tactical-overlay-hud .overlay-btn-training,
+html:not(.dark) .tactical-overlay-hud .overlay-btn-training {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+  border: 2px solid #C5A880 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5) !important;
+}
+
+.tactical-overlay-hud .overlay-btn-training:hover,
+html:not(.dark) .tactical-overlay-hud .overlay-btn-training:hover {
+  background-color: #ffffff !important;
+  color: #0f2b5c !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.35), 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+  transform: translateY(-1px) scale(1.02);
+}
+
+.tactical-overlay-hud .overlay-btn-training:hover *,
+html:not(.dark) .tactical-overlay-hud .overlay-btn-training:hover * {
+  color: #0f2b5c !important;
+}
+
+.tactical-overlay-hud .overlay-btn-datahub,
+html:not(.dark) .tactical-overlay-hud .overlay-btn-datahub {
+  background-color: rgba(5, 46, 22, 0.85) !important;
+  border: 2px solid #34d399 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5) !important;
+}
+
+.tactical-overlay-hud .overlay-btn-datahub:hover,
+html:not(.dark) .tactical-overlay-hud .overlay-btn-datahub:hover {
+  background-color: #ffffff !important;
+  color: #064e3b !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.35), 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+  transform: translateY(-1px) scale(1.02);
+}
+
+.tactical-overlay-hud .overlay-btn-datahub:hover *,
+html:not(.dark) .tactical-overlay-hud .overlay-btn-datahub:hover * {
+  color: #064e3b !important;
+}
+
+/* Tactical Portal Input Accent in Training Mode */
+.u025-training {
+  --u025-accent: #2563eb;
+  --u025-ink-2: #1d4ed8;
+  --u025-mint: #2563eb;
+}
+.dark .u025-training {
+  --u025-accent: #3b82f6;
+  --u025-ink-2: #60a5fa;
+  --u025-mint: #3b82f6;
+}
+
+
 
 
 

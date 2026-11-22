@@ -22,6 +22,8 @@ export interface FingerprintScanModalProps {
   fileId?: string;
   purpose?: 'file_access' | 'admin_login';
   tempTicket?: string;
+  /** Cổng đăng nhập đã chọn ở bước 1 (chỉ dùng khi purpose='admin_login'); backend kiểm tra lại theo vai trò. */
+  portal?: 'datahub' | 'training';
   onSuccess: (fingerprintToken: string) => void;
   onCancel: () => void;
   // ✅ FIX #2: thêm onToast vào interface
@@ -37,6 +39,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   fileId = '',
   purpose = 'file_access',
   tempTicket,
+  portal,
   onSuccess,
   onCancel,
   onToast = () => {},        // ✅ FIX #2: default no-op
@@ -145,7 +148,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         const res: any = await http('/api/auth/login/admin-fp-verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ temp_ticket: tempTicket, device_id: deviceId }),
+          body: JSON.stringify({ temp_ticket: tempTicket, device_id: deviceId, portal: portal || 'datahub' }),
           signal,
         });
         if (signal.aborted || !mountedRef.current) return;

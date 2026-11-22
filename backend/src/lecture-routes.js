@@ -4,14 +4,15 @@
 // - Bảng: DIGITAL_LECTURE, TEACHING_SCHEDULE, SCORM_TRACKING
 // - Permission: LECTURE_VIEW / CREATE / APPROVE / DELETE / SCHEDULE_START
 // - Role: ROL-01 Admin, ROL-02 BGH, ROL-07 Giảng viên
-// - Trưởng bộ môn: nhận diện qua ROL-06 hoặc position
+// - Trưởng bộ môn: nhận diện qua position (ROL-06 là Nhân viên IT, không phải trưởng bộ môn). CHỈ ROL-01/ROL-02 được duyệt
 // - Live Monitor: LECTURE_VIEW + role (Admin/Commander/DeptHead)
 // - Teaching History: query TEACHING_SCHEDULE status COMPLETED/CANCELLED
 // - SCORM: commit vào SCORM_TRACKING
 // ============================================================
 const express = require('express');
 const path = require('path');
-const fs = require('fs');         
+const fs = require('fs');
+const { memo } = require('./memo');         
 const { sql, getPool } = require('./db');
 const { getLectureScope, bindUnitIn, inScope, isPeerUnit } = require('./lecture-scope');
 
@@ -25,6 +26,14 @@ module.exports = function createLectureRoutes({
   getClientIp,
 }) {
   const router = express.Router();
+
+  // scorm_entry_point từ client chỉ hợp lệ khi nằm trong uploads/bai-giang-so/ (chống path traversal:
+  // "../../.env", đường dẫn tuyệt đối...). Giá trị thật do BE sinh khi giải nén gói nên hợp lệ.
+  const isSafeEntryPoint = (ep) => {
+    if (ep === undefined || ep === null || ep === '') return true; // không gửi = bỏ qua
+    const s = String(ep).replace(/\\/g, '/');
+    return s.startsWith('uploads/bai-giang-so/') && !s.split('/').includes('..') && !/^[a-zA-Z]:/.test(s);
+  };
 
   // API ĐỌC của phần giám sát (sơ đồ giảng đường, ca đang diễn ra): chỉ huy thuần chỉ có
   // COMMAND_VIEW (không có LECTURE_VIEW) vẫn xem được. Kiểm tra vai trò trong từng handler giữ nguyên.
@@ -63,17 +72,21 @@ module.exports = function createLectureRoutes({
   async function resolveUserRoles(pool, user) {
     if (!user?.user_id) return user?.roles || [];
     try {
-      const r = await pool.request()
-        .input('u', sql.VarChar(50), user.user_id)
-        .query(`SELECT role_id FROM USER_ROLE
-                WHERE user_id = @u AND (expires_at IS NULL OR expires_at > GETDATE())`);
-      return r.recordset.map((x) => x.role_id);
+      // Cache 15s + gộp request trùng: hàm này bị gọi ở hầu hết route bài giảng (có route gọi 2 lần)
+      const roles = await memo(`roles-active:${user.user_id}`, 15 * 1000, async () => {
+        const r = await pool.request()
+          .input('u', sql.VarChar(50), user.user_id)
+          .query(`SELECT role_id FROM USER_ROLE
+                  WHERE user_id = @u AND (expires_at IS NULL OR expires_at > GETDATE())`);
+        return r.recordset.map((x) => x.role_id);
+      });
+      return roles.slice();
     } catch { return user?.roles || []; }
   }
 
   async function isDeptHead(pool, user) {
     const roles = await resolveUserRoles(pool, user);
-    if (roles.includes('ROL-06')) return true;
+    // ROL-06 trên hệ thống thật là "Nhân viên IT", KHÔNG phải trưởng bộ môn → không còn tính là trưởng bộ môn
     const pos = String(user.position || '').toLowerCase();
     return pos.includes('trưởng bộ môn') || pos.includes('trưởng khoa')
         || pos.includes('chủ nhiệm khoa') || pos.includes('trưởng phòng');
@@ -82,7 +95,7 @@ module.exports = function createLectureRoutes({
   // Hàm phụ kiểm tra quyền Chỉ huy (Chỉ Admin, BGH, Trưởng BM mới được Lưu trữ/Khôi phục)
   async function requireCommander(pool, req, res) {
     const roles = await resolveUserRoles(pool, req.user);
-    if (roles.includes('ROL-01') || roles.includes('ROL-02') || roles.includes('ROL-06')) {
+    if (roles.includes('ROL-01') || roles.includes('ROL-02')) {
       return true;
     }
     res.status(403).json({ error: 'Chỉ Chỉ huy cấp trên mới có quyền lưu trữ/khôi phục bài giảng.' });
@@ -105,15 +118,19 @@ module.exports = function createLectureRoutes({
 
   router.get('/catalogs/subjects', async (req, res) => {
     try {
-      const pool = await getPool();
-      const result = await pool.request().query(`
-        SELECT s.*, u.name AS faculty_name
-        FROM SUBJECT s
-        LEFT JOIN UNIT u ON u.unit_id = s.faculty_unit_id
-        WHERE s.active = 1
-        ORDER BY s.name
-      `);
-      res.json({ items: result.recordset });
+      // Danh mục môn học ít thay đổi: cache 10s (mọi người dùng chung) thay vì truy vấn ở từng request
+      const items = await memo('catalog:subjects', 10 * 1000, async () => {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+          SELECT s.*, u.name AS faculty_name
+          FROM SUBJECT s
+          LEFT JOIN UNIT u ON u.unit_id = s.faculty_unit_id
+          WHERE s.active = 1
+          ORDER BY s.name
+        `);
+        return result.recordset;
+      });
+      res.json({ items });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -294,13 +311,16 @@ module.exports = function createLectureRoutes({
         content_type, scorm_entry_point,
       } = req.body || {};
       if (!title || !subject_id) return res.status(400).json({ error: 'Thiếu tiêu đề hoặc môn học' });
+      if (!isSafeEntryPoint(scorm_entry_point)) {
+        return res.status(400).json({ error: 'scorm_entry_point không hợp lệ' });
+      }
 
       const validTypes = ['PDF', 'HTML5', 'SCORM'];
       const ctype = String(content_type || 'PDF').toUpperCase();
       if (!validTypes.includes(ctype)) return res.status(400).json({ error: 'Loại nội dung không hợp lệ' });
-      if (ctype === 'SCORM' && !scorm_entry_point) {
-        return res.status(400).json({ error: 'SCORM yêu cầu scorm_entry_point' });
-      }
+      // SCORM: scorm_entry_point KHÔNG bắt buộc lúc tạo — web tạo bản nháp trước rồi mới tải gói .zip
+      // lên (POST /:id/package/upload), khi đó BE tự đọc imsmanifest.xml và ghi entry point.
+      // Việc "bài chưa có gói" đã được chặn ở bước gửi duyệt (kiểm tra thiếu gói học liệu).
 
       const pool = await getPool();
       const lectureId = 'LEC-' + Date.now();
@@ -358,6 +378,9 @@ module.exports = function createLectureRoutes({
       const { title, subject_id, security_level_id, content_type, scorm_entry_point } = req.body || {};
       // Trường nào client không gửi thì GIỮ NGUYÊN giá trị cũ (COALESCE) — tránh xóa nhầm
       // scorm_entry_point khi form sửa không đính kèm lại tệp. Tệp PDF chỉ đổi qua POST /:id/pdf/upload.
+      if (!isSafeEntryPoint(scorm_entry_point)) {
+        return res.status(400).json({ error: 'scorm_entry_point không hợp lệ' });
+      }
       const ctype = String(content_type || lec.content_type || 'PDF').toUpperCase();
       if (!['PDF', 'HTML5', 'SCORM'].includes(ctype)) {
         return res.status(400).json({ error: 'Loại nội dung không hợp lệ' });
@@ -411,13 +434,25 @@ module.exports = function createLectureRoutes({
       const pool = await getPool();
       const check = await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
-        .query(`SELECT status, author_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT status, author_id, content_type, pending_scorm_path, scorm_entry_point, pdf_path
+                FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
       if (check.recordset[0].author_id !== req.user.user_id) {
         return res.status(403).json({ error: 'Chỉ tác giả mới có quyền gửi duyệt' });
       }
       if (!['DRAFT', 'REJECTED'].includes(check.recordset[0].status)) {
         return res.status(400).json({ error: 'Trạng thái không hợp lệ để gửi duyệt' });
+      }
+      // Chặn gửi duyệt bài chưa có tệp/gói học liệu (nếu không, cấp trên duyệt sẽ báo thiếu gói)
+      const lc = check.recordset[0];
+      const hasContent = lc.content_type === 'PDF'
+        ? !!lc.pdf_path
+        : !!(lc.pending_scorm_path || lc.scorm_entry_point);
+      if (!hasContent) {
+        return res.status(400).json({
+          error: 'Bài giảng chưa có tệp/gói học liệu. Hãy tải lên (Chỉnh sửa → chọn tệp) trước khi gửi duyệt.',
+          code: 'NO_PACKAGE',
+        });
       }
       await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
@@ -552,8 +587,9 @@ module.exports = function createLectureRoutes({
 
       let nextStatus = '';
       if (lec.status === 'PENDING_FACULTY') {
-        if (!isAdmin && !isCommander && !deptHead) {
-          return res.status(403).json({ error: 'Chỉ Trưởng bộ môn hoặc BGH mới duyệt cấp Khoa' });
+        // Quy tắc thống nhất: CHỈ Admin (ROL-01) và Chỉ huy (ROL-02) được duyệt (trưởng bộ môn theo chức vụ không duyệt)
+        if (!isAdmin && !isCommander) {
+          return res.status(403).json({ error: 'Chỉ Admin hoặc Chỉ huy mới được duyệt bài giảng' });
         }
         if (!isAdmin) {
           const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
@@ -682,6 +718,10 @@ module.exports = function createLectureRoutes({
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
       {
         const roles = await resolveUserRoles(pool, req.user);
+        // Từ chối cũng là quyết định duyệt → chỉ Admin (ROL-01) / Chỉ huy (ROL-02)
+        if (!roles.includes('ROL-01') && !roles.includes('ROL-02')) {
+          return res.status(403).json({ error: 'Chỉ Admin hoặc Chỉ huy mới được từ chối bài giảng' });
+        }
         const scope = await getLectureScope({
           userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
         });

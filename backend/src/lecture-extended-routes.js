@@ -169,8 +169,8 @@ module.exports = function createLectureExtendedRoutes({
                   WHERE user_id = @uid AND (expires_at IS NULL OR expires_at > GETDATE())`);
         const roles = roleRs.recordset.map((x) => x.role_id);
         const pos = String(req.user.position || '').toLowerCase();
-        const deptHead = roles.includes('ROL-06')
-          || ['trưởng bộ môn', 'trưởng khoa', 'chủ nhiệm khoa', 'trưởng phòng'].some((k) => pos.includes(k));
+        // ROL-06 = Nhân viên IT (không phải trưởng bộ môn) → chỉ nhận diện theo chức vụ
+        const deptHead = ['trưởng bộ môn', 'trưởng khoa', 'chủ nhiệm khoa', 'trưởng phòng'].some((k) => pos.includes(k));
         const canViewAll = (req.user.permissions || []).includes('SCHEDULE_MONITOR_ALL');
         const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
         if (!canViewAll && !inScope(scope, req.params.facultyUnitId)) {

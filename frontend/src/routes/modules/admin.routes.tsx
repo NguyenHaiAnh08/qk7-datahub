@@ -47,7 +47,7 @@ const adminRoutes: RouteModuleExport = {
     {
       path: '/admin/sessions',
       element: (
-        <ProtectedRoute requiredPermission="SESSION_VIEW">
+        <ProtectedRoute requiredPermission="SESSION_VIEW" requiredPortal="training">
           <SessionsPage />
         </ProtectedRoute>
       ),

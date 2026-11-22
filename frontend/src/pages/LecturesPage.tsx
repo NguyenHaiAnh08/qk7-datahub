@@ -164,18 +164,19 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
     if (isAdmin) return true;
     const roles = user.roles || [];
     const pos = (user.position || '').toLowerCase();
-    if (roles.includes('ROL-02') || roles.includes('ROL-06')) return true;
+    if (roles.includes('ROL-02')) return true;
     return pos.includes('trưởng bộ môn') || pos.includes('trưởng khoa') || pos.includes('trưởng phòng');
   }, [user, isAdmin]);
 
   const canCreate        = hasPermission('LECTURE_CREATE');
-  const canApprove       = hasPermission('LECTURE_APPROVE');
+  // Quy tắc thống nhất: chỉ Admin (ROL-01) và Chỉ huy (ROL-02) được duyệt (backend cũng chặn lại)
+  const canApprove       = hasPermission('LECTURE_APPROVE') && (isAdmin || (user?.roles || []).includes('ROL-02'));
   const canStartSchedule = hasPermission('SCHEDULE_START');
 
   const canArchive = useMemo(() => {
     if (isAdmin) return true;
     const roles = user?.roles || [];
-    return roles.includes('ROL-01') || roles.includes('ROL-02') || roles.includes('ROL-06');
+    return roles.includes('ROL-01') || roles.includes('ROL-02');
   }, [user, isAdmin]);
 
   const canForceEnd = useMemo(() => {

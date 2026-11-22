@@ -19,6 +19,7 @@ import { User } from '../../types/user';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../routes/routePaths';
 import { NotchedInput } from './NotchedInput';
+import { FingerprintScanModal } from '../users/FingerprintScanModal';
 
 export interface TrainingLoginFormProps {
   onSuccess?: (user: User) => void;
@@ -72,6 +73,9 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
   const [selectedDemo, setSelectedDemo] = useState<TrainingDemoKey | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Admin bắt buộc quét vân tay 2FA (backend trả 202) — dùng chung modal với cổng Dữ liệu số
+  const [adminFpModalOpen, setAdminFpModalOpen] = useState(false);
+  const [tempTicket, setTempTicket] = useState('');
 
   // States quản lý lỗi và rung lắc (Shake UX #025)
   const [usernameError, setUsernameError] = useState('');
@@ -131,7 +135,15 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
     setLoading(true);
 
     try {
-      const res: any = await authService.login(username, password);
+      const res: any = await authService.login(username, password, 'training');
+
+      // Admin cần quét vân tay 2FA (HTTP 202)
+      if (res && res.require_admin_fp) {
+        setTempTicket(res.temp_ticket);
+        setAdminFpModalOpen(true);
+        setLoading(false);
+        return;
+      }
 
       const loggedInUser = res?.user || (await authService.getMe());
       saveUserSession(loggedInUser);
@@ -146,18 +158,24 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
       if (onSuccess) {
         onSuccess(loggedInUser);
       } else {
+        // Cổng giám sát chỉ có Admin / Chỉ huy (backend đã chặn vai trò khác)
         if (isUserAdmin(loggedInUser)) {
           navigate(ROUTE_PATHS.ADMIN, { replace: true });
         } else {
-          // Chuyển hướng tới phân hệ bài giảng số của portal
-          navigate('/portal', { replace: true, state: { defaultTab: 'lectures' } });
+          navigate(getDestinationByRole(loggedInUser), { replace: true });
         }
       }
     } catch (err: any) {
       console.error('[Đăng nhập Đào tạo thất bại]:', err?.message || err);
       const rawMsg = err?.message || '';
-      setUsernameError('Tài khoản hoặc mật khẩu không chính xác');
-      setPasswordError(rawMsg || 'Vui lòng kiểm tra lại thông tin xác thực');
+      if (err?.data?.code === 'PORTAL_FORBIDDEN') {
+        // Mật khẩu đúng nhưng tài khoản không được vào cổng này → không báo "sai mật khẩu"
+        setUsernameError('');
+        setPasswordError(rawMsg);
+      } else {
+        setUsernameError('Tài khoản hoặc mật khẩu không chính xác');
+        setPasswordError(rawMsg || 'Vui lòng kiểm tra lại thông tin xác thực');
+      }
       setUsernameShake((prev) => prev + 1);
       setPasswordShake((prev) => prev + 1);
 
@@ -169,7 +187,29 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
     }
   };
 
+  // Sau khi quét vân tay Admin thành công: lưu token, lấy thông tin, vào trang quản trị
+  const handleAdminFpSuccess = async (finalToken: string) => {
+    setAdminFpModalOpen(false);
+    if (!finalToken) return;
+    try {
+      Object.keys(sessionStorage).forEach((key) => {
+        if (key.startsWith('qk7_fp_token')) sessionStorage.removeItem(key);
+      });
+    } catch (_) {}
+    sessionStorage.setItem('qk7_token', finalToken);
+    try {
+      const me = await authService.getMe();
+      saveUserSession(me);
+      if (onToast) onToast('Xác thực vân tay Quản trị viên thành công!', 'success');
+      if (onSuccess) onSuccess(me);
+      else navigate(isUserAdmin(me) ? ROUTE_PATHS.ADMIN : getDestinationByRole(me), { replace: true });
+    } catch (err: any) {
+      if (onToast) onToast('Lỗi khi lấy thông tin người dùng sau khi xác thực: ' + err.message, 'error');
+    }
+  };
+
   return (
+    <>
     <form onSubmit={handleSubmit} className="w-full space-y-3.5">
       <input type="hidden" name="_csrf" value="qk7_training_auth" />
 
@@ -293,5 +333,16 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
         )}
       </button>
     </form>
+
+    {/* Modal quét vân tay 2FA cho Admin (cổng Đào tạo) */}
+    <FingerprintScanModal
+      open={adminFpModalOpen}
+      purpose="admin_login"
+      tempTicket={tempTicket}
+      portal="training"
+      onSuccess={handleAdminFpSuccess}
+      onCancel={() => setAdminFpModalOpen(false)}
+    />
+    </>
   );
 };

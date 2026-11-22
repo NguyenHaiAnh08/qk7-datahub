@@ -10,7 +10,7 @@ const http = require('http');
 const https = require('https');
 const multer = require('multer');
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('./src/bcrypt-lib');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
@@ -133,6 +133,21 @@ const {
 // ═══════════════════════════════════════════════════════════════
 // [FIX CWE-1021 / CWE-79 / FINDINGS #5-#36] Middleware bảo mật tập trung (HSTS, CSP Nonce, Permissions-Policy, COOP, CORP)
 app.use(createSecurityHeadersMiddleware());
+// Nén gzip/deflate cho phản hồi text (JS/CSS/HTML/JSON...): giảm mạnh băng thông khi nhiều người tải cùng lúc.
+// KHÔNG nén: yêu cầu Range (video/PDF tải từng phần, mã 206), event-stream, hoặc đã có Content-Encoding;
+// file PDF/ảnh/video/zip vốn đã nén nên thư viện tự bỏ qua. Tắt bằng COMPRESSION=false.
+if (process.env.COMPRESSION !== 'false') {
+  const compression = require('compression');
+  app.use(compression({
+    threshold: 2048, // phản hồi nhỏ hơn 2KB: tiết kiệm băng thông không đáng so với CPU nén
+    filter: (req, res) => {
+      if (req.headers.range || res.statusCode === 206) return false;
+      const type = String(res.getHeader('Content-Type') || '');
+      if (type.includes('text/event-stream')) return false;
+      return compression.filter(req, res);
+    },
+  }));
+}
 // Đo thời gian API (log [SLOW], tổng kết định kỳ, GET /api/admin/perf)
 const perfTiming = require('./src/perf-timing');
 app.use(perfTiming.middleware());
@@ -192,7 +207,7 @@ app.use((req, res, next) => {
 // RATE LIMITERS
 // ═══════════════════════════════════════════════════════════════
 const globalLimiter = rateLimit({
-  windowMs: 60 * 1000, max: 300,
+  windowMs: 60 * 1000, max: parseInt(process.env.RATE_LIMIT_MAX || '300', 10), // mặc định 300; chỉ nâng khi kiểm thử tải
   standardHeaders: true, legacyHeaders: false,
   skip: (req) => req.path === '/auth/login',
   message: { error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.', code: 'RATE_LIMITED' },
@@ -260,14 +275,43 @@ app.use('/api/auth/fingerprint/verify', fingerprintLimiter);
 // ═══════════════════════════════════════════════════════════════
 // STATIC & SWAGGER
 // ═══════════════════════════════════════════════════════════════
+// Phát file .gz nén sẵn (do precompress-public.js tạo) khi trình duyệt hỗ trợ gzip: không tốn CPU nén mỗi request.
+// Bỏ qua nếu .gz không tồn tại hoặc cũ hơn file gốc (tránh phát nội dung cũ sau khi build lại).
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || !/\.(js|mjs|css|svg|json|map|txt|xml)$/i.test(req.path)) return next();
+  if (!/\bgzip\b/i.test(req.headers['accept-encoding'] || '')) return next();
+  let rel;
+  try { rel = decodeURIComponent(req.path); } catch { return next(); }
+  const abs = path.join(publicDir, rel);
+  if (!abs.startsWith(publicDir + path.sep)) return next(); // chặn ../
+  fs.stat(abs, (e1, st) => {
+    if (e1 || !st.isFile()) return next();
+    fs.stat(abs + '.gz', (e2, gst) => {
+      if (e2 || !gst.isFile() || gst.mtimeMs < st.mtimeMs) return next();
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Vary', 'Accept-Encoding');
+      res.type(path.extname(abs));
+      res.setHeader('Cache-Control', 'no-cache'); // luôn hỏi lại bằng ETag (304 nhẹ)
+      res.sendFile(abs + '.gz', { headers: {}, dotfiles: 'deny' }, (err) => { if (err && !res.headersSent) next(); });
+    });
+  });
+});
+
 app.use(express.static(publicDir, {
   index: false, // Bắt buộc tắt index mặc định để request '/' đi vào serveSpaIndex và inject nonce bảo mật
   setHeaders: (res, filePath) => {
-    // Không cache file HTML để client luôn cập nhật phiên bản mới nhất ngay lập tức
-    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+    const norm = filePath.replace(/\\/g, '/');
+    if (norm.endsWith('.html')) {
+      // HTML luôn lấy bản mới (inject nonce, trỏ tới file build mới)
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+    } else if (/\/assets\/.+-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$/.test(norm)) {
+      // File build có mã băm trong tên (Vite): nội dung đổi thì tên đổi → cache 1 năm, không cần hỏi lại server
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      // File tĩnh còn lại (không băm tên): cache được nhưng luôn hỏi lại bằng ETag (304 rất nhẹ)
+      res.setHeader('Cache-Control', 'no-cache');
     }
   }
 }));
@@ -499,6 +543,14 @@ const {
 
 const config = createConfigModule({ sql, getPool });
 
+// Hai cổng đăng nhập (Trung tâm dữ liệu số / Quản lý đào tạo) — xem src/portal.js
+const { createPortalModule, normalizePortal, isTrainingOnlyPath, PORTAL_DATAHUB, PORTAL_TRAINING } = require('./src/portal');
+const portalModule = createPortalModule({ sql, getPool });
+const PORTAL_DENIED_MESSAGE = {
+  [PORTAL_TRAINING]: 'Tài khoản của bạn không có quyền vào cổng Quản lý đào tạo (chỉ dành cho Quản trị viên và Chỉ huy).',
+  [PORTAL_DATAHUB]: 'Tài khoản của bạn không có quyền vào cổng này.',
+};
+
 // Tự động revoke session không hoạt động > SESSION_IDLE_TIMEOUT_MINUTES
 setInterval(async () => {
   try {
@@ -728,7 +780,17 @@ app.use('/api', async (req, res, next) => {
       permissions: permsList,
       is_authenticated: true,
       raw_token: rawToken,
+      portal: decoded.portal || PORTAL_DATAHUB, // token cũ (trước khi có cổng) coi là cổng Dữ liệu số
     };
+
+    // Các API GIÁM SÁT chỉ dùng được với token của cổng Quản lý đào tạo (xem TRAINING_ONLY_PATHS trong src/portal.js)
+    if (isTrainingOnlyPath(req.originalUrl) && req.user.portal !== PORTAL_TRAINING) {
+      return res.status(403).json({
+        error: 'Chức năng giám sát chỉ dùng được khi đăng nhập qua cổng Quản lý đào tạo.',
+        code: 'PORTAL_FORBIDDEN',
+        required_portal: PORTAL_TRAINING,
+      });
+    }
     return next();
   } catch (err) {
     if (tokenSource === 'cookie' || isPublicGetEndpoint) {
@@ -916,14 +978,14 @@ const SINGLE_SESSION_PER_USER = String(process.env.SINGLE_SESSION_PER_USER || 't
 // Tắt trình duyệt mà chưa đăng xuất → sau N phút người khác đăng nhập được (nhịp tim 60s giữ phiên khi còn mở).
 const ACCOUNT_IN_USE_WINDOW_MINUTES = parseInt(process.env.ACCOUNT_IN_USE_WINDOW_MINUTES || '3', 10);
 
-async function rejectIfAccountInUse(req, res, userId, ip) {
+async function rejectIfAccountInUse(req, res, userId, ip, portal = null) {
   if (!SINGLE_SESSION_PER_USER) return false;
-  const live = await listActiveSessions(userId, ACCOUNT_IN_USE_WINDOW_MINUTES);
+  const live = await listActiveSessions(userId, ACCOUNT_IN_USE_WINDOW_MINUTES, portal);
   if (!live || live.length === 0) {
     // Không còn ai dùng: thu hồi các phiên cũ còn sót (chưa tới hạn idle) để không tồn tại 2 phiên song song
-    const leftovers = await listActiveSessions(userId, SESSION_IDLE_TIMEOUT_MINUTES);
+    const leftovers = await listActiveSessions(userId, SESSION_IDLE_TIMEOUT_MINUTES, portal);
     if (leftovers && leftovers.length > 0) {
-      await revokeAllUserSessions(userId, userId, 'REPLACED_BY_NEW_LOGIN');
+      await revokeAllUserSessions(userId, userId, 'REPLACED_BY_NEW_LOGIN', portal);
     }
     return false;
   }
@@ -931,7 +993,7 @@ async function rejectIfAccountInUse(req, res, userId, ip) {
   const ua = String(req.headers['user-agent'] || '').slice(0, 255);
   const otherDevice = live.filter((s) => !(s.ip === ip && String(s.user_agent || '') === ua));
   if (otherDevice.length === 0) {
-    await revokeAllUserSessions(userId, userId, 'RELOGIN_SAME_DEVICE');
+    await revokeAllUserSessions(userId, userId, 'RELOGIN_SAME_DEVICE', portal);
     return false;
   }
 
@@ -955,6 +1017,7 @@ async function handleLogin(req, res) {
   try {
     const username = (req.body.user_id || req.body.username || '').trim().toLowerCase();
     const password = req.body.password;
+    const portal = normalizePortal(req.body.portal); // 'datahub' (mặc định) | 'training'
     if (!username || !password) return res.status(400).json({ error: 'Thiếu user_id hoặc password' });
 
     const ipCheck = await checkIpBlocked(ip);
@@ -1078,8 +1141,21 @@ async function handleLogin(req, res) {
       .input('uid', sql.VarChar(50), user.user_id)
       .query(`UPDATE [USER] SET failed_attempts = 0, locked_at = NULL, last_failed_at = NULL, status = 'active' WHERE user_id = @uid`);
 
-    // Mật khẩu đã đúng → kiểm tra tài khoản có đang được người khác sử dụng không
-    if (await rejectIfAccountInUse(req, res, user.user_id, ip)) return;
+    // Mật khẩu đã đúng → kiểm tra tài khoản có được vào CỔNG này không (vai trò ↔ cổng, bảng ROLE_PORTAL)
+    if (!(await portalModule.canEnterPortal(userRoles, portal))) {
+      await writeAccessLog({
+        userId: user.user_id, fileId: null, action: 'LOGIN_PORTAL_DENIED', ip,
+        note: `Từ chối vào cổng "${portal}" (roles=${userRoles.join(',')})`,
+      });
+      return res.status(403).json({
+        error: PORTAL_DENIED_MESSAGE[portal] || PORTAL_DENIED_MESSAGE[PORTAL_DATAHUB],
+        code: 'PORTAL_FORBIDDEN',
+        portal,
+      });
+    }
+
+    // Kiểm tra tài khoản có đang được người khác sử dụng ở cùng cổng này không
+    if (await rejectIfAccountInUse(req, res, user.user_id, ip, portal)) return;
 
     // ═══════════════════════════════════════════════════════════
     // ✅ BƯỚC 2: 2FA VÂN TAY CHO **MỌI** TÀI KHOẢN ADMIN
@@ -1169,7 +1245,7 @@ async function handleLogin(req, res) {
     user.has_fingerprint = user.has_fingerprint === 1;
 
     const token = jwt.sign(
-      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles, jti: crypto.randomUUID() },
+      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles, portal, jti: crypto.randomUUID() },
       JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
     );
 
@@ -1188,6 +1264,7 @@ async function handleLogin(req, res) {
         ip,
         userAgent: req.headers['user-agent'],
         expiresInMs: ttlMs,
+        portal,
       });
     } catch (err) {
       console.error('[login] createSession:', err.message);
@@ -1214,8 +1291,12 @@ async function handleLogin(req, res) {
       path: '/',
       maxAge: ttlMs,
     };
-    res.cookie('qk7_session', token, sessionCookieOpts);
-    res.cookie('token', token, sessionCookieOpts);
+    // Cookie dùng chung giữa các tab → chỉ đặt cho cổng Dữ liệu số; cổng Đào tạo dùng Bearer (sessionStorage riêng từng tab),
+    // nhờ vậy 2 tab đăng nhập 2 cổng khác nhau không ghi đè token của nhau.
+    if (portal === PORTAL_DATAHUB) {
+      res.cookie('qk7_session', token, sessionCookieOpts);
+      res.cookie('token', token, sessionCookieOpts);
+    }
 
     if (req.originalUrl === '/login' && req.headers.accept?.includes('text/html') && !req.headers.accept?.includes('application/json')) {
       return res.redirect(303, '/portal');
@@ -1223,7 +1304,7 @@ async function handleLogin(req, res) {
 
     res.json({
       success: true, token, expires_in: JWT_EXPIRES_IN,
-      user: { ...user, permissions },
+      user: { ...user, permissions, portal, allowed_portals: await portalModule.allowedPortals(user.roles) },
     });
   } catch (err) {
     console.error('[POST /api/auth/login]', err);
@@ -1244,6 +1325,7 @@ app.post('/api/auth/login/admin-fp-verify',
   adminFpIpLimiter,
   async (req, res) => {
   const { temp_ticket, device_id, user_id: bodyUserId } = req.body;
+  const portal = normalizePortal(req.body.portal); // client gửi lại cổng đã chọn ở bước 1; server kiểm tra lại theo vai trò
   const ip = getClientIp(req);
 
   try {
@@ -1419,7 +1501,7 @@ app.post('/api/auth/login/admin-fp-verify',
     user.role_names = rolesRes.recordset.map((x) => x.name);
 
     const token = jwt.sign(
-      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles, jti: crypto.randomUUID() },
+      { user_id: user.user_id, clearance_level_id: user.clearance_level_id, roles: user.roles, portal, jti: crypto.randomUUID() },
       JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
     );
 
@@ -1431,7 +1513,19 @@ app.post('/api/auth/login/admin-fp-verify',
       ttlMs = n * mult;
     }
 
-    if (await rejectIfAccountInUse(req, res, user.user_id, ip)) return;
+    if (!(await portalModule.canEnterPortal(user.roles, portal))) {
+      await writeAccessLog({
+        userId: user.user_id, fileId: null, action: 'LOGIN_PORTAL_DENIED', ip,
+        note: `Từ chối vào cổng "${portal}" (roles=${user.roles.join(',')}) — bước 2FA`,
+      });
+      return res.status(403).json({
+        error: PORTAL_DENIED_MESSAGE[portal] || PORTAL_DENIED_MESSAGE[PORTAL_DATAHUB],
+        code: 'PORTAL_FORBIDDEN',
+        portal,
+      });
+    }
+
+    if (await rejectIfAccountInUse(req, res, user.user_id, ip, portal)) return;
 
     await createSession({
       userId: user.user_id,
@@ -1439,6 +1533,7 @@ app.post('/api/auth/login/admin-fp-verify',
       token, ip,
       userAgent: req.headers['user-agent'],
       expiresInMs: ttlMs,
+        portal,
     });
 
     await writeAccessLog({
@@ -1456,12 +1551,16 @@ app.post('/api/auth/login/admin-fp-verify',
       path: '/',
       maxAge: ttlMs,
     };
-    res.cookie('qk7_session', token, sessionCookieOpts);
-    res.cookie('token', token, sessionCookieOpts);
+    // Cookie dùng chung giữa các tab → chỉ đặt cho cổng Dữ liệu số; cổng Đào tạo dùng Bearer (sessionStorage riêng từng tab),
+    // nhờ vậy 2 tab đăng nhập 2 cổng khác nhau không ghi đè token của nhau.
+    if (portal === PORTAL_DATAHUB) {
+      res.cookie('qk7_session', token, sessionCookieOpts);
+      res.cookie('token', token, sessionCookieOpts);
+    }
 
     res.json({
       success: true, token, expires_in: JWT_EXPIRES_IN,
-      user: { ...user, permissions },
+      user: { ...user, permissions, portal, allowed_portals: await portalModule.allowedPortals(user.roles) },
     });
 
   } catch (err) {
@@ -1671,6 +1770,8 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     user.has_fingerprint = user.has_fingerprint === 1;
 
     user.permissions = await getUserPermissions(user.user_id);
+    user.portal = req.user.portal || PORTAL_DATAHUB; // cổng của phiên hiện tại (lấy từ token)
+    user.allowed_portals = await portalModule.allowedPortals(user.roles);
 
     res.json(user);
   } catch (err) {
@@ -4504,9 +4605,9 @@ async function start() {
     console.log('  ╔════════════════════════════════════════════════════╗');
     console.log('  ║  QK7 Paperless Gateway v4.1 — RBAC + Session       ║');
     console.log('  ╠════════════════════════════════════════════════════╣');
-    console.log(`  ║  Web:       ${protocol}://localhost:${PORT}                    ║`);
-    console.log(`  ║  WebSocket: ${wsProtocol}://localhost:${PORT}/ws/fingerprint      ║`);
-    console.log(`  ║  Swagger:   ${protocol}://localhost:${PORT}/api-docs          ║`);
+    console.log(`  ║  Web:       ${protocol}://localhost:${PORT}                 ║`);
+    console.log(`  ║  WebSocket: ${wsProtocol}://localhost:${PORT}/ws/fingerprint    ║`);
+    console.log(`  ║  Swagger:   ${protocol}://localhost:${PORT}/api-docs        ║`);
     console.log(`  ║  HTTPS:     ${USE_HTTPS ? 'ENABLED ✅' : 'DISABLED ⚠️'}                              ║`);
     console.log('  ╚════════════════════════════════════════════════════╝');
   });

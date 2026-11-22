@@ -96,6 +96,16 @@ function setupFingerprintWS(httpServer, { BRIDGE_TOKEN }) {
             clearTimeout(pending.timeout);
             pendingJobs.delete(msg.job_id);
 
+            const c = agentConnections.get(deviceId);
+            if (c) {
+              if (msg.error === 'DEVICE_OFFLINE') {
+                c.sensorOffline = true;
+                console.warn(`[WS] ⚠️ Agent ${deviceId} báo DEVICE_OFFLINE (chưa nhận máy quét ZK9500).`);
+              } else {
+                c.sensorOffline = false;
+              }
+            }
+
             if (msg.type === 'enroll_result') {
               deviceEnrollProgress.set(deviceId, {
                 enrolling: false,
@@ -268,11 +278,14 @@ function isAgentOnline(deviceId) {
 }
 
 function listAgents() {
-  return Array.from(agentConnections.entries()).map(([id, c]) => ({
-    device_id: id,
-    connected_at: new Date(c.connectedAt).toISOString(),
-    last_ping: new Date(c.lastPing).toISOString(),
-  }));
+  return Array.from(agentConnections.entries())
+    .map(([id, c]) => ({
+      device_id: id,
+      sensor_ready: !c.sensorOffline,
+      connected_at: new Date(c.connectedAt).toISOString(),
+      last_ping: new Date(c.lastPing).toISOString(),
+    }))
+    .sort((a, b) => (b.sensor_ready ? 1 : 0) - (a.sensor_ready ? 1 : 0));
 }
 
 module.exports = {

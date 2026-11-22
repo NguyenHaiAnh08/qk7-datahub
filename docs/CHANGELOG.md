@@ -4,6 +4,25 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.5-admin-2fa-fingerprint-resilience-and-agent-fallback] — 2026-11-22
+
+### 1. Nâng Cấp Khả Năng Chống Lỗi & Cơ Chế Dự Phòng Xác Thực 2FA Vân Tay Admin (`server.js`, `admin-2fa-ticket.js`, `fingerprint-ws.js`)
+- **Cơ chế thử lại 3 lần cho vé xác thực 2FA ([`admin-2fa-ticket.js`](../backend/src/admin-2fa-ticket.js)):**
+  - Bổ sung các hàm `validateTicket`, `markTicketUsed` và `recordFailedScan`.
+  - Không hủy vé xác thực (ticket) ngay lần quét sai đầu tiên; cho phép thử quét lại tối đa 3 lần (`failed_attempts < 3`).
+  - Hủy vé và ghi nhận `used_at = GETDATE()` khi sai quá 3 lần (`TICKET_MAX_ATTEMPTS`) hoặc hết hạn 2 phút (`TICKET_EXPIRED`), đảm bảo cân bằng giữa trải nghiệm người dùng và an toàn bảo mật.
+- **Tự động chuyển tiếp máy quét dự phòng (Agent Auto-Fallback - [`server.js`](../backend/server.js) & [`fingerprint-ws.js`](../backend/src/fingerprint-ws.js)):**
+  - Tự động phát hiện và chọn máy quét đang online có cảm biến sẵn sàng (`readyAgent`) nếu thiết bị được chỉ định không trực tuyến.
+  - Xử lý lỗi `DEVICE_OFFLINE`: Tự động fallback sang agent khác đang hoạt động trong mạng nội bộ.
+  - Cập nhật trạng thái `sensor_ready` trong danh sách agent và ưu tiên máy quét sẵn sàng lên đầu.
+
+### 2. Tinh Chỉnh Giao Diện Quét Vân Tay Admin ([`FingerprintScanModal.tsx`](../frontend/src/components/users/FingerprintScanModal.tsx))
+- **Xử lý trạng thái vé xác thực hết hạn / vượt quá số lần thử:**
+  - Nhận diện các mã lỗi `TICKET_INVALID`, `TICKET_ALREADY_USED`, `TICKET_EXPIRED`, `TICKET_MAX_ATTEMPTS`.
+  - Hiển thị thông báo hướng dẫn rõ ràng, khóa nút thử lại (`retryExhausted = true`) và yêu cầu người dùng đóng modal để đăng nhập lại từ đầu.
+
+---
+
 ## [v1.8.4-dual-gateway-portal-refinement-and-ux-pagination] — 2026-11-21
 
 ### 1. Cổng Xác Thực Kép Trượt Động: Khắc Phục Dính Hậu & Nâng Cấp Tốc Độ Chuyển Động (`DualGatewayPortal.tsx` & `LoginPage.tsx`)

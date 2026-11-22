@@ -63,6 +63,18 @@ function middleware() {
         console.warn(`[SLOW] ${req.method} ${pattern} ${Math.round(ms)}ms status=${res.statusCode}`);
       }
     });
+    // Chẩn đoán: request bị ngắt khi chưa trả lời xong (vd upload file lớn bị đứt giữa chừng)
+    res.on('close', () => {
+      if (res.writableFinished) return;
+      const ms = Math.round(Number(process.hrtime.bigint() - t0) / 1e6);
+      const got = req.socket?.bytesRead || 0;
+      const total = Number(req.headers['content-length'] || 0);
+      console.warn(
+        `[ABORTED] ${req.method} ${req.originalUrl.split('?')[0]} sau ${ms}ms, ` +
+        `nhận ${(got / 1048576).toFixed(1)}MB/${(total / 1048576).toFixed(1)}MB ` +
+        `(req.complete=${req.complete}, ip=${req.ip})`
+      );
+    });
     next();
   };
 }

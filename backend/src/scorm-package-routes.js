@@ -175,12 +175,23 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       res.status(404).send('Bài giảng chưa có gói học liệu'); return null;
     }
 
-    const entryAbs = path.isAbsolute(entryPoint)
-      ? entryPoint
-      : path.resolve(__dirname, '..', entryPoint);
+    // CHỐNG PATH TRAVERSAL: entry point chỉ được trỏ vào uploads/bai-giang-so/ (không nhận đường
+    // dẫn tuyệt đối, không nhận ".."). Nếu không, giảng viên đặt "../../.env" sẽ đọc được file hệ thống.
+    const lectureRoot = path.resolve(__dirname, '..', 'uploads', MODULES.LECTURES);
+    const insideLectureRoot = (abs) => abs === lectureRoot || abs.startsWith(lectureRoot + path.sep);
+    const entryAbs = path.resolve(__dirname, '..', String(entryPoint));
+    if (path.isAbsolute(String(entryPoint)) || !insideLectureRoot(entryAbs)) {
+      console.warn(`[SECURITY] entry point ngoài thư mục bài giảng bị chặn: lecture=${lectureId} entry=${entryPoint}`);
+      res.status(403).send('Đường dẫn gói học liệu không hợp lệ'); return null;
+    }
 
     if (!fs.existsSync(entryAbs) || !fs.statSync(entryAbs).isFile()) {
       res.status(404).send('Tệp không tồn tại: ' + path.basename(entryAbs)); return null;
+    }
+    // Chặn liên kết tượng trưng trỏ ra ngoài: đường dẫn thật cũng phải nằm trong thư mục bài giảng
+    if (!insideLectureRoot(fs.realpathSync(entryAbs))) {
+      console.warn(`[SECURITY] entry point (symlink) ngoài thư mục bài giảng bị chặn: lecture=${lectureId}`);
+      res.status(403).send('Đường dẫn gói học liệu không hợp lệ'); return null;
     }
 
     return {

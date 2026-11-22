@@ -122,3 +122,6 @@ fingerprint/build_tmp_setup/
 # Goi trien khai
 QK7_release/
 deploy/https/may-chu/mkcert.exe
+
+# File nen san do backend/precompress-public.js tao
+backend/public/**/*.gz

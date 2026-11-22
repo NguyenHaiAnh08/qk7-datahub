@@ -85,6 +85,12 @@ async function extractAndParse({ lectureId, pendingPath, title, createdAt }) {
         }
     }
 
+    // href trong imsmanifest.xml do người tạo gói viết → không tin: cấm tuyệt đối/".." để không thoát khỏi thư mục bài giảng
+    if (typeof launchFile !== 'string' || /^([a-zA-Z]:|[\\/])/.test(launchFile) ||
+        launchFile.split(/[\\/]/).includes('..')) {
+        throw new Error('Gói học liệu không hợp lệ: đường dẫn khởi chạy trong imsmanifest.xml trỏ ra ngoài gói.');
+    }
+
     // Trả về đường dẫn tương đối cho DB: uploads/bai-giang-so/YYYY/MM/Ten_Bai_Giang_MaLecture/index.html
     const relativeEntryPoint = `${baseRelPath}/${launchFile}`.replace(/\\/g, '/');
     

@@ -111,7 +111,10 @@ async function consumeTicket({ ticket, deviceId, ip }) {
 
   // 6. Đánh dấu đã dùng NGAY (one-time use, chống replay)
   //    Cập nhật device_id nếu ticket chưa có (bind tại consume)
-  await pool.request()
+  //    ĐÂY mới là điểm chặn nguyên tử: SELECT ở trên không giữ khóa (không nằm trong transaction),
+  //    nên 2 request đồng thời có thể cùng thấy "chưa dùng". Chỉ request cập nhật được đúng 1 dòng
+  //    (used_at IS NULL) mới được coi là hợp lệ; request còn lại bị từ chối.
+  const mark = await pool.request()
     .input('tid', sql.VarChar(64), ticket)
     .input('did', sql.VarChar(100), deviceId)
     .query(`
@@ -119,7 +122,11 @@ async function consumeTicket({ ticket, deviceId, ip }) {
       SET used_at = GETDATE(),
           device_id = ISNULL(device_id, @did)
       WHERE ticket_id = @tid AND used_at IS NULL
+        AND expires_at >= GETDATE()
     `);
+  if (!mark.rowsAffected || mark.rowsAffected[0] !== 1) {
+    return { valid: false, reason: 'TICKET_ALREADY_USED' };
+  }
 
   return {
     valid: true,

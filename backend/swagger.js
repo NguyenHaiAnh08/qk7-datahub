@@ -2669,7 +2669,7 @@ const swaggerSpec = {
       '**Yêu cầu permission:** `LECTURE_VIEW`.\n\n' +
       '**Scope theo role:**\n' +
       '- Admin (`ROL-01`) / BGH (`ROL-02`): thấy tất cả\n' +
-      '- Trưởng bộ môn (`ROL-06`): chỉ bài giảng thuộc khoa/bộ môn mình + bài tự soạn\n' +
+      '- Trưởng bộ môn (nhận diện theo chức vụ, không theo role): chỉ bài giảng thuộc khoa/bộ môn mình + bài tự soạn\n' +
       '- Còn lại: chỉ thấy bài `PUBLISHED` hoặc bài của chính mình / cùng đơn vị',
     parameters: [
       { in: 'query', name: 'status',          schema: { type: 'string', enum: ['DRAFT', 'PENDING_FACULTY', 'PENDING_TRAINING', 'PUBLISHED', 'REJECTED', 'ARCHIVED'] } },
@@ -2785,9 +2785,9 @@ const swaggerSpec = {
     tags: [TAG_LECTURES],
     summary: 'Duyệt 2 tầng — PENDING_FACULTY→PENDING_TRAINING, PENDING_TRAINING→PUBLISHED',
     description:
-      '**Yêu cầu permission:** `LECTURE_APPROVE`.\n\n' +
-      '**Tầng 1 (PENDING_FACULTY → PENDING_TRAINING):** Trưởng bộ môn (`ROL-06`) hoặc BGH/Admin — nếu là Trưởng BM chỉ được duyệt bài thuộc đơn vị mình.\n\n' +
-      '**Tầng 2 (PENDING_TRAINING → PUBLISHED):** Chỉ BGH (`ROL-02`) hoặc Admin (`ROL-01`).',
+      '**Yêu cầu:** permission `LECTURE_APPROVE` **và** vai trò Admin (`ROL-01`) hoặc Chỉ huy (`ROL-02`). Vai trò khác dù có permission vẫn bị 403.\n\n' +
+      '**Tầng 1 (PENDING_FACULTY → PENDING_TRAINING):** Chỉ Chỉ huy (`ROL-02`) hoặc Admin (`ROL-01`).\n\n' +
+      '**Tầng 2 (PENDING_TRAINING → PUBLISHED):** Chỉ Chỉ huy (`ROL-02`) hoặc Admin (`ROL-01`).',
     parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
     responses: {
       200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {

@@ -19,7 +19,10 @@ const { getPool, closePool, sql } = require('../src/db');
 
 const PERM_ID = 'PERM-APR-01';
 const CODE = 'APPROVAL_VALIDATE';
-const ROLES = ['ROL-02', 'ROL-06'];
+// CHỈ Chỉ huy (ROL-02). Trước đây có thêm ROL-06 vì tưởng là "Trưởng bộ môn", nhưng trên hệ thống thật
+// ROL-06 = "Nhân viên IT" → KHÔNG được duyệt yêu cầu. Nếu đã lỡ gán, thu hồi bằng:
+//   DELETE FROM ROLE_PERMISSION WHERE role_id='ROL-06' AND permission_id='PERM-APR-01';
+const ROLES = ['ROL-02'];
 
 (async () => {
   const pool = await getPool();

@@ -36,6 +36,7 @@ import { DeviceModeSwitch } from './DeviceModeSwitch';
 import { ROUTE_PATHS } from '../../routes/routePaths';
 import { useApprovalContext } from '../../contexts/ApprovalContext';
 import { UserViewPinModal } from '../users/UserViewPinModal';
+import { authService } from '../../services/authService';
 
 interface HeaderProps {
   title?: string;
@@ -181,7 +182,8 @@ export const Header: React.FC<HeaderProps> = ({
   );
 
   const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
-  const canAccessSessions = hasPermission('SESSION_VIEW');
+  // Khu giám sát (phiên đang hoạt động) chỉ có ở cổng Quản lý đào tạo
+  const canAccessSessions = hasPermission('SESSION_VIEW') && authService.getCurrentPortal() === 'training';
 
   useEffect(() => {
     const handleDevChanged = () => {

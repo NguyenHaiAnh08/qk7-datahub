@@ -18,7 +18,11 @@ export interface User {
   permissions?: string[];       
   created_at?: string;
   updated_at?: string;
-  pin_requested?: boolean;  
+  pin_requested?: boolean;
+  /** Cổng của phiên đăng nhập hiện tại: 'datahub' (Trung tâm dữ liệu số) | 'training' (Quản lý đào tạo) */
+  portal?: 'datahub' | 'training';
+  /** Các cổng tài khoản này được phép vào (theo vai trò) */
+  allowed_portals?: Array<'datahub' | 'training'>;
 }
 
 export interface Unit {

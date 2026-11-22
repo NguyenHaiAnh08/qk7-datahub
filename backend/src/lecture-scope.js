@@ -5,18 +5,22 @@
 //     (Chỉ huy cấp Trường có unit_id ở gốc cây → subtree phủ toàn trường)
 //   - Còn lại (giảng viên): chỉ thấy đơn vị của mình (+ bài do chính mình đăng)
 const { sql, getPool } = require('./db');
+const { memo } = require('./memo');
 const { getSubtreeUnits, resolveUserUnitId } = require('./unit-scope');
 
 async function getSiblingUnits(unitId) {
-  const pool = await getPool();
-  const r = await pool.request()
-    .input('uid', sql.NVarChar(50), unitId)
-    .query(`SELECT u.unit_id FROM UNIT u
-            WHERE u.unit_id <> @uid
-              AND u.parent_id IS NOT NULL
-              AND (u.parent_id = (SELECT parent_id FROM UNIT WHERE unit_id = @uid)  -- bộ môn cùng khoa
-                   OR u.unit_id  = (SELECT parent_id FROM UNIT WHERE unit_id = @uid))  -- chính khoa cha`);
-  return r.recordset.map((x) => x.unit_id);
+  const ids = await memo(`siblings:${unitId}`, 15 * 1000, async () => {
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('uid', sql.NVarChar(50), unitId)
+      .query(`SELECT u.unit_id FROM UNIT u
+              WHERE u.unit_id <> @uid
+                AND u.parent_id IS NOT NULL
+                AND (u.parent_id = (SELECT parent_id FROM UNIT WHERE unit_id = @uid)  -- bộ môn cùng khoa
+                     OR u.unit_id  = (SELECT parent_id FROM UNIT WHERE unit_id = @uid))  -- chính khoa cha`);
+    return r.recordset.map((x) => x.unit_id);
+  });
+  return ids.slice();
 }
 
 async function getLectureScope({ userId, roles, deptHead, includeSiblings = false }) {

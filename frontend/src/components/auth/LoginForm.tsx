@@ -167,7 +167,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
 
     try {
       // ✅ SỬ DỤNG authService.login TRỰC TIẾP ĐỂ BẮT ĐƯỢC RESPONSE 202
-      const res: any = await authService.login(username, password);
+      const res: any = await authService.login(username, password, 'datahub');
 
       // ✅ NẾU BACKEND YÊU CẦU VÂN TAY (Mã 202)
       if (res && res.require_admin_fp) {
@@ -548,6 +548,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
           open={adminFpModalOpen}
           purpose="admin_login"
           tempTicket={tempTicket}
+          portal="datahub"
           onSuccess={handleAdminFpSuccess}
           onCancel={() => setAdminFpModalOpen(false)}
         />
@@ -780,6 +781,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
         open={adminFpModalOpen}
         purpose="admin_login"
         tempTicket={tempTicket}
+        portal="datahub"
         onSuccess={handleAdminFpSuccess}
         onCancel={() => setAdminFpModalOpen(false)}
       />

@@ -1,5 +1,5 @@
 // src/admin-routes.js
-const bcrypt = require('bcryptjs');
+const bcrypt = require('./bcrypt-lib');
 const { AUTO_PERMISSIONS, getAutoRequiredPermission } = require('./route-permissions');
 let invalidateCatalogCache;
 try {

@@ -138,11 +138,13 @@ export const authService = {
    * ghi được (Ẩn danh / storage bị chặn) → THROW để AuthContext biết
    * login THẤT BẠI — tránh trạng thái "login ảo".
    */
-  login: async (user_id: string, password: string): Promise<any> => { // Đổi return type thành any để linh hoạt
+  // portal: cổng đăng nhập — 'datahub' (Trung tâm dữ liệu số) hoặc 'training' (Quản lý đào tạo, chỉ Admin/Chỉ huy).
+  // Backend kiểm tra vai trò ↔ cổng và gắn cổng vào token/phiên.
+  login: async (user_id: string, password: string, portal: 'datahub' | 'training' = 'datahub'): Promise<any> => { // Đổi return type thành any để linh hoạt
     const res = await http<any>(API_ENDPOINTS.AUTH.LOGIN, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user_id.trim(), password }),
+      body: JSON.stringify({ user_id: user_id.trim(), password, portal }),
     });
 
     // Trả về ngay để LoginForm mở Modal quét vân tay
@@ -221,6 +223,15 @@ export const authService = {
     const token = authService.getToken();
     if (!token) return false;
     return !authService.isTokenExpired(0);
+  },
+
+  /**
+   * Cổng của phiên hiện tại ('datahub' | 'training') — đọc từ JWT của CHÍNH TAB này (sessionStorage riêng từng tab).
+   * Token cũ chưa có claim portal được coi là 'datahub'. Chỉ dùng cho giao diện; backend mới là nơi chặn thật.
+   */
+  getCurrentPortal: (): 'datahub' | 'training' => {
+    const p: any = authService.getTokenPayload();
+    return p?.portal === 'training' ? 'training' : 'datahub';
   },
 
   /** Decode JWT payload — chỉ dùng cho optimistic UI. */

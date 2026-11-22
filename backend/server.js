@@ -123,6 +123,9 @@ if (!FP_ENC_KEY) console.warn('[SECURITY] ⚠️  FP_ENC_KEY chưa set');
 const {
   issueTicket: issueAdmin2FATicket,
   consumeTicket: consumeAdmin2FATicket,
+  validateTicket: validateAdmin2FATicket,
+  markTicketUsed: markAdmin2FATicketUsed,
+  recordFailedScan: recordFailedAdmin2FAScan,
   cleanupExpiredTickets: cleanupAdmin2FATickets,
   getRecentFailures: getAdmin2FAFailures,
   TICKET_TTL_SECONDS: ADMIN_2FA_TTL_SECONDS,
@@ -1336,8 +1339,8 @@ app.post('/api/auth/login/admin-fp-verify',
       });
     }
 
-    // ── 1. Consume ticket (opaque, one-time use, TTL 2 phút) ──
-    const ticketResult = await consumeAdmin2FATicket({
+    // ── 1. Validate ticket (opaque, TTL 2 phút, cho phép tối đa 3 lần thử) ──
+    const ticketResult = await validateAdmin2FATicket({
       ticket: temp_ticket,
       deviceId: device_id,
       ip,
@@ -1366,9 +1369,16 @@ app.post('/api/auth/login/admin-fp-verify',
         } catch (_) {}
       }
 
+      let errMsg = 'Phiên xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.';
+      if (ticketResult.reason === 'TICKET_MAX_ATTEMPTS') {
+        errMsg = 'Bạn đã quét sai vân tay quá 3 lần. Vui lòng đăng nhập lại từ đầu.';
+      } else if (ticketResult.reason === 'TICKET_EXPIRED') {
+        errMsg = 'Phiên xác thực đã hết hạn (quá 2 phút). Vui lòng đăng nhập lại.';
+      }
+
       return res.status(401).json({
-        error: 'Phiên xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.',
-        code: 'TICKET_INVALID',
+        error: errMsg,
+        code: ticketResult.reason || 'TICKET_INVALID',
       });
     }
 
@@ -1385,12 +1395,18 @@ app.post('/api/auth/login/admin-fp-verify',
       console.warn(`[SECURITY] IP mismatch cho 2FA user ${decodedUserId}: ${ticketResult.issuedIp} → ${ip}`);
     }
 
-    // ── 3. Verify agent online ──
-    if (!isAgentOnline(device_id)) {
-      return res.status(503).json({
-        error: 'Máy quét vân tay chưa sẵn sàng.',
-        agent_offline: true,
-      });
+    // ── 3. Verify agent online (tự động fallback nếu device_id được chỉ định không online) ──
+    let activeDeviceId = device_id;
+    if (!isAgentOnline(activeDeviceId)) {
+      const readyAgent = listAgents().find((a) => a.sensor_ready);
+      if (readyAgent) {
+        activeDeviceId = readyAgent.device_id;
+      } else {
+        return res.status(503).json({
+          error: 'Máy quét vân tay chưa sẵn sàng.',
+          agent_offline: true,
+        });
+      }
     }
 
     // ── 4. Lấy template vân tay của user ──
@@ -1420,13 +1436,26 @@ app.post('/api/auth/login/admin-fp-verify',
     }
     const templateB64 = templateBuffer.toString('base64');
 
-    // ── 5. Gửi lệnh quét xuống Agent ──
+    // ── 5. Gửi lệnh quét xuống Agent (kèm tự động fallback nếu thiết bị gặp DEVICE_OFFLINE) ──
     let scanResult;
     try {
-      scanResult = await requestScan(device_id, {
+      scanResult = await requestScan(activeDeviceId, {
         template_b64: templateB64,
         file_id: 'ADMIN_LOGIN',
       });
+
+      // Nếu agent báo DEVICE_OFFLINE và có agent khác đang online có sensor -> tự động chuyển sang agent kia
+      if (scanResult && scanResult.error === 'DEVICE_OFFLINE') {
+        const fallbacks = listAgents().filter((a) => a.device_id !== activeDeviceId && a.sensor_ready);
+        if (fallbacks.length > 0) {
+          console.warn(`[admin-fp-verify] 🔄 Agent ${activeDeviceId} báo DEVICE_OFFLINE, tự động chuyển sang ${fallbacks[0].device_id}...`);
+          activeDeviceId = fallbacks[0].device_id;
+          scanResult = await requestScan(activeDeviceId, {
+            template_b64: templateB64,
+            file_id: 'ADMIN_LOGIN',
+          });
+        }
+      }
     } catch (err) {
       if (err.message === 'AGENT_OFFLINE' || err.message === 'AGENT_DISCONNECTED') {
         return res.status(503).json({ error: 'Máy quét vừa mất kết nối.', agent_offline: true });
@@ -1437,7 +1466,7 @@ app.post('/api/auth/login/admin-fp-verify',
       throw err;
     }
 
-    // ── 6. Quét sai vân tay → KHÔNG đếm failed_attempts ──
+    // ── 6. Quét sai vân tay hoặc lỗi thiết bị ──
     if (!scanResult.match) {
       if (scanResult.error === 'CANCELLED') {
         return res.status(409).json({ error: 'Yêu cầu đã bị hủy bởi thao tác mới.', cancelled: true });
@@ -1454,15 +1483,33 @@ app.post('/api/auth/login/admin-fp-verify',
       if (scanResult.error) {
         return res.status(500).json({ error: `Lỗi máy quét: ${scanResult.error}`, device_error: true });
       }
+
+      // Quét sai vân tay (không khớp mẫu) -> ghi nhận lần thử
+      const failInfo = await recordFailedAdmin2FAScan(temp_ticket);
+      const remaining = Math.max(0, 3 - failInfo.failedAttempts);
+
       await writeAccessLog({
         userId: decodedUserId, fileId: null, action: 'LOGIN_FAIL_FP', ip,
-        note: `Admin 2FA không khớp (score=${scanResult.score}) — không đếm vào failed_attempts`,
+        note: `Admin 2FA không khớp (score=${scanResult.score}, lần ${failInfo.failedAttempts}/3)`,
       });
+
+      if (failInfo.burned) {
+        return res.status(403).json({
+          error: `Vân tay quản trị viên không khớp (score=${scanResult.score}). Đã quá 3 lần thử, phiên xác thực bị khóa. Vui lòng đăng nhập lại.`,
+          score: scanResult.score,
+          exhausted: true,
+        });
+      }
+
       return res.status(403).json({
-        error: `Vân tay quản trị viên không khớp (score=${scanResult.score}). Vui lòng thử lại.`,
+        error: `Vân tay quản trị viên không khớp (score=${scanResult.score}). Còn ${remaining} lần thử.`,
         score: scanResult.score,
+        remaining_attempts: remaining,
       });
     }
+
+    // ── 6.5. Vân tay khớp! Đánh dấu ticket đã dùng (burn ticket, chống replay) ──
+    await markAdmin2FATicketUsed(temp_ticket);
 
     // ── 7. Defense-in-depth: kiểm tra template vẫn tồn tại ──
     const fpCheckAgain = await pool.request()
@@ -1859,13 +1906,27 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
     }
     const templateB64 = templateBuffer.toString('base64');
 
-    if (!isAgentOnline(deviceId)) {
-      return res.status(503).json({ error: 'Máy quét vân tay chưa sẵn sàng.', agent_offline: true });
+    let activeDeviceId = deviceId;
+    if (!isAgentOnline(activeDeviceId)) {
+      const readyAgent = listAgents().find((a) => a.sensor_ready);
+      if (readyAgent) {
+        activeDeviceId = readyAgent.device_id;
+      } else {
+        return res.status(503).json({ error: 'Máy quét vân tay chưa sẵn sàng.', agent_offline: true });
+      }
     }
 
     let scanResult;
     try {
-      scanResult = await requestScan(deviceId, { template_b64: templateB64, file_id: 'VERIFY' });
+      scanResult = await requestScan(activeDeviceId, { template_b64: templateB64, file_id: 'VERIFY' });
+      if (scanResult && scanResult.error === 'DEVICE_OFFLINE') {
+        const fallbacks = listAgents().filter((a) => a.device_id !== activeDeviceId && a.sensor_ready);
+        if (fallbacks.length > 0) {
+          console.warn(`[fingerprint/verify] 🔄 Agent ${activeDeviceId} báo DEVICE_OFFLINE, tự động chuyển sang ${fallbacks[0].device_id}...`);
+          activeDeviceId = fallbacks[0].device_id;
+          scanResult = await requestScan(activeDeviceId, { template_b64: templateB64, file_id: 'VERIFY' });
+        }
+      }
     } catch (err) {
       if (err.message === 'AGENT_OFFLINE' || err.message === 'AGENT_DISCONNECTED') {
         return res.status(503).json({ error: 'Máy quét vừa mất kết nối.', agent_offline: true });
@@ -2006,13 +2067,15 @@ res.json({
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/fingerprint/agents-online', (req, res) => {
   const agents = listAgents();
-  res.json({ items: agents.map((a) => ({ device_id: a.device_id })) });
+  res.json({ items: agents.map((a) => ({ device_id: a.device_id, sensor_ready: a.sensor_ready })) });
 });
 
 app.get('/api/fingerprint/device-id', (req, res) => {
   const agents = listAgents();
-  if (agents.length > 0) {
-    return res.json({ device_id: agents[0].device_id, service: 'qk7-fingerprint-gateway' });
+  // Ưu tiên agent có phần cứng ZK9500 sẵn sàng
+  const readyAgent = agents.find((a) => a.sensor_ready) || agents[0];
+  if (readyAgent) {
+    return res.json({ device_id: readyAgent.device_id, service: 'qk7-fingerprint-gateway' });
   }
   return res.status(503).json({ error: 'Chưa kết nối máy quét vân tay.', code: 'AGENT_OFFLINE' });
 });

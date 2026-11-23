@@ -15,7 +15,33 @@ const pendingJobs = new Map();
 const deviceEnrollProgress = new Map();
 
 function setupFingerprintWS(httpServer, { BRIDGE_TOKEN }) {
-  const wss = new WebSocket.Server({ server: httpServer, path: '/ws/fingerprint' });
+  const wss = new WebSocket.Server({ noServer: true });
+
+  function attachServer(srv) {
+    if (!srv) return;
+    srv.on('upgrade', (request, socket, head) => {
+      try {
+        const parsed = new URL(request.url, 'http://localhost');
+        if (parsed.pathname === '/ws/fingerprint') {
+          wss.handleUpgrade(request, socket, head, (ws) => {
+            wss.emit('connection', ws, request);
+          });
+        } else {
+          socket.destroy();
+        }
+      } catch (_) {
+        socket.destroy();
+      }
+    });
+  }
+
+  if (Array.isArray(httpServer)) {
+    httpServer.forEach(attachServer);
+  } else {
+    attachServer(httpServer);
+  }
+
+  wss.attachServer = attachServer;
 
   wss.on('connection', (ws, req) => {
     let deviceId;

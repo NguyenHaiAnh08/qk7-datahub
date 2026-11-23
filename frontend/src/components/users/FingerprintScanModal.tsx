@@ -13,6 +13,7 @@ import {
 import { fingerprintService } from '../../services/fingerprintService';
 import { http } from '../../services/http';
 import { userService } from '../../services/userService';   // ✅ FIX #1: import
+import { toast } from '../common/Toast';
 import { TouchIDFingerprint } from '../common/TouchIDFingerprint';
 import { CircularSpinner } from './FingerprintEnrollModal';
 import { PinVerifyModal } from './PinVerifyModal';
@@ -149,6 +150,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ temp_ticket: tempTicket, device_id: deviceId, portal: portal || 'datahub' }),
+          skipErrorNotification: true,
           signal,
         });
         if (signal.aborted || !mountedRef.current) return;
@@ -309,7 +311,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     handleRetryInternal();
   };
 
-  const handleCancel = () => {
+  const handleCancel = (notifyUser: boolean = true) => {
     abortRef.current?.abort();
     abortRef.current = null;
     if (autoRetryTimerRef.current) {
@@ -319,6 +321,12 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     inFlightRef.current = false;
     retryCountRef.current = 0;
     setPinChallenge(null);
+    if (notifyUser && phase !== 'success') {
+      toast.info('Đã đóng quét vân tay.', {
+        title: 'Đã hủy xác thực',
+        badge: 'ĐÃ ĐÓNG',
+      });
+    }
     onCancel();
   };
 
@@ -328,7 +336,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
     <AnimatePresence>
       <div
         className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/30 dark:bg-black/50 backdrop-blur-md transition-all duration-300"
-        onClick={handleCancel}
+        onClick={() => handleCancel(true)}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.94, y: 10 }}
@@ -355,7 +363,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
               </div>
             </div>
             <button
-              onClick={handleCancel}
+              onClick={() => handleCancel(true)}
               className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -426,7 +434,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
 
           <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <button
-              onClick={handleCancel}
+              onClick={() => handleCancel(true)}
               className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
             >
               {pinNotSet ? 'Đóng' : 'Hủy'}
@@ -447,7 +455,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
                       setTimeout(() => {
                         // Chỉ đóng nếu modal chưa bị đóng thủ công & component còn mount
                         if (mountedRef.current && abortRef.current !== null) {
-                          handleCancel();
+                          handleCancel(false);
                         }
                       }, 2000);
                     } catch (e: any) {

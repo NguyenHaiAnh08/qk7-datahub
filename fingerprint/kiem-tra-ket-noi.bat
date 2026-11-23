@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title QK7 - Kiem tra ket noi May con -> May chu
+title QK7 - Kiem tra ket noi May con - May chu
 powershell -NoProfile -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; iex ((Get-Content -Raw -Encoding UTF8 '%~f0') -split ('#P'+'S#'))[1]"
 echo.
 pause

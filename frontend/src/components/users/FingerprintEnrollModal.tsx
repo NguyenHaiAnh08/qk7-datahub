@@ -9,6 +9,7 @@ import {
   Fingerprint,
 } from 'lucide-react';
 import { fingerprintService } from '../../services/fingerprintService';
+import { toast } from '../common/Toast';
 import { TouchIDFingerprint } from '../common/TouchIDFingerprint';
 
 export interface FingerprintEnrollModalProps {
@@ -303,6 +304,12 @@ export const FingerprintEnrollModal: React.FC<FingerprintEnrollModalProps> = ({
       animControlsRef.current.stop();
     }
     inFlightRef.current = false;
+    if (phase !== 'success') {
+      toast.info('Đã đóng quét vân tay.', {
+        title: 'Đã hủy đăng ký',
+        badge: 'ĐÃ ĐÓNG',
+      });
+    }
     onCancel();
   };
 

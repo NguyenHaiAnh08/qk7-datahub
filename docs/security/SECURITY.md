@@ -38,7 +38,7 @@ Trong mạng cô lập không có kết nối Internet để xác thực Let's E
    # Windows PowerShell
    powershell -ExecutionPolicy Bypass -File scripts/gen_cert.ps1 -Mode mkcert -Domain 192.168.1.229
    ```
-   Script sẽ tự sinh chứng chỉ SAN (Subject Alternative Names) bao gồm: `192.168.1.229`, `localhost`, `127.0.0.1`, `trungtamdulieuso.tqs.com`, `::1` và xuất ra:
+   Script sẽ tự sinh chứng chỉ SAN (Subject Alternative Names) bao gồm: `192.168.1.229`, `localhost`, `127.0.0.1`, `trungtamdulieuso.tqsqk7.edu`, `::1` và xuất ra:
    - Cert: `backend/certs/cert.pem`
    - Key: `backend/certs/private-key.pem`
 

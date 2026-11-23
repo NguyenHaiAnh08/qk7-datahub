@@ -10,20 +10,26 @@ export interface ThemeContextType {
 }
 
 const THEME_STORAGE_KEY = 'qk7_theme';
+const THEME_DEFAULT_MIGRATION_KEY = 'qk7_theme_default_light_v1';
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'dark';
+    if (typeof window === 'undefined') return 'light';
     try {
+      if (!localStorage.getItem(THEME_DEFAULT_MIGRATION_KEY)) {
+        localStorage.setItem(THEME_STORAGE_KEY, 'light');
+        localStorage.setItem(THEME_DEFAULT_MIGRATION_KEY, '1');
+        return 'light';
+      }
       const stored = localStorage.getItem(THEME_STORAGE_KEY);
       if (stored === 'dark' || stored === 'light') return stored;
     } catch (e) {
       // ignore
     }
-    // Default to dark for QK7 DataHub
-    return document.documentElement.classList.contains('light') ? 'light' : 'dark';
+    // Mặc định khởi động vào Light Mode cho QK7 DataHub
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
   });
 
   // Apply theme to DOM (html, body, data-theme, color-scheme)
@@ -164,7 +170,7 @@ export const useTheme = (): ThemeContextType => {
   if (!context) {
     // Resilient fallback when component is rendered without ThemeProvider
     const isDark =
-      typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : true;
+      typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : false;
     return {
       theme: isDark ? 'dark' : 'light',
       isDark,

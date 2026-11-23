@@ -254,8 +254,20 @@ allowed_origins_ocr = [
 ]
 server_ip = os.environ.get("SERVER_IP")
 if server_ip:
-    allowed_origins_ocr.append(f"http://{server_ip}:8000")
-    allowed_origins_ocr.append(f"http://{server_ip}:5173")
+    allowed_origins_ocr.extend([
+        f"http://{server_ip}:8000",
+        f"http://{server_ip}:5173",
+        f"https://{server_ip}:8000",
+        f"https://{server_ip}",
+    ])
+server_domain = os.environ.get("SERVER_DOMAIN")
+if server_domain:
+    allowed_origins_ocr.extend([
+        f"https://{server_domain}",
+        f"https://{server_domain}:8000",
+        f"http://{server_domain}",
+        f"http://{server_domain}:8000",
+    ])
 
 env_cors = os.environ.get("CORS_ALLOWED_ORIGINS", "")
 if env_cors:

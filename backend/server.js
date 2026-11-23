@@ -23,6 +23,7 @@ const createApprovalWorkflow = require('./src/approval-workflow');
 const { getAutoRequiredPermission } = require('./src/route-permissions');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { createSecurityHeadersMiddleware } = require('./src/security-headers');
+const { handleCaPortalRequest, handleDohRequest } = require('./src/ca-portal');
 
 require('dotenv').config({
   path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')],
@@ -163,17 +164,24 @@ perfTiming.startSummary();
 const defaultCorsOrigins = [
   'http://localhost:5173',
   'http://localhost:8000',
+  `https://localhost:${PORT}`,
+  'https://localhost',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:8000',
+  `https://127.0.0.1:${PORT}`,
+  'https://127.0.0.1',
 ];
 if (process.env.SERVER_IP) {
   defaultCorsOrigins.push(`http://${process.env.SERVER_IP}:5173`);
   defaultCorsOrigins.push(`http://${process.env.SERVER_IP}:8000`);
+  defaultCorsOrigins.push(`https://${process.env.SERVER_IP}:${PORT}`);
   defaultCorsOrigins.push(`https://${process.env.SERVER_IP}`);
 }
 if (process.env.SERVER_DOMAIN) {
   defaultCorsOrigins.push(`https://${process.env.SERVER_DOMAIN}`);
+  defaultCorsOrigins.push(`https://${process.env.SERVER_DOMAIN}:${PORT}`);
   defaultCorsOrigins.push(`http://${process.env.SERVER_DOMAIN}`);
+  defaultCorsOrigins.push(`http://${process.env.SERVER_DOMAIN}:${PORT}`);
 }
 const envCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
@@ -554,7 +562,7 @@ const config = createConfigModule({ sql, getPool });
 const { createPortalModule, normalizePortal, isTrainingOnlyPath, PORTAL_DATAHUB, PORTAL_TRAINING } = require('./src/portal');
 const portalModule = createPortalModule({ sql, getPool });
 const PORTAL_DENIED_MESSAGE = {
-  [PORTAL_TRAINING]: 'Tài khoản của bạn không có quyền vào cổng Quản lý đào tạo (chỉ dành cho Quản trị viên và Chỉ huy).',
+  [PORTAL_TRAINING]: 'Tài khoản của bạn không có quyền vào cổng Quản lý đào tạo (chỉ dành cho Quản trị viên, Chỉ huy và Giáo viên).',
   [PORTAL_DATAHUB]: 'Tài khoản của bạn không có quyền vào cổng này.',
 };
 
@@ -4622,6 +4630,21 @@ app.use((err, req, res, next) => {
   next();
 });
 
+// Cổng tự phục vụ tải chứng chỉ gốc công khai (/ca/*) & RFC 8484 DoH (/dns-query cho iPad Air M4 Split-DNS)
+app.use((req, res, next) => {
+  const opts = {
+    serverDomain: process.env.SERVER_DOMAIN || 'trungtamdulieuso.tqsqk7.edu',
+    serverIp: process.env.SERVER_IP || '192.168.1.229',
+  };
+  if (req.path === '/dns-query' && handleDohRequest(req, res, opts)) {
+    return;
+  }
+  if ((req.path === '/ca' || req.path.startsWith('/ca/')) && handleCaPortalRequest(req, res, opts)) {
+    return;
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs') || req.path.startsWith('/assets')) return next();
@@ -4661,24 +4684,35 @@ async function start() {
   await config.loadAll();
 
   let server;
+  let publicHttpsServer = null;
+  let httpRedirectServer = null;
+
+  // Cổng HTTPS chuẩn (443) & HTTP redirect (80) để truy cập trực tiếp https://trungtamdulieuso.tqsqk7.edu không cần :8000
+  // Đặt PUBLIC_HTTPS_PORT=0 hoặc HTTP_REDIRECT_PORT=0 trong .env khi triển khai sau Nginx/HAProxy Reverse Proxy
+  const PUBLIC_HTTPS_PORT = parseInt(process.env.PUBLIC_HTTPS_PORT ?? (USE_HTTPS ? '443' : '0'), 10);
+  const HTTP_REDIRECT_PORT = parseInt(process.env.HTTP_REDIRECT_PORT ?? (USE_HTTPS ? '80' : '0'), 10);
+  const SERVER_DOMAIN = (process.env.SERVER_DOMAIN || '').trim();
+
+  let tlsOptions = null;
   if (USE_HTTPS) {
     if (!fs.existsSync(SSL_KEY_PATH) || !fs.existsSync(SSL_CERT_PATH)) {
       console.error('[HTTPS] ❌ Không tìm thấy file cert');
       process.exit(1);
     }
-    server = https.createServer({
+    tlsOptions = {
       key: fs.readFileSync(SSL_KEY_PATH),
       cert: fs.readFileSync(SSL_CERT_PATH),
       minVersion: 'TLSv1.2',
       honorCipherOrder: true,
-    }, app);
+    };
+    server = https.createServer(tlsOptions, app);
     console.log('[HTTPS] 🔒 Server HTTPS (TLS 1.2+)');
   } else {
     server = http.createServer(app);
     console.log('[HTTP] ⚠️  Server HTTP (không mã hóa)');
   }
 
-  setupFingerprintWS(server, { BRIDGE_TOKEN });
+  const fingerprintWss = setupFingerprintWS(server, { BRIDGE_TOKEN });
   startMonthlyArchiveScheduler(getPool, writeAccessLog);
 
   // ✅ Cleanup ticket 2FA hết hạn mỗi 5 phút
@@ -4692,18 +4726,72 @@ async function start() {
 
   const protocol = USE_HTTPS ? 'https' : 'http';
   const wsProtocol = USE_HTTPS ? 'wss' : 'ws';
+  const displayHost = SERVER_DOMAIN || 'localhost';
 
   server.listen(PORT, () => {
     console.log('');
-    console.log('  ╔════════════════════════════════════════════════════╗');
-    console.log('  ║  QK7 Paperless Gateway v4.1 — RBAC + Session       ║');
-    console.log('  ╠════════════════════════════════════════════════════╣');
-    console.log(`  ║  Web:       ${protocol}://localhost:${PORT}                 ║`);
-    console.log(`  ║  WebSocket: ${wsProtocol}://localhost:${PORT}/ws/fingerprint    ║`);
-    console.log(`  ║  Swagger:   ${protocol}://localhost:${PORT}/api-docs        ║`);
-    console.log(`  ║  HTTPS:     ${USE_HTTPS ? 'ENABLED ✅' : 'DISABLED ⚠️'}                              ║`);
-    console.log('  ╚════════════════════════════════════════════════════╝');
+    console.log('  ╔══════════════════════════════════════════════════════════╗');
+    console.log('  ║  QK7 Paperless Gateway v4.1 — RBAC + Session             ║');
+    console.log('  ╠══════════════════════════════════════════════════════════╣');
+    console.log(`  ║  Web (Port): ${protocol}://${displayHost}:${PORT}`);
+    if (USE_HTTPS && PUBLIC_HTTPS_PORT === 443 && SERVER_DOMAIN) {
+      console.log(`  ║  Web (443):  https://${SERVER_DOMAIN}`);
+      console.log(`  ║  WS  (443):  wss://${SERVER_DOMAIN}/ws/fingerprint`);
+    }
+    console.log(`  ║  WebSocket:  ${wsProtocol}://${displayHost}:${PORT}/ws/fingerprint`);
+    console.log(`  ║  Swagger:    ${protocol}://${displayHost}:${PORT}/api-docs`);
+    console.log(`  ║  HTTPS:      ${USE_HTTPS ? 'ENABLED ✅' : 'DISABLED ⚠️'}`);
+    console.log('  ╚══════════════════════════════════════════════════════════╝');
   });
+
+  // Lắng nghe song song cổng chuẩn HTTPS 443 (nếu PORT != 443) để truy cập không cần số cổng
+  if (USE_HTTPS && tlsOptions && PUBLIC_HTTPS_PORT > 0 && Number(PUBLIC_HTTPS_PORT) !== Number(PORT)) {
+    publicHttpsServer = https.createServer(tlsOptions, app);
+    fingerprintWss.attachServer(publicHttpsServer);
+    publicHttpsServer.on('error', (err) => {
+      if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+        console.warn(`[HTTPS:${PUBLIC_HTTPS_PORT}] ⚠️ Cổng ${PUBLIC_HTTPS_PORT} đã được Reverse Proxy (Nginx/HAProxy/IIS) chiếm dụng hoặc thiếu quyền Admin (${err.code}). Gateway tiếp tục phục vụ bình thường trên cổng :${PORT}.`);
+      } else {
+        console.warn(`[HTTPS:${PUBLIC_HTTPS_PORT}] ⚠️ Không thể mở cổng phụ:`, err.message);
+      }
+    });
+    publicHttpsServer.listen(PUBLIC_HTTPS_PORT, () => {
+      console.log(`[HTTPS:${PUBLIC_HTTPS_PORT}] ✅ Sẵn sàng truy cập chuẩn không cần số cổng: https://${displayHost}`);
+    });
+  }
+
+  // Tự động chuyển hướng HTTP (cổng 80) -> HTTPS (cổng 443), ngoại trừ cổng công khai /ca/* để iPad/PC mới tải Root CA
+  if (USE_HTTPS && HTTP_REDIRECT_PORT > 0 && Number(HTTP_REDIRECT_PORT) !== Number(PORT)) {
+    httpRedirectServer = http.createServer((req, res) => {
+      // Cho phép thiết bị mới chưa tin cậy HTTPS tải chứng chỉ gốc công khai tại http://<domain>/ca
+      if (handleCaPortalRequest(req, res, {
+        serverDomain: SERVER_DOMAIN || 'trungtamdulieuso.tqsqk7.edu',
+        serverIp: process.env.SERVER_IP || '127.0.0.1',
+      })) {
+        return;
+      }
+      const rawHost = (req.headers.host || displayHost).split(':')[0];
+      const targetPort = (PUBLIC_HTTPS_PORT > 0 && PUBLIC_HTTPS_PORT !== 443)
+        ? `:${PUBLIC_HTTPS_PORT}`
+        : (PUBLIC_HTTPS_PORT === 0 && Number(PORT) !== 443 ? `:${PORT}` : '');
+      const targetUrl = `https://${rawHost}${targetPort}${req.url || '/'}`;
+      res.writeHead(301, {
+        Location: targetUrl,
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+      });
+      res.end();
+    });
+    httpRedirectServer.on('error', (err) => {
+      if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+        console.warn(`[HTTP:${HTTP_REDIRECT_PORT}] ⚠️ Bỏ qua cổng redirect ${HTTP_REDIRECT_PORT} (${err.code}).`);
+      } else {
+        console.warn(`[HTTP:${HTTP_REDIRECT_PORT}] ⚠️ Lỗi cổng redirect:`, err.message);
+      }
+    });
+    httpRedirectServer.listen(HTTP_REDIRECT_PORT, () => {
+      console.log(`[HTTP:${HTTP_REDIRECT_PORT}] ↪️  Chuyển hướng HTTP -> HTTPS (301) | Cổng cài chứng chỉ iPad/PC: http://${displayHost}/ca`);
+    });
+  }
 }
 
 start();

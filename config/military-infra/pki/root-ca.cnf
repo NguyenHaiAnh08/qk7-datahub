@@ -1,0 +1,56 @@
+# ==============================================================================
+# Tầng 1: OFFLINE MILITARY ROOT CA (QK7-Military-Root-CA)
+# Thời hạn: 20 năm (7300 ngày) | Khóa: RSA 4096-bit | SHA-384
+# Nguyên tắc bảo mật: Sau khi ký Issuing CA (Tầng 2), lưu Private Key vào HSM
+# hoặc két sắt ngoại tuyến (Air-Gapped Vault), tuyệt đối không để trên máy chủ Web.
+# ==============================================================================
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir               = ./root-ca
+certs             = $dir/certs
+crl_dir           = $dir/crl
+new_certs_dir     = $dir/newcerts
+database          = $dir/index.txt
+serial            = $dir/serial
+private_key       = $dir/private/root-ca.key.pem
+certificate       = $dir/certs/root-ca.cert.pem
+default_md        = sha384
+preserve          = no
+policy            = policy_strict
+
+[ policy_strict ]
+countryName             = match
+stateOrProvinceName     = match
+organizationName        = match
+organizationalUnitName  = optional
+commonName              = supplied
+
+[ req ]
+default_bits        = 4096
+distinguished_name  = req_distinguished_name
+string_mask         = utf8only
+default_md          = sha384
+x509_extensions     = v3_ca
+prompt              = no
+
+[ req_distinguished_name ]
+C  = VN
+ST = Ho Chi Minh City
+L  = Quan Khu 7
+O  = Truong Quan Su Quan Khu 7
+OU = Ban Cong Nghe Thong Tin & An Ninh Mang
+CN = QK7 Military Root CA
+
+[ v3_ca ]
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints       = critical, CA:true
+keyUsage               = critical, digitalSignature, cRLSign, keyCertSign
+
+[ v3_intermediate_ca ]
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints       = critical, CA:true, pathlen:0
+keyUsage               = critical, digitalSignature, cRLSign, keyCertSign

@@ -37,7 +37,7 @@ const { getPool, closePool, sql } = require('../src/db');
     `);
     console.log('= Bảng ROLE_PORTAL sẵn sàng');
 
-    for (const role of ['ROL-01', 'ROL-02']) {
+    for (const role of ['ROL-01', 'ROL-02', 'ROL-07']) {
       const exists = await new sql.Request(tx).input('r', sql.VarChar(50), role)
         .query(`SELECT 1 AS ok FROM [ROLE] WHERE role_id = @r`);
       if (!exists.recordset.length) { console.log(`! Bỏ qua ${role}: không có trong bảng ROLE`); continue; }

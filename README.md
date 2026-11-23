@@ -355,7 +355,9 @@ sequenceDiagram
 | **`USR-003`** | **Phạm Trường Sơn** | Trung tá QNCN / Cán bộ Cơ yếu | **Cấp 5 (Tuyệt Mật)** | Quản lý mã khóa mật mã và truyền tin |
 | **`USR-004`** | **Nguyễn Xuân Thanh**| Trung tá / Trợ lý tác chiến | **Cấp 2 (Nội bộ)** | Khai thác tài liệu thông thường, soạn thảo |
 | **`USR-005`** | **Trần Thị Ánh Tuyết**| Trung tá QNCN / Cán bộ Văn thư | **Cấp 3 (Mật)** | Tiếp nhận, đăng ký, số hóa văn kiện Mật |
-| **`USR-006`** | **Nguyễn Hải Anh** | Hạ sĩ / Nhân viên Kỹ thuật IT | **Cấp 1 (Công khai)**| Hỗ trợ kỹ thuật phần cứng, trực giám sát |
+| **`USR-006`** | **Nguyễn Hải Anh** | Trung sĩ / Nhân viên Kỹ thuật IT | **Cấp 5 (Tuyệt Mật)** | Kỹ thuật, Toàn quyền hệ thống (Admin 2FA Vân tay) |
+| **`USR-012`** | **Lê Minh Tiến** | Thượng tá / Trưởng khoa Binh Chủng | **Cấp 4 (Tối Mật)** | Chỉ huy Khoa & Giáo viên giảng dạy bài giảng số |
+| **`USR-013`** | **Đoàn Quang Linh** | Đại úy / Trưởng khoa Binh Chủng | **Cấp 2 (Nội bộ)** | Giáo viên giảng dạy, biên soạn học liệu & bài giảng số |
 
 *Mật khẩu mặc định cho toàn bộ tài khoản thử nghiệm:* **`123456789`**
 

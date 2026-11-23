@@ -9,7 +9,7 @@ rem ============================================================
 setlocal
 
 rem ---- SUA CHO DUNG MAY CHU ----
-set "DOMAIN=trungtamdulieuso.tqs.com"
+set "DOMAIN=trungtamdulieuso.tqsqk7.edu"
 set "SERVER_IP=172.22.1.111"
 rem Them ten khac neu can (cach nhau dau cach), de trong neu khong:
 set "EXTRA_NAMES="

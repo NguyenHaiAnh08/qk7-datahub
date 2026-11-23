@@ -1,13 +1,24 @@
 // theme-init.js — Khởi tạo Theme giao diện trước khi render SPA và gán nonce cho Dynamic Style Tags
 (function() {
   try {
-    const theme = localStorage.getItem('qk7_theme') || 'dark';
+    var MIGRATION_KEY = 'qk7_theme_default_light_v1';
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      localStorage.setItem('qk7_theme', 'light');
+      localStorage.setItem(MIGRATION_KEY, '1');
+    }
+    var stored = localStorage.getItem('qk7_theme');
+    var theme = stored === 'dark' ? 'dark' : 'light';
+    var root = document.documentElement;
     if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
+      root.classList.add('dark');
+      root.classList.remove('light');
+      root.setAttribute('data-theme', 'dark');
+      root.style.colorScheme = 'dark';
     } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
+      root.classList.remove('dark');
+      root.classList.add('light');
+      root.setAttribute('data-theme', 'light');
+      root.style.colorScheme = 'light';
     }
 
     // Auto-attach CSP nonce to dynamically created <style> tags (Ant Design v5 CSS-in-JS)

@@ -7,10 +7,8 @@ import {
   EyeOff,
   UserCheck,
   Loader2,
-  BookOpen,
-  Calendar,
-  Award,
-  Sparkles,
+  Monitor,
+  ShieldAlert,
 } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../hooks/useAuth';
@@ -20,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../routes/routePaths';
 import { NotchedInput } from './NotchedInput';
 import { FingerprintScanModal } from '../users/FingerprintScanModal';
+import { DEMO_ACCOUNTS } from './LoginForm';
 
 export interface TrainingLoginFormProps {
   onSuccess?: (user: User) => void;
@@ -27,38 +26,59 @@ export interface TrainingLoginFormProps {
   onForgotPassword?: () => void;
 }
 
-export type TrainingDemoKey = 'giangvien' | 'quanly' | 'khoa';
+// Danh sách tài khoản kiểm thử được cấp quyền đăng nhập vào Hệ Thống Quản Lý Đào Tạo (bỏ Trợ lý, thêm các tài khoản Giáo viên USR-012 & USR-013)
+export type TrainingDemoKey = 'chihuy' | 'giaovien1' | 'giaovien2' | 'it' | 'admin';
 
 export const TRAINING_DEMO_ACCOUNTS: Record<
   TrainingDemoKey,
   {
     id: string;
+    code: string;
     title: string;
     subtitle: string;
+    label: string;
     roleName: string;
-    icon: any;
   }
 > = {
-  giangvien: {
-    id: 'USR-004',
-    title: 'Giảng viên',
-    subtitle: 'Hạ sĩ Mạc Lương Thanh Tỉnh',
-    roleName: 'Giảng viên / Trợ lý',
-    icon: BookOpen,
+  chihuy: {
+    id: DEMO_ACCOUNTS.chihuy.id,
+    code: '002',
+    title: DEMO_ACCOUNTS.chihuy.title,
+    subtitle: 'Cấp 5 • Tuyệt Mật',
+    label: DEMO_ACCOUNTS.chihuy.label,
+    roleName: DEMO_ACCOUNTS.chihuy.roleName,
   },
-  quanly: {
-    id: 'USR-001',
-    title: 'Quản lý Đào tạo',
-    subtitle: 'Toàn quyền cơ sở & lịch học',
-    roleName: 'Ban Quản trị Đào tạo',
-    icon: Award,
+  giaovien1: {
+    id: 'USR-012',
+    code: '012',
+    title: 'Giáo viên',
+    subtitle: 'Cấp 4 • Tối Mật, Chỉ huy',
+    label: 'Thượng tá Lê Minh Tiến - Trưởng khoa Binh Chủng',
+    roleName: 'Chỉ huy / Giáo viên',
   },
-  khoa: {
-    id: 'USR-002',
-    title: 'Chỉ huy / Khoa',
-    subtitle: 'Trưởng phòng Tham mưu - HC',
-    roleName: 'Chỉ huy Huấn luyện',
-    icon: Calendar,
+  giaovien2: {
+    id: 'USR-013',
+    code: '013',
+    title: 'Giáo viên',
+    subtitle: 'Cấp 2 • Nội bộ',
+    label: 'Đại úy Đoàn Quang Linh - Giáo viên Khoa Binh Chủng',
+    roleName: 'Giáo viên',
+  },
+  it: {
+    id: DEMO_ACCOUNTS.it.id,
+    code: '006',
+    title: DEMO_ACCOUNTS.it.title,
+    subtitle: 'Cấp 5 • Kỹ thuật, Toàn quyền',
+    label: DEMO_ACCOUNTS.it.label,
+    roleName: DEMO_ACCOUNTS.it.roleName,
+  },
+  admin: {
+    id: DEMO_ACCOUNTS.admin.id,
+    code: '001',
+    title: 'Quản trị viên',
+    subtitle: 'Toàn quyền Admin',
+    label: DEMO_ACCOUNTS.admin.label,
+    roleName: DEMO_ACCOUNTS.admin.roleName,
   },
 };
 
@@ -88,9 +108,11 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
     if (usernameError) setUsernameError('');
     if (passwordError) setPasswordError('');
     const upper = val.trim().toUpperCase();
-    if (upper === 'USR-004') setSelectedDemo('giangvien');
-    else if (upper === 'USR-001') setSelectedDemo('quanly');
-    else if (upper === 'USR-002') setSelectedDemo('khoa');
+    if (upper === 'USR-002') setSelectedDemo('chihuy');
+    else if (upper === 'USR-012') setSelectedDemo('giaovien1');
+    else if (upper === 'USR-013') setSelectedDemo('giaovien2');
+    else if (upper === 'USR-006') setSelectedDemo('it');
+    else if (upper === 'USR-001') setSelectedDemo('admin');
     else setSelectedDemo(null);
   };
 
@@ -108,7 +130,7 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
     if (acc) {
       setUsername(acc.id);
       setPassword('123456789');
-      if (onToast) onToast(`Đã chọn tài khoản đào tạo: ${acc.title} (${acc.id})`, 'info');
+      if (onToast) onToast(`Đã chọn tài khoản: ${acc.label}`, 'info');
     }
   };
 
@@ -275,42 +297,121 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
         />
       </div>
 
-      {/* Tài khoản kiểm thử đào tạo nhanh */}
-      <div className="space-y-1.5 pt-1">
+      {/* Tài khoản kiểm thử đào tạo nhanh — Đồng bộ 100% UX/UI với Trung Tâm Dữ Liệu Số */}
+      <div className="space-y-1.5 pt-0.5">
         <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-          <span className="font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-amber-500" />
-            Tài khoản kiểm thử đào tạo:
+          <span className="font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+            Tài khoản kiểm thử nhanh:
           </span>
-          <span className="text-[10px] text-slate-400 font-mono">Pass: 123456789</span>
+          <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono font-medium">Pass: 123456789</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5">
-          {(Object.keys(TRAINING_DEMO_ACCOUNTS) as TrainingDemoKey[]).map((key) => {
-            const acc = TRAINING_DEMO_ACCOUNTS[key];
-            const isSelected = selectedDemo === key;
-            const Icon = acc.icon;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => quickFillDemo(key)}
-                className={`p-2 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-500 text-blue-900 dark:text-blue-100 ring-2 ring-blue-500/30 shadow-xs'
-                    : 'bg-slate-50/90 hover:bg-blue-50/50 border-slate-200/90 hover:border-blue-300 text-slate-800 dark:bg-slate-850 dark:hover:bg-slate-800 dark:border-slate-800 dark:text-slate-200'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-1 w-full">
-                  <span className="font-bold text-xs truncate">{acc.title}</span>
-                  <Icon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                </div>
-                <div className="text-[9px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                  {acc.id}
-                </div>
-              </button>
-            );
-          })}
+        {/* 5 Tài khoản được cấp quyền đăng nhập Hệ Thống Quản Lý Đào Tạo (Lưới 2 cột chuẩn Double-Slider) */}
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+          {/* 1. Chỉ huy (002) */}
+          <button
+            type="button"
+            onClick={() => quickFillDemo('chihuy')}
+            title="Đại tá Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính"
+            className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+              selectedDemo === 'chihuy'
+                ? 'bg-blue-50 dark:bg-blue-950/70 border-blue-500/60 text-blue-800 dark:text-blue-200 ring-1 ring-blue-500/40 shadow-xs'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
+            }`}
+          >
+            <div className="min-w-0 pr-1">
+              <div className="font-bold text-xs flex items-center gap-1">
+                <span>Chỉ huy</span>
+                <span className="text-[10px] font-mono text-slate-400">002</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Tuyệt Mật</div>
+            </div>
+            <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 dark:text-blue-400 shrink-0" />
+          </button>
+
+          {/* 2. Giáo viên (012 - Lê Minh Tiến: Chỉ huy & Giáo viên) */}
+          <button
+            type="button"
+            onClick={() => quickFillDemo('giaovien1')}
+            title="Thượng tá Lê Minh Tiến - Trưởng khoa Binh Chủng"
+            className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+              selectedDemo === 'giaovien1'
+                ? 'bg-indigo-50 dark:bg-indigo-950/70 border-indigo-500/60 text-indigo-800 dark:text-indigo-200 ring-1 ring-indigo-500/40 shadow-xs'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
+            }`}
+          >
+            <div className="min-w-0 pr-1">
+              <div className="font-bold text-xs flex items-center gap-1">
+                <span>Giáo viên</span>
+                <span className="text-[10px] font-mono text-slate-400">012</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 4 • Tối Mật, Chỉ huy</div>
+            </div>
+            <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
+          </button>
+
+          {/* 3. Giáo viên (013 - Đoàn Quang Linh: Giáo viên) */}
+          <button
+            type="button"
+            onClick={() => quickFillDemo('giaovien2')}
+            title="Đại úy Đoàn Quang Linh - Giáo viên Khoa Binh Chủng"
+            className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+              selectedDemo === 'giaovien2'
+                ? 'bg-teal-50 dark:bg-teal-950/70 border-teal-500/60 text-teal-800 dark:text-teal-200 ring-1 ring-teal-500/40 shadow-xs'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
+            }`}
+          >
+            <div className="min-w-0 pr-1">
+              <div className="font-bold text-xs flex items-center gap-1">
+                <span>Giáo viên</span>
+                <span className="text-[10px] font-mono text-slate-400">013</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
+            </div>
+            <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+          </button>
+
+          {/* 4. Nhân viên IT (006) */}
+          <button
+            type="button"
+            onClick={() => quickFillDemo('it')}
+            title="Trung sĩ Nguyễn Hải Anh - Nhân viên IT"
+            className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+              selectedDemo === 'it'
+                ? 'bg-cyan-50 dark:bg-cyan-950/70 border-cyan-500/60 text-cyan-800 dark:text-cyan-200 ring-1 ring-cyan-500/40 shadow-xs'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
+            }`}
+          >
+            <div className="min-w-0 pr-1">
+              <div className="font-bold text-xs flex items-center gap-1">
+                <span>Nhân viên IT</span>
+                <span className="text-[10px] font-mono text-slate-400">006</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Kỹ thuật, Toàn quyền</div>
+            </div>
+            <Monitor className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-500 dark:text-cyan-400 shrink-0" />
+          </button>
+
+          {/* 5. Quản trị viên (001) */}
+          <button
+            type="button"
+            onClick={() => quickFillDemo('admin')}
+            title="Thiếu tá QNCN Nguyễn Mạnh Nam - Quản trị viên"
+            className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
+              selectedDemo === 'admin'
+                ? 'bg-amber-50 dark:bg-amber-950/70 border-amber-500/60 text-amber-800 dark:text-amber-200 ring-1 ring-amber-500/40 shadow-xs'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
+            }`}
+          >
+            <div className="min-w-0 pr-1">
+              <div className="font-bold text-xs flex items-center gap-1">
+                <span>Quản trị viên</span>
+                <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/10 px-1 rounded">001</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Toàn quyền Admin</div>
+            </div>
+            <ShieldAlert className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+          </button>
         </div>
       </div>
 

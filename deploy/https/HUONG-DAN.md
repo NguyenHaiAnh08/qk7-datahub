@@ -37,7 +37,7 @@ Bước 2. Trỏ tên miền về máy này để test
 Máy này chưa có IP 172.22.1.111, nên tạm trỏ về chính nó:
 
 
-Add-Content "$env:SystemRoot\System32\drivers\etc\hosts" "127.0.0.1   trungtamdulieuso.tqs.com"
+Add-Content "$env:SystemRoot\System32\drivers\etc\hosts" "127.0.0.1   trungtamdulieuso.tqsqk7.edu"
 Khi có máy chủ thật, sửa dòng này thành 172.22.1.111, hoặc xóa nếu mạng đã có DNS nội bộ.
 
 Bước 3. Bật HTTPS cho backend
@@ -48,9 +48,9 @@ Mở backend/.env và đặt các dòng sau. Nếu khóa nào đã có thì sử
 USE_HTTPS=true
 SSL_KEY_PATH=../deploy/https/may-chu/certs/server.key
 SSL_CERT_PATH=../deploy/https/may-chu/certs/server.crt
-SERVER_DOMAIN=trungtamdulieuso.tqs.com
+SERVER_DOMAIN=trungtamdulieuso.tqsqk7.edu
 SERVER_IP=172.22.1.111
-CORS_ALLOWED_ORIGINS=https://trungtamdulieuso.tqs.com:8000,https://172.22.1.111:8000
+CORS_ALLOWED_ORIGINS=https://trungtamdulieuso.tqsqk7.edu:8000,https://172.22.1.111:8000
 Bước 4. Khởi động lại backend
 
 
@@ -92,15 +92,15 @@ Bước 5. Kiểm tra
 Lệnh này không có -k, nên nếu chứng chỉ không tin cậy thì sẽ báo lỗi:
 
 
-curl.exe -I https://trungtamdulieuso.tqs.com:8000
-Sau đó đóng hết trình duyệt, mở lại https://trungtamdulieuso.tqs.com:8000 và kiểm tra ổ khóa có hợp lệ không. Chrome và Edge dùng kho tin cậy của Windows nên nhận ngay. Firefox cần chạy bước 2 trong script máy con (khóa registry).
+curl.exe -I https://trungtamdulieuso.tqsqk7.edu:8000
+Sau đó đóng hết trình duyệt, mở lại https://trungtamdulieuso.tqsqk7.edu:8000 và kiểm tra ổ khóa có hợp lệ không. Chrome và Edge dùng kho tin cậy của Windows nên nhận ngay. Firefox cần chạy bước 2 trong script máy con (khóa registry).
 
 B. Từng máy con (làm một lần cho mỗi máy)
 Chép 2 file vào cùng một thư mục trên USB:
 deploy\https\may-chu\certs\rootCA.crt
 deploy\https\may-con\cai-rootca-may-con.bat
 Trên máy con, chuột phải vào file .bat → Run as administrator. Script tự làm 4 việc: cài Root CA, bật tin cậy cho Firefox, trỏ tên miền về 172.22.1.111 trong file hosts, rồi kiểm tra.
-Đóng hết trình duyệt và mở lại https://trungtamdulieuso.tqs.com:8000.
+Đóng hết trình duyệt và mở lại https://trungtamdulieuso.tqsqk7.edu:8000.
 Thứ tự bắt buộc là cài Root CA cho toàn bộ máy con trước, rồi mới đổi máy chủ sang chứng chỉ mới. Lý do là web đang bật HSTS, nên máy con chưa tin Root CA mới sẽ bị chặn hẳn, không bấm bỏ qua được.
 
 C. Khi có máy chủ thật (IP 172.22.1.111)

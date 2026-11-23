@@ -8,7 +8,7 @@ rem ============================================================
 setlocal
 
 rem ---- SUA 2 DONG NAY CHO DUNG MOI TRUONG ----
-set "DOMAIN=trungtamdulieuso.tqs.com"
+set "DOMAIN=trungtamdulieuso.tqsqk7.edu"
 set "SERVER_IP=172.22.1.111"
 rem --------------------------------------------
 

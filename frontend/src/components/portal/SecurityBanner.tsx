@@ -116,6 +116,7 @@ export const SecurityBanner: React.FC<SecurityBannerProps> = ({
         )}
         {isGuest ? (
           <Link
+            id="tour-upgrade-btn"
             to={ROUTE_PATHS.LOGIN}
             className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-md shadow-emerald-950/20 border border-amber-500/25"
           >

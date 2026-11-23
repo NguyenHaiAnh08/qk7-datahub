@@ -4,7 +4,7 @@ import {
   Shield, Lock, Search, CheckCircle2, AlertTriangle, ChevronDown,
   ChevronRight, Zap, Calendar, X, Minus,
   FileText, Users, KeyRound, ShieldAlert, BookOpen, Fingerprint,
-  Activity, Bot, Settings, Monitor,
+  Activity, Bot, Settings, Monitor, Gauge, MonitorPlay,
 } from 'lucide-react';
 
 import { permissionService } from '../../services/permissionService';
@@ -100,6 +100,20 @@ const GROUP_CONFIG: Record<
     bg: 'bg-slate-100 dark:bg-slate-700/40',
     border: 'border-slate-300 dark:border-slate-600/40',
     description: 'Dashboard, health check',
+  },
+  LECTURE: {
+    label: 'Bài giảng', icon: MonitorPlay,
+    color: 'text-cyan-700 dark:text-cyan-400',
+    bg: 'bg-cyan-50 dark:bg-cyan-500/10',
+    border: 'border-cyan-200 dark:border-cyan-500/30',
+    description: 'Xem, soạn, duyệt, xóa bài giảng số',
+  },
+  COMMAND: {
+    label: 'Chỉ huy', icon: Gauge,
+    color: 'text-emerald-700 dark:text-emerald-400',
+    bg: 'bg-emerald-50 dark:bg-emerald-500/10',
+    border: 'border-emerald-200 dark:border-emerald-500/30',
+    description: 'Xem tổng quan giám sát toàn hệ thống (chỉ đọc)',
   },
   SESSION: {
     label: 'Phiên', icon: Monitor,

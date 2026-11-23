@@ -19,6 +19,18 @@ const RootIndexRoute: React.FC = () => {
   return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
 };
 
+const PortalRouteWrapper: React.FC = () => {
+  const { user, isAuthenticated } = useAuth();
+  const isGuestMode = typeof window !== 'undefined' && sessionStorage.getItem('qk7_guest_mode') === 'true';
+
+  // Nếu chưa đăng nhập và không bật chế độ Đại biểu tham quan -> Chuyển về trang Đăng nhập
+  if (!isAuthenticated && !isGuestMode && (!user || user.user_id !== 'GUEST')) {
+    return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
+  }
+
+  return <PortalPage />;
+};
+
 const portalRoutes: RouteModuleExport = {
   group: 'portal',
   order: 2,
@@ -29,7 +41,7 @@ const portalRoutes: RouteModuleExport = {
     },
     {
       path: ROUTE_PATHS.PORTAL,
-      element: <PortalPage />,
+      element: <PortalRouteWrapper />,
     },
     {
       path: '/portal.html',

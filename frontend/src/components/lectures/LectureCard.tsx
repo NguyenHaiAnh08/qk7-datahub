@@ -2,7 +2,7 @@ import React from 'react';
 import {
   FileText, Layers, FileCode, Send, Check, X,
   Play, Trash2, Hash, User, AlertTriangle, Edit, RotateCcw, Eye,
-  HelpCircle, Shield, CheckCircle2, Clock
+  HelpCircle, Shield, CheckCircle2, Clock, BookOpen
 } from 'lucide-react';
 import { Lecture, ContentType, LectureStatus } from '../../types/lecture';
 
@@ -47,6 +47,12 @@ const SECURITY_LEVEL_LABELS: Record<number, { label: string; cls: string }> = {
 
 export interface LectureCardProps {
   lecture: Lecture;
+  /**
+   * 'list'    — trang Danh sách: chỉ Xem chi tiết + Mở ca dạy (không thao tác CRUD/duyệt)
+   * 'compose' — trang Soạn & duyệt: chỉnh sửa, gửi duyệt, duyệt, xóa/khôi phục (không mở ca)
+   * Không truyền = hiện đủ như trước.
+   */
+  mode?: 'list' | 'compose';
   viewMode: 'grid' | 'table';
   currentUserId?: string;
   isAdmin: boolean;
@@ -62,12 +68,13 @@ export interface LectureCardProps {
   onPurge: () => void;        // 🆕 — xoá vĩnh viễn
   onEdit: () => void;
   onView: () => void;
+  onRead?: () => void;
   onStartSession: () => void;
 }
 
 export const LectureCard: React.FC<LectureCardProps> = ({
-  lecture, viewMode, currentUserId, isAdmin, canApprove, canArchive, canStartSchedule, canEdit,
-  onSubmit, onApprove, onReject, onSoftDelete, onRestore, onPurge, onEdit, onView, onStartSession,
+  lecture, mode, viewMode, currentUserId, isAdmin, canApprove, canArchive, canStartSchedule, canEdit,
+  onSubmit, onApprove, onReject, onSoftDelete, onRestore, onPurge, onEdit, onView, onRead, onStartSession,
 }) => {
   const statusCfg = STATUS_STYLES[lecture.status] || STATUS_STYLES.DRAFT;
   const secCfg = SECURITY_LEVEL_LABELS[lecture.security_level_id] || SECURITY_LEVEL_LABELS[2];
@@ -82,9 +89,21 @@ export const LectureCard: React.FC<LectureCardProps> = ({
 
   type Action = { label: string; icon: typeof FileText; onClick: () => void; cls: string };
   const actions: Action[] = [];
+  const allowTeach = mode !== 'compose';
+  const allowManage = mode !== 'list';
 
-  // 1. Mở ca dạy khi đã PUBLISHED (Ưu tiên số 1 theo yêu cầu chỉ huy)
-  if (isPublished && isAuthor && canStartSchedule) {
+  // 1a. Đọc / Xem bài giảng khi đã PUBLISHED (Dành cho tất cả mọi người bao gồm Đại biểu)
+  if (isPublished && onRead) {
+    actions.push({
+      label: 'Đọc bài giảng',
+      icon: BookOpen,
+      onClick: onRead,
+      cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs'
+    });
+  }
+
+  // 1b. Mở ca dạy khi đã PUBLISHED (Ưu tiên số 1 theo yêu cầu chỉ huy: giảng viên tác giả hoặc có quyền can_teach)
+  if (allowTeach && isPublished && (isAuthor || lecture.can_teach) && canStartSchedule) {
     actions.push({
       label: 'Mở ca dạy',
       icon: Play,
@@ -93,34 +112,34 @@ export const LectureCard: React.FC<LectureCardProps> = ({
     });
   }
 
-  // 2. Chỉnh sửa & Gửi duyệt khi là DRAFT / REJECTED
-  if (isAuthor && isDraftOrRejected && canEdit) {
-    actions.push({
-      label: 'Chỉnh sửa',
-      icon: Edit,
-      onClick: onEdit,
-      cls: 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30'
-    });
+  // 2. Gửi duyệt & Chỉnh sửa khi là DRAFT / REJECTED (Thứ tự chuẩn: Gửi duyệt -> Chỉnh sửa -> Xem chi tiết -> Xóa)
+  if (allowManage && isAuthor && isDraftOrRejected && canEdit) {
     actions.push({
       label: 'Gửi duyệt',
       icon: Send,
       onClick: onSubmit,
       cls: 'bg-[#166534] hover:bg-[#14532d] text-white border border-emerald-600 shadow-xs'
     });
+    actions.push({
+      label: 'Chỉnh sửa',
+      icon: Edit,
+      onClick: onEdit,
+      cls: 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30'
+    });
   }
 
   // 3. Quyền phê duyệt 2 tầng (Chỉ huy Khoa / Đào tạo / BGH)
-  if (canApprove) {
+  if (allowManage && canApprove) {
     if (isPendingFaculty) {
       actions.push(
-        { label: 'Duyệt Khoa', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600' },
-        { label: 'Từ chối',    icon: X,     onClick: onReject,  cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
+        { label: 'Duyệt', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
+        { label: 'Từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
       );
     }
     if (isPendingTraining) {
       actions.push(
-        { label: 'Duyệt BGH', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600' },
-        { label: 'Từ chối',   icon: X,     onClick: onReject,  cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
+        { label: 'Duyệt', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
+        { label: 'Từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
       );
     }
   }
@@ -133,8 +152,9 @@ export const LectureCard: React.FC<LectureCardProps> = ({
     cls: 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
   });
 
-  // 5. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn
-  if (canArchive) {
+  // 5. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn (KHÔNG hiển thị khi bài giảng đang chờ duyệt hoặc đã duyệt xuất bản)
+  const isPendingApproval = isPendingFaculty || isPendingTraining;
+  if (allowManage && canArchive && !isPendingApproval && !isPublished) {
     if (isDeleted) {
       // Đang trong thùng rác → Khôi phục + Xoá vĩnh viễn
       actions.push(
@@ -152,7 +172,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
         },
       );
     } else {
-      // Đang hoạt động bình thường → Xoá mềm (màu đỏ theo yêu cầu)
+      // Đang hoạt động bình thường → Xoá mềm
       actions.push({
         label: 'Xóa',
         icon: Trash2,
@@ -172,24 +192,24 @@ export const LectureCard: React.FC<LectureCardProps> = ({
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             {/* Header dòng 1: Tiêu đề + Cấp bảo mật + Trạng thái (Đã xuất bản / Lưu trữ nằm kế cấp bảo mật) */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-start gap-2 flex-wrap min-w-0">
               <span
-                className="font-bold text-sm text-slate-900 dark:text-white truncate cursor-pointer hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+                className="font-bold text-sm text-slate-900 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] cursor-pointer hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors max-w-full"
                 onClick={onView}
                 title={lecture.title}
               >
                 {lecture.title}
               </span>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${secCfg.cls}`}>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border shrink-0 ${secCfg.cls}`}>
                 {secCfg.label.split('—')[0].trim()}
               </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shadow-2xs ${statusCfg.badgeCls}`}>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shadow-2xs shrink-0 ${statusCfg.badgeCls}`}>
                 {statusCfg.label}
               </span>
             </div>
 
             {/* Dòng trên: Mã bài giảng & Môn học (in đậm giá trị) */}
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400 min-w-0">
               <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded text-[11px]">
                 #{lecture.lecture_code}
               </span>
@@ -230,11 +250,11 @@ export const LectureCard: React.FC<LectureCardProps> = ({
 
   // ── GRID VIEW (TACTICAL COMMAND CARD) ──
   return (
-    <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-4 flex flex-col gap-3 hover:border-emerald-500/40 hover:shadow-md transition-all h-full relative group">
+    <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-white/[0.08] p-4 flex flex-col gap-3 hover:border-emerald-500/40 hover:shadow-md transition-all h-full relative group min-w-0 overflow-hidden">
       
       {/* 1. Header Card: Mã bài giảng nổi bật + Cấp độ & Trạng thái (Bỏ badge Gói) */}
       <div className="flex items-center justify-between gap-2">
-        {/* Mã danh sách bài giảng nổi bật */}
+        {/* Mã danh sách bài giảng nổi bật — hiển thị đầy đủ 100% mã bài giảng */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300/70 dark:border-emerald-700/60 font-mono text-xs font-bold text-emerald-800 dark:text-emerald-300 shadow-2xs tracking-wide">
           <Hash className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{lecture.lecture_code}</span>
@@ -251,10 +271,10 @@ export const LectureCard: React.FC<LectureCardProps> = ({
         </div>
       </div>
 
-      {/* 2. Tên danh sách bài giảng (Hero Title) */}
-      <div className="min-w-0">
+      {/* 2. Tên danh sách bài giảng (Hero Title — tối đa 2 dòng + ... + chống tràn tuyệt đối) */}
+      <div className="min-w-0 overflow-hidden">
         <h3
-          className="font-bold text-[15px] text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors cursor-pointer"
+          className="font-bold text-[15px] text-slate-900 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] leading-snug group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors cursor-pointer"
           onClick={onView}
           title={lecture.title}
         >
@@ -331,9 +351,9 @@ export const LectureCard: React.FC<LectureCardProps> = ({
         )}
       </div>
 
-      {/* Action buttons dứt khoát */}
+      {/* Action buttons dứt khoát — xếp gọn trên 1 hàng duy nhất */}
       {actions.length > 0 && (
-        <div className="flex items-center flex-wrap gap-1.5 pt-2.5 border-t border-slate-100 dark:border-white/[0.04] mt-auto">
+        <div className="flex items-center flex-nowrap gap-1.5 pt-2.5 border-t border-slate-100 dark:border-white/[0.04] mt-auto">
           {actions.map((a, i) => {
             const I = a.icon;
             return (
@@ -341,7 +361,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
                 key={i}
                 type="button"
                 onClick={a.onClick}
-                className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-2xs ${a.cls}`}
+                className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg flex items-center justify-center gap-1 whitespace-nowrap shrink-0 transition active:scale-95 cursor-pointer shadow-2xs ${a.cls}`}
               >
                 <I className="w-3.5 h-3.5 shrink-0" />
                 <span>{a.label}</span>

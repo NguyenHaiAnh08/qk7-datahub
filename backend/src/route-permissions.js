@@ -13,6 +13,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/creatable-roles$/,           'USER_VIEW'],
     [/^\/api\/admin\/users\/[^/]+\/roles$/,       'USER_VIEW'],
     [/^\/api\/admin\/users\/[^/]+\/permissions$/, 'USER_VIEW'],
+    [/^\/api\/command\/overview$/,                'COMMAND_VIEW'],
     [/^\/api\/admin\/roles$/,                     'ROLE_VIEW'],
     [/^\/api\/admin\/roles\/[^/]+\/permissions$/, 'ROLE_VIEW'],
     [/^\/api\/admin\/permissions$/,               'PERMISSION_VIEW'],
@@ -27,12 +28,19 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/sessions$/,                  'SESSION_VIEW'],
     [/^\/api\/admin\/sessions\/[^/]+$/,           'SESSION_VIEW'],
     [/^\/api\/admin\/sessions\/user\/[^/]+$/,     'SESSION_VIEW'],
-    [/^\/api\/admin\/approval-requests$/,         'AUDIT_VIEW'],
-    [/^\/api\/admin\/approval-requests\/[^/]+$/,  'AUDIT_VIEW'],
+    [/^\/api\/admin\/approval-requests$/,         'APPROVAL_VALIDATE'],
+    [/^\/api\/admin\/approval-requests\/[^/]+$/,  'APPROVAL_VALIDATE'],
     [/^\/api\/admin\/protected-permissions$/,     'ROLE_VIEW'],
     [/^\/api\/documents\/trash$/,                 'DOC_TRASH_VIEW'],
     [/^\/api\/documents\/my-unit$/,               'DOC_VIEW'],
     [/^\/api\/documents\/proposals\/pending$/,    'DOC_VIEW'],
+<<<<<<< HEAD
+=======
+    [/^\/api\/admin\/lectures\/subjects$/,    'SUBJECT_VIEW'],
+    [/^\/api\/admin\/lectures\/classes$/,     'CLASS_VIEW'],
+    [/^\/api\/admin\/lectures\/classrooms$/,  'CLASSROOM_VIEW'],
+    [/^\/api\/admin\/lectures\/buildings$/,   'CLASSROOM_VIEW'],
+>>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
   ],
 
   POST: [
@@ -45,7 +53,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/roles\/[^/]+\/permissions$/,        'ROLE_PERMISSION_ASSIGN'],// Đổi quyền role → duyệt
     [/^\/api\/admin\/permissions$/,                      'PERMISSION_CREATE'],
     [/^\/api\/admin\/security-levels$/,                  'SECLEVEL_MANAGE'],       // Đổi mức mật → duyệt
-    [/^\/api\/admin\/approval-requests\/[^/]+\/(approve|reject|mark-executed)$/, 'AUDIT_VIEW'],
+    [/^\/api\/admin\/approval-requests\/[^/]+\/(approve|reject|mark-executed)$/, 'APPROVAL_VALIDATE'],
     [/^\/api\/admin\/protected-permissions\/[^/]+$/,     'ROLE_EDIT'],
     [/^\/api\/documents\/upload$/,                'DOC_UPLOAD'],
     [/^\/api\/documents\/parse$/,                 'DOC_PARSE'],
@@ -54,9 +62,30 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/documents\/proposals\/[^/]+\/reject$/,  'DOC_EDIT'],
     [/^\/api\/ai\/sync-all$/,                     'AI_SYNC'],
     [/^\/api\/ai\/chat$/,                         'AI_QUERY'],
+<<<<<<< HEAD
+=======
+    [/^\/api\/admin\/lectures\/subjects$/,    'SUBJECT_MANAGE'],
+    [/^\/api\/admin\/lectures\/classes$/,     'CLASS_MANAGE'],
+    [/^\/api\/admin\/lectures\/classrooms$/,  'CLASSROOM_MANAGE'],
+    [/^\/api\/admin\/lectures\/buildings$/,   'CLASSROOM_MANAGE'],
+>>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
 
     // ─── LECTURES ───
     [/^\/api\/lectures\/upload-scorm$/,           'LECTURE_CREATE'],
+    [/^\/api\/lectures$/,                         'LECTURE_CREATE'],
+    [/^\/api\/lectures\/[^/]+\/submit$/,          'LECTURE_CREATE'],
+    [/^\/api\/lectures\/[^/]+\/(scorm|html5|pdf)\/upload$/, 'LECTURE_CREATE'],
+    [/^\/api\/lectures\/[^/]+\/approve$/,         'LECTURE_APPROVE'],
+    [/^\/api\/lectures\/[^/]+\/reject$/,          'LECTURE_APPROVE'],
+    [/^\/api\/lectures\/[^/]+\/restore$/,         'LECTURE_DELETE'],
+    [/^\/api\/lectures\/[^/]+\/quiz$/,            'LECTURE_QUIZ_MANAGE'],
+    [/^\/api\/lectures\/schedules\/start$/,       'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/end$/,  'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/scorm\/commit$/, 'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/quiz\/[^/]+\/activate$/, 'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/force-end$/, 'SCHEDULE_FORCE_END'],
+    // Bật/tắt bảo trì phòng: handler tự kiểm tra vai trò (Admin/Chỉ huy/Trưởng khoa)
+    [/^\/api\/lectures\/radar\/rooms\/[^/]+\/maintenance$/, 'CLASSROOM_VIEW'],
 
     // ─── NHÓM 2 (quan trọng — CREATE thì OK, EDIT/DELETE phải duyệt) ───
     [/^\/api\/admin\/units$/,                            'UNIT_CREATE'],           // ← TÁCH riêng
@@ -70,6 +99,7 @@ const AUTO_PERMISSIONS = {
     // ─── NHÓM 1 + 2 (EDIT luôn phải duyệt) ───
     [/^\/api\/admin\/users\/[^/]+$/,                     'USER_EDIT'],
     [/^\/api\/admin\/users\/[^/]+\/credentials$/,        'USER_CREDENTIALS'],      // Reset password → duyệt
+    [/^\/api\/admin\/users\/[^/]+\/roles$/,              'USER_ROLE_ASSIGN'],      // Đặt lại toàn bộ role → duyệt
     [/^\/api\/admin\/roles\/[^/]+$/,                     'ROLE_EDIT'],
     [/^\/api\/admin\/permissions\/[^/]+$/,               'PERMISSION_EDIT'],
     [/^\/api\/admin\/units\/[^/]+$/,                     'UNIT_EDIT'],             // ← TÁCH
@@ -78,7 +108,18 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/ranks\/[^/]+$/,                     'RANK_EDIT'],             // ← TÁCH
     [/^\/api\/admin\/positions\/[^/]+$/,                 'POSITION_EDIT'],         // ← TÁCH
     [/^\/api\/admin\/unit-aliases\/[^/]+$/,              'UNIT_ALIAS_EDIT'],       // ← TÁCH
+    [/^\/api\/lectures\/schedules\/[^/]+\/progress$/, 'SCHEDULE_START'],
+    [/^\/api\/lectures\/schedules\/[^/]+\/slide$/,    'SCHEDULE_START'],
+    [/^\/api\/lectures\/[^/]+\/quiz\/[^/]+$/,         'LECTURE_QUIZ_MANAGE'],
+    [/^\/api\/lectures\/[^/]+$/,                      'LECTURE_CREATE'],
     [/^\/api\/documents\/[^/]+$/,                 'DOC_EDIT'],
+<<<<<<< HEAD
+=======
+    [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
+    [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
+    [/^\/api\/admin\/lectures\/classrooms\/[^/]+$/,  'CLASSROOM_MANAGE'],
+    [/^\/api\/admin\/lectures\/buildings\/[^/]+$/,   'CLASSROOM_MANAGE'],
+>>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
   ],
 
   DELETE: [
@@ -99,8 +140,18 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/admin\/sessions\/user\/[^/]+$/,            'SESSION_KILL'],
     [/^\/api\/admin\/sessions\/[^/]+$/,                  'SESSION_KILL'],
     [/^\/api\/admin\/protected-permissions\/[^/]+$/,     'ROLE_EDIT'],
+    [/^\/api\/lectures\/[^/]+\/purge$/,           'LECTURE_DELETE'],
+    [/^\/api\/lectures\/[^/]+\/quiz\/[^/]+$/,     'LECTURE_QUIZ_MANAGE'],
+    [/^\/api\/lectures\/[^/]+$/,                  'LECTURE_DELETE'],
     [/^\/api\/documents\/[^/]+\/purge$/,          'DOC_PURGE'],
     [/^\/api\/documents\/[^/]+$/,                 'DOC_DELETE'],
+<<<<<<< HEAD
+=======
+    [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
+    [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
+    [/^\/api\/admin\/lectures\/classrooms\/[^/]+$/,  'CLASSROOM_MANAGE'],
+    [/^\/api\/admin\/lectures\/buildings\/[^/]+$/,   'CLASSROOM_MANAGE'],
+>>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
   ],
 };
 

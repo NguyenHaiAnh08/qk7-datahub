@@ -26,7 +26,7 @@ export interface ToastItem {
   title?: string;
   message: string;
   type: ToastType;
-  duration?: number; // ms, default 3600
+  duration?: number; // ms, default 2500
   timestamp?: number;
   badge?: string;
 }
@@ -54,7 +54,7 @@ export const showAnimatedToast = (
           message,
           type,
           title: options?.title,
-          duration: options?.duration || 3600,
+          duration: Math.min(options?.duration || 2000, 2000),
           badge: options?.badge,
           timestamp: Date.now(),
         },
@@ -72,7 +72,7 @@ export const toast = {
     showAnimatedToast(message, 'securityAlert', {
       title: options?.title || 'CẢNH BÁO AN NINH QUÂN SỰ',
       badge: options?.badge || 'SOC-ALERT',
-      duration: options?.duration || 5000,
+      duration: Math.min(options?.duration || 2000, 2000),
     }),
   info: (message: string, options?: ToastOptions) => showAnimatedToast(message, 'info', options),
 };
@@ -121,7 +121,7 @@ interface SingleToastCardProps {
 
 const SingleToastCard = React.forwardRef<HTMLDivElement, SingleToastCardProps>(
   ({ item, onDismiss }, ref) => {
-    const duration = item.duration || 3600;
+    const duration = Math.min(item.duration || 2000, 2000);
     const [isHovered, setIsHovered] = useState(false);
     const [progress, setProgress] = useState(100);
     const startTimeRef = useRef<number>(Date.now());
@@ -328,7 +328,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         message,
         type,
         title: options?.title,
-        duration: options?.duration || 3600,
+        duration: Math.min(options?.duration || 2000, 2000),
         badge: options?.badge,
         timestamp: Date.now(),
       };
@@ -403,7 +403,7 @@ export const Toast: React.FC<LegacyToastProps> = ({ toast: state, onClose }) => 
               id: 'legacy-single-toast',
               message: state.message,
               type: state.type,
-              duration: 3200,
+              duration: 2000,
               timestamp: Date.now(),
             }}
             onDismiss={onClose}

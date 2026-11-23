@@ -55,24 +55,16 @@ async function issueTicket({ userId, deviceId = null, ip }) {
 }
 
 /**
- * Consume ticket (one-time use).
- * Trả về { valid, reason, userId, deviceId, ipMismatch }.
- *
- * LƯU Ý: Không throw nếu ticket invalid — trả object để caller xử lý.
- *
- * @param {Object} opts
- * @param {string} opts.ticket
- * @param {string} opts.deviceId - bắt buộc ở bước 2
- * @param {string} opts.ip
- * @returns {Promise<Object>}
+ * Validate ticket mà KHÔNG đánh dấu used_at ngay (cho phép tối đa 3 lần quét trong TTL).
+ * Trả về { valid, reason, userId, deviceId, ipMismatch, failedAttempts }.
  */
-async function consumeTicket({ ticket, deviceId, ip }) {
+async function validateTicket({ ticket, deviceId, ip }) {
   if (!ticket) return { valid: false, reason: 'TICKET_MISSING' };
   if (!deviceId) return { valid: false, reason: 'DEVICE_ID_MISSING' };
 
   const pool = await getPool();
 
-  // 1. Lấy ticket kèm row lock để tránh race condition (2 request đồng thời)
+  // 1. Lấy ticket kèm row lock để tránh race condition
   const r = await pool.request()
     .input('tid', sql.VarChar(64), ticket)
     .query(`
@@ -87,47 +79,94 @@ async function consumeTicket({ ticket, deviceId, ip }) {
   }
   const t = r.recordset[0];
 
-  // 2. One-time use
+  // 2. One-time use: nếu đã xác thực thành công trước đó -> từ chối
   if (t.used_at) {
     return { valid: false, reason: 'TICKET_ALREADY_USED' };
   }
 
-  // 3. Hết hạn
+  // 3. Hết hạn (2 phút TTL)
   if (new Date(t.expires_at) < new Date()) {
     return { valid: false, reason: 'TICKET_EXPIRED' };
   }
 
-  // 4. Bind device_id TẠI CONSUME (nếu ticket được issue không có device_id)
-  //    Nếu ticket đã có device_id từ bước 1 → phải khớp
-  if (t.device_id && t.device_id !== deviceId) {
-    await pool.request()
-      .input('tid', sql.VarChar(64), ticket)
-      .query(`UPDATE ADMIN_2FA_TICKET SET failed_attempts = failed_attempts + 1 WHERE ticket_id = @tid`);
-    return { valid: false, reason: 'TICKET_DEVICE_MISMATCH' };
+  // 4. Quá số lần quét sai (tối đa 3 lần)
+  if ((t.failed_attempts || 0) >= 3) {
+    return { valid: false, reason: 'TICKET_MAX_ATTEMPTS' };
   }
 
-  // 5. IP mismatch → chỉ log warning, KHÔNG chặn (theo yêu cầu)
+  // 5. Bind device_id tại lần gọi đầu tiên nếu chưa có
+  if (!t.device_id) {
+    await pool.request()
+      .input('tid', sql.VarChar(64), ticket)
+      .input('did', sql.VarChar(100), deviceId)
+      .query(`UPDATE ADMIN_2FA_TICKET SET device_id = @did WHERE ticket_id = @tid`);
+  }
+
+  // 6. IP mismatch → chỉ log warning, KHÔNG chặn (theo yêu cầu)
   const ipMismatch = (t.ip_address || '') !== (ip || '');
 
-  // 6. Đánh dấu đã dùng NGAY (one-time use, chống replay)
-  //    Cập nhật device_id nếu ticket chưa có (bind tại consume)
-  await pool.request()
+  return {
+    valid: true,
+    userId: t.user_id,
+    deviceId: t.device_id || deviceId,
+    ipMismatch,
+    issuedIp: t.ip_address,
+    failedAttempts: t.failed_attempts || 0,
+  };
+}
+
+/**
+ * Đánh dấu ticket đã sử dụng thành công (burn ticket) sau khi vân tay khớp.
+ * Sử dụng cập nhật nguyên tử chống replay: chỉ request cập nhật được used_at IS NULL mới hợp lệ.
+ */
+async function markTicketUsed(ticket, deviceId) {
+  if (!ticket) return false;
+  const pool = await getPool();
+  const mark = await pool.request()
     .input('tid', sql.VarChar(64), ticket)
-    .input('did', sql.VarChar(100), deviceId)
+    .input('did', sql.VarChar(100), deviceId || null)
     .query(`
       UPDATE ADMIN_2FA_TICKET
       SET used_at = GETDATE(),
           device_id = ISNULL(device_id, @did)
       WHERE ticket_id = @tid AND used_at IS NULL
+        AND expires_at >= GETDATE()
     `);
+  return Boolean(mark.rowsAffected && mark.rowsAffected[0] === 1);
+}
 
-  return {
-    valid: true,
-    userId: t.user_id,
-    deviceId: deviceId,
-    ipMismatch,
-    issuedIp: t.ip_address,
-  };
+/**
+ * Ghi nhận 1 lần quét vân tay không khớp (tăng failed_attempts).
+ * Nếu đạt 3 lần, tự động khóa ticket (used_at = GETDATE()).
+ */
+async function recordFailedScan(ticket) {
+  if (!ticket) return { failedAttempts: 0, burned: false };
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('tid', sql.VarChar(64), ticket)
+    .query(`
+      UPDATE ADMIN_2FA_TICKET
+      SET failed_attempts = failed_attempts + 1,
+          used_at = CASE WHEN failed_attempts + 1 >= 3 THEN GETDATE() ELSE used_at END
+      OUTPUT INSERTED.failed_attempts, INSERTED.used_at
+      WHERE ticket_id = @tid
+    `);
+  const row = r.recordset[0];
+  const count = row ? row.failed_attempts : 1;
+  return { failedAttempts: count, burned: count >= 3 };
+}
+
+/**
+ * Consume ticket (one-time use truyền thống, tương thích ngược).
+ */
+async function consumeTicket({ ticket, deviceId, ip }) {
+  const v = await validateTicket({ ticket, deviceId, ip });
+  if (!v.valid) return v;
+  const marked = await markTicketUsed(ticket, deviceId);
+  if (!marked) {
+    return { valid: false, reason: 'TICKET_ALREADY_USED' };
+  }
+  return v;
 }
 
 /**
@@ -166,6 +205,9 @@ async function getRecentFailures(userId, minutes = 60) {
 module.exports = {
   issueTicket,
   consumeTicket,
+  validateTicket,
+  markTicketUsed,
+  recordFailedScan,
   cleanupExpiredTickets,
   getRecentFailures,
   TICKET_TTL_SECONDS,

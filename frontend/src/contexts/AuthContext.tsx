@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types/user';
 import { authService } from '../services/authService';
+import { http } from '../services/http';
 import { ROUTE_PATHS } from '../routes/routePaths';
 
 interface AuthContextType {
@@ -92,7 +93,12 @@ export const getDestinationByRole = (user?: User | null): string => {
     return ROUTE_PATHS.DESK; // Trả về /document-desk
   }
 
-  // 4. Các trường hợp còn lại (Trợ lý, Chỉ huy, Cán bộ thường) -> Về Cổng thông tin
+  // 3b. Chỉ huy (có quyền COMMAND_VIEW, không thao tác văn bản) -> Giảng đường (có tổng quan hệ thống)
+  if (user.permissions?.includes('COMMAND_VIEW')) {
+    return ROUTE_PATHS.CLASSROOMS;
+  }
+
+  // 4. Các trường hợp còn lại (Trợ lý, Cán bộ thường) -> Về Cổng thông tin
   return ROUTE_PATHS.PORTAL;
 };
 
@@ -101,6 +107,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const navigate = useNavigate();
 
   const saveUserSession = useCallback((userData: User) => {
+    try {
+      sessionStorage.removeItem('qk7_guest_mode');
+    } catch (_) {}
     authService.saveSession(userData);
     setUser(userData);
   }, []);
@@ -128,8 +137,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [refreshProfile]);
 
+  // Nhịp tim: báo máy chủ "trình duyệt còn mở" mỗi 60s để phiên không bị coi là bỏ trống
+  // (tắt trình duyệt mà chưa đăng xuất → sau vài phút người khác đăng nhập được).
+  const heartbeatUserId = user?.user_id;
+  useEffect(() => {
+    if (!heartbeatUserId || heartbeatUserId === 'GUEST') return;
+    const beat = () => {
+      http('/api/auth/ping', { method: 'GET', silent: true, skipErrorNotification: true } as any).catch(() => {});
+    };
+    const t = setInterval(beat, 60_000);
+    return () => clearInterval(t);
+  }, [heartbeatUserId]);
+
   useEffect(() => {
     const handleExpired = () => {
+      try {
+        sessionStorage.removeItem('qk7_guest_mode');
+      } catch (_) {}
       authService.clearSession();
       setUser(null);
       navigate(ROUTE_PATHS.LOGIN, { replace: true });
@@ -146,6 +170,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           sessionStorage.removeItem('qk7_screenshot_violation_count');
           sessionStorage.removeItem('qk7_account_locked_screenshot');
+          sessionStorage.removeItem('qk7_guest_mode');
         } catch (_) {}
       }
       return res.user;
@@ -154,9 +179,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [saveUserSession]);
 
   const logout = useCallback(async () => {
-    await authService.logout();
+    try {
+      await authService.logout();
+    } catch (_) {}
+    try {
+      sessionStorage.removeItem('qk7_guest_mode');
+    } catch (_) {}
+    authService.clearSession();
     setUser(null);
-    navigate(ROUTE_PATHS.LOGIN);
+    navigate(ROUTE_PATHS.LOGIN, { replace: true });
 
     if (typeof window !== 'undefined') {
       try {
@@ -165,6 +196,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .forEach(k => sessionStorage.removeItem(k));
         sessionStorage.removeItem('qk7_screenshot_violation_count');
         sessionStorage.removeItem('qk7_account_locked_screenshot');
+        sessionStorage.removeItem('qk7_guest_mode');
 
         // Dọn dẹp an toàn các phiên bài giảng số trong localStorage khi đăng xuất
         Object.keys(localStorage)
@@ -176,14 +208,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const continueAsGuest = useCallback(() => {
     authService.clearSession();
+    try {
+      sessionStorage.setItem('qk7_guest_mode', 'true');
+    } catch (_) {}
     const guest: User = {
       user_id: 'GUEST',
       full_name: 'Đại biểu',
-      clearance_level_id: 2,
-      clearance_name: 'Nội bộ',
+      clearance_level_id: 1,
+      clearance_name: 'Công khai',
       roles: ['DELEGATE'],
       role_names: ['Đại biểu'],
-      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
+      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD', 'LECTURE_VIEW'],
     };
     setUser(guest);
     navigate(ROUTE_PATHS.PORTAL);

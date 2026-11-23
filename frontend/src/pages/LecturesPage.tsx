@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import { ROUTE_PATHS } from '../routes/routePaths';
 import {
   MonitorPlay, Plus, Search, RefreshCw, RotateCw, LayoutGrid, List,
   BookOpen, Radio, Clock, CheckCircle2, FileText, X,
@@ -14,6 +16,7 @@ import { CreateLectureModal } from '../components/lectures/CreateLectureModal';
 import { StartSessionModal } from '../components/lectures/StartSessionModal';
 import { TeachingHistoryPanel } from '../components/lectures/TeachingHistoryPanel';
 import { LectureDetailModal } from '../components/lectures/LectureDetailModal';
+import { LectureViewerModal } from '../components/lectures/LectureViewerModal';
 import { LiveSessionRoom } from '../components/lectures/LiveSessionRoom';
 import { RejectReasonModal } from '../components/lectures/RejectReasonModal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -22,7 +25,31 @@ import { RollingNumber } from '../components/common/RollingNumber';
 import { FingerprintScanModal } from '../components/users/FingerprintScanModal';
 import { Lecture, LectureStatus, Subject, TeachingSchedule } from '../types/lecture';
 
-type TabKey = 'list' | 'history';
+/**
+ * Trang Bài giảng số được chia như Văn bản số:
+ *  - list    : Danh sách bài giảng đã xuất bản — chỉ tra cứu, xem chi tiết, mở ca dạy
+ *  - compose : Soạn & duyệt bài giảng — soạn mới, chỉnh sửa, gửi duyệt, phê duyệt, thùng rác
+ *  - history : Lịch sử giảng dạy
+ */
+export type LecturesPageMode = 'list' | 'compose' | 'history';
+
+const PAGE_META: Record<LecturesPageMode, { title: string; subtitle: string; badge: string }> = {
+  list: {
+    title: 'Danh Sách Bài Giảng',
+    subtitle: 'Tra cứu bài giảng đã xuất bản và mở ca giảng dạy — Trường Quân Sự Quân Khu 7',
+    badge: 'Sẵn sàng giảng dạy',
+  },
+  compose: {
+    title: 'Soạn Và Duyệt Bài Giảng',
+    subtitle: 'Soạn bài giảng mới, gửi duyệt, phê duyệt 2 tầng và quản lý thùng rác — Trường Quân Sự Quân Khu 7',
+    badge: 'Xưởng bài giảng',
+  },
+  history: {
+    title: 'Lịch Sử Giảng Dạy',
+    subtitle: 'Các ca giảng đã thực hiện, thời lượng và sĩ số — Trường Quân Sự Quân Khu 7',
+    badge: 'Nhật ký ca dạy',
+  },
+};
 
 // ── Cụm KPI Telemetry Cards chuẩn Quân Đội (Đồng bộ hiệu ứng Rolling cơ học Tổng Quan) ──
 const TacticalKpiCard: React.FC<{
@@ -84,10 +111,11 @@ const TacticalKpiCard: React.FC<{
   );
 };
 
-export const LecturesPage: React.FC = () => {
+export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'list' }) => {
   const { user, hasPermission, isAdmin } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<TabKey>('list');
+  // Đường dẫn cũ /lectures?tab=history → chuyển sang trang Lịch sử giảng dạy riêng
+  const [searchParams] = useSearchParams();
   const [kpiRefreshKey, setKpiRefreshKey] = useState(0);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,12 +124,13 @@ export const LecturesPage: React.FC = () => {
   const [subjectFilter, setSubjectFilter] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 9;
+  const PAGE_SIZE = 30;
 
   // Modals
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [startSessionLecture, setStartSessionLecture] = useState<Lecture | null>(null);
   const [viewingLecture, setViewingLecture] = useState<Lecture | null>(null);
+  const [readingLecture, setReadingLecture] = useState<Lecture | null>(null);
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
 
   // Trạng thái chờ quét vân tay để mở ca dạy đối với bài giảng Cấp 3+
@@ -135,18 +164,19 @@ export const LecturesPage: React.FC = () => {
     if (isAdmin) return true;
     const roles = user.roles || [];
     const pos = (user.position || '').toLowerCase();
-    if (roles.includes('ROL-02') || roles.includes('ROL-06')) return true;
+    if (roles.includes('ROL-02')) return true;
     return pos.includes('trưởng bộ môn') || pos.includes('trưởng khoa') || pos.includes('trưởng phòng');
   }, [user, isAdmin]);
 
   const canCreate        = hasPermission('LECTURE_CREATE');
-  const canApprove       = hasPermission('LECTURE_APPROVE');
+  // Quy tắc thống nhất: chỉ Admin (ROL-01) và Chỉ huy (ROL-02) được duyệt (backend cũng chặn lại)
+  const canApprove       = hasPermission('LECTURE_APPROVE') && (isAdmin || (user?.roles || []).includes('ROL-02'));
   const canStartSchedule = hasPermission('SCHEDULE_START');
 
   const canArchive = useMemo(() => {
     if (isAdmin) return true;
     const roles = user?.roles || [];
-    return roles.includes('ROL-01') || roles.includes('ROL-02') || roles.includes('ROL-06');
+    return roles.includes('ROL-01') || roles.includes('ROL-02');
   }, [user, isAdmin]);
 
   const canForceEnd = useMemo(() => {
@@ -176,9 +206,12 @@ export const LecturesPage: React.FC = () => {
     if (!silent) setLoading(true);
     try {
       // Backend ẩn DELETED mặc định → cần gọi thêm 1 lần với status=DELETED
+      // Thùng rác chỉ cần ở trang Soạn & duyệt
       const [normalRes, deletedRes] = await Promise.all([
         lectureService.list(),
-        lectureService.list({ status: 'DELETED' }),
+        mode === 'compose'
+          ? lectureService.list({ status: 'DELETED' })
+          : Promise.resolve({ items: [] as Lecture[], total: 0 }),
       ]);
       setAllLectures([
         ...(normalRes.items  || []),
@@ -189,7 +222,7 @@ export const LecturesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     loadLectures();
@@ -276,7 +309,9 @@ export const LecturesPage: React.FC = () => {
 
   // ── Lọc tức thì trên Client (Zero-Latency / Smooth Transition, triệt tiêu giật màn hình) ──
   const filteredLectures = useMemo(() => {
-    return allLectures.filter(lec => {
+    // Trang Danh sách chỉ hiện bài đã xuất bản; bản nháp/chờ duyệt/thùng rác nằm ở trang Soạn & duyệt
+    const base = mode === 'list' ? allLectures.filter(l => l.status === 'PUBLISHED') : allLectures;
+    return base.filter(lec => {
       // 1. Lọc theo trạng thái từ chip Lọc nhanh
       if (statusFilter && lec.status !== statusFilter) return false;
       // 2. Lọc theo môn học
@@ -292,12 +327,12 @@ export const LecturesPage: React.FC = () => {
       }
       return true;
     });
-  }, [allLectures, statusFilter, subjectFilter, searchQuery]);
+  }, [allLectures, statusFilter, subjectFilter, searchQuery, mode]);
 
-  // Tự động chuyển về trang 1 khi thay đổi điều kiện lọc
+  // Tự động chuyển về trang 1 khi thay đổi điều kiện lọc hoặc chế độ xem
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, subjectFilter, searchQuery]);
+  }, [mode, statusFilter, subjectFilter, searchQuery]);
 
   // ── Pagination ──
   const totalPages    = Math.max(1, Math.ceil(filteredLectures.length / PAGE_SIZE));
@@ -462,17 +497,17 @@ export const LecturesPage: React.FC = () => {
     }
   };
 
-  const tabs: { key: TabKey; label: string; icon: any; visible: boolean; badge?: string }[] = [
-    { key: 'list',    label: 'Danh sách bài giảng',  icon: BookOpen, visible: true },
-    { key: 'history', label: 'Lịch sử giảng dạy',    icon: Clock,    visible: true },
-  ];
-  const visibleTabs = tabs.filter(t => t.visible);
+  const meta = PAGE_META[mode];
+  const HeroIcon = mode === 'history' ? Clock : mode === 'compose' ? FileText : BookOpen;
+  const isGuest = !user || user.user_id === 'GUEST';
 
-  useEffect(() => {
-    if (!visibleTabs.find(t => t.key === activeTab)) {
-      setActiveTab(visibleTabs[0]?.key || 'list');
-    }
-  }, [visibleTabs, activeTab]);
+  if (isGuest && mode === 'history') {
+    return <Navigate to={ROUTE_PATHS.LECTURES} replace />;
+  }
+
+  if (!isGuest && mode === 'list' && searchParams.get('tab') === 'history') {
+    return <Navigate to={ROUTE_PATHS.LECTURES_HISTORY} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-200 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
@@ -491,25 +526,25 @@ export const LecturesPage: React.FC = () => {
       <div className={activeSession ? 'hidden' : 'contents'}>
         <Header activeNav="lectures" title="Trường Quân Sự Quân Khu 7" subtitle="Trung tâm dữ liệu số" />
 
-        <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 w-full max-w-7xl mx-auto space-y-6">
+        <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 w-full max-w-[1440px] mx-auto space-y-6">
 
           {/* Hero Header trang nghiêm chuẩn Quân đội */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-[#111827] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-[#166534]/15 border border-[#166534]/30 dark:bg-emerald-500/15 dark:border-emerald-500/30 flex items-center justify-center shrink-0 shadow-xs">
-                <MonitorPlay className="w-6 h-6 text-[#166534] dark:text-emerald-400" />
+                <HeroIcon className="w-6 h-6 text-[#166534] dark:text-emerald-400" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    Phân Hệ Bài Giảng Số
+                    {meta.title}
                   </h1>
                   <span className="hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30">
-                    Học Viện Số
+                    {meta.badge}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Quản trị bài giảng điện tử, quy trình duyệt 2 tầng và sơ đồ giám sát giảng đường — Trường Quân Sự Quân Khu 7
+                  {meta.subtitle}
                 </p>
               </div>
             </div>
@@ -530,7 +565,7 @@ export const LecturesPage: React.FC = () => {
                 <span>Làm mới</span>
               </button>
 
-              {canCreate && (
+              {mode === 'compose' && canCreate && (
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(true)}
@@ -543,7 +578,23 @@ export const LecturesPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Thông báo chế độ Đại biểu tham quan */}
+          {(user?.user_id === 'GUEST' || !user || !user.user_id) && (
+            <div className="px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-300">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="font-medium">
+                  <strong>Chế độ Đại biểu tham quan:</strong> Đồng chí đang xem các bài giảng điện tử đã xuất bản ở cấp độ <strong>Công khai (Cấp 1)</strong> của Trường Quân sự Quân khu 7.
+                </span>
+              </div>
+              <span className="hidden sm:inline-block font-mono text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-md font-bold uppercase shrink-0">
+                Chỉ đọc
+              </span>
+            </div>
+          )}
+
           {/* Cụm KPI Telemetry Cards tích hợp RollingNumber cuộn số cơ học như Tổng Quan */}
+          {mode === 'compose' && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
             <TacticalKpiCard
               label="Tổng số bài giảng"
@@ -583,40 +634,10 @@ export const LecturesPage: React.FC = () => {
             />
           </div>
 
-          {/* Thanh Tab Segmented Glider dạng Viên Thuốc */}
-          <div className="bg-slate-200/80 dark:bg-slate-900/90 p-1 rounded-2xl border border-slate-300/80 dark:border-white/[0.08] inline-flex items-center gap-1 max-w-full overflow-x-auto shadow-2xs">
-            {visibleTabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(tab.key);
-                    setKpiRefreshKey(prev => prev + 1);
-                  }}
-                  className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap select-none relative ${
-                    isActive
-                      ? 'bg-white dark:bg-[#111827] text-[#166534] dark:text-emerald-400 shadow-sm border border-slate-200/80 dark:border-white/[0.08]'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-[#166534] dark:text-emerald-400' : 'text-slate-400'}`} />
-                  <span>{tab.label}</span>
-                  {tab.badge && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                      {tab.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          )}
 
           {/* ── TAB 1: DANH SÁCH BÀI GIẢNG ── */}
-          {activeTab === 'list' && (
+          {mode !== 'history' && (
             <div className="space-y-4">
               {/* Thanh công cụ tìm kiếm và bộ lọc */}
               <div className="bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200 dark:border-white/[0.08] flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shadow-xs">
@@ -641,6 +662,7 @@ export const LecturesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  {mode === 'compose' && (
                   <select
                     value={statusFilter}
                     onChange={e => setStatusFilter(e.target.value as LectureStatus | '')}
@@ -655,6 +677,7 @@ export const LecturesPage: React.FC = () => {
                     <option value="ARCHIVED">Lưu trữ</option>
                     <option value="DELETED">🗑️ Thùng rác (Đã xóa)</option>
                   </select>
+                  )}
 
                   <select
                     value={subjectFilter}
@@ -689,6 +712,7 @@ export const LecturesPage: React.FC = () => {
                 </div>
               </div>
 
+              {mode === 'compose' && (<>
               {/* Quick Filter Chips: Lọc nhanh 1 chạm theo trạng thái */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs select-none">
                 <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mr-1 shrink-0">
@@ -725,6 +749,7 @@ export const LecturesPage: React.FC = () => {
                   );
                 })}
               </div>
+              </>)}
 
               {/* Danh sách bài giảng */}
               {loading && allLectures.length === 0 ? (
@@ -741,6 +766,8 @@ export const LecturesPage: React.FC = () => {
                         ? 'Thùng rác đang trống. Các bài giảng đã xóa mềm sẽ xuất hiện ở đây và có thể khôi phục hoặc xóa vĩnh viễn.'
                         : searchQuery || statusFilter || subjectFilter
                         ? 'Không có bài giảng nào khớp với các tiêu chí tìm kiếm hoặc bộ lọc hiện tại. Đồng chí vui lòng đặt lại bộ lọc.'
+                        : mode === 'list'
+                        ? 'Hiện chưa có bài giảng nào được xuất bản trong phạm vi của đồng chí. Bài giảng mới soạn nằm ở mục "Soạn và duyệt bài giảng".'
                         : canCreate
                         ? 'Kho bài giảng số của Nhà trường đang sẵn sàng. Đồng chí hãy bắt đầu khởi tạo bài giảng đầu tiên bằng nút "Soạn bài giảng mới".'
                         : 'Hiện chưa có bài giảng nào được phân công hoặc xuất bản trong phân hệ.'
@@ -762,6 +789,7 @@ export const LecturesPage: React.FC = () => {
                     <LectureCard
                       key={lec.lecture_id}
                       lecture={lec}
+                      mode={mode === 'compose' ? 'compose' : 'list'}
                       viewMode={viewMode}
                       currentUserId={user?.user_id}
                       isAdmin={isAdmin}
@@ -777,6 +805,7 @@ export const LecturesPage: React.FC = () => {
                       onPurge={() => handlePurge(lec)}
                       onEdit={() => handleEditClick(lec)}
                       onView={() => setViewingLecture(lec)}
+                      onRead={() => setReadingLecture(lec)}
                       onStartSession={() => {
                         // KIỂM TRA CẤP ĐỘ BẢO MẬT
                         if (lec.security_level_id >= 3) {
@@ -792,19 +821,19 @@ export const LecturesPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Phân trang tinh gọn */}
+              {/* Phân trang tinh gọn chuẩn tối đa 30 bài giảng / trang */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
                   <div>
-                    Đang hiển thị trang <strong className="text-slate-800 dark:text-slate-200">{currentPage}</strong> / {totalPages}
-                    {' '}— Tổng số <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{filteredLectures.length}</strong> bài giảng
+                    Đang hiển thị bài <strong className="text-slate-800 dark:text-slate-200 font-bold">{(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredLectures.length)}</strong> / {filteredLectures.length}
+                    {' '}— Tổng số <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{filteredLectures.length}</strong> bài giảng (Trang {currentPage}/{totalPages})
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setPage(Math.max(1, currentPage - 1))}
                       disabled={currentPage <= 1}
-                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium"
+                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
                     >
                       Trang trước
                     </button>
@@ -815,7 +844,7 @@ export const LecturesPage: React.FC = () => {
                       type="button"
                       onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
                       disabled={currentPage >= totalPages}
-                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium"
+                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
                     >
                       Trang sau
                     </button>
@@ -826,7 +855,7 @@ export const LecturesPage: React.FC = () => {
           )}
 
           {/* ── TAB 2: LỊCH SỬ GIẢNG DẠY ── */}
-          {activeTab === 'history' && <TeachingHistoryPanel />}
+          {mode === 'history' && <TeachingHistoryPanel />}
         </main>
       </div>
 
@@ -874,6 +903,18 @@ export const LecturesPage: React.FC = () => {
         open={!!viewingLecture}
         lecture={viewingLecture}
         onClose={() => setViewingLecture(null)}
+        onOpenReader={() => {
+          if (viewingLecture) {
+            setReadingLecture(viewingLecture);
+          }
+        }}
+      />
+
+      {/* Modal Đọc / Xem Bài Giảng Số Trực Tuyến */}
+      <LectureViewerModal
+        open={!!readingLecture}
+        lecture={readingLecture}
+        onClose={() => setReadingLecture(null)}
       />
 
       {/* Modal từ chối phê duyệt (thay thế window.prompt) */}

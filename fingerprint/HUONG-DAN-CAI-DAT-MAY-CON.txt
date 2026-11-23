@@ -1,0 +1,152 @@
+HUONG DAN CAI QK7 FINGERPRINT AGENT CHO MAY CON
+================================================
+(Tai lieu nay duoc viet dua tren ma nguon: build_exe.py, build_setup.py,
+installer_setup.py, agent.py. Chua duoc thu tren may that.)
+
+
+1. TONG QUAN
+------------
+QK7AgentSetup.exe cai "QK7 Fingerprint Agent" len may con, de trang QK7 DataHub
+doc duoc van tay tu dau doc ZKTeco ZK9500 cam vao may do.
+
+- Khong can quyen admin.
+- Khong can cai Python tren may con.
+- Bo cai KHONG cai driver ZKTeco. Driver phai cai tay (xem muc 3).
+
+May con moi can du 3 thu:
+  a) Dau doc ZK9500 da cam USB va da cai driver ZKTeco.
+  b) Duong mang toi may chu 192.168.1.229 qua cong 8000.
+  c) File QK7AgentSetup.exe da build san tu may chu (muc 2).
+
+
+2. PHAN A - CHUAN BI TREN MAY CHU VA BUILD BO CAI (lam mot lan)
+---------------------------------------------------------------
+Build mot lan la dung duoc cho moi may con. Bo cai da goi san: dia chi may chu,
+BRIDGE_TOKEN, rootCA.pem, cert.pem va private-key.pem cua agent.
+
+May build can co:
+  1. BRIDGE_TOKEN trong backend/.env, dai tu 16 ky tu tro len, va GIONG token
+     dang chay tren may chu.
+  2. fingerprint/cert.pem va fingerprint/private-key.pem.
+     Tao bang:  mkcert 127.0.0.1 localhost   (roi doi ten file thanh
+     cert.pem / private-key.pem).
+  3. rootCA.pem cua mkcert, mac dinh o:
+     %LOCALAPPDATA%\mkcert\rootCA.pem
+  4. Python co pyinstaller va cac thu vien trong fingerprint/requirements.txt.
+
+Chay lenh trong thu muc fingerprint:
+
+    python build_setup.py --server 192.168.1.229
+
+Ket qua: fingerprint\dist\QK7AgentSetup.exe
+
+Luu y:
+  - Backend tren may chu phai la ban moi co agent-crypto.js va fingerprint-ws.js,
+    neu khong agent moi se khong xac thuc duoc voi may chu.
+  - BRIDGE_TOKEN nam ngay trong file exe: chi chia se file nay trong mang noi bo
+    tin cay.
+  - Doi IP may chu thi phai build lai (dia chi da goi san trong exe).
+  - Chi can copy file QK7AgentSetup.exe. KHONG copy installer_setup.py: do chi
+    la ma nguon, no can QK7FingerprintAgent.exe di kem.
+
+
+3. PHAN B - CHUAN BI TREN MAY CON MOI
+-------------------------------------
+  [ ] He dieu hanh Windows.
+  [ ] Dau doc ZKTeco ZK9500 da cam vao cong USB.
+  [ ] Da cai driver ZKTeco (bo ZKFinger SDK / driver cua hang).
+      Day la viec duy nhat phai cai tay.
+  [ ] May con truy cap duoc may chu: mo https://192.168.1.229:8000 tren trinh
+      duyet cua may con de thu.
+
+Khong can cai Python, khong can quyen admin, khong can copy file nao ngoai
+QK7AgentSetup.exe. Dung copy device_id.txt tu may khac: moi may phai co ma
+thiet bi rieng.
+
+
+4. PHAN C - CAC BUOC CAI DAT
+----------------------------
+  1. Copy QK7AgentSetup.exe sang may con (USB hoac thu muc chia se noi bo).
+  2. Cam dau doc ZK9500 va dam bao driver da nhan thiet bi.
+  3. Chay QK7AgentSetup.exe, bam Yes khi hoi cai vao %LOCALAPPDATA%\QK7Agent.
+  4. Bo cai tu lam: chep agent va Uninstall.exe vao thu muc tren, tao shortcut
+     o Start Menu va Desktop, dang ky tu chay cung Windows, them muc go cai dat
+     vao Settings > Apps, roi khoi dong agent.
+  5. Agent mo mot cua so console. GIU CUA SO NAY MO trong luc dung.
+  6. Lan dau, neu Windows hoi cai chung chi, bam Yes, roi dong va mo lai
+     trinh duyet.
+
+Cai khong hoi:      QK7AgentSetup.exe /silent
+Tu cac lan dang nhap Windows sau, agent tu chay lai.
+
+
+5. PHAN D - KIEM TRA SAU KHI CAI
+--------------------------------
+  Tren may con   : mo https://127.0.0.1:9001/device-id
+                   -> thay ma thiet bi nghia la agent dang chay.
+  Tren may chu   : mo /api/fingerprint/agents-online
+                   -> danh sach co may con vua cai.
+  Tren may con   : chay fingerprint\kiem-tra-ket-noi.bat (neu co)
+                   -> khong bao loi ket noi hay chung chi.
+
+Cua so console cua agent hien dong "WS connected" la binh thuong.
+
+
+6. PHAN E - LOI THUONG GAP
+--------------------------
+Dau hieu                                   | Nguyen nhan / Cach xu ly
+-------------------------------------------|---------------------------------
+"Server khong xac thuc duoc (sai           | Token trong exe khac may chu.
+BRIDGE_TOKEN...)"                          | -> Build lai bo cai voi token dung.
+Thieu driver / khong thay ZK9500           | Chua cai driver hoac chua cam USB.
+                                           | -> Cai driver, cam lai, chay lai.
+Trinh duyet canh bao chung chi             | Chua tin chung chi goc may chu.
+                                           | -> Bam Yes khi Windows hoi, mo lai
+                                           |    trinh duyet.
+Agent khong noi duoc may chu               | Sai IP trong exe hoac cong 8000 bi
+                                           | chan. -> Kiem tra mang; doi IP thi
+                                           | build lai.
+Cong 9001 bi chiem                         | Agent tu tat tien trinh dang giu cong
+                                           | do. Chay lai neu can.
+Hai may cung ma thiet bi                   | Da copy device_id.txt tu may khac.
+                                           | -> Xoa device_id.txt, agent tao ma
+                                           |    moi.
+
+
+7. FILE QK7AgentSetup.exe BI PHAN MEM DIET VIRUS CANH BAO
+---------------------------------------------------------
+Thuong la canh bao nham, nhung can kiem tra. Ly do thuong gap:
+  - File khong co chu ky so (code signing), nen SmartScreen khong biet nha
+    phat hanh.
+  - Dong goi bang PyInstaller dang mot file: ma doc cung hay dung cach nay.
+  - Hanh vi giong phan mem doc hai: tu dang ky chay cung Windows (khoa Run),
+    taskkill, goi PowerShell tao shortcut, mang theo chung chi va token.
+  - Tai qua trinh duyet bi gan nhan "tai tu Internet".
+
+Cach xu ly, tu an toan den it an toan:
+  1. Dua file len VirusTotal. 1-3 cong cu bao ten chung chung (Generic, Heur)
+     thuong la canh bao nham. Nhieu cong cu noi tieng cung bao thi dung lai va
+     build lai tu ma goc tren may sach.
+  2. Chuyen file bang thu muc chia se noi bo hoac USB, khong tai qua trinh duyet.
+  3. Them ngoai le CO PHAM VI HEP cho dung file hoac thu muc
+     %LOCALAPPDATA%\QK7Agent. Dung tat diet virus toan may.
+  4. Lau dai: ky so file bang chung chi code signing (voi mang noi bo co the dung
+     chung chi do CA noi bo cap va phan phoi chung chi do cho cac may).
+
+Gui kem ma bam de nguoi nhan doi chieu:
+    certutil -hashfile QK7AgentSetup.exe SHA256
+
+
+8. GO CAI DAT VA GHI CHU BAO MAT
+--------------------------------
+Go cai dat: vao Settings > Apps, go "QK7 Fingerprint Agent", hoac chay:
+    QK7AgentSetup.exe /uninstall
+Thao tac nay tat agent, xoa shortcut, bo muc tu chay va xoa thu muc
+%LOCALAPPDATA%\QK7Agent.
+
+Ghi chu bao mat:
+  - File exe chua BRIDGE_TOKEN. Chi chia se trong mang noi bo tin cay, khong gui
+    qua kenh cong khai.
+  - Chi copy rootCA.pem (phan cong khai), KHONG BAO GIO copy rootCA-key.pem.
+  - Neu nghi ngo token bi lo: doi BRIDGE_TOKEN tren may chu, build lai va cai lai
+    cho tat ca may con.

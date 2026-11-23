@@ -7,7 +7,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;   // ← đổi thành 5 * 60 * 1000
 const cache = new Map(); // userId → { codes, loadedAt }
 
 module.exports = function createPermissionsModule({
-  sql, getPool, writeAccessLog, getClientIp,
+  sql, getPool, writeAccessLog, getClientIp, getViewGate,
 }) {
   async function getUserPermissions(userId) {
     if (!userId) return [];
@@ -83,6 +83,9 @@ module.exports = function createPermissionsModule({
             required_permission: requiredCode,
           });
         }
+        // Tầng 2: quyền XEM bị khóa bảo vệ → phải được duyệt cho đối tượng này
+        const gate = typeof getViewGate === 'function' ? getViewGate() : null;
+        if (gate && !(await gate(req, res, [requiredCode]))) return;
         next();
       } catch (err) {
         console.error('[requirePermission]', err);
@@ -107,6 +110,8 @@ module.exports = function createPermissionsModule({
             required_permissions: requiredCodes,
           });
         }
+        const gate = typeof getViewGate === 'function' ? getViewGate() : null;
+        if (gate && !(await gate(req, res, requiredCodes.filter((c) => codes.includes(c))))) return;
         next();
       } catch (err) {
         res.status(500).json({ error: err.message });

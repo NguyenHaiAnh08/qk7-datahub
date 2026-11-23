@@ -22,6 +22,10 @@ export interface Lecture {
   author_rank?: string;
   faculty_unit_id: string;
   faculty_name?: string;
+  /** Bài của đơn vị ngang cấp (cùng đơn vị cha) — được xem và mở ca */
+  peer_unit?: boolean;
+  /** Được mở ca dạy: bài thuộc đơn vị của mình hoặc cùng khoa (không chỉ tác giả) */
+  can_teach?: boolean;
   security_level_id: number;
   security_name?: string;
   content_type: ContentType;
@@ -39,6 +43,15 @@ export interface Lecture {
   venue_name?: string;
   created_at: string;
   updated_at: string;
+}
+
+/** Khu giảng đường (bảng CLASSROOM_BUILDING) — quản lý trong Quản trị */
+export interface ClassroomBuilding {
+  building_code: string;
+  building_name: string;
+  display_order: number;
+  active: boolean;
+  room_count: number;
 }
 
 export interface Subject {
@@ -64,6 +77,8 @@ export interface TrainingClass {
 export interface TeachingSchedule {
   schedule_id: string;
   lecture_id: string;
+  room_id?: string;
+  is_restricted?: boolean;
   lecture_title?: string;
   subject_name?: string;
   presenter_id: string;
@@ -87,6 +102,7 @@ export interface TeachingSchedule {
   is_hanging?: boolean;
   quiz_activated_count?: number;
   quiz_total_count?: number;
+  content_type?: string;
 }
 
 export interface LectureListFilters {
@@ -108,10 +124,25 @@ export interface CreateLecturePayload {
 export interface StartSchedulePayload {
   lecture_id: string;
   class_id: string;
-  venue_name: string;
+  /** Mã giảng đường, chọn từ danh sách (không nhập tay) */
+  room_id: string;
   student_count: number;
   session_type?: SessionType;
   note?: string;
+}
+
+/** Giảng đường chọn được khi mở ca (GET /api/lectures/catalogs/rooms) */
+export interface LectureRoomOption {
+  room_id: string;
+  room_name: string;
+  room_type?: string;
+  capacity?: number | null;
+  building_code: string;
+  building_name: string;
+  is_maintenance: boolean;
+  maintenance_reason?: string | null;
+  /** Đang có ca giảng dạy diễn ra trong phòng */
+  is_busy: boolean;
 }
 
 export interface HistoryKpi {
@@ -223,6 +254,7 @@ export interface RadarSessionSummary {
   slide_index?: number;
   slide_total?: number;
   scorm_progress?: number;
+  current_page?: number;
   is_hanging?: boolean;
   content_type?: ContentType;
   subject_name?: string;

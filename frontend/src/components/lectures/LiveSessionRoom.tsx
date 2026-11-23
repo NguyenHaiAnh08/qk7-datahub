@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { Lecture, TeachingSchedule } from '../../types/lecture';
 import { http, getAuthHeaders } from '../../services/http';
+import { PdfPagesViewer } from '../document-desk/PdfPagesViewer';
+import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
 
 interface Props {
   open: boolean;
@@ -57,6 +59,15 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
   const [pdfUrl, setPdfUrl] = useState<string>('');
   const [pdfError, setPdfError] = useState<string>('');
 
+  // ⭕ Document Reading Completion Ring cho bài giảng số dạng PDF
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress>({
+    currentPage: 1,
+    totalPages: 1,
+    percent: 0,
+    isCompleted: false,
+  });
+  const pdfViewerRef = useRef<{ scrollToPage: (page: number) => void; scrollToTop: () => void; scrollToNext: () => void; scrollToBottom: () => void } | null>(null);
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastSentProgress = useRef<{ index: number; total: number } | null>(null);
   const modesRef = useRef<ModeItem[]>([]);
@@ -70,6 +81,12 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
     setSelectedFile('');
     setModes([]);
     lastSentProgress.current = null;
+    setReadingProgress({
+      currentPage: 1,
+      totalPages: 1,
+      percent: 0,
+      isCompleted: false,
+    });
   }, [lecture?.lecture_id]);
 
   // Nạp PDF giáo án: GET /api/lectures/:id/pdf (kèm Authorization + token vân tay của bài giảng nếu có)
@@ -231,6 +248,28 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
       }
     },
     [session.schedule_id]
+  );
+
+  // 🎯 CẬP NHẬT TIẾN ĐỘ BÀI GIẢNG PDF QUA DOCUMENT READING COMPLETION RING
+  const handlePdfProgressChange = useCallback(
+    (prog: ReadingProgress) => {
+      setReadingProgress(prog);
+      if (!session?.schedule_id) return;
+      const safeTotal = Math.max(1, prog.totalPages);
+      const safeCurrent = Math.max(1, Math.min(prog.currentPage, safeTotal));
+      const percentRatio = Math.max(0, Math.min(1, +(prog.percent / 100).toFixed(4)));
+
+      // Gửi tiến độ giảng dạy lên Backend khi trang thay đổi hoặc % thay đổi
+      if (
+        !lastSentProgress.current ||
+        lastSentProgress.current.index !== safeCurrent ||
+        lastSentProgress.current.total !== safeTotal
+      ) {
+        lastSentProgress.current = { index: safeCurrent, total: safeTotal };
+        sendRealProgress(safeCurrent, safeTotal, percentRatio);
+      }
+    },
+    [session?.schedule_id, sendRealProgress]
   );
 
   // 🔄 ĐỒNG BỘ HEADER KHI NGƯỜI DÙNG CLICK LIÊN KẾT TRONG MENU TỔNG HỢP (index.html)
@@ -486,19 +525,25 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
       }
       return (
         <div className="relative w-full h-full bg-slate-100 dark:bg-slate-950">
-          {!iframeLoaded && (
+          {pdfUrl ? (
+            <div className="w-full h-full relative overflow-hidden">
+              <PdfPagesViewer
+                blobUrl={pdfUrl}
+                fileId={lecture.lecture_id}
+                securityLevel={lecture.security_level_id || 1}
+                isHighlighterActive={false}
+                highlighterColor="#fbbf24"
+                onReadingProgressChange={handlePdfProgressChange}
+                viewerRef={pdfViewerRef}
+                showFloatingProgressRing={true}
+              />
+            </div>
+          ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/90 dark:bg-slate-950/90 text-slate-700 dark:text-slate-300 z-10 backdrop-blur-xs">
               <Loader2 className="w-8 h-8 text-emerald-600 dark:text-emerald-500 animate-spin" />
               <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Đang nạp tài liệu giáo án PDF...</p>
             </div>
           )}
-          {pdfUrl && <iframe
-            key={`pdf-${reloadKey}`}
-            src={pdfUrl}
-            onLoad={() => setIframeLoaded(true)}
-            className="w-full h-full border-0 bg-white dark:bg-slate-900"
-            title="PDF Viewer"
-          />}
         </div>
       );
     }
@@ -633,8 +678,26 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
           </div>
         )}
 
-        {/* Cụm điều khiển thời lượng & kết thúc */}
+        {/* Cụm điều khiển thời lượng, tiến độ giảng dạy & kết thúc */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* ⭕ Document Reading Completion Ring cho bài giảng số dạng PDF */}
+          {lecture.content_type === 'PDF' && pdfUrl && (
+            <DocumentReadingRing
+              currentPage={readingProgress.currentPage}
+              totalPages={readingProgress.totalPages}
+              percent={readingProgress.percent}
+              isCompleted={readingProgress.isCompleted}
+              variant="header"
+              onClick={() => {
+                if (readingProgress.currentPage > 1 || readingProgress.percent > 0) {
+                  pdfViewerRef.current?.scrollToTop();
+                } else {
+                  pdfViewerRef.current?.scrollToNext();
+                }
+              }}
+            />
+          )}
+
           <div
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-mono font-bold transition-colors ${
               isOverLimit

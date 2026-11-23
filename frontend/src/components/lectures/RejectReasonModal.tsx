@@ -83,13 +83,16 @@ export const RejectReasonModal: React.FC<RejectReasonModalProps> = ({
           </div>
 
           {/* Thông tin bài giảng tóm tắt */}
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.08] mb-4 text-xs space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/[0.08] mb-4 text-xs space-y-1 min-w-0 overflow-hidden">
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold shrink-0">
                 {lecture.lecture_code}
               </span>
-              <span className="text-slate-400">•</span>
-              <span className="text-slate-700 dark:text-slate-300 font-semibold truncate">
+              <span className="text-slate-400 shrink-0">•</span>
+              <span
+                className="text-slate-700 dark:text-slate-300 font-semibold line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0 flex-1"
+                title={lecture.title}
+              >
                 {lecture.title}
               </span>
             </div>

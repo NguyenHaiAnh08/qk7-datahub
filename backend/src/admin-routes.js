@@ -1,5 +1,5 @@
 // src/admin-routes.js
-const bcrypt = require('bcryptjs');
+const bcrypt = require('./bcrypt-lib');
 const { AUTO_PERMISSIONS, getAutoRequiredPermission } = require('./route-permissions');
 let invalidateCatalogCache;
 try {
@@ -41,7 +41,7 @@ module.exports = (app, deps) => {
     
 
     const approvalModule = require('./approval-workflow')({
-        sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission,
+        sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission, getUserPermissions,
     });
     const { approvalInterceptor, loadProtectedPermissions, isProtectedAdmin } = approvalModule;
 
@@ -106,13 +106,16 @@ module.exports = (app, deps) => {
           WHERE p.requester_id = @uid
         `;
         if (status === 'PENDING_REJECTED') {
-          propQuery += ` AND p.status IN ('PENDING', 'REJECTED')`;
+          propQuery += ` AND p.status IN ('PENDING_OWNER', 'PENDING', 'REJECTED')`;
         } else if (status === 'APPROVED') {
           propQuery += ` AND p.status IN ('APPROVED', 'EXECUTED')`;
+        } else if (status === 'PENDING') {
+          propQuery += ` AND p.status IN ('PENDING_OWNER', 'PENDING')`;
         } else if (status !== 'ALL') {
           propQuery += ` AND p.status = @pstatus`;
           propReq.input('pstatus', sql.VarChar(20), status);
         }
+        propQuery += ` AND p.status <> 'CANCELLED'`; // đề xuất đã rút lại không hiện trong danh sách
         propQuery += ` ORDER BY p.created_at DESC`;
         const propResult = await propReq.query(propQuery);
 
@@ -126,12 +129,13 @@ module.exports = (app, deps) => {
             http_method: 'PUT',
             http_path: `/api/documents/${p.file_id}`,
             target_summary: `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
-            status: p.status,
+            status: p.status === 'PENDING_OWNER' ? 'PENDING' : p.status,
+            stage: p.status === 'PENDING_OWNER' ? 'WAITING_OWNER' : undefined,
             reviewed_by: p.reviewed_by,
             reviewed_at: p.reviewed_at,
             review_note: p.review_note,
             created_at: p.created_at,
-            request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+            request_reason: (p.status === 'PENDING_OWNER' ? '[Đang chờ người đăng văn bản xem xét] ' : '') + (p.note || 'Đề xuất chuẩn hóa thông tin văn bản'),
             document_code: docCodeDisplay,
             doc_title: p.title,
           };
@@ -191,7 +195,11 @@ module.exports = (app, deps) => {
 
         try {
             const codes = await getUserPermissions(req.user.user_id);
-            if (codes.includes(requiredPerm)) return next();
+            if (codes.includes(requiredPerm)) {
+                // Tầng 2: quyền XEM bị khóa bảo vệ → cần được duyệt cho đối tượng này
+                if (!(await approvalModule.enforceViewGate(req, res, [requiredPerm]))) return;
+                return next();
+            }
             return res.status(403).json({
                 error: `Bạn không có quyền thực hiện thao tác này (thiếu: ${requiredPerm})`,
                 code: 'PERMISSION_DENIED',
@@ -806,6 +814,93 @@ module.exports = (app, deps) => {
         } catch (err) {
             console.error('[assign-role]', err);
             res.status(500).json({ error: err.message });
+        }
+    });
+
+    // PUT — đặt tập vai trò của user trong 1 transaction. Quyền của user = HỢP quyền của mọi vai trò.
+    // Vai trò đang giữ được GIỮ NGUYÊN (kể cả hạn dùng riêng); chỉ gỡ vai trò không còn trong danh sách
+    // và thêm vai trò mới (expires_at nếu có chỉ áp cho vai trò mới thêm).
+    app.put('/api/admin/users/:id/roles', async (req, res) => {
+        const userId = req.params.id;
+        const { roles, expires_at } = req.body || {};
+        if (!Array.isArray(roles) || roles.some(r => typeof r !== 'string' || !r.trim())) {
+            return res.status(400).json({ error: 'roles phải là mảng role_id hợp lệ', code: 'INVALID_ROLES' });
+        }
+        const newRoles = [...new Set(roles.map(r => r.trim()))];
+        let tx;
+        try {
+            const pool = await getPool();
+            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+
+            const userChk = await pool.request().input('u', sql.VarChar(50), userId)
+                .query(`SELECT user_id FROM [USER] WHERE user_id = @u`);
+            if (!userChk.recordset.length) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+            const curRes = await pool.request().input('u', sql.VarChar(50), userId)
+                .query(`SELECT role_id FROM USER_ROLE WHERE user_id = @u`);
+            const currentRoles = curRes.recordset.map(r => r.role_id);
+            const targetIsAdmin = currentRoles.includes('ROL-01');
+            const touchesAdmin = targetIsAdmin !== newRoles.includes('ROL-01');
+
+            if (!callerIsAdmin) {
+                if (targetIsAdmin) return res.status(403).json({ error: 'Người dùng có vai trò Quản trị viên, không thể sửa', code: 'ADMIN_ROLE_LOCKED' });
+                if (touchesAdmin) return res.status(403).json({ error: 'Chỉ Admin mới có thể gán vai trò Admin (ROL-01)', code: 'PERMISSION_DENIED' });
+                if (userId === req.user.user_id) return res.status(403).json({ error: 'Không thể tự thay đổi vai trò của chính mình', code: 'PERMISSION_DENIED' });
+            }
+
+            if (newRoles.length) {
+                const valid = await pool.request().query(`SELECT role_id FROM [ROLE]`);
+                const known = new Set(valid.recordset.map(r => r.role_id));
+                const bad = newRoles.filter(r => !known.has(r));
+                if (bad.length) return res.status(400).json({ error: `Vai trò không tồn tại: ${bad.join(', ')}`, code: 'ROLE_NOT_FOUND' });
+            }
+
+            let finalExpiresAt = null;
+            if (expires_at) {
+                finalExpiresAt = new Date(expires_at);
+                if (isNaN(finalExpiresAt.getTime())) return res.status(400).json({ error: 'Ngày hết hạn không hợp lệ.', code: 'INVALID_EXPIRY' });
+                finalExpiresAt.setHours(23, 59, 59, 999);
+                if (finalExpiresAt <= new Date()) return res.status(400).json({ error: 'Ngày hết hạn phải lớn hơn thời điểm hiện tại.', code: 'INVALID_EXPIRY' });
+            }
+
+            tx = new sql.Transaction(pool);
+            await tx.begin();
+            try {
+                // 1) Gỡ các vai trò không còn trong danh sách mới
+                const delReq = new sql.Request(tx).input('u', sql.VarChar(50), userId);
+                let delSql = `DELETE FROM USER_ROLE WHERE user_id = @u`;
+                if (newRoles.length) {
+                    const names = newRoles.map((rid, i) => { delReq.input(`k${i}`, sql.VarChar(50), rid); return `@k${i}`; });
+                    delSql += ` AND role_id NOT IN (${names.join(',')})`;
+                }
+                await delReq.query(delSql);
+                // 2) Thêm vai trò mới (vai trò đã có thì giữ nguyên)
+                for (const rid of newRoles) {
+                    if (currentRoles.includes(rid)) continue;
+                    await new sql.Request(tx)
+                        .input('u', sql.VarChar(50), userId)
+                        .input('r', sql.VarChar(50), rid)
+                        .input('exp', sql.DateTime, finalExpiresAt)
+                        .query(`INSERT INTO USER_ROLE (user_id, role_id, expires_at) VALUES (@u, @r, @exp)`);
+                }
+                await tx.commit();
+            } catch (dbErr) {
+                try { await tx.rollback(); } catch (_) {}
+                if (dbErr.message.includes('The transaction ended in the trigger') || dbErr.message.includes('Không thể gỡ vai trò Admin')) {
+                    return res.status(403).json({
+                        error: 'Hệ thống từ chối thay đổi. Tài khoản này đang giữ vai trò Quản trị viên cuối cùng hoặc bị khóa bởi quy tắc bảo vệ.',
+                        code: 'TRIGGER_BLOCKED',
+                    });
+                }
+                throw dbErr;
+            }
+
+            await log(req, 'ASSIGN_ROLE', `Đặt vai trò của ${userId}: [${currentRoles.join(', ')}] → [${newRoles.join(', ')}]`);
+            _invalidateUser(userId);
+            res.json({ success: true, roles: newRoles, expires_at: finalExpiresAt });
+        } catch (e) {
+            console.error('[set-user-roles]', e);
+            res.status(500).json({ error: e.message });
         }
     });
 
@@ -2124,14 +2219,17 @@ module.exports = (app, deps) => {
             if (id.startsWith('PROP-')) {
                 const checkProp = await pool.request()
                     .input('pid', sql.VarChar(50), id)
-                    .query(`SELECT u.unit_id
+                    .query(`SELECT u.unit_id, d.issuing_unit_id AS doc_unit_id
                             FROM DOCUMENT_REVISION_PROPOSAL p
                             JOIN [USER] u ON u.user_id = p.requester_id
+                            LEFT JOIN DOCUMENT d ON d.file_id = p.file_id
                             WHERE p.proposal_id = @pid AND p.status = 'PENDING'`);
                 if (checkProp.recordset.length === 0) {
                     return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
                 }
-                const hasPermission = await canUserApproveRequest(req, checkProp.recordset[0].unit_id);
+                // Chỉ huy đơn vị của NGƯỜI ĐỀ XUẤT hoặc của đơn vị BAN HÀNH văn bản đều được duyệt
+                const hasPermission = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
+                    || (checkProp.recordset[0].doc_unit_id && await canUserApproveRequest(req, checkProp.recordset[0].doc_unit_id));
                 if (!hasPermission) {
                     return res.status(403).json({ error: 'Bạn không có thẩm quyền duyệt đề xuất của đơn vị này' });
                 }
@@ -2187,14 +2285,17 @@ module.exports = (app, deps) => {
             if (id.startsWith('PROP-')) {
                 const checkProp = await pool.request()
                     .input('pid', sql.VarChar(50), id)
-                    .query(`SELECT u.unit_id
+                    .query(`SELECT u.unit_id, d.issuing_unit_id AS doc_unit_id
                             FROM DOCUMENT_REVISION_PROPOSAL p
                             JOIN [USER] u ON u.user_id = p.requester_id
+                            LEFT JOIN DOCUMENT d ON d.file_id = p.file_id
                             WHERE p.proposal_id = @pid AND p.status = 'PENDING'`);
                 if (checkProp.recordset.length === 0) {
                     return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
                 }
-                const hasPermission = await canUserApproveRequest(req, checkProp.recordset[0].unit_id);
+                // Chỉ huy đơn vị của NGƯỜI ĐỀ XUẤT hoặc của đơn vị BAN HÀNH văn bản đều được duyệt
+                const hasPermission = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
+                    || (checkProp.recordset[0].doc_unit_id && await canUserApproveRequest(req, checkProp.recordset[0].doc_unit_id));
                 if (!hasPermission) {
                     return res.status(403).json({ error: 'Bạn không có thẩm quyền từ chối đề xuất của đơn vị này' });
                 }
@@ -2534,34 +2635,73 @@ app.delete('/api/admin/lectures/classes/:id', async (req, res) => {
 });
 
 // ── GIẢNG ĐƯỜNG ──
+// Tra khu theo mã trong bảng CLASSROOM_BUILDING (null nếu không có hoặc chưa tạo bảng)
+async function findBuilding(pool, code) {
+  if (!code) return null;
+  try {
+    const r = await pool.request().input('c', sql.VarChar(20), String(code))
+      .query(`SELECT building_code, building_name, active FROM CLASSROOM_BUILDING WHERE building_code = @c`);
+    return r.recordset[0] || null;
+  } catch (_) { return null; }
+}
+
 app.get('/api/admin/lectures/classrooms', async (req, res) => {
   try {
     const pool = await getPool();
-    const r = await pool.request().query(`
-      SELECT room_id, room_name, building_name, room_type, capacity, description, active
-      FROM CLASSROOM
-      ORDER BY active DESC, room_name
-    `);
+    let r;
+    try {
+      // Tên khu lấy từ danh mục khu (CLASSROOM_BUILDING)
+      r = await pool.request().query(`
+        SELECT c.room_id, c.room_name, c.building_code,
+               COALESCE(b.building_name, c.building_name) AS building_name,
+               c.room_type, c.capacity, c.description, c.active
+        FROM CLASSROOM c
+        LEFT JOIN CLASSROOM_BUILDING b ON b.building_code = c.building_code
+        ORDER BY c.active DESC, c.room_name
+      `);
+    } catch (_) {
+      // Chưa chạy migration create_classroom_building → giữ cách đọc cũ
+      r = await pool.request().query(`
+        SELECT room_id, room_name, building_code, building_name, room_type, capacity, description, active
+        FROM CLASSROOM
+        ORDER BY active DESC, room_name
+      `);
+    }
     res.json({ total: r.recordset.length, items: r.recordset });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/lectures/classrooms', async (req, res) => {
   try {
-    const { room_id, room_name, building_name, room_type, capacity, description } = req.body;
+    const { room_id, room_name, building_name, building_code, room_type, capacity, description } = req.body;
     if (!room_id || !room_name) return res.status(400).json({ error: 'Thiếu room_id hoặc room_name' });
     const validTypes = ['LECTURE_HALL', 'COMPUTER_LAB', 'SEMINAR'];
     const rt = validTypes.includes(room_type) ? room_type : 'LECTURE_HALL';
     const pool = await getPool();
-    await pool.request()
+
+    // Có chọn khu → phải là khu có thật; tên khu lấy từ danh mục (không tin tên client gửi lên)
+    let bCode = null, bName = building_name || null;
+    if (building_code) {
+      const b = await findBuilding(pool, building_code);
+      if (!b) return res.status(400).json({ error: `Khu "${building_code}" không tồn tại`, code: 'BUILDING_NOT_FOUND' });
+      bCode = b.building_code; bName = b.building_name;
+    }
+
+    const request = pool.request()
       .input('id', sql.VarChar(50), room_id)
       .input('name', sql.NVarChar(100), room_name)
-      .input('bld', sql.NVarChar(100), building_name || null)
+      .input('bld', sql.NVarChar(100), bName)
       .input('type', sql.VarChar(30), rt)
       .input('cap', sql.Int, capacity || null)
-      .input('desc', sql.NVarChar(500), description || null)
-      .query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, room_type, capacity, description, active)
+      .input('desc', sql.NVarChar(500), description || null);
+    if (bCode) {
+      request.input('bcode', sql.VarChar(20), bCode);
+      await request.query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, building_code, room_type, capacity, description, active)
+              VALUES (@id, @name, @bld, @bcode, @type, @cap, @desc, 1)`);
+    } else {
+      await request.query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, room_type, capacity, description, active)
               VALUES (@id, @name, @bld, @type, @cap, @desc, 1)`);
+    }
     await log(req, 'LECTURE_CLASSROOM_CREATE', `Tạo giảng đường ${room_id} - ${room_name}`);
     res.json({ success: true, room_id });
   } catch (e) {
@@ -2572,14 +2712,23 @@ app.post('/api/admin/lectures/classrooms', async (req, res) => {
 
 app.put('/api/admin/lectures/classrooms/:id', async (req, res) => {
   try {
-    const { room_name, building_name, room_type, capacity, description, active } = req.body;
+    const { room_name, building_name, building_code, room_type, capacity, description, active } = req.body;
     const validTypes = ['LECTURE_HALL', 'COMPUTER_LAB', 'SEMINAR'];
     const rt = validTypes.includes(room_type) ? room_type : null;
     const pool = await getPool();
+
+    let bCode = null, bName = building_name || null;
+    if (building_code) {
+      const b = await findBuilding(pool, building_code);
+      if (!b) return res.status(400).json({ error: `Khu "${building_code}" không tồn tại`, code: 'BUILDING_NOT_FOUND' });
+      bCode = b.building_code; bName = b.building_name;
+    }
+
     const r = await pool.request()
       .input('id', sql.VarChar(50), req.params.id)
       .input('name', sql.NVarChar(100), room_name)
-      .input('bld', sql.NVarChar(100), building_name || null)
+      .input('bld', sql.NVarChar(100), bName)
+      .input('bcode', sql.VarChar(20), bCode)
       .input('type', sql.VarChar(30), rt)
       .input('cap', sql.Int, capacity || null)
       .input('desc', sql.NVarChar(500), description || null)
@@ -2587,6 +2736,7 @@ app.put('/api/admin/lectures/classrooms/:id', async (req, res) => {
       .query(`UPDATE CLASSROOM SET
               room_name = @name,
               building_name = @bld,
+              building_code = COALESCE(@bcode, building_code),
               room_type = COALESCE(@type, room_type),
               capacity = @cap,
               description = @desc,
@@ -2616,5 +2766,102 @@ app.delete('/api/admin/lectures/classrooms/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+<<<<<<< HEAD
 >>>>>>> eefdd9dfdf8e59304137e7f9ceaad64f1c1d2fb8
+=======
+// ── KHU GIẢNG ĐƯỜNG (CLASSROOM_BUILDING) — quản lý thay cho danh sách viết cứng ──
+const BUILDING_CODE_RE = /^[A-Za-z0-9_-]{1,20}$/;
+
+app.get('/api/admin/lectures/buildings', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT b.building_code, b.building_name, b.display_order, b.active,
+             (SELECT COUNT(*) FROM CLASSROOM c WHERE c.building_code = b.building_code) AS room_count
+      FROM CLASSROOM_BUILDING b
+      ORDER BY b.display_order, b.building_code
+    `);
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) {
+    const missing = /Invalid object name 'CLASSROOM_BUILDING'/i.test(e.message);
+    res.status(500).json({
+      error: missing
+        ? 'Chưa có bảng CLASSROOM_BUILDING. Hãy chạy migration create_classroom_building.'
+        : e.message,
+      code: missing ? 'BUILDING_TABLE_MISSING' : undefined,
+    });
+  }
+});
+
+app.post('/api/admin/lectures/buildings', async (req, res) => {
+  try {
+    const code = String(req.body.building_code || '').trim().toUpperCase();
+    const name = String(req.body.building_name || '').trim();
+    const order = Number.isFinite(Number(req.body.display_order)) ? Math.trunc(Number(req.body.display_order)) : 0;
+    if (!BUILDING_CODE_RE.test(code)) {
+      return res.status(400).json({ error: 'Mã khu chỉ gồm chữ, số, "-" hoặc "_" (tối đa 20 ký tự)' });
+    }
+    if (!name || name.length > 100) return res.status(400).json({ error: 'Tên khu bắt buộc, tối đa 100 ký tự' });
+    const pool = await getPool();
+    await pool.request()
+      .input('c', sql.VarChar(20), code)
+      .input('n', sql.NVarChar(100), name)
+      .input('o', sql.Int, order)
+      .query(`INSERT INTO CLASSROOM_BUILDING (building_code, building_name, display_order, active)
+              VALUES (@c, @n, @o, 1)`);
+    await log(req, 'LECTURE_BUILDING_CREATE', `Tạo khu giảng đường ${code} - ${name}`);
+    res.json({ success: true, building_code: code });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'Mã khu đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/buildings/:code', async (req, res) => {
+  try {
+    const name = String(req.body.building_name || '').trim();
+    const order = Number.isFinite(Number(req.body.display_order)) ? Math.trunc(Number(req.body.display_order)) : 0;
+    if (!name || name.length > 100) return res.status(400).json({ error: 'Tên khu bắt buộc, tối đa 100 ký tự' });
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('c', sql.VarChar(20), req.params.code)
+      .input('n', sql.NVarChar(100), name)
+      .input('o', sql.Int, order)
+      .input('a', sql.Bit, req.body.active === false ? 0 : 1)
+      .query(`UPDATE CLASSROOM_BUILDING
+              SET building_name = @n, display_order = @o, active = @a
+              WHERE building_code = @c`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy khu' });
+    // Giữ tên khu ghi kèm từng phòng đồng bộ với danh mục khu
+    await pool.request()
+      .input('c', sql.VarChar(20), req.params.code)
+      .input('n', sql.NVarChar(100), name)
+      .query(`UPDATE CLASSROOM SET building_name = @n WHERE building_code = @c`);
+    await log(req, 'LECTURE_BUILDING_UPDATE', `Sửa khu giảng đường ${req.params.code}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/buildings/:code', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request().input('c', sql.VarChar(20), req.params.code)
+      .query(`SELECT COUNT(*) AS n FROM CLASSROOM WHERE building_code = @c`);
+    const n = used.recordset[0].n;
+    if (n > 0) {
+      return res.status(409).json({
+        error: `Khu còn ${n} phòng học. Hãy chuyển hoặc xóa các phòng đó trước, hoặc tắt khu thay vì xóa.`,
+        code: 'BUILDING_NOT_EMPTY',
+        room_count: n,
+      });
+    }
+    const r = await pool.request().input('c', sql.VarChar(20), req.params.code)
+      .query(`DELETE FROM CLASSROOM_BUILDING WHERE building_code = @c`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy khu' });
+    await log(req, 'LECTURE_BUILDING_DELETE', `Xóa khu giảng đường ${req.params.code}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+>>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
 };

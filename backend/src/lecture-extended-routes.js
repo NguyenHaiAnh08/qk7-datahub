@@ -13,18 +13,32 @@ module.exports = function createLectureExtendedRoutes({
   // Dùng LECTURE_QUIZ_QUESTION + LECTURE_QUIZ_ATTEMPT
   // ══════════════════════════════════════════════════════════
 
-  router.get('/:lectureId/quiz', requireAuth, requirePermission('LECTURE_VIEW'),
-    async (req, res) => {
-      try {
-        const pool = await getPool();
-        const r = await pool.request()
+  router.get('/:lectureId/quiz', async (req, res) => {
+    try {
+      const pool = await getPool();
+      const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST';
+      if (isGuest) {
+        const check = await pool.request()
           .input('lid', sql.VarChar(50), req.params.lectureId)
-          .query(`SELECT * FROM LECTURE_QUIZ_QUESTION
-                  WHERE lecture_id = @lid AND active = 1
-                  ORDER BY question_order, question_id`);
-        res.json({ total: r.recordset.length, items: r.recordset });
-      } catch (e) { res.status(500).json({ error: e.message }); }
-    });
+          .query(`SELECT status, security_level_id FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
+        const lec = check.recordset[0];
+        if (!lec || lec.status !== 'PUBLISHED' || lec.security_level_id !== 1) {
+          return res.status(403).json({ error: 'Đại biểu chỉ được xem câu hỏi bài giảng công khai' });
+        }
+      } else {
+        const perms = req.user?.permissions || [];
+        if (!perms.includes('LECTURE_VIEW')) {
+          return res.status(403).json({ error: 'Bạn không có quyền LECTURE_VIEW' });
+        }
+      }
+      const r = await pool.request()
+        .input('lid', sql.VarChar(50), req.params.lectureId)
+        .query(`SELECT * FROM LECTURE_QUIZ_QUESTION
+                WHERE lecture_id = @lid AND active = 1
+                ORDER BY question_order, question_id`);
+      res.json({ total: r.recordset.length, items: r.recordset });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
 
   router.post('/:lectureId/quiz', requireAuth, requirePermission('LECTURE_QUIZ_MANAGE'),
     async (req, res) => {
@@ -155,8 +169,8 @@ module.exports = function createLectureExtendedRoutes({
                   WHERE user_id = @uid AND (expires_at IS NULL OR expires_at > GETDATE())`);
         const roles = roleRs.recordset.map((x) => x.role_id);
         const pos = String(req.user.position || '').toLowerCase();
-        const deptHead = roles.includes('ROL-06')
-          || ['trưởng bộ môn', 'trưởng khoa', 'chủ nhiệm khoa', 'trưởng phòng'].some((k) => pos.includes(k));
+        // ROL-06 = Nhân viên IT (không phải trưởng bộ môn) → chỉ nhận diện theo chức vụ
+        const deptHead = ['trưởng bộ môn', 'trưởng khoa', 'chủ nhiệm khoa', 'trưởng phòng'].some((k) => pos.includes(k));
         const canViewAll = (req.user.permissions || []).includes('SCHEDULE_MONITOR_ALL');
         const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
         if (!canViewAll && !inScope(scope, req.params.facultyUnitId)) {

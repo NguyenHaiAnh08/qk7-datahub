@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { School, RotateCw } from 'lucide-react';
 import { Header } from '../components/common/Header';
 import { LiveMonitorPanel } from '../components/lectures/LiveMonitorPanel';
+import { SystemOverviewPanel } from '../components/command/SystemOverviewPanel';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from '../components/common/Toast';
 
@@ -24,7 +25,7 @@ export const ClassroomsPage: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Phân Hệ Giảng Đường
+                  Quản Lý Giám Sát
                 </h1>
                 <span className="inline-flex text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
@@ -32,7 +33,7 @@ export const ClassroomsPage: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Sơ đồ mặt bằng giảng đường, kiểm soát trạng thái phòng học và điều hành ca dạy trực tiếp — Trường Quân Sự Quân Khu 7
+                Giám sát chung toàn hệ thống: tài liệu, bài giảng, giảng đường và an ninh — Trường Quân Sự Quân Khu 7
               </p>
             </div>
           </div>
@@ -52,6 +53,9 @@ export const ClassroomsPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Tổng quan toàn hệ thống: chỉ hiện với người có quyền COMMAND_VIEW (chỉ huy, quản lý) */}
+        {hasPermission('COMMAND_VIEW') && <SystemOverviewPanel refreshSignal={refreshKey} />}
 
         {/* Bảng Giám Sát Giảng Đường Trực Tiếp (Live Monitor & Radar) */}
         <LiveMonitorPanel

@@ -84,18 +84,44 @@ module.exports = function createSessionModule({
   sql, getPool, writeAccessLog, getClientIp,
 }) {
   // ✅ Xác định session thuộc admin (bypass IP binding)
-  // Điều chỉnh ngưỡng theo hệ thống của bạn. Ví dụ: clearance_level_id >= 4 = admin.
-  function isAdminSession(session) {
-    const level = Number(session?.clearance_level_id);
-    return Number.isFinite(level) && level >= 4;
+  // CHỈ tài khoản đang có vai trò Quản trị (ROL-01) còn hiệu lực mới được bypass. Trước đây coi
+  // mọi clearance_level_id >= 4 là admin → sĩ quan cấp cao bị lộ token vẫn dùng được từ mạng khác.
+  // Chỉ gọi khi IP thay đổi bất thường (hiếm) nên không tốn truy vấn ở request thường.
+  // Lỗi truy vấn → coi như KHÔNG phải admin (an toàn hơn).
+  async function isAdminSession(session, pool) {
+    try {
+      const r = await pool.request()
+        .input('uid', sql.VarChar(50), session?.user_id)
+        .query(`SELECT TOP 1 1 AS ok FROM USER_ROLE
+                WHERE user_id = @uid AND role_id = 'ROL-01'
+                  AND (expires_at IS NULL OR expires_at > GETDATE())`);
+      return r.recordset.length > 0;
+    } catch (e) {
+      console.error('[isAdminSession]', e.message);
+      return false;
+    }
   }
 
-  async function createSession({ userId, clearanceLevelId, token, ip, userAgent, expiresInMs }) {
+  // Cột USER_SESSION.portal có thể CHƯA tồn tại (chưa chạy migration add_portal_support) → backend vẫn chạy như cũ.
+  let _portalColCache = { v: false, at: 0 };
+  async function hasPortalColumn() {
+    if (_portalColCache.v) return true;
+    if (Date.now() - _portalColCache.at < 30 * 1000) return false;
+    try {
+      const pool = await getPool();
+      const r = await pool.request().query(`SELECT COL_LENGTH('USER_SESSION', 'portal') AS len`);
+      _portalColCache = { v: r.recordset[0]?.len != null, at: Date.now() };
+    } catch { _portalColCache = { v: false, at: Date.now() }; }
+    return _portalColCache.v;
+  }
+
+  async function createSession({ userId, clearanceLevelId, token, ip, userAgent, expiresInMs, portal }) {
     const pool = await getPool();
     const tokenHash = hashToken(token);
     const expiresAt = new Date(Date.now() + expiresInMs);
     const sessionId = crypto.randomUUID();
 
+    const withPortal = await hasPortalColumn();
     await pool.request()
       .input('sid', sql.UniqueIdentifier, sessionId)
       .input('tok', sql.Char(64), tokenHash)
@@ -104,10 +130,12 @@ module.exports = function createSessionModule({
       .input('ip', sql.VarChar(50), ip || null)
       .input('ua', sql.NVarChar(255), (userAgent || '').slice(0, 255))
       .input('exp', sql.DateTime, expiresAt)
-      .query(`
-        INSERT INTO USER_SESSION (session_id, token, user_id, clearance_level_id, ip, user_agent, expires_at)
-        VALUES (@sid, @tok, @uid, @clr, @ip, @ua, @exp)
-      `);
+      .input('portal', sql.VarChar(20), portal || 'datahub')
+      .query(withPortal
+        ? `INSERT INTO USER_SESSION (session_id, token, user_id, clearance_level_id, ip, user_agent, expires_at, portal)
+           VALUES (@sid, @tok, @uid, @clr, @ip, @ua, @exp, @portal)`
+        : `INSERT INTO USER_SESSION (session_id, token, user_id, clearance_level_id, ip, user_agent, expires_at)
+           VALUES (@sid, @tok, @uid, @clr, @ip, @ua, @exp)`);
 
     return { sessionId, tokenHash };
   }
@@ -179,12 +207,12 @@ module.exports = function createSessionModule({
         }
       };
       const ipChange = classifyIpChange(s.ip, ip);
-      const isAdmin = isAdminSession(s);
 
       if (s.ip && ip && ipChange !== 'SAME' && ipChange !== 'UNKNOWN') {
         // 🔴 SUSPICIOUS (LAN↔WAN, WAN→WAN khác) HOẶC LAN_DIFF_SUBNET → block + revoke
         const mustBlock =
           ipChange === 'SUSPICIOUS' || ipChange === 'LAN_DIFF_SUBNET';
+        const isAdmin = mustBlock ? await isAdminSession(s, pool) : false;
 
         if (mustBlock && !isAdmin) {
           await revokeSession({
@@ -279,17 +307,20 @@ module.exports = function createSessionModule({
    * Revoke tất cả session của 1 user (đổi mật khẩu, admin kill toàn bộ).
    * ✅ Targeted cache delete theo user_id, không bump global.
    */
-  async function revokeAllUserSessions(userId, revokedBy, reason) {
+  async function revokeAllUserSessions(userId, revokedBy, reason, portal = null) {
     const pool = await getPool();
-    const r = await pool.request()
+    // portal != null → chỉ thu hồi phiên của cổng đó (đăng nhập lại cùng cổng không làm mất phiên cổng kia)
+    const scoped = portal && (await hasPortalColumn());
+    const rq = pool.request()
       .input('uid', sql.VarChar(50), userId)
       .input('rby', sql.VarChar(50), revokedBy || null)
-      .input('rsn', sql.NVarChar(200), reason || 'ADMIN_KILL')
-      .query(`
+      .input('rsn', sql.NVarChar(200), reason || 'ADMIN_KILL');
+    if (scoped) rq.input('portal', sql.VarChar(20), portal);
+    const r = await rq.query(`
         UPDATE USER_SESSION
         SET revoked = 1, revoked_at = GETDATE(),
             revoked_by = @rby, revoked_reason = @rsn
-        WHERE user_id = @uid AND revoked = 0;
+        WHERE user_id = @uid AND revoked = 0${scoped ? " AND ISNULL(portal, 'datahub') = @portal" : ''};
         SELECT @@ROWCOUNT AS n;
       `);
 
@@ -329,9 +360,10 @@ module.exports = function createSessionModule({
     return affected;
   }
 
-  async function listActiveSessions(userId = null, idleTimeoutMinutes = 15) {
+  async function listActiveSessions(userId = null, idleTimeoutMinutes = 15, portal = null) {
     const pool = await getPool();
     const req = pool.request();
+    const scopedPortal = portal && (await hasPortalColumn());
 
     // Mặc định coi là "offline" nếu không hoạt động trong 30 phút
     const timeout = parseInt(idleTimeoutMinutes, 10) || 30;
@@ -350,6 +382,10 @@ module.exports = function createSessionModule({
     if (userId) {
       q += ` AND s.user_id = @uid`;
       req.input('uid', sql.VarChar(50), userId);
+    }
+    if (scopedPortal) {
+      q += ` AND ISNULL(s.portal, 'datahub') = @portal`;
+      req.input('portal', sql.VarChar(20), portal);
     }
     q += ` ORDER BY s.last_seen_at DESC`;
     return (await req.query(q)).recordset;

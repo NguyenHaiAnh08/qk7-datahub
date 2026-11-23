@@ -318,7 +318,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
       {/* ============================================================ */}
       {/* PHẦN 1: 4 THẺ KPI VĨ MÔ TOÀN TRƯỜNG (4 MACRO KPI CARDS)       */}
       {/* ============================================================ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div id="tour-kpi-cards" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* THẺ 1: TỔNG VĂN BẢN TOÀN TRƯỜNG */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -520,7 +520,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
       {/* ============================================================ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* BẢNG TRÁI (7 CỘT): TIẾN ĐỘ SỐ HÓA & PHÂN BỔ THEO ĐƠN VỊ */}
-        <div className="lg:col-span-7 bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-3.5 shadow-xs">
+        <div id="tour-department-radar" className="lg:col-span-7 bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-3.5 shadow-xs">
           {/* Header Bảng Trái: Thiết kế 2 tầng chuẩn Command Center chống ngắt dòng */}
           <div className="pb-3 border-b border-slate-100 dark:border-white/[0.06] space-y-2.5">
             {/* Hàng 1: Tiêu đề và Subtitle độc lập toàn dải */}
@@ -692,7 +692,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
         </div>
 
         {/* BẢNG PHẢI (5 CỘT): CƠ CẤU THỂ LOẠI & MỨC BẢO MẬT TOÀN TRƯỜNG */}
-        <div className="lg:col-span-5 bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-3.5 shadow-xs flex flex-col justify-between">
+        <div id="tour-document-breakdown" className="lg:col-span-5 bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-3.5 shadow-xs flex flex-col justify-between">
           <div>
             {/* Header Bảng Phải kèm Mini Segmented Tabs */}
             <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-white/[0.06]">

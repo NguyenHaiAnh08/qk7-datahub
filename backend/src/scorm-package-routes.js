@@ -97,14 +97,22 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
     if (lr.recordset.length === 0) { res.status(404).send('Not found'); return null; }
 
     const lec = lr.recordset[0];
-    if (lec.security_level_id > (req.user.clearance_level_id || 1)) {
-      res.status(403).send('Không đủ cấp bảo mật'); return null;
+    const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST' || req.user.user_id === 'ANONYMOUS';
+    if (isGuest) {
+      if (lec.status !== 'PUBLISHED' || lec.security_level_id !== 1) {
+        res.status(403).send('Đại biểu chỉ được xem các bài giảng công khai đã xuất bản');
+        return null;
+      }
+    } else {
+      if (lec.security_level_id > (req.user?.clearance_level_id || 1)) {
+        res.status(403).send('Không đủ cấp bảo mật'); return null;
+      }
+      if (requirePublished && lec.status !== 'PUBLISHED') {
+        res.status(404).send('Bài giảng chưa được xuất bản'); return null;
+      }
     }
     if (!contentTypes.includes(lec.content_type)) {
       res.status(400).send(`Bài giảng không phải ${contentTypes.join('/')}`); return null;
-    }
-    if (requirePublished && lec.status !== 'PUBLISHED') {
-      res.status(404).send('Bài giảng chưa được xuất bản'); return null;
     }
 
     let entryPoint = lec.scorm_entry_point;
@@ -167,12 +175,23 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       res.status(404).send('Bài giảng chưa có gói học liệu'); return null;
     }
 
-    const entryAbs = path.isAbsolute(entryPoint)
-      ? entryPoint
-      : path.resolve(__dirname, '..', entryPoint);
+    // CHỐNG PATH TRAVERSAL: entry point chỉ được trỏ vào uploads/bai-giang-so/ (không nhận đường
+    // dẫn tuyệt đối, không nhận ".."). Nếu không, giảng viên đặt "../../.env" sẽ đọc được file hệ thống.
+    const lectureRoot = path.resolve(__dirname, '..', 'uploads', MODULES.LECTURES);
+    const insideLectureRoot = (abs) => abs === lectureRoot || abs.startsWith(lectureRoot + path.sep);
+    const entryAbs = path.resolve(__dirname, '..', String(entryPoint));
+    if (path.isAbsolute(String(entryPoint)) || !insideLectureRoot(entryAbs)) {
+      console.warn(`[SECURITY] entry point ngoài thư mục bài giảng bị chặn: lecture=${lectureId} entry=${entryPoint}`);
+      res.status(403).send('Đường dẫn gói học liệu không hợp lệ'); return null;
+    }
 
     if (!fs.existsSync(entryAbs) || !fs.statSync(entryAbs).isFile()) {
       res.status(404).send('Tệp không tồn tại: ' + path.basename(entryAbs)); return null;
+    }
+    // Chặn liên kết tượng trưng trỏ ra ngoài: đường dẫn thật cũng phải nằm trong thư mục bài giảng
+    if (!insideLectureRoot(fs.realpathSync(entryAbs))) {
+      console.warn(`[SECURITY] entry point (symlink) ngoài thư mục bài giảng bị chặn: lecture=${lectureId}`);
+      res.status(403).send('Đường dẫn gói học liệu không hợp lệ'); return null;
     }
 
     return {
@@ -608,14 +627,21 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       const isAuthor = lec.author_id === req.user.user_id;
       const isReviewer = (req.user.permissions || []).includes('LECTURE_APPROVE');
 
-      if (lec.status === 'DELETED' && !isAdmin) {
-        return res.status(404).json({ error: 'Bài giảng không tồn tại' });
-      }
-      if (lec.status !== 'PUBLISHED' && !isAdmin && !isAuthor && !isReviewer) {
-        return res.status(404).json({ error: 'Bài giảng chưa được xuất bản' });
-      }
-      if (lec.security_level_id > (req.user.clearance_level_id || 1)) {
-        return res.status(403).json({ error: 'Không đủ cấp bảo mật' });
+      const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST' || req.user.user_id === 'ANONYMOUS';
+      if (isGuest) {
+        if (lec.status !== 'PUBLISHED' || lec.security_level_id !== 1) {
+          return res.status(403).json({ error: 'Đại biểu chỉ được xem các bài giảng công khai đã xuất bản' });
+        }
+      } else {
+        if (lec.status === 'DELETED' && !isAdmin) {
+          return res.status(404).json({ error: 'Bài giảng không tồn tại' });
+        }
+        if (lec.status !== 'PUBLISHED' && !isAdmin && !isAuthor && !isReviewer) {
+          return res.status(404).json({ error: 'Bài giảng chưa được xuất bản' });
+        }
+        if (lec.security_level_id > (req.user.clearance_level_id || 1)) {
+          return res.status(403).json({ error: 'Không đủ cấp bảo mật' });
+        }
       }
 
       // Cấp 3+: cần token vân tay đúng bài giảng, HOẶC đang là người giảng của một ca ONGOING
@@ -670,6 +696,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(lec.pdf_name || 'giao-an.pdf')}"`);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
       fs.createReadStream(abs).pipe(res);
     } catch (e) {
       console.error('[PDF serve]', e);
@@ -694,34 +721,52 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
     requireAuth, requirePermission('LECTURE_CREATE'),
     uploadPdf.single('file'), handlePdfUpload);
 
+  const lectureContentReadGuard = (req, res, next) => {
+    const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST' || req.user.user_id === 'ANONYMOUS';
+    if (isGuest) {
+      if (!req.user) {
+        req.user = {
+          user_id: 'GUEST',
+          clearance_level_id: 1,
+          roles: ['DELEGATE'],
+          permissions: ['LECTURE_VIEW'],
+          is_authenticated: false,
+          is_guest: true,
+        };
+      }
+      return next();
+    }
+    return requirePermission('LECTURE_VIEW')(req, res, next);
+  };
+
   // Xem PDF giáo án (tách biệt khỏi /api/files của Dữ liệu số)
   router.get('/:lectureId/pdf',
-    requireAuth, requirePermission('LECTURE_VIEW'), servePdf);
+    lectureContentReadGuard, servePdf);
 
   // Launch
   router.get('/:lectureId/scorm/launch',
-    requireAuth, requirePermission('LECTURE_VIEW'), launchScorm);
+    lectureContentReadGuard, launchScorm);
 
   router.get('/:lectureId/html5/launch',
-    requireAuth, requirePermission('LECTURE_VIEW'), launchHtml5);
+    lectureContentReadGuard, launchHtml5);
 
   // ✅ FIX EXPRESS 5: Thêm tên cho wildcard (*path)
   // Assets (đăng ký TRƯỚC catch-all)
   router.get('/:lectureId/scorm/assets/*path',
-    requireAuth, requirePermission('LECTURE_VIEW'), serveScormAsset);
+    lectureContentReadGuard, serveScormAsset);
 
   router.get('/:lectureId/html5/assets/*path',
-    requireAuth, requirePermission('LECTURE_VIEW'), serveHtml5Asset);
+    lectureContentReadGuard, serveHtml5Asset);
 
   // Legacy catch-all (client cũ / HTML có ../ path)
   router.get('/:lectureId/scorm/*path',
-    requireAuth, requirePermission('LECTURE_VIEW'), serveScormAsset);
+    lectureContentReadGuard, serveScormAsset);
 
   router.get('/:lectureId/html5/*path',
-    requireAuth, requirePermission('LECTURE_VIEW'), serveHtml5Asset);
+    lectureContentReadGuard, serveHtml5Asset);
 
   // Lấy danh sách các chế độ trình chiếu khả dụng trong gói học liệu (Demo, Tutorial, Practice, Test...)
-  router.get('/:lectureId/modes', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/:lectureId/modes', lectureContentReadGuard, async (req, res) => {
     const lectureId = req.params.lectureId;
     try {
       const pkg = await loadLecturePackage(lectureId, req, res, {

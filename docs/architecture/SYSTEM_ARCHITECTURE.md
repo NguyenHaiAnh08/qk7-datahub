@@ -1624,4 +1624,28 @@ Tại `backend/src/lecture-package-helper.js`, gói ZIP SCORM/HTML5 bắt buộc
   - Hiển thị danh xưng đơn vị kép chuẩn quân sự (`{Tên đơn vị con} - {Tên đơn vị cha}`).
   - Bảng tổng hợp số hóa toàn trường chỉ nhóm theo các đơn vị cấp 1 trực thuộc Nhà trường, tổng hợp số liệu của toàn bộ đơn vị con cháu và sắp xếp theo trọng số quân sự `getMilitaryUnitSortWeight`.
 
+---
+
+## 35. Kiến Trúc Vòng Đọc Tài Liệu Tương Phản Cao & Quản Trị Mặt Bằng Giảng Đường Toàn Diện (v1.8.3)
+
+### 35.1. Vòng Chỉ Báo Tiến Độ Đọc Tài Liệu High-Contrast Dual-Theme (`DocumentReadingRing.tsx`)
+- **Nguyên lý hiển thị tương phản cao:**
+  - Giải quyết triệt để lỗi chìm màu trên nền tối hoặc đè màu trên nền sáng trong giao diện xem PDF trực tuyến.
+  - Sử dụng SVG vòng tròn động với `strokeDasharray` và `strokeDashoffset` theo công thức:
+    $$\text{offset} = \text{circumference} \times \left(1 - \frac{\text{percent}}{100}\right)$$
+  - Chuyển tiếp mượt mà qua Framer Motion: Từ vòng nét mảnh (0%) sang vòng xanh Emerald rực rỡ (1-99%) và huy hiệu hoàn tất có dấu tick trắng tinh (100%).
+- **Đồng bộ trạng thái đọc đa phân hệ:**
+  - Tích hợp trực tiếp tại thanh công cụ xem văn bản của `PdfPagesViewer.tsx` và `DocumentPreviewModal.tsx`.
+  - Hiển thị tiến độ đọc thời gian thực trên bảng danh sách tài liệu `PortalDocumentList.tsx` và `DocumentTable.tsx`.
+
+### 35.2. Quản Trị Mặt Bằng Giảng Đường, Tòa Nhà & Giám Sát Telemetry
+- **Đại tu `BuildingManagerPanel.tsx`:** Quản trị danh mục giảng đường, khu nhà, phòng học theo sơ đồ kiến trúc mặt bằng, hỗ trợ cấu hình cảm biến viễn trắc telemetry và trạng thái bảo trì.
+- **Tối ưu Bảng Radar `LiveMonitorPanel.tsx`:** Tích hợp bộ lọc đa tầng theo tòa nhà, chế độ xem toàn màn hình, hiển thị sĩ số, tiến độ slide bài giảng và trạng thái ca dạy trực tiếp thời gian thực.
+
+### 35.3. Gia Cố An Toàn Phiên, Xóa Sạch Cookie & Phân Quyền Đại Biểu
+- **Thu hồi phiên đăng xuất toàn diện:** `POST /api/auth/logout` kích hoạt `revokeAllUserSessions` để hủy bỏ toàn bộ vé JWT đang lưu hành của người dùng trên hệ thống, kết hợp dọn sạch các cookie xác thực (`qk7_session`, `qk7_token`, `token`) kèm cờ `secure: true, httpOnly: true, sameSite: 'strict'`.
+- **Chống Replay Attack:** Bổ sung `jti: crypto.randomUUID()` vào JWT payload của mọi phiên đăng nhập và vé 2FA vân tay.
+- **Cô lập quyền hạn Đại biểu:** Tự động gán `can_teach = false` và `peer_unit = false` trong `lecture-routes.js`, đảm bảo khách tham quan chỉ được xem nội dung Cấp 1 Công khai.
+
+
 

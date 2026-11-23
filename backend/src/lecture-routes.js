@@ -4,26 +4,42 @@
 // - Bảng: DIGITAL_LECTURE, TEACHING_SCHEDULE, SCORM_TRACKING
 // - Permission: LECTURE_VIEW / CREATE / APPROVE / DELETE / SCHEDULE_START
 // - Role: ROL-01 Admin, ROL-02 BGH, ROL-07 Giảng viên
-// - Trưởng bộ môn: nhận diện qua ROL-06 hoặc position
+// - Trưởng bộ môn: nhận diện qua position (ROL-06 là Nhân viên IT, không phải trưởng bộ môn). CHỈ ROL-01/ROL-02 được duyệt
 // - Live Monitor: LECTURE_VIEW + role (Admin/Commander/DeptHead)
 // - Teaching History: query TEACHING_SCHEDULE status COMPLETED/CANCELLED
 // - SCORM: commit vào SCORM_TRACKING
 // ============================================================
 const express = require('express');
 const path = require('path');
-const fs = require('fs');         
+const fs = require('fs');
+const { memo } = require('./memo');         
 const { sql, getPool } = require('./db');
-const { getLectureScope, bindUnitIn, inScope } = require('./lecture-scope');
+const { getLectureScope, bindUnitIn, inScope, isPeerUnit } = require('./lecture-scope');
 
 const HANGING_THRESHOLD_MINUTES = 4 * 60; // 4 giờ
 
 module.exports = function createLectureRoutes({
   requireAuth,
   requirePermission,
+  requireAnyPermission,
   writeAccessLog,
   getClientIp,
 }) {
   const router = express.Router();
+
+  // scorm_entry_point từ client chỉ hợp lệ khi nằm trong uploads/bai-giang-so/ (chống path traversal:
+  // "../../.env", đường dẫn tuyệt đối...). Giá trị thật do BE sinh khi giải nén gói nên hợp lệ.
+  const isSafeEntryPoint = (ep) => {
+    if (ep === undefined || ep === null || ep === '') return true; // không gửi = bỏ qua
+    const s = String(ep).replace(/\\/g, '/');
+    return s.startsWith('uploads/bai-giang-so/') && !s.split('/').includes('..') && !/^[a-zA-Z]:/.test(s);
+  };
+
+  // API ĐỌC của phần giám sát (sơ đồ giảng đường, ca đang diễn ra): chỉ huy thuần chỉ có
+  // COMMAND_VIEW (không có LECTURE_VIEW) vẫn xem được. Kiểm tra vai trò trong từng handler giữ nguyên.
+  const monitorReadGuard = typeof requireAnyPermission === 'function'
+    ? requireAnyPermission(['LECTURE_VIEW', 'COMMAND_VIEW'])
+    : requirePermission('LECTURE_VIEW');
 
   const getIp = (req) => {
     if (typeof getClientIp === 'function') return getClientIp(req);
@@ -56,17 +72,21 @@ module.exports = function createLectureRoutes({
   async function resolveUserRoles(pool, user) {
     if (!user?.user_id) return user?.roles || [];
     try {
-      const r = await pool.request()
-        .input('u', sql.VarChar(50), user.user_id)
-        .query(`SELECT role_id FROM USER_ROLE
-                WHERE user_id = @u AND (expires_at IS NULL OR expires_at > GETDATE())`);
-      return r.recordset.map((x) => x.role_id);
+      // Cache 15s + gộp request trùng: hàm này bị gọi ở hầu hết route bài giảng (có route gọi 2 lần)
+      const roles = await memo(`roles-active:${user.user_id}`, 15 * 1000, async () => {
+        const r = await pool.request()
+          .input('u', sql.VarChar(50), user.user_id)
+          .query(`SELECT role_id FROM USER_ROLE
+                  WHERE user_id = @u AND (expires_at IS NULL OR expires_at > GETDATE())`);
+        return r.recordset.map((x) => x.role_id);
+      });
+      return roles.slice();
     } catch { return user?.roles || []; }
   }
 
   async function isDeptHead(pool, user) {
     const roles = await resolveUserRoles(pool, user);
-    if (roles.includes('ROL-06')) return true;
+    // ROL-06 trên hệ thống thật là "Nhân viên IT", KHÔNG phải trưởng bộ môn → không còn tính là trưởng bộ môn
     const pos = String(user.position || '').toLowerCase();
     return pos.includes('trưởng bộ môn') || pos.includes('trưởng khoa')
         || pos.includes('chủ nhiệm khoa') || pos.includes('trưởng phòng');
@@ -75,7 +95,7 @@ module.exports = function createLectureRoutes({
   // Hàm phụ kiểm tra quyền Chỉ huy (Chỉ Admin, BGH, Trưởng BM mới được Lưu trữ/Khôi phục)
   async function requireCommander(pool, req, res) {
     const roles = await resolveUserRoles(pool, req.user);
-    if (roles.includes('ROL-01') || roles.includes('ROL-02') || roles.includes('ROL-06')) {
+    if (roles.includes('ROL-01') || roles.includes('ROL-02')) {
       return true;
     }
     res.status(403).json({ error: 'Chỉ Chỉ huy cấp trên mới có quyền lưu trữ/khôi phục bài giảng.' });
@@ -96,21 +116,25 @@ module.exports = function createLectureRoutes({
   // PHẦN 1 — CATALOGS
   // ═════════════════════════════════════════════════════════════
 
-  router.get('/catalogs/subjects', requireAuth, async (req, res) => {
+  router.get('/catalogs/subjects', async (req, res) => {
     try {
-      const pool = await getPool();
-      const result = await pool.request().query(`
-        SELECT s.*, u.name AS faculty_name
-        FROM SUBJECT s
-        LEFT JOIN UNIT u ON u.unit_id = s.faculty_unit_id
-        WHERE s.active = 1
-        ORDER BY s.name
-      `);
-      res.json({ items: result.recordset });
+      // Danh mục môn học ít thay đổi: cache 10s (mọi người dùng chung) thay vì truy vấn ở từng request
+      const items = await memo('catalog:subjects', 10 * 1000, async () => {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+          SELECT s.*, u.name AS faculty_name
+          FROM SUBJECT s
+          LEFT JOIN UNIT u ON u.unit_id = s.faculty_unit_id
+          WHERE s.active = 1
+          ORDER BY s.name
+        `);
+        return result.recordset;
+      });
+      res.json({ items });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  router.get('/catalogs/classes', requireAuth, async (req, res) => {
+  router.get('/catalogs/classes', async (req, res) => {
     try {
       const pool = await getPool();
       const result = await pool.request().query(`
@@ -125,7 +149,7 @@ module.exports = function createLectureRoutes({
   });
 
   // Gợi ý giảng đường từ lịch sử (vì không có bảng HALL)
-  router.get('/catalogs/venues', requireAuth, async (req, res) => {
+  router.get('/catalogs/venues', async (req, res) => {
     try {
       const pool = await getPool();
       const result = await pool.request().query(`
@@ -143,17 +167,18 @@ module.exports = function createLectureRoutes({
   // PHẦN 2 — LECTURE CRUD + APPROVAL 2 TẦNG
   // ═════════════════════════════════════════════════════════════
 
-  router.get('/', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/', async (req, res) => {
     try {
       const pool = await getPool();
       const r = pool.request();
-      const userId = req.user.user_id;
-      const roles = await resolveUserRoles(pool, req.user);
+      const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST' || req.user.user_id === 'ANONYMOUS';
+      const userId = req.user?.user_id || 'GUEST';
+      const roles = isGuest ? [] : await resolveUserRoles(pool, req.user);
       const isAdmin = roles.includes('ROL-01');
       const isCommander = roles.includes('ROL-02');
-      const deptHead = await isDeptHead(pool, req.user);
+      const deptHead = isGuest ? false : await isDeptHead(pool, req.user);
       
-      const clearance = req.user.clearance_level_id || 1;
+      const clearance = req.user?.clearance_level_id || 1;
 
       let query = `
         SELECT l.lecture_id, l.lecture_code, l.title, l.subject_id, l.author_id,
@@ -183,23 +208,29 @@ module.exports = function createLectureRoutes({
       `;
       r.input('clearance', sql.Int, clearance);
 
-      const scope = await getLectureScope({ userId, roles, deptHead });
-      if (!scope.all) {
-        const inList = bindUnitIn(r, scope.unitIds);
-        if (deptHead || roles.includes('ROL-02')) {
-          query += ` AND (l.faculty_unit_id IN (${inList}) OR l.author_id = @selfId)`;
-        } else {
-          query += ` AND (l.status = 'PUBLISHED' OR l.author_id = @selfId OR l.faculty_unit_id IN (${inList}))`;
-        }
-        r.input('selfId', sql.VarChar(50), userId);
-      }
-
-      if (req.query.status) {
-        query += ` AND l.status = @status`;
-        r.input('status', sql.VarChar(30), req.query.status);
+      let scope = { all: false, unitIds: [] };
+      if (isGuest) {
+        // Đại biểu / Khách chỉ được xem các bài giảng đã xuất bản (PUBLISHED) và ở mức bảo mật Cấp 1 (Công khai)
+        query += ` AND l.status = 'PUBLISHED' AND l.security_level_id = 1`;
       } else {
-        // Mặc định: Ẩn các bài giảng đã bị xóa mềm
-        query += ` AND l.status != 'DELETED'`;
+        scope = await getLectureScope({ userId, roles, deptHead, includeSiblings: true });
+        if (!scope.all) {
+          const inList = bindUnitIn(r, scope.unitIds);
+          if (deptHead || roles.includes('ROL-02')) {
+            query += ` AND (l.faculty_unit_id IN (${inList}) OR l.author_id = @selfId)`;
+          } else {
+            query += ` AND (l.status = 'PUBLISHED' OR l.author_id = @selfId OR l.faculty_unit_id IN (${inList}))`;
+          }
+          r.input('selfId', sql.VarChar(50), userId);
+        }
+
+        if (req.query.status) {
+          query += ` AND l.status = @status`;
+          r.input('status', sql.VarChar(30), req.query.status);
+        } else {
+          // Mặc định: Ẩn các bài giảng đã bị xóa mềm
+          query += ` AND l.status != 'DELETED'`;
+        }
       }
       if (req.query.subject_id)       { query += ` AND l.subject_id = @subId`;      r.input('subId', sql.VarChar(50), req.query.subject_id); }
       if (req.query.faculty_unit_id)  { query += ` AND l.faculty_unit_id = @fac`;   r.input('fac', sql.NVarChar(50), req.query.faculty_unit_id); }
@@ -207,6 +238,10 @@ module.exports = function createLectureRoutes({
 
       query += ` ORDER BY l.created_at DESC`;
       const result = await r.query(query);
+      result.recordset.forEach((row) => {
+        row.peer_unit = isGuest ? false : isPeerUnit(scope, row.faculty_unit_id);
+        row.can_teach = isGuest ? false : (inScope(scope, row.faculty_unit_id) || row.author_id === userId);
+      });
       res.json({ total: result.recordset.length, items: result.recordset });
     } catch (err) {
       console.error('[GET /api/lectures]', err);
@@ -214,9 +249,12 @@ module.exports = function createLectureRoutes({
     }
   });
 
-  router.get('/:id', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/:id', async (req, res) => {
     try {
       const pool = await getPool();
+      const isGuest = !req.user || !req.user.is_authenticated || req.user.user_id === 'GUEST' || req.user.user_id === 'ANONYMOUS';
+      const clearance = req.user?.clearance_level_id || 1;
+
       const r = await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
         .query(`
@@ -240,15 +278,23 @@ module.exports = function createLectureRoutes({
         `);
       if (r.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lec = r.recordset[0];
-      if (lec.security_level_id > (req.user.clearance_level_id || 1)) {
+      if (lec.security_level_id > clearance) {
         return res.status(403).json({ error: 'Không đủ cấp bảo mật để xem bài giảng này' });
       }
-      const roles = await resolveUserRoles(pool, req.user);
-      const scope = await getLectureScope({
-        userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
-      });
-      if (!inScope(scope, lec.faculty_unit_id) && lec.author_id !== req.user.user_id) {
-        return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
+      if (isGuest) {
+        if (lec.status !== 'PUBLISHED' || lec.security_level_id !== 1) {
+          return res.status(403).json({ error: 'Đại biểu chỉ được xem các bài giảng công khai đã xuất bản' });
+        }
+      } else {
+        const roles = await resolveUserRoles(pool, req.user);
+        const isAdmin = roles.includes('ROL-01');
+        const scope = await getLectureScope({
+          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), includeSiblings: true,
+        });
+        const isPublished = (lec.status === 'PUBLISHED');
+        if (!isPublished && !isAdmin && !inScope(scope, lec.faculty_unit_id) && lec.author_id !== req.user.user_id) {
+          return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
+        }
       }
       // Không lộ đường dẫn lưu trữ nội bộ ra client — chỉ báo có/không có PDF
       lec.has_pdf = !!lec.pdf_path;
@@ -265,13 +311,19 @@ module.exports = function createLectureRoutes({
         content_type, scorm_entry_point,
       } = req.body || {};
       if (!title || !subject_id) return res.status(400).json({ error: 'Thiếu tiêu đề hoặc môn học' });
+      if (lecture_code && String(lecture_code).trim().length > 30) {
+        return res.status(400).json({ error: 'Mã bài giảng không được vượt quá 30 ký tự' });
+      }
+      if (!isSafeEntryPoint(scorm_entry_point)) {
+        return res.status(400).json({ error: 'scorm_entry_point không hợp lệ' });
+      }
 
       const validTypes = ['PDF', 'HTML5', 'SCORM'];
       const ctype = String(content_type || 'PDF').toUpperCase();
       if (!validTypes.includes(ctype)) return res.status(400).json({ error: 'Loại nội dung không hợp lệ' });
-      if (ctype === 'SCORM' && !scorm_entry_point) {
-        return res.status(400).json({ error: 'SCORM yêu cầu scorm_entry_point' });
-      }
+      // SCORM: scorm_entry_point KHÔNG bắt buộc lúc tạo — web tạo bản nháp trước rồi mới tải gói .zip
+      // lên (POST /:id/package/upload), khi đó BE tự đọc imsmanifest.xml và ghi entry point.
+      // Việc "bài chưa có gói" đã được chặn ở bước gửi duyệt (kiểm tra thiếu gói học liệu).
 
       const pool = await getPool();
       const lectureId = 'LEC-' + Date.now();
@@ -326,9 +378,15 @@ module.exports = function createLectureRoutes({
         return res.status(400).json({ error: 'Không thể sửa bài giảng đang chờ duyệt hoặc đã xuất bản' });
       }
 
-      const { title, subject_id, security_level_id, content_type, scorm_entry_point } = req.body || {};
+      const { title, subject_id, lecture_code, security_level_id, content_type, scorm_entry_point } = req.body || {};
+      if (lecture_code && String(lecture_code).trim().length > 30) {
+        return res.status(400).json({ error: 'Mã bài giảng không được vượt quá 30 ký tự' });
+      }
       // Trường nào client không gửi thì GIỮ NGUYÊN giá trị cũ (COALESCE) — tránh xóa nhầm
       // scorm_entry_point khi form sửa không đính kèm lại tệp. Tệp PDF chỉ đổi qua POST /:id/pdf/upload.
+      if (!isSafeEntryPoint(scorm_entry_point)) {
+        return res.status(400).json({ error: 'scorm_entry_point không hợp lệ' });
+      }
       const ctype = String(content_type || lec.content_type || 'PDF').toUpperCase();
       if (!['PDF', 'HTML5', 'SCORM'].includes(ctype)) {
         return res.status(400).json({ error: 'Loại nội dung không hợp lệ' });
@@ -337,6 +395,7 @@ module.exports = function createLectureRoutes({
       await pool.request()
         .input('id', sql.VarChar(50), lectureId)
         .input('title', sql.NVarChar(500), title ?? null)
+        .input('lecture_code', sql.NVarChar(100), lecture_code ? String(lecture_code).trim() : null)
         .input('subject_id', sql.VarChar(50), subject_id ?? null)
         .input('security_level_id', sql.Int, security_level_id ?? null)
         .input('content_type', sql.VarChar(20), ctype)
@@ -344,6 +403,7 @@ module.exports = function createLectureRoutes({
         .query(`
           UPDATE DIGITAL_LECTURE
           SET title = COALESCE(@title, title),
+              lecture_code = COALESCE(@lecture_code, lecture_code),
               subject_id = COALESCE(@subject_id, subject_id),
               security_level_id = COALESCE(@security_level_id, security_level_id),
               content_type = @content_type,
@@ -382,13 +442,25 @@ module.exports = function createLectureRoutes({
       const pool = await getPool();
       const check = await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
-        .query(`SELECT status, author_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT status, author_id, content_type, pending_scorm_path, scorm_entry_point, pdf_path
+                FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
       if (check.recordset[0].author_id !== req.user.user_id) {
         return res.status(403).json({ error: 'Chỉ tác giả mới có quyền gửi duyệt' });
       }
       if (!['DRAFT', 'REJECTED'].includes(check.recordset[0].status)) {
         return res.status(400).json({ error: 'Trạng thái không hợp lệ để gửi duyệt' });
+      }
+      // Chặn gửi duyệt bài chưa có tệp/gói học liệu (nếu không, cấp trên duyệt sẽ báo thiếu gói)
+      const lc = check.recordset[0];
+      const hasContent = lc.content_type === 'PDF'
+        ? !!lc.pdf_path
+        : !!(lc.pending_scorm_path || lc.scorm_entry_point);
+      if (!hasContent) {
+        return res.status(400).json({
+          error: 'Bài giảng chưa có tệp/gói học liệu. Hãy tải lên (Chỉnh sửa → chọn tệp) trước khi gửi duyệt.',
+          code: 'NO_PACKAGE',
+        });
       }
       await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
@@ -523,8 +595,9 @@ module.exports = function createLectureRoutes({
 
       let nextStatus = '';
       if (lec.status === 'PENDING_FACULTY') {
-        if (!isAdmin && !isCommander && !deptHead) {
-          return res.status(403).json({ error: 'Chỉ Trưởng bộ môn hoặc BGH mới duyệt cấp Khoa' });
+        // Quy tắc thống nhất: CHỈ Admin (ROL-01) và Chỉ huy (ROL-02) được duyệt (trưởng bộ môn theo chức vụ không duyệt)
+        if (!isAdmin && !isCommander) {
+          return res.status(403).json({ error: 'Chỉ Admin hoặc Chỉ huy mới được duyệt bài giảng' });
         }
         if (!isAdmin) {
           const scope = await getLectureScope({ userId: req.user.user_id, roles, deptHead });
@@ -653,6 +726,10 @@ module.exports = function createLectureRoutes({
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
       {
         const roles = await resolveUserRoles(pool, req.user);
+        // Từ chối cũng là quyết định duyệt → chỉ Admin (ROL-01) / Chỉ huy (ROL-02)
+        if (!roles.includes('ROL-01') && !roles.includes('ROL-02')) {
+          return res.status(403).json({ error: 'Chỉ Admin hoặc Chỉ huy mới được từ chối bài giảng' });
+        }
         const scope = await getLectureScope({
           userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
         });
@@ -676,14 +753,66 @@ module.exports = function createLectureRoutes({
   // PHẦN 3 — TEACHING SCHEDULE (Ca giảng dạy)
   // ═════════════════════════════════════════════════════════════
 
+  // Danh sách giảng đường CHỌN ĐƯỢC khi mở ca (thay cho ô nhập tay): phòng đang hoạt động,
+  // kèm khu, sức chứa, trạng thái bảo trì và có ca đang diễn ra hay không.
+  router.get('/catalogs/rooms', async (req, res) => {
+    try {
+      const pool = await getPool();
+      const catalog = await loadBuildingCatalog(pool);
+      const catalogByCode = new Map(catalog.map((b) => [b.building_code, b]));
+      const inactiveCodes = new Set(catalog.filter((b) => !b.active).map((b) => b.building_code));
+
+      const r = await pool.request().query(`
+        SELECT c.room_id, c.room_name, c.room_type, c.capacity, c.building_code, c.building_name,
+               c.floor_number, c.display_order, c.is_maintenance, c.maintenance_reason,
+               CAST(CASE WHEN EXISTS (
+                 SELECT 1 FROM TEACHING_SCHEDULE s
+                 WHERE s.status = 'ONGOING' AND (s.room_id = c.room_id OR s.venue_name = c.room_name)
+               ) THEN 1 ELSE 0 END AS BIT) AS is_busy
+        FROM CLASSROOM c
+        WHERE c.active = 1
+        ORDER BY c.building_code, c.floor_number, c.display_order, c.room_name
+      `);
+
+      const items = r.recordset
+        .filter((x) => !inactiveCodes.has(x.building_code || 'H1'))
+        .map((x) => {
+          const code = x.building_code || 'H1';
+          const cat = catalogByCode.get(code);
+          return {
+            room_id: x.room_id,
+            room_name: x.room_name,
+            room_type: x.room_type,
+            capacity: x.capacity,
+            building_code: code,
+            building_name: cat?.building_name || x.building_name || `Khu ${code}`,
+            building_order: cat?.display_order ?? 999,
+            is_maintenance: !!x.is_maintenance,
+            maintenance_reason: x.maintenance_reason || null,
+            is_busy: !!x.is_busy,
+          };
+        })
+        .sort((a, b) => a.building_order - b.building_order || a.building_code.localeCompare(b.building_code));
+
+      res.json({ items });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   // Bắt đầu ca
   router.post('/schedules/start', requireAuth, requirePermission('SCHEDULE_START'), async (req, res) => {
     try {
-      const { lecture_id, class_id, venue_name, student_count, session_type, note } = req.body || {};
+      const { lecture_id, class_id, room_id, student_count, session_type, note } = req.body || {};
       const stype = String(session_type || 'TEACHER_LED').toUpperCase();
 
-      if (!lecture_id || !class_id || !venue_name) {
-        return res.status(400).json({ error: 'Thiếu bài giảng, lớp hoặc giảng đường' });
+      if (!lecture_id || !class_id) {
+        return res.status(400).json({ error: 'Thiếu bài giảng hoặc lớp' });
+      }
+      // Giảng đường phải chọn từ danh sách (mã phòng), không nhận tên gõ tay để sơ đồ giám sát luôn khớp
+      if (!room_id) {
+        return res.status(400).json({
+          error: 'Vui lòng chọn giảng đường từ danh sách',
+          code: 'ROOM_REQUIRED',
+        });
       }
       if (!['TEACHER_LED', 'SELF_STUDY'].includes(stype)) {
         return res.status(400).json({ error: 'Loại ca dạy không hợp lệ' });
@@ -705,7 +834,7 @@ module.exports = function createLectureRoutes({
       {
         const roles = await resolveUserRoles(pool, req.user);
         const scope = await getLectureScope({
-          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
+          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), includeSiblings: true,
         });
         if (!inScope(scope, lecture.faculty_unit_id)) {
           return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
@@ -735,9 +864,10 @@ module.exports = function createLectureRoutes({
           if (decoded.purpose !== 'file_access') throw new Error('Sai purpose');
 
           // Xác thực chéo: token phải khớp đúng bài giảng VÀ đúng user đang đăng nhập
-          if (decoded.file_id !== lecture.lecture_id) throw new Error('Token không khớp bài giảng');
+          if (decoded.file_id !== String(lecture_id).trim()) throw new Error('Token không khớp bài giảng');
           if (decoded.user_id !== req.user.user_id) throw new Error('Token không khớp user');
         } catch (err) {
+          console.warn('[POST schedules/start] token vân tay bị từ chối:', err.name, '-', err.message);
           return res.status(403).json({
             error: 'Phiên xác thực vân tay không hợp lệ hoặc đã hết hạn. Vui lòng quét lại.',
             require_fingerprint: true,
@@ -745,11 +875,33 @@ module.exports = function createLectureRoutes({
         }
       }
 
-      // Kiểm tra giảng đường trống
+      // Giảng đường phải có thật, đang hoạt động, khu không bị tắt và không bảo trì
+      const roomRes = await pool.request()
+        .input('rid', sql.VarChar(50), String(room_id))
+        .query(`SELECT room_id, room_name, building_code, is_maintenance, maintenance_reason, active
+                FROM CLASSROOM WHERE room_id = @rid`);
+      const room = roomRes.recordset[0];
+      if (!room || !room.active) {
+        return res.status(400).json({ error: 'Giảng đường không tồn tại hoặc đã ngừng sử dụng', code: 'ROOM_NOT_FOUND' });
+      }
+      const buildingCatalogStart = await loadBuildingCatalog(pool);
+      if (buildingCatalogStart.some((b) => b.building_code === (room.building_code || 'H1') && !b.active)) {
+        return res.status(400).json({ error: 'Khu của giảng đường này đã ngừng sử dụng', code: 'BUILDING_INACTIVE' });
+      }
+      if (room.is_maintenance) {
+        return res.status(409).json({
+          error: `Giảng đường đang bảo trì${room.maintenance_reason ? `: ${room.maintenance_reason}` : ''}`,
+          code: 'ROOM_MAINTENANCE',
+        });
+      }
+      const venue_name = room.room_name; // tên hiển thị lấy từ danh mục, không tin dữ liệu client
+
+      // Kiểm tra giảng đường trống (theo mã phòng; kèm tên để bắt các ca cũ ghi tên tự do)
       const busy = await pool.request()
+        .input('rid', sql.VarChar(50), room.room_id)
         .input('v', sql.NVarChar(100), venue_name)
         .query(`SELECT TOP 1 schedule_id FROM TEACHING_SCHEDULE
-                WHERE venue_name = @v AND status = 'ONGOING'`);
+                WHERE status = 'ONGOING' AND (room_id = @rid OR venue_name = @v)`);
       if (busy.recordset.length > 0) {
         return res.status(409).json({
           error: 'Giảng đường đang có ca giảng dạy khác chưa kết thúc',
@@ -761,6 +913,7 @@ module.exports = function createLectureRoutes({
       const hasSessionType = await hasColumn(pool, 'TEACHING_SCHEDULE', 'session_type');
       const hasCurrentPage = await hasColumn(pool, 'TEACHING_SCHEDULE', 'current_page');
       const hasNote = await hasColumn(pool, 'TEACHING_SCHEDULE', 'note');
+      const hasRoomId = await hasColumn(pool, 'TEACHING_SCHEDULE', 'room_id');
 
       const scheduleId = 'SCH-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
       const presenterId = req.user.user_id;
@@ -775,6 +928,10 @@ module.exports = function createLectureRoutes({
         .input('v', sql.NVarChar(100), venue_name)
         .input('cnt', sql.Int, sc);
 
+      if (hasRoomId) {
+        columns.push('room_id'); values.push('@rid');
+        request.input('rid', sql.VarChar(50), room.room_id);
+      }
       if (hasSessionType) {
         columns.push('session_type'); values.push('@stype');
         request.input('stype', sql.VarChar(20), stype);
@@ -795,7 +952,7 @@ module.exports = function createLectureRoutes({
       await logAudit(
         req,
         'SCHEDULE_START',
-        `Bắt đầu ca ${stype}: "${lecture.title}" | sĩ số=${sc} | venue=${venue_name}`,
+        `Bắt đầu ca ${stype}: "${lecture.title}" | sĩ số=${sc} | phòng=${room.room_id} (${venue_name})`,
         lecture_id
       );
 
@@ -803,6 +960,8 @@ module.exports = function createLectureRoutes({
         success: true,
         schedule_id: scheduleId,
         session_type: hasSessionType ? stype : 'TEACHER_LED',
+        room_id: room.room_id,
+        venue_name,
         start_time: new Date().toISOString(),
       });
     } catch (err) {
@@ -961,7 +1120,7 @@ module.exports = function createLectureRoutes({
   });
 
   // Live Monitor — LECTURE_VIEW + role check
-  router.get('/schedules/live', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/schedules/live', requireAuth, monitorReadGuard, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
@@ -1037,12 +1196,18 @@ module.exports = function createLectureRoutes({
   // PHẦN 3B — QK7 LECTURE HALL RADAR (REAL-TIME CLASSROOM MONITORING)
   // ═════════════════════════════════════════════════════════════
 
-  const BUILDING_NAMES = {
-    H1: 'Khu Giảng đường H1',
-    H2: 'Khu Giảng đường H2',
-    HT: 'Khu Hội trường Quân sự',
-    PM: 'Khu Công nghệ / Phòng máy',
-  };
+  // Danh mục khu lấy từ bảng CLASSROOM_BUILDING (quản lý trong Quản trị, không còn viết cứng).
+  // Chưa có bảng (chưa chạy migration) → trả [] và dùng tên ghi kèm từng phòng.
+  async function loadBuildingCatalog(pool) {
+    try {
+      const r = await pool.request().query(
+        `SELECT building_code, building_name, display_order, active
+         FROM CLASSROOM_BUILDING ORDER BY display_order, building_code`);
+      return r.recordset;
+    } catch (_) {
+      return [];
+    }
+  }
 
   function sanitizeSessionForClearance(session, userClearance) {
     if (!session) return null;
@@ -1055,7 +1220,7 @@ module.exports = function createLectureRoutes({
   }
 
   // 1. Radar Overview: KPIs + Danh sách các Khu & Tầng
-  router.get('/radar/overview', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/radar/overview', requireAuth, monitorReadGuard, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
@@ -1077,7 +1242,11 @@ module.exports = function createLectureRoutes({
         WHERE active = 1
         ORDER BY building_code, floor_number, display_order
       `);
-      const allRooms = roomsResult.recordset;
+      // Khu đã bị tắt thì ẩn cả các phòng của khu đó khỏi sơ đồ và KPI
+      const buildingCatalog = await loadBuildingCatalog(pool);
+      const catalogByCode = new Map(buildingCatalog.map((b) => [b.building_code, b]));
+      const inactiveCodes = new Set(buildingCatalog.filter((b) => !b.active).map((b) => b.building_code));
+      const allRooms = roomsResult.recordset.filter((r) => !inactiveCodes.has(r.building_code || 'H1'));
 
       // Các ca đang diễn ra (ONGOING)
       const ongoingResult = await pool.request().query(`
@@ -1150,18 +1319,26 @@ module.exports = function createLectureRoutes({
       }
       const available = Math.max(0, total_rooms - in_session - maintenance);
 
+      const makeBuilding = (code, name) => ({
+        building_code: code,
+        building_name: name,
+        total_rooms: 0,
+        in_session_count: 0,
+        maintenance_count: 0,
+        floors: new Set(),
+      });
       const buildingsMap = new Map();
+      // Khu trong danh mục (đang bật) luôn hiện, kể cả khi chưa có phòng nào
+      for (const c of buildingCatalog) {
+        if (c.active) buildingsMap.set(c.building_code, makeBuilding(c.building_code, c.building_name));
+      }
       for (const r of allRooms) {
         const bCode = r.building_code || 'H1';
         if (!buildingsMap.has(bCode)) {
-          buildingsMap.set(bCode, {
-            building_code: bCode,
-            building_name: BUILDING_NAMES[bCode] || r.building_name || `Khu ${bCode}`,
-            total_rooms: 0,
-            in_session_count: 0,
-            maintenance_count: 0,
-            floors: new Set(),
-          });
+          buildingsMap.set(
+            bCode,
+            makeBuilding(bCode, catalogByCode.get(bCode)?.building_name || r.building_name || `Khu ${bCode}`)
+          );
         }
         const b = buildingsMap.get(bCode);
         b.total_rooms++;
@@ -1194,7 +1371,7 @@ module.exports = function createLectureRoutes({
   });
 
   // 2. Radar Floor Plan: Sơ đồ phòng học và trạng thái theo Khu và Tầng
-  router.get('/radar/floor-plan', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/radar/floor-plan', requireAuth, monitorReadGuard, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
@@ -1304,7 +1481,9 @@ module.exports = function createLectureRoutes({
 
       res.json({
         building_code: buildingCode,
-        building_name: BUILDING_NAMES[buildingCode] || `Khu ${buildingCode}`,
+        building_name:
+          (await loadBuildingCatalog(pool)).find((b) => b.building_code === buildingCode)?.building_name
+          || `Khu ${buildingCode}`,
         floor_number: floorNumber,
         time_shift: timeShift,
         rooms: resultRooms,
@@ -1317,7 +1496,7 @@ module.exports = function createLectureRoutes({
   });
 
   // 3. Radar Room Detail: Chi tiết giảng đường cho Inspector
-  router.get('/radar/rooms/:roomId/detail', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/radar/rooms/:roomId/detail', requireAuth, monitorReadGuard, async (req, res) => {
     try {
       const pool = await getPool();
       const roles = await resolveUserRoles(pool, req.user);
@@ -1345,7 +1524,9 @@ module.exports = function createLectureRoutes({
         return res.status(404).json({ error: 'Không tìm thấy phòng học' });
       }
       const room = roomRes.recordset[0];
-      room.building_name = BUILDING_NAMES[room.building_code] || room.building_name;
+      room.building_name =
+        (await loadBuildingCatalog(pool)).find((b) => b.building_code === room.building_code)?.building_name
+        || room.building_name;
 
       const hasNote = await hasColumn(pool, 'TEACHING_SCHEDULE', 'note');
 

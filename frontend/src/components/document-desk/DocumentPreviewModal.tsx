@@ -3,6 +3,7 @@ import { HIGHLIGHTER_COLORS } from './DocumentHighlighter';
 import { Highlighter, Trash2, Undo2 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
 import {
   X,
   Download,
@@ -69,6 +70,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [highlighterColor, setHighlighterColor] = useState<string>(HIGHLIGHTER_COLORS[0].value);
   const [strokeCount, setStrokeCount] = useState<number>(0);
   const highlighterRef = React.useRef<{ undo: () => void; clear: () => void; getStrokeCount: () => number } | null>(null);
+
+  // ⭕ Vòng chỉ báo hoàn thành đọc tài liệu (Document Reading Completion Ring)
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress>({
+    currentPage: 1,
+    totalPages: 1,
+    percent: 0,
+    isCompleted: false,
+  });
+  const viewerRef = React.useRef<{ scrollToPage: (page: number) => void; scrollToTop: () => void; scrollToNext: () => void } | null>(null);
 
   // 🛡️ Chống chụp màn hình & cảnh báo an ninh (PrintScreen, Win+Shift+S, Quá 3 lần khóa tài khoản)
   const { isShieldActive, violationInfo, violationCount, isAccountLocked, dismissShield } = useAntiScreenshot({
@@ -238,6 +248,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   useEffect(() => {
     if (open && document) {
+      // Đặt lại tiến độ đọc về trạng thái ban đầu (0% - Chưa đọc)
+      setReadingProgress({
+        currentPage: page || 1,
+        totalPages: 1,
+        percent: 0,
+        isCompleted: false,
+      });
+
       // Khi mở modal: ưu tiên propInitialToken, sau đó fallback sang sessionStorage per-file (đồng bộ với fileService).
       // Token được bind chặt với file_id ở server-side nên không thể dùng chéo file khác.
       // Đối với tài liệu Cấp 3+ chưa có token hợp lệ, fingerprintToken ban đầu là null nên sẽ kích hoạt quét vân tay ngay lập tức.
@@ -256,6 +274,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       setLoading(false);
       setShowScanModal(false);
       clearBiometricSession();
+      setReadingProgress({
+        currentPage: 1,
+        totalPages: 1,
+        percent: 0,
+        isCompleted: false,
+      });
     }
 
     return () => {
@@ -460,6 +484,24 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
+              {/* ⭕ Document Reading Completion Ring (Vòng chỉ báo hoàn thành đọc tài liệu) */}
+              {blobUrl && (
+                <DocumentReadingRing
+                  currentPage={readingProgress.currentPage}
+                  totalPages={readingProgress.totalPages}
+                  percent={readingProgress.percent}
+                  isCompleted={readingProgress.isCompleted}
+                  variant="header"
+                  onClick={() => {
+                    if (readingProgress.currentPage > 1 || readingProgress.percent > 0) {
+                      viewerRef.current?.scrollToTop();
+                    } else {
+                      viewerRef.current?.scrollToNext();
+                    }
+                  }}
+                />
+              )}
+
               {/* 🖊️ Bút dạ quang ghi chú (Hỗ trợ toàn diện từ Cấp 1 đến Cấp 5) */}
               <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700">
                 <button
@@ -610,6 +652,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   highlighterColor={highlighterColor}
                   onStrokeCountChange={(count) => setStrokeCount(count)}
                   highlighterRef={highlighterRef}
+                  onReadingProgressChange={(prog) => setReadingProgress(prog)}
+                  viewerRef={viewerRef}
+                  showFloatingProgressRing={true}
                 />
 
                 {/* Lá chắn cảnh báo đỏ vi phạm an ninh (Liên tục & Quá 3 lần khóa tài khoản) */}

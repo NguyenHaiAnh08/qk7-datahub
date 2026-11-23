@@ -22,6 +22,8 @@ export interface FingerprintScanModalProps {
   fileId?: string;
   purpose?: 'file_access' | 'admin_login';
   tempTicket?: string;
+  /** Cổng đăng nhập đã chọn ở bước 1 (chỉ dùng khi purpose='admin_login'); backend kiểm tra lại theo vai trò. */
+  portal?: 'datahub' | 'training';
   onSuccess: (fingerprintToken: string) => void;
   onCancel: () => void;
   // ✅ FIX #2: thêm onToast vào interface
@@ -37,6 +39,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
   fileId = '',
   purpose = 'file_access',
   tempTicket,
+  portal,
   onSuccess,
   onCancel,
   onToast = () => {},        // ✅ FIX #2: default no-op
@@ -145,7 +148,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         const res: any = await http('/api/auth/login/admin-fp-verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ temp_ticket: tempTicket, device_id: deviceId }),
+          body: JSON.stringify({ temp_ticket: tempTicket, device_id: deviceId, portal: portal || 'datahub' }),
           signal,
         });
         if (signal.aborted || !mountedRef.current) return;
@@ -194,6 +197,7 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       if (err?.name === 'AbortError' || signal.aborted || !mountedRef.current) return;
 
       const msg = err.message || 'Xác thực thất bại';
+      const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
       const isAgentOffline = Boolean(
         err.data?.agent_offline ||
         err.data?.device_offline ||
@@ -207,6 +211,22 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
       const isCancelled = Boolean(err.data?.cancelled) || err.message === 'CANCELLED';
       const isTimeout = Boolean(err.data?.timeout) || err.status === 408 || /Hết thời gian/i.test(msg);
       const isDeviceError = Boolean(err.data?.device_error) || /Lỗi máy quét/i.test(msg);
+      const isTicketInvalid =
+        err.status === 401 ||
+        err.data?.code === 'TICKET_INVALID' ||
+        err.data?.code === 'TICKET_ALREADY_USED' ||
+        err.data?.code === 'TICKET_EXPIRED' ||
+        err.data?.code === 'TICKET_MAX_ATTEMPTS' ||
+        err.data?.exhausted === true ||
+        /Phiên xác thực không hợp lệ/i.test(msg) ||
+        /quá 3 lần thử/i.test(msg);
+
+      if (isTicketInvalid) {
+        setError(cleanMsg || msg || 'Phiên xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đóng cửa sổ và đăng nhập lại.');
+        setPhase('error');
+        setRetryExhausted(true);
+        return;
+      }
 
       if (isCancelled) {
         if (retryCountRef.current < 1) {
@@ -250,7 +270,6 @@ export const FingerprintScanModal: React.FC<FingerprintScanModalProps> = ({
         setPhase('error');
         setRetryExhausted(true);
       } else {
-        const cleanMsg = msg.replace(/\s*\(score=\d+\)/gi, '');
         setError(cleanMsg || 'Vân tay không khớp. Vui lòng thử lại.');
         setPhase('error');
 

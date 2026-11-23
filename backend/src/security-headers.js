@@ -22,8 +22,11 @@ function createSecurityHeadersMiddleware() {
 
     // Kiểm tra xem request có phải là gói học liệu số hóa (SCORM/HTML5/PDF view trong iframe)
     const reqPath = req.path || '';
-    const isLecturePlayback = reqPath.includes('/scorm/') || reqPath.includes('/html5/') || reqPath.includes('/launch');
-    const isFramedPdfView = reqPath.startsWith('/api/files/') && reqPath.endsWith('/view');
+    // CHỈ nới CSP cho đúng route phát gói học liệu / PDF bài giảng (GET). Trước đây dùng includes()
+    // trên cả đường dẫn nên bất kỳ URL nào chứa '/pdf', '/launch'... cũng được nới (unsafe-inline/eval).
+    const isLecturePlayback = req.method === 'GET' &&
+      /^\/api\/lectures\/[^/]+\/((scorm|html5)\/|pdf\/?$)/.test(reqPath);
+    const isFramedPdfView = (reqPath.startsWith('/api/files/') && reqPath.endsWith('/view')) || reqPath.includes('/pdf');
 
     if (isLecturePlayback) {
       // 3a. CSP chuyên dụng cho SCORM / HTML5 / ActivePresenter: cho phép engine player chạy trơn tru
@@ -34,7 +37,9 @@ function createSecurityHeadersMiddleware() {
         "img-src 'self' blob: data:",
         "media-src 'self' blob: data:",
         "font-src 'self' blob: data:",
-        "connect-src 'self' blob: data: ws: wss: https://127.0.0.1:9001 https://localhost:9001",
+        // Gói học liệu chỉ được gọi lại chính server này: bỏ ws:/wss: (cho phép gửi dữ liệu ra mọi máy chủ ngoài)
+        "connect-src 'self' blob: data:",
+        "form-action 'self'",
         "frame-ancestors 'self'",
         "object-src 'none'",
         "base-uri 'self'"

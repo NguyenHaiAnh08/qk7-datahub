@@ -10,7 +10,6 @@ import {
   UploadCloud,
   BookOpen,
   MonitorPlay,
-  Layers,
   Library,
   School,
   LogOut,
@@ -32,10 +31,12 @@ import { useDeviceMode } from '../../contexts/DeviceModeContext';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { useAIChat } from '../../contexts/AIChatContext';
 import { ThemeToggle } from './ThemeToggle';
+import { MainNavBar } from './MainNavBar';
 import { DeviceModeSwitch } from './DeviceModeSwitch';
 import { ROUTE_PATHS } from '../../routes/routePaths';
 import { useApprovalContext } from '../../contexts/ApprovalContext';
 import { UserViewPinModal } from '../users/UserViewPinModal';
+import { authService } from '../../services/authService';
 
 interface HeaderProps {
   title?: string;
@@ -135,172 +136,6 @@ export function checkUserCanAccessAdmin(
   return adminCategoryPermissions.some((perm) => hasPermission(perm));
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// COMPONENT: Cụm Nút Điều Hướng 5 Phân Hệ (Morphing Pill: Icon -> Chữ Đẩy Ra)
-// ══════════════════════════════════════════════════════════════════════
-const NavigationGlider: React.FC<{
-  activeNav?: 'desk' | 'portal' | 'myunit' | 'admin' | 'login' | 'lectures' | 'classrooms' | 'materials' | 'library' | 'data';
-}> = ({ activeNav: explicitActiveNav }) => {
-  const { user, isAdmin, hasPermission } = useAuth();
-  const canAccessAdmin = useMemo(() => checkUserCanAccessAdmin(user, isAdmin, hasPermission), [user, isAdmin, hasPermission]);
-  const { deviceMode, isTouch } = useDeviceMode();
-  const location = useLocation();
-
-  // Nhận diện thiết bị cảm ứng hoặc chế độ iPadOS để vô hiệu hóa Tooltip
-  const isTouchOrIPad =
-    deviceMode === 'ipad' ||
-    isTouch ||
-    (typeof navigator !== 'undefined' &&
-      (navigator.maxTouchPoints > 0 ||
-        (/iPad|iPhone|iPod|Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1))) ||
-    (typeof window !== 'undefined' && 'ontouchstart' in window);
-
-  const getEffectiveActiveNav = () => {
-    if (explicitActiveNav) {
-      if (
-        explicitActiveNav === 'desk' ||
-        explicitActiveNav === 'myunit' ||
-        explicitActiveNav === 'portal' ||
-        explicitActiveNav === 'data'
-      ) {
-        return 'portal';
-      }
-      return explicitActiveNav;
-    }
-    const path = location.pathname;
-    if (
-      path.startsWith(ROUTE_PATHS.DESK) ||
-      path.startsWith(ROUTE_PATHS.MY_UNIT) ||
-      path.startsWith(ROUTE_PATHS.PORTAL)
-    ) {
-      return 'portal';
-    }
-    if (path.startsWith(ROUTE_PATHS.LECTURES)) return 'lectures';
-    if (path.startsWith(ROUTE_PATHS.CLASSROOMS)) return 'classrooms';
-    if (path.startsWith(ROUTE_PATHS.MATERIALS)) return 'materials';
-    if (path.startsWith(ROUTE_PATHS.LIBRARY)) return 'library';
-    if (path.startsWith(ROUTE_PATHS.ADMIN)) return 'admin';
-    return undefined;
-  };
-
-  const activeNav = getEffectiveActiveNav();
-
-  const allNavTabs = [
-    {
-      key: 'portal',
-      to: ROUTE_PATHS.PORTAL,
-      label: 'Văn bản số',
-      icon: BookOpen,
-      tourId: 'tour-nav-portal',
-      visible: true,
-    },
-    {
-      key: 'lectures',
-      to: ROUTE_PATHS.LECTURES,
-      label: 'Bài giảng số',
-      icon: MonitorPlay,
-      visible: true,
-    },
-    {
-      key: 'classrooms',
-      to: ROUTE_PATHS.CLASSROOMS,
-      label: 'Giảng đường',
-      icon: School,
-      visible: true,
-    },
-    {
-      key: 'materials',
-      to: ROUTE_PATHS.MATERIALS,
-      label: 'Học liệu số',
-      icon: Layers,
-      visible: false, // Tạm thời ẩn theo yêu cầu
-    },
-    {
-      key: 'library',
-      to: ROUTE_PATHS.LIBRARY,
-      label: 'Thư viện số',
-      icon: Library,
-      visible: true,
-    },
-    {
-      key: 'admin',
-      to: ROUTE_PATHS.ADMIN,
-      label: 'Quản trị',
-      icon: Shield,
-      visible: Boolean(canAccessAdmin),
-    },
-  ];
-
-  const visibleTabs = allNavTabs.filter((t) => t.visible);
-
-  return (
-    <nav
-      aria-label="Điều hướng hệ thống"
-      className="u058-nav relative flex items-center gap-1.5 sm:gap-2 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-2xl rounded-full px-2 sm:px-2.5 py-1.5 select-none w-fit max-w-full touch-manipulation"
-    >
-      {visibleTabs.map((tab) => {
-        const isActive = activeNav === tab.key;
-        const IconComponent = tab.icon;
-
-        const tabLink = (
-          <Link
-            key={tab.key}
-            id={tab.tourId || (tab.key === 'portal' ? 'tour-nav-portal' : undefined)}
-            to={tab.to}
-            onClick={(e) => {
-              if (isActive && location.pathname === tab.to) {
-                e.preventDefault();
-              }
-            }}
-            aria-current={isActive ? 'page' : undefined}
-            aria-label={tab.label}
-            data-active={isActive ? 'true' : 'false'}
-            className={`u058-tab relative z-10 shrink-0 flex items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 ease-out select-none h-10 touch-manipulation cursor-pointer ${
-              isActive
-                ? 'is-active bg-[#166534] dark:bg-emerald-600 !text-white font-bold px-4 py-2 shadow-md border border-emerald-500/40'
-                : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 w-10 px-0 border border-transparent'
-            }`}
-            style={isActive ? { color: '#ffffff' } : undefined}
-          >
-            <IconComponent
-              className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
-                isActive ? 'scale-105 !text-white stroke-white' : 'text-slate-600 dark:text-slate-400'
-              }`}
-              style={isActive ? { color: '#ffffff', stroke: '#ffffff' } : undefined}
-            />
-            <span
-              className={`morphing-pill-label overflow-hidden whitespace-nowrap transition-all duration-200 ease-out ${
-                isActive
-                  ? 'max-w-[280px] opacity-100 ml-2 font-bold !text-white'
-                  : 'max-w-0 opacity-0 ml-0 pointer-events-none'
-              }`}
-              style={isActive ? { color: '#ffffff' } : undefined}
-            >
-              {tab.label}
-            </span>
-          </Link>
-        );
-
-        if (isTouchOrIPad || isActive) {
-          return <React.Fragment key={tab.key}>{tabLink}</React.Fragment>;
-        }
-
-        return (
-          <Tooltip
-            key={tab.key}
-            title={tab.label}
-            placement="bottom"
-            mouseEnterDelay={0.25}
-            arrow={{ pointAtCenter: true }}
-          >
-            {tabLink}
-          </Tooltip>
-        );
-      })}
-    </nav>
-  );
-};
-
 export const Header: React.FC<HeaderProps> = ({
   title = 'Trường Quân Sự Quân Khu 7',
   subtitle = 'Trung tâm dữ liệu số',
@@ -347,7 +182,8 @@ export const Header: React.FC<HeaderProps> = ({
   );
 
   const canAccessTrash = hasPermission('DOC_TRASH_VIEW');
-  const canAccessSessions = hasPermission('SESSION_VIEW');
+  // Khu giám sát (phiên đang hoạt động) chỉ có ở cổng Quản lý đào tạo
+  const canAccessSessions = hasPermission('SESSION_VIEW') && authService.getCurrentPortal() === 'training';
 
   useEffect(() => {
     const handleDevChanged = () => {
@@ -545,41 +381,33 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         )}
 
-        <Link
-          to={ROUTE_PATHS.LECTURES}
-          onClick={() => {
-            setUserPopoverOpen(false);
-            setDropdownOpen(false);
-          }}
-          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
-        >
-          <MonitorPlay className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
-          <span>Bài giảng số</span>
-        </Link>
+        {hasPermission('LECTURE_VIEW') && (
+          <Link
+            to={ROUTE_PATHS.LECTURES}
+            onClick={() => {
+              setUserPopoverOpen(false);
+              setDropdownOpen(false);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+          >
+            <MonitorPlay className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+            <span>Bài giảng số</span>
+          </Link>
+        )}
 
-        <Link
-          to={ROUTE_PATHS.CLASSROOMS}
-          onClick={() => {
-            setUserPopoverOpen(false);
-            setDropdownOpen(false);
-          }}
-          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
-        >
-          <School className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
-          <span>Giảng đường</span>
-        </Link>
-
-        <Link
-          to={ROUTE_PATHS.MATERIALS}
-          onClick={() => {
-            setUserPopoverOpen(false);
-            setDropdownOpen(false);
-          }}
-          className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
-        >
-          <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
-          <span>Học liệu số</span>
-        </Link>
+        {hasPermission('COMMAND_VIEW') && (
+          <Link
+            to={ROUTE_PATHS.CLASSROOMS}
+            onClick={() => {
+              setUserPopoverOpen(false);
+              setDropdownOpen(false);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+          >
+            <School className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mr-2" />
+            <span>Giám sát</span>
+          </Link>
+        )}
 
         <Link
           to={ROUTE_PATHS.LIBRARY}
@@ -793,6 +621,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             <div
+              id="tour-nav-brand"
               className="flex items-center gap-2.5 cursor-pointer group shrink-0"
               onClick={() => navigate(canAccessAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
             >
@@ -813,9 +642,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 flex justify-center px-1 sm:px-2 lg:px-4 min-w-0 overflow-hidden">
-            <NavigationGlider activeNav={activeNav} />
-          </div>
+          <div className="flex-1" />
 
           <div id="tour-header-controls-ipad" className="shrink-0 z-20 flex items-center gap-1.5 sm:gap-2">
             {!isOnline && (
@@ -937,6 +764,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </header>
 
+        <MainNavBar activeNav={activeNav} canAccessAdmin={canAccessAdmin} />
+
         {/* ✅ Modal xem PIN — render ngoài <header> để tránh bị cắt bởi overflow-hidden */}
         {pinViewModal}
       </>
@@ -964,6 +793,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           <div
+            id="tour-nav-brand-pc"
             className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group shrink-0"
             onClick={() => navigate(canAccessAdmin ? ROUTE_PATHS.ADMIN : ROUTE_PATHS.PORTAL)}
           >
@@ -986,9 +816,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <div className="hidden sm:flex flex-1 justify-center items-center px-2 sm:px-4 min-w-0 z-10">
-          <NavigationGlider activeNav={activeNav} />
-        </div>
+        <div className="flex-1" />
 
         <div id="tour-header-controls" className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-2.5 shrink-0 z-20">
           {!isOnline && (
@@ -1003,11 +831,11 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <div className="shrink-0">
+          <div id="tour-device-switch" className="shrink-0">
             <DeviceModeSwitch compact />
           </div>
 
-          <div className="shrink-0">
+          <div id="tour-theme-toggle" className="shrink-0">
             <ThemeToggle />
           </div>
 
@@ -1124,6 +952,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </header>
+
+      <MainNavBar activeNav={activeNav} canAccessAdmin={canAccessAdmin} />
 
       {/* ✅ Modal xem PIN — render ngoài <header> để tránh bị cắt bởi overflow-hidden */}
       {pinViewModal}

@@ -4,6 +4,116 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.6-lecture-code-limit-and-card-layout] — 2026-11-23
+
+### 1. Giới Hạn Mã Bài Giảng 30 Ký Tự (`CreateLectureModal.tsx` & `lecture-routes.js`)
+- **Kiểm soát trực tiếp trên giao diện tạo bài giảng ([`CreateLectureModal.tsx`](../frontend/src/components/lectures/CreateLectureModal.tsx)):**
+  - Tích hợp bộ đếm ký tự trực quan `{lectureCode.length}/30` ngay dưới ô nhập mã bài giảng.
+  - Khi vượt quá 30 ký tự: viền ô nhập lập tức chuyển đỏ cảnh báo, hiển thị dòng thông báo lỗi tức thì và vô hiệu hóa nút submit (`disabled={submitting || lectureCode.length > 30}`), tuyệt đối ngăn chặn việc tải bài giảng lên khi mã không hợp lệ.
+- **Ràng buộc bảo vệ tầng Gateway ([`lecture-routes.js`](../backend/src/lecture-routes.js)):**
+  - Thực thi kiểm tra độ dài mã bài giảng tại cả 2 endpoint `POST /api/lectures` và `PUT /api/lectures/:id` (`lecture_code.trim().length > 30` -> từ chối HTTP `400 Bad Request`).
+  - Hỗ trợ cập nhật trường `lecture_code` trong câu lệnh `UPDATE` khi chỉnh sửa thông tin bài giảng.
+
+### 2. Tinh Chỉnh Hiển Thị Chống Tràn Tiêu Đề Bài Giảng & Hiển Thị Đầy Đủ Mã Bài Giảng
+- **Tiêu đề bài giảng tự động ngắt 2 dòng và cắt `...`:**
+  - Áp dụng các utility class `line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] overflow-hidden` cho trường tiêu đề bài giảng (`title`) trên toàn bộ hệ thống component: [`LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx), [`LectureDetailModal.tsx`](../frontend/src/components/lectures/LectureDetailModal.tsx), [`LectureViewerModal.tsx`](../frontend/src/components/lectures/LectureViewerModal.tsx), [`RejectReasonModal.tsx`](../frontend/src/components/lectures/RejectReasonModal.tsx), [`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx), và [`TeachingHistoryPanel.tsx`](../frontend/src/components/lectures/TeachingHistoryPanel.tsx).
+  - Đảm bảo tiêu đề dù dài đến đâu cũng chỉ chiếm tối đa 2 dòng, có dấu `...` ở cuối và tuyệt đối không làm vỡ hoặc tràn ra ngoài khung thẻ.
+- **Hiển thị đầy đủ 100% Mã bài giảng:**
+  - Do mã bài giảng đã bị chặn cứng tối đa 30 ký tự, huy hiệu mã bài giảng trên thẻ và modal được gỡ bỏ giới hạn chiều rộng và `truncate`, hiển thị toàn bộ chuỗi mã mà không bị cắt `...`.
+
+### 3. Quy Hoạch Bố Cục Thẻ Bài Giảng & Dàn Hàng Ngang Cụm Nút Thao Tác (`LectureCard.tsx` & `LecturesPage.tsx`)
+- **Mở rộng chiều rộng khung trang ([`LecturesPage.tsx`](../frontend/src/pages/LecturesPage.tsx)):**
+  - Nâng chiều rộng container chính từ `max-w-7xl` (`1280px`) lên `max-w-[1440px]`, tạo đủ không gian bề ngang cho các thẻ bài giảng.
+- **Sắp xếp thứ tự và cố định 4 nút thao tác trên 1 hàng ([`LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx)):**
+  - Sắp xếp lại thứ tự nút theo chuẩn nghiệp vụ: **`Gửi duyệt` -> `Chỉnh sửa` -> `Xem chi tiết` -> `Xóa`**.
+  - Thiết lập `flex-nowrap` kèm `whitespace-nowrap shrink-0` cho các nút bấm, giúp nút `Xóa` được đưa lên cùng hàng với 3 nút còn lại, tạo nên cụm điều khiển gọn gàng, cân đối và thẩm mỹ.
+
+### 4. Bổ Sung Cơ Chế Tự Động Dự Phòng Gói Nén Tĩnh ([`server.js`](../backend/server.js))
+- Bổ sung khối `try...catch` an toàn khi tải module `compression` tại `server.js`, đảm bảo Gateway vẫn khởi động ổn định ngay cả khi môi trường thử nghiệm chưa hoàn tất cài đặt phụ thuộc.
+
+---
+
+## [v1.8.5-admin-2fa-fingerprint-resilience-and-agent-fallback] — 2026-11-22
+
+### 1. Nâng Cấp Khả Năng Chống Lỗi & Cơ Chế Dự Phòng Xác Thực 2FA Vân Tay Admin (`server.js`, `admin-2fa-ticket.js`, `fingerprint-ws.js`)
+- **Cơ chế thử lại 3 lần cho vé xác thực 2FA ([`admin-2fa-ticket.js`](../backend/src/admin-2fa-ticket.js)):**
+  - Bổ sung các hàm `validateTicket`, `markTicketUsed` và `recordFailedScan`.
+  - Không hủy vé xác thực (ticket) ngay lần quét sai đầu tiên; cho phép thử quét lại tối đa 3 lần (`failed_attempts < 3`).
+  - Hủy vé và ghi nhận `used_at = GETDATE()` khi sai quá 3 lần (`TICKET_MAX_ATTEMPTS`) hoặc hết hạn 2 phút (`TICKET_EXPIRED`), đảm bảo cân bằng giữa trải nghiệm người dùng và an toàn bảo mật.
+- **Tự động chuyển tiếp máy quét dự phòng (Agent Auto-Fallback - [`server.js`](../backend/server.js) & [`fingerprint-ws.js`](../backend/src/fingerprint-ws.js)):**
+  - Tự động phát hiện và chọn máy quét đang online có cảm biến sẵn sàng (`readyAgent`) nếu thiết bị được chỉ định không trực tuyến.
+  - Xử lý lỗi `DEVICE_OFFLINE`: Tự động fallback sang agent khác đang hoạt động trong mạng nội bộ.
+  - Cập nhật trạng thái `sensor_ready` trong danh sách agent và ưu tiên máy quét sẵn sàng lên đầu.
+
+### 2. Tinh Chỉnh Giao Diện Quét Vân Tay Admin ([`FingerprintScanModal.tsx`](../frontend/src/components/users/FingerprintScanModal.tsx))
+- **Xử lý trạng thái vé xác thực hết hạn / vượt quá số lần thử:**
+  - Nhận diện các mã lỗi `TICKET_INVALID`, `TICKET_ALREADY_USED`, `TICKET_EXPIRED`, `TICKET_MAX_ATTEMPTS`.
+  - Hiển thị thông báo hướng dẫn rõ ràng, khóa nút thử lại (`retryExhausted = true`) và yêu cầu người dùng đóng modal để đăng nhập lại từ đầu.
+
+---
+
+## [v1.8.4-dual-gateway-portal-refinement-and-ux-pagination] — 2026-11-21
+
+### 1. Cổng Xác Thực Kép Trượt Động: Khắc Phục Dính Hậu & Nâng Cấp Tốc Độ Chuyển Động (`DualGatewayPortal.tsx` & `LoginPage.tsx`)
+- **Triệt tiêu dính hậu (Ghosting / Bleed-Through) bằng Cô lập Không gian Vật lý ([`DualGatewayPortal.tsx`](../frontend/src/components/auth/DualGatewayPortal.tsx)):**
+  - Khắc phục lỗi Form Đào tạo trượt ngược về nửa trái (`translate-x-0`) đè lên Form Dữ Liệu Số khi chuyển portal.
+  - Cố định Form Dữ Liệu Số ở nửa trái (`left-0 w-1/2`), Form Đào Tạo ở nửa phải (`left-1/2 w-1/2`), không bao giờ xâm lấn không gian của nhau.
+  - Tích hợp chốt chặn `visible` khi active và `invisible` (`visibility: hidden`) khi inactive, chuẩn hóa z-index: Form active (`z-10`), Form inactive (`z-0`), Overlay HUD (`z-30`).
+- **Tối ưu tốc độ & nâng cấp đường cong gia tốc siêu mượt ([`DualGatewayPortal.tsx`](../frontend/src/components/auth/DualGatewayPortal.tsx) & [`LoginPage.tsx`](../frontend/src/pages/LoginPage.tsx)):**
+  - Rút ngắn thời gian trượt từ `700ms` xuống **`500ms`** (`duration-500`) trên toàn bộ form, tấm trượt overlay HUD, nền parallax và lớp phủ ánh sáng môi trường `Ambient Sync`.
+  - Nâng cấp đường cong gia tốc sang **`cubic-bezier(0.25, 1, 0.5, 1)`** khởi động tức thì không độ trễ và giảm tốc mượt mà khi vào vị trí đích.
+  - Tinh chỉnh 2 vòng tròn kính mờ Neumorphic Glass Rings sang `700ms` tạo hiệu ứng quán tính sống động, kết thúc đồng pha với giao diện.
+
+### 2. Tối Ưu Bảng Quản Trị Giảng Đường & Phân Trang Thông Minh (`BuildingManagerPanel.tsx`)
+- **Phân trang khu giảng đường ([`BuildingManagerPanel.tsx`](../frontend/src/components/lectures/BuildingManagerPanel.tsx)):**
+  - Quy định hiển thị tối đa 30 khu giảng đường / trang, khu thứ 31 tự động chuyển sang trang 2.
+  - Bổ sung thanh điều khiển phân trang trực quan: hiển thị dải khu đang xem, tổng số khu, số trang hiện tại / tổng trang, nút *Trang trước*, nhãn số trang nổi bật và nút *Trang sau*.
+  - Tự động reset về trang 1 khi thay đổi từ khóa tìm kiếm, bộ lọc trạng thái hoặc chế độ hiển thị (Grid / Table).
+
+### 3. Tối Ưu Điều Hướng Phân Hệ Bài Giảng & Phân Quyền Đặc Quyền (`LectureCatalogsPage.tsx` & `ProtectedPermissionsConfigPage.tsx`)
+- **Thanh cuộn phân hệ bài giảng số ([`LectureCatalogsPage.tsx`](../frontend/src/pages/LectureCatalogsPage.tsx)):**
+  - Bổ sung nút cuộn ngang mượt mà (Trái / Phải) và nút hành động *Phân hệ tiếp theo* kèm hiển thị nhãn phân hệ kế tiếp.
+  - Tự động cuộn định tâm (scrollIntoView) vào phân hệ được chọn.
+- **Trình cấu hình phân quyền đặc quyền ([`ProtectedPermissionsConfigPage.tsx`](../frontend/src/pages/ProtectedPermissionsConfigPage.tsx)):**
+  - Tích hợp điều hướng cuộn ngang phân hệ, nút chuyển phân hệ kế tiếp và hiển thị thẻ phân quyền độ tương phản cao.
+
+---
+
+## [v1.8.3-reading-ring-building-manager-and-security-hardening] — 2026-11-20
+
+### 1. Vòng Chỉ Báo Hoàn Thành Đọc Tài Liệu (Document Reading Completion Ring - `DocumentReadingRing.tsx`)
+- **Tối ưu tương phản cao Dual-Theme UX/UI ([`DocumentReadingRing.tsx`](../frontend/src/components/common/DocumentReadingRing.tsx)):**
+  - Thiết kế vòng tiến độ SVG độ tương phản cao, chống chìm màu hoặc đè màu trên cả nền Sáng (Light Mode) và Tối (Dark Mode).
+  - 3 trạng thái nhận diện thị giác chuẩn quân sự:
+    1. *Chưa đọc (0%):* Viền nét mảnh rõ ràng, số trang in đậm đen/trắng nét cao.
+    2. *Đang đọc (1% - 99%):* Vòng tiến độ xanh ngọc lục bảo (Emerald) tương phản mạnh, hiển thị tỷ lệ % trang đã đọc sắc nét.
+    3. *Đã đọc hết (100%):* Huy hiệu xanh Emerald rực rỡ, biểu tượng tick ($\checkmark$) trắng tinh nổi bật kèm vòng phát quang nhẹ.
+- **Tích hợp sâu vào các khung hiển thị tài liệu:**
+  - Tích hợp vòng chỉ báo vào [`PdfPagesViewer.tsx`](../frontend/src/components/document-desk/PdfPagesViewer.tsx) và [`DocumentPreviewModal.tsx`](../frontend/src/components/document-desk/DocumentPreviewModal.tsx).
+  - Đồng bộ hiển thị tiến độ đọc tài liệu trực tiếp trên bảng danh sách [`PortalDocumentList.tsx`](../frontend/src/components/portal/PortalDocumentList.tsx) và [`DocumentTable.tsx`](../frontend/src/components/document-desk/DocumentTable.tsx).
+
+### 2. Đại Tu Phân Hệ Quản Lý Giảng Đường & Bảng Điều Khiển Giám Sát Radar
+- **Nâng cấp Bảng Quản Lý Khu Nhà & Phòng Học ([`BuildingManagerPanel.tsx`](../frontend/src/components/lectures/BuildingManagerPanel.tsx)):**
+  - Tái cấu trúc giao diện quản trị khu nhà, phòng học, mã phòng, loại giảng đường và cấu hình viễn trắc telemetry.
+  - Hỗ trợ thao tác thêm, sửa, xóa phòng học và trạng thái bảo trì thời gian thực.
+- **Tối ưu Bảng Giám Sát Giảng Đường Trực Tiếp ([`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx)):**
+  - Bổ sung chế độ toàn màn hình, bộ lọc thông minh theo tòa nhà và trạng thái phòng (Đang dạy / Trống / Bảo trì).
+  - Hiển thị trực quan sĩ số quân số, tên giảng viên, slide hiện tại và cảnh báo phiên học kéo dài.
+- **Cải tiến Phòng Học & Lịch Sử Giảng Dạy ([`LiveSessionRoom.tsx`](../frontend/src/components/lectures/LiveSessionRoom.tsx) & [`TeachingHistoryPanel.tsx`](../frontend/src/components/lectures/TeachingHistoryPanel.tsx)):**
+  - Đồng bộ trạng thái trình chiếu bài giảng điện tử và lưu vết lịch sử giảng dạy chính xác.
+
+### 3. Siết Chặt An Toàn Phiên, Bảo Mật Cookie & Phân Quyền Đại Biểu (Security Hardening)
+- **Quản lý Phiên & Xóa Sạch Cookie ([`backend/server.js`](../backend/server.js)):**
+  - Tại endpoint `POST /api/auth/logout`: Gọi `revokeAllUserSessions` thu hồi toàn bộ phiên hoạt động của người dùng trên toàn mạng.
+  - Cưỡng chế xóa cookie an toàn với các cờ nghiêm ngặt `{ path: '/', httpOnly: true, secure: true, sameSite: 'strict' }`.
+  - Bổ sung `jti: crypto.randomUUID()` vào JWT token khi đăng nhập và xác thực 2FA vân tay, ngăn chặn triệt để tấn công phát lại (Replay Attacks).
+- **Cô lập Quyền Hạn Đại Biểu ([`backend/src/lecture-routes.js`](../backend/src/lecture-routes.js)):**
+  - Khóa hoàn toàn cờ `can_teach = false` và `peer_unit = false` đối với người dùng Khách/Đại biểu (`isGuest`), ngăn chặn mọi thao tác vượt quyền.
+- **Bảo Vệ Iframe & CSP ([`backend/src/security-headers.js`](../backend/src/security-headers.js) & [`backend/src/scorm-package-routes.js`](../backend/src/scorm-package-routes.js)):**
+  - Bổ sung `X-Frame-Options: SAMEORIGIN` và CSP cho phép nhúng an toàn tệp PDF giáo án qua endpoint `/api/lectures/:id/pdf` trong modal trình chiếu.
+
+---
+
 ## [v1.8.2-classrooms-subsystem-and-unit-inheritance] — 2026-11-18
 
 ### 1. Phân Hệ Giảng Đường Độc Lập & Giám Sát Mặt Bằng Trực Quan (Classrooms Subsystem)

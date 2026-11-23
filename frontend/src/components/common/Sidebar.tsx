@@ -19,13 +19,10 @@ import {
   Monitor,
   Bell,
   Lock,
-<<<<<<< HEAD
-=======
   BookOpen,
   GraduationCap,
   Building2,
   Landmark,
->>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';

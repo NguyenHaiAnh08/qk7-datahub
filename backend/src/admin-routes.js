@@ -2453,8 +2453,6 @@ module.exports = (app, deps) => {
             }
         });
 
-<<<<<<< HEAD
-=======
         // ═══════════════════════════════════════════════════════════
 // LECTURE CATALOGS — Môn học / Lớp học / Giảng đường
 // ═══════════════════════════════════════════════════════════
@@ -2766,9 +2764,6 @@ app.delete('/api/admin/lectures/classrooms/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-<<<<<<< HEAD
->>>>>>> eefdd9dfdf8e59304137e7f9ceaad64f1c1d2fb8
-=======
 // ── KHU GIẢNG ĐƯỜNG (CLASSROOM_BUILDING) — quản lý thay cho danh sách viết cứng ──
 const BUILDING_CODE_RE = /^[A-Za-z0-9_-]{1,20}$/;
 
@@ -2863,5 +2858,4 @@ app.delete('/api/admin/lectures/buildings/:code', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
->>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
 };

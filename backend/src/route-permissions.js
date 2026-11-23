@@ -34,13 +34,10 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/documents\/trash$/,                 'DOC_TRASH_VIEW'],
     [/^\/api\/documents\/my-unit$/,               'DOC_VIEW'],
     [/^\/api\/documents\/proposals\/pending$/,    'DOC_VIEW'],
-<<<<<<< HEAD
-=======
     [/^\/api\/admin\/lectures\/subjects$/,    'SUBJECT_VIEW'],
     [/^\/api\/admin\/lectures\/classes$/,     'CLASS_VIEW'],
     [/^\/api\/admin\/lectures\/classrooms$/,  'CLASSROOM_VIEW'],
     [/^\/api\/admin\/lectures\/buildings$/,   'CLASSROOM_VIEW'],
->>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
   ],
 
   POST: [
@@ -62,13 +59,10 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/documents\/proposals\/[^/]+\/reject$/,  'DOC_EDIT'],
     [/^\/api\/ai\/sync-all$/,                     'AI_SYNC'],
     [/^\/api\/ai\/chat$/,                         'AI_QUERY'],
-<<<<<<< HEAD
-=======
     [/^\/api\/admin\/lectures\/subjects$/,    'SUBJECT_MANAGE'],
     [/^\/api\/admin\/lectures\/classes$/,     'CLASS_MANAGE'],
     [/^\/api\/admin\/lectures\/classrooms$/,  'CLASSROOM_MANAGE'],
     [/^\/api\/admin\/lectures\/buildings$/,   'CLASSROOM_MANAGE'],
->>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
 
     // ─── LECTURES ───
     [/^\/api\/lectures\/upload-scorm$/,           'LECTURE_CREATE'],
@@ -113,13 +107,10 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/lectures\/[^/]+\/quiz\/[^/]+$/,         'LECTURE_QUIZ_MANAGE'],
     [/^\/api\/lectures\/[^/]+$/,                      'LECTURE_CREATE'],
     [/^\/api\/documents\/[^/]+$/,                 'DOC_EDIT'],
-<<<<<<< HEAD
-=======
     [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
     [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
     [/^\/api\/admin\/lectures\/classrooms\/[^/]+$/,  'CLASSROOM_MANAGE'],
     [/^\/api\/admin\/lectures\/buildings\/[^/]+$/,   'CLASSROOM_MANAGE'],
->>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
   ],
 
   DELETE: [
@@ -145,13 +136,10 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/lectures\/[^/]+$/,                  'LECTURE_DELETE'],
     [/^\/api\/documents\/[^/]+\/purge$/,          'DOC_PURGE'],
     [/^\/api\/documents\/[^/]+$/,                 'DOC_DELETE'],
-<<<<<<< HEAD
-=======
     [/^\/api\/admin\/lectures\/subjects\/[^/]+$/,    'SUBJECT_MANAGE'],
     [/^\/api\/admin\/lectures\/classes\/[^/]+$/,     'CLASS_MANAGE'],
     [/^\/api\/admin\/lectures\/classrooms\/[^/]+$/,  'CLASSROOM_MANAGE'],
     [/^\/api\/admin\/lectures\/buildings\/[^/]+$/,   'CLASSROOM_MANAGE'],
->>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
   ],
 };
 

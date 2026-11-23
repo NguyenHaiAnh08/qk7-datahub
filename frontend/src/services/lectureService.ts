@@ -270,8 +270,6 @@ export const lectureService = {
   async getFacultyLectures(facultyUnitId: string): Promise<{ total: number; items: Lecture[] }> {
     return http(`/api/lectures/faculty/${encodeURIComponent(facultyUnitId)}`);
   },
-<<<<<<< HEAD
-=======
 
   // ─── ADMIN CRUD — LECTURE CATALOGS ───
   async adminListSubjects(): Promise<{ total: number; items: any[] }> {
@@ -386,7 +384,6 @@ export const lectureService = {
       body: JSON.stringify(data),
     });
   },
->>>>>>> eefdd9dfdf8e59304137e7f9ceaad64f1c1d2fb8
 };
 
 export default lectureService;

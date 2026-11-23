@@ -433,7 +433,6 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       const targetDoc = items[0];
 
       if (items.length === 0) {
-<<<<<<< HEAD
         answer = `${salutation} không tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.`;
       } else if (items.length === 1 && targetDoc) {
         const docCode = targetDoc.document_code || targetDoc.file_id;
@@ -453,9 +452,6 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
         } else {
           answer = `${salutation} tìm thấy 1 văn bản liên quan:\n1. ${docCode} — ${targetDoc.title}`;
         }
-=======
-        answer = `${salutation}\nKhông tìm thấy văn bản phù hợp trong phạm vi cấp quyền hiện tại.`;
->>>>>>> eefdd9dfdf8e59304137e7f9ceaad64f1c1d2fb8
       } else if (lockedSecretItems.length > 0) {
         if (visibleItems.length === 0) {
           answer = `${salutation}\nTài liệu liên quan thuộc danh mục văn bản bảo mật (Cấp 3 trở lên).\nYêu cầu cán bộ xác thực vân tay trên máy quét ZKTeco ZK9500 (hoặc bấm vào thẻ trích dẫn văn bản bên dưới để quét vân tay) trước khi Trợ lý AI trích xuất nội dung mật.`;

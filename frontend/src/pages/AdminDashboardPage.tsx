@@ -3,11 +3,8 @@ import { createPortal } from 'react-dom';
 import { Drawer } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PinManageModal } from '../components/users/PinManageModal';
-<<<<<<< HEAD
-=======
 import { LectureCatalogsPage } from './LectureCatalogsPage';
 import { LectureBuildingsPage } from './LectureBuildingsPage';
->>>>>>> 4e3a8e94bb31ee5981cca67eabd4a8bf681e9423
 
 
 import {

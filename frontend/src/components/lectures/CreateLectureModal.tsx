@@ -152,6 +152,11 @@ export const CreateLectureModal: React.FC<Props> = ({
     setError('');
 
     if (!title.trim()) return setError('Vui lòng nhập tiêu đề bài giảng');
+    if (lectureCode.length > 30 || lectureCode.trim().length > 30) {
+      const msg = `Mã bài giảng không được vượt quá 30 ký tự (hiện tại: ${lectureCode.length}/30 ký tự). Vui lòng rút gọn mã bài giảng!`;
+      toast.error(msg);
+      return setError(msg);
+    }
     if (!subjectId) return setError('Vui lòng chọn môn học');
 
     if (!editLecture && securityLevel > 3) {
@@ -333,17 +338,46 @@ export const CreateLectureModal: React.FC<Props> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  <Hash className="w-3 h-3 text-slate-400" />
-                  Mã bài giảng
-                </span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                    <Hash className="w-3 h-3 text-slate-400" />
+                    Mã bài giảng (tối đa 30 ký tự)
+                  </span>
+                  <span
+                    className={`font-mono text-[10px] font-bold ${
+                      lectureCode.length > 30
+                        ? 'text-rose-600 dark:text-rose-400'
+                        : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                  >
+                    {lectureCode.length}/30
+                  </span>
+                </div>
                 <input
                   type="text"
                   value={lectureCode}
-                  onChange={(e) => setLectureCode(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setLectureCode(val);
+                    if (val.length > 30) {
+                      setError(`Mã bài giảng không được vượt quá 30 ký tự (hiện tại: ${val.length}/30 ký tự)`);
+                    } else if (error.startsWith('Mã bài giảng không được vượt quá 30 ký tự')) {
+                      setError('');
+                    }
+                  }}
                   placeholder="VD: BG-CTBB-01"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-emerald-600 font-mono text-slate-900 dark:text-slate-100 text-xs"
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border rounded-xl focus:outline-none font-mono text-slate-900 dark:text-slate-100 text-xs transition ${
+                    lectureCode.length > 30
+                      ? 'border-rose-500 dark:border-rose-500 focus:border-rose-600 focus:ring-1 focus:ring-rose-600'
+                      : 'border-slate-300 dark:border-slate-700 focus:border-emerald-600'
+                  }`}
                 />
+                {lectureCode.length > 30 && (
+                  <p className="mt-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Vượt quá giới hạn 30 ký tự! Không thể tải bài giảng lên.</span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -440,8 +474,8 @@ export const CreateLectureModal: React.FC<Props> = ({
             </button>
             <button
               type="submit"
-              disabled={submitting}
-              className="px-5 py-2.5 bg-gradient-to-r from-[#166534] via-[#15803d] to-[#16a34a] hover:from-[#15803d] hover:to-[#22c55e] border border-emerald-400/30 text-white rounded-xl font-bold flex items-center gap-2 disabled:opacity-40 shadow-sm transition active:scale-[0.98] min-h-[44px]"
+              disabled={submitting || lectureCode.length > 30 || lectureCode.trim().length > 30}
+              className="px-5 py-2.5 bg-gradient-to-r from-[#166534] via-[#15803d] to-[#16a34a] hover:from-[#15803d] hover:to-[#22c55e] border border-emerald-400/30 text-white rounded-xl font-bold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition active:scale-[0.98] min-h-[44px]"
             >
               {submitting ? (
                 <>

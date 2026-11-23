@@ -4,6 +4,35 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.6-lecture-code-limit-and-card-layout] — 2026-11-23
+
+### 1. Giới Hạn Mã Bài Giảng 30 Ký Tự (`CreateLectureModal.tsx` & `lecture-routes.js`)
+- **Kiểm soát trực tiếp trên giao diện tạo bài giảng ([`CreateLectureModal.tsx`](../frontend/src/components/lectures/CreateLectureModal.tsx)):**
+  - Tích hợp bộ đếm ký tự trực quan `{lectureCode.length}/30` ngay dưới ô nhập mã bài giảng.
+  - Khi vượt quá 30 ký tự: viền ô nhập lập tức chuyển đỏ cảnh báo, hiển thị dòng thông báo lỗi tức thì và vô hiệu hóa nút submit (`disabled={submitting || lectureCode.length > 30}`), tuyệt đối ngăn chặn việc tải bài giảng lên khi mã không hợp lệ.
+- **Ràng buộc bảo vệ tầng Gateway ([`lecture-routes.js`](../backend/src/lecture-routes.js)):**
+  - Thực thi kiểm tra độ dài mã bài giảng tại cả 2 endpoint `POST /api/lectures` và `PUT /api/lectures/:id` (`lecture_code.trim().length > 30` -> từ chối HTTP `400 Bad Request`).
+  - Hỗ trợ cập nhật trường `lecture_code` trong câu lệnh `UPDATE` khi chỉnh sửa thông tin bài giảng.
+
+### 2. Tinh Chỉnh Hiển Thị Chống Tràn Tiêu Đề Bài Giảng & Hiển Thị Đầy Đủ Mã Bài Giảng
+- **Tiêu đề bài giảng tự động ngắt 2 dòng và cắt `...`:**
+  - Áp dụng các utility class `line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] overflow-hidden` cho trường tiêu đề bài giảng (`title`) trên toàn bộ hệ thống component: [`LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx), [`LectureDetailModal.tsx`](../frontend/src/components/lectures/LectureDetailModal.tsx), [`LectureViewerModal.tsx`](../frontend/src/components/lectures/LectureViewerModal.tsx), [`RejectReasonModal.tsx`](../frontend/src/components/lectures/RejectReasonModal.tsx), [`LiveMonitorPanel.tsx`](../frontend/src/components/lectures/LiveMonitorPanel.tsx), và [`TeachingHistoryPanel.tsx`](../frontend/src/components/lectures/TeachingHistoryPanel.tsx).
+  - Đảm bảo tiêu đề dù dài đến đâu cũng chỉ chiếm tối đa 2 dòng, có dấu `...` ở cuối và tuyệt đối không làm vỡ hoặc tràn ra ngoài khung thẻ.
+- **Hiển thị đầy đủ 100% Mã bài giảng:**
+  - Do mã bài giảng đã bị chặn cứng tối đa 30 ký tự, huy hiệu mã bài giảng trên thẻ và modal được gỡ bỏ giới hạn chiều rộng và `truncate`, hiển thị toàn bộ chuỗi mã mà không bị cắt `...`.
+
+### 3. Quy Hoạch Bố Cục Thẻ Bài Giảng & Dàn Hàng Ngang Cụm Nút Thao Tác (`LectureCard.tsx` & `LecturesPage.tsx`)
+- **Mở rộng chiều rộng khung trang ([`LecturesPage.tsx`](../frontend/src/pages/LecturesPage.tsx)):**
+  - Nâng chiều rộng container chính từ `max-w-7xl` (`1280px`) lên `max-w-[1440px]`, tạo đủ không gian bề ngang cho các thẻ bài giảng.
+- **Sắp xếp thứ tự và cố định 4 nút thao tác trên 1 hàng ([`LectureCard.tsx`](../frontend/src/components/lectures/LectureCard.tsx)):**
+  - Sắp xếp lại thứ tự nút theo chuẩn nghiệp vụ: **`Gửi duyệt` -> `Chỉnh sửa` -> `Xem chi tiết` -> `Xóa`**.
+  - Thiết lập `flex-nowrap` kèm `whitespace-nowrap shrink-0` cho các nút bấm, giúp nút `Xóa` được đưa lên cùng hàng với 3 nút còn lại, tạo nên cụm điều khiển gọn gàng, cân đối và thẩm mỹ.
+
+### 4. Bổ Sung Cơ Chế Tự Động Dự Phòng Gói Nén Tĩnh ([`server.js`](../backend/server.js))
+- Bổ sung khối `try...catch` an toàn khi tải module `compression` tại `server.js`, đảm bảo Gateway vẫn khởi động ổn định ngay cả khi môi trường thử nghiệm chưa hoàn tất cài đặt phụ thuộc.
+
+---
+
 ## [v1.8.5-admin-2fa-fingerprint-resilience-and-agent-fallback] — 2026-11-22
 
 ### 1. Nâng Cấp Khả Năng Chống Lỗi & Cơ Chế Dự Phòng Xác Thực 2FA Vân Tay Admin (`server.js`, `admin-2fa-ticket.js`, `fingerprint-ws.js`)

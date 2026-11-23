@@ -155,8 +155,8 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
               )}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate" title={lecture.title}>
                   {lecture.title}
                 </h3>
                 <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-semibold shrink-0">

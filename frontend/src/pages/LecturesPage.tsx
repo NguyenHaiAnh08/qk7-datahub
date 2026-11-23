@@ -526,7 +526,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
       <div className={activeSession ? 'hidden' : 'contents'}>
         <Header activeNav="lectures" title="Trường Quân Sự Quân Khu 7" subtitle="Trung tâm dữ liệu số" />
 
-        <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 w-full max-w-7xl mx-auto space-y-6">
+        <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 w-full max-w-[1440px] mx-auto space-y-6">
 
           {/* Hero Header trang nghiêm chuẩn Quân đội */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-[#111827] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">

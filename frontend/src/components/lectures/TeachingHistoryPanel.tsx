@@ -242,8 +242,8 @@ export const TeachingHistoryPanel: React.FC = () => {
                   className="bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-500/40 hover:shadow-xs transition-all"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-1" title={s.lecture_title}>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0" title={s.lecture_title}>
                         {s.lecture_title}
                       </span>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 shrink-0">

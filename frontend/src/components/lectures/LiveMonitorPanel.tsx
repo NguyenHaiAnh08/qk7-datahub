@@ -1012,7 +1012,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                             </span>
                           </div>
 
-                          <div className="font-black text-base text-slate-950 dark:text-white">
+                          <div
+                            className="font-black text-base text-slate-950 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word]"
+                            title={activeSession.lecture_title}
+                          >
                             {activeSession.lecture_title}
                           </div>
 
@@ -1206,7 +1209,10 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                           </span>
                         </div>
 
-                        <div className="font-black text-base text-slate-950 dark:text-white">
+                        <div
+                          className="font-black text-base text-slate-950 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word]"
+                          title={activeSession.lecture_title}
+                        >
                           {activeSession.lecture_title}
                         </div>
 
@@ -1425,8 +1431,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                     </div>
 
                     {/* Tiêu đề bài giảng */}
-                    <div>
-                      <h4 className="font-black text-sm text-slate-950 dark:text-white line-clamp-1" title={s.lecture_title}>
+                    <div className="min-w-0 overflow-hidden">
+                      <h4 className="font-black text-sm text-slate-950 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word]" title={s.lecture_title}>
                         {s.lecture_title}
                       </h4>
                       <p className="text-xs text-slate-700 dark:text-slate-300 truncate mt-0.5 font-bold">

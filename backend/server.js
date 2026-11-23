@@ -140,16 +140,20 @@ app.use(createSecurityHeadersMiddleware());
 // KHÔNG nén: yêu cầu Range (video/PDF tải từng phần, mã 206), event-stream, hoặc đã có Content-Encoding;
 // file PDF/ảnh/video/zip vốn đã nén nên thư viện tự bỏ qua. Tắt bằng COMPRESSION=false.
 if (process.env.COMPRESSION !== 'false') {
-  const compression = require('compression');
-  app.use(compression({
-    threshold: 2048, // phản hồi nhỏ hơn 2KB: tiết kiệm băng thông không đáng so với CPU nén
-    filter: (req, res) => {
-      if (req.headers.range || res.statusCode === 206) return false;
-      const type = String(res.getHeader('Content-Type') || '');
-      if (type.includes('text/event-stream')) return false;
-      return compression.filter(req, res);
-    },
-  }));
+  try {
+    const compression = require('compression');
+    app.use(compression({
+      threshold: 2048, // phản hồi nhỏ hơn 2KB: tiết kiệm băng thông không đáng so với CPU nén
+      filter: (req, res) => {
+        if (req.headers.range || res.statusCode === 206) return false;
+        const type = String(res.getHeader('Content-Type') || '');
+        if (type.includes('text/event-stream')) return false;
+        return compression.filter(req, res);
+      },
+    }));
+  } catch (e) {
+    console.warn('[COMPRESSION] ⚠️ Thư viện compression chưa được cài đặt (chạy npm install trong backend/), bỏ qua nén HTTP:', e.message);
+  }
 }
 // Đo thời gian API (log [SLOW], tổng kết định kỳ, GET /api/admin/perf)
 const perfTiming = require('./src/perf-timing');

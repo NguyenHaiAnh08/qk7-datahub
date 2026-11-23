@@ -311,6 +311,9 @@ module.exports = function createLectureRoutes({
         content_type, scorm_entry_point,
       } = req.body || {};
       if (!title || !subject_id) return res.status(400).json({ error: 'Thiếu tiêu đề hoặc môn học' });
+      if (lecture_code && String(lecture_code).trim().length > 30) {
+        return res.status(400).json({ error: 'Mã bài giảng không được vượt quá 30 ký tự' });
+      }
       if (!isSafeEntryPoint(scorm_entry_point)) {
         return res.status(400).json({ error: 'scorm_entry_point không hợp lệ' });
       }
@@ -375,7 +378,10 @@ module.exports = function createLectureRoutes({
         return res.status(400).json({ error: 'Không thể sửa bài giảng đang chờ duyệt hoặc đã xuất bản' });
       }
 
-      const { title, subject_id, security_level_id, content_type, scorm_entry_point } = req.body || {};
+      const { title, subject_id, lecture_code, security_level_id, content_type, scorm_entry_point } = req.body || {};
+      if (lecture_code && String(lecture_code).trim().length > 30) {
+        return res.status(400).json({ error: 'Mã bài giảng không được vượt quá 30 ký tự' });
+      }
       // Trường nào client không gửi thì GIỮ NGUYÊN giá trị cũ (COALESCE) — tránh xóa nhầm
       // scorm_entry_point khi form sửa không đính kèm lại tệp. Tệp PDF chỉ đổi qua POST /:id/pdf/upload.
       if (!isSafeEntryPoint(scorm_entry_point)) {
@@ -389,6 +395,7 @@ module.exports = function createLectureRoutes({
       await pool.request()
         .input('id', sql.VarChar(50), lectureId)
         .input('title', sql.NVarChar(500), title ?? null)
+        .input('lecture_code', sql.NVarChar(100), lecture_code ? String(lecture_code).trim() : null)
         .input('subject_id', sql.VarChar(50), subject_id ?? null)
         .input('security_level_id', sql.Int, security_level_id ?? null)
         .input('content_type', sql.VarChar(20), ctype)
@@ -396,6 +403,7 @@ module.exports = function createLectureRoutes({
         .query(`
           UPDATE DIGITAL_LECTURE
           SET title = COALESCE(@title, title),
+              lecture_code = COALESCE(@lecture_code, lecture_code),
               subject_id = COALESCE(@subject_id, subject_id),
               security_level_id = COALESCE(@security_level_id, security_level_id),
               content_type = @content_type,

@@ -18,6 +18,7 @@ import { documentsApi } from '../services/documentsApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
+import { LectureTrashPanel } from '../components/lectures/LectureTrashPanel';
 
 export interface TrashPageProps {
   /** Khi true: render inline trong AdminDashboardPage (không có Header riêng, không min-h-screen) */
@@ -28,6 +29,8 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   const { hasPermission, user } = useAuth();
   const isAdminUser = (user?.roles || []).includes('ROL-01');
 
+  // Tab: thùng rác Tài liệu | Bài giảng (bài giảng chỉ Admin thấy)
+  const [trashTab, setTrashTab] = useState<'docs' | 'lectures'>('docs');
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -695,13 +698,38 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
     </AnimatePresence>
   );
 
+  const tabBtn = (key: 'docs' | 'lectures', label: string) => (
+    <button
+      type="button"
+      onClick={() => setTrashTab(key)}
+      className={`px-4 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+        trashTab === key
+          ? 'bg-[#166534] text-white border-[#166534]'
+          : 'bg-white dark:bg-[#111827] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/[0.08] hover:border-slate-300'
+      }`}
+    >
+      {label}
+    </button>
+  );
+  const tabbedContent = (
+    <>
+      {isAdminUser && (
+        <div className="flex items-center gap-2">
+          {tabBtn('docs', 'Tài liệu')}
+          {tabBtn('lectures', 'Bài giảng')}
+        </div>
+      )}
+      {trashTab === 'lectures' && isAdminUser ? <LectureTrashPanel /> : pageContent}
+    </>
+  );
+
   // ═══════════════════════════════════════════════════════════
   // EMBEDDED LAYOUT (Khi nhúng trong AdminDashboardPage)
   // ═══════════════════════════════════════════════════════════
   if (embedded) {
     return (
       <div className="space-y-5">
-        {pageContent}
+        {tabbedContent}
         {dangerPurgeModal}
         {restoreAllConfirmModal}
       </div>
@@ -716,7 +744,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
       <Header activeNav="admin" title="Trường Quân Sự Quân Khu 7" subtitle="Thùng rác tài liệu" />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-5">
-        {pageContent}
+        {tabbedContent}
       </main>
 
       {dangerPurgeModal}

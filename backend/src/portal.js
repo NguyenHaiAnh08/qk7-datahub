@@ -18,18 +18,11 @@ const VALID_PORTALS = [PORTAL_DATAHUB, PORTAL_TRAINING];
 // Dùng khi chưa chạy migration tạo bảng ROLE_PORTAL (không làm hỏng đăng nhập)
 const DEFAULT_TRAINING_ROLES = ['ROL-01', 'ROL-02'];
 
-// Các API thuộc khu GIÁM SÁT: chỉ nhận token cổng Đào tạo. Muốn thêm/bớt API → sửa danh sách này.
-// Hiện chỉ gồm nhóm GIÁM SÁT BẢO MẬT (phiên đăng nhập, nhật ký đăng nhập, danh sách chặn IP, nhật ký truy cập, đo hiệu năng).
-// Cố ý KHÔNG đưa vào: /api/admin/approval-requests (Chỉ huy cần thông báo duyệt ở cả hai cổng),
-// /api/admin/stats và /api/command/* (trang quản trị/giảng đường dùng chung hai cổng), /api/admin/users...
-// Muốn đưa thêm chức năng vào khu giám sát: thêm regex vào đây (không cần sửa chỗ khác).
-const TRAINING_ONLY_PATHS = [
-  /^\/api\/admin\/sessions(\/|$)/,
-  /^\/api\/admin\/login-attempts(\/|$)/,
-  /^\/api\/admin\/ip-blocklist(\/|$)/,
-  /^\/api\/admin\/perf(\/|$)/,
-  /^\/api\/access-logs(\/|$)/,
-];
+// Các API chỉ nhận token cổng Đào tạo. HIỆN ĐỂ TRỐNG: cổng chỉ quyết định AI được đăng nhập vào đâu
+// (giám sát = ROL-01/ROL-02, sử dụng = còn lại). Bên trong hệ thống, chức năng hiển thị/dùng được hay không
+// chỉ theo QUYỀN như trước (admin đăng nhập cổng nào cũng thấy và dùng đầy đủ).
+// Muốn khóa riêng 1 API cho cổng Đào tạo: thêm regex vào đây (không cần sửa chỗ khác).
+const TRAINING_ONLY_PATHS = [];
 
 function normalizePortal(input) {
   const p = String(input || '').trim().toLowerCase();

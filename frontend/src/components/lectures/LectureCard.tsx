@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   FileText, Layers, FileCode, Send, Check, X,
-  Play, Trash2, Hash, User, AlertTriangle, Edit, RotateCcw, Eye,
+  Play, Trash2, Hash, User, AlertTriangle, Edit, Eye,
   HelpCircle, Shield, CheckCircle2, Clock, BookOpen
 } from 'lucide-react';
 import { Lecture, ContentType, LectureStatus } from '../../types/lecture';
@@ -57,15 +57,14 @@ export interface LectureCardProps {
   currentUserId?: string;
   isAdmin: boolean;
   canApprove: boolean;
-  canArchive: boolean;
+  canArchive: boolean;        // Admin/Chỉ huy: xóa mềm mọi bài chưa chờ duyệt/xuất bản
+  canDelete?: boolean;        // có quyền LECTURE_DELETE: tác giả xóa mềm bài của mình (Bản nháp/Cần sửa)
   canStartSchedule: boolean;
   canEdit: boolean;
   onSubmit: () => void;
   onApprove: () => void;
   onReject: () => void;
-  onSoftDelete: () => void;   // 🆕 — chuyển vào thùng rác
-  onRestore: () => void;      // giữ nguyên — khôi phục từ thùng rác
-  onPurge: () => void;        // 🆕 — xoá vĩnh viễn
+  onSoftDelete: () => void;   // chuyển vào thùng rác (Quản trị mới khôi phục / xóa vĩnh viễn)
   onEdit: () => void;
   onView: () => void;
   onRead?: () => void;
@@ -73,8 +72,8 @@ export interface LectureCardProps {
 }
 
 export const LectureCard: React.FC<LectureCardProps> = ({
-  lecture, mode, viewMode, currentUserId, isAdmin, canApprove, canArchive, canStartSchedule, canEdit,
-  onSubmit, onApprove, onReject, onSoftDelete, onRestore, onPurge, onEdit, onView, onRead, onStartSession,
+  lecture, mode, viewMode, currentUserId, isAdmin, canApprove, canArchive, canDelete, canStartSchedule, canEdit,
+  onSubmit, onApprove, onReject, onSoftDelete, onEdit, onView, onRead, onStartSession,
 }) => {
   const statusCfg = STATUS_STYLES[lecture.status] || STATUS_STYLES.DRAFT;
   const secCfg = SECURITY_LEVEL_LABELS[lecture.security_level_id] || SECURITY_LEVEL_LABELS[2];
@@ -152,34 +151,17 @@ export const LectureCard: React.FC<LectureCardProps> = ({
     cls: 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
   });
 
-  // 5. Quyền Xoá mềm / Khôi phục / Xoá vĩnh viễn (KHÔNG hiển thị khi bài giảng đang chờ duyệt hoặc đã duyệt xuất bản)
+  // 5. Xóa mềm → chuyển vào Thùng rác của trang Quản trị (KHÔNG hiển thị khi đang chờ duyệt / đã xuất bản).
+  //    Khôi phục và xóa vĩnh viễn chỉ Admin làm ở trang Quản trị → Thùng rác, không còn nút ở đây.
   const isPendingApproval = isPendingFaculty || isPendingTraining;
-  if (allowManage && canArchive && !isPendingApproval && !isPublished) {
-    if (isDeleted) {
-      // Đang trong thùng rác → Khôi phục + Xoá vĩnh viễn
-      actions.push(
-        {
-          label: 'Khôi phục',
-          icon: RotateCcw,
-          onClick: onRestore,
-          cls: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30'
-        },
-        {
-          label: 'Xóa vĩnh viễn',
-          icon: AlertTriangle,
-          onClick: onPurge,
-          cls: 'bg-rose-600 hover:bg-rose-700 text-white border border-rose-700 shadow-md font-bold'
-        },
-      );
-    } else {
-      // Đang hoạt động bình thường → Xoá mềm
-      actions.push({
-        label: 'Xóa',
-        icon: Trash2,
-        onClick: onSoftDelete,
-        cls: 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 dark:bg-red-500/15 dark:hover:bg-red-500/25 dark:text-red-300 dark:border-red-500/30'
-      });
-    }
+  const isOwner = !!currentUserId && currentUserId === lecture.author_id;
+  if (allowManage && !isPendingApproval && !isPublished && !isDeleted && (canArchive || (canDelete && isOwner))) {
+    actions.push({
+      label: 'Xóa',
+      icon: Trash2,
+      onClick: onSoftDelete,
+      cls: 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 dark:bg-red-500/15 dark:hover:bg-red-500/25 dark:text-red-300 dark:border-red-500/30'
+    });
   }
 
   // ── TABLE VIEW ──

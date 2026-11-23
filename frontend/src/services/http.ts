@@ -163,6 +163,17 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
 
     return data as T;
   } catch (err: any) {
+    // Nếu request bị hủy chủ động qua AbortController (khi đóng modal quét vân tay, chuyển trang...)
+    // Tuyệt đối không biến thành lỗi 503 Sự Cố Máy Chủ hay bắn sự kiện qk7:http-error.
+    const isAborted =
+      err?.name === 'AbortError' ||
+      options.signal?.aborted === true ||
+      /signal is aborted|aborted a request|operation was aborted/i.test(err?.message || '');
+
+    if (isAborted) {
+      throw err;
+    }
+
     // Nếu là lỗi mạng không phản hồi (fetch failed/offline/Safari Load failed)
     if (!(err instanceof HttpError)) {
       const isLoadFailed =

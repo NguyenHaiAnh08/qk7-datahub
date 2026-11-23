@@ -13,6 +13,7 @@ import threading
 import time          # ★ cho idle watchdog
 import uuid
 from typing import Optional
+from urllib.parse import urlparse
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -483,11 +484,16 @@ class FingerprintAgent:
     async def _session(self):
         candidate_urls = [BACKEND_WS_URL]
         if "127.0.0.1" not in BACKEND_WS_URL and "localhost" not in BACKEND_WS_URL:
-            # Fallback sang localhost nếu đang chạy trên cùng máy với Gateway
-            local_fallback = BACKEND_WS_URL.replace("192.168.1.229", "127.0.0.1")
-            if ":8000" in BACKEND_WS_URL and local_fallback == BACKEND_WS_URL:
-                local_fallback = "wss://127.0.0.1:8000/ws/fingerprint"
-            candidate_urls.append(local_fallback)
+            # Fallback động sang loopback nếu đang chạy cùng máy với Gateway (tương thích mọi IP & tên miền)
+            parsed_ws = urlparse(BACKEND_WS_URL)
+            scheme = parsed_ws.scheme or ("wss" if USE_TLS else "ws")
+            ws_path = parsed_ws.path or "/ws/fingerprint"
+            ws_port = parsed_ws.port
+            if ws_port and ws_port not in (80, 443):
+                candidate_urls.append(f"{scheme}://127.0.0.1:{ws_port}{ws_path}")
+            else:
+                candidate_urls.append(f"{scheme}://127.0.0.1{ws_path}")
+                candidate_urls.append(f"{scheme}://127.0.0.1:8000{ws_path}")
 
         connect_kwargs = {"ping_interval": None}
         if self.ssl_context is not None:

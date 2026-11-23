@@ -16,7 +16,7 @@ mkdir -p "$CERTS_DIR"
 
 MODE="${1:-mkcert}"
 DOMAIN="${2:-192.168.1.229}"
-ADDITIONAL_DOMAINS="localhost 127.0.0.1 trungtamdulieuso.tqs.com ::1"
+ADDITIONAL_DOMAINS="localhost 127.0.0.1 trungtamdulieuso.tqsqk7.edu ::1"
 
 echo "======================================================================="
 echo "  QK7 DataHub — Trình tạo chứng chỉ SSL/TLS Bảo Mật"

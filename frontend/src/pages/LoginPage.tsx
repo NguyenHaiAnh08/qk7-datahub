@@ -117,13 +117,8 @@ export const LoginPage: React.FC = () => {
       if (redirectUrl && redirectUrl !== ROUTE_PATHS.LOGIN && redirectUrl !== ROUTE_PATHS.INDEX) {
         navigate(redirectUrl, { replace: true });
       } else {
-        // Phân quyền điều hướng theo Role & Portal
-        if (activePortal === 'training') {
-          navigate('/portal', { replace: true, state: { defaultTab: 'lectures' } });
-        } else {
-          const targetPath = getDestinationByRole(loggedInUser);
-          navigate(targetPath, { replace: true });
-        }
+        const targetPath = getDestinationByRole(loggedInUser);
+        navigate(targetPath, { replace: true });
       }
     }, 500);
   };
@@ -141,15 +136,9 @@ export const LoginPage: React.FC = () => {
       <DongSonDrumBackground />
 
       {/* ══════════════════════════════════════════════════════════════════
-          LỚP z-15: AMBIENT SYNC GRADIENT ĐỔI MÀU ÁNH SÁNG THEO PORTAL
+          LỚP z-15: AMBIENT GRADIENT CỐ ĐỊNH (GIỮ NGUYÊN MÀU TRUNG TÂM DỮ LIỆU SỐ)
           ══════════════════════════════════════════════════════════════════ */}
-      <div
-        className={`fixed inset-0 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] z-15 ${
-          activePortal === 'datahub'
-            ? 'bg-gradient-to-tr from-emerald-950/30 via-transparent to-amber-900/20'
-            : 'bg-gradient-to-tr from-slate-950/45 via-blue-950/25 to-indigo-900/30'
-        }`}
-      />
+      <div className="fixed inset-0 pointer-events-none z-15 bg-gradient-to-tr from-emerald-950/30 via-transparent to-amber-900/20" />
 
       {/* ══════════════════════════════════════════════════════════════════
           LỚP z-30 (TRÊN CÙNG): CỐ ĐỊNH TOP BAR (HEADER) & FOOTER

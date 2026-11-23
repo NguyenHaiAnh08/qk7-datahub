@@ -16,7 +16,7 @@ const PORTAL_TRAINING = 'training';
 const VALID_PORTALS = [PORTAL_DATAHUB, PORTAL_TRAINING];
 
 // Dùng khi chưa chạy migration tạo bảng ROLE_PORTAL (không làm hỏng đăng nhập)
-const DEFAULT_TRAINING_ROLES = ['ROL-01', 'ROL-02'];
+const DEFAULT_TRAINING_ROLES = ['ROL-01', 'ROL-02', 'ROL-07'];
 
 // Các API thuộc khu GIÁM SÁT: chỉ nhận token cổng Đào tạo. Muốn thêm/bớt API → sửa danh sách này.
 // Hiện chỉ gồm nhóm GIÁM SÁT BẢO MẬT (phiên đăng nhập, nhật ký đăng nhập, danh sách chặn IP, nhật ký truy cập, đo hiệu năng).

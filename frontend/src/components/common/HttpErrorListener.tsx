@@ -24,8 +24,14 @@ export const HttpErrorListener: React.FC = () => {
       const detail = customEvent.detail;
       if (!detail) return;
 
-      // Endpoint fingerprint tự xử lý lỗi riêng (agent offline, timeout...)
-      if (detail.url?.includes('/fingerprint/')) return;
+      // Endpoint fingerprint tự xử lý lỗi riêng (agent offline, timeout, hủy quét...)
+      if (
+        detail.url?.includes('/fingerprint/') ||
+        detail.url?.includes('admin-fp-verify') ||
+        /signal is aborted|aborted a request|operation was aborted/i.test(detail.message || '')
+      ) {
+        return;
+      }
 
       const { status, message, url, autoRedirect } = detail;
       const statusNum = Number(status);

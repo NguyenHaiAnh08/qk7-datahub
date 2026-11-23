@@ -48,42 +48,42 @@ export const DEMO_ACCOUNTS: Record<
     id: 'USR-002',
     title: 'Chỉ huy',
     subtitle: 'Cấp 5 • Tuyệt Mật',
-    label: 'Chỉ huy - Lương Nhật Thăng (USR-002 - Cấp 5)',
+    label: 'Chỉ huy - Lương Nhật Thăng',
     roleName: 'Chỉ huy',
   },
   coyeu: {
     id: 'USR-003',
     title: 'Cơ yếu',
     subtitle: 'Cấp 5 • Tuyệt Mật',
-    label: 'Cơ yếu - Phạm Trường Sơn (USR-003 - Cấp 5)',
+    label: 'Cơ yếu - Phạm Trường Sơn',
     roleName: 'Cơ yếu',
   },
   troly: {
     id: 'USR-004',
     title: 'Trợ lý',
     subtitle: 'Cấp 2 • Nội bộ',
-    label: 'Trợ lý - Nguyễn Xuân Thanh (USR-004 - Cấp 2)',
+    label: 'Trợ lý - Nguyễn Xuân Thanh',
     roleName: 'Trợ lý',
   },
   vanthu: {
     id: 'USR-005',
     title: 'Văn thư',
     subtitle: 'Cấp 3 • Mật',
-    label: 'Cán bộ Văn thư - Trần Thị Ánh Tuyết (USR-005 - Cấp 3)',
+    label: 'Cán bộ Văn thư - Trần Thị Ánh Tuyết',
     roleName: 'Văn thư',
   },
   it: {
     id: 'USR-006',
     title: 'Nhân viên IT',
-    subtitle: 'Cấp 5 • Quản trị viên (2FA)',
-    label: 'Quản trị viên / IT - Nguyễn Hải Anh (USR-006 - Cấp 5)',
+    subtitle: 'Cấp 5 • Kỹ thuật, Toàn quyền',
+    label: 'Quản trị viên / IT - Nguyễn Hải Anh',
     roleName: 'Quản trị viên / IT',
   },
   admin: {
     id: 'USR-001',
     title: 'Admin',
     subtitle: 'Toàn quyền • Dashboard',
-    label: 'Quản trị viên (Admin - USR-001)',
+    label: 'Quản trị viên - Nguyễn Mạnh Nam',
     roleName: 'Admin',
   },
 };
@@ -417,11 +417,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <button
                     type="button"
                     onClick={() => quickFillRole('chihuy')}
-                    title="Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính (Cấp 5 - Tuyệt Mật)"
+                    title="Đại tá Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính"
                     className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                       selectedRole === 'chihuy'
-                        ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500/60 text-blue-800 dark:text-blue-300 ring-1 ring-blue-500/40 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                        ? 'bg-blue-50 dark:bg-blue-950/70 border-blue-500/60 text-blue-800 dark:text-blue-200 ring-1 ring-blue-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
                     }`}
                   >
                     <div className="min-w-0 pr-1">
@@ -438,11 +438,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <button
                     type="button"
                     onClick={() => quickFillRole('coyeu')}
-                    title="Phạm Trường Sơn - Cơ yếu (Cấp 5 - Tuyệt Mật)"
+                    title="Trung tá QNCN Phạm Trường Sơn - Cơ yếu"
                     className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                       selectedRole === 'coyeu'
-                        ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                        ? 'bg-red-50 dark:bg-red-950/70 border-red-500/60 text-red-800 dark:text-red-200 ring-1 ring-red-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
                     }`}
                   >
                     <div className="min-w-0 pr-1">
@@ -459,11 +459,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <button
                     type="button"
                     onClick={() => quickFillRole('troly')}
-                    title="Nguyễn Xuân Thanh - Trợ lý tác chiến (Cấp 2 - Nội bộ)"
+                    title="Trung tá Nguyễn Xuân Thanh - Trợ lý tác chiến"
                     className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                       selectedRole === 'troly'
-                        ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500/60 text-teal-800 dark:text-teal-300 ring-1 ring-teal-500/40 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                        ? 'bg-teal-50 dark:bg-teal-950/70 border-teal-500/60 text-teal-800 dark:text-teal-200 ring-1 ring-teal-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
                     }`}
                   >
                     <div className="min-w-0 pr-1">
@@ -480,11 +480,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <button
                     type="button"
                     onClick={() => quickFillRole('vanthu')}
-                    title="Trần Thị Ánh Tuyết - Cán bộ Văn thư (Cấp 3 - Mật)"
+                    title="Trung tá QNCN Trần Thị Ánh Tuyết - Cán bộ Văn thư"
                     className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                       selectedRole === 'vanthu'
-                        ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/60 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/40 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/70 border-emerald-500/60 text-emerald-800 dark:text-emerald-200 ring-1 ring-emerald-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
                     }`}
                   >
                     <div className="min-w-0 pr-1">
@@ -501,11 +501,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <button
                     type="button"
                     onClick={() => quickFillRole('it')}
-                    title="Nguyễn Hải Anh - Nhân viên IT (Cấp 1 - Công khai)"
+                    title="Trung sĩ Nguyễn Hải Anh - Nhân viên IT"
                     className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                       selectedRole === 'it'
-                        ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-500/60 text-cyan-800 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                        ? 'bg-cyan-50 dark:bg-cyan-950/70 border-cyan-500/60 text-cyan-800 dark:text-cyan-200 ring-1 ring-cyan-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
                     }`}
                   >
                     <div className="min-w-0 pr-1">
@@ -513,7 +513,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                         <span>Nhân viên IT</span>
                         <span className="text-[10px] font-mono text-slate-400">006</span>
                       </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 1 • Công khai</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Kỹ thuật, Toàn quyền</div>
                     </div>
                     <Monitor className="w-4 h-4 text-cyan-500 dark:text-cyan-400 shrink-0" />
                   </button>
@@ -522,10 +522,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <button
                     type="button"
                     onClick={() => quickFillRole('admin')}
+                    title="Thiếu tá QNCN Nguyễn Mạnh Nam - Quản trị viên"
                     className={`w-full p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                       selectedRole === 'admin'
-                        ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-500/60 text-amber-800 dark:text-amber-300 ring-1 ring-amber-500/40 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                        ? 'bg-amber-50 dark:bg-amber-950/70 border-amber-500/60 text-amber-800 dark:text-amber-200 ring-1 ring-amber-500/40 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
                     }`}
                   >
                     <div>
@@ -619,11 +620,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <button
               type="button"
               onClick={() => quickFillRole('chihuy')}
-              title="Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính (Cấp 5 - Tuyệt Mật)"
+              title="Lương Nhật Thăng - Trưởng phòng Tham mưu - Hành chính"
               className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                 selectedRole === 'chihuy'
-                  ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500/60 text-blue-800 dark:text-blue-300 ring-1 ring-blue-500/40 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                  ? 'bg-blue-50 dark:bg-blue-950/70 border-blue-500/60 text-blue-800 dark:text-blue-200 ring-1 ring-blue-500/40 shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
               }`}
             >
               <div className="min-w-0 pr-1">
@@ -640,11 +641,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <button
               type="button"
               onClick={() => quickFillRole('coyeu')}
-              title="Phạm Trường Sơn - Cơ yếu (Cấp 5 - Tuyệt Mật)"
+              title="Phạm Trường Sơn - Cơ yếu"
               className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                 selectedRole === 'coyeu'
-                  ? 'bg-red-50 dark:bg-red-950/60 border-red-500/60 text-red-800 dark:text-red-300 ring-1 ring-red-500/40 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                  ? 'bg-red-50 dark:bg-red-950/70 border-red-500/60 text-red-800 dark:text-red-200 ring-1 ring-red-500/40 shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
               }`}
             >
               <div className="min-w-0 pr-1">
@@ -661,11 +662,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <button
               type="button"
               onClick={() => quickFillRole('troly')}
-              title="Nguyễn Xuân Thanh - Trợ lý tác chiến (Cấp 2 - Nội bộ)"
+              title="Nguyễn Xuân Thanh - Trợ lý tác chiến"
               className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                 selectedRole === 'troly'
-                  ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500/60 text-teal-800 dark:text-teal-300 ring-1 ring-teal-500/40 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                  ? 'bg-teal-50 dark:bg-teal-950/70 border-teal-500/60 text-teal-800 dark:text-teal-200 ring-1 ring-teal-500/40 shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
               }`}
             >
               <div className="min-w-0 pr-1">
@@ -682,11 +683,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <button
               type="button"
               onClick={() => quickFillRole('vanthu')}
-              title="Trần Thị Ánh Tuyết - Cán bộ Văn thư (Cấp 3 - Mật)"
+              title="Trần Thị Ánh Tuyết - Cán bộ Văn thư"
               className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                 selectedRole === 'vanthu'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/60 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/40 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/70 border-emerald-500/60 text-emerald-800 dark:text-emerald-200 ring-1 ring-emerald-500/40 shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
               }`}
             >
               <div className="min-w-0 pr-1">
@@ -703,11 +704,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <button
               type="button"
               onClick={() => quickFillRole('it')}
-              title="Nguyễn Hải Anh - Nhân viên IT (Cấp 1 - Công khai)"
+              title="Nguyễn Hải Anh - Nhân viên IT"
               className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                 selectedRole === 'it'
-                  ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-500/60 text-cyan-800 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                  ? 'bg-cyan-50 dark:bg-cyan-950/70 border-cyan-500/60 text-cyan-800 dark:text-cyan-200 ring-1 ring-cyan-500/40 shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
               }`}
             >
               <div className="min-w-0 pr-1">
@@ -715,7 +716,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
                   <span>Nhân viên IT</span>
                   <span className="text-[10px] font-mono text-slate-400">006</span>
                 </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 1 • Kỹ thuật</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 5 • Kỹ thuật, Toàn quyền</div>
               </div>
               <Monitor className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-500 dark:text-cyan-400 shrink-0" />
             </button>
@@ -724,11 +725,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onToast, isSpli
             <button
               type="button"
               onClick={() => quickFillRole('admin')}
-              title="Quản trị viên (Admin - USR-001)"
+              title="Quản trị viên - Nguyễn Mạnh Nam"
               className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
                 selectedRole === 'admin'
-                  ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-500/60 text-amber-800 dark:text-amber-300 ring-1 ring-amber-500/40 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-800/80 dark:border-slate-800 dark:text-slate-300'
+                  ? 'bg-amber-50 dark:bg-amber-950/70 border-amber-500/60 text-amber-800 dark:text-amber-200 ring-1 ring-amber-500/40 shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
               }`}
             >
               <div className="min-w-0 pr-1">

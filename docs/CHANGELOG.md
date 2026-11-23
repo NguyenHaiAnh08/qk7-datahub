@@ -4,6 +4,39 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.7-military-autonomous-infrastructure-and-ca-portal] — 2026-11-23
+
+### 1. Hạ Tầng Tự Chủ Quân Sự & Tên Miền Nội Bộ (Military Autonomous Infrastructure & Internal Domain)
+- **Chuẩn hóa tên miền tác chiến nội bộ:**
+  - Thiết lập tên miền chính quy `trungtamdulieuso.tqsqk7.edu` cho toàn bộ hệ thống QK7 DataHub trong môi trường mạng nội bộ quân sự biệt lập (Air-Gapped).
+- **Hệ thống DNS tự chủ nội bộ & DNS-over-HTTPS (DoH) RFC 8484:**
+  - Phát triển máy chủ DNS nội bộ độc lập ([`scripts/dns-server.js`](../scripts/dns-server.js), [`scripts/setup-military-dns.ps1`](../scripts/setup-military-dns.ps1), [`scripts/start-dns.bat`](../scripts/start-dns.bat)) phân giải tên miền nội bộ tại cổng UDP 53.
+  - Tích hợp endpoint DoH `/dns-query` tại Gateway phục vụ Split-DNS cho iPad Air M4 và các thiết bị di động trong mạng tác chiến không cần cấu hình DNS tĩnh.
+- **Kịch bản tự động hóa hạ tầng trạm:**
+  - Cung cấp kịch bản đổi IP linh hoạt ([`scripts/doi-ip.bat`](../scripts/doi-ip.bat), [`scripts/switch-ip.ps1`](../scripts/switch-ip.ps1)) và kịch bản cài đặt tự động cho máy con ([`scripts/cai-dat-may-con.bat`](../scripts/cai-dat-may-con.bat)).
+  - Bổ sung tài liệu kiến trúc toàn diện ([`docs/architecture/MILITARY_AUTONOMOUS_INFRASTRUCTURE.md`](../docs/architecture/MILITARY_AUTONOMOUS_INFRASTRUCTURE.md)) và cẩm nang vận hành ([`docs/guides/INTERNAL_DOMAIN_AND_MILITARY_INFRA_PLAYBOOK.md`](../docs/guides/INTERNAL_DOMAIN_AND_MILITARY_INFRA_PLAYBOOK.md)).
+
+### 2. Cổng Tự Phục Vụ Chứng Chỉ Gốc (CA Portal) & Hỗ Trợ Đa Cổng HTTPS (`server.js` & `ca-portal.js`)
+- **Cổng phân phối Root CA tự phục vụ ([`backend/src/ca-portal.js`](../backend/src/ca-portal.js)):**
+  - Cung cấp giao diện tải chứng chỉ gốc công khai tại `/ca` cho phép máy trạm PC và iPad Air tự động cài đặt Root CA (`.crt`, `.cer`, `.der`) và cấu hình iOS Configuration Profile (`.mobileconfig`).
+- **Hỗ trợ song song cổng chuẩn HTTPS 443 & Chuyển hướng HTTP 80 ([`backend/server.js`](../backend/server.js)):**
+  - Cho phép người dùng truy cập trực tiếp `https://trungtamdulieuso.tqsqk7.edu` không cần chỉ định cổng `:8000`.
+  - Tự động chuyển hướng HTTP (cổng 80) sang HTTPS (cổng 443), giữ nguyên ngoại lệ cho `/ca` để máy con chưa tin cậy chứng chỉ vẫn tải được Root CA.
+  - Mở rộng gắn kết đa máy chủ (`attachServer`) trong [`fingerprint-ws.js`](../backend/src/fingerprint-ws.js), đảm bảo WebSocket vân tay hoạt động ổn định trên cả 2 cổng.
+
+### 3. Nâng Cấp Form Đăng Nhập Cổng Đào Tạo & Hệ Thống Toast Đa Tầng (`TrainingLoginForm.tsx`, `Toast.tsx`, `portal.js`)
+- **Mở rộng phân quyền Cổng Quản lý Đào tạo ([`backend/src/portal.js`](../backend/src/portal.js)):**
+  - Bổ sung vai trò Giáo viên được phép truy cập Cổng Quản lý Đào tạo song song với Quản trị viên và Chỉ huy.
+- **Tối ưu trải nghiệm đăng nhập Cổng Đào tạo ([`TrainingLoginForm.tsx`](../frontend/src/components/auth/TrainingLoginForm.tsx)):**
+  - Cập nhật tài khoản kiểm thử nhanh trực quan, hỗ trợ gợi ý thông tin đăng nhập cho giáo viên, quản lý đào tạo và chỉ huy.
+  - Tinh chỉnh cơ chế autofocus, xử lý thông báo lỗi chuẩn xác và chuyển đổi form mượt mà.
+- **Hệ thống thông báo Toast đa tầng ([`Toast.tsx`](../frontend/src/components/common/Toast.tsx)):**
+  - Nâng cấp styling thông báo độ tương phản cao, hỗ trợ nhiều mức độ ưu tiên và hiển thị thanh đếm thời gian tự động đóng.
+- **Khởi tạo giao diện chống nhấp nháy (Flicker-Free Theme Init):**
+  - Cải tiến [`frontend/public/theme-init.js`](../frontend/public/theme-init.js) và [`ThemeContext.tsx`](../frontend/src/contexts/ThemeContext.tsx) áp dụng class dark/light ngay lập tức trước khi render DOM.
+
+---
+
 ## [v1.8.6-lecture-code-limit-and-card-layout] — 2026-11-23
 
 ### 1. Giới Hạn Mã Bài Giảng 30 Ký Tự (`CreateLectureModal.tsx` & `lecture-routes.js`)

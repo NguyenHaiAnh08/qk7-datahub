@@ -110,6 +110,46 @@ export const useToast = () => {
 export const useAnimatedToast = useToast;
 
 // =========================================================================
+// Smart Semantic Line-Wrapping Formatter for Vietnamese Notifications
+// Giữ nguyên cụm từ ghép, quân hàm, họ tên, tên hệ thống và cấp độ mật
+// bằng Non-Breaking Space (\u00A0) để xuống dòng thông minh, không bị mất nghĩa
+// hoặc rơi từ đơn lẻ (orphan word) ở cuối dòng.
+// =========================================================================
+const SMART_VIETNAMESE_PHRASE_PATTERNS: RegExp[] = [
+  // 1. Cụm giới từ + Tên Hệ thống / Phân hệ (luôn đi cùng nhau khi xuống dòng)
+  /(?<![\p{L}\p{N}])(vào|tại|trên|khỏi|tới|đến)[ ]+(Hệ[ ]+Thống[ ]+Quản[ ]+Lý[ ]+Đào[ ]+Tạo|Trung[ ]+Tâm[ ]+Dữ[ ]+Liệu[ ]+Số|Trường[ ]+Quân[ ]+Sự[ ]+Quân[ ]+Khu[ ]+7|Tổ[ ]+Quản[ ]+Trị[ ]+Hệ[ ]+Thống(?:[ ]+QK7)?)(?![\p{L}\p{N}])/giu,
+  // 2. Tên Hệ thống, Đơn vị, Tổ chức & Thuật ngữ kỹ thuật cố định
+  /(?<![\p{L}\p{N}])(Hệ[ ]+Thống[ ]+Quản[ ]+Lý[ ]+Đào[ ]+Tạo|Trung[ ]+Tâm[ ]+Dữ[ ]+Liệu[ ]+Số|Trường[ ]+Quân[ ]+Sự[ ]+Quân[ ]+Khu[ ]+7|Quân[ ]+Khu[ ]+7|Thư[ ]+viện[ ]+số(?:[ ]+QK7)?|Khoa[ ]+Binh[ ]+Chủng|Phòng[ ]+Tham[ ]+mưu|Phòng[ ]+Đào[ ]+tạo|Trợ[ ]+lý[ ]+AI|SQL[ ]+Server|Port[ ]+\d+)(?![\p{L}\p{N}])/giu,
+  // 3. Cấp độ mật & Cụm bảo mật
+  /(?<![\p{L}\p{N}])(Cấp[ ]+[1-5]|Công[ ]+khai|Nội[ ]+bộ|Tối[ ]+Mật|Tuyệt[ ]+Mật|Toàn[ ]+quyền(?:[ ]+Admin)?|vân[ ]+tay[ ]+2FA|sinh[ ]+trắc[ ]+học| bảo[ ]+vệ[ ]+2[ ]+tầng)(?![\p{L}\p{N}])/giu,
+  // 4. Danh xưng, Quân hàm & Chức vụ
+  /(?<![\p{L}\p{N}])(đồng[ ]+chí|Đại[ ]+tướng|Thượng[ ]+tướng|Trung[ ]+tướng|Thiếu[ ]+tướng|Đại[ ]+tá|Thượng[ ]+tá|Trung[ ]+tá|Thiếu[ ]+tá|Đại[ ]+úy|Thượng[ ]+úy|Trung[ ]+úy|Thiếu[ ]+úy|Thượng[ ]+sĩ|Trung[ ]+sĩ|Hạ[ ]+sĩ|Binh[ ]+nhất|Binh[ ]+nhì|Quản[ ]+trị[ ]+viên|Cán[ ]+bộ[ ]+Văn[ ]+thư|Nhân[ ]+viên[ ]+IT|Trưởng[ ]+khoa|Phó[ ]+khoa|Trưởng[ ]+phòng|Phó[ ]+phòng|Giáo[ ]+viên|Giảng[ ]+viên|Học[ ]+viên|Chỉ[ ]+huy|Cơ[ ]+yếu|Trợ[ ]+lý|Văn[ ]+thư)(?![\p{L}\p{N}])/giu,
+  // 5. Họ tên riêng tiếng Việt (2–4 âm tiết viết hoa liên tiếp, vd: Đoàn Quang Linh, Lê Minh Tiến)
+  /(?<![\p{L}\p{N}])(\p{Lu}\p{Ll}+(?:[ ]+\p{Lu}\p{Ll}+){1,3})(?![\p{L}\p{N}])/gu,
+  // 6. Từ ghép tiếng Việt 2 âm tiết phổ biến trong thông báo (không cắt đôi từ ghép giữa 2 dòng)
+  /(?<![\p{L}\p{N}])(Chào[ ]+mừng|Xin[ ]+chào|Đã[ ]+chọn|tài[ ]+khoản|mật[ ]+khẩu|đăng[ ]+nhập|đăng[ ]+xuất|thành[ ]+công|thất[ ]+bại|xác[ ]+thực|vân[ ]+tay|quản[ ]+trị|hệ[ ]+thống|phân[ ]+hệ|đào[ ]+tạo|dữ[ ]+liệu|văn[ ]+bản|tài[ ]+liệu|bài[ ]+giảng|môn[ ]+học|lớp[ ]+học|giảng[ ]+đường|phê[ ]+duyệt|từ[ ]+chối|khôi[ ]+phục|thùng[ ]+rác|vĩnh[ ]+viễn|máy[ ]+chủ|kết[ ]+nối|truy[ ]+cập|trực[ ]+tiếp|tuyệt[ ]+đối|quy[ ]+định|tác[ ]+chiến|kiểm[ ]+tra|thông[ ]+tin|người[ ]+dùng|quân[ ]+nhân|làm[ ]+việc|hết[ ]+hạn|mở[ ]+khóa|kích[ ]+hoạt|bảo[ ]+vệ|hàng[ ]+loạt|nhật[ ]+ký|an[ ]+ninh|báo[ ]+cáo|tải[ ]+xuống|hoàn[ ]+tất|yêu[ ]+cầu|hiệu[ ]+lực|chuyển[ ]+hướng|chế[ ]+độ|bảo[ ]+mật|cấp[ ]+độ|quyền[ ]+hạn|thao[ ]+tác|hiện[ ]+tại|trở[ ]+lên|duy[ ]+nhất|cho[ ]+phép)(?![\p{L}\p{N}])/giu,
+];
+
+export const formatSmartToastMessage = (rawMessage: string): string => {
+  if (!rawMessage) return '';
+  let formatted = rawMessage.trim();
+
+  for (const pattern of SMART_VIETNAMESE_PHRASE_PATTERNS) {
+    formatted = formatted.replace(pattern, (match) => match.replace(/ +/g, '\u00A0'));
+  }
+
+  // Chống từ mồ côi cuối câu (orphan word): ghép 2 cụm ngắn cuối câu nếu tổng độ dài <= 16 ký tự
+  formatted = formatted.replace(/(\S+)[ ]+(\S+[.!?…]*)$/u, (full, secondLast, last) => {
+    if (secondLast.length + last.length <= 16) {
+      return `${secondLast}\u00A0${last}`;
+    }
+    return full;
+  });
+
+  return formatted;
+};
+
+// =========================================================================
 // Single Animated Toast Card Component (JolyUI & Spring Physics)
 // ✅ Dùng React.forwardRef để AnimatePresence mode="popLayout" có thể gắn ref
 //    đo kích thước/vị trí khi toast exit (tránh warning PopChild).
@@ -228,7 +268,7 @@ const SingleToastCard = React.forwardRef<HTMLDivElement, SingleToastCardProps>(
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`group pointer-events-auto relative w-full sm:w-auto min-w-[320px] sm:min-w-[480px] md:min-w-[540px] max-w-full overflow-hidden rounded-2xl border bg-white/95 dark:bg-[#0c1420]/95 backdrop-blur-xl shadow-xl transition-all duration-200 select-none ${theme.borderHighlight}`}
+        className={`group pointer-events-auto relative w-full sm:w-auto min-w-[300px] sm:min-w-[420px] md:min-w-[460px] max-w-[92vw] sm:max-w-[540px] md:max-w-[580px] overflow-hidden rounded-2xl border bg-white/95 dark:bg-[#0c1420]/95 backdrop-blur-xl shadow-xl transition-all duration-200 select-none ${theme.borderHighlight}`}
         style={{
           boxShadow: isHovered
             ? '0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1)'
@@ -249,7 +289,7 @@ const SingleToastCard = React.forwardRef<HTMLDivElement, SingleToastCardProps>(
           {/* Content Body */}
           <div className="flex-1 min-w-0 pr-1">
             <div className="flex items-center justify-between gap-3 mb-1">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
                 <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap shrink-0 tracking-tight">
                   {item.title || theme.defaultTitle}
                 </span>
@@ -269,14 +309,8 @@ const SingleToastCard = React.forwardRef<HTMLDivElement, SingleToastCardProps>(
               )}
             </div>
 
-            <p
-              className={`text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 font-medium ${
-                item.message.length <= 110
-                  ? 'whitespace-normal sm:whitespace-nowrap leading-normal'
-                  : 'leading-relaxed break-words'
-              }`}
-            >
-              {item.message}
+            <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-line break-words [text-wrap:pretty]">
+              {formatSmartToastMessage(item.message)}
             </p>
           </div>
 

@@ -812,6 +812,12 @@ app.use('/api', async (req, res, next) => {
 });
 
 // ============================================================
+// 1b. BẢO VỆ TUYỆT ĐỐI USR-001 — chặn mọi thao tác ghi nhắm vào tài khoản Quản trị tối cao
+//     (kể cả từ admin ROL-01 khác). Đặt TRƯỚC approval + mọi route.
+// ============================================================
+app.use(require('./src/protected-admin-guard')({ sql, getPool, writeAccessLog, getClientIp }));
+
+// ============================================================
 // 2. SETUP APPROVAL WORKFLOW — NGAY SAU MIDDLEWARE JWT
 // ============================================================
 const { approvalInterceptor, enforceViewGate, isPermissionLocked } = createApprovalWorkflow({
@@ -1875,6 +1881,16 @@ app.post('/api/auth/fingerprint/verify', requireAuth, requirePermission('FP_VERI
     const isAdminUser = (req.user.roles || []).includes('ROL-01');
     if (isDeleted && !isAdminUser) {
       return res.status(404).json({ error: 'Tài liệu không tồn tại hoặc đã bị xóa' });
+    }
+
+    // [SECURITY] Không cấp token vân tay cho tài liệu vượt cấp mật của chính người dùng
+    // (trước đây thiếu kiểm tra này → quét vân tay xong dùng token để đọc tài liệu quá cấp)
+    if (security_level_id > (req.user.clearance_level_id || 0)) {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId: file_id, action: 'DENIED',
+        ip: getClientIp(req), note: `Yêu cầu quét vân tay cho tài liệu Cấp ${security_level_id} vượt cấp mật của người dùng`,
+      });
+      return res.status(403).json({ error: 'Không có quyền truy cập tài liệu này' });
     }
 
     if (security_level_id < 3) {
@@ -3951,14 +3967,24 @@ app.get('/api/files/:fileId/view', async (req, res) => {
   if ((!req.user || req.user.user_id === 'GUEST') && req.headers['x-fingerprint-token']) {
     try {
       const decodedFp = jwt.verify(req.headers['x-fingerprint-token'], JWT_SECRET);
-      if (decodedFp && decodedFp.user_id) {
-        req.user = {
-          user_id: decodedFp.user_id,
-          clearance_level_id: decodedFp.clearance_level_id || 5,
-          roles: decodedFp.roles || [],
-          permissions: [],
-          is_authenticated: true,
-        };
+      // [SECURITY] Chỉ chấp nhận token vân tay đúng mục đích, đúng tài liệu; cấp mật lấy từ CSDL
+      // (không tin/không mặc định 5 như trước) và chỉ cho tài khoản đang hoạt động.
+      // (khớp file_id được kiểm tra lại ở bước xác thực vân tay Cấp 3+ bên dưới)
+      if (decodedFp && decodedFp.user_id && decodedFp.purpose === 'file_access') {
+        const poolFp = await getPool();
+        const u = await poolFp.request()
+          .input('uid', sql.VarChar(50), decodedFp.user_id)
+          .query(`SELECT clearance_level_id, status FROM [USER] WHERE user_id = @uid`);
+        const row = u.recordset[0];
+        if (row && row.status === 'active') {
+          req.user = {
+            user_id: decodedFp.user_id,
+            clearance_level_id: row.clearance_level_id,
+            roles: [],
+            permissions: [],
+            is_authenticated: true,
+          };
+        }
       }
     } catch (_) {}
   }
@@ -4340,7 +4366,7 @@ app.post('/api/security/screenshot-alert', async (req, res) => {
     const authHeader = req.headers['authorization'];
     if (authHeader && authHeader.startsWith('Bearer ') && userId === 'GUEST') {
       try {
-        const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET || 'fallback_secret');
+        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
         if (decoded?.user_id) userId = decoded.user_id;
       } catch (_) {}
     }
@@ -4481,7 +4507,7 @@ app.get('/api/security/violation-status', async (req, res) => {
     const authHeader = req.headers['authorization'];
     if (authHeader && authHeader.startsWith('Bearer ') && !userId) {
       try {
-        const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET || 'fallback_secret');
+        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
         if (decoded?.user_id) userId = decoded.user_id;
       } catch (_) {}
     }

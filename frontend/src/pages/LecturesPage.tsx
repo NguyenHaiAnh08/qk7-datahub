@@ -41,7 +41,7 @@ const PAGE_META: Record<LecturesPageMode, { title: string; subtitle: string; bad
   },
   compose: {
     title: 'Soạn Và Duyệt Bài Giảng',
-    subtitle: 'Soạn bài giảng mới, gửi duyệt, phê duyệt 2 tầng và quản lý thùng rác — Trường Quân Sự Quân Khu 7',
+    subtitle: 'Soạn bài giảng mới, gửi duyệt và phê duyệt 2 tầng — Trường Quân Sự Quân Khu 7',
     badge: 'Xưởng bài giảng',
   },
   history: {
@@ -205,18 +205,9 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
   const loadLectures = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      // Backend ẩn DELETED mặc định → cần gọi thêm 1 lần với status=DELETED
-      // Thùng rác chỉ cần ở trang Soạn & duyệt
-      const [normalRes, deletedRes] = await Promise.all([
-        lectureService.list(),
-        mode === 'compose'
-          ? lectureService.list({ status: 'DELETED' })
-          : Promise.resolve({ items: [] as Lecture[], total: 0 }),
-      ]);
-      setAllLectures([
-        ...(normalRes.items  || []),
-        ...(deletedRes.items || []),
-      ]);
+      // Bài đã xóa mềm nằm ở Thùng rác trang Quản trị (chỉ Admin) → backend không trả về ở đây
+      const normalRes = await lectureService.list();
+      setAllLectures(normalRes.items || []);
     } catch (err: any) {
       toast.error('Không thể tải danh sách bài giảng: ' + (err?.message || 'Lỗi không xác định'));
     } finally {
@@ -293,25 +284,33 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
 
   // ── Stats luôn được tính từ toàn bộ kho dữ liệu bài giảng của người dùng ──
   const stats = useMemo(() => {
-    const deleted = allLectures.filter(l => l.status === 'DELETED').length;
-    const active  = allLectures.filter(l => l.status !== 'DELETED');
+    // Không còn Lưu trữ / Thùng rác ở trang này
+    const active = allLectures.filter(l => l.status !== 'DELETED' && l.status !== 'ARCHIVED');
     return {
-      total:           active.length,               // không tính bài trong thùng rác
+      total:           active.length,
       published:       active.filter(l => l.status === 'PUBLISHED').length,
       pending:         active.filter(l => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length,
       draft:           active.filter(l => l.status === 'DRAFT' || l.status === 'REJECTED').length,
       pendingFaculty:  active.filter(l => l.status === 'PENDING_FACULTY').length,
       pendingTraining: active.filter(l => l.status === 'PENDING_TRAINING').length,
       rejected:        active.filter(l => l.status === 'REJECTED').length,
-      deleted,                                      // 🆕 đếm riêng cho chip "Thùng rác"
+      draftOnly:       active.filter(l => l.status === 'DRAFT').length,
     };
   }, [allLectures]);
 
   // ── Lọc tức thì trên Client (Zero-Latency / Smooth Transition, triệt tiêu giật màn hình) ──
   const filteredLectures = useMemo(() => {
     // Trang Danh sách chỉ hiện bài đã xuất bản; bản nháp/chờ duyệt/thùng rác nằm ở trang Soạn & duyệt
-    const base = mode === 'list' ? allLectures.filter(l => l.status === 'PUBLISHED') : allLectures;
-    return base.filter(lec => {
+    const base = mode === 'list'
+      ? allLectures.filter(l => l.status === 'PUBLISHED')
+      : allLectures.filter(l => l.status !== 'DELETED' && l.status !== 'ARCHIVED');
+    // Trang Soạn: xếp theo thứ tự Chờ Khoa duyệt → Chờ BGH duyệt → Cần hiệu chỉnh → Bản nháp → Đã xuất bản (mới nhất trước trong từng nhóm)
+    const rank: Record<string, number> = { PENDING_FACULTY: 0, PENDING_TRAINING: 1, REJECTED: 2, DRAFT: 3, PUBLISHED: 4 };
+    const ordered = mode === 'compose'
+      ? [...base].sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9)
+          || String(b.created_at || '').localeCompare(String(a.created_at || '')))
+      : base;
+    return ordered.filter(lec => {
       // 1. Lọc theo trạng thái từ chip Lọc nhanh
       if (statusFilter && lec.status !== statusFilter) return false;
       // 2. Lọc theo môn học
@@ -386,7 +385,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
     setConfirmModal({
       open: true,
       title: 'Chuyển Vào Thùng Rác',
-      description: `Đồng chí có chắc chắn muốn chuyển bài giảng "${lec.title}" (${lec.lecture_code}) vào thùng rác? Bạn có thể khôi phục lại sau này.`,
+      description: `Đồng chí có chắc chắn muốn chuyển bài giảng "${lec.title}" (${lec.lecture_code}) vào thùng rác? Bài sẽ được chuyển sang Thùng rác của Quản trị viên (chỉ Quản trị viên mới khôi phục hoặc xóa vĩnh viễn).`,
       confirmText: 'Chuyển vào thùng rác',
       isDestructive: true,
       onConfirm: async () => {
@@ -396,50 +395,6 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
           loadLectures();
         } catch (err: any) {
           toast.error(err?.message || 'Xóa mềm thất bại');
-        } finally {
-          setConfirmModal(prev => ({ ...prev, open: false }));
-        }
-      },
-    });
-  };
-
-  // ✅ 2. HÀM XÓA VĨNH VIỄN (Xóa khỏi ổ cứng & CSDL)
-  const handlePurge = (lec: Lecture) => {
-    setConfirmModal({
-      open: true,
-      title: 'CẢNH BÁO: XÓA VĨNH VIỄN',
-      description: `Hành động này sẽ XÓA VĨNH VIỄN bài giảng "${lec.title}", toàn bộ gói học liệu SCORM/HTML5 và câu hỏi Quiz khỏi ổ cứng máy chủ. Thao tác này KHÔNG THỂ HOÀN TÁC!`,
-      confirmText: 'Xóa vĩnh viễn',
-      isDestructive: true,
-      onConfirm: async () => {
-        try {
-          await lectureService.purge(lec.lecture_id);
-          toast.success(`Đã xóa vĩnh viễn "${lec.title}" khỏi hệ thống`);
-          loadLectures();
-        } catch (err: any) {
-          toast.error(err?.message || 'Lỗi khi xóa vĩnh viễn');
-        } finally {
-          setConfirmModal(prev => ({ ...prev, open: false }));
-        }
-      },
-    });
-  };
-  
-
-  const handleRestoreClick = (lec: Lecture) => {
-    setConfirmModal({
-      open: true,
-      title: 'Khôi phục bài giảng',
-      description: `Đồng chí có muốn khôi phục bài giảng "${lec.title}" về trạng thái Bản nháp để tiếp tục hiệu chỉnh và giảng dạy?`,
-      confirmText: 'Khôi phục ngay',
-      isDestructive: false,
-      onConfirm: async () => {
-        try {
-          await lectureService.restore(lec.lecture_id);
-          toast.success(`Đã khôi phục "${lec.title}" về Bản nháp`);
-          loadLectures();
-        } catch (err: any) {
-          toast.error(err?.message || 'Khôi phục thất bại');
         } finally {
           setConfirmModal(prev => ({ ...prev, open: false }));
         }
@@ -669,13 +624,11 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                     className="px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none focus:border-emerald-600"
                   >
                     <option value="">Tất cả trạng thái</option>
-                    <option value="DRAFT">Bản nháp</option>
                     <option value="PENDING_FACULTY">Chờ Khoa duyệt (Tầng 1)</option>
                     <option value="PENDING_TRAINING">Chờ BGH duyệt (Tầng 2)</option>
-                    <option value="PUBLISHED">Đã xuất bản (Sẵn sàng dạy)</option>
                     <option value="REJECTED">Cần hiệu chỉnh</option>
-                    <option value="ARCHIVED">Lưu trữ</option>
-                    <option value="DELETED">🗑️ Thùng rác (Đã xóa)</option>
+                    <option value="DRAFT">Bản nháp</option>
+                    <option value="PUBLISHED">Đã xuất bản (Sẵn sàng dạy)</option>
                   </select>
                   )}
 
@@ -720,12 +673,11 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                 </span>
                 {[
                   { key: '', label: 'Tất cả', count: stats.total },
-                  { key: 'PUBLISHED', label: 'Đã xuất bản', count: stats.published },
                   { key: 'PENDING_FACULTY', label: 'Chờ Khoa duyệt', count: stats.pendingFaculty },
                   { key: 'PENDING_TRAINING', label: 'Chờ BGH duyệt', count: stats.pendingTraining },
-                  { key: 'DRAFT', label: 'Bản nháp', count: stats.draft },
-                  { key: 'REJECTED', label: 'Cần sửa đổi', count: stats.rejected },
-                  { key: 'DELETED', label: '🗑️ Thùng rác', count: stats.deleted },
+                  { key: 'REJECTED', label: 'Cần hiệu chỉnh', count: stats.rejected },
+                  { key: 'DRAFT', label: 'Bản nháp', count: stats.draftOnly },
+                  { key: 'PUBLISHED', label: 'Đã xuất bản', count: stats.published },
                 ].map(chip => {
                   const active = statusFilter === chip.key;
                   return (
@@ -762,9 +714,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                   <TacticalEmptyState
                     title="Chưa tìm thấy bài giảng nào phù hợp"
                     description={
-                      statusFilter === 'DELETED'
-                        ? 'Thùng rác đang trống. Các bài giảng đã xóa mềm sẽ xuất hiện ở đây và có thể khôi phục hoặc xóa vĩnh viễn.'
-                        : searchQuery || statusFilter || subjectFilter
+                      searchQuery || statusFilter || subjectFilter
                         ? 'Không có bài giảng nào khớp với các tiêu chí tìm kiếm hoặc bộ lọc hiện tại. Đồng chí vui lòng đặt lại bộ lọc.'
                         : mode === 'list'
                         ? 'Hiện chưa có bài giảng nào được xuất bản trong phạm vi của đồng chí. Bài giảng mới soạn nằm ở mục "Soạn và duyệt bài giảng".'
@@ -795,14 +745,13 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                       isAdmin={isAdmin}
                       canApprove={canApprove}
                       canArchive={canArchive}
+                      canDelete={hasPermission('LECTURE_DELETE')}
                       canStartSchedule={canStartSchedule}
                       canEdit={canCreate}
                       onSubmit={() => handleSubmit(lec)}
                       onApprove={() => handleApprove(lec)}
                       onReject={() => handleRejectClick(lec)}
                       onSoftDelete={() => handleSoftDelete(lec)}
-                      onRestore={() => handleRestoreClick(lec)}
-                      onPurge={() => handlePurge(lec)}
                       onEdit={() => handleEditClick(lec)}
                       onView={() => setViewingLecture(lec)}
                       onRead={() => setReadingLecture(lec)}

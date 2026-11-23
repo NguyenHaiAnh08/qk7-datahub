@@ -118,8 +118,17 @@ module.exports = function createApprovalWorkflow({
   let cacheLoadedAt = 0;
   const CACHE_TTL_MS = 30 * 1000;
 
+  // Gộp các lần tải đồng thời: khi cache hết hạn, hàng chục request cùng lúc chỉ chạy 1 truy vấn (trước đây mỗi request 1 truy vấn + 1 dòng log)
+  let inflightLoad = null;
+  let lastLoggedKey = '';
   async function loadProtectedPermissions(force = false) {
     if (!force && Date.now() - cacheLoadedAt < CACHE_TTL_MS) return protectedSet;
+    if (inflightLoad) return inflightLoad;
+    inflightLoad = doLoadProtectedPermissions().finally(() => { inflightLoad = null; });
+    return inflightLoad;
+  }
+
+  async function doLoadProtectedPermissions() {
     try {
       const pool = await getPool();
       const r = await pool.request().query(`
@@ -143,10 +152,12 @@ module.exports = function createApprovalWorkflow({
       if (protectedSet.size === 0) {
         console.warn('[approval] ⚠️  protectedSet rỗng — kiểm tra migration v4.3');
       } else {
-        console.log(
-          `[approval] 🔒 Loaded ${protectedSet.size} protected codes: ` +
-          Array.from(protectedSet).sort().join(', ')
-        );
+        // Chỉ ghi log khi danh sách khóa bảo vệ THAY ĐỔI (không lặp lại mỗi 30 giây)
+        const sorted = Array.from(protectedSet).sort().join(', ');
+        if (sorted !== lastLoggedKey) {
+          lastLoggedKey = sorted;
+          console.log(`[approval] 🔒 Loaded ${protectedSet.size} protected codes: ` + sorted);
+        }
       }
     } catch (err) {
       console.error('[approval] loadProtectedPermissions:', err.message);

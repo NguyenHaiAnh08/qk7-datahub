@@ -102,6 +102,14 @@ module.exports = function createLectureRoutes({
     return false;
   }
 
+  // Khôi phục / Xóa vĩnh viễn bài giảng trong thùng rác: CHỈ Admin (ROL-01), thao tác ở trang Quản trị → Thùng rác
+  async function requireAdminOnly(pool, req, res) {
+    const roles = await resolveUserRoles(pool, req.user);
+    if (roles.includes('ROL-01')) return true;
+    res.status(403).json({ error: 'Chỉ Quản trị viên (Admin) mới được khôi phục hoặc xóa vĩnh viễn bài giảng trong thùng rác.' });
+    return false;
+  }
+
   // Check cột có tồn tại (dùng cho fallback nếu chưa chạy migration v2)
   async function hasColumn(pool, table, column) {
     const r = await pool.request()
@@ -229,6 +237,10 @@ module.exports = function createLectureRoutes({
           r.input('status', sql.VarChar(30), req.query.status);
         } else {
           // Mặc định: Ẩn các bài giảng đã bị xóa mềm
+          query += ` AND l.status != 'DELETED'`;
+        }
+        // Bài trong thùng rác CHỈ Admin xem (ở trang Quản trị → Thùng rác); giáo viên/chỉ huy không còn thấy
+        if (!isAdmin) {
           query += ` AND l.status != 'DELETED'`;
         }
       }
@@ -416,13 +428,30 @@ module.exports = function createLectureRoutes({
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  // 1. API Xoá mềm — CHẶN Ở BACKEND: chỉ Chỉ huy cấp trên
+  // 1. API Xoá mềm → chuyển vào THÙNG RÁC của trang Quản trị (chỉ Admin khôi phục / xóa vĩnh viễn ở đó)
+  //    Ai được xóa mềm: Admin/Chỉ huy (mọi bài chưa chờ duyệt/xuất bản) hoặc TÁC GIẢ (bài của mình đang Bản nháp/Cần sửa)
   router.delete('/:id', requireAuth, requirePermission('LECTURE_DELETE'), async (req, res) => {
     try {
       const pool = await getPool();
-      if (!(await requireCommander(pool, req, res))) return;
-
       const lectureId = req.params.id;
+
+      const cur = await pool.request()
+        .input('id', sql.VarChar(50), lectureId)
+        .query(`SELECT status, author_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+      if (cur.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
+      const { status: curStatus, author_id: authorId } = cur.recordset[0];
+
+      const roles = await resolveUserRoles(pool, req.user);
+      const isCommanderOrAdmin = roles.includes('ROL-01') || roles.includes('ROL-02');
+      const isOwnerOfEditable = authorId === req.user.user_id && ['DRAFT', 'REJECTED'].includes(curStatus);
+      if (!isCommanderOrAdmin && !isOwnerOfEditable) {
+        return res.status(403).json({ error: 'Chỉ tác giả (bài Bản nháp/Cần hiệu chỉnh của mình) hoặc Chỉ huy mới được xóa bài giảng.' });
+      }
+      if (['PENDING_FACULTY', 'PENDING_TRAINING', 'PUBLISHED'].includes(curStatus)) {
+        return res.status(400).json({ error: 'Không thể xóa bài giảng đang chờ duyệt hoặc đã xuất bản.' });
+      }
+      if (curStatus === 'DELETED') return res.status(400).json({ error: 'Bài giảng đã nằm trong thùng rác.' });
+
       const r = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
         .query(`UPDATE DIGITAL_LECTURE SET status = 'DELETED', updated_at = GETDATE() WHERE lecture_id = @id`);
@@ -474,7 +503,7 @@ module.exports = function createLectureRoutes({
   router.post('/:id/restore', requireAuth, requirePermission('LECTURE_DELETE'), async (req, res) => {
     try {
       const pool = await getPool();
-      if (!(await requireCommander(pool, req, res))) return;
+      if (!(await requireAdminOnly(pool, req, res))) return;
 
       const lectureId = req.params.id;
       const r = await pool.request()
@@ -497,7 +526,7 @@ module.exports = function createLectureRoutes({
   router.delete('/:id/purge', requireAuth, requirePermission('LECTURE_DELETE'), async (req, res) => {
     try {
       const pool = await getPool();
-      if (!(await requireCommander(pool, req, res))) return;
+      if (!(await requireAdminOnly(pool, req, res))) return;
 
       const lectureId = req.params.id;
 

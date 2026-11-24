@@ -26,8 +26,9 @@ export interface TrainingLoginFormProps {
   onForgotPassword?: () => void;
 }
 
-// Danh sách tài khoản kiểm thử được cấp quyền đăng nhập vào Hệ Thống Quản Lý Đào Tạo (bỏ Trợ lý, thêm các tài khoản Giáo viên USR-012 & USR-013)
-export type TrainingDemoKey = 'chihuy' | 'giaovien1' | 'giaovien2' | 'it' | 'admin';
+// Tài khoản kiểm thử vào Hệ Thống Quản Lý Đào Tạo — cổng giám sát chỉ dành cho ROL-01 (Admin) / ROL-02 (Chỉ huy).
+// Giáo viên thuần (chỉ ROL-07) không vào được cổng này nên không có nút điền nhanh.
+export type TrainingDemoKey = 'chihuy' | 'giaovien1' | 'it' | 'admin';
 
 export const TRAINING_DEMO_ACCOUNTS: Record<
   TrainingDemoKey,
@@ -55,14 +56,6 @@ export const TRAINING_DEMO_ACCOUNTS: Record<
     subtitle: 'Cấp 4 • Tối Mật, Chỉ huy',
     label: 'Thượng tá Lê Minh Tiến - Trưởng khoa Binh Chủng',
     roleName: 'Chỉ huy / Giáo viên',
-  },
-  giaovien2: {
-    id: 'USR-013',
-    code: '013',
-    title: 'Giáo viên',
-    subtitle: 'Cấp 2 • Nội bộ',
-    label: 'Đại úy Đoàn Quang Linh - Giáo viên Khoa Binh Chủng',
-    roleName: 'Giáo viên',
   },
   it: {
     id: DEMO_ACCOUNTS.it.id,
@@ -110,7 +103,6 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
     const upper = val.trim().toUpperCase();
     if (upper === 'USR-002') setSelectedDemo('chihuy');
     else if (upper === 'USR-012') setSelectedDemo('giaovien1');
-    else if (upper === 'USR-013') setSelectedDemo('giaovien2');
     else if (upper === 'USR-006') setSelectedDemo('it');
     else if (upper === 'USR-001') setSelectedDemo('admin');
     else setSelectedDemo(null);
@@ -306,7 +298,7 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
           <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono font-medium">Pass: 123456789</span>
         </div>
 
-        {/* 5 Tài khoản được cấp quyền đăng nhập Hệ Thống Quản Lý Đào Tạo (Lưới 2 cột chuẩn Double-Slider) */}
+        {/* 4 Tài khoản được cấp quyền đăng nhập Hệ Thống Quản Lý Đào Tạo (Lưới 2 cột chuẩn Double-Slider) */}
         <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
           {/* 1. Chỉ huy (002) */}
           <button
@@ -348,27 +340,6 @@ export const TrainingLoginForm: React.FC<TrainingLoginFormProps> = ({
               <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 4 • Tối Mật, Chỉ huy</div>
             </div>
             <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
-          </button>
-
-          {/* 3. Giáo viên (013 - Đoàn Quang Linh: Giáo viên) */}
-          <button
-            type="button"
-            onClick={() => quickFillDemo('giaovien2')}
-            title="Đại úy Đoàn Quang Linh - Giáo viên Khoa Binh Chủng"
-            className={`p-1.5 sm:p-2 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-              selectedDemo === 'giaovien2'
-                ? 'bg-teal-50 dark:bg-teal-950/70 border-teal-500/60 text-teal-800 dark:text-teal-200 ring-1 ring-teal-500/40 shadow-xs'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200'
-            }`}
-          >
-            <div className="min-w-0 pr-1">
-              <div className="font-bold text-xs flex items-center gap-1">
-                <span>Giáo viên</span>
-                <span className="text-[10px] font-mono text-slate-400">013</span>
-              </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Cấp 2 • Nội bộ</div>
-            </div>
-            <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-500 dark:text-teal-400 shrink-0" />
           </button>
 
           {/* 4. Nhân viên IT (006) */}

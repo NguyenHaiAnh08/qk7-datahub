@@ -111,10 +111,14 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
         proposalId,
         note || 'Chỉ huy / Quản trị viên đã phê duyệt & chuẩn hóa'
       );
-      toast.success(res.message || 'Đã phê duyệt đề xuất thành công', {
-        title: 'PHÊ DUYỆT THÀNH CÔNG',
-        badge: 'APPROVED',
-      });
+      if ((res as any).validated) {
+        toast.info(res.message || 'Đã thẩm định — chờ Chỉ huy cấp trên xác nhận', { title: 'ĐÃ THẨM ĐỊNH', badge: 'CHỜ CHỈ HUY' });
+      } else {
+        toast.success(res.message || 'Đã phê duyệt đề xuất thành công', {
+          title: 'PHÊ DUYỆT THÀNH CÔNG',
+          badge: 'APPROVED',
+        });
+      }
       onRefresh();
       if (proposals.length <= 1) {
         onClose();
@@ -132,10 +136,14 @@ export const PendingProposalsModal: React.FC<PendingProposalsModalProps> = ({
     setIsProcessing(true);
     try {
       const res = await documentService.rejectProposal(proposalId, reason);
-      toast.success(res.message || 'Đã từ chối đề xuất thành công', {
-        title: 'ĐÃ TỪ CHỐI',
-        badge: 'REJECTED',
-      });
+      if ((res as any).validated) {
+        toast.info(res.message || 'Đã ghi nhận đề nghị từ chối — chờ Chỉ huy cấp trên xác nhận', { title: 'ĐÃ THẨM ĐỊNH', badge: 'CHỜ CHỈ HUY' });
+      } else {
+        toast.success(res.message || 'Đã từ chối đề xuất thành công', {
+          title: 'ĐÃ TỪ CHỐI',
+          badge: 'REJECTED',
+        });
+      }
       onRefresh();
       if (proposals.length <= 1) {
         onClose();

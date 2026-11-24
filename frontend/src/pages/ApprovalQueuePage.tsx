@@ -140,6 +140,12 @@ export const ApprovalQueuePage: React.FC = () => {
   const isAdminRole = (user?.roles || []).includes('ROL-01') || user?.user_id === 'USR-001';
   const isCommanderRole = (user?.roles || []).includes('ROL-02');
   const canSelfApprove = isAdminRole || isCommanderRole;
+  // Có quyền duyệt trong bảng quyền nhưng không phải Admin/Chỉ huy → chỉ THẨM ĐỊNH (chờ Chỉ huy cấp trên xác nhận)
+  const isDelegate = !canSelfApprove && (user?.permissions || []).includes('APPROVAL_VALIDATE');
+  const delegateToast = (msg?: string) => toast.info(msg || 'Đã thẩm định — chờ Chỉ huy cấp trên xác nhận mới chính thức thành công', {
+    title: 'ĐÃ THẨM ĐỊNH',
+    badge: 'CHỜ CHỈ HUY',
+  });
 
   // Danh sách các đề xuất văn bản (PROP-) đang chờ duyệt để phục vụ duyệt liên hoàn
   const pendingPropList: DiffProposalData[] = React.useMemo(() => {
@@ -206,10 +212,16 @@ export const ApprovalQueuePage: React.FC = () => {
   const handleApproveProposal = async (proposalId: string, note?: string) => {
     setProcessing(true);
     try {
-      await approvalService.approve(
+      const aRes: any = await approvalService.approve(
         proposalId,
         note || (isCommanderRole ? 'Chỉ huy cấp Phòng đã phê duyệt & chuẩn hóa' : 'Quản trị viên đã phê duyệt & áp dụng')
       );
+      if (aRes?.validated) {
+        delegateToast(aRes.message);
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
       toast.success(`Đã phê duyệt và áp dụng thành công đề xuất chuẩn hóa văn bản ${proposalId}!`, {
         title: 'PHÊ DUYỆT THÀNH CÔNG',
         badge: 'APPROVED',
@@ -240,7 +252,13 @@ export const ApprovalQueuePage: React.FC = () => {
   const handleRejectProposal = async (proposalId: string, reason: string) => {
     setProcessing(true);
     try {
-      await approvalService.reject(proposalId, reason);
+      const rRes: any = await approvalService.reject(proposalId, reason);
+      if (rRes?.validated) {
+        delegateToast('Đã ghi nhận đề nghị từ chối — chờ Chỉ huy cấp trên xác nhận mới chính thức');
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
       toast.info(`Đã từ chối đề xuất ${proposalId}`, {
         title: 'ĐÃ TỪ CHỐI',
         badge: 'REJECTED',
@@ -291,7 +309,14 @@ export const ApprovalQueuePage: React.FC = () => {
     if (!selected) return;
     setProcessing(true);
     try {
-      await approvalService.approve(selected.request_id);
+      const sRes: any = await approvalService.approve(selected.request_id);
+      if (sRes?.validated) {
+        delegateToast(sRes.message);
+        setSelected(null);
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
 
       // Yêu cầu XEM: duyệt xong là người dùng tự xem được (cấp quyền theo thời hạn), không chạy lại API
       if (String(selected.http_method).toUpperCase() === 'GET') {
@@ -364,11 +389,15 @@ export const ApprovalQueuePage: React.FC = () => {
     }
     setProcessing(true);
     try {
-      await approvalService.reject(selected.request_id, rejectNote);
-      toast.info(`Đã từ chối yêu cầu ${selected.request_id}`, {
-        title: 'ĐÃ TỪ CHỐI',
-        badge: 'REJECTED',
-      });
+      const sjRes: any = await approvalService.reject(selected.request_id, rejectNote);
+      if (sjRes?.validated) {
+        delegateToast('Đã ghi nhận đề nghị từ chối — chờ Chỉ huy cấp trên xác nhận mới chính thức');
+      } else {
+        toast.info(`Đã từ chối yêu cầu ${selected.request_id}`, {
+          title: 'ĐÃ TỪ CHỐI',
+          badge: 'REJECTED',
+        });
+      }
       setSelected(null);
       setRejectNote('');
       setActionInputMode('idle');
@@ -705,6 +734,16 @@ export const ApprovalQueuePage: React.FC = () => {
                 </div>
               )}
 
+              {selected.status === 'PENDING' && selected.validated_by && (
+                <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-xl text-sky-700 dark:text-sky-300 font-semibold flex items-center gap-2">
+                  <Check className="w-4 h-4 shrink-0" />
+                  <span>
+                    Đã được {selected.validated_by_name || selected.validated_by} thẩm định ({selected.validate_decision === 'REJECT' ? 'đề nghị từ chối' : 'đề nghị duyệt'})
+                    {selected.validate_note ? `: ${selected.validate_note}` : ''} — chờ Chỉ huy cấp trên xác nhận.
+                  </span>
+                </div>
+              )}
+
               {/* YÊU CẦU CẤP MÃ PIN */}
               {selected.http_path.includes('/pin') || selected.required_permission === 'PIN_GENERATE' ? (
                 <div className="space-y-4 text-center py-6 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800">
@@ -824,7 +863,7 @@ export const ApprovalQueuePage: React.FC = () => {
                     ) : (
                       <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                     )}
-                    <span>{selected.http_path.includes('/pin') ? 'Duyệt & Cấp PIN' : 'Phê duyệt & Thực thi'}</span>
+                    <span>{isDelegate ? 'Thẩm định (chờ Chỉ huy xác nhận)' : selected.http_path.includes('/pin') ? 'Duyệt & Cấp PIN' : 'Phê duyệt & Thực thi'}</span>
                   </button>
                 </>
               )}

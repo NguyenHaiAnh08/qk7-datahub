@@ -1,5 +1,6 @@
 // src/admin-routes.js
 const bcrypt = require('./bcrypt-lib');
+const { createApprovalAuthority, delegatedReady } = require('./approval-authority');
 const { AUTO_PERMISSIONS, getAutoRequiredPermission } = require('./route-permissions');
 let invalidateCatalogCache;
 try {
@@ -279,28 +280,30 @@ module.exports = (app, deps) => {
     // ═══════════════════════════════════════════════════════════════
     const APPROVAL_MODE = (process.env.UNIT_APPROVAL_MODE || 'subtree').toLowerCase();
 
+    // Thẩm quyền duyệt theo BẢNG QUYỀN (APPROVAL_VALIDATE): Admin/Chỉ huy duyệt CHÍNH THỨC; người khác được cấp quyền
+    // chỉ THẨM ĐỊNH (chờ Chỉ huy cấp trên xác nhận). Trả về 'FINAL' | 'DELEGATE' | false.
+    const approvalAuthority = createApprovalAuthority({ getUserPermissions, resolveUserRoles });
     const canUserApproveRequest = async (req, requestUnitId) => {
-        // 1. Protected Admin duyệt mọi yêu cầu
-        if (req.user.user_id === 'USR-001') return true;
+        const auth = await approvalAuthority.getAuthority(req.user, 'APPROVAL_VALIDATE');
+        if (auth.level === 'NONE') return false;
+        // Chế độ Strict: chỉ đúng đơn vị mình; mặc định Subtree: đơn vị mình + toàn bộ cấp dưới
+        if (!approvalAuthority.covers(auth, [requestUnitId], { strict: APPROVAL_MODE === 'strict' })) return false;
+        return auth.level;
+    };
 
-        // 2. Phải có vai trò Chỉ huy (ROL-02) hoặc Admin (ROL-01)
-        const roles = await resolveUserRoles(req.user);
-        if (!roles.includes('ROL-02') && !roles.includes('ROL-01')) return false;
-
-        // 3. Phải có đơn vị công tác
-        const userUnitId = await resolveUserUnitId(req.user);
-        if (!userUnitId) return false;
-
-        // 4. So khớp đơn vị
-        if (APPROVAL_MODE === 'strict') {
-            // Chế độ Strict: Chỉ duyệt đúng đơn vị mình
-            return userUnitId === requestUnitId;
+    // Người được ủy quyền (không phải Chỉ huy/Admin) duyệt/từ chối = chỉ THẨM ĐỊNH, chưa chính thức
+    const delegateValidate = async (req, res, { table, id, requesterId, decision, note }) => {
+        if (requesterId && requesterId === req.user.user_id) {
+            return res.status(403).json({ error: 'Bạn không thể tự thẩm định yêu cầu của chính mình', code: 'SELF_VALIDATE' });
         }
-
-        // Chế độ Subtree (mặc định): duyệt được cho đơn vị mình + toàn bộ đơn vị con
-        // VD: CH Phòng Chính trị (U-CT) duyệt được cho Ban tuyên huấn, Cơ quan hành chính
-        const subtree = await getSubtreeUnits(userUnitId);
-        return subtree.includes(requestUnitId);
+        const n = await approvalAuthority.recordValidation({ table, id, userId: req.user.user_id, decision, note });
+        if (n === 0) return res.status(400).json({ error: 'Yêu cầu không còn ở trạng thái chờ duyệt' });
+        await log(req, decision === 'APPROVE' ? 'APPROVAL_VALIDATED' : 'APPROVAL_VALIDATE_REJECT',
+            `Thẩm định ${id} (${decision === 'APPROVE' ? 'đề nghị duyệt' : 'đề nghị từ chối'})${note ? ' — ' + note : ''}`);
+        return res.json({
+            success: true, validated: true, final: false, request_id: id,
+            message: 'Đã thẩm định — yêu cầu chờ Chỉ huy cấp trên xác nhận mới chính thức thành công',
+        });
     };
 
 
@@ -1972,20 +1975,23 @@ module.exports = (app, deps) => {
             const request = pool.request();
 
             const currentUserId = req.user.user_id;
-            const isProtected = isProtectedAdmin(req.user);
-            const userRoles = await resolveUserRoles(req.user);
-            const isCommander = userRoles.includes('ROL-02');
+            // Thấy danh sách theo BẢNG QUYỀN: Admin thấy hết; Chỉ huy / người được ủy quyền thấy trong phạm vi đơn vị; còn lại chỉ thấy của mình
+            const auth = await approvalAuthority.getAuthority(req.user, 'APPROVAL_VALIDATE');
+            const isProtected = isProtectedAdmin(req.user) || auth.all === true;
+            const isCommander = auth.level !== 'NONE' && !auth.all;
+            const dReady = await delegatedReady();
 
             let query = `
                 SELECT ar.*, u.full_name AS requester_name, u.[rank] AS requester_rank,
                        u.position AS requester_position,
                        u.unit_id AS requester_unit_id,
                        req_unit.name AS requester_unit_name,
-                       rv.full_name AS reviewer_name
+                       rv.full_name AS reviewer_name${dReady ? ', vb.full_name AS validated_by_name' : ''}
                 FROM APPROVAL_REQUEST ar
                 LEFT JOIN [USER] u ON u.user_id = ar.requester_id
                 LEFT JOIN UNIT req_unit ON req_unit.unit_id = u.unit_id
                 LEFT JOIN [USER] rv ON rv.user_id = ar.reviewed_by
+                ${dReady ? 'LEFT JOIN [USER] vb ON vb.user_id = ar.validated_by' : ''}
                 WHERE 1=1
             `;
 
@@ -2026,6 +2032,7 @@ module.exports = (app, deps) => {
                 SELECT 
                   p.proposal_id, p.file_id, p.requester_id, p.status, p.note, p.review_note,
                   p.reviewed_by, p.reviewed_at, p.created_at, p.updated_at,
+                  ${dReady ? 'p.validated_by, p.validated_at, p.validate_decision, p.validate_note, vb.full_name AS validated_by_name,' : ''}
                   p.document_code, p.title, p.doc_type_id, p.issued_date, p.issuing_unit_id,
                   p.signer, p.summary, p.security_level_id,
                   p.new_original_name, p.new_file_size,
@@ -2047,6 +2054,7 @@ module.exports = (app, deps) => {
                 JOIN [USER] u ON u.user_id = p.requester_id
                 LEFT JOIN UNIT req_unit ON req_unit.unit_id = u.unit_id
                 LEFT JOIN [USER] rv ON rv.user_id = p.reviewed_by
+                ${dReady ? 'LEFT JOIN [USER] vb ON vb.user_id = p.validated_by' : ''}
                 LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
                 LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = p.security_level_id
@@ -2108,6 +2116,11 @@ module.exports = (app, deps) => {
                   ? `Đăng tải văn bản mới [${docCodeDisplay}]: ${p.title}`
                   : `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
                 status: p.status,
+                validated_by: p.validated_by,
+                validated_by_name: p.validated_by_name,
+                validated_at: p.validated_at,
+                validate_decision: p.validate_decision,
+                validate_note: p.validate_note,
                 reviewed_by: p.reviewed_by,
                 reviewer_name: p.reviewer_name,
                 reviewed_at: p.reviewed_at,
@@ -2219,7 +2232,7 @@ module.exports = (app, deps) => {
             if (id.startsWith('PROP-')) {
                 const checkProp = await pool.request()
                     .input('pid', sql.VarChar(50), id)
-                    .query(`SELECT u.unit_id, d.issuing_unit_id AS doc_unit_id
+                    .query(`SELECT u.unit_id, p.requester_id, d.issuing_unit_id AS doc_unit_id
                             FROM DOCUMENT_REVISION_PROPOSAL p
                             JOIN [USER] u ON u.user_id = p.requester_id
                             LEFT JOIN DOCUMENT d ON d.file_id = p.file_id
@@ -2228,10 +2241,14 @@ module.exports = (app, deps) => {
                     return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
                 }
                 // Chỉ huy đơn vị của NGƯỜI ĐỀ XUẤT hoặc của đơn vị BAN HÀNH văn bản đều được duyệt
-                const hasPermission = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
+                const level = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
                     || (checkProp.recordset[0].doc_unit_id && await canUserApproveRequest(req, checkProp.recordset[0].doc_unit_id));
-                if (!hasPermission) {
+                if (!level) {
                     return res.status(403).json({ error: 'Bạn không có thẩm quyền duyệt đề xuất của đơn vị này' });
+                }
+                if (level === 'DELEGATE') {
+                    return delegateValidate(req, res, { table: 'DOCUMENT_REVISION_PROPOSAL', id,
+                        requesterId: checkProp.recordset[0].requester_id, decision: 'APPROVE', note: req.body?.review_note });
                 }
                 if (deps.approveProposalCore) {
                     const result = await deps.approveProposalCore({
@@ -2248,16 +2265,20 @@ module.exports = (app, deps) => {
             // ─── [STANDARD] Kiểm tra đơn vị người yêu cầu ───
             const checkReq = await pool.request()
                 .input('rid', sql.VarChar(50), id)
-                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id
+                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id, ar.requester_id
                         FROM APPROVAL_REQUEST ar
                         LEFT JOIN [USER] u ON u.user_id = ar.requester_id
                         WHERE ar.request_id = @rid AND ar.status = 'PENDING'`);
             if (checkReq.recordset.length === 0) {
                 return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
             }
-            const hasPermission = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
-            if (!hasPermission) {
+            const level = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
+            if (!level) {
                 return res.status(403).json({ error: 'Bạn không có thẩm quyền duyệt yêu cầu của đơn vị này' });
+            }
+            if (level === 'DELEGATE') {
+                return delegateValidate(req, res, { table: 'APPROVAL_REQUEST', id,
+                    requesterId: checkReq.recordset[0].requester_id, decision: 'APPROVE', note: req.body?.review_note });
             }
 
             const r = await pool.request()
@@ -2285,7 +2306,7 @@ module.exports = (app, deps) => {
             if (id.startsWith('PROP-')) {
                 const checkProp = await pool.request()
                     .input('pid', sql.VarChar(50), id)
-                    .query(`SELECT u.unit_id, d.issuing_unit_id AS doc_unit_id
+                    .query(`SELECT u.unit_id, p.requester_id, d.issuing_unit_id AS doc_unit_id
                             FROM DOCUMENT_REVISION_PROPOSAL p
                             JOIN [USER] u ON u.user_id = p.requester_id
                             LEFT JOIN DOCUMENT d ON d.file_id = p.file_id
@@ -2294,10 +2315,14 @@ module.exports = (app, deps) => {
                     return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
                 }
                 // Chỉ huy đơn vị của NGƯỜI ĐỀ XUẤT hoặc của đơn vị BAN HÀNH văn bản đều được duyệt
-                const hasPermission = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
+                const level = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
                     || (checkProp.recordset[0].doc_unit_id && await canUserApproveRequest(req, checkProp.recordset[0].doc_unit_id));
-                if (!hasPermission) {
+                if (!level) {
                     return res.status(403).json({ error: 'Bạn không có thẩm quyền từ chối đề xuất của đơn vị này' });
+                }
+                if (level === 'DELEGATE') {
+                    return delegateValidate(req, res, { table: 'DOCUMENT_REVISION_PROPOSAL', id,
+                        requesterId: checkProp.recordset[0].requester_id, decision: 'REJECT', note: note.trim() });
                 }
                 if (deps.rejectProposalCore) {
                     const result = await deps.rejectProposalCore({
@@ -2314,16 +2339,20 @@ module.exports = (app, deps) => {
             // ─── [STANDARD] ───
             const checkReq = await pool.request()
                 .input('rid', sql.VarChar(50), id)
-                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id
+                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id, ar.requester_id
                         FROM APPROVAL_REQUEST ar
                         LEFT JOIN [USER] u ON u.user_id = ar.requester_id
                         WHERE ar.request_id = @rid AND ar.status = 'PENDING'`);
             if (checkReq.recordset.length === 0) {
                 return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
             }
-            const hasPermission = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
-            if (!hasPermission) {
+            const level = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
+            if (!level) {
                 return res.status(403).json({ error: 'Bạn không có thẩm quyền từ chối yêu cầu của đơn vị này' });
+            }
+            if (level === 'DELEGATE') {
+                return delegateValidate(req, res, { table: 'APPROVAL_REQUEST', id,
+                    requesterId: checkReq.recordset[0].requester_id, decision: 'REJECT', note: note.trim() });
             }
 
             const r = await pool.request()

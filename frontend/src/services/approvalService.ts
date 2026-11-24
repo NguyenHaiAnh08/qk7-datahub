@@ -15,6 +15,12 @@ export interface ApprovalRequest {
   reviewer_name?: string;
   reviewed_at?: string;
   review_note?: string;
+  /** Người được cấp quyền duyệt (không phải Chỉ huy/Admin) đã THẨM ĐỊNH — vẫn chờ Chỉ huy cấp trên xác nhận */
+  validated_by?: string;
+  validated_by_name?: string;
+  validated_at?: string;
+  validate_decision?: 'APPROVE' | 'REJECT';
+  validate_note?: string;
   executed_at?: string;
   created_at: string;
   request_reason?: string;

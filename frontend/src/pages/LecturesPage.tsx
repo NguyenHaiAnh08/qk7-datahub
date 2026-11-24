@@ -169,8 +169,10 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
   }, [user, isAdmin]);
 
   const canCreate        = hasPermission('LECTURE_CREATE');
-  // Quy tắc thống nhất: chỉ Admin (ROL-01) và Chỉ huy (ROL-02) được duyệt (backend cũng chặn lại)
-  const canApprove       = hasPermission('LECTURE_APPROVE') && (isAdmin || (user?.roles || []).includes('ROL-02'));
+  // Quyền duyệt do BẢNG QUYỀN quyết định (mặc định Admin/Chỉ huy có). Admin/Chỉ huy duyệt chính thức;
+  // người khác được cấp quyền chỉ THẨM ĐỊNH, phải có Chỉ huy cấp trên xác nhận mới chính thức.
+  const canApprove       = hasPermission('LECTURE_APPROVE');
+  const isFinalApprover  = isAdmin || (user?.roles || []).includes('ROL-02');
   const canStartSchedule = hasPermission('SCHEDULE_START');
 
   const canArchive = useMemo(() => {
@@ -206,7 +208,9 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
     if (!silent) setLoading(true);
     try {
       // Bài đã xóa mềm nằm ở Thùng rác trang Quản trị (chỉ Admin) → backend không trả về ở đây
-      const normalRes = await lectureService.list();
+      // Trang Soạn & duyệt: chỉ bài của khoa/phòng mình (khoa nào khoa đấy lo).
+      // Trang Danh sách: toàn bộ bài đã xuất bản của mọi khoa, bài khoa mình xếp lên đầu (do máy chủ sắp xếp).
+      const normalRes = await lectureService.list(mode === 'compose' ? { scope: 'compose' } : {});
       setAllLectures(normalRes.items || []);
     } catch (err: any) {
       toast.error('Không thể tải danh sách bài giảng: ' + (err?.message || 'Lỗi không xác định'));
@@ -355,6 +359,11 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
   const handleApprove = async (lec: Lecture) => {
     try {
       const res = await lectureService.approve(lec.lecture_id);
+      if (res.validated) {
+        toast.info(res.message || 'Đã thẩm định — chờ Chỉ huy cấp trên xác nhận');
+        loadLectures();
+        return;
+      }
       toast.success(`Đã ${res.new_status === 'PUBLISHED' ? 'hoàn tất xuất bản' : 'phê duyệt cấp Khoa'} bài giảng "${lec.title}"`);
       loadLectures();
     } catch (err: any) {
@@ -369,8 +378,10 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
   const handleConfirmReject = async (reason: string) => {
     if (!rejectingLecture) return;
     try {
-      await lectureService.reject(rejectingLecture.lecture_id, reason);
-      toast.info(`Đã gửi yêu cầu chỉnh sửa bài giảng "${rejectingLecture.title}"`);
+      const rj = await lectureService.reject(rejectingLecture.lecture_id, reason);
+      toast.info(rj?.validated
+        ? (rj.message || 'Đã ghi nhận đề nghị từ chối — chờ Chỉ huy cấp trên xác nhận')
+        : `Đã gửi yêu cầu chỉnh sửa bài giảng "${rejectingLecture.title}"`);
       loadLectures();
     } catch (err: any) {
       toast.error(err?.message || 'Từ chối thất bại');
@@ -744,6 +755,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                       currentUserId={user?.user_id}
                       isAdmin={isAdmin}
                       canApprove={canApprove}
+                      isFinalApprover={isFinalApprover}
                       canArchive={canArchive}
                       canDelete={hasPermission('LECTURE_DELETE')}
                       canStartSchedule={canStartSchedule}

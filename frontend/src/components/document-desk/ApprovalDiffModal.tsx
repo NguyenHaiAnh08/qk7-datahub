@@ -222,6 +222,8 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
     (user?.permissions || []).includes('APPROVAL_VALIDATE');
 
   const canApprove = isAdminRole || isCommanderRole;
+  // Chính thức = Admin hoặc đúng vai trò Chỉ huy (ROL-02); người chỉ có quyền duyệt trong bảng quyền chỉ THẨM ĐỊNH
+  const isFinalApprover = isAdminRole || (user?.roles || []).includes('ROL-02');
 
   // Kiểm tra tài liệu nội bộ phòng
   const isInternalUnit = Boolean(
@@ -232,7 +234,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
   );
 
   const isSelfRequest = activeProposal.requester_id === user?.user_id;
-  const blockSelfApprove = isSelfRequest && !canApprove;
+  const blockSelfApprove = isSelfRequest && !isFinalApprover;
 
   const handleConfirmReject = async () => {
     if (!rejectReason.trim()) {
@@ -830,7 +832,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
                             <Check className="w-4 h-4 stroke-[2.5]" />
                           )}
                           <span>
-                            {isNewUpload ? 'Phê duyệt & Tiếp nhận văn bản' : 'Phê duyệt & Cập nhật'}
+                            {!isFinalApprover ? 'Thẩm định (chờ Chỉ huy xác nhận)' : isNewUpload ? 'Phê duyệt & Tiếp nhận văn bản' : 'Phê duyệt & Cập nhật'}
                           </span>
                         </button>
                       </>

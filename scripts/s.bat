@@ -61,6 +61,18 @@ if exist "%ROOT%ocr-service\start-ocr.bat" (
     echo [CANH BAO] Khong tim thay ocr-service\start-ocr.bat
 )
 
+REM --- 4. DNS noi bo (:53) - may con khong can sua hosts. start-dns.bat tu xin quyen Admin (UAC) ---
+echo [4/4] Khoi dong DNS noi bo (:53)...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-NetUDPEndpoint -LocalPort 53 -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+if errorlevel 1 (
+    echo [OK] Port 53 da co dich vu DNS dang chay - bo qua.
+) else if exist "%~dp0start-dns.bat" (
+    start "QK7 DNS" cmd /c ""%~dp0start-dns.bat""
+    echo [OK] Da goi DNS noi bo - bam Yes o hop thoai Administrator neu duoc hoi.
+) else (
+    echo [CANH BAO] Khong tim thay scripts\start-dns.bat
+)
+
 echo.
 echo ==========================================================
 echo   Server da khoi dong!
@@ -71,7 +83,7 @@ if /i "%USE_HTTPS%"=="true" (
 ) else (
     echo   Web:               http://localhost:%PORT_BACKEND%
 )
-echo   DNS Noi bo (:53):  Chay scripts\start-dns.bat de may con khong can sua hosts
+echo   DNS Noi bo (:53):  Tu dong khoi dong (cua so "QK7 DNS"), may con khong can sua hosts
 if "%FRONTEND_BUILT%"=="1" (
     echo.
     echo   [OK] Frontend da build san - khong can npm run dev

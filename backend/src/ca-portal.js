@@ -166,27 +166,48 @@ function sanitizeBatLines(lines) {
   });
 }
 
-function buildWindowsInstallerBat(hostname, serverIp, requestHost) {
+const PS_MARKER = '#QK7PS#';
+
+function buildWindowsInstallerBat(hostname, serverIp, requestHost, pem) {
   const cleanIp = (serverIp && serverIp !== '127.0.0.1' && serverIp !== 'localhost')
     ? serverIp
     : (requestHost && /^\d+\.\d+\.\d+\.\d+$/.test(requestHost) ? requestHost : '192.168.1.229');
-  const downloadHost = cleanIp || requestHost || hostname;
+  // Chỉ nhận tên miền hợp lệ để không thể chèn ký tự phá chuỗi PowerShell/cmd
+  const safeDomain = /^[a-zA-Z0-9.-]+$/.test(hostname) ? hostname : 'trungtamdulieuso.tqsqk7.edu';
+  hostname = safeDomain;
 
-  // Mã hóa toàn bộ kịch bản PowerShell bằng Base64 UTF-16LE (-EncodedCommand)
-  // để cmd.exe TUYỆT ĐỐI không bị lỗi ký tự đặc biệt (>, |, &, %, dấu ngoặc).
+  // Chứng chỉ gốc được NHÚNG THẲNG vào file (không tải lại qua HTTP thường → không bị tráo giữa đường),
+  // kèm mã SHA-256 để script tự kiểm tra trước khi nạp vào kho tin cậy của máy.
+  const certB64 = extractDerBase64FromPem(pem);
+  const fpHex = getCertSha256Fingerprint(pem).replace(/:/g, '');
+  const fpPretty = getCertSha256Fingerprint(pem);
+
+  // Kịch bản PowerShell đặt ở CUỐI file .bat (sau dấu PS_MARKER), được chính file đọc lại và chạy.
+  // Không dùng -EncodedCommand vì dòng lệnh dài quá giới hạn 8191 ký tự của cmd.exe.
   const psScript = [
     "$ErrorActionPreference = 'Stop'",
     `$srvIp = '${cleanIp}'`,
-    `$dlHost = '${downloadHost}'`,
     `$dom = '${hostname}'`,
+    `$certB64 = '${certB64}'`,
+    `$expectedFp = '${fpHex}'`,
     // Tự động dọn sạch tệp rác 0 byte dạng "192.168.1.229)" nếu máy con từng chạy bản cũ
     "$scanDirs = @((Get-Location).Path, $env:QK7_BAT_DIR) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique",
     "foreach ($d in $scanDirs) {",
     "  Get-ChildItem -Path $d -File -ErrorAction SilentlyContinue | Where-Object { $_.Length -eq 0 -and $_.Name -match '^\\d{1,3}(\\.\\d{1,3}){3}\\)$' } | Remove-Item -Force -ErrorAction SilentlyContinue",
     "}",
     "$tmpCa = Join-Path $env:TEMP 'QK7-DataHub-RootCA.crt'",
-    "Write-Host '[1/3] Dang tai va nap chung chi goc Root CA...' -ForegroundColor Cyan",
-    "Invoke-WebRequest -UseBasicParsing -Uri \"http://$dlHost/ca/rootCA.crt\" -OutFile $tmpCa",
+    "Write-Host '[1/3] Dang kiem tra va nap chung chi goc Root CA (nhung san trong file)...' -ForegroundColor Cyan",
+    "$caBytes = [Convert]::FromBase64String($certB64)",
+    "$sha = [System.Security.Cryptography.SHA256]::Create()",
+    "$actualFp = ($sha.ComputeHash($caBytes) | ForEach-Object { $_.ToString('X2') }) -join ''",
+    "if ($actualFp -ne $expectedFp) { Write-Host '      [LOI] Chung chi trong file bi sai lech ma SHA-256 - KHONG cai. Hay tai lai file tu Quan tri vien.' -ForegroundColor Red; exit 3 }",
+    "$caObj = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(,$caBytes)",
+    "$bc = $caObj.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.19' } | Select-Object -First 1",
+    "if (-not $bc -or -not $bc.CertificateAuthority) { Write-Host '      [LOI] Tep khong phai chung chi goc (CA) - KHONG cai.' -ForegroundColor Red; exit 3 }",
+    "Write-Host \"      Chu the  : $($caObj.Subject)\"",
+    `Write-Host '      SHA-256 : ${fpPretty}' -ForegroundColor Yellow`,
+    "Write-Host '      -> Doi chieu ma SHA-256 nay voi ma Quan tri vien cong bo (trang /ca) truoc khi tin cay.' -ForegroundColor Yellow",
+    "[System.IO.File]::WriteAllBytes($tmpCa, $caBytes)",
     "Import-Certificate -FilePath $tmpCa -CertStoreLocation Cert:\\LocalMachine\\Root | Out-Null",
     "Remove-Item $tmpCa -Force -ErrorAction SilentlyContinue",
     "Write-Host '      [OK] Da nap chung chi QK7 DataHub Root CA vao Windows!' -ForegroundColor Green",
@@ -253,12 +274,18 @@ function buildWindowsInstallerBat(hostname, serverIp, requestHost) {
     "}",
   ].join('\r\n');
 
-  const encodedPs = Buffer.from(psScript, 'utf16le').toString('base64');
+  // Lệnh ngắn: đọc chính file .bat, lấy phần sau dấu PS_MARKER rồi chạy. Chuỗi marker trong lệnh
+  // được tách đôi ('#QK7'+'PS#') để IndexOf không khớp nhầm vào chính dòng lệnh này.
+  const half = Math.floor(PS_MARKER.length / 2);
+  const runPs = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText($env:QK7_BAT_FILE);'
+    + ` $m='${PS_MARKER.slice(0, half)}'+'${PS_MARKER.slice(half)}'; $i=$s.IndexOf($m);`
+    + ' if ($i -lt 0) { exit 9 }; iex $s.Substring($i + $m.Length)"';
 
   const lines = sanitizeBatLines([
     '@echo off',
     `title QK7 DataHub - Cai Dat 1-Click May Con (${hostname} - ${cleanIp})`,
     'set "QK7_BAT_DIR=%~dp0"',
+    'set "QK7_BAT_FILE=%~f0"',
     'net session >nul 2>&1',
     'if %errorlevel% neq 0 (',
     '    echo [ADMIN] Dang xin quyen Administrator de nap chung chi bao mat va ten mien noi bo...',
@@ -271,7 +298,7 @@ function buildWindowsInstallerBat(hostname, serverIp, requestHost) {
     `echo   May chu  : ${cleanIp}`,
     'echo ====================================================================',
     'echo.',
-    `powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${encodedPs}`,
+    runPs,
     'if %errorlevel% neq 0 (',
     '    echo.',
     '    echo [LOI] Qua trinh cai dat chua hoan tat. Xem dong huong dan mau vang/do o tren.',
@@ -285,7 +312,8 @@ function buildWindowsInstallerBat(hostname, serverIp, requestHost) {
     'pause',
     'exit /b 0',
   ]);
-  return lines.join('\r\n') + '\r\n';
+  // cmd.exe dừng ở "exit /b 0" nên không bao giờ đọc tới phần PowerShell bên dưới
+  return lines.join('\r\n') + '\r\n' + PS_MARKER + '\r\n' + psScript + '\r\n';
 }
 
 function escapeHtml(str) {
@@ -581,20 +609,20 @@ function handleCaPortalRequest(req, res, { serverDomain, serverIp } = {}) {
     return true;
   }
 
+  if (!pem) {
+    res.writeHead(404, { ...baseHeaders, 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Chưa có tệp chứng chỉ gốc công khai (backend/certs/rootCA.pem). Hãy chạy scripts\\doi-ip.bat trên máy chủ.');
+    return true;
+  }
+
   if (rawUrl === '/ca/cai-dat-windows.bat') {
-    const bat = buildWindowsInstallerBat(hostname, ip, reqHostHeader);
+    const bat = buildWindowsInstallerBat(hostname, ip, reqHostHeader, pem);
     res.writeHead(200, {
       ...baseHeaders,
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': 'attachment; filename="cai-dat-chung-chi-qk7.bat"',
     });
     res.end(req.method === 'HEAD' ? undefined : bat);
-    return true;
-  }
-
-  if (!pem) {
-    res.writeHead(404, { ...baseHeaders, 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Chưa có tệp chứng chỉ gốc công khai (backend/certs/rootCA.pem). Hãy chạy scripts\\doi-ip.bat trên máy chủ.');
     return true;
   }
 
@@ -677,6 +705,8 @@ function answerDohPacket(buf, hostname, serverIp) {
   return Buffer.concat([header, rawQuestion, ans]);
 }
 
+const DOH_MAX_BYTES = 4096;
+
 function handleDohRequest(req, res, { serverDomain, serverIp } = {}) {
   const parsedUrl = new URL(req.url || '/', 'http://localhost');
   if (parsedUrl.pathname !== '/dns-query') return false;
@@ -703,15 +733,44 @@ function handleDohRequest(req, res, { serverDomain, serverIp } = {}) {
       res.end('Missing dns query param');
       return true;
     }
+    // base64url của 4 KB ≈ 5.5 KB ký tự
+    if (b64url.length > Math.ceil(DOH_MAX_BYTES * 4 / 3) + 4) {
+      res.writeHead(413, { 'Content-Type': 'text/plain' });
+      res.end('DNS query too large');
+      return true;
+    }
     const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
     sendDns(Buffer.from(b64, 'base64'));
     return true;
   }
 
   if (req.method === 'POST') {
+    // Gói hỏi DNS thực tế 50–512 byte; chặn cứng 4 KB để không ai gửi dữ liệu khổng lồ làm cạn RAM (endpoint công khai)
+    const declared = parseInt(req.headers['content-length'] || '0', 10);
+    if (declared > DOH_MAX_BYTES) {
+      res.writeHead(413, { 'Content-Type': 'text/plain', Connection: 'close' });
+      res.end('DNS query too large');
+      req.destroy();
+      return true;
+    }
     const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => sendDns(Buffer.concat(chunks)));
+    let size = 0;
+    let aborted = false;
+    req.on('data', (c) => {
+      if (aborted) return;
+      size += c.length;
+      if (size > DOH_MAX_BYTES) {
+        aborted = true;
+        chunks.length = 0;
+        res.writeHead(413, { 'Content-Type': 'text/plain', Connection: 'close' });
+        res.end('DNS query too large');
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => { if (!aborted) sendDns(Buffer.concat(chunks)); });
+    req.on('error', () => {});
     return true;
   }
 

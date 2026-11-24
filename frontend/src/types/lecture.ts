@@ -24,8 +24,15 @@ export interface Lecture {
   faculty_name?: string;
   /** Bài của đơn vị ngang cấp (cùng đơn vị cha) — được xem và mở ca */
   peer_unit?: boolean;
-  /** Được mở ca dạy: bài thuộc đơn vị của mình hoặc cùng khoa (không chỉ tác giả) */
+  /** Được mở ca dạy: bài đã xuất bản (mọi khoa) hoặc bài thuộc đơn vị của mình */
   can_teach?: boolean;
+  /** Bài thuộc khoa/phòng của người dùng (hoặc do chính họ đăng) — xếp lên đầu, được CRUD ở trang Soạn */
+  in_my_faculty?: boolean;
+  /** Người được cấp quyền duyệt đã thẩm định — bài vẫn chờ Chỉ huy cấp trên xác nhận */
+  validated_by?: string;
+  validated_by_name?: string;
+  validate_decision?: 'APPROVE' | 'REJECT';
+  validate_note?: string;
   security_level_id: number;
   security_name?: string;
   content_type: ContentType;
@@ -112,6 +119,8 @@ export interface LectureListFilters {
   subject_id?: string;
   faculty_unit_id?: string;
   q?: string;
+  /** 'compose' = trang Soạn & duyệt: chỉ bài của khoa/phòng mình (khoa nào khoa đấy lo) */
+  scope?: 'compose';
 }
 
 export interface CreateLecturePayload {

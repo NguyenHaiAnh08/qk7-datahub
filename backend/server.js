@@ -562,7 +562,7 @@ const config = createConfigModule({ sql, getPool });
 const { createPortalModule, normalizePortal, isTrainingOnlyPath, PORTAL_DATAHUB, PORTAL_TRAINING } = require('./src/portal');
 const portalModule = createPortalModule({ sql, getPool });
 const PORTAL_DENIED_MESSAGE = {
-  [PORTAL_TRAINING]: 'Tài khoản của bạn không có quyền vào cổng Quản lý đào tạo (chỉ dành cho Quản trị viên, Chỉ huy và Giáo viên).',
+  [PORTAL_TRAINING]: 'Tài khoản của bạn không có quyền vào cổng Quản lý đào tạo (chỉ dành cho Quản trị viên và Chỉ huy).',
   [PORTAL_DATAHUB]: 'Tài khoản của bạn không có quyền vào cổng này.',
 };
 
@@ -3563,18 +3563,11 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
   try {
     await escalateStaleOwnerProposals();
     const pool = await getPool();
-    const userRoles = await resolveUserRoles(req.user);
-    const isAdmin =
-      userRoles.includes('ROL-01') ||
-      (req.user?.roles || []).includes('ROL-01') ||
-      req.user?.user_id === 'USR-001' ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
-      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
-    const isCommander =
-      userRoles.includes('ROL-02') ||
-      (req.user?.roles || []).includes('ROL-02') ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
-      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy'));
+    // Danh sách theo BẢNG QUYỀN: Admin thấy hết; Chỉ huy / người được ủy quyền thấy trong phạm vi đơn vị; còn lại chỉ thấy của mình
+    const auth = await approvalAuthority.getAuthority(req.user, 'APPROVAL_VALIDATE');
+    const isAdmin = auth.all === true;
+    const isCommander = auth.level !== 'NONE' && !auth.all;
+    const dReady = await delegatedReady();
 
     const r = pool.request();
     let query = `
@@ -3594,10 +3587,11 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
              unit.name AS issuing_unit_name,
              cur_unit.name AS current_unit_name,
              sl.name AS security_level_name,
-             cur_sl.name AS current_security_name
+             cur_sl.name AS current_security_name${dReady ? ', vb.full_name AS validated_by_name' : ''}
       FROM DOCUMENT_REVISION_PROPOSAL p
       JOIN DOCUMENT d ON d.file_id = p.file_id
       JOIN [USER] u ON u.user_id = p.requester_id
+      ${dReady ? 'LEFT JOIN [USER] vb ON vb.user_id = p.validated_by' : ''}
       LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
       LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
       LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = p.security_level_id
@@ -3746,44 +3740,69 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
   return { success: true, message: 'Đã phê duyệt và áp dụng đề xuất chỉnh sửa văn bản thành công', file_id: prop.file_id };
 }
 
+// Thẩm quyền duyệt đề xuất theo BẢNG QUYỀN (APPROVAL_VALIDATE): Admin/Chỉ huy có quyền → duyệt CHÍNH THỨC;
+// người khác được Admin cấp quyền → chỉ THẨM ĐỊNH, phải có Chỉ huy cấp trên xác nhận mới chính thức thành công.
+const { createApprovalAuthority, delegatedReady } = require('./src/approval-authority');
+const approvalAuthority = createApprovalAuthority({ getUserPermissions, resolveUserRoles });
+
 async function requireProposalApprover(req, res, next) {
   if (!req.user?.is_authenticated) {
     return res.status(401).json({ error: 'Cần đăng nhập để thực hiện thao tác này', code: 'UNAUTHENTICATED' });
   }
   try {
-    const userRoles = await resolveUserRoles(req.user);
-    const isAdmin =
-      userRoles.includes('ROL-01') ||
-      req.user?.user_id === 'USR-001' ||
-      (req.user?.roles || []).includes('ROL-01') ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('admin')) ||
-      (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('admin') || String(r).toLowerCase().includes('quản trị'));
-
-    const isCommander =
-      userRoles.includes('ROL-02') ||
-      (req.user?.roles || []).includes('ROL-02') ||
-      (req.user?.roles || []).some((r) => String(r).toLowerCase().includes('chỉ huy')) ||
-      (req.user?.role_names || []).some((r) =>
-        String(r).toLowerCase().includes('chỉ huy') ||
-        String(r).toLowerCase().includes('trưởng phòng') ||
-        String(r).toLowerCase().includes('thủ trưởng')
-      );
-
-    if (isAdmin || isCommander) return next();
-
-    const codes = await getUserPermissions(req.user.user_id);
-    if (codes.includes('DOC_EDIT') || codes.includes('APPROVAL_VALIDATE')) {
-      return next();
+    const auth = await approvalAuthority.getAuthority(req.user, 'APPROVAL_VALIDATE');
+    if (auth.level === 'NONE') {
+      await writeAccessLog({
+        userId: req.user.user_id, fileId: null, action: 'PROPOSAL_APPROVE_DENIED',
+        ip: getClientIp(req), note: `Không có quyền duyệt mà cố duyệt/từ chối đề xuất ${req.params.proposalId}`,
+      }).catch(() => {});
+      return res.status(403).json({
+        error: 'Bạn không có quyền xét duyệt đề xuất (cần được cấp quyền duyệt trong bảng quyền)',
+        code: 'PERMISSION_DENIED',
+      });
     }
-
+    req.approvalLevel = auth.level; // 'FINAL' | 'DELEGATE'
+    const pool = await getPool();
+    const pr = await pool.request()
+      .input('pid', sql.VarChar(50), req.params.proposalId)
+      .query(`SELECT p.requester_id, u.unit_id AS requester_unit, d.issuing_unit_id AS doc_unit
+              FROM DOCUMENT_REVISION_PROPOSAL p
+              JOIN DOCUMENT d ON d.file_id = p.file_id
+              JOIN [USER] u ON u.user_id = p.requester_id
+              WHERE p.proposal_id = @pid`);
+    if (pr.recordset.length === 0) return next(); // để handler trả "Không tìm thấy đề xuất" như cũ
+    req.proposalRequesterId = pr.recordset[0].requester_id;
+    if (auth.all) return next();
+    // Chỉ duyệt/thẩm định đề xuất thuộc đơn vị mình và cấp dưới (khớp danh sách chờ duyệt)
+    if (approvalAuthority.covers(auth, [pr.recordset[0].requester_unit, pr.recordset[0].doc_unit])) return next();
     return res.status(403).json({
-      error: 'Chỉ Chỉ huy đơn vị hoặc Quản trị viên mới có thẩm quyền xét duyệt đề xuất',
-      code: 'PERMISSION_DENIED',
+      error: 'Đề xuất này không thuộc đơn vị của bạn hoặc cấp dưới nên bạn không có thẩm quyền duyệt',
+      code: 'PROPOSAL_OUT_OF_SCOPE',
     });
   } catch (err) {
     console.error('[requireProposalApprover]', err);
     res.status(500).json({ error: 'Lỗi kiểm tra quyền phê duyệt đề xuất' });
   }
+}
+
+// Người được ủy quyền (không phải Chỉ huy/Admin): chỉ ghi nhận thẩm định, KHÔNG áp dụng thay đổi
+async function validateProposalAsDelegate(req, res, decision, note) {
+  if (req.proposalRequesterId && req.proposalRequesterId === req.user.user_id) {
+    return res.status(403).json({ error: 'Bạn không thể tự thẩm định đề xuất của chính mình', code: 'SELF_VALIDATE' });
+  }
+  const n = await approvalAuthority.recordValidation({
+    table: 'DOCUMENT_REVISION_PROPOSAL', id: req.params.proposalId, userId: req.user.user_id, decision, note,
+  });
+  if (n === 0) return res.status(400).json({ error: 'Đề xuất không còn ở trạng thái chờ Chỉ huy duyệt' });
+  await writeAccessLog({
+    userId: req.user.user_id, fileId: null, action: decision === 'APPROVE' ? 'PROPOSAL_VALIDATED' : 'PROPOSAL_VALIDATE_REJECT',
+    ip: getClientIp(req),
+    note: `Thẩm định đề xuất ${req.params.proposalId} (${decision === 'APPROVE' ? 'đề nghị duyệt' : 'đề nghị từ chối'})${note ? ': ' + String(note).slice(0, 200) : ''}`,
+  }).catch(() => {});
+  return res.json({
+    success: true, validated: true, final: false,
+    message: 'Đã thẩm định — đề xuất chờ Chỉ huy cấp trên xác nhận mới chính thức thành công',
+  });
 }
 
 async function rejectProposalCore({ proposalId, reviewerUser, reviewNote, clientIp }) {
@@ -3827,6 +3846,7 @@ async function rejectProposalCore({ proposalId, reviewerUser, reviewNote, client
 
 app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requireProposalApprover, async (req, res) => {
   try {
+    if (req.approvalLevel === 'DELEGATE') return await validateProposalAsDelegate(req, res, 'APPROVE', req.body?.review_note);
     const result = await approveProposalCore({
       proposalId: req.params.proposalId,
       reviewerUser: req.user,
@@ -3842,6 +3862,7 @@ app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePro
 
 app.post('/api/documents/proposals/:proposalId/reject', requireAuth, requireProposalApprover, async (req, res) => {
   try {
+    if (req.approvalLevel === 'DELEGATE') return await validateProposalAsDelegate(req, res, 'REJECT', req.body?.review_note || req.body?.reason);
     const result = await rejectProposalCore({
       proposalId: req.params.proposalId,
       reviewerUser: req.user,

@@ -14,7 +14,8 @@ const path = require('path');
 const fs = require('fs');
 const { memo } = require('./memo');         
 const { sql, getPool } = require('./db');
-const { getLectureScope, bindUnitIn, inScope, isPeerUnit } = require('./lecture-scope');
+const { getLectureScope, bindUnitIn, inScope, isPeerUnit, canManageLecture } = require('./lecture-scope');
+const { delegatedReady, recordValidation } = require('./approval-authority');
 
 const HANGING_THRESHOLD_MINUTES = 4 * 60; // 4 giờ
 
@@ -185,7 +186,9 @@ module.exports = function createLectureRoutes({
       const isAdmin = roles.includes('ROL-01');
       const isCommander = roles.includes('ROL-02');
       const deptHead = isGuest ? false : await isDeptHead(pool, req.user);
-      
+      const composeMode = String(req.query.scope || '') === 'compose';
+      const dReady = await delegatedReady();
+
       const clearance = req.user?.clearance_level_id || 1;
 
       let query = `
@@ -199,12 +202,13 @@ module.exports = function createLectureRoutes({
                un.name AS faculty_name,
                sl.name AS security_name,
                sch.class_name,
-               sch.venue_name
+               sch.venue_name${dReady ? ', l.validated_by, l.validated_at, l.validate_decision, l.validate_note, vb.full_name AS validated_by_name' : ''}
         FROM DIGITAL_LECTURE l
         JOIN SUBJECT s ON s.subject_id = l.subject_id
         JOIN [USER] u ON u.user_id = l.author_id
         JOIN UNIT un ON un.unit_id = l.faculty_unit_id
         JOIN SECURITY_LEVEL sl ON sl.level_id = l.security_level_id
+        ${dReady ? 'LEFT JOIN [USER] vb ON vb.user_id = l.validated_by' : ''}
         OUTER APPLY (
           SELECT TOP 1 ts.venue_name, tc.class_name
           FROM TEACHING_SCHEDULE ts
@@ -224,9 +228,11 @@ module.exports = function createLectureRoutes({
         scope = await getLectureScope({ userId, roles, deptHead, includeSiblings: true });
         if (!scope.all) {
           const inList = bindUnitIn(r, scope.unitIds);
-          if (deptHead || roles.includes('ROL-02')) {
+          if (composeMode) {
+            // Trang Soạn & duyệt: khoa nào khoa đấy lo — chỉ bài của đơn vị mình (và cấp dưới / ngang cấp liền kề) hoặc do mình đăng
             query += ` AND (l.faculty_unit_id IN (${inList}) OR l.author_id = @selfId)`;
           } else {
+            // Trang chung (Danh sách bài giảng): thấy MỌI bài đã xuất bản của mọi khoa + bài thuộc phạm vi của mình
             query += ` AND (l.status = 'PUBLISHED' OR l.author_id = @selfId OR l.faculty_unit_id IN (${inList}))`;
           }
           r.input('selfId', sql.VarChar(50), userId);
@@ -252,8 +258,13 @@ module.exports = function createLectureRoutes({
       const result = await r.query(query);
       result.recordset.forEach((row) => {
         row.peer_unit = isGuest ? false : isPeerUnit(scope, row.faculty_unit_id);
-        row.can_teach = isGuest ? false : (inScope(scope, row.faculty_unit_id) || row.author_id === userId);
+        // Bài của khoa/đơn vị mình (hoặc do mình đăng) → dùng để xếp lên đầu và cho phép CRUD ở trang Soạn
+        row.in_my_faculty = isGuest ? false : (inScope(scope, row.faculty_unit_id) || row.author_id === userId);
+        // Mở ca dạy: bài đã xuất bản thì AI cũng mở được (kể cả bài của khoa khác); chưa xuất bản thì chỉ trong phạm vi của mình
+        row.can_teach = isGuest ? false : (row.status === 'PUBLISHED' || row.in_my_faculty);
       });
+      // Bài của khoa mình lên đầu, bài khoa khác xuống dưới (sort ổn định: giữ thứ tự mới nhất trước trong từng nhóm)
+      if (!isGuest) result.recordset.sort((a, b) => (b.in_my_faculty ? 1 : 0) - (a.in_my_faculty ? 1 : 0));
       res.json({ total: result.recordset.length, items: result.recordset });
     } catch (err) {
       console.error('[GET /api/lectures]', err);
@@ -380,14 +391,23 @@ module.exports = function createLectureRoutes({
       const pool = await getPool();
       const check = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .query(`SELECT status, author_id, content_type FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT status, author_id, content_type, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lec = check.recordset[0];
-      if (lec.author_id !== req.user.user_id && !(req.user.roles || []).includes('ROL-01')) {
-        return res.status(403).json({ error: 'Chỉ tác giả mới có quyền sửa bài giảng này' });
+      // Admin: sửa mọi bài, mọi trạng thái (xử lý bài lỗi/hư hỏng). Tác giả và thành viên cùng khoa/phòng: sửa bài của khoa mình.
+      // Bài đã xuất bản do người không phải Admin sửa: có phải qua Chỉ huy duyệt hay không do quyền bị Admin khóa quyết định.
+      const roles = await resolveUserRoles(pool, req.user);
+      const mg = await canManageLecture({ userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), lecture: lec });
+      if (!mg.ok) {
+        return res.status(403).json({ error: 'Chỉ tác giả, thành viên cùng khoa/đơn vị hoặc Admin mới được sửa bài giảng này' });
       }
-      if (!['DRAFT', 'REJECTED'].includes(lec.status)) {
-        return res.status(400).json({ error: 'Không thể sửa bài giảng đang chờ duyệt hoặc đã xuất bản' });
+      const editable = mg.admin
+        ? ['DRAFT', 'REJECTED', 'PENDING_FACULTY', 'PENDING_TRAINING', 'PUBLISHED']
+        : ['DRAFT', 'REJECTED', 'PUBLISHED'];
+      if (!editable.includes(lec.status)) {
+        return res.status(400).json({ error: lec.status === 'DELETED'
+          ? 'Bài giảng đang nằm trong thùng rác'
+          : 'Không thể sửa bài giảng đang chờ duyệt (hãy đợi duyệt xong hoặc nhờ Admin)' });
       }
 
       const { title, subject_id, lecture_code, security_level_id, content_type, scorm_entry_point } = req.body || {};
@@ -423,7 +443,9 @@ module.exports = function createLectureRoutes({
               updated_at = GETDATE()
           WHERE lecture_id = @id
         `);
-      await logAudit(req, 'LECTURE_UPDATE', `Sửa bài giảng ${lectureId}`, lectureId);
+      await logAudit(req, 'LECTURE_UPDATE',
+        `Sửa bài giảng ${lectureId}${lec.author_id !== req.user.user_id ? ` (của ${lec.author_id}, ${mg.admin ? 'Admin' : 'cùng khoa'})` : ''}${lec.status === 'PUBLISHED' ? ' — bài đã xuất bản' : ''}`,
+        lectureId);
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -437,18 +459,21 @@ module.exports = function createLectureRoutes({
 
       const cur = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .query(`SELECT status, author_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT status, author_id, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
       if (cur.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
-      const { status: curStatus, author_id: authorId } = cur.recordset[0];
+      const { status: curStatus } = cur.recordset[0];
 
+      // Admin: xóa mềm mọi bài, mọi trạng thái. Tác giả / thành viên cùng khoa-phòng (và Chỉ huy cấp trên): xóa bài của khoa mình.
+      // Bài đã xuất bản do người không phải Admin xóa: có phải qua Chỉ huy duyệt hay không do quyền bị Admin khóa quyết định.
       const roles = await resolveUserRoles(pool, req.user);
-      const isCommanderOrAdmin = roles.includes('ROL-01') || roles.includes('ROL-02');
-      const isOwnerOfEditable = authorId === req.user.user_id && ['DRAFT', 'REJECTED'].includes(curStatus);
-      if (!isCommanderOrAdmin && !isOwnerOfEditable) {
-        return res.status(403).json({ error: 'Chỉ tác giả (bài Bản nháp/Cần hiệu chỉnh của mình) hoặc Chỉ huy mới được xóa bài giảng.' });
+      const mg = await canManageLecture({
+        userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), lecture: cur.recordset[0],
+      });
+      if (!mg.ok) {
+        return res.status(403).json({ error: 'Chỉ tác giả, thành viên cùng khoa/đơn vị hoặc Admin mới được xóa bài giảng này.' });
       }
-      if (['PENDING_FACULTY', 'PENDING_TRAINING', 'PUBLISHED'].includes(curStatus)) {
-        return res.status(400).json({ error: 'Không thể xóa bài giảng đang chờ duyệt hoặc đã xuất bản.' });
+      if (!mg.admin && ['PENDING_FACULTY', 'PENDING_TRAINING'].includes(curStatus)) {
+        return res.status(400).json({ error: 'Không thể xóa bài giảng đang chờ duyệt.' });
       }
       if (curStatus === 'DELETED') return res.status(400).json({ error: 'Bài giảng đã nằm trong thùng rác.' });
 
@@ -458,7 +483,9 @@ module.exports = function createLectureRoutes({
 
       if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
 
-      await logAudit(req, 'LECTURE_SOFT_DELETE', `Chuyển bài giảng ${lectureId} vào thùng rác`, lectureId);
+      await logAudit(req, 'LECTURE_SOFT_DELETE',
+        `Chuyển bài giảng ${lectureId} vào thùng rác${curStatus === 'PUBLISHED' ? ' (bài đã xuất bản)' : ''}${mg.admin ? ' — Admin' : ''}`,
+        lectureId);
       res.json({ success: true, message: 'Đã chuyển bài giảng vào thùng rác' });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -493,7 +520,7 @@ module.exports = function createLectureRoutes({
       }
       await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
-        .query(`UPDATE DIGITAL_LECTURE SET status='PENDING_FACULTY', reject_reason=NULL, updated_at=GETDATE() WHERE lecture_id=@id`);
+        .query(`UPDATE DIGITAL_LECTURE SET status='PENDING_FACULTY', reject_reason=NULL, updated_at=GETDATE()${(await delegatedReady()) ? ', validated_by=NULL, validated_at=NULL, validate_decision=NULL, validate_note=NULL' : ''} WHERE lecture_id=@id`);
       await logAudit(req, 'LECTURE_SUBMIT', `Gửi duyệt bài giảng ${req.params.id}`, req.params.id);
       res.json({ success: true, message: 'Đã gửi duyệt lên Khoa/Bộ môn' });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -610,7 +637,7 @@ module.exports = function createLectureRoutes({
       const lectureId = req.params.id;
       const check = await pool.request()
         .input('id', sql.VarChar(50), lectureId)
-        .query(`SELECT status, faculty_unit_id, content_type,
+        .query(`SELECT status, faculty_unit_id, author_id, content_type,
                        pending_scorm_path, scorm_entry_point,
                        title, created_at, pdf_path
                 FROM DIGITAL_LECTURE WHERE lecture_id = @id`);                 // [1]
@@ -621,6 +648,34 @@ module.exports = function createLectureRoutes({
       const isAdmin = roles.includes('ROL-01');
       const isCommander = roles.includes('ROL-02');
       const deptHead = await isDeptHead(pool, req.user);
+
+      // Người được cấp quyền LECTURE_APPROVE trong bảng quyền nhưng KHÔNG phải Admin/Chỉ huy → chỉ THẨM ĐỊNH:
+      // ghi nhận người thẩm định, bài vẫn chờ; Chỉ huy cấp trên xác nhận mới chính thức duyệt.
+      if (!isAdmin && !isCommander) {
+        if (!['PENDING_FACULTY', 'PENDING_TRAINING'].includes(lec.status)) {
+          return res.status(400).json({ error: 'Trạng thái không hợp lệ để duyệt' });
+        }
+        if (!(await delegatedReady())) {
+          return res.status(403).json({ error: 'Chỉ Admin hoặc Chỉ huy mới được duyệt bài giảng' });
+        }
+        if (lec.author_id === req.user.user_id) {
+          return res.status(403).json({ error: 'Bạn không thể tự thẩm định bài giảng của chính mình', code: 'SELF_VALIDATE' });
+        }
+        const dScope = await getLectureScope({ userId: req.user.user_id, roles, deptHead: true }); // đơn vị mình + cấp dưới
+        if (!inScope(dScope, lec.faculty_unit_id)) {
+          return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn hoặc cấp dưới' });
+        }
+        const n = await recordValidation({
+          table: 'DIGITAL_LECTURE', id: lectureId, userId: req.user.user_id, decision: 'APPROVE',
+          note: req.body?.note || req.body?.review_note,
+        });
+        if (n === 0) return res.status(400).json({ error: 'Bài giảng không còn ở trạng thái chờ duyệt' });
+        await logAudit(req, 'LECTURE_VALIDATED', `Thẩm định (đề nghị duyệt) bài giảng ${lectureId}`, lectureId);
+        return res.json({
+          success: true, validated: true, final: false,
+          message: 'Đã thẩm định — bài giảng chờ Chỉ huy cấp trên xác nhận mới chính thức',
+        });
+      }
 
       let nextStatus = '';
       if (lec.status === 'PENDING_FACULTY') {
@@ -714,7 +769,7 @@ module.exports = function createLectureRoutes({
         }
       }
 
-      let updateSql = `UPDATE DIGITAL_LECTURE SET status=@st, reject_reason=NULL, updated_at=GETDATE()`;
+      let updateSql = `UPDATE DIGITAL_LECTURE SET status=@st, reject_reason=NULL, updated_at=GETDATE()${(await delegatedReady()) ? ', validated_by=NULL, validated_at=NULL, validate_decision=NULL, validate_note=NULL' : ''}`;
       const updateReq = pool.request()
         .input('id', sql.VarChar(50), lectureId)
         .input('st', sql.VarChar(30), nextStatus);
@@ -751,13 +806,35 @@ module.exports = function createLectureRoutes({
       const pool = await getPool();
       const check = await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
-        .query(`SELECT status, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
+        .query(`SELECT status, faculty_unit_id, author_id FROM DIGITAL_LECTURE WHERE lecture_id = @id`);
       if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
       {
         const roles = await resolveUserRoles(pool, req.user);
-        // Từ chối cũng là quyết định duyệt → chỉ Admin (ROL-01) / Chỉ huy (ROL-02)
+        // Từ chối cũng là quyết định duyệt: Admin/Chỉ huy từ chối CHÍNH THỨC; người khác có quyền duyệt chỉ ĐỀ NGHỊ từ chối
         if (!roles.includes('ROL-01') && !roles.includes('ROL-02')) {
-          return res.status(403).json({ error: 'Chỉ Admin hoặc Chỉ huy mới được từ chối bài giảng' });
+          const cur = check.recordset[0];
+          if (!(await delegatedReady())) {
+            return res.status(403).json({ error: 'Chỉ Admin hoặc Chỉ huy mới được từ chối bài giảng' });
+          }
+          if (!['PENDING_FACULTY', 'PENDING_TRAINING'].includes(cur.status)) {
+            return res.status(400).json({ error: 'Trạng thái không hợp lệ để từ chối' });
+          }
+          if (cur.author_id === req.user.user_id) {
+            return res.status(403).json({ error: 'Bạn không thể tự thẩm định bài giảng của chính mình', code: 'SELF_VALIDATE' });
+          }
+          const dScope = await getLectureScope({ userId: req.user.user_id, roles, deptHead: true });
+          if (!inScope(dScope, cur.faculty_unit_id)) {
+            return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn hoặc cấp dưới' });
+          }
+          const n = await recordValidation({
+            table: 'DIGITAL_LECTURE', id: req.params.id, userId: req.user.user_id, decision: 'REJECT', note: reason,
+          });
+          if (n === 0) return res.status(400).json({ error: 'Bài giảng không còn ở trạng thái chờ duyệt' });
+          await logAudit(req, 'LECTURE_VALIDATE_REJECT', `Thẩm định (đề nghị từ chối) ${req.params.id}: ${reason}`, req.params.id);
+          return res.json({
+            success: true, validated: true, final: false,
+            message: 'Đã thẩm định — đề nghị từ chối chờ Chỉ huy cấp trên xác nhận',
+          });
         }
         const scope = await getLectureScope({
           userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user),
@@ -772,7 +849,7 @@ module.exports = function createLectureRoutes({
       await pool.request()
         .input('id', sql.VarChar(50), req.params.id)
         .input('reason', sql.NVarChar(500), reason.slice(0, 500))
-        .query(`UPDATE DIGITAL_LECTURE SET status='REJECTED', reject_reason=@reason, updated_at=GETDATE() WHERE lecture_id=@id`);
+        .query(`UPDATE DIGITAL_LECTURE SET status='REJECTED', reject_reason=@reason, updated_at=GETDATE()${(await delegatedReady()) ? ', validated_by=NULL, validated_at=NULL, validate_decision=NULL, validate_note=NULL' : ''} WHERE lecture_id=@id`);
       await logAudit(req, 'LECTURE_REJECTED', `Từ chối ${req.params.id}: ${reason}`, req.params.id);
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -860,17 +937,13 @@ module.exports = function createLectureRoutes({
                 FROM DIGITAL_LECTURE WHERE lecture_id = @lid`);
       if (lecCheck.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy bài giảng' });
       const lecture = lecCheck.recordset[0];
-      {
-        const roles = await resolveUserRoles(pool, req.user);
-        const scope = await getLectureScope({
-          userId: req.user.user_id, roles, deptHead: await isDeptHead(pool, req.user), includeSiblings: true,
-        });
-        if (!inScope(scope, lecture.faculty_unit_id)) {
-          return res.status(403).json({ error: 'Bài giảng không thuộc đơn vị của bạn' });
-        }
-      }
       if (lecture.status !== 'PUBLISHED') {
         return res.status(400).json({ error: 'Chỉ có thể mở ca với bài giảng đã PUBLISHED' });
+      }
+      // Bài đã xuất bản thuộc kho chung: giáo viên MỌI khoa đều mở ca được (kể cả bài của khoa khác),
+      // miễn là có quyền mở ca và đủ cấp bảo mật. Quản lý (sửa/xóa) mới bị giới hạn theo khoa.
+      if (lecture.security_level_id > (req.user.clearance_level_id || 1)) {
+        return res.status(403).json({ error: 'Không đủ cấp bảo mật để mở ca với bài giảng này' });
       }
 
       // 🛡️ CHỐT CHẶN BẢO MẬT: Bài giảng Cấp 3+ bắt buộc phải có token vân tay hợp lệ

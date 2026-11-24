@@ -57,6 +57,8 @@ export interface LectureCardProps {
   currentUserId?: string;
   isAdmin: boolean;
   canApprove: boolean;
+  /** Admin/Chỉ huy duyệt chính thức; false = chỉ thẩm định (chờ Chỉ huy cấp trên xác nhận) */
+  isFinalApprover?: boolean;
   canArchive: boolean;        // Admin/Chỉ huy: xóa mềm mọi bài chưa chờ duyệt/xuất bản
   canDelete?: boolean;        // có quyền LECTURE_DELETE: tác giả xóa mềm bài của mình (Bản nháp/Cần sửa)
   canStartSchedule: boolean;
@@ -72,7 +74,7 @@ export interface LectureCardProps {
 }
 
 export const LectureCard: React.FC<LectureCardProps> = ({
-  lecture, mode, viewMode, currentUserId, isAdmin, canApprove, canArchive, canDelete, canStartSchedule, canEdit,
+  lecture, mode, viewMode, currentUserId, isAdmin, canApprove, isFinalApprover = true, canArchive, canDelete, canStartSchedule, canEdit,
   onSubmit, onApprove, onReject, onSoftDelete, onEdit, onView, onRead, onStartSession,
 }) => {
   const statusCfg = STATUS_STYLES[lecture.status] || STATUS_STYLES.DRAFT;
@@ -85,6 +87,16 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   const isPublished       = lecture.status === 'PUBLISHED';
   const isArchived        = lecture.status === 'ARCHIVED';   // legacy — giữ để tương thích
   const isDeleted         = lecture.status === 'DELETED';    // 🆕 — trong thùng rác
+
+  // Đã được người có quyền duyệt (không phải Chỉ huy) thẩm định — còn chờ Chỉ huy cấp trên xác nhận
+  const validatedTag = lecture.validated_by && (isPendingFaculty || isPendingTraining) ? (
+    <span
+      className="text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 bg-sky-50 text-sky-700 border-sky-300 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30"
+      title={`${lecture.validate_decision === 'REJECT' ? 'Đề nghị từ chối' : 'Đề nghị duyệt'}${lecture.validate_note ? ': ' + lecture.validate_note : ''} — chờ Chỉ huy cấp trên xác nhận`}
+    >
+      Đã thẩm định: {lecture.validated_by_name || lecture.validated_by}
+    </span>
+  ) : null;
 
   type Action = { label: string; icon: typeof FileText; onClick: () => void; cls: string };
   const actions: Action[] = [];
@@ -112,13 +124,24 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   }
 
   // 2. Gửi duyệt & Chỉnh sửa khi là DRAFT / REJECTED (Thứ tự chuẩn: Gửi duyệt -> Chỉnh sửa -> Xem chi tiết -> Xóa)
-  if (allowManage && isAuthor && isDraftOrRejected && canEdit) {
+  //    - Gửi duyệt: CHỈ đúng tác giả (backend chặn mọi người khác, kể cả Admin) → không hiện nút cho người khác.
+  //    - Chỉnh sửa: tác giả hoặc Admin (backend cho phép Admin sửa hộ).
+  const isLectureOwner = !!currentUserId && currentUserId === lecture.author_id;
+  // Thành viên cùng khoa/phòng (máy chủ đánh dấu in_my_faculty) và Admin cũng quản lý được bài này ở trang Soạn
+  const canManageThis = isAdmin || isLectureOwner || !!lecture.in_my_faculty;
+  if (allowManage && isLectureOwner && isDraftOrRejected && canEdit) {
     actions.push({
       label: 'Gửi duyệt',
       icon: Send,
       onClick: onSubmit,
       cls: 'bg-[#166534] hover:bg-[#14532d] text-white border border-emerald-600 shadow-xs'
     });
+  }
+  // Sửa: Admin mọi trạng thái (trừ thùng rác); tác giả/thành viên cùng khoa: bản nháp, cần hiệu chỉnh, hoặc bài đã xuất bản của khoa mình
+  //       (bài đã xuất bản do người không phải Admin sửa sẽ phải qua Chỉ huy duyệt nếu quyền này bị Admin khóa duyệt)
+  const canEditThis = allowManage && canEdit && canManageThis && !isDeleted
+    && (isAdmin || isDraftOrRejected || isPublished);
+  if (canEditThis) {
     actions.push({
       label: 'Chỉnh sửa',
       icon: Edit,
@@ -131,14 +154,14 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   if (allowManage && canApprove) {
     if (isPendingFaculty) {
       actions.push(
-        { label: 'Duyệt', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
-        { label: 'Từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
+        { label: isFinalApprover ? 'Duyệt' : 'Thẩm định', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
+        { label: isFinalApprover ? 'Từ chối' : 'Đề nghị từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
       );
     }
     if (isPendingTraining) {
       actions.push(
-        { label: 'Duyệt', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
-        { label: 'Từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
+        { label: isFinalApprover ? 'Duyệt' : 'Thẩm định', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
+        { label: isFinalApprover ? 'Từ chối' : 'Đề nghị từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
       );
     }
   }
@@ -154,8 +177,8 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   // 5. Xóa mềm → chuyển vào Thùng rác của trang Quản trị (KHÔNG hiển thị khi đang chờ duyệt / đã xuất bản).
   //    Khôi phục và xóa vĩnh viễn chỉ Admin làm ở trang Quản trị → Thùng rác, không còn nút ở đây.
   const isPendingApproval = isPendingFaculty || isPendingTraining;
-  const isOwner = !!currentUserId && currentUserId === lecture.author_id;
-  if (allowManage && !isPendingApproval && !isPublished && !isDeleted && (canArchive || (canDelete && isOwner))) {
+  //    Admin xóa mềm mọi trạng thái; người khác (tác giả/cùng khoa) không xóa bài đang chờ duyệt.
+  if (allowManage && !isDeleted && (isAdmin || (!isPendingApproval && (canArchive || canDelete) && canManageThis))) {
     actions.push({
       label: 'Xóa',
       icon: Trash2,
@@ -188,6 +211,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shadow-2xs shrink-0 ${statusCfg.badgeCls}`}>
                 {statusCfg.label}
               </span>
+              {validatedTag}
             </div>
 
             {/* Dòng trên: Mã bài giảng & Môn học (in đậm giá trị) */}
@@ -250,6 +274,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${statusCfg.badgeCls}`}>
             {statusCfg.label}
           </span>
+          {validatedTag}
         </div>
       </div>
 

@@ -37,7 +37,7 @@ const { getPool, closePool, sql } = require('../src/db');
     `);
     console.log('= Bảng ROLE_PORTAL sẵn sàng');
 
-    for (const role of ['ROL-01', 'ROL-02', 'ROL-07']) {
+    for (const role of ['ROL-01', 'ROL-02']) {
       const exists = await new sql.Request(tx).input('r', sql.VarChar(50), role)
         .query(`SELECT 1 AS ok FROM [ROLE] WHERE role_id = @r`);
       if (!exists.recordset.length) { console.log(`! Bỏ qua ${role}: không có trong bảng ROLE`); continue; }
@@ -46,6 +46,12 @@ const { getPool, closePool, sql } = require('../src/db');
                   INSERT INTO ROLE_PORTAL (role_id, portal) VALUES (@r, 'training')`);
       console.log(`${r.rowsAffected[0] ? '+ Thêm' : '= Đã có'} ${role} → training`);
     }
+
+    // Bản migration trước từng thêm ROL-07 (Giảng viên) vào cổng giám sát — gỡ lại theo quy tắc:
+    // chỉ Admin/Chỉ huy; giảng viên muốn vào phải được gán thêm ROL-01 hoặc ROL-02.
+    const removed = await new sql.Request(tx)
+      .query(`DELETE FROM ROLE_PORTAL WHERE role_id = 'ROL-07' AND portal = 'training'`);
+    if (removed.rowsAffected[0]) console.log('- Gỡ ROL-07 khỏi cổng training');
 
     await new sql.Request(tx).query(`
       IF COL_LENGTH('USER_SESSION', 'portal') IS NULL

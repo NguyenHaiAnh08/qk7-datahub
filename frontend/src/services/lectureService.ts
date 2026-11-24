@@ -50,6 +50,7 @@ export const lectureService = {
     if (filters.subject_id) p.set('subject_id', filters.subject_id);
     if (filters.faculty_unit_id) p.set('faculty_unit_id', filters.faculty_unit_id);
     if (filters.q) p.set('q', filters.q);
+    if (filters.scope) p.set('scope', filters.scope);
     const qs = p.toString();
     return http(`/api/lectures${qs ? `?${qs}` : ''}`);
   },
@@ -101,11 +102,11 @@ export const lectureService = {
     return http(`/api/lectures/${encodeURIComponent(id)}/submit`, { method: 'POST' });
   },
 
-  async approve(id: string): Promise<{ new_status: string }> {
+  async approve(id: string): Promise<{ new_status?: string; validated?: boolean; message?: string }> {
     return http(`/api/lectures/${encodeURIComponent(id)}/approve`, { method: 'POST' });
   },
 
-  async reject(id: string, reason: string): Promise<void> {
+  async reject(id: string, reason: string): Promise<{ validated?: boolean; message?: string }> {
     return http(`/api/lectures/${encodeURIComponent(id)}/reject`, {
       method: 'POST',
       headers: JSON_HEADERS,

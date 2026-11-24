@@ -16,7 +16,7 @@ const PORTAL_TRAINING = 'training';
 const VALID_PORTALS = [PORTAL_DATAHUB, PORTAL_TRAINING];
 
 // Dùng khi chưa chạy migration tạo bảng ROLE_PORTAL (không làm hỏng đăng nhập)
-const DEFAULT_TRAINING_ROLES = ['ROL-01', 'ROL-02', 'ROL-07'];
+const DEFAULT_TRAINING_ROLES = ['ROL-01', 'ROL-02'];
 
 // Các API chỉ nhận token cổng Đào tạo. HIỆN ĐỂ TRỐNG: cổng chỉ quyết định AI được đăng nhập vào đâu
 // (giám sát = ROL-01/ROL-02, sử dụng = còn lại). Bên trong hệ thống, chức năng hiển thị/dùng được hay không

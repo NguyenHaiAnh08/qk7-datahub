@@ -6,6 +6,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const { sql, getPool } = require('./db');
+const { canManageLecture, isDeptHeadByPosition } = require('./lecture-scope');
 
 module.exports = function createScormPackageRoutes({ requireAuth, requirePermission, writeAccessLog, getClientIp }) {
   const router = express.Router();
@@ -438,7 +439,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         const pool = await getPool();
         const lr = await pool.request()
           .input('lid', sql.VarChar(50), lectureId)
-          .query(`SELECT author_id, status FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
+          .query(`SELECT author_id, status, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
         
         if (lr.recordset.length === 0) {
           if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -446,10 +447,13 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         }
 
         const lec = lr.recordset[0];
-        const isAdmin = (req.user.roles || []).includes('ROL-01');
-        if (!isAdmin && lec.author_id !== req.user.user_id) {
+        // Admin, tác giả hoặc thành viên cùng khoa/đơn vị (khoa nào khoa đấy lo) mới được tải gói học liệu
+        const mg = await canManageLecture({
+          userId: req.user.user_id, roles: req.user.roles || [], deptHead: isDeptHeadByPosition(req.user), lecture: lec,
+        });
+        if (!mg.ok) {
           if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-          return res.status(403).json({ error: 'Chỉ tác giả mới được upload' });
+          return res.status(403).json({ error: 'Chỉ tác giả, thành viên cùng khoa/đơn vị hoặc Admin mới được upload' });
         }
 
         const pendingDir = path.join(__dirname, '..', 'uploads', 'bai-giang-so', 'pending', folder);
@@ -531,7 +535,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       const pool = await getPool();
       const lr = await pool.request()
         .input('lid', sql.VarChar(50), lectureId)
-        .query(`SELECT lecture_id, title, author_id, status, pdf_path FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
+        .query(`SELECT lecture_id, title, author_id, status, pdf_path, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
 
       if (lr.recordset.length === 0) {
         dropTemp();
@@ -539,14 +543,16 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       }
 
       const lec = lr.recordset[0];
-      const isAdmin = (req.user.roles || []).includes('ROL-01');
-      if (!isAdmin && lec.author_id !== req.user.user_id) {
+      const mg = await canManageLecture({
+        userId: req.user.user_id, roles: req.user.roles || [], deptHead: isDeptHeadByPosition(req.user), lecture: lec,
+      });
+      if (!mg.ok) {
         dropTemp();
-        return res.status(403).json({ error: 'Chỉ tác giả mới được tải lên tệp giáo án' });
+        return res.status(403).json({ error: 'Chỉ tác giả, thành viên cùng khoa/đơn vị hoặc Admin mới được tải lên tệp giáo án' });
       }
-      // Chỉ được thay tệp khi bài giảng còn là bản nháp / bị từ chối — nếu không, tác giả
-      // có thể đổi nội dung bài đã duyệt/đã xuất bản mà không qua quy trình duyệt 2 tầng.
-      if (!['DRAFT', 'REJECTED'].includes(lec.status)) {
+      // Người thường chỉ được thay tệp khi bài còn là bản nháp / bị từ chối — nếu không, có thể đổi nội dung
+      // bài đã duyệt/đã xuất bản mà không qua duyệt 2 tầng. Admin được thay ở mọi trạng thái (xử lý bài lỗi/hư hỏng).
+      if (!mg.admin && !['DRAFT', 'REJECTED'].includes(lec.status)) {
         dropTemp();
         return res.status(409).json({
           error: 'Chỉ được thay tệp giáo án khi bài giảng ở trạng thái Bản nháp hoặc Bị từ chối',

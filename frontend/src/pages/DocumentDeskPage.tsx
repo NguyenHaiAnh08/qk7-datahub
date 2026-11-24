@@ -62,9 +62,9 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
     const isCommander = (user.roles || []).includes('ROL-02');
 
-    // Admin HOẶC Chỉ huy được duyệt đề xuất chỉnh sửa văn bản
-    // (ROL-03 KHÔNG được duyệt — tránh mở rộng nhầm qua isUserManager)
-    return isAdmin || isCommander;
+    // Quyền duyệt do BẢNG QUYỀN quyết định (APPROVAL_VALIDATE): Admin/Chỉ huy duyệt chính thức,
+    // người được cấp quyền chỉ thẩm định (chờ Chỉ huy cấp trên xác nhận).
+    return isAdmin || isCommander || (user.permissions || []).includes('APPROVAL_VALIDATE');
   }, [user]);
 
   const loadPendingProposals = useCallback(async () => {

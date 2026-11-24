@@ -78,8 +78,8 @@ echo.
 echo ==========================================================
 echo   Server da khoi dong!
 if /i "%USE_HTTPS%"=="true" (
-    echo   Web (Chuan 443):   https://%SERVER_DOMAIN%
-    echo   Web (Port %PORT_BACKEND%):    https://%SERVER_DOMAIN%:%PORT_BACKEND%
+    echo   Web ^(Chuan 443^):   https://%SERVER_DOMAIN%
+    echo   Web ^(Port %PORT_BACKEND%^):    https://%SERVER_DOMAIN%:%PORT_BACKEND%
     echo   Cai chung chi LAN: http://%SERVER_DOMAIN%/ca  ^(iPad Air M4 ^& Windows PC^)
 ) else (
     echo   Web:               http://localhost:%PORT_BACKEND%

@@ -43,6 +43,8 @@ load_dotenv(os.path.join(_HERE, ".env"))
 load_dotenv(os.path.join(_RES_DIR, ".env"))
 
 BACKEND_WS_URL = os.getenv("BACKEND_WS_URL", "ws://localhost:8000/ws/fingerprint")
+# Địa chỉ dự phòng (cách nhau bằng dấu phẩy), thử khi địa chỉ chính (tên miền) không phân giải/kết nối được.
+BACKEND_FALLBACK_URLS = [u.strip() for u in os.getenv("BACKEND_FALLBACK_URLS", "").split(",") if u.strip()]
 BRIDGE_TOKEN = os.getenv("BRIDGE_TOKEN", "")
 DEVICE_SERVER_HOST = os.getenv("DEVICE_SERVER_HOST", "127.0.0.1")
 DEVICE_SERVER_PORT = int(os.getenv("DEVICE_SERVER_PORT", "9001"))
@@ -482,7 +484,7 @@ class FingerprintAgent:
                 self._idle_task.cancel()
 
     async def _session(self):
-        candidate_urls = [BACKEND_WS_URL]
+        candidate_urls = [BACKEND_WS_URL] + [u for u in BACKEND_FALLBACK_URLS if u != BACKEND_WS_URL]
         if "127.0.0.1" not in BACKEND_WS_URL and "localhost" not in BACKEND_WS_URL:
             # Fallback động sang loopback nếu đang chạy cùng máy với Gateway (tương thích mọi IP & tên miền)
             parsed_ws = urlparse(BACKEND_WS_URL)

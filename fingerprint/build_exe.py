@@ -1,6 +1,6 @@
 """Đóng gói QK7 Fingerprint Agent thành 1 file exe chạy 'click là chạy' trên máy con.
 
-Dùng:  python build_exe.py --server 192.168.1.229
+Dùng:  python build_exe.py --server trungtamdulieuso.tqsqk7.edu --ip 192.168.1.229
 Kết quả: dist/QK7FingerprintAgent.exe
 
 Nhúng sẵn vào exe: địa chỉ Server + BRIDGE_TOKEN (.env), rootCA.pem (công khai),
@@ -23,10 +23,16 @@ def read_env(path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--server", required=True, help="IP/tên miền Server, vd 192.168.1.229")
-    ap.add_argument("--port", default="8000")
+    ap.add_argument("--server", required=True, help="Tên miền (khuyến nghị) hoặc IP Server, vd trungtamdulieuso.tqsqk7.edu")
+    ap.add_argument("--port", default="", help="Mặc định: 443 (bỏ trống cổng) nếu là tên miền, 8000 nếu là IP")
+    ap.add_argument("--ip", default="", help="IP dự phòng khi máy con chưa phân giải được tên miền, vd 192.168.1.229")
+    ap.add_argument("--fallback-port", default="443", help="Cổng của IP dự phòng")
     ap.add_argument("--ca", default=os.path.join(os.environ.get("LOCALAPPDATA", ""), "mkcert", "rootCA.pem"))
     a = ap.parse_args()
+    is_ip = re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", a.server) is not None
+    port = a.port or ("8000" if is_ip else "443")
+    primary = f"wss://{a.server}" + ("" if port == "443" else f":{port}") + "/ws/fingerprint"
+    fallback = (f"wss://{a.ip}" + ("" if a.fallback_port == "443" else f":{a.fallback_port}") + "/ws/fingerprint") if a.ip else ""
 
     token = read_env(os.path.join(HERE, "..", "backend", ".env")).get("BRIDGE_TOKEN", "")
     if len(token) < 16:
@@ -40,7 +46,8 @@ def main():
     shutil.rmtree(STAGE, ignore_errors=True)
     os.makedirs(STAGE)
     with open(os.path.join(STAGE, ".env"), "w", encoding="utf-8") as f:
-        f.write(f"BACKEND_WS_URL=wss://{a.server}:{a.port}/ws/fingerprint\n"
+        f.write(f"BACKEND_WS_URL={primary}\n"
+                + (f"BACKEND_FALLBACK_URLS={fallback}\n" if fallback else "") +
                 f"BRIDGE_TOKEN={token}\nCA_CERT_PATH=rootCA.pem\n"
                 "DEVICE_SERVER_HOST=127.0.0.1\nDEVICE_SERVER_PORT=9001\n"
                 "MATCH_SCORE_THRESHOLD=45\nDEVICE_IDLE_TIMEOUT=60\nDEVICE_FULL_RESET_ON_CLOSE=true\n")

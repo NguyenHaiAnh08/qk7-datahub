@@ -8,12 +8,14 @@ import { TeachingSchedule, HistoryKpi } from '../../types/lecture';
 import { RollingNumber } from '../common/RollingNumber';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
 import { DateRangePicker } from '../common/DateRangePicker';
+import { PaginationBar } from '../common/PaginationBar';
+import { usePageTransition } from '../common/PageTransitionStage';
 
 const HistoryKpiCard: React.FC<{
   label: string;
   value: number;
   suffix?: string;
-  icon: any;
+  icon: React.ElementType;
   tone: 'emerald' | 'amber' | 'blue' | 'purple';
   delay?: number;
   refreshKey?: number | string;
@@ -87,12 +89,13 @@ export const TeachingHistoryPanel: React.FC = () => {
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  const listRef = usePageTransition<HTMLDivElement>(currentPage, { mode: 'row' });
   const pagedItems = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return items.slice(start, start + PAGE_SIZE);
   }, [items, currentPage]);
 
-  const load = async () => {
+  const load = React.useCallback(async () => {
     setLoading(true);
     try {
       const res = await lectureService.getHistory({
@@ -106,12 +109,12 @@ export const TeachingHistoryPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fromDate, toDate]);
 
   useEffect(() => {
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
-  }, [fromDate, toDate]);
+  }, [load]);
 
   return (
     <div className="space-y-4">
@@ -151,6 +154,7 @@ export const TeachingHistoryPanel: React.FC = () => {
           />
 
           <button
+            type="button"
             onClick={() => {
               setHistoryRefreshKey((prev) => prev + 1);
               load();
@@ -219,7 +223,7 @@ export const TeachingHistoryPanel: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="space-y-2">
+          <div ref={listRef} className="u043 space-y-2">
             {pagedItems.map((s) => {
               const presenterFull = [s.presenter_rank, s.presenter_name].filter(Boolean).join(' ') || s.presenter_name || 'Chưa xác định';
               const venueLabel = s.venue_name || '1';
@@ -243,7 +247,7 @@ export const TeachingHistoryPanel: React.FC = () => {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start gap-2 min-w-0">
-                      <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0" title={s.lecture_title}>
+                      <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-2 [overflow-wrap:anywhere] [word-break:break-word] min-w-0" title={s.lecture_title}>
                         {s.lecture_title}
                       </span>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 shrink-0">
@@ -290,32 +294,16 @@ export const TeachingHistoryPanel: React.FC = () => {
 
           {/* Phân trang chuẩn tối đa 30 ca / trang */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
               <div>
                 Đang hiển thị ca <strong className="text-slate-800 dark:text-slate-200 font-bold">{(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, items.length)}</strong> / {items.length}
                 {' '}— Tổng số <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{items.length}</strong> ca giảng dạy (Trang {currentPage}/{totalPages})
               </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1}
-                  className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
-                >
-                  Trang trước
-                </button>
-                <span className="px-2.5 font-bold font-mono text-emerald-700 dark:text-emerald-400">
-                  {currentPage}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage >= totalPages}
-                  className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
-                >
-                  Trang sau
-                </button>
-              </div>
+              <PaginationBar
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={(p) => setPage(p)}
+              />
             </div>
           )}
         </div>

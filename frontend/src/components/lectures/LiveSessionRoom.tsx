@@ -7,6 +7,9 @@ import { Lecture, TeachingSchedule } from '../../types/lecture';
 import { http, getAuthHeaders } from '../../services/http';
 import { PdfPagesViewer } from '../document-desk/PdfPagesViewer';
 import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
+import { useAuth } from '../../hooks/useAuth';
+import { formatUserDisplayName, formatWatermarkDateTime } from '../../hooks/useFloatingWatermark';
+import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
 
 interface Props {
   open: boolean;
@@ -49,6 +52,7 @@ const buildLaunchUrl = (lecture: Lecture, selectedFile?: string): string => {
 };
 
 export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd }) => {
+  const { user } = useAuth();
   const [elapsed, setElapsed] = useState<number>(() => computeElapsed(session.start_time));
   const [ending, setEnding] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -58,6 +62,8 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
   const [reloadKey, setReloadKey] = useState<number>(0);
   const [pdfUrl, setPdfUrl] = useState<string>('');
   const [pdfError, setPdfError] = useState<string>('');
+  const [isBlobWatermarked, setIsBlobWatermarked] = useState<boolean>(true);
+  const [watermarkText, setWatermarkText] = useState<string>('');
 
   // ⭕ Document Reading Completion Ring cho bài giảng số dạng PDF
   const [readingProgress, setReadingProgress] = useState<ReadingProgress>({
@@ -119,7 +125,19 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
           try { const j = await r.json(); if (j?.error) msg = j.error; } catch { /* không phải JSON */ }
           throw new Error(msg);
         }
-        objectUrl = URL.createObjectURL(await r.blob());
+        const rawBlob = await r.blob();
+        const serverDateStr = r.headers.get('X-Server-Time') || r.headers.get('Date');
+        const serverTime = serverDateStr ? new Date(serverDateStr) : new Date();
+        const userDisplayName = formatUserDisplayName(user?.full_name || session?.presenter_name, user?.username);
+        const timeStr = formatWatermarkDateTime(serverTime);
+        const stampedBlob = await stampWatermarkOnPdf(rawBlob, {
+          userDisplayName,
+          timeStr,
+          opacity: 0.18,
+        });
+        setIsBlobWatermarked((stampedBlob as any).__isWatermarked !== false);
+        setWatermarkText(`${userDisplayName} - ${timeStr}`);
+        objectUrl = URL.createObjectURL(stampedBlob);
         setPdfUrl(objectUrl);
       } catch (e: any) {
         if (e?.name !== 'AbortError') setPdfError(e?.message || 'Không tải được tệp PDF');
@@ -536,6 +554,7 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
                 onReadingProgressChange={handlePdfProgressChange}
                 viewerRef={pdfViewerRef}
                 showFloatingProgressRing={true}
+                fallbackWatermarkText={!isBlobWatermarked ? watermarkText : undefined}
               />
             </div>
           ) : (

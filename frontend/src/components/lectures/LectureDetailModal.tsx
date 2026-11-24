@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, BookOpen, User, Building2, Shield, Calendar, HelpCircle, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { X, BookOpen, User, Building2, Shield, Calendar, HelpCircle, AlertTriangle } from 'lucide-react';
 import { Lecture, LectureStatus } from '../../types/lecture';
+import { ApprovalStepper } from '../common/ApprovalStepper';
 
 interface Props {
   open: boolean;
@@ -30,37 +31,6 @@ export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose, on
 
   const statusCfg = STATUS_CONFIG[lecture.status] || STATUS_CONFIG.DRAFT;
   const formatCfg = FORMAT_CONFIG[lecture.content_type] || FORMAT_CONFIG.PDF;
-
-  // Mini stepper states
-  const stages = [
-    { key: 'DRAFT', label: 'Soạn thảo' },
-    { key: 'FACULTY', label: 'Khoa/Bộ môn' },
-    { key: 'TRAINING', label: 'Ban Giám hiệu' },
-    { key: 'PUBLISHED', label: 'Xuất bản' },
-  ];
-
-  const getStageState = (index: number) => {
-    if (lecture.status === 'PUBLISHED') return 'completed';
-    if (lecture.status === 'DELETED') return 'rejected'; // 🆕 bài đã bị xoá → toàn bộ quy trình dừng
-    if (lecture.status === 'REJECTED') {
-      return index === 0 ? 'completed' : 'rejected';
-    }
-    if (lecture.status === 'PENDING_TRAINING') {
-      if (index <= 1) return 'completed';
-      if (index === 2) return 'current';
-      return 'pending';
-    }
-    if (lecture.status === 'PENDING_FACULTY') {
-      if (index === 0) return 'completed';
-      if (index === 1) return 'current';
-      return 'pending';
-    }
-    if (lecture.status === 'DRAFT') {
-      if (index === 0) return 'current';
-      return 'pending';
-    }
-    return 'pending';
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
@@ -98,7 +68,7 @@ export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose, on
           <div className="min-w-0">
             <div className="flex items-start justify-between gap-3 mb-2 min-w-0">
               <h2
-                className="text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] overflow-hidden min-w-0 flex-1"
+                className="text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 [overflow-wrap:anywhere] [word-break:break-word] overflow-hidden min-w-0 flex-1"
                 title={lecture.title}
               >
                 {lecture.title}
@@ -120,44 +90,13 @@ export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose, on
             )}
           </div>
 
-          {/* Mini Stepper Flow */}
+          {/* Mini Stepper Flow (Lucian #444) */}
           <div className="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/[0.06]">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-              Tiến trình thẩm định & phê duyệt
-            </div>
-            <div className="grid grid-cols-4 gap-1.5 relative">
-              {stages.map((st, idx) => {
-                const state = getStageState(idx);
-                return (
-                  <div key={st.key} className="flex flex-col items-center text-center">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors mb-1 ${
-                      state === 'completed'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : state === 'current'
-                        ? 'bg-amber-500 text-white animate-pulse'
-                        : state === 'rejected'
-                        ? 'bg-rose-600 text-white'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400'
-                    }`}>
-                      {state === 'completed' ? (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      ) : state === 'current' ? (
-                        <Clock className="w-3.5 h-3.5" />
-                      ) : state === 'rejected' ? (
-                        <X className="w-3.5 h-3.5" />
-                      ) : (
-                        idx + 1
-                      )}
-                    </div>
-                    <span className={`text-[10px] font-medium leading-tight ${
-                      state === 'current' ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-slate-600 dark:text-slate-400'
-                    }`}>
-                      {st.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            <ApprovalStepper
+              status={lecture.status}
+              headerLabel="Tiến trình thẩm định & phê duyệt:"
+              steps={['Soạn thảo', 'Khoa/Bộ môn', 'Ban Giám hiệu', 'Xuất bản']}
+            />
           </div>
 
           {/* Telemetry Matrix Grid */}

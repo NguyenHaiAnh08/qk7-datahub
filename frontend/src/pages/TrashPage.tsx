@@ -8,12 +8,12 @@ import {
   ShieldAlert,
   CheckCircle2,
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { Tooltip } from 'antd';
 import { Header } from '../components/common/Header';
 import { toast } from '../components/common/Toast';
+import { PaginationBar } from '../components/common/PaginationBar';
+import { usePageTransition } from '../components/common/PageTransitionStage';
 import { documentsApi } from '../services/documentsApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem } from '../types';
@@ -39,6 +39,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   // Phân trang: tối đa 30 tài liệu / trang
   const ITEMS_PER_PAGE = 30;
   const [currentPage, setCurrentPage] = useState(1);
+  const tbodyRef = usePageTransition<HTMLTableSectionElement>(currentPage, { mode: 'row' });
 
   const totalPages = Math.max(1, Math.ceil(docs.length / ITEMS_PER_PAGE));
   const paginatedDocs = useMemo(() => {
@@ -385,7 +386,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
                 <th className="py-3 px-4 text-right whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            <tbody ref={tbodyRef} className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {loading && docs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-slate-400">
@@ -498,53 +499,18 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
 
         {/* Thanh phân trang: Tối đa 30 tài liệu / trang, sang tài liệu 31 là trang 2 */}
         {totalPages > 1 && (
-          <div className="p-3.5 border-t border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+          <div className="p-3.5 border-t border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
             <div>
               Hiển thị trang{' '}
               <span className="font-semibold text-slate-900 dark:text-white">{currentPage}</span> /{' '}
               <span className="font-semibold text-slate-900 dark:text-white">{totalPages}</span> (Tổng{' '}
               <span className="font-semibold text-slate-900 dark:text-white">{docs.length}</span> tài liệu đã xóa)
             </div>
-            <div className="flex items-center space-x-1">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage <= 1}
-                className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .map((p, idx, arr) => {
-                  const prev = arr[idx - 1];
-                  const showEllipsis = prev && p - prev > 1;
-                  return (
-                    <React.Fragment key={p}>
-                      {showEllipsis && <span className="px-1 text-slate-400">...</span>}
-                      <button
-                        type="button"
-                        onClick={() => setCurrentPage(p)}
-                        className={`px-2.5 py-1 rounded transition text-xs cursor-pointer ${
-                          currentPage === p
-                            ? 'bg-emerald-600 text-white font-bold'
-                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    </React.Fragment>
-                  );
-                })}
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
-                className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(p) => setCurrentPage(p)}
+            />
           </div>
         )}
       </div>

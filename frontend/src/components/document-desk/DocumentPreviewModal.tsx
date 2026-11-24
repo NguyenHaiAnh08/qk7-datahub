@@ -26,6 +26,11 @@ import { FingerprintScanModal } from '../users/FingerprintScanModal';
 import { CompactDownloadButton } from '../common/CompactDownloadButton';
 import { AccessDeniedCard } from '../common/AccessDeniedCard';
 import { toast } from '../common/Toast';
+import {
+  formatUserDisplayName,
+  formatWatermarkDateTime,
+} from '../../hooks/useFloatingWatermark';
+import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
 
 import { useAntiScreenshot } from '../../hooks/useAntiScreenshot';
 import { SecurityScreenShield } from '../common/SecurityScreenShield';
@@ -53,6 +58,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const clearanceLevel = propClearanceLevel ?? (user?.clearance_level_id || 1);
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isBlobWatermarked, setIsBlobWatermarked] = useState<boolean>(true);
+  const [watermarkText, setWatermarkText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<boolean>(false);
@@ -227,7 +234,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         return;
       }
 
-      const url = URL.createObjectURL(fileResult.blob);
+      const userDisplayName = formatUserDisplayName(user?.full_name, user?.username);
+      // Sử dụng thời gian chuẩn từ máy chủ NTP (tuyệt đối không dùng new Date() của client)
+      const timeStr = formatWatermarkDateTime(fileResult.serverTime);
+      const stampedBlob = await stampWatermarkOnPdf(fileResult.blob, {
+        userDisplayName,
+        timeStr,
+        traceId: fileResult.traceId,
+        opacity: 0.18,
+      });
+
+      setIsBlobWatermarked((stampedBlob as any).__isWatermarked !== false);
+      setWatermarkText(`${userDisplayName} - ${timeStr}`);
+
+      const url = URL.createObjectURL(stampedBlob);
       setBlobUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return url;
@@ -502,19 +522,31 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 />
               )}
 
-              {/* 🖊️ Bút dạ quang ghi chú (Hỗ trợ toàn diện từ Cấp 1 đến Cấp 5) */}
-              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700">
+              {/* 🖊️ Bút dạ quang ghi chú — Tương phản cao trên cả Light Mode & Dark Mode (Sắc Vàng Kim Quân Hiệu) */}
+              <div
+                className={`flex items-center gap-1.5 p-1 rounded-xl border-2 transition-all ${
+                  isHighlighterActive
+                    ? 'bg-amber-50 dark:bg-amber-950/70 border-amber-500 dark:border-amber-400 shadow-sm shadow-amber-500/20'
+                    : 'bg-amber-50/80 dark:bg-amber-500/15 border-amber-300 dark:border-amber-400/50 hover:border-amber-400 dark:hover:border-amber-400'
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => setIsHighlighterActive((prev) => !prev)}
-                  className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer ${
                     isHighlighterActive
-                      ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
-                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      ? 'bg-amber-500 dark:bg-amber-400 text-slate-950 shadow-xs'
+                      : 'text-amber-900 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-amber-500/25'
                   }`}
                   title={isHighlighterActive ? 'Đang bật bút dạ quang (Click để tắt và thao tác văn bản)' : 'Bật bút dạ quang ghi chú giáo trình'}
                 >
-                  <Highlighter className="w-3.5 h-3.5" />
+                  <Highlighter
+                    className={`w-3.5 h-3.5 ${
+                      isHighlighterActive
+                        ? 'text-slate-950'
+                        : 'text-amber-600 dark:text-amber-400'
+                    }`}
+                  />
                   <span className="hidden sm:inline">
                     {isHighlighterActive ? 'Đang vẽ ghi chú' : 'Bút dạ quang'}
                   </span>
@@ -522,7 +554,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
                 {/* Bảng chọn màu bút dạ quang & nút Hoàn tác (Undo) */}
                 {isHighlighterActive && (
-                  <div className="flex items-center gap-1 pl-1.5 border-l border-slate-300 dark:border-slate-600">
+                  <div className="flex items-center gap-1 pl-1.5 border-l border-amber-300 dark:border-amber-500/40">
                     {HIGHLIGHTER_COLORS.map((c) => (
                       <button
                         key={c.id}
@@ -655,6 +687,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   onReadingProgressChange={(prog) => setReadingProgress(prog)}
                   viewerRef={viewerRef}
                   showFloatingProgressRing={true}
+                  fallbackWatermarkText={!isBlobWatermarked ? watermarkText : undefined}
                 />
 
                 {/* Lá chắn cảnh báo đỏ vi phạm an ninh (Liên tục & Quá 3 lần khóa tài khoản) */}

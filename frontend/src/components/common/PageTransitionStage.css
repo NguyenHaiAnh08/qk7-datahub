@@ -1,0 +1,19 @@
+/* Lucian UX/UI Prompt #043 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#043 */
+
+.u043 {
+  --ux-ease: cubic-bezier(.2, .8, .2, 1);
+  --ux-spring: cubic-bezier(.34, 1.45, .64, 1);
+  overflow-x: clip;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u043,
+  .u043 *,
+  .u043 *::before,
+  .u043 *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

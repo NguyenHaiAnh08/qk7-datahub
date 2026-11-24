@@ -1,7 +1,7 @@
 /* <!-- AI Chat Drawer Component --> */
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Spin, Tooltip } from 'antd';
+import { Tooltip } from 'antd';
 import {
   Bot,
   X,
@@ -15,11 +15,11 @@ import {
   Maximize2,
   Info,
   CheckCircle2,
-  ChevronRight,
   ShieldAlert,
   ShieldCheck,
   Quote,
 } from 'lucide-react';
+import { AIThinkingBubble } from './AIThinkingBubble';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAIChat } from '../../contexts/AIChatContext';
@@ -117,7 +117,7 @@ export const AIChatDrawer: React.FC = () => {
       setTimeout(() => inputRef.current?.focus(), 150);
       checkServiceStatus();
     }
-  }, [isChatOpen, messages]);
+  }, [isChatOpen, messages, loading]);
 
   // 🔒 Khóa cuộn trang web cha khi mở Chatbox, bảo toàn vị trí cuộn & triệt tiêu cuộn xuyên tầng (Scroll Chaining)
   useEffect(() => {
@@ -361,13 +361,6 @@ export const AIChatDrawer: React.FC = () => {
     }
   };
 
-  // Các câu hỏi gợi ý tác chiến nhanh
-  const quickPrompts = [
-    'Quy định phân cấp bảo mật tài liệu 5 cấp độ',
-    'Hướng dẫn sử dụng máy quét vân tay ZKTeco ZK9500',
-    'Chính sách lưu trữ và tải văn bản Cấp 3 (Mật)',
-  ];
-
   return (
     <>
       <AnimatePresence>
@@ -474,9 +467,9 @@ export const AIChatDrawer: React.FC = () => {
                   previewOpen ? 'overflow-hidden' : 'overflow-y-auto'
                 } p-4 sm:p-5 space-y-4 scrollbar-thin select-text bg-[#f8fafc] dark:bg-[#0b1120] overscroll-contain`}
               >
-                {/* Lời chào & gợi ý câu hỏi khi chưa có tin nhắn */}
+                {/* Lời chào khi chưa có tin nhắn */}
                 {messages.length === 0 && (
-                  <div className="py-8 px-4 text-center space-y-5">
+                  <div className="py-12 px-4 text-center space-y-5">
                     <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
                       <Sparkles className="w-7 h-7 stroke-[2]" />
                     </div>
@@ -487,24 +480,6 @@ export const AIChatDrawer: React.FC = () => {
                       <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                         Hệ thống tra cứu thông minh tích hợp RAG, vector hóa dữ liệu quân sự và kiểm soát phân cấp bí mật 5 cấp độ.
                       </p>
-                    </div>
-
-                    {/* Khối gợi ý câu hỏi nhanh */}
-                    <div className="space-y-2 pt-2 text-left max-w-md mx-auto">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
-                        Gợi ý tra cứu nhanh:
-                      </div>
-                      {quickPrompts.map((prompt, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => handleSend(prompt)}
-                          className="w-full text-left p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-emerald-500 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 text-xs text-slate-700 dark:text-slate-300 font-medium transition-all duration-150 flex items-center justify-between group cursor-pointer shadow-2xs"
-                        >
-                          <span className="truncate pr-2">{prompt}</span>
-                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0" />
-                        </button>
-                      ))}
                     </div>
                   </div>
                 )}
@@ -654,14 +629,9 @@ export const AIChatDrawer: React.FC = () => {
                   </div>
                 ))}
 
-                {/* Trạng thái đang tải câu trả lời */}
+                {/* Trạng thái AI đang suy nghĩ — bong bóng 3 dấu chấm nhấp nháy theo sóng */}
                 {loading && (
-                  <div className="flex items-center space-x-3 text-xs text-emerald-800 dark:text-emerald-400 p-3 bg-white dark:bg-emerald-950/30 rounded-2xl border border-emerald-500/30 shadow-xs animate-pulse">
-                    <Spin size="small" />
-                    <span className="font-semibold">
-                      {lastQuery ? 'Đang giải mã và lập báo cáo câu trả lời...' : 'Trợ lý AI đang truy vấn kho văn bản số...'}
-                    </span>
-                  </div>
+                  <AIThinkingBubble isDecrypting={Boolean(lastQuery)} />
                 )}
 
                 <div ref={messagesEndRef} />

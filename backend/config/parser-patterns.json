@@ -2,7 +2,7 @@
   "_comment": "Cấu hình Regex cho PDF parser QK7 — Sửa file này thay vì sửa code (v4.4)",
 
   "document_code": "S\\s*[ốo06]\\s*[:.]?\\s*(\\d{1,5})?\\s*([\\/\\-])?\\s*([A-ZĐ0-9][A-ZĐ0-9\\-]*(?:[\\/\\-][A-ZĐ0-9]+)*)",
-  "issued_date": "ng[àaäáâ]?y\\s*(\\d{1,2})?\\s*th[áaäâ]?ng\\s*(\\d{1,2})\\s*n[ăaäâ]?m\\s*(\\d{4})",
+  "issued_date": "ng[àaäáâ]?y\\s*(\\d{1,2})?\\s*th[áaäâà]?ng\\s*(\\d{1,2})\\s*n[ăaäâáà]?m\\s*(\\d{4})",
   "title_stop": "^(Căn cứ|Kính gửi|Thực hiện|Căn cứ vào|HIỆU TRƯỞNG|CHỦ TỊCH|KT\\.|TM\\.|T\\/M|Nơi nhận)",
   "roman_heading": "^\\s*(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)[\\-\\s\\.]",
   "signer_name": "^[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,4}$",

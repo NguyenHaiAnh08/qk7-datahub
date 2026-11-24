@@ -31,6 +31,8 @@ import { User, Role } from '../../types';
 import { roleService } from '../../services/roleService';
 import { usersApi } from '../../services/usersApi';
 import { isProtectedAdminRole, isProtectedUser } from '../../constants/protectedAccounts';
+import { PaginationBar } from '../common/PaginationBar';
+import { usePageTransition } from '../common/PageTransitionStage';
 
 export interface AssignRoleModalProps {
   open: boolean;
@@ -71,6 +73,10 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const tableWrapRef = usePageTransition<HTMLDivElement>(currentPage, {
+    mode: 'row',
+    itemSelector: '.ant-table-tbody > tr.ant-table-row',
+  });
 
   // State cho Sub-modal chọn thời hạn
   const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
@@ -529,22 +535,40 @@ export const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
           </div>
 
           {/* Bảng */}
-          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs bg-white dark:bg-transparent [&_.ant-pagination]:px-3 [&_.ant-pagination]:py-2">
-            <Table<User>
-              columns={columns}
-              dataSource={filteredUsers}
-              rowKey="user_id"
-              size="small"
-              pagination={{
-                current: Math.min(Math.max(1, currentPage), Math.ceil(filteredUsers.length / 5) || 1),
-                pageSize: 5,
-                onChange: (page) => setCurrentPage(page),
-                showSizeChanger: false,
-                showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} quân nhân`,
-              }}
-              locale={{ emptyText: 'Không tìm thấy quân nhân nào' }}
-            />
-          </div>
+          {(() => {
+            const assignPageSize = 5;
+            const assignTotalPages = Math.max(1, Math.ceil(filteredUsers.length / assignPageSize));
+            const safeAssignPage = Math.min(Math.max(1, currentPage), assignTotalPages);
+            const pagedUsers = filteredUsers.slice(
+              (safeAssignPage - 1) * assignPageSize,
+              safeAssignPage * assignPageSize
+            );
+            return (
+              <div ref={tableWrapRef} className="u043 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs bg-white dark:bg-transparent">
+                <Table<User>
+                  columns={columns}
+                  dataSource={pagedUsers}
+                  rowKey="user_id"
+                  size="small"
+                  pagination={false}
+                  locale={{ emptyText: 'Không tìm thấy quân nhân nào' }}
+                />
+                {filteredUsers.length > 0 && (
+                  <div className="px-3 py-2.5 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50/60 dark:bg-slate-900/60">
+                    <div>
+                      {(safeAssignPage - 1) * assignPageSize + 1}-
+                      {Math.min(safeAssignPage * assignPageSize, filteredUsers.length)} / {filteredUsers.length} quân nhân
+                    </div>
+                    <PaginationBar
+                      currentPage={safeAssignPage}
+                      totalPages={assignTotalPages}
+                      onPageChange={(page) => setCurrentPage(page)}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </Modal>
 

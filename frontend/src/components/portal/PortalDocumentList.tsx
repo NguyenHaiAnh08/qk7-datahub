@@ -1,9 +1,10 @@
 import React from 'react';
 import { Skeleton } from 'antd';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DocumentItem } from '../../types';
 import { DocumentCard } from './DocumentCard';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
+import { PaginationBar } from '../common/PaginationBar';
+import { usePageTransition } from '../common/PageTransitionStage';
 
 export interface PortalDocumentListProps {
   documents: DocumentItem[];
@@ -34,6 +35,8 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
   onDownload,
   onCancelDownload,
 }) => {
+  const gridRef = usePageTransition<HTMLDivElement>(currentPage, { cols: 3, mode: 'grid' });
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -74,7 +77,7 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div ref={gridRef} className="u043 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {documents.map((doc, idx) => (
           <div
             key={doc.file_id}
@@ -94,50 +97,18 @@ export const PortalDocumentList: React.FC<PortalDocumentListProps> = ({
       </div>
 
       {totalPages > 1 && (
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 shadow-sm">
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400 shadow-sm">
           <div>
             Đang hiển thị tài liệu{' '}
             <strong className="font-bold text-slate-900 dark:text-white">{(currentPage - 1) * 30 + 1} - {Math.min(currentPage * 30, totalItems)}</strong> /{' '}
             <strong className="font-bold text-emerald-700 dark:text-emerald-400">{totalItems}</strong> tài liệu
             {' '}(Trang <strong className="font-bold text-slate-900 dark:text-white">{currentPage}</strong>/{totalPages})
           </div>
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage <= 1}
-              className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-              .map((p, idx, arr) => {
-                const prev = arr[idx - 1];
-                const showEllipsis = prev && p - prev > 1;
-                return (
-                  <React.Fragment key={p}>
-                    {showEllipsis && <span className="px-1 text-slate-400">...</span>}
-                    <button
-                      onClick={() => onPageChange(p)}
-                      className={`px-2.5 py-1 rounded transition text-xs ${
-                        currentPage === p
-                          ? 'bg-emerald-600 text-white font-bold'
-                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  </React.Fragment>
-                );
-              })}
-            <button
-              onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage >= totalPages}
-              className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
         </div>
       )}
     </div>

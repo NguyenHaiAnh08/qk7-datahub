@@ -22,11 +22,11 @@ import {
   Monitor,
   Presentation,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TreeSelect } from 'antd';
+import { PaginationBar } from '../components/common/PaginationBar';
+import { usePageTransition } from '../components/common/PageTransitionStage';
 import { Unit } from '../types/user';
 import { unitService } from '../services/unitService';
 import { buildUnitTree, filterSchoolUnits } from '../utils/unitTree';
@@ -260,6 +260,7 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  const tbodyRef = usePageTransition<HTMLTableSectionElement>(currentPage, { mode: 'row' });
   const pagedItems = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredItems.slice(start, start + PAGE_SIZE);
@@ -493,7 +494,7 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-medium text-slate-700 dark:text-slate-300">
+            <tbody ref={tbodyRef} className="divide-y divide-slate-100 dark:divide-slate-800/80 font-medium text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-slate-400">
@@ -712,31 +713,11 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
               {itemUnitName} (Trang <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{currentPage}/{totalPages}</span>)
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage <= 1}
-                className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer flex items-center gap-1 active:scale-95"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Trang trước</span>
-              </button>
-
-              <span className="px-3 py-1 font-bold font-mono text-xs rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
-                {currentPage} / {totalPages}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
-                className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer flex items-center gap-1 active:scale-95"
-              >
-                <span>Trang sau</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(p) => setPage(p)}
+            />
           </div>
         )}
       </div>

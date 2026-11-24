@@ -1,0 +1,197 @@
+/* QK7 DataHub · AI Thinking Bubble (3-Dot Wave Indicator) */
+
+.qk7-ai-think,
+.qk7-ai-think *,
+.qk7-ai-think *::before,
+.qk7-ai-think *::after {
+  box-sizing: border-box;
+}
+
+.qk7-ai-think {
+  --ai-bubble-bg: #FFFFFF;
+  --ai-bubble-border: rgba(15, 23, 42, 0.09);
+  --ai-bubble-shadow: 0 6px 20px -10px rgba(15, 23, 42, 0.16);
+  --ai-dot-idle: #94A3B8;
+  --ai-dot-active: #166534;
+  --ai-caption: #64748B;
+  --ai-avatar-ring: rgba(22, 101, 52, 0.22);
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  animation: qk7-ai-enter 0.32s cubic-bezier(.34, 1.45, .64, 1) both;
+}
+
+:root.dark .qk7-ai-think,
+:root[data-theme="dark"] .qk7-ai-think {
+  --ai-bubble-bg: #111827;
+  --ai-bubble-border: rgba(255, 255, 255, 0.1);
+  --ai-bubble-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
+  --ai-dot-idle: rgba(241, 245, 249, 0.38);
+  --ai-dot-active: #10B981;
+  --ai-caption: #94A3B8;
+  --ai-avatar-ring: rgba(16, 185, 129, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.light) .qk7-ai-think {
+    --ai-bubble-bg: #111827;
+    --ai-bubble-border: rgba(255, 255, 255, 0.1);
+    --ai-bubble-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
+    --ai-dot-idle: rgba(241, 245, 249, 0.38);
+    --ai-dot-active: #10B981;
+    --ai-caption: #94A3B8;
+    --ai-avatar-ring: rgba(16, 185, 129, 0.28);
+  }
+}
+
+.qk7-ai-think-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qk7-ai-avatar {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #14532d 0%, #166534 55%, #10b981 100%);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px -4px rgba(22, 101, 52, 0.45);
+}
+
+.qk7-ai-think.is-compact .qk7-ai-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+}
+
+.qk7-ai-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 15px;
+  box-shadow: 0 0 0 2px var(--ai-avatar-ring);
+  animation: qk7-ai-halo 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.qk7-ai-think.is-compact .qk7-ai-avatar::after {
+  border-radius: 13px;
+  inset: -3px;
+}
+
+.qk7-ai-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 9999px;
+  background: var(--ai-bubble-bg);
+  border: 1px solid var(--ai-bubble-border);
+  box-shadow: var(--ai-bubble-shadow);
+}
+
+.qk7-ai-think.is-compact .qk7-ai-bubble {
+  height: 32px;
+  padding: 0 14px;
+  gap: 5px;
+}
+
+.qk7-ai-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--ai-dot-idle);
+  animation: qk7-ai-dot-wave 1.25s cubic-bezier(.45, .05, .55, .95) infinite;
+  will-change: transform, opacity;
+}
+
+.qk7-ai-think.is-compact .qk7-ai-dot {
+  width: 7px;
+  height: 7px;
+}
+
+.qk7-ai-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.qk7-ai-dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.qk7-ai-dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+.qk7-ai-caption {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ai-caption);
+  padding-left: 46px;
+  letter-spacing: -0.01em;
+}
+
+.qk7-ai-think.is-compact .qk7-ai-caption {
+  padding-left: 40px;
+  font-size: 10.5px;
+}
+
+@keyframes qk7-ai-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes qk7-ai-dot-wave {
+  0%, 60%, 100% {
+    transform: translateY(0) scale(0.92);
+    opacity: 0.36;
+    background-color: var(--ai-dot-idle);
+  }
+  30% {
+    transform: translateY(-5px) scale(1.08);
+    opacity: 1;
+    background-color: var(--ai-dot-active);
+  }
+}
+
+@keyframes qk7-ai-halo {
+  50% {
+    transform: scale(1.08);
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qk7-ai-think,
+  .qk7-ai-avatar::after,
+  .qk7-ai-dot {
+    animation: none !important;
+  }
+
+  .qk7-ai-dot:nth-child(1) {
+    opacity: 1;
+    background-color: var(--ai-dot-active);
+  }
+
+  .qk7-ai-dot:nth-child(2) {
+    opacity: 0.65;
+  }
+
+  .qk7-ai-dot:nth-child(3) {
+    opacity: 0.35;
+  }
+}

@@ -24,7 +24,7 @@ echo.
 
 REM --- Kiem tra va giai phong port backend, AI & OCR neu bi chiem ---
 echo [Kiem tra] Giai phong port %PORT_BACKEND%, %PORT_AI%, %PORT_OCR% neu bi chiem...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort %PORT_BACKEND%,%PORT_AI%,%PORT_OCR% -State Listen -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Phat hien port dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port thanh cong.' } else { Write-Host '[OK] Cac port dang san sang.' } } catch { Write-Host '[OK] Cac port dang san sang.' }; exit 0"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort %PORT_BACKEND%,%PORT_AI%,%PORT_OCR% -ErrorAction SilentlyContinue).OwningProcess | Where-Object { $_ -gt 0 } | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Phat hien port dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port thanh cong.' } else { Write-Host '[OK] Cac port dang san sang.' } } catch { Write-Host '[OK] Cac port dang san sang.' }; exit 0"
 echo.
 
 REM --- 1. Backend ---
@@ -48,7 +48,7 @@ if exist "%ROOT%boxchat\s.bat" (
 REM --- 4. OCR Microservice ---
 echo [4/4] Khoi dong OCR Microservice (:%PORT_OCR%)...
 if exist "%ROOT%ocr-service\start-ocr.bat" (
-    start "QK7 OCR" cmd /k "cd /d "%ROOT%ocr-service" && start-ocr.bat"
+    start "QK7 OCR" cmd /k "cd /d "%ROOT%ocr-service" && set "PORT=%PORT_OCR%" && set "OCR_PORT=%PORT_OCR%" && start-ocr.bat"
 ) else (
     echo [CANH BAO] Khong tim thay ocr-service\start-ocr.bat
 )

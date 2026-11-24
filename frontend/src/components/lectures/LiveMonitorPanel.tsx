@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Radio, RefreshCw, AlertTriangle, Clock, Users, Building2, User,
-  Square, ShieldAlert, Monitor, CheckCircle2,
-  X, Wrench, Calendar, ExternalLink, ShieldCheck, MapPin,
-  LayoutGrid, List, School, ArrowRight,
-  Flame, Lock, HelpCircle
+  Square, Monitor, CheckCircle2,
+  X, Wrench, Calendar, ShieldCheck,
+  LayoutGrid, List, School, ArrowRight
 } from 'lucide-react';
 import { lectureService } from '../../services/lectureService';
 import { toast } from '../common/Toast';
@@ -14,12 +13,12 @@ import {
   RadarBuilding,
   RadarClassroom,
   RadarSessionSummary,
-  RadarRoomStatus,
 } from '../../types/lecture';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
+import { PaginationBar } from '../common/PaginationBar';
+import { usePageTransition } from '../common/PageTransitionStage';
 import { useAuth } from '../../hooks/useAuth';
-import { useDeviceMode } from '../../hooks/useDeviceMode';
 
 interface Props {
   currentUserId?: string;
@@ -29,11 +28,9 @@ interface Props {
 
 export const LiveMonitorPanel: React.FC<Props> = ({
   currentUserId,
-  canForceEnd = false,
   isAdmin: propIsAdmin,
 }) => {
   const { user: authUser, isAdmin: authIsAdmin } = useAuth();
-  const { isTouch } = useDeviceMode();
   const isAdministrator = Boolean(propIsAdmin ?? (authIsAdmin || (authUser?.roles || []).includes('ROL-01')));
 
   // Responsive state
@@ -53,7 +50,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
   const [viewMode, setViewMode] = useState<'radar' | 'list'>('radar');
 
   // Time shift filter: 'live' | 'morning' | 'afternoon' | 'evening'
-  const [timeShift, setTimeShift] = useState<'live' | 'morning' | 'afternoon' | 'evening'>('live');
+  const [timeShift] = useState<'live' | 'morning' | 'afternoon' | 'evening'>('live');
 
   // Radar state
   const [kpis, setKpis] = useState<RadarKpis>({
@@ -319,6 +316,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
   // Tính toán phân trang phòng học Sơ đồ giảng đường (tối đa 30 phòng / trang)
   const totalRoomPages = Math.max(1, Math.ceil(floorRooms.length / ROOMS_PAGE_SIZE));
   const currentRoomPage = Math.min(roomPage, totalRoomPages);
+  const roomsGridRef = usePageTransition<HTMLDivElement>(currentRoomPage, { cols: 3, mode: 'grid' });
   const pagedRooms = useMemo(() => {
     const start = (currentRoomPage - 1) * ROOMS_PAGE_SIZE;
     return floorRooms.slice(start, start + ROOMS_PAGE_SIZE);
@@ -384,19 +382,19 @@ export const LiveMonitorPanel: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Thanh Track Tiến độ gradient sống động có glow — từ xanh biển đến xanh lá */}
-        <div className="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 relative border border-slate-300 dark:border-slate-700 shadow-inner">
-          <div
-            style={{ width: `${Math.max(percent, isRunning ? 2 : 0)}%` }}
-            className={`h-full rounded-full transition-all duration-700 ease-out relative ${
-              isDone
-                ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-400 shadow-xs'
-                : isRunning
-                ? 'bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 shadow-xs'
-                : 'bg-slate-400 dark:bg-slate-600'
-            }`}
-          />
-        </div>
+        {/* Thanh Track Tiến độ sống động */}
+        <progress
+          max={100}
+          value={Math.max(percent, isRunning ? 2 : 0)}
+          aria-label="Tiến độ bài giảng"
+          className={`w-full h-3 rounded-full overflow-hidden border border-slate-300 dark:border-slate-700 shadow-inner [&::-webkit-progress-bar]:bg-slate-200 dark:[&::-webkit-progress-bar]:bg-slate-800 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-700 ${
+            isDone
+              ? '[&::-webkit-progress-value]:bg-emerald-500 [&::-moz-progress-bar]:bg-emerald-500 accent-emerald-500'
+              : isRunning
+              ? '[&::-webkit-progress-value]:bg-emerald-600 dark:[&::-webkit-progress-value]:bg-emerald-500 [&::-moz-progress-bar]:bg-emerald-600 accent-emerald-600'
+              : '[&::-webkit-progress-value]:bg-slate-400 dark:[&::-webkit-progress-value]:bg-slate-600 [&::-moz-progress-bar]:bg-slate-400 accent-slate-500'
+          }`}
+        />
 
         {/* Dòng trạng thái: Đã dạy X phút ĐƯỢC ĐƯA LÊN TRÊN DÒNG 100% Hoàn thành để tránh đè chữ */}
         <div className="pt-1.5 border-t border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
@@ -472,7 +470,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
         {/* KPI 2: Đang giảng dạy */}
         <div className={`rounded-2xl border-2 p-3.5 shadow-xs flex items-center gap-3 relative overflow-hidden ${
           kpis.in_session > 0
-            ? 'bg-gradient-to-br from-rose-50/90 via-white to-rose-50/40 dark:from-rose-950/40 dark:via-[#111827] dark:to-rose-950/20 border-rose-500 dark:border-rose-500 shadow-rose-500/10'
+            ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-500 dark:border-rose-500 shadow-rose-500/10'
             : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-white/[0.08]'
         }`}>
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 relative ${
@@ -653,7 +651,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                 </div>
 
                 {/* CHỌN KHU GIẢNG ĐƯỜNG — mỗi khu hiện tổng phòng / trống / đang dạy */}
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" role="tablist" aria-label="Chọn khu giảng đường">
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" role="group" aria-label="Chọn khu giảng đường">
                   {buildings.map((b) => {
                     const busy = b.in_session_count;
                     const free = Math.max(0, b.total_rooms - busy - b.maintenance_count);
@@ -663,9 +661,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                       <button
                         key={b.building_code}
                         type="button"
-                        role="tab"
-                        aria-selected={active}
                         onClick={() => setSelectedBuilding(active ? null : b.building_code)}
+                        aria-pressed={active}
                         className={`min-h-[52px] text-left rounded-xl border-2 p-3 transition cursor-pointer flex flex-col justify-between relative ${
                           active && hasActiveSession
                             ? 'border-rose-500 bg-rose-50/80 dark:bg-rose-950/30 ring-2 ring-rose-500/40 shadow-sm'
@@ -719,10 +716,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   </div>
                 ) : (
                   <div
-                    className="grid gap-4 sm:gap-4.5 mt-4"
-                    style={{
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                    }}
+                    ref={roomsGridRef}
+                    className="u043 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-4.5 mt-4"
                   >
                     {pagedRooms.map((room) => {
                       const isSelected = selectedRoomId === room.room_id;
@@ -746,7 +741,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                               : 'hover:shadow-md hover:-translate-y-0.5'
                           } ${
                             status === 'IN_SESSION'
-                              ? 'bg-gradient-to-b from-rose-50/90 via-white to-rose-50/40 dark:from-rose-950/40 dark:via-[#111827] dark:to-rose-950/20 border-rose-500 dark:border-rose-500 shadow-md shadow-rose-500/10'
+                              ? 'bg-rose-50/75 dark:bg-rose-950/30 border-rose-500 dark:border-rose-500 shadow-md shadow-rose-500/10'
                               : status === 'ALERT'
                               ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-500/60 shadow-rose-500/5'
                               : status === 'UPCOMING'
@@ -839,29 +834,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                 </div>
 
                                 {/* Slide / Progress Bar */}
-                                {(() => {
-                                  const pct = session.scorm_progress != null
-                                    ? Math.round(session.scorm_progress * 100)
-                                    : session.slide_total && session.slide_total > 0
-                                    ? Math.round(((session.slide_index || 1) / session.slide_total) * 100)
-                                    : 10;
-                                  return (
-                                    <div className="pt-1 space-y-1.5">
-                                      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner border border-slate-300 dark:border-slate-700">
-                                        <div
-                                          className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 rounded-full transition-all duration-500 shadow-xs"
-                                          style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
-                                        />
-                                      </div>
-                                      <div className="flex items-center justify-between text-[11px] font-mono">
-                                        <span className="text-slate-900 dark:text-slate-200 font-bold">Đã dạy {session.duration_minutes || 0}p</span>
-                                        <span className="font-black text-emerald-700 dark:text-emerald-400">
-                                          {session.slide_total ? `${session.content_type === 'PDF' ? 'Trang' : 'Slide'} ${session.slide_index || 1}/${session.slide_total} • ` : ''}Tiến độ {pct}%
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
+                                {renderLectureProgressBox(session)}
                               </div>
                             )}
 
@@ -913,32 +886,16 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                 {/* Phân trang chuẩn Sơ đồ giảng đường (tối đa 30 phòng / trang, sang phòng 31 là trang 2) */}
                 {totalRoomPages > 1 && (
-                  <div className="mt-4 flex items-center justify-between text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
+                  <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
                     <div>
                       Đang hiển thị phòng <strong className="text-slate-800 dark:text-slate-200 font-bold">{(currentRoomPage - 1) * ROOMS_PAGE_SIZE + 1} - {Math.min(currentRoomPage * ROOMS_PAGE_SIZE, floorRooms.length)}</strong> / {floorRooms.length}
                       {' '}— Khu <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{currentBuilding?.building_name || selectedBuilding}</strong> (Trang {currentRoomPage}/{totalRoomPages})
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setRoomPage(Math.max(1, currentRoomPage - 1))}
-                        disabled={currentRoomPage <= 1}
-                        className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
-                      >
-                        Trang trước
-                      </button>
-                      <span className="px-2.5 font-bold font-mono text-emerald-700 dark:text-emerald-400">
-                        {currentRoomPage}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setRoomPage(Math.min(totalRoomPages, currentRoomPage + 1))}
-                        disabled={currentRoomPage >= totalRoomPages}
-                        className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
-                      >
-                        Trang sau
-                      </button>
-                    </div>
+                    <PaginationBar
+                      currentPage={currentRoomPage}
+                      totalPages={totalRoomPages}
+                      onPageChange={(p) => setRoomPage(p)}
+                    />
                   </div>
                 )}
               </div>
@@ -1013,7 +970,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                           </div>
 
                           <div
-                            className="font-black text-base text-slate-950 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word]"
+                            className="font-black text-base text-slate-950 dark:text-white line-clamp-2 [overflow-wrap:anywhere] [word-break:break-word]"
                             title={activeSession.lecture_title}
                           >
                             {activeSession.lecture_title}
@@ -1055,8 +1012,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                                 const s = activeSession;
                                 setConfirmTarget({
                                   scheduleId: s.schedule_id,
-                                  lectureTitle: s.lecture_title,
-                                  presenterName: s.presenter_name,
+                                  lectureTitle: s.lecture_title || '',
+                                  presenterName: s.presenter_name || '',
                                   venueName: activeRoom.room_name,
                                   isForce: true,
                                 });
@@ -1210,7 +1167,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                         </div>
 
                         <div
-                          className="font-black text-base text-slate-950 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word]"
+                          className="font-black text-base text-slate-950 dark:text-white line-clamp-2 [overflow-wrap:anywhere] [word-break:break-word]"
                           title={activeSession.lecture_title}
                         >
                           {activeSession.lecture_title}
@@ -1251,8 +1208,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                             const s = activeSession;
                             setConfirmTarget({
                               scheduleId: s.schedule_id,
-                              lectureTitle: s.lecture_title,
-                              presenterName: s.presenter_name,
+                              lectureTitle: s.lecture_title || '',
+                              presenterName: s.presenter_name || '',
                               venueName: activeRoom.room_name,
                               isForce: true,
                             });
@@ -1390,7 +1347,6 @@ export const LiveMonitorPanel: React.FC<Props> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sessions.map((s) => {
                 const isOwner = s.presenter_id === currentUserId;
-                const canForce = !isOwner && canForceEnd;
 
                 return (
                   <div
@@ -1398,7 +1354,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                     className={`bg-white dark:bg-[#111827] rounded-2xl border-2 p-5 flex flex-col gap-3.5 transition-all shadow-xs relative ${
                       s.is_hanging
                         ? 'border-amber-500/80 bg-amber-50/30 dark:bg-amber-950/20 shadow-amber-500/10'
-                        : 'border-rose-500/80 bg-gradient-to-br from-rose-50/40 via-white to-transparent dark:from-rose-950/20 dark:via-[#111827] shadow-sm'
+                        : 'border-rose-500/80 bg-rose-50/30 dark:bg-rose-950/20 shadow-sm'
                     }`}
                   >
                     {/* Giảng đường & Trạng thái */}
@@ -1432,7 +1388,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                     {/* Tiêu đề bài giảng */}
                     <div className="min-w-0 overflow-hidden">
-                      <h4 className="font-black text-sm text-slate-950 dark:text-white line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word]" title={s.lecture_title}>
+                      <h4 className="font-black text-sm text-slate-950 dark:text-white line-clamp-2 [overflow-wrap:anywhere] [word-break:break-word]" title={s.lecture_title}>
                         {s.lecture_title}
                       </h4>
                       <p className="text-xs text-slate-700 dark:text-slate-300 truncate mt-0.5 font-bold">
@@ -1511,8 +1467,8 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                           type="button"
                           onClick={() => setConfirmTarget({
                             scheduleId: s.schedule_id,
-                            lectureTitle: s.lecture_title,
-                            presenterName: s.presenter_name,
+                            lectureTitle: s.lecture_title || '',
+                            presenterName: s.presenter_name || '',
                             venueName: s.venue_name,
                             isForce: true,
                           })}

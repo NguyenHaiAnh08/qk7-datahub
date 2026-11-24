@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Tooltip,
-  Spin
-} from 'antd';
+import { Tooltip } from 'antd';
 import {
   MessageOutlined,
   CloseOutlined,
@@ -23,6 +20,7 @@ import { toast } from '../common/Toast';
 import { FingerprintScanModal } from '../users/FingerprintScanModal';
 import { DocumentPreviewModal } from '../document-desk/DocumentPreviewModal';
 import { DocumentItem } from '../../types';
+import { AIThinkingBubble } from './AIThinkingBubble';
 
 interface ChatMessage {
   id: string;
@@ -37,13 +35,6 @@ interface ChatMessage {
     tool_call?: string;
   };
 }
-
-const QUICK_PROMPTS = [
-  '📋 Tóm tắt các văn bản mới nhất',
-  '🔒 Quy định 5 cấp độ bảo mật quân sự',
-  '🎯 Kế hoạch tác chiến và huấn luyện',
-  '⚡ Quy trình lưu trữ và băm tệp SHA-256'
-];
 
 export const AIChatWidget: React.FC = () => {
   const { isDark } = useTheme();
@@ -675,41 +666,17 @@ export const AIChatWidget: React.FC = () => {
               </div>
             ))}
 
-            {/* Trạng thái đang tải */}
+            {/* Trạng thái AI đang suy nghĩ — bong bóng 3 dấu chấm nhấp nháy */}
             {loading && (
-              <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/20 animate-pulse">
-                <Spin size="small" />
-                <span className="font-medium">
-                  {lastQuery ? 'Đang lấy câu trả lời...' : 'Trợ lý AI đang tra cứu kho văn bản số...'}
-                </span>
-              </div>
+              <AIThinkingBubble
+                compact
+                showRoleLabel={false}
+                isDecrypting={Boolean(lastQuery)}
+              />
             )}
 
             <div ref={messagesEndRef} />
           </div>
-
-          {/* GỢI Ý CÂU HỎI NHANH */}
-          {messages.length <= 2 && (
-            <div className="px-3 py-1.5 flex flex-wrap gap-1.5 border-t border-emerald-500/15">
-              {QUICK_PROMPTS.map((prompt, pIdx) => (
-                <button
-                  key={pIdx}
-                  onClick={() => handleSend(prompt)}
-                  disabled={loading}
-                  className={`
-                    text-[11px] px-2.5 py-1 rounded-full transition-colors truncate max-w-full
-                    ${
-                      isDark
-                        ? 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-800/40'
-                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
-                    }
-                  `}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Ô NHẬP LIỆU CHAT DƯỚI CÙNG */}
           <div

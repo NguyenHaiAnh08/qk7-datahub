@@ -1,9 +1,11 @@
 // usertable.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { Pagination, Tooltip } from 'antd';
+import { Tooltip } from 'antd';
 import { User } from '../../types/user';
 import { useAuth } from '../../hooks/useAuth';
 import { Pencil, KeyRound, Trash2, Fingerprint, Shield, KeySquare } from 'lucide-react';
+import { PaginationBar } from '../common/PaginationBar';
+import { usePageTransition } from '../common/PageTransitionStage';
 
 export interface UserTableProps {
   users: User[];
@@ -47,6 +49,7 @@ export const UserTable: React.FC<UserTableProps> = ({
 
   const totalPages = Math.ceil(users.length / pageSize) || 1;
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const tbodyRef = usePageTransition<HTMLTableSectionElement>(safeCurrentPage, { mode: 'row' });
 
   const pagedUsers = useMemo(() => {
     const start = (safeCurrentPage - 1) * pageSize;
@@ -71,7 +74,7 @@ export const UserTable: React.FC<UserTableProps> = ({
               <th className="py-3 px-4 text-right whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+          <tbody ref={tbodyRef} className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
               <tr>
                 <td colSpan={10} className="py-12 text-center text-slate-500 dark:text-slate-400">
@@ -324,13 +327,10 @@ export const UserTable: React.FC<UserTableProps> = ({
             <span className="font-semibold text-slate-800 dark:text-slate-200">{Math.min(safeCurrentPage * pageSize, users.length)}</span> trên{' '}
             <span className="font-semibold text-slate-800 dark:text-slate-200">{users.length}</span> quân nhân
           </div>
-          <Pagination
-            size="small"
-            current={safeCurrentPage}
-            pageSize={pageSize}
-            total={users.length}
-            onChange={(page) => setCurrentPage(page)}
-            showSizeChanger={false}
+          <PaginationBar
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
           />
         </div>
       )}

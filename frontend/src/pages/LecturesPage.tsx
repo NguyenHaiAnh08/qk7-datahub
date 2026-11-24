@@ -22,6 +22,8 @@ import { RejectReasonModal } from '../components/lectures/RejectReasonModal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { TacticalEmptyState } from '../components/common/TacticalEmptyState';
 import { RollingNumber } from '../components/common/RollingNumber';
+import { PaginationBar } from '../components/common/PaginationBar';
+import { usePageTransition } from '../components/common/PageTransitionStage';
 import { FingerprintScanModal } from '../components/users/FingerprintScanModal';
 import { Lecture, LectureStatus, Subject, TeachingSchedule } from '../types/lecture';
 
@@ -340,6 +342,10 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
   // ── Pagination ──
   const totalPages    = Math.max(1, Math.ceil(filteredLectures.length / PAGE_SIZE));
   const currentPage   = Math.min(page, totalPages);
+  const lecturesListRef = usePageTransition<HTMLDivElement>(currentPage, {
+    cols: viewMode === 'grid' ? 3 : 1,
+    mode: viewMode === 'grid' ? 'grid' : 'row',
+  });
   const pagedLectures = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredLectures.slice(start, start + PAGE_SIZE);
@@ -743,9 +749,12 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                   />
                 </div>
               ) : (
-                <div className={viewMode === 'grid'
-                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-                  : 'space-y-2.5'}>
+                <div
+                  ref={lecturesListRef}
+                  className={viewMode === 'grid'
+                    ? 'u043 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
+                    : 'u043 space-y-2.5'}
+                >
                   {pagedLectures.map(lec => (
                     <LectureCard
                       key={lec.lecture_id}
@@ -784,32 +793,16 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
 
               {/* Phân trang tinh gọn chuẩn tối đa 30 bài giảng / trang */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500 bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200 dark:border-white/[0.08] shadow-xs">
                   <div>
                     Đang hiển thị bài <strong className="text-slate-800 dark:text-slate-200 font-bold">{(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredLectures.length)}</strong> / {filteredLectures.length}
                     {' '}— Tổng số <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{filteredLectures.length}</strong> bài giảng (Trang {currentPage}/{totalPages})
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage <= 1}
-                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
-                    >
-                      Trang trước
-                    </button>
-                    <span className="px-2.5 font-bold font-mono text-emerald-700 dark:text-emerald-400">
-                      {currentPage}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage >= totalPages}
-                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer"
-                    >
-                      Trang sau
-                    </button>
-                  </div>
+                  <PaginationBar
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={(p) => setPage(p)}
+                  />
                 </div>
               )}
             </div>

@@ -17,8 +17,6 @@ import {
   ArrowUpDown,
   CheckCircle2,
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
@@ -28,6 +26,8 @@ import { ClassroomBuilding } from '../../types/lecture';
 import { toast } from '../common/Toast';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
+import { PaginationBar } from '../common/PaginationBar';
+import { usePageTransition } from '../common/PageTransitionStage';
 
 interface Props {
   /** Có quyền thêm/sửa/xóa khu (CLASSROOM_MANAGE). Không có thì chỉ xem. */
@@ -311,6 +311,8 @@ export const BuildingManagerPanel: React.FC<Props> = ({ canManage = true, onChan
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  const gridRef = usePageTransition<HTMLDivElement>(currentPage, { cols: 4, mode: 'grid' });
+  const tbodyRef = usePageTransition<HTMLTableSectionElement>(currentPage, { mode: 'row' });
   const pagedItems = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredItems.slice(start, start + PAGE_SIZE);
@@ -542,7 +544,7 @@ export const BuildingManagerPanel: React.FC<Props> = ({ canManage = true, onChan
         </div>
       ) : viewMode === 'grid' ? (
         /* ── DẠNG THẺ KHU (GRID CARDS) — HIỆN ĐẠI, TRỰC QUAN ── */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div ref={gridRef} className="u043 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {pagedItems.map((b) => (
             <div
               key={b.building_code}
@@ -647,7 +649,7 @@ export const BuildingManagerPanel: React.FC<Props> = ({ canManage = true, onChan
                   {canManage && <th className="py-3 px-4 text-right w-36">THAO TÁC</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-white/[0.08] font-medium">
+              <tbody ref={tbodyRef} className="divide-y divide-slate-200 dark:divide-white/[0.08] font-medium">
                 {pagedItems.map((b) => (
                   <tr
                     key={b.building_code}
@@ -754,31 +756,11 @@ export const BuildingManagerPanel: React.FC<Props> = ({ canManage = true, onChan
             khu giảng đường (Trang <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{currentPage}/{totalPages}</span>)
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer flex items-center gap-1 active:scale-95"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span>Trang trước</span>
-            </button>
-
-            <span className="px-3 py-1 font-bold font-mono text-xs rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
-              {currentPage} / {totalPages}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium cursor-pointer flex items-center gap-1 active:scale-95"
-            >
-              <span>Trang sau</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(p) => setPage(p)}
+          />
         </div>
       )}
 

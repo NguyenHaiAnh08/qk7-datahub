@@ -8,6 +8,7 @@ set "FRONTEND_BUILT=0"
 REM Doc cau hinh tu .env root (neu co)
 if exist "%ROOT%.env" call "%~dp0load-env.bat" >nul 2>&1
 if not defined PORT_BACKEND set "PORT_BACKEND=8000"
+if not defined PORT_OCR set "PORT_OCR=8002"
 if not defined SERVER_DOMAIN set "SERVER_DOMAIN=trungtamdulieuso.tqsqk7.edu"
 if not defined USE_HTTPS set "USE_HTTPS=true"
 
@@ -28,8 +29,8 @@ echo ==========================================
 echo.
 
 REM --- Kiem tra va giai phong port 8000, 8001, 8002 neu bi chiem ---
-echo [0/3] Kiem tra va giai phong port %PORT_BACKEND%, 8001, 8002...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort %PORT_BACKEND%,8001,8002 -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Phat hien port dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port thanh cong.' } else { Write-Host '[OK] Cac port dang san sang.' } } catch { Write-Host '[OK] Cac port dang san sang.' }; exit 0"
+echo [0/3] Kiem tra va giai phong port %PORT_BACKEND%, 8001, %PORT_OCR%...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $pids = (Get-NetTCPConnection -LocalPort %PORT_BACKEND%,8001,%PORT_OCR% -ErrorAction SilentlyContinue).OwningProcess | Where-Object { $_ -gt 0 } | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Phat hien port dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port thanh cong.' } else { Write-Host '[OK] Cac port dang san sang.' } } catch { Write-Host '[OK] Cac port dang san sang.' }; exit 0"
 echo.
 
 REM --- 1. Backend ---
@@ -54,9 +55,9 @@ if exist "%ROOT%boxchat\s.bat" (
 )
 
 REM --- 3. OCR Microservice (MonkeyOCRv2 / PaddleOCR) ---
-echo [3/3] Khoi dong OCR Microservice (:8002)...
+echo [3/3] Khoi dong OCR Microservice (:%PORT_OCR%)...
 if exist "%ROOT%ocr-service\start-ocr.bat" (
-    start "QK7 OCR" cmd /k "cd /d "%ROOT%ocr-service" && start-ocr.bat"
+    start "QK7 OCR" cmd /k "cd /d "%ROOT%ocr-service" && set "PORT=%PORT_OCR%" && set "OCR_PORT=%PORT_OCR%" && start-ocr.bat"
 ) else (
     echo [CANH BAO] Khong tim thay ocr-service\start-ocr.bat
 )

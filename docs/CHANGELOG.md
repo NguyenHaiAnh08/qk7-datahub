@@ -4,6 +4,27 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.8-ui-animation-system-and-ocr-air-gapped-hardening] — 2026-11-24
+
+### 1. Hệ Thống Hoạt Ảnh UI Mới (Lucian Prompt Library)
+- **Stacking Toasts** ([`Toast.tsx`](../frontend/src/components/common/Toast.tsx), `Toast.css`): xếp chồng ở góc dưới phải, hover xòe quạt và tạm dừng, vuốt ngang để đóng, trạng thái `loading` chuyển hoàn tất.
+- **Phân trang kéo giãn & chuyển trang** (`PaginationBar`, `TacticalPagination`, `PageTransitionStage`): áp dụng cho các bảng/lưới phân trang.
+- **Stepper duyệt bài giảng 2 tầng** (`ApprovalStepper`): tích hợp vào `LectureCard` và `LectureDetailModal`.
+- **Ô nhập mã PIN 6 số** (`VerificationCodeInput`): tích hợp vào `PinVerifyModal` bảo vệ văn bản Cấp 4–5.
+- **AI Thinking Bubble** (`AIThinkingBubble`): hiệu ứng suy nghĩ cho `AIChatDrawer` / `AIChatWidget`.
+- Cập nhật tài liệu thiết kế [`docs/design/DESIGN.md`](./design/DESIGN.md).
+
+### 2. Củng Cố OCR / Phân Tích PDF Chạy Cục Bộ (Air-Gapped)
+- [`backend/pdf-parser.js`](../backend/pdf-parser.js): dùng WASM `pdfjs-dist` cục bộ (giải mã JBIG2/OpenJPEG), nạp `tessdata` (`vie`/`eng`) cục bộ, giải phóng tài nguyên tài liệu sau render; mở rộng nhận diện loại văn bản (Quy chế, Chỉ thị, Công văn, Hướng dẫn, Tờ trình, Biên bản…) và ghép tiêu đề nhiều dòng.
+- [`ocr-service/main.py`](../ocr-service/main.py), `start-ocr.bat`, `start-ocr.sh`: tinh chỉnh dịch vụ OCR.
+- [`scripts/s.bat`](../scripts/s.bat), `s-dev.bat`: cổng OCR cấu hình qua `PORT_OCR` (mặc định `8002`), lọc PID hợp lệ khi giải phóng cổng.
+
+### 3. Tinh Chỉnh Giao Diện Bài Giảng & Quản Trị
+- Cập nhật `LectureCard`, `LectureDetailModal`, `LectureViewerModal`, `LiveMonitorPanel`, `LiveSessionRoom`, `TeachingHistoryPanel`, `BuildingManagerPanel`, `LecturesPage`, `LectureCatalogsPage`, `TrashPage`, `DataTable`, `UserTable`, `AssignRoleModal`, `SecurityAuditLog`, `DocumentTable`, `DocumentPreviewModal`, `PdfPagesViewer`, `PortalDocumentList`.
+- Không đổi API contract; vẫn giữ nguyên 3 tầng kiểm soát độ mật (UI Guard, Gateway Middleware, SQL Constraint).
+
+---
+
 ## [v1.8.7-military-autonomous-infrastructure-and-ca-portal] — 2026-11-23
 
 ### 1. Hạ Tầng Tự Chủ Quân Sự & Tên Miền Nội Bộ (Military Autonomous Infrastructure & Internal Domain)

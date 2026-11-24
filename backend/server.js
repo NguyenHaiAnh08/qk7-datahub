@@ -2614,6 +2614,9 @@ app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('D
     let usedEngine = 'digital-text';
     let source = 'digital';
     let isFallback = false;
+    let ocrTotalPages = digitalExtract.pageCount || 1;
+    const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://127.0.0.1:8002';
+    const OCR_TIMEOUT_MS = parseInt(process.env.OCR_SERVICE_TIMEOUT_MS || '60000', 10);
 
     if (hasTextLayer) {
       // File có text layer (> 100 ký tự) -> Sử dụng trực tiếp text số hóa
@@ -2625,9 +2628,6 @@ app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('D
       // 3. File scan (text <= 100 ký tự): Gọi sang OCR Microservice (:8002)
       // Set timeout 60 giây theo đúng quy chuẩn kiến trúc
       // ─────────────────────────────────────────────────────────────
-      const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://127.0.0.1:8002';
-      const OCR_TIMEOUT_MS = parseInt(process.env.OCR_SERVICE_TIMEOUT_MS || '60000', 10);
-
       console.log(`[parse] Phát hiện file scan (ký tự: ${digitalExtract.charCount} <= 100). Gửi sang OCR Microservice (${OCR_SERVICE_URL}, timeout: ${OCR_TIMEOUT_MS}ms)...`);
 
       try {
@@ -2649,7 +2649,10 @@ app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('D
             preExtractedText = ocrData.combined_text;
             usedEngine = ocrData.engine_used || 'monkey-ocr';
             source = 'ocr';
-            console.log(`[parse] ✅ OCR Microservice thành công (${ocrData.elapsed_seconds}s, engine: ${usedEngine}, ${preExtractedText.length} ký tự)`);
+            if (Number.isInteger(ocrData.total_pages) && ocrData.total_pages > 0) {
+              ocrTotalPages = ocrData.total_pages;
+            }
+            console.log(`[parse] ✅ OCR Microservice thành công (${ocrData.elapsed_seconds}s, engine: ${usedEngine}, ${preExtractedText.length} ký tự, ${ocrTotalPages} trang)`);
           } else {
             throw new Error(ocrData.error || 'OCR service trả về success=false');
           }
@@ -2672,11 +2675,48 @@ app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('D
     // ─────────────────────────────────────────────────────────────
     // 4. Nhận text sạch (từ Digital hoặc OCR), bóc tách Metadata
     // ─────────────────────────────────────────────────────────────
-    const result = await parseDocumentPdf(buffer, { sql, getPool }, {
+    let result = await parseDocumentPdf(buffer, { sql, getPool }, {
       preExtractedText,
       source,
       engine: usedEngine,
     });
+
+    // Nếu là tài liệu scan nhiều trang và trang 1 chưa tìm thấy người ký -> OCR nhanh trang cuối qua :8002
+    if (source === 'ocr' && ocrTotalPages > 1 && !result?.parsed?.signer) {
+      try {
+        const tailFormData = new FormData();
+        tailFormData.append('file', new Blob([buffer], { type: 'application/pdf' }), req.file.originalname || 'scan_tail.pdf');
+        tailFormData.append('pages', JSON.stringify([ocrTotalPages]));
+        tailFormData.append('dpi', '150');
+        const tailResp = await fetch(`${OCR_SERVICE_URL}/api/ocr/extract`, {
+          method: 'POST',
+          body: tailFormData,
+          signal: AbortSignal.timeout(Math.min(OCR_TIMEOUT_MS, 25000)),
+        });
+        if (tailResp.ok) {
+          const tailData = await tailResp.json();
+          if (tailData.success && tailData.combined_text && tailData.combined_text.trim().length > 10) {
+            const combinedWithTail = `${preExtractedText}\n\n${tailData.combined_text}`;
+            const mergedResult = await parseDocumentPdf(buffer, { sql, getPool }, {
+              preExtractedText: combinedWithTail,
+              source,
+              engine: usedEngine,
+            });
+            if (mergedResult?.parsed?.signer) {
+              result.parsed.signer = mergedResult.parsed.signer;
+              if (!result.parsed.signer_position && mergedResult.parsed.signer_position) {
+                result.parsed.signer_position = mergedResult.parsed.signer_position;
+              }
+              result.sources = { ...result.sources, signer: `${usedEngine}-tail` };
+              result.missingFields = (result.missingFields || []).filter((f) => f !== 'signer');
+              console.log(`[parse] ✅ Bổ sung người ký từ trang cuối (${ocrTotalPages}): "${result.parsed.signer}"`);
+            }
+          }
+        }
+      } catch (tailErr) {
+        console.warn('[parse] OCR trang cuối bổ sung người ký bỏ qua:', tailErr.message);
+      }
+    }
 
     const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
 

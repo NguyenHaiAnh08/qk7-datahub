@@ -90,7 +90,7 @@ export const RejectReasonModal: React.FC<RejectReasonModalProps> = ({
               </span>
               <span className="text-slate-400 shrink-0">•</span>
               <span
-                className="text-slate-700 dark:text-slate-300 font-semibold line-clamp-2 break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0 flex-1"
+                className="text-slate-700 dark:text-slate-300 font-semibold line-clamp-2 [overflow-wrap:anywhere] [word-break:break-word] min-w-0 flex-1"
                 title={lecture.title}
               >
                 {lecture.title}

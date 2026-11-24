@@ -12,10 +12,6 @@ import {
   RotateCw,
   Search,
   Download,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   User,
   HardDrive,
   Shield,
@@ -36,6 +32,8 @@ import { AccessLog } from '../../types/user';
 import { dashboardApi } from '../../services/dashboardApi';
 import { exportAuditReportExcel, prepareAuditReportExcel } from '../../utils/exportAuditReportExcel';
 import { CompactDownloadButton } from '../common/CompactDownloadButton';
+import { PaginationBar } from '../common/PaginationBar';
+import { usePageTransition } from '../common/PageTransitionStage';
 import { toast } from '../common/Toast';
 
 export type SeverityGroup = 'ALL' | 'ALERT' | 'SYSTEM' | 'ACCESS';
@@ -222,6 +220,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
+  const tbodyRef = usePageTransition<HTMLTableSectionElement>(currentPage, { mode: 'row' });
   const [pageSize, setPageSize] = useState(20);
 
   // Xem chi tiết (Modal / Drawer)
@@ -1127,7 +1126,7 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
                 <th className="py-3 px-3 text-center whitespace-nowrap">Chi Tiết</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+            <tbody ref={tbodyRef} className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
               {loading && logs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-slate-500 dark:text-slate-400">
@@ -1309,70 +1308,11 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
           </div>
 
           {/* Bên phải: Nút điều hướng phân trang */}
-          <div className="flex items-center space-x-1">
-            {/* Trang đầu */}
-            <button
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage <= 1}
-              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-700 transition dark:bg-slate-800/80 dark:border-transparent dark:hover:bg-slate-700 dark:text-slate-300"
-              title="Về trang đầu"
-            >
-              <ChevronsLeft className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Trang trước */}
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-700 transition dark:bg-slate-800/80 dark:border-transparent dark:hover:bg-slate-700 dark:text-slate-300"
-              title="Trang trước"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Các nút số trang */}
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-              .map((p, idx, arr) => {
-                const prev = arr[idx - 1];
-                const showEllipsis = prev && p - prev > 1;
-                return (
-                  <React.Fragment key={p}>
-                    {showEllipsis && <span className="px-1 text-slate-400 dark:text-slate-600 font-mono">...</span>}
-                    <button
-                      onClick={() => setCurrentPage(p)}
-                      className={`min-w-[28px] h-7 px-2 rounded-lg transition text-xs font-mono font-medium ${
-                        currentPage === p
-                          ? 'bg-[#166534] dark:bg-emerald-600 text-white font-bold shadow-xs'
-                          : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:border-transparent dark:hover:bg-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  </React.Fragment>
-                );
-              })}
-
-            {/* Trang sau */}
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-700 transition dark:bg-slate-800/80 dark:border-transparent dark:hover:bg-slate-700 dark:text-slate-300"
-              title="Trang sau"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Trang cuối */}
-            <button
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-700 transition dark:bg-slate-800/80 dark:border-transparent dark:hover:bg-slate-700 dark:text-slate-300"
-              title="Đến trang cuối"
-            >
-              <ChevronsRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(p) => setCurrentPage(p)}
+          />
         </div>
       </div>
 

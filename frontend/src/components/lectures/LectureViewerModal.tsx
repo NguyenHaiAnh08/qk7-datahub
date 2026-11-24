@@ -4,6 +4,9 @@ import { Lecture } from '../../types/lecture';
 import { getAuthHeaders } from '../../services/http';
 import { PdfPagesViewer } from '../document-desk/PdfPagesViewer';
 import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
+import { useAuth } from '../../hooks/useAuth';
+import { formatUserDisplayName, formatWatermarkDateTime } from '../../hooks/useFloatingWatermark';
+import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
 
 interface Props {
   open: boolean;
@@ -18,10 +21,13 @@ interface ModeItem {
 }
 
 export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) => {
+  const { user } = useAuth();
   const [fullscreen, setFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string>('');
+  const [isBlobWatermarked, setIsBlobWatermarked] = useState<boolean>(true);
+  const [watermarkText, setWatermarkText] = useState<string>('');
   const [modes, setModes] = useState<ModeItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [reloadKey, setReloadKey] = useState(0);
@@ -72,9 +78,21 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
           throw new Error(msg);
         }
 
-        const blob = await res.blob();
+        const rawBlob = await res.blob();
         if (!active) return;
-        objUrl = URL.createObjectURL(blob);
+        const serverDateStr = res.headers.get('X-Server-Time') || res.headers.get('Date');
+        const serverTime = serverDateStr ? new Date(serverDateStr) : new Date();
+        const userDisplayName = formatUserDisplayName(user?.full_name, user?.username);
+        const timeStr = formatWatermarkDateTime(serverTime);
+        const stampedBlob = await stampWatermarkOnPdf(rawBlob, {
+          userDisplayName,
+          timeStr,
+          opacity: 0.18,
+        });
+        if (!active) return;
+        setIsBlobWatermarked((stampedBlob as any).__isWatermarked !== false);
+        setWatermarkText(`${userDisplayName} - ${timeStr}`);
+        objUrl = URL.createObjectURL(stampedBlob);
         setPdfBlobUrl(objUrl);
         setLoading(false);
       } catch (err: any) {
@@ -283,6 +301,7 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
                   onReadingProgressChange={(prog) => setReadingProgress(prog)}
                   viewerRef={viewerRef}
                   showFloatingProgressRing={true}
+                  fallbackWatermarkText={!isBlobWatermarked ? watermarkText : undefined}
                 />
               </div>
             ) : null

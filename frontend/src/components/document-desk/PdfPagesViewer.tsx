@@ -28,6 +28,8 @@ export interface PdfPagesViewerProps {
   onReadingProgressChange?: (progress: ReadingProgress) => void;
   viewerRef?: React.MutableRefObject<{ scrollToPage: (page: number) => void; scrollToTop: () => void; scrollToNext: () => void } | null>;
   showFloatingProgressRing?: boolean;
+  /** Văn bản watermark dự phòng vẽ trực tiếp lên Canvas nếu pdf-lib fallback */
+  fallbackWatermarkText?: string;
 }
 
 export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
@@ -43,6 +45,7 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
   onReadingProgressChange,
   viewerRef,
   showFloatingProgressRing = true,
+  fallbackWatermarkText,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [numPages, setNumPages] = useState<number>(0);
@@ -530,6 +533,7 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
                 isHighlighterActive={isHighlighterActive}
                 highlighterColor={highlighterColor}
                 strokes={pageStrokes[pageNum] || EMPTY_STROKES}
+                fallbackWatermarkText={fallbackWatermarkText}
                 onSaveStroke={(newStroke) => {
                   setPageStrokes((prev) => {
                     const currentList = prev[pageNum] || EMPTY_STROKES;
@@ -584,6 +588,7 @@ interface SinglePdfPageProps {
   isHighlighterActive: boolean;
   highlighterColor: string;
   strokes: HighlighterStroke[];
+  fallbackWatermarkText?: string;
   onSaveStroke: (stroke: HighlighterStroke) => void;
 }
 
@@ -598,6 +603,7 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
   isHighlighterActive,
   highlighterColor,
   strokes,
+  fallbackWatermarkText,
   onSaveStroke,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -708,6 +714,28 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
               viewport: viewport,
             });
             await renderTask.promise;
+
+            // 🛡️ Fallback Watermark trực tiếp lên Canvas 2D nếu pdf-lib không nhúng được vào Blob
+            if (fallbackWatermarkText) {
+              const isLandscape = viewport.width > viewport.height;
+              const angle = (isLandscape ? -18 : -25) * (Math.PI / 180);
+              const yPositions = [0.18, 0.38, 0.62, 0.82];
+              const fontSize = Math.max(13, Math.round((viewport.width / 880) * 17));
+              ctx.save();
+              ctx.font = `normal ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+              ctx.fillStyle = '#b91c1c';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.globalAlpha = 0.18;
+              for (const yRatio of yPositions) {
+                ctx.save();
+                ctx.translate(viewport.width / 2, viewport.height * yRatio);
+                ctx.rotate(angle);
+                ctx.fillText(fallbackWatermarkText, 0, 0);
+                ctx.restore();
+              }
+              ctx.restore();
+            }
           }
         }
 
@@ -878,13 +906,13 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
         </div>
       )}
 
-      {/* ⏳ Khung đệm placeholder khi trang chưa vào vùng nhìn (Zero memory & Zero layout shift) */}
+      {/* ⏳ Khung đệm placeholder khi trang chưa vào vùng nhìn (Luôn giữ nền giấy trắng sáng đồng nhất với trang PDF) */}
       {!isInView && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900/40 text-slate-400 select-none">
-          <div className="w-10 h-10 rounded-full border-2 border-slate-300 dark:border-slate-700 flex items-center justify-center text-xs font-mono font-bold text-slate-400 dark:text-slate-500">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-500 select-none">
+          <div className="w-10 h-10 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center text-xs font-mono tabular-nums font-bold text-slate-600 shadow-2xs">
             {pageNum}
           </div>
-          <span className="text-[11px] font-mono mt-1.5 text-slate-400 dark:text-slate-500 font-medium">Trang {pageNum}</span>
+          <span className="text-[11px] font-mono tabular-nums mt-1.5 text-slate-500 font-semibold">Trang {pageNum}</span>
         </div>
       )}
 
@@ -921,12 +949,12 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
         }}
       />
 
-      {/* Số trang góc dưới (có chỉ báo đoạn trích dẫn nếu đúng trang được AI trích dẫn) */}
+      {/* Số trang góc dưới — Tiệp màu giấy trắng A4 (không đảo màu đen khi bật Dark Mode) */}
       <div
-        className={`absolute bottom-2.5 right-3 px-2.5 py-0.5 rounded text-[10px] font-mono pointer-events-none z-20 transition-all ${
+        className={`absolute bottom-2.5 right-3 px-2.5 py-0.5 rounded-md text-[10px] font-mono tabular-nums pointer-events-none z-20 transition-all ${
           isCitedPage
             ? 'bg-amber-500 text-amber-950 font-extrabold shadow-md border border-amber-600 animate-pulse'
-            : 'text-slate-400 bg-slate-50/80 dark:bg-slate-800/80 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-medium'
+            : 'bg-slate-100/95 text-slate-600 border border-slate-300/80 shadow-2xs font-semibold backdrop-blur-[2px]'
         }`}
       >
         {isCitedPage ? `⭐ ĐOẠN TRÍCH DẪN • TRANG ${pageNum}` : `Trang ${pageNum}`}

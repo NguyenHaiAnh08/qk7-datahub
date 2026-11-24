@@ -1,0 +1,290 @@
+/* Lucian UX/UI Prompt #449 + #043 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#449 */
+
+.u449,
+.u449 *,
+.u449 *::before,
+.u449 *::after {
+  box-sizing: border-box;
+}
+
+.u449 {
+  --ux-surface: #FFFFFF;
+  --ux-surface-2: #F1F5F9;
+  --ux-surface-3: #E2E8F0;
+  --ux-ink: #0F172A;
+  --ux-ink-2: #475569;
+  --ux-ink-3: #94A3B8;
+  --ux-line: rgba(15, 23, 42, 0.1);
+  --ux-line-2: rgba(15, 23, 42, 0.18);
+  --ux-accent: #166534;
+  --ux-accent-soft: rgba(22, 101, 52, 0.14);
+  --ux-accent-ink: #FFFFFF;
+  --ux-pill-bg: #166534;
+  --ux-pill-ink: #FFFFFF;
+  --ux-shadow-strong: rgba(15, 23, 42, 0.22);
+  --ux-ease: cubic-bezier(.2, .8, .2, 1);
+  --ux-spring: cubic-bezier(.34, 1.45, .64, 1);
+  --slot-w: 32px;
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  color: var(--ux-ink);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -.01em;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root.dark .u449,
+:root[data-theme="dark"] .u449 {
+  --ux-surface: #111827;
+  --ux-surface-2: #1E293B;
+  --ux-surface-3: #334155;
+  --ux-ink: #F1F5F9;
+  --ux-ink-2: rgba(241, 245, 249, 0.72);
+  --ux-ink-3: rgba(241, 245, 249, 0.42);
+  --ux-line: rgba(255, 255, 255, 0.09);
+  --ux-line-2: rgba(255, 255, 255, 0.16);
+  --ux-accent: #10B981;
+  --ux-accent-soft: rgba(16, 185, 129, 0.18);
+  --ux-accent-ink: #090E17;
+  --ux-pill-bg: #059669;
+  --ux-pill-ink: #FFFFFF;
+  --ux-shadow-strong: rgba(0, 0, 0, 0.72);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.light) .u449 {
+    --ux-surface: #111827;
+    --ux-surface-2: #1E293B;
+    --ux-surface-3: #334155;
+    --ux-ink: #F1F5F9;
+    --ux-ink-2: rgba(241, 245, 249, 0.72);
+    --ux-ink-3: rgba(241, 245, 249, 0.42);
+    --ux-line: rgba(255, 255, 255, 0.09);
+    --ux-line-2: rgba(255, 255, 255, 0.16);
+    --ux-accent: #10B981;
+    --ux-accent-soft: rgba(16, 185, 129, 0.18);
+    --ux-accent-ink: #090E17;
+    --ux-pill-bg: #059669;
+    --ux-pill-ink: #FFFFFF;
+    --ux-shadow-strong: rgba(0, 0, 0, 0.72);
+  }
+}
+
+.u449-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--ux-surface);
+  box-shadow: inset 0 0 0 1px var(--ux-line), 0 10px 26px -18px var(--ux-shadow-strong);
+}
+
+.u449-ar {
+  width: 32px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ux-ink-2);
+  cursor: pointer;
+  padding: 0;
+  transition: background .2s, color .2s, opacity .25s, transform .35s var(--ux-spring);
+}
+
+.u449-ar:hover:not(:disabled) {
+  background: var(--ux-surface-2);
+  color: var(--ux-ink);
+}
+
+.u449-ar:active:not(:disabled) {
+  transform: scale(.9);
+}
+
+.u449-ar:disabled {
+  opacity: .3;
+  cursor: default;
+}
+
+.u449-ar svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.u449 button:focus-visible {
+  outline: 2px solid var(--ux-accent);
+  outline-offset: 1px;
+}
+
+.u449-sl {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--slots, 7), var(--slot-w, 32px));
+  gap: 2px;
+}
+
+/* Giữ nguyên hình dáng & màu xanh nút trang #449, nâng cấp động học kéo giãn mép trước chuẩn #043 */
+.u449-pill {
+  position: absolute;
+  top: 0;
+  left: var(--l, 0px);
+  right: var(--r, 0px);
+  height: 36px;
+  border-radius: 10px;
+  background: var(--ux-pill-bg);
+  pointer-events: none;
+}
+
+.u449-sl.go-r .u449-pill {
+  transition: right .32s var(--ux-ease), left .55s var(--ux-spring) .08s;
+}
+
+.u449-sl.go-l .u449-pill {
+  transition: left .32s var(--ux-ease), right .55s var(--ux-spring) .08s;
+}
+
+.u449-pill.is-sq {
+  animation: u449-sq .55s var(--ux-ease);
+}
+
+@keyframes u449-sq {
+  35% {
+    scale: 1.22 .9;
+  }
+}
+
+.u449-n {
+  position: relative;
+  width: var(--slot-w, 32px);
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ux-ink-2);
+  cursor: pointer;
+  overflow: hidden;
+  transition: color .3s, background .2s;
+}
+
+.u449-n:hover:not(.is-dots):not([aria-current]) {
+  background: var(--ux-surface-2);
+  color: var(--ux-ink);
+}
+
+.u449-n[aria-current] {
+  color: var(--ux-pill-ink);
+}
+
+.u449-n.is-dots {
+  cursor: default;
+  color: var(--ux-ink-3);
+}
+
+.u449-n span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.u449-n span.is-in {
+  animation: u449-in .4s var(--ux-spring);
+}
+
+.u449-n span.is-out {
+  animation: u449-out .3s var(--ux-ease) forwards;
+}
+
+.u449-n.is-back span.is-in {
+  animation-name: u449-in-b;
+}
+
+.u449-n.is-back span.is-out {
+  animation-name: u449-out-b;
+}
+
+@keyframes u449-in {
+  from {
+    transform: translateY(22px);
+    opacity: 0;
+  }
+}
+
+@keyframes u449-out {
+  to {
+    transform: translateY(-22px);
+    opacity: 0;
+  }
+}
+
+@keyframes u449-in-b {
+  from {
+    transform: translateY(-22px);
+    opacity: 0;
+  }
+}
+
+@keyframes u449-out-b {
+  to {
+    transform: translateY(22px);
+    opacity: 0;
+  }
+}
+
+.u449-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .u449 {
+    --slot-w: 28px;
+  }
+
+  .u449-nav {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .u449-ar {
+    width: 28px;
+    height: 34px;
+  }
+
+  .u449-pill,
+  .u449-n {
+    height: 34px;
+    font-size: 12.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u449,
+  .u449 *,
+  .u449 *::before,
+  .u449 *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

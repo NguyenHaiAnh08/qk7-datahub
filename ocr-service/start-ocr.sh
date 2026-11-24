@@ -43,11 +43,12 @@ export DISABLE_TELEMETRY=1
 export SCARF_NO_ANALYTICS=1
 export ANONYMIZED_TELEMETRY=False
 
-# PaddleOCR offline hardening
+# PaddleOCR & Albumentations offline hardening
 export PADDLE_HOME="$SCRIPT_DIR/model_weight/paddleocr"
 export PADDLEOCR_HOME="$SCRIPT_DIR/model_weight/paddleocr"
 export PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 export DISABLE_PADDLE_UPDATE_CHECK=1
+export NO_ALBUMENTATIONS_UPDATE=1
 export FLAGS_use_mkldnn=0
 
 if [ -d "$SCRIPT_DIR/model_weight/MonkeyOCRv2-B-Parsing" ]; then
@@ -56,7 +57,8 @@ fi
 
 export OCR_ENGINE=${OCR_ENGINE:-"auto"}
 export MONKEY_DEVICE=${MONKEY_DEVICE:-"auto"}
-export PORT=8002
+export OCR_PORT=${PORT_OCR:-8002}
+export PORT="$OCR_PORT"
 
 echo "OCR_ENGINE    = $OCR_ENGINE"
 echo "MONKEY_DEVICE = $MONKEY_DEVICE"

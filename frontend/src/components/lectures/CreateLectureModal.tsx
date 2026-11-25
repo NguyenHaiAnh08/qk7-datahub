@@ -49,14 +49,14 @@ const CONTENT_TYPE_OPTIONS: Array<{
     value: 'HTML5',
     title: 'Tương tác HTML5',
     badge: 'Sa bàn số',
-    desc: 'Mô phỏng chiến thuật, bài tập đa phương tiện tương tác cao',
+    desc: 'Gói HTML5 xuất từ ActivePresenter: mô phỏng, bài tập đa phương tiện tương tác',
     icon: Sparkles,
   },
   {
     value: 'SCORM',
     title: 'Chuẩn SCORM',
     badge: 'e-Learning LMS',
-    desc: 'Gói ActivePresenter / Storyline theo dõi tiến trình và điểm số học viên',
+    desc: 'Gói SCORM 2004 xuất từ ActivePresenter, theo dõi tiến trình và điểm số học viên',
     icon: Layers,
   },
 ];
@@ -167,6 +167,10 @@ export const CreateLectureModal: React.FC<Props> = ({
     if (!editLecture && contentType !== 'PDF' && !file) {
       return setError('Vui lòng chọn tệp .zip chứa gói bài giảng');
     }
+    // Định dạng của bài đã có học liệu chỉ đổi theo tệp mới
+    if (editLecture && contentType !== editLecture.content_type && !file) {
+      return setError('Muốn đổi định dạng bài giảng, hãy chọn tệp mới đúng định dạng');
+    }
 
     setSubmitting(true);
     try {
@@ -188,7 +192,7 @@ export const CreateLectureModal: React.FC<Props> = ({
       } else {
         const res = await lectureService.create(payload);
         targetLectureId = res.lecture_id;
-        toast.success('Đã tạo bài giảng mới thành công');
+        if (!file) toast.success('Đã tạo bài giảng mới thành công');
       }
 
       // BƯỚC 2: Upload file bài giảng (PDF / HTML5 / SCORM) nếu có
@@ -196,19 +200,29 @@ export const CreateLectureModal: React.FC<Props> = ({
         toast.info(
           contentType === 'PDF'
             ? 'Đang nạp tệp giáo án PDF lên máy chủ...'
-            : 'Đang nạp gói bài giảng lên máy chủ...',
+            : 'Đang nạp và kiểm tra gói bài giảng...',
           { duration: 4000 }
         );
-        await lectureService.uploadPackage(
-          targetLectureId,
-          file,
-          contentType
-        );
-        toast.success(
+        let uploaded: { message?: string };
+        try {
+          uploaded = await lectureService.uploadPackage(targetLectureId, file, contentType);
+        } catch (uploadErr: any) {
+          const reason = uploadErr?.message || 'Tải tệp lên không thành công';
+          if (editLecture) {
+            throw new Error(`${reason}. Thông tin bài đã được lưu, tệp cũ giữ nguyên. Hãy chọn tệp khác rồi lưu lại.`);
+          }
+          // Tạo mới mà tệp không đạt → bỏ bài nháp rỗng để không sinh bài thừa
+          const removed = await lectureService.discardEmptyDraft(targetLectureId).then(() => true, () => false);
+          if (!removed) onCreated();
+          throw new Error(removed
+            ? `${reason}. Bài giảng chưa được tạo, hãy chọn tệp khác rồi bấm Tạo lại.`
+            : `${reason}. Bài nháp đã tạo vẫn còn, hãy mở Chỉnh sửa để chọn tệp khác.`);
+        }
+        toast.success(uploaded?.message || (
           contentType === 'PDF'
-            ? 'Đã lưu tệp giáo án PDF cho bài giảng thành công'
-            : 'Đã giải nén và lưu gói bài giảng thành công'
-        );
+            ? 'Đã lưu tệp PDF. Bấm "Gửi duyệt" khi sẵn sàng'
+            : 'Gói đạt yêu cầu, đang chờ duyệt'
+        ));
       }
 
       reset();

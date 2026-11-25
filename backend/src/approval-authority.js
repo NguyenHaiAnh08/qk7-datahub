@@ -40,6 +40,23 @@ async function delegatedReady() {
   return ok;
 }
 
+let updateCache = { ok: false, at: 0 };
+// Chưa chạy migration add_lecture_update_review.cjs → không nhận bản cập nhật cho bài giảng đã xuất bản
+async function updateReviewReady() {
+  if (Date.now() - updateCache.at < 60 * 1000) return updateCache.ok;
+  let ok = false;
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`SELECT COL_LENGTH('DIGITAL_LECTURE','update_status') a,
+                                                 COL_LENGTH('DIGITAL_LECTURE','update_by') b`);
+    ok = Boolean(r.recordset[0].a && r.recordset[0].b);
+  } catch (e) {
+    console.warn('[approval-authority] kiểm tra migration bản cập nhật bài giảng lỗi:', e.message);
+  }
+  updateCache = { ok, at: Date.now() };
+  return ok;
+}
+
 /**
  * Ghi nhận thẩm định của người không phải Chỉ huy/Admin. KHÔNG đổi trạng thái chính thức.
  * Trả về số dòng cập nhật (0 = yêu cầu không còn ở trạng thái chờ).
@@ -47,6 +64,10 @@ async function delegatedReady() {
 async function recordValidation({ table, id, userId, decision, note }) {
   const t = TARGETS[table];
   if (!t) throw new Error('Bảng không hợp lệ');
+  // Bài giảng đã xuất bản có bản mới chờ duyệt cũng là đối tượng đang chờ
+  const pending = table === 'DIGITAL_LECTURE' && await updateReviewReady()
+    ? `(${t.pending} OR (status = 'PUBLISHED' AND update_status IN ('PENDING_FACULTY','PENDING_TRAINING')))`
+    : t.pending;
   const pool = await getPool();
   const r = await pool.request()
     .input('id', sql.VarChar(50), id)
@@ -55,7 +76,7 @@ async function recordValidation({ table, id, userId, decision, note }) {
     .input('n', sql.NVarChar(500), note ? String(note).slice(0, 500) : null)
     .query(`UPDATE ${table}
             SET validated_by = @by, validated_at = GETDATE(), validate_decision = @d, validate_note = @n
-            WHERE ${t.id} = @id AND ${t.pending};
+            WHERE ${t.id} = @id AND ${pending};
             SELECT @@ROWCOUNT AS n;`);
   return r.recordset[0].n;
 }
@@ -90,4 +111,4 @@ function createApprovalAuthority({ getUserPermissions, resolveUserRoles }) {
   return { getAuthority, covers, recordValidation };
 }
 
-module.exports = { createApprovalAuthority, delegatedReady, recordValidation };
+module.exports = { createApprovalAuthority, delegatedReady, updateReviewReady, recordValidation };

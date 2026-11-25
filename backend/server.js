@@ -16,7 +16,7 @@ const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf, extractTextFromDigitalPdf, extractMetadata } = require('./pdf-parser');
-// pdf-router.js và pdfWatermarkServer.js là module tiện ích độc lập (dùng cho test-pipeline.js)
+// pdf-router.js và pdfWatermarkServer.js là module tiện ích độc lập
 const { getAuthoritativeServerTime, detectOsClockTamper, syncFromDatabase } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 const createApprovalWorkflow = require('./src/approval-workflow');
@@ -2529,6 +2529,10 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
     res.status(500).json({ error: err.message });
   }
 });
+
+// Báo cáo tài liệu trùng (chỉ đọc, chỉ Admin) — phải đặt TRƯỚC '/api/documents/:fileId'
+const { createDuplicateReportHandler } = require('./src/duplicate-docs');
+app.get('/api/documents/duplicates', requireAuth, createDuplicateReportHandler({ resolveUserRoles: (user) => resolveUserRoles(user) }));
 
 app.get('/api/documents/trash', requireAuth, requirePermission('DOC_TRASH_VIEW'), async (req, res) => {
   try {

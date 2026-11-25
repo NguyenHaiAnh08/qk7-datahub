@@ -25,7 +25,7 @@ import { RollingNumber } from '../components/common/RollingNumber';
 import { PaginationBar } from '../components/common/PaginationBar';
 import { usePageTransition } from '../components/common/PageTransitionStage';
 import { FingerprintScanModal } from '../components/users/FingerprintScanModal';
-import { Lecture, LectureStatus, Subject, TeachingSchedule } from '../types/lecture';
+import { Lecture, LectureStatus, Subject, TeachingSchedule, reviewStageOf } from '../types/lecture';
 
 /**
  * Trang Bài giảng số được chia như Văn bản số:
@@ -304,11 +304,12 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
     return {
       total:           active.length,
       published:       active.filter(l => l.status === 'PUBLISHED').length,
-      pending:         active.filter(l => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length,
-      draft:           active.filter(l => l.status === 'DRAFT' || l.status === 'REJECTED').length,
-      pendingFaculty:  active.filter(l => l.status === 'PENDING_FACULTY').length,
-      pendingTraining: active.filter(l => l.status === 'PENDING_TRAINING').length,
-      rejected:        active.filter(l => l.status === 'REJECTED').length,
+      // Bản cập nhật của bài đã xuất bản cũng tính vào hàng chờ duyệt / cần hiệu chỉnh
+      pending:         active.filter(l => ['PENDING_FACULTY', 'PENDING_TRAINING'].includes(reviewStageOf(l))).length,
+      draft:           active.filter(l => ['DRAFT', 'REJECTED'].includes(reviewStageOf(l))).length,
+      pendingFaculty:  active.filter(l => reviewStageOf(l) === 'PENDING_FACULTY').length,
+      pendingTraining: active.filter(l => reviewStageOf(l) === 'PENDING_TRAINING').length,
+      rejected:        active.filter(l => reviewStageOf(l) === 'REJECTED').length,
       draftOnly:       active.filter(l => l.status === 'DRAFT').length,
     };
   }, [allLectures]);
@@ -322,12 +323,13 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
     // Trang Soạn: xếp theo thứ tự Chờ Khoa duyệt → Chờ BGH duyệt → Cần hiệu chỉnh → Bản nháp → Đã xuất bản (mới nhất trước trong từng nhóm)
     const rank: Record<string, number> = { PENDING_FACULTY: 0, PENDING_TRAINING: 1, REJECTED: 2, DRAFT: 3, PUBLISHED: 4 };
     const ordered = mode === 'compose'
-      ? [...base].sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9)
+      ? [...base].sort((a, b) => (rank[reviewStageOf(a)] ?? 9) - (rank[reviewStageOf(b)] ?? 9)
           || String(b.created_at || '').localeCompare(String(a.created_at || '')))
       : base;
     return ordered.filter(lec => {
       // 1. Lọc theo trạng thái từ chip Lọc nhanh
-      if (statusFilter && lec.status !== statusFilter) return false;
+      if (statusFilter && lec.status !== statusFilter
+        && !(mode === 'compose' && reviewStageOf(lec) === statusFilter)) return false;
       // 2. Lọc theo môn học
       if (subjectFilter && lec.subject_id !== subjectFilter) return false;
       // 3. Lọc theo từ khóa tìm kiếm
@@ -379,7 +381,8 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
         loadLectures();
         return;
       }
-      toast.success(`Đã ${res.new_status === 'PUBLISHED' ? 'hoàn tất xuất bản' : 'phê duyệt cấp Khoa'} bài giảng "${lec.title}"`);
+      const done = res.new_status === 'PUBLISHED' ? 'hoàn tất xuất bản' : 'phê duyệt cấp Khoa';
+      toast.success(`Đã ${done} ${res.is_update ? 'bản mới của ' : ''}bài giảng "${lec.title}"`);
       loadLectures();
     } catch (err: any) {
       toast.error(err?.message || 'Phê duyệt thất bại');

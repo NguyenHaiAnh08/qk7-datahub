@@ -4,7 +4,7 @@ import {
   Play, Trash2, Hash, User, AlertTriangle, Edit, Eye,
   HelpCircle, Shield, CheckCircle2, Clock, BookOpen
 } from 'lucide-react';
-import { Lecture, ContentType, LectureStatus } from '../../types/lecture';
+import { Lecture, ContentType, LectureStatus, reviewStageOf } from '../../types/lecture';
 import { ApprovalStepper } from '../common/ApprovalStepper';
 
 const STATUS_STYLES: Record<LectureStatus, { label: string; badgeCls: string; step: number }> = {
@@ -83,9 +83,20 @@ export const LectureCard: React.FC<LectureCardProps> = ({
 
   const isAuthor = isAdmin || (currentUserId && currentUserId === lecture.author_id);
   const isDraftOrRejected = lecture.status === 'DRAFT' || lecture.status === 'REJECTED';
-  const isPendingFaculty  = lecture.status === 'PENDING_FACULTY';
-  const isPendingTraining = lecture.status === 'PENDING_TRAINING';
   const isPublished       = lecture.status === 'PUBLISHED';
+  // Bước đang chờ duyệt: của bài mới hoặc của bản cập nhật (bài vẫn xuất bản bản cũ)
+  const stage             = reviewStageOf(lecture);
+  const hasUpdate         = isPublished && !!lecture.update_status && mode !== 'list';
+  const isPendingFaculty  = stage === 'PENDING_FACULTY';
+  const isPendingTraining = stage === 'PENDING_TRAINING';
+  const updateTag = hasUpdate ? (
+    <span
+      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${STATUS_STYLES[stage].badgeCls}`}
+      title="Học viên vẫn xem bản đang xuất bản cho đến khi bản mới được duyệt xong"
+    >
+      Bản mới: {STATUS_STYLES[stage].label}
+    </span>
+  ) : null;
   const isArchived        = lecture.status === 'ARCHIVED';   // legacy — giữ để tương thích
   const isDeleted         = lecture.status === 'DELETED';    // 🆕 — trong thùng rác
 
@@ -128,13 +139,13 @@ export const LectureCard: React.FC<LectureCardProps> = ({
   if (allowManage && canApprove) {
     if (isPendingFaculty) {
       actions.push(
-        { label: isFinalApprover ? 'Duyệt' : 'Thẩm định', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
+        { label: isFinalApprover ? (hasUpdate ? 'Duyệt bản mới' : 'Duyệt') : 'Thẩm định', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
         { label: isFinalApprover ? 'Từ chối' : 'Đề nghị từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
       );
     }
     if (isPendingTraining) {
       actions.push(
-        { label: isFinalApprover ? 'Duyệt' : 'Thẩm định', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
+        { label: isFinalApprover ? (hasUpdate ? 'Duyệt bản mới' : 'Duyệt') : 'Thẩm định', icon: Check, onClick: onApprove, cls: 'bg-[#166534] hover:bg-[#14532d] text-white font-bold border border-emerald-600 shadow-xs' },
         { label: isFinalApprover ? 'Từ chối' : 'Đề nghị từ chối', icon: X, onClick: onReject, cls: 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30' },
       );
     }
@@ -177,7 +188,7 @@ export const LectureCard: React.FC<LectureCardProps> = ({
 
   // 5. Xóa mềm → chuyển vào Thùng rác của trang Quản trị (KHÔNG hiển thị khi đang chờ duyệt / đã xuất bản).
   //    Khôi phục và xóa vĩnh viễn chỉ Admin làm ở trang Quản trị → Thùng rác, không còn nút ở đây.
-  const isPendingApproval = isPendingFaculty || isPendingTraining;
+  const isPendingApproval = lecture.status === 'PENDING_FACULTY' || lecture.status === 'PENDING_TRAINING';
   //    Admin xóa mềm mọi trạng thái; người khác (tác giả/cùng khoa) không xóa bài đang chờ duyệt.
   if (allowManage && !isDeleted && (isAdmin || (!isPendingApproval && (canArchive || canDelete) && canManageThis))) {
     actions.push({
@@ -212,8 +223,15 @@ export const LectureCard: React.FC<LectureCardProps> = ({
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shadow-2xs shrink-0 ${statusCfg.badgeCls}`}>
                 {statusCfg.label}
               </span>
+              {updateTag}
               {validatedTag}
             </div>
+
+            {hasUpdate && stage === 'REJECTED' && lecture.update_reject_reason && (
+              <p className="text-[11px] text-rose-700 dark:text-rose-300 line-clamp-2">
+                Bản mới cần hiệu chỉnh: {lecture.update_reject_reason}
+              </p>
+            )}
 
             {/* Dòng trên: Mã bài giảng & Môn học (in đậm giá trị) */}
             <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400 min-w-0">
@@ -279,6 +297,8 @@ export const LectureCard: React.FC<LectureCardProps> = ({
         </div>
       </div>
 
+      {updateTag && <div className="flex justify-end">{updateTag}</div>}
+
       {/* 2. Tên danh sách bài giảng (Hero Title — tối đa 2 dòng + ... + chống tràn tuyệt đối) */}
       <div className="min-w-0 overflow-hidden">
         <h3
@@ -293,7 +313,11 @@ export const LectureCard: React.FC<LectureCardProps> = ({
       {/* 3. Mini Stepper: Quy trình duyệt 2 tầng quân sự (Lucian #444) */}
       {!isArchived && !isDeleted && (
         <div className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/80 dark:border-white/[0.04]">
-          <ApprovalStepper status={lecture.status} compact />
+          <ApprovalStepper
+            status={hasUpdate ? stage : lecture.status}
+            headerLabel={hasUpdate ? 'Duyệt bản mới:' : undefined}
+            compact
+          />
         </div>
       )}
 
@@ -304,6 +328,16 @@ export const LectureCard: React.FC<LectureCardProps> = ({
           <div>
             <strong className="block text-[10px] uppercase tracking-wider text-rose-800 dark:text-rose-400">Yêu cầu hiệu chỉnh:</strong>
             <span className="line-clamp-2">{lecture.reject_reason}</span>
+          </div>
+        </div>
+      )}
+
+      {hasUpdate && stage === 'REJECTED' && lecture.update_reject_reason && (
+        <div className="flex items-start gap-2 text-[11px] text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/30 p-2.5 rounded-xl border border-rose-200 dark:border-rose-500/30 leading-relaxed">
+          <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+          <div>
+            <strong className="block text-[10px] uppercase tracking-wider text-rose-800 dark:text-rose-400">Bản mới cần hiệu chỉnh:</strong>
+            <span className="line-clamp-2">{lecture.update_reject_reason}</span>
           </div>
         </div>
       )}

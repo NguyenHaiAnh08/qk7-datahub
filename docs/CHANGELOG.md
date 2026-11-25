@@ -4,6 +4,52 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.12-test-suite-cleanup-and-pipeline-hardening] — 2026-11-25
+
+### 1. Dọn Dẹp Mã Nguồn & Loại Bỏ Tệp Kiểm Thử Lỗi Thời (Test Suite Modernization)
+- **Chuẩn hóa script kiểm tra cú pháp Backend ([`backend/package.json`](../backend/package.json), [`backend/server.js`](../backend/server.js)):**
+  - Chuyển lệnh `npm test` sang kiểm tra cú pháp Node.js tự động (`node -c server.js && node -c pdf-parser.js`), loại bỏ phụ thuộc vào tệp kiểm thử tích hợp cũ cần máy chủ sống.
+  - Cập nhật chú thích và tài liệu hướng dẫn trong [`README.md`](../README.md) chuẩn hóa luồng đóng dấu watermark và trích xuất PDF.
+- **Loại bỏ các tệp test & nhật ký đánh giá lỗi thời theo kết quả Test Audit:**
+  - Xóa bỏ các kịch bản kiểm thử lỗi thời / hardcode tài khoản: `backend/test-pipeline.js`, `backend/test-scan-parse.js`, `boxchat/measure_chunking.py`, `boxchat/test_e2e_15_scenarios.py`.
+  - Dọn dẹp các tệp nhật ký đánh giá tĩnh cũ: `docs/E2E_TEST_RESULTS.md`, `docs/e2e_results.json`, `docs/eval_results_3b.txt`, `docs/eval_results_3b_run2.txt`, `docs/ragas_evaluation_results.json`.
+  - Dọn dẹp kịch bản bash/PowerShell trùng lặp hoặc không còn phù hợp: `scripts/rescan_check.sh`, `scripts/run-strix.ps1`.
+- **Đồng bộ hóa tài liệu bàn giao ([`docs/HANDOVER_CHECKLIST.md`](HANDOVER_CHECKLIST.md)):**
+  - Cập nhật danh mục kiểm thử hồi quy loại bỏ `test_e2e_15_scenarios.py`, tập trung vào bộ Unit Test cốt lõi (`boxchat/test_*.py`) và RAGAS (`boxchat/eval_ragas_quality.py`).
+
+---
+
+## [v1.8.11-clean-repository-and-local-tooling-security] — 2026-11-25
+
+### 1. Gỡ Bỏ Theo Dõi Git Cho Bộ Não Tổng & Công Cụ Quản Trị Cục Bộ (Local-First Security)
+- **Gỡ bỏ theo dõi Git an toàn qua `git rm -r --cached`:**
+  - Loại bỏ hoàn toàn `ANTIGRAVITY_MASTER_BRAIN.md`, `config/`, `tools/`, `skills-lock.json` khỏi Git index mà vẫn bảo toàn 100% dữ liệu vật lý trên máy trạm của kỹ sư.
+  - Ngăn ngừa đưa các cấu hình hạ tầng mạng quân sự nội bộ (`config/military-infra/`), công cụ kiểm thử vân tay (`tools/admin-fingerprint-tool.js`, `tools/them-giang-duong.js`), và bộ não điều phối AI lên GitHub repository.
+- **Tăng cường hàng rào `.gitignore`:**
+  - Bổ sung quy tắc bỏ qua tuyệt đối cho: `ANTIGRAVITY_MASTER_BRAIN.md`, `skills-lock.json`, `config/`, `tools/`, `reports/`, `.agent/`, `.agents/`, `.claude/`, `.design-references/`.
+- **Đồng bộ hóa tài liệu kiến trúc & cấu trúc thư mục ([`README.md`](../README.md), [`docs/architecture/SYSTEM_ARCHITECTURE.md`](architecture/SYSTEM_ARCHITECTURE.md)):**
+  - Cập nhật sơ đồ cây thư mục toàn diện, phân định rõ ràng giữa mã nguồn sản phẩm đẩy lên remote GitHub và tài nguyên cục bộ chỉ phục vụ máy phát triển.
+
+---
+
+## [v1.8.10-gpu-vram-guard-and-ai-inference-optimization] — 2026-11-25
+
+### 1. Tối Ưu Hóa GPU VRAM, Flash Attention & Bộ Đệm KV Cho Ollama AI Boxchat
+- **Cấu hình GPU VRAM Guard ([`scripts/start-ai.bat`](../scripts/start-ai.bat), [`boxchat/s.bat`](../boxchat/s.bat), [`.env.example`](../.env.example)):**
+  - Tích hợp các tham số tối ưu hóa phần cứng cao cấp: `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=3m`, `OLLAMA_NUM_CTX=4096`, `OLLAMA_NUM_GPU=99`.
+  - Tự động phát hiện thực thi `ollama.exe` trong cả `PATH` và `%LOCALAPPDATA%\Programs\Ollama\`.
+- **Đồng nhất Options & Giám sát VRAM Thời Gian Thực ([`boxchat/core/agent_tutor.py`](../boxchat/core/agent_tutor.py), [`boxchat/main.py`](../boxchat/main.py)):**
+  - Thêm phương thức `_build_ollama_options()` đồng nhất giữa `warm_up()` và `_call_ollama()`, giữ model 100% trên VRAM GPU, loại bỏ hiện tượng tải lại model khi đổi context.
+  - Bổ sung endpoint `/api/ai/runtime-status` và hàm `get_loaded_models()` truy vấn trực tiếp `/api/ps` của Ollama (cache 5s) hiển thị kích thước VRAM sử dụng và % GPU offload.
+
+### 2. Tối Ưu Tài Nguyên Cho Dịch Vụ OCR & Chống Rò Rỉ Bộ Nhớ
+- **Nhường 100% VRAM GPU cho AI Boxchat ([`ocr-service/start-ocr.bat`](../ocr-service/start-ocr.bat)):**
+  - Cấu hình mặc định `MONKEY_DEVICE=cpu` chạy PaddleOCR PP-OCRv3 siêu nhẹ trên CPU (~60-400MB RAM, 0MB VRAM).
+- **Giải phóng bộ nhớ triệt để ([`ocr-service/main.py`](../ocr-service/main.py)):**
+  - Bổ sung thu gom rác chủ động (`del pil_img; gc.collect()`) sau khi xử lý OCR từng trang tài liệu, triệt tiêu rò rỉ bộ nhớ khi xử lý file PDF lớn.
+
+---
+
 ## [v1.8.9-ai-rag-threadpool-and-lecture-route-order-hardening] — 2026-11-25
 
 ### 1. Khắc Phục Route Shadowing & Phân Định Hạn Mức Tải Lên Phân Hệ Bài Giảng

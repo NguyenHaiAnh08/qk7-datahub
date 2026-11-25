@@ -79,8 +79,9 @@ REM             "monkey"    = chi MonkeyOCRv2
 REM             "paddleocr" = chi PaddleOCR (hieu nang nhanh hon)
 if not defined OCR_ENGINE set "OCR_ENGINE=auto"
 
-REM Device: "auto" = tu dong chon CUDA neu co, nguoc lai CPU
-REM         "cpu"  = ep CPU (an toan, luon chay duoc)
+REM Device: "cpu"  = Phuong an nhuong 100%% VRAM cho Ollama AI Boxchat,
+REM                  chay PaddleOCR PP-OCRv3 sieu nhe tren CPU (~60-400MB RAM, 0MB VRAM)
+REM         "auto" = tu dong chon CUDA neu co GPU >= 8GB VRAM, nguoc lai CPU
 if not defined MONKEY_DEVICE set "MONKEY_DEVICE=cpu"
 
 echo    OCR_ENGINE   = %OCR_ENGINE%

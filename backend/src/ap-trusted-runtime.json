@@ -1,0 +1,131 @@
+{
+  "player": {
+    "player/APIWrapper.js": [
+      "b89f644c38fa014756d522c6c130bccdb335d3672f3d944dc19104e38bc82b62"
+    ],
+    "player/smartart/drawing.css": [
+      "e411520b20a038bea74babeab9eeddd1c501ef74c69b2234b00711a8474505b6"
+    ],
+    "player/smartart/drawing.component.js": [
+      "6856ff12c7bc0fadff47ee8f702d10a9710eec7998f946e658c75c21dbaebaf7"
+    ],
+    "player/smartart/drawing.js": [
+      "01d45f241b08a31992b3af75bec57d995756ad5f48b94e0d838448252fe6cf92"
+    ],
+    "player/smartart/icons/pencil.svg": [
+      "6b8e152407622ec99d8dffa1ef96f9c663fd96218f5e16ac60cbcdde896afee3"
+    ],
+    "player/smartart/icons/pencil-disabled.svg": [
+      "23aa8ad1ad04aa8bda62e7b73d3325590b5323a7da6f1e65929ee70889f7a3ed"
+    ],
+    "player/smartart/icons/guide.svg": [
+      "04722b6ccfb961e72c0f7d9586a103c7792563f5c99f2bed21f259df243a6c63"
+    ],
+    "player/smartart/icons/pause.svg": [
+      "22b93cc844e3eed83ee689625d82750e2f93106c614524c8e3f7e5412a843622"
+    ],
+    "player/smartart/icons/resume.svg": [
+      "1b18bca272b028687510cc4562af203579fbf7702fc6c69b664de33de767316e"
+    ],
+    "player/smartart/icons/stop.svg": [
+      "785ee416a8cef4f1f4bb337227d07bc4d429b5285949407d4019f40cdb4942e8"
+    ],
+    "player/smartart/icons/undo.svg": [
+      "73be08883ff43087efd2bfba1e623746493cb93d0169f1d1b6afcac6bf57f784"
+    ],
+    "player/smartart/icons/redo.svg": [
+      "e2119cc0f59dea8d37beaaccff422a3cde558d96b4d1eaef92f5a48ebd34b341"
+    ],
+    "player/smartart/icons/clear.svg": [
+      "664069a505798f60c83dc9c6dc143121fc08870342ffbcdaf516a6b378cd5608"
+    ],
+    "player/smartart/icons/brush-size.svg": [
+      "7d93b634458708bd3ba1a627f42173df91beea9f83976c3224b875e0a25b4fd8"
+    ],
+    "player/smartart/icons/eye-close.svg": [
+      "44b844c5818563068e52ee3dc24baec91eefa6da19a0f776ecc74cd2aa467ff1"
+    ],
+    "player/smartart/icons/eye-open.svg": [
+      "af03145c5eae16bc718b57f41edc33dcabfe948dbb6cde8675d540be4ff22888"
+    ],
+    "player/smartart/icons/show-drawing-tool.svg": [
+      "b2886d0cba8a1bc1c367dbefe4be0661dcc90bd781be043425cfedd3f2e08910"
+    ],
+    "player/smartart/icons/expand-compact.svg": [
+      "9f161b1234fae852d903c8707524576710fab0d240eea6d7eae035607a243308"
+    ],
+    "player/rlplayer.js": [
+      "53dc08f990ac980189b59f89e6671215f67e6a88a184a9e1376919c34a75d5e5"
+    ],
+    "player/rlplayer.lang.vi-VN.js": [
+      "0fa57025295c1e2dfc306874839aac0861bd2d63bf11b1d09a53ee233b61e6fb"
+    ],
+    "player/rlplayer.css": [
+      "7d0979b182b8bd0cb4e108f5c45e771880fd106ea723edf9ce6095067927af3c"
+    ],
+    "player/rlsco_functions.js": [
+      "bd99db0a9605fdb180bf026d29183725c4c0d22f5dca63b9953afa5d19113dff"
+    ]
+  },
+  "schemas": {
+    "adlcp_v1p3.xsd": [
+      "e7dafa4b6fbe3bfeb1806eab00bf75c27bf26f1f1df0f2313d54123ff2d337e5"
+    ],
+    "adlnav_v1p3.xsd": [
+      "8a8559c6ab2bc6aa34689c5bc6be8dff269820c36ba8cb6f85b667c8094a2d3a"
+    ],
+    "adlseq_v1p3.xsd": [
+      "ccd30860ee621ea65b39e75fe26a8ebcde0612585f9efd85419b6af7542420ae"
+    ],
+    "datatypes.dtd": [
+      "49e85fbfbf065b62cc5b8c3ea98529a1af4ee347a7ad18a7887e461781ac65cf"
+    ],
+    "ims_xml.xsd": [
+      "d5ee21b60f118e42f70837e66ef99f9b9977b7d9cf2bb321346371f2fa22a6b2"
+    ],
+    "imscp_v1p1.xsd": [
+      "464ea5ada964c8310146f8a7ae77cb9f336cfda5285ba8f7d5882c1779ddb2d4"
+    ],
+    "imsss_v1p0.xsd": [
+      "daef999eb61a3755a483e86be07226d877dbdcf6062fb978a7e4069921f8ef7b"
+    ],
+    "imsss_v1p0auxresource.xsd": [
+      "c5985ad0f64a7fc780fe3e8b5ee85c983de54a1aba8df4a32dd4e6febcf43baa"
+    ],
+    "imsss_v1p0control.xsd": [
+      "5c74cfa648b2cf98b71a15e77a5e92ff75f111d72ac84766ccafff3d29ab8e43"
+    ],
+    "imsss_v1p0delivery.xsd": [
+      "ea44db41eeae1f8802117362236b68d3943bf3eafa8d41fa5ab5d7354a2b61f0"
+    ],
+    "imsss_v1p0limit.xsd": [
+      "5c1b1e5add19942ff205b423ea750959ffb79f080983b51ba5a62f185eff13ec"
+    ],
+    "imsss_v1p0objective.xsd": [
+      "6b196b71ac408141811899cd77b7cbeac5e3cbc239abf223de1777efedfaf4e8"
+    ],
+    "imsss_v1p0random.xsd": [
+      "195472fbb65a3daeda13edb9cb5a62adcc41287c61d7433a65b5b3ed32460e85"
+    ],
+    "imsss_v1p0rollup.xsd": [
+      "e0e95bafa5693eb7649946379ec735ad6a4f6389c6b385ae2296efc38b8a412f"
+    ],
+    "imsss_v1p0seqrule.xsd": [
+      "a391f0b7c7faee99207865df735dde2bb682ac07e4804b1140a7e2d9b8ec77d8"
+    ],
+    "imsss_v1p0util.xsd": [
+      "3afc09fead11951b1aa5db10f80d09874d516eded489b382aa3ee380f1eae814"
+    ],
+    "xml.xsd": [
+      "987f7ddbb71278c7a5bbb2d46cfc3913a9c752670d8d3c0c4f88e827c25f5f94"
+    ],
+    "XMLSchema.dtd": [
+      "34dd3e1baeb9ab90a8ebd36135fd46a669cfe5a2c88d3036a6a2acd0adf039b8"
+    ]
+  },
+  "pages": [
+    "a8c9a811f447b3f1c4f4516a7758a6f26b87d3249cd3a5a2e8d5e882c15a76ee",
+    "37eeada6eb36bd702f2a0362fb95b45036c1da3321446f5eefd2417471bbd536",
+    "d9762082e2c06433051d16e5e998d9c57774613cf297346cdf55b529fc39119d"
+  ]
+}

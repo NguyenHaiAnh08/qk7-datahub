@@ -7,6 +7,10 @@ const crypto = require('crypto');
 const multer = require('multer');
 const { sql, getPool } = require('./db');
 const { canManageLecture, isDeptHeadByPosition } = require('./lecture-scope');
+const { checkPackageFile } = require('./lecture-package-worker');
+const { formatIssues } = require('./lecture-package-validator');
+const { finishReplacement, removeUploadFile: removeStoredFile } = require('./lecture-package-helper');
+const { updateReviewReady, delegatedReady } = require('./approval-authority');
 
 module.exports = function createScormPackageRoutes({ requireAuth, requirePermission, writeAccessLog, getClientIp }) {
   const router = express.Router();
@@ -126,49 +130,31 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
     if (fs.existsSync(lectureDir)) {
       const rootFiles = fs.readdirSync(lectureDir);
       const isActivePresenter = rootFiles.includes('demo.html') && (rootFiles.includes('rlprez.js') || rootFiles.includes('player'));
-      if (isActivePresenter && (!entryPoint || entryPoint.endsWith('index.html'))) {
+      // Chỉ áp dụng cho gói đang nằm đúng thư mục này — không kéo bài đã thay bản mới về tệp cũ
+      const ownsEntry = !entryPoint || path.posix.dirname(String(entryPoint)) === baseRelPath;
+      if (isActivePresenter && ownsEntry && (!entryPoint || entryPoint.endsWith('index.html'))) {
         entryPoint = `${baseRelPath}/demo.html`;
         await pool.request()
           .input('lid', sql.VarChar(50), lectureId)
           .input('ep', sql.NVarChar(500), entryPoint)
-          .query(`UPDATE DIGITAL_LECTURE SET scorm_entry_point = @ep, pending_scorm_path = NULL WHERE lecture_id = @lid`);
+          .query(`UPDATE DIGITAL_LECTURE SET scorm_entry_point = @ep WHERE lecture_id = @lid`);
         console.log(`[activepresenter] Tự động nâng cấp scorm_entry_point cho ${lectureId} → demo.html`);
       }
     }
 
-    // 🌟 SELF-HEALING: Tự động phục hồi entry point nếu bài giảng đã được giải nén hoặc còn file pending
-    if (!entryPoint) {
-      if (fs.existsSync(lectureDir)) {
-        const rootFiles = fs.readdirSync(lectureDir);
-        const commonEntries = ['demo.html', 'story.html', 'index.html', 'launch.html', 'story_html5.html'];
-        const found = commonEntries.find(f => rootFiles.includes(f)) || rootFiles.find(f => f.toLowerCase().endsWith('.html'));
-        if (found) {
-          entryPoint = `${baseRelPath}/${found}`;
-          await pool.request()
-            .input('lid', sql.VarChar(50), lectureId)
-            .input('ep', sql.NVarChar(500), entryPoint)
-            .query(`UPDATE DIGITAL_LECTURE SET scorm_entry_point = @ep, pending_scorm_path = NULL WHERE lecture_id = @lid`);
-          console.log(`[self-healing] Tự động khắc phục scorm_entry_point cho ${lectureId} → ${entryPoint}`);
-        }
-      } else if (lec.pending_scorm_path) {
-        try {
-          const { extractAndParse } = require('./lecture-package-helper');
-          const out = await extractAndParse({ 
-            lectureId, 
-            pendingPath: lec.pending_scorm_path,
-            title: lec.title,
-            createdAt: lec.created_at
-          });
-          entryPoint = out.entry_point;
-          await pool.request()
-            .input('lid', sql.VarChar(50), lectureId)
-            .input('ep', sql.NVarChar(500), entryPoint)
-            .input('ct', sql.VarChar(20), out.content_type)
-            .query(`UPDATE DIGITAL_LECTURE SET scorm_entry_point = @ep, content_type = @ct, pending_scorm_path = NULL WHERE lecture_id = @lid`);
-          console.log(`[self-healing] Tự động giải nén và cập nhật scorm_entry_point cho ${lectureId} → ${entryPoint}`);
-        } catch (ex) {
-          console.error(`[self-healing] Lỗi giải nén:`, ex);
-        }
+    // 🌟 SELF-HEALING: phục hồi entry point nếu bài đã được giải nén nhưng thiếu đường dẫn.
+    // Không tự giải nén gói chờ duyệt: gói chỉ được đưa vào sử dụng qua bước duyệt.
+    if (!entryPoint && fs.existsSync(lectureDir)) {
+      const rootFiles = fs.readdirSync(lectureDir);
+      const commonEntries = ['demo.html', 'story.html', 'index.html', 'launch.html', 'story_html5.html'];
+      const found = commonEntries.find(f => rootFiles.includes(f)) || rootFiles.find(f => f.toLowerCase().endsWith('.html'));
+      if (found) {
+        entryPoint = `${baseRelPath}/${found}`;
+        await pool.request()
+          .input('lid', sql.VarChar(50), lectureId)
+          .input('ep', sql.NVarChar(500), entryPoint)
+          .query(`UPDATE DIGITAL_LECTURE SET scorm_entry_point = @ep WHERE lecture_id = @lid`);
+        console.log(`[self-healing] Tự động khắc phục scorm_entry_point cho ${lectureId} → ${entryPoint}`);
       }
     }
 
@@ -439,7 +425,7 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         const pool = await getPool();
         const lr = await pool.request()
           .input('lid', sql.VarChar(50), lectureId)
-          .query(`SELECT author_id, status, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
+          .query(`SELECT author_id, status, faculty_unit_id, pending_scorm_path FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
         
         if (lr.recordset.length === 0) {
           if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -456,9 +442,42 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
           return res.status(403).json({ error: 'Chỉ tác giả, thành viên cùng khoa/đơn vị hoặc Admin mới được upload' });
         }
 
+        // Bài đã xuất bản: bản đang dùng giữ nguyên, tệp mới là "bản cập nhật" chờ duyệt
+        const isUpdate = lec.status === 'PUBLISHED';
+        const updReady = await updateReviewReady();
+        let refusal = null;
+        if (['DELETED', 'ARCHIVED'].includes(lec.status)) {
+          refusal = 'Bài giảng đang ở thùng rác hoặc lưu trữ, không nhận tệp mới';
+        } else if (isUpdate && !updReady) {
+          refusal = 'Máy chủ chưa chạy migration add_lecture_update_review.cjs nên chưa nhận bản cập nhật. Bản đang xuất bản được giữ nguyên';
+        }
+        if (refusal) {
+          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+          return res.status(409).json({ error: refusal, code: 'LECTURE_NOT_EDITABLE', status: lec.status });
+        }
+
+        // Chặn gói thiếu, sai hoặc bị chèn tệp/mã: kiểm tra khi tệp còn ở thư mục tạm (không phát ra web)
+        const check = await checkPackageFile(req.file.path);
+        if (!check.ok) {
+          fs.unlinkSync(req.file.path);
+          const message = formatIssues(check.issues);
+          if (typeof writeAccessLog === 'function') {
+            await writeAccessLog({
+              userId: req.user.user_id,
+              fileId: null,
+              action: 'LECTURE_PKG_REJECT',
+              ip: typeof getClientIp === 'function' ? getClientIp(req) : req.ip,
+              note: `Bài ${lectureId}, tệp "${req.file.originalname}": ${message}`.slice(0, 1000),
+            });
+          }
+          return res.status(400).json({ error: message, code: 'PACKAGE_REJECTED', issues: check.issues });
+        }
+
         const pendingDir = path.join(__dirname, '..', 'uploads', 'bai-giang-so', 'pending', folder);
         fs.mkdirSync(pendingDir, { recursive: true });
-        const pendingAbs = path.join(pendingDir, `${lectureId}.zip`);
+        // Tên riêng cho mỗi lần tải lên: bước duyệt biết chắc mình đang duyệt đúng tệp nào
+        const fileName = `${lectureId}_${Date.now()}.zip`;
+        const pendingAbs = path.join(pendingDir, fileName);
 
         // ✅ Chuyển file từ thư mục temp sang thư mục pending
         try {
@@ -468,17 +487,41 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
           return res.status(500).json({ error: 'Lỗi di chuyển tệp tin: ' + moveErr.message });
         }
 
-        const relPending = `uploads/bai-giang-so/pending/${folder}/${lectureId}.zip`;
-        await pool.request()
-          .input('lid', sql.VarChar(50), lectureId)
-          .input('pp',  sql.NVarChar(500), relPending)
-          .input('ct',  sql.VarChar(20),   contentType)
-          .query(`UPDATE DIGITAL_LECTURE
-                  SET pending_scorm_path=@pp, content_type=@ct,
-                      status='PENDING_FACULTY', reject_reason=NULL, updated_at=GETDATE()
-                  WHERE lecture_id=@lid`);
+        const relPending = `uploads/bai-giang-so/pending/${folder}/${fileName}`;
+        const clearValidation = (await delegatedReady()) ? ', validated_by=NULL, validated_at=NULL, validate_decision=NULL, validate_note=NULL' : '';
+        const changes = isUpdate
+          ? `pending_scorm_path=@pp, update_status='PENDING_FACULTY', update_reject_reason=NULL, update_by=@uid`
+          : `pending_scorm_path=@pp, content_type=@ct, status='PENDING_FACULTY', reject_reason=NULL`;
+        let saved;
+        try {
+          saved = await pool.request()
+            .input('lid', sql.VarChar(50), lectureId)
+            .input('pp',  sql.NVarChar(500), relPending)
+            .input('ct',  sql.VarChar(20),   check.format || contentType) // định dạng thật của gói, kể cả khi chọn nhầm
+            .input('uid', sql.VarChar(50),   req.user.user_id)
+            .input('cur', sql.VarChar(30),   lec.status)
+            .query(`UPDATE DIGITAL_LECTURE
+                    SET ${changes}${clearValidation}, updated_at=GETDATE()
+                    WHERE lecture_id=@lid AND status=@cur`);
+        } catch (dbErr) {
+          removeStoredFile(relPending);
+          throw dbErr;
+        }
+        if (saved.rowsAffected[0] === 0) {
+          removeStoredFile(relPending);
+          return res.status(409).json({ error: 'Trạng thái bài giảng vừa thay đổi, vui lòng tải lại trang rồi gửi lại', code: 'LECTURE_CHANGED' });
+        }
+        if (lec.pending_scorm_path) removeStoredFile(lec.pending_scorm_path); // bản chờ duyệt trước đó
 
-        res.json({ success: true, status: 'PENDING_FACULTY', pending_scorm_path: relPending });
+        res.json({
+          success: true,
+          status: isUpdate ? 'PUBLISHED' : 'PENDING_FACULTY',
+          update_status: isUpdate ? 'PENDING_FACULTY' : null,
+          pending_scorm_path: relPending,
+          message: isUpdate
+            ? 'Gói đạt yêu cầu. Bản mới đang chờ duyệt; học viên vẫn xem bản cũ cho đến khi bản mới được duyệt xong'
+            : 'Gói đạt yêu cầu. Bài giảng đang chờ Khoa duyệt',
+        });
       } catch (e) {
         console.error(`[${contentType} upload]`, e);
         // Dọn dẹp file rác nếu có lỗi xảy ra
@@ -535,7 +578,8 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       const pool = await getPool();
       const lr = await pool.request()
         .input('lid', sql.VarChar(50), lectureId)
-        .query(`SELECT lecture_id, title, author_id, status, pdf_path, faculty_unit_id FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
+        .query(`SELECT lecture_id, title, author_id, status, pdf_path, faculty_unit_id, pending_scorm_path, scorm_entry_point
+                FROM DIGITAL_LECTURE WHERE lecture_id=@lid`);
 
       if (lr.recordset.length === 0) {
         dropTemp();
@@ -584,6 +628,8 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
       moveFileSafe(req.file.path, absPath);
       movedAbs = absPath;
 
+      const clearUpdate = ((await updateReviewReady()) ? ', update_status = NULL, update_reject_reason = NULL, update_by = NULL' : '')
+        + ((await delegatedReady()) ? ', validated_by = NULL, validated_at = NULL, validate_decision = NULL, validate_note = NULL' : '');
       await pool.request()
         .input('lid', sql.VarChar(50), lectureId)
         .input('p', sql.NVarChar(500), relPath)
@@ -593,13 +639,16 @@ module.exports = function createScormPackageRoutes({ requireAuth, requirePermiss
         .query(`
           UPDATE DIGITAL_LECTURE
           SET pdf_path = @p, pdf_name = @n, pdf_size = @s, pdf_sha256 = @h,
-              content_type = 'PDF', document_id = NULL, updated_at = GETDATE()
+              content_type = 'PDF', document_id = NULL, pending_scorm_path = NULL, scorm_entry_point = NULL${clearUpdate},
+              updated_at = GETDATE()
           WHERE lecture_id = @lid
         `);
       movedAbs = null; // đã ghi DB thành công → không cần hoàn tác
 
       // Thay tệp: xóa tệp cũ (nếu khác đường dẫn mới)
       if (lec.pdf_path && lec.pdf_path !== relPath) removeUploadFile(lec.pdf_path);
+      // Bài chuyển từ gói ZIP sang PDF: dọn gói cũ và gói đang chờ duyệt
+      finishReplacement({ lectureId, pendingPath: lec.pending_scorm_path, oldEntryPoint: lec.scorm_entry_point });
 
       res.json({
         success: true,

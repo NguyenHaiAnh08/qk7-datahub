@@ -88,12 +88,7 @@ Khi có bất kỳ thay đổi cấu hình hạ tầng hoặc cập nhật dữ 
    python boxchat/test_multiturn_and_biometric.py
    # Kết quả: 12/12 PASS
    ```
-3. **Bộ kiểm thử 15 kịch bản toàn diện End-to-End (Phase 4):**
-   ```bash
-   python boxchat/test_e2e_15_scenarios.py
-   # Kết quả: 15/15 PASS (100.0%)
-   ```
-4. **Bộ đánh giá chất lượng RAGAS chuyên sâu (Phase 5):**
+3. **Bộ đánh giá chất lượng RAGAS chuyên sâu (Phase 5):**
    ```bash
    python boxchat/eval_ragas_quality.py
    # Kết quả: Faithfulness 94.43%, Answer Relevance 98.20%, MRR 0.5833

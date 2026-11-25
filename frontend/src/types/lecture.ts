@@ -46,10 +46,19 @@ export interface Lecture {
   quiz_count?: number;
   status: LectureStatus;
   reject_reason?: string;
+  /** Bài đã xuất bản có bản mới: tiến trình duyệt bản mới (học viên vẫn xem bản cũ) */
+  update_status?: 'PENDING_FACULTY' | 'PENDING_TRAINING' | 'REJECTED';
+  update_reject_reason?: string;
+  update_by?: string;
   class_name?: string;
   venue_name?: string;
   created_at: string;
   updated_at: string;
+}
+
+/** Bước duyệt đang chờ xử lý: của bài mới, hoặc của bản cập nhật cho bài đã xuất bản */
+export function reviewStageOf(l: Pick<Lecture, 'status' | 'update_status'>): LectureStatus {
+  return l.status === 'PUBLISHED' && l.update_status ? l.update_status : l.status;
 }
 
 /** Khu giảng đường (bảng CLASSROOM_BUILDING) — quản lý trong Quản trị */

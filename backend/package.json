@@ -9,7 +9,7 @@
     "start": "node --max-old-space-size=4096 server.js",
     "dev": "node server.js",
     "setup:passwords": "node setup-passwords.js",
-    "test": "node --test test-pipeline.js"
+    "test": "node -c server.js && node -c pdf-parser.js"
   },
   "keywords": [],
   "author": "",

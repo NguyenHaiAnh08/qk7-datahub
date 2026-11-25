@@ -208,7 +208,7 @@ module.exports = function createApprovalWorkflow({
     const r = await pool.request()
       .input('id', _sql.VarChar(50), lectureId)
       .query(`
-        SELECT lecture_id, pending_scorm_path, title, created_at
+        SELECT lecture_id, pending_scorm_path, scorm_entry_point, title, created_at
         FROM DIGITAL_LECTURE
         WHERE lecture_id = @id
       `);
@@ -244,6 +244,10 @@ module.exports = function createApprovalWorkflow({
             updated_at = GETDATE()
         WHERE lecture_id = @id
       `);
+
+    require('./lecture-package-helper').finishReplacement({
+      lectureId, pendingPath: lecture.pending_scorm_path, oldEntryPoint: lecture.scorm_entry_point,
+    });
 
     return {
       lectureId,

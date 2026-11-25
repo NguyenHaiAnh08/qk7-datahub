@@ -98,16 +98,16 @@ strix_runs/
 offline_packages/
 tools/gitleaks/
 
-# Virtual Company Logs & Local Agent Skills (Local AI Runtime & Talent Pool)
-.agents/company-*.md
-.agents/skills/*
-!.agents/skills/daub-ui/
-!.agents/skills/design-md/
-!.agents/skills/design-taste-frontend/
-!.agents/skills/huashu-design/
-!.agents/skills/qk7-design-orchestrator/
-!.agents/skills/ui-ux-pro-max/
-!.agents/skills/unslop/
+# Local Master Brain, Agent Skills, Config & Local Tools (Chỉ lưu trên máy cá nhân, không đẩy lên Git)
+ANTIGRAVITY_MASTER_BRAIN.md
+skills-lock.json
+config/
+tools/
+reports/
+.agent/
+.agents/
+.claude/
+.design-references/
 
 
 
@@ -125,3 +125,6 @@ deploy/https/may-chu/mkcert.exe
 
 # File nen san do backend/precompress-public.js tao
 backend/public/**/*.gz
+
+# Log do hieu nang
+backend/logs/

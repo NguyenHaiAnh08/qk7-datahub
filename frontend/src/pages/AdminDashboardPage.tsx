@@ -78,6 +78,7 @@ import { dashboardApi } from '../services/dashboardApi';
 import { permissionService } from '../services/permissionService';
 import { usersApi } from '../services/usersApi';
 import { lectureService } from '../services/lectureService';
+import { reviewStageOf } from '../types/lecture';
 import { formatFileSize } from '../utils/formatFileSize';
 import {
   User,
@@ -581,7 +582,7 @@ const pinPendingCount = useMemo(
       const active = items.filter((l: any) => l.status !== 'DELETED');
       const total = active.length;
       const published = active.filter((l: any) => l.status === 'PUBLISHED').length;
-      const pending = active.filter((l: any) => l.status === 'PENDING_FACULTY' || l.status === 'PENDING_TRAINING').length;
+      const pending = active.filter((l: any) => ['PENDING_FACULTY', 'PENDING_TRAINING'].includes(reviewStageOf(l))).length;
       const draft = active.filter((l: any) => l.status === 'DRAFT' || l.status === 'REJECTED').length;
       const scormCount = active.filter((l: any) => Boolean(l.scorm_entry_point || l.content_type === 'SCORM')).length;
       const secretCount = active.filter((l: any) => (l.security_level_id || 1) >= 3).length;

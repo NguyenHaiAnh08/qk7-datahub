@@ -4,6 +4,31 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.9-ai-rag-threadpool-and-lecture-route-order-hardening] — 2026-11-25
+
+### 1. Khắc Phục Route Shadowing & Phân Định Hạn Mức Tải Lên Phân Hệ Bài Giảng
+- **Đảo thứ tự đăng ký router ([`backend/server.js`](../backend/server.js)):**
+  - Gắn `lecture-extended-routes` trước `lecture-routes` tại tiền tố `/api/lectures` để đảm bảo endpoint tĩnh `/schedules/monitor` không bị route động `/schedules/:id` nuốt chửng.
+- **Phân định rõ giới hạn tải lên theo định dạng nội dung số ([`backend/server.js`](../backend/server.js)):**
+  - Tự động nhận diện URL upload: gói SCORM / HTML5 cho phép dung lượng tối đa **300MB**, bài giảng số PDF tối đa **150MB**, văn bản tài liệu hành chính mặc định **50MB**, trả về thông báo lỗi tiếng Việt trực quan kèm mã kích thước.
+
+### 2. Tối Ưu Bất Đồng Bộ Hóa & Đo Lường Giám Sát AI Boxchat Microservice
+- **Chạy tác vụ nặng trong threadpool ([`boxchat/main.py`](../boxchat/main.py), [`pdf_processor.py`](../boxchat/core/pdf_processor.py), [`agent_tutor.py`](../boxchat/core/agent_tutor.py)):**
+  - Chuyển toàn bộ tác vụ trích xuất PDF scan/OCR và nạp chunk vector store vào `run_in_threadpool`, giải phóng Event Loop của FastAPI.
+  - Endpoint `/api/ai/health` kiểm tra kết nối Ollama thực tế có bộ đệm cache 10 giây và trả về model đang nạp.
+- **Đo lường giám sát chất lượng RAG nâng cao ([`boxchat/core/metrics.py`](../boxchat/core/metrics.py)):**
+  - Bổ sung đếm trích dẫn được xác thực hợp lệ (`CITATIONS_VALID`) và cảnh báo trích dẫn bịa đặt (`CITATIONS_FABRICATED`).
+  - Ghi nhận chi tiết chế độ tổng hợp (`LLM_SYNTHESIS_MODE`) và lý do fallback sang trích xuất trích đoạn (`LLM_FALLBACK_TOTAL`).
+
+### 3. Cấu Hình Timeout Độc Lập Cho Từng Luồng Nghiệp Vụ AI ([`backend/src/ai-routes.js`](../backend/src/ai-routes.js))
+- Tách bạch thời gian chờ: chat hỏi đáp AI thông thường (`AI_CHAT_TIMEOUT_MS`), tạo cẩm nang số (`AI_STUDY_BOOK_TIMEOUT_MS` = 20s), và đồng bộ hóa toàn bộ kho Vector AI (`AI_SYNC_TIMEOUT_MS` = 300s).
+
+### 4. Dọn Dẹp Mã Nguồn & Tinh Chỉnh Giao Diện Frontend
+- Xóa bỏ tệp rỗng `TacticalPagination.tsx`.
+- Tối ưu hóa các thành phần `AIChatDrawer`, `AIChatWidget`, `LoadingSpinner`, `LectureViewerModal`, `LiveMonitorPanel`, `LecturesPage`, `SessionsPage`, `NetworkStatusContext`.
+
+---
+
 ## [v1.8.8-ui-animation-system-and-ocr-air-gapped-hardening] — 2026-11-24
 
 ### 1. Hệ Thống Hoạt Ảnh UI Mới (Lucian Prompt Library)

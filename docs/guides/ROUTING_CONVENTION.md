@@ -239,7 +239,7 @@ Sau khi tạo file này, route được tự động phát hiện và nạp — 
 ## Lưu ý quan trọng
 
 1. **Không sửa `getAppRoutes.ts`** — file này tự động discover route, không import thủ công.
-2. **Không sửa `App.tsx`** — `App.tsx` chỉ khởi tạo `ConfigProvider` (màu tím `#722ED1`), Auth, Theme;
+2. **Không sửa `App.tsx`** — `App.tsx` chỉ khởi tạo `ConfigProvider` (Xanh Lục Quân `#166534` / `#10b981`), Auth, Theme;
    không chứa định nghĩa route.
 3. **Luôn dùng `ROUTE_PATHS`** — không hardcode chuỗi path, luôn tham chiếu hằng số.
 4. **Luôn khai báo `minClearance`** cho route mới — đây là điểm khác biệt bắt buộc so với mẫu

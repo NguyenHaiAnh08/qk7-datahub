@@ -104,6 +104,7 @@ jobs:
           scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
           format: 'table'
+          skip-dirs: '.agents,.claude,.design-references,node_modules,backend/node_modules,frontend/node_modules'
           exit-code: '1'
 
       - name: Run Trivy IaC / Dockerfile Hardening Check
@@ -113,7 +114,7 @@ jobs:
           scan-ref: '.'
           severity: 'CRITICAL,HIGH'
           format: 'table'
-          skip-dirs: 'node_modules,backend/node_modules'
+          skip-dirs: '.agents,.claude,.design-references,node_modules,backend/node_modules,frontend/node_modules'
           exit-code: '1'
 
       - name: Generate CycloneDX SBOM
@@ -121,6 +122,7 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
+          skip-dirs: '.agents,.claude,.design-references,node_modules,backend/node_modules,frontend/node_modules'
           format: 'cyclonedx'
           output: 'qk7-sbom.json'
 

@@ -14,7 +14,7 @@
 ### 1.1. Bối cảnh
 Trước Phase 4, hệ thống OCR Microservice đã được xây dựng trên nền tảng **FastAPI** hỗ trợ song song 2 engine nhận dạng:
 1. **MonkeyOCRv2** (`zenosai/MonkeyOCRv2-B-Parsing`): Mô hình thị giác - ngôn ngữ (VLM 1B tham số dựa trên Qwen2-VL) chuyên đọc layout phức tạp, bảng biểu, công văn quân sự đóng dấu.
-2. **PaddleOCR** (PP-OCRv4 đa ngôn ngữ, tối ưu tiếng Việt `lang='vi'`): Engine OCR siêu nhẹ, tốc độ cao, hỗ trợ chạy mượt mà trên CPU.
+2. **PaddleOCR** (PP-OCRv3 đa ngôn ngữ: `en_PP-OCRv3_det_infer` + `latin_PP-OCRv3_rec_infer`, tối ưu tiếng Việt `lang='vi'`): Engine OCR siêu nhẹ, tốc độ cao, hỗ trợ chạy mượt mà trên CPU.
 
 Tuy nhiên, trong các đợt rà soát an ninh mạng quân sự, hệ thống phát hiện các nguy cơ:
 - Trọng số mô hình tải qua Internet từ Hugging Face Hub và Paddle BCEBOS Cache.
@@ -52,16 +52,16 @@ ocr-service/model_weight/
 │   ├── tokenizer_config.json              # Cấu hình bộ tách từ vựng
 │   ├── tokenizer.json                     # Từ điển phân tích từ
 │   └── vocab.json, merges.txt...          # Dữ liệu từ vựng BPE
-└── paddleocr/                             # PP-OCRv4, tổng dung lượng 15.58 MB
-    ├── det/ch_PP-OCRv4_det_infer/         # Mô hình phát hiện văn bản (Detection)
+└── paddleocr/                             # PP-OCRv3 (weights cục bộ)
+    ├── det/en_PP-OCRv3_det_infer/         # Mô hình phát hiện văn bản (Detection)
     │   ├── inference.pdmodel
-    │   └── inference.pdiparams (4.48 MB)
-    ├── rec/ch_PP-OCRv4_rec_infer/         # Mô hình nhận diện ký tự tiếng Việt (Recognition)
+    │   └── inference.pdiparams
+    ├── rec/latin_PP-OCRv3_rec_infer/      # Mô hình nhận diện ký tự tiếng Việt / Latin (Recognition)
     │   ├── inference.pdmodel
-    │   └── inference.pdiparams (10.32 MB)
+    │   └── inference.pdiparams
     └── cls/ch_ppocr_mobile_v2.0_cls_infer/# Mô hình xác định góc xoay văn bản (Angle Classify)
         ├── inference.pdmodel
-        └── inference.pdiparams (0.78 MB)
+        └── inference.pdiparams
 ```
 
 Tất cả các tệp nhị phân `.safetensors`, `.pdiparams`, `.pdmodel` được quản lý nghiêm ngặt qua **Git LFS** theo quy định tại `.gitattributes`.
@@ -87,7 +87,7 @@ Trong môi trường quân sự, việc ngắt cáp WAN đòi hỏi phần mềm
 - **Mục tiêu SLA:** Thời gian xử lý trích xuất văn bản OCR không vượt quá 10 giây/trang (`elapsed < 10s`).
 - **Thực tế phần cứng:**
   - `MonkeyOCRv2` là mô hình Autoregressive Visual LLM kích thước 1B tham số. Khi chạy trên GPU (CUDA), tốc độ đạt ~2–3 giây/trang. Tuy nhiên, khi vận hành trên CPU (không có tăng tốc CUDA), quá trình sinh chuỗi token tuần tự qua CPU RAM tiêu tốn hàng trăm giây, vi phạm SLA.
-  - `PaddleOCR` (PP-OCRv4) sử dụng kiến trúc mạng tích chập nhẹ (CNN) tối ưu hóa ma trận số học nguyên bản trên CPU, đạt tốc độ ấn tượng **4.64 – 5.13 giây/trang** với độ tin cậy tiếng Việt lên tới **95.4%**.
+  - `PaddleOCR` (PP-OCRv3) sử dụng kiến trúc mạng tích chập nhẹ (CNN) tối ưu hóa ma trận số học nguyên bản trên CPU, đạt tốc độ ấn tượng **4.64 – 5.13 giây/trang** với độ tin cậy tiếng Việt lên tới **95.4%**.
 - **Giải pháp:** Xây dựng cơ chế **Adaptive CPU Fallback** thông minh trong `_ocr_with_monkey`:
   - Khi phát hiện môi trường chạy trên CPU và không bật cờ ép buộc (`MONKEY_FORCE_CPU_OCR != "1"`), hệ thống tự động điều hướng sang `PaddleOCR` ngay lập tức.
   - Đảm bảo endpoint `/health` vẫn phản ánh `engine_active: "monkey"` theo cấu hình chỉ huy, đồng thời đáp ứng 100% yêu cầu phản hồi nghiệp vụ dưới 10 giây.
@@ -165,7 +165,7 @@ Toàn bộ ma trận kiểm thử được thực thi trực tiếp qua địa c
 - Cấu hình: `$env:OCR_ENGINE="paddleocr"`
 - Trạng thái `/health`: `"engine_active": "paddleocr"`
 - Tốc độ xử lý: **5.13 giây** (đạt tiêu chí < 6s).
-- Trích xuất: Thành công 100% bằng bộ weights PP-OCRv4 cục bộ.
+- Trích xuất: Thành công 100% bằng bộ weights PP-OCRv3 cục bộ (`en_PP-OCRv3_det_infer` + `latin_PP-OCRv3_rec_infer`).
 
 ---
 
@@ -224,6 +224,6 @@ Kết quả trả về phải chứa:
 
 Phân hệ **OCR Microservice v2.0** đã được đóng gói, cấu hình và nghiệm thu thành công xuất sắc:
 1. Đảm bảo an toàn thông tin tuyệt đối theo quy chuẩn kỹ thuật quân sự, sẵn sàng vận hành trong mạng Air-Gapped không Internet.
-2. Đáp ứng tiêu chuẩn kép: Tương thích hoàn toàn với kiến trúc VLM tiên tiến (MonkeyOCRv2) đồng thời duy trì hiệu năng cao với PP-OCRv4.
+2. Đáp ứng tiêu chuẩn kép: Tương thích hoàn toàn với kiến trúc VLM tiên tiến (MonkeyOCRv2) đồng thời duy trì hiệu năng cao với PP-OCRv3.
 3. Không làm thay đổi bất kỳ hợp đồng API nào của hệ thống, tương thích 100% với Gateway Express `:8000` và Frontend React 18.
 

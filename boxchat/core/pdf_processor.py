@@ -7,6 +7,8 @@ Gắn cứng metadata bảo mật (security_level_id 1-5) vào từng chunk văn
 import os
 import sys
 import re
+import json
+import requests
 from typing import List, Dict, Any, Optional
 
 # Đảm bảo in tiếng Việt trên console Windows không bị lỗi charmap
@@ -31,6 +33,93 @@ except ImportError:
 class PDFProcessor:
     def __init__(self, uploads_dir: str = "../backend/uploads"):
         self.uploads_dir = os.path.abspath(uploads_dir)
+        self.ocr_service_url = os.getenv("OCR_SERVICE_URL", "http://127.0.0.1:8002").rstrip("/")
+        self.enable_rag_ocr = os.getenv("ENABLE_RAG_OCR", "true").strip().lower() in ("1", "true", "yes", "on")
+        self.ocr_timeout = float(os.getenv("OCR_INGEST_TIMEOUT", "120"))
+        self.ocr_max_pages = int(os.getenv("OCR_INGEST_MAX_PAGES", "20"))
+
+    def _extract_chunks_via_ocr(
+        self,
+        resolved_path: str,
+        file_id: str,
+        document_code: str,
+        title: str,
+        security_level_id: int = 1,
+        chunk_size: int = 900,
+        chunk_overlap: int = 80,
+        max_chunk_size: int = 1200,
+        total_pages: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Gọi OCR Microservice (:8002/api/ocr/extract) cho tệp PDF thuần scan (< 50 ký tự text layer).
+        Bảo toàn chính xác số trang [p.X] và security_level_id. An toàn tuyệt đối nếu :8002 offline.
+        """
+        if not self.enable_rag_ocr:
+            return []
+
+        if total_pages and total_pages > self.ocr_max_pages:
+            pages_param = json.dumps(list(range(1, self.ocr_max_pages + 1)))
+        else:
+            pages_param = "all"
+
+        try:
+            with open(resolved_path, "rb") as f:
+                files = {"file": (os.path.basename(resolved_path), f, "application/pdf")}
+                data = {"pages": pages_param, "dpi": "150"}
+                resp = requests.post(
+                    f"{self.ocr_service_url}/api/ocr/extract",
+                    files=files,
+                    data=data,
+                    timeout=(3.0, self.ocr_timeout),
+                )
+            if resp.status_code != 200:
+                print(f"[OCR_INGEST] ⚠️ OCR Service trả HTTP {resp.status_code} cho file_id={file_id}")
+                return []
+
+            payload = resp.json()
+            if not payload.get("success"):
+                print(f"[OCR_INGEST] ⚠️ OCR không thành công cho file_id={file_id}: {payload.get('error')}")
+                return []
+
+            ocr_chunks: List[Dict[str, Any]] = []
+            current_section_title = ""
+            c_counter = 0
+
+            for page_res in payload.get("results", []):
+                page_num = int(page_res.get("page") or 1)
+                clean_text = self._clean_text(page_res.get("text") or "")
+                if not clean_text or len(clean_text) < 20:
+                    continue
+                sub_texts = self._split_text_to_chunks(clean_text, chunk_size, chunk_overlap, max_chunk_size)
+                for ct in sub_texts:
+                    ct = ct.strip()
+                    if len(ct) < 20:
+                        continue
+                    if self._is_heading(ct):
+                        current_section_title = self._extract_section_title(ct)
+                    c_counter += 1
+                    ocr_chunks.append({
+                        "chunk_id": f"{file_id}_p{page_num}_c{c_counter}",
+                        "file_id": file_id,
+                        "document_code": document_code,
+                        "title": title,
+                        "section_title": current_section_title,
+                        "security_level_id": int(security_level_id),
+                        "page": page_num,
+                        "bbox": [0, 0, 0, 0],
+                        "text": ct,
+                        "ocr_extracted": True,
+                    })
+
+            if ocr_chunks:
+                print(
+                    f"[OCR_INGEST] ✅ Trích xuất OCR thành công file_id={file_id}: "
+                    f"{len(ocr_chunks)} chunks (engine={payload.get('engine_used')})"
+                )
+            return ocr_chunks
+        except Exception as e:
+            print(f"[OCR_INGEST] ⚠️ Không thể gọi OCR Service ({self.ocr_service_url}) cho file_id={file_id}: {e}")
+            return []
 
     def resolve_file_path(self, stored_path: str) -> str:
         """
@@ -142,7 +231,20 @@ class PDFProcessor:
 
                 total_chars = sum(len(c.get("text", "")) for c in chunks)
                 if total_chars < 50:
-                    print(f"[OCR_REQUIRED] file_id={file_id} - Tệp PDF có ít hơn 50 ký tự văn bản ({total_chars} ký tự), nhận diện là tệp scan ảnh.")
+                    print(f"[OCR_REQUIRED] file_id={file_id} - Tệp PDF có ít hơn 50 ký tự văn bản ({total_chars} ký tự), đang thử trích xuất qua OCR Service (:8002)...")
+                    ocr_chunks = self._extract_chunks_via_ocr(
+                        resolved_path=resolved_path,
+                        file_id=file_id,
+                        document_code=document_code,
+                        title=title,
+                        security_level_id=security_level_id,
+                        chunk_size=chunk_size,
+                        chunk_overlap=chunk_overlap,
+                        max_chunk_size=max_chunk_size,
+                        total_pages=len(reader.pages),
+                    )
+                    if ocr_chunks:
+                        return ocr_chunks
                 return chunks
             except Exception as e:
                 raise RuntimeError(f"Lỗi đọc PDF không có PyMuPDF: {e}")
@@ -297,10 +399,23 @@ class PDFProcessor:
         finally:
             doc.close()
 
-        # Kiểm tra tổng số ký tự của tài liệu, cảnh báo nếu là scan ảnh
+        # Kiểm tra tổng số ký tự của tài liệu, nếu là scan ảnh thì tự động gọi OCR Service (:8002)
         total_doc_chars = sum(len(c.get("text", "")) for c in chunks)
         if total_doc_chars < 50:
-            print(f"[OCR_REQUIRED] file_id={file_id} - Tệp PDF có ít hơn 50 ký tự văn bản ({total_doc_chars} ký tự), nhận diện là tệp scan ảnh.")
+            print(f"[OCR_REQUIRED] file_id={file_id} - Tệp PDF có ít hơn 50 ký tự văn bản ({total_doc_chars} ký tự), đang thử trích xuất qua OCR Service (:8002)...")
+            ocr_chunks = self._extract_chunks_via_ocr(
+                resolved_path=resolved_path,
+                file_id=file_id,
+                document_code=document_code,
+                title=title,
+                security_level_id=security_level_id,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                max_chunk_size=max_chunk_size,
+                total_pages=total_pages,
+            )
+            if ocr_chunks:
+                return ocr_chunks
 
         return chunks
 

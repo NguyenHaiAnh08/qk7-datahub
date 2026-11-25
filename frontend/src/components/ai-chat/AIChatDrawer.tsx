@@ -58,6 +58,7 @@ export const AIChatDrawer: React.FC = () => {
   const [fpTokenExpiresAt, setFpTokenExpiresAt] = useState<number | null>(null);
   // Lưu câu hỏi gần nhất của user để auto-retry sau khi quét vân tay
   const [lastQuery, setLastQuery] = useState<string>('');
+  const [isDecryptingRetry, setIsDecryptingRetry] = useState<boolean>(false);
   const lastUserQueryRef = useRef<string>('');
 
   // Lấy token vân tay còn hiệu lực nội bộ trong Chatbox (hạn 5 phút từ khi quét và đúng file)
@@ -233,6 +234,7 @@ export const AIChatDrawer: React.FC = () => {
       }
     }
 
+    setIsDecryptingRetry(Boolean(isRetry));
     setLoading(true);
 
     const history = messages
@@ -286,6 +288,7 @@ export const AIChatDrawer: React.FC = () => {
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
+      setIsDecryptingRetry(false);
       setLoading(false);
     }
   };
@@ -354,6 +357,7 @@ export const AIChatDrawer: React.FC = () => {
 
     const queryToRetry = lastQuery || lastUserQueryRef.current || inputText.trim();
     if (queryToRetry) {
+      setIsDecryptingRetry(true);
       setLoading(true);
       await handleSend(queryToRetry, validToken, true, targetScanFileId);
     } else if (targetScanFileId) {
@@ -631,7 +635,7 @@ export const AIChatDrawer: React.FC = () => {
 
                 {/* Trạng thái AI đang suy nghĩ — bong bóng 3 dấu chấm nhấp nháy theo sóng */}
                 {loading && (
-                  <AIThinkingBubble isDecrypting={Boolean(lastQuery)} />
+                  <AIThinkingBubble isDecrypting={isDecryptingRetry} />
                 )}
 
                 <div ref={messagesEndRef} />

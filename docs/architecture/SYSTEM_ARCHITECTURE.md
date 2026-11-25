@@ -45,7 +45,7 @@
 
 **TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB** là nền tảng quản trị và lưu trữ tài liệu số tập trung, phục vụ công tác chỉ huy, tham mưu tác chiến và văn thư hành chính trong toàn Quân Khu 7. Hệ thống tích hợp toàn diện trí tuệ nhân tạo và công nghệ sinh trắc học phần cứng theo các trụ cột cốt lõi:
 
-* **Ứng Dụng Đơn Trang Chuẩn (SPA React 18 + TypeScript + Ant Design):** Toàn bộ giao diện được nạp qua duy nhất 1 vỏ bọc `index.html`, sử dụng cơ chế Auto-Discovery Routing qua `import.meta.glob`, không tải lại trang, bảo lưu trạng thái xác thực và trải nghiệm mượt mà với tông màu Tím chủ đạo (`#722ED1`).
+* **Ứng Dụng Đơn Trang Chuẩn (SPA React 18 + TypeScript + Ant Design):** Toàn bộ giao diện được nạp qua duy nhất 1 vỏ bọc `index.html`, sử dụng cơ chế Auto-Discovery Routing qua `import.meta.glob`, không tải lại trang, bảo lưu trạng thái xác thực và trải nghiệm mượt mà với tông màu Xanh Lục Quân chủ đạo (`#166534` Light / `#10b981` Dark).
 * **Kiến Trúc Giao Diện Kép Đa Nền Tảng (Dual-Platform PC & iPad Air M4 Touch UI):** Tương thích tối ưu cả Máy tính để bàn (Widescreen 16:9) và máy tính bảng iPad Air M4 (11-inch & 13-inch) với cơ chế `DeviceModeContext`, cho phép chuyển đổi chế độ xem tức thì. Trên iPadOS hỗ trợ vuốt chạm chuẩn Apple HIG (Touch Target ≥ 44×44px); trên Desktop PC sử dụng cụm nút bấm chuyển trang màu sắc chuyên biệt (`Đăng tải`, `Trung tâm thư viện số`, `Đơn vị của tôi`, `Quản trị`) ổn định, loại bỏ hiệu ứng viên thuốc trượt để ngăn ngừa triệt để lỗi nhảy giao diện.
 * **Chuẩn Hóa Danh Xưng "Trung Tâm Thư Viện Số" & Phân Hệ "Đơn Vị Của Tôi":** Chuẩn hóa toàn bộ nhãn giao diện từ "Portal" thành "Trung tâm thư viện số", đồng thời cung cấp phân hệ `/my-unit` hỗ trợ các cơ quan, đơn vị trực thuộc Quân Khu 7 tra cứu, lưu trữ và khai thác tài liệu nội bộ chuyên biệt.
 * **Kiểm Soát Độ Mật 5 Cấp Nghiêm Ngặt:** Ngăn chặn tuyệt đối việc rò rỉ thông tin quân sự (từ Cấp 1 - Công khai đến Cấp 5 - Tuyệt mật), thực thi kiểm soát tại cả 3 tầng: UI Guard, Gateway Middleware và SQL Server Database Constraint.
@@ -218,7 +218,7 @@ qk7-datahub/
     ├── tailwind.config.js                  # Cấu hình TailwindCSS
     │
     └── src/
-        ├── App.tsx                         # Khởi tạo Ant Design ConfigProvider (Màu Tím #722ED1), Auth, Theme
+        ├── App.tsx                         # Khởi tạo Ant Design ConfigProvider (Xanh Lục Quân #166534 / #10b981), Auth, Theme
         ├── main.tsx                        # Gắn kết React createRoot
         ├── index.css                       # Design System CSS, biến màu quân sự, hiệu ứng glassmorphism
         │
@@ -741,7 +741,7 @@ Tạo hoặc chỉnh sửa tệp `boxchat/.env`:
 BACKEND_UPLOADS_DIR=../backend/uploads
 QDRANT_STORAGE_PATH=./local_storage/qdrant_data
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_MODEL=qwen2.5:3b
 ```
 
 #### 5. Cài đặt dependencies (Chỉ chạy lần đầu)
@@ -880,7 +880,7 @@ Phân hệ **SecurityAuditLog** (`frontend/src/components/dashboard/SecurityAudi
   - Đường viền và phân cách: `border-slate-800/80` kèm hiệu ứng phát sáng nhẹ (subtle glow), giảm thiểu tối đa hiện tượng lóa và mỏi mắt khi trực ca đêm kéo dài.
 - **Light Mode (Day Ops / Văn phòng ban ngày):**
   - Nền `bg-slate-50`, card `bg-white/90`, viền `border-slate-200/90`, văn bản tương phản rõ ràng, bảo đảm khả năng đọc văn bản dưới ánh sáng mạnh.
-- **Màu sắc hành động chủ đạo:** Tông màu tím Ant Design (`#722ED1`, `bg-purple-600`) đồng nhất toàn hệ thống.
+- **Màu sắc hành động chủ đạo:** Tông màu Xanh Lục Quân (`#166534` Light / `#10b981` Dark, `bg-emerald-700`) đồng nhất toàn hệ thống.
 
 ### 11.2. Bốn Thẻ Chỉ Số KPI Tác Chiến Thời Gian Thực (Tactical KPI Cards)
 Hệ thống tự động phân loại và tính toán 4 chỉ số KPI ngay trên dữ liệu nhật ký kiểm toán:
@@ -937,7 +937,7 @@ Hệ thống sử dụng bộ phân loại từ khóa và biểu thức chính q
 
 | Phân Cấp | Tiêu Chí Nhận Diện Tên Đơn Vị | Màu Sắc / Badge |
 | :--- | :--- | :---: |
-| **Cấp Quân Khu** | `Bộ Tư Lệnh`, `Quân Khu`, `BTL` | Tím Đậm (`#722ED1`) |
+| **Cấp Quân Khu** | `Bộ Tư Lệnh`, `Quân Khu`, `BTL` | Xanh Lục Quân (`#166534`) |
 | **Cấp Sư Đoàn** | `Sư đoàn`, `Lữ đoàn`, `F[0-9]+`, `Lữ` | Xanh Lam Đậm |
 | **Cấp Trung Đoàn** | `Trung đoàn`, `E[0-9]+` | Xanh Dương |
 | **Cấp Tiểu Đoàn** | `Tiểu đoàn`, `Đại đội`, `D[0-9]+`, `C[0-9]+` | Xanh Lá Cây |
@@ -1014,7 +1014,7 @@ Hệ thống được thiết kế và kiểm thử thực tế trên thiết b�
   - Đặt tại góc phải thanh Header (bên cạnh đồng hồ hệ thống).
   - Hỗ trợ xem nhanh Popover thông số kỹ thuật thiết bị: Viewport thực tế, DPR, Touch Area, Gestures, Định dạng tối ưu.
   - **Hỗ trợ toàn diện 2 Theme:**
-    - **Light Mode:** Nền `bg-purple-50/70`, viền `border-purple-200/80`, nút kích hoạt đổ màu tím đậm thương hiệu QK7 (`#722ED1`, `bg-purple-600 text-white`). Popover nền trắng tinh khiết `#ffffff`, viền tím nhạt thanh lịch.
+    - **Light Mode:** Nền `bg-emerald-50/70`, viền `border-emerald-200/80`, nút kích hoạt đổ màu Xanh Lục Quân thương hiệu QK7 (`#166534`, `bg-[#166534] text-white`). Popover nền trắng tinh khiết `#ffffff`, viền xanh lục nhạt thanh lịch.
     - **Dark Mode:** Nền `bg-slate-900/80`, viền `border-slate-800`, nút kích hoạt tím dạ quang sang trọng.
 
 ### 14.4. Cơ Chế Điều Hướng Chuyển Trang Phân Biệt Giữa PC & iPad
@@ -1438,7 +1438,7 @@ Toàn bộ danh mục 13 sự cố kỹ thuật điển hình đã từng gặp 
 ### 4.3. Phân Hệ OCR Microservice (:8002 - PaddleOCR & PyMuPDF)
 - **Vai trò:** Xử lý offload các tác vụ nhận dạng ký tự quang học nặng (OCR), tách biệt hoàn toàn khỏi luồng Event Loop của Gateway.
 - **Công nghệ lõi:**
-  - **PaddleOCR (PP-OCRv4):** Nhận diện tiếng Việt (`lang='vi'`), tự động xoay hướng văn bản (`use_angle_cls=True`), phân tích bố cục văn bản hành chính 2 cột.
+  - **PaddleOCR (PP-OCRv3 — `en_PP-OCRv3_det_infer` + `latin_PP-OCRv3_rec_infer` + `ch_ppocr_mobile_v2.0_cls_infer`):** Nhận diện tiếng Việt (`lang='vi'`), tự động xoay hướng văn bản (`use_angle_cls=True`), phân tích bố cục văn bản hành chính 2 cột.
   - **PyMuPDF (fitz):** Render trang PDF trực tiếp ra bitmap bộ nhớ với hiệu năng C-speed và DPI tối ưu (150 DPI).
 - **Định tuyến thông minh (`pdf-router.js`):** Phân loại `TextBased`, `Scanned`, `Mixed` trong vòng 7ms, chỉ gửi các trang cần bóc tách metadata (Trang 1) sang microservice OCR, giảm tải 95% thời gian tính toán.
 - **Fallback an toàn:** Nếu tiến trình `:8002` không phản hồi hoặc timeout (15s), Gateway kích hoạt cơ chế dự phòng an toàn (local Tesseract) bị chặn trần tối đa trang để tránh nghẽn server.
@@ -1592,7 +1592,7 @@ Tại `backend/src/lecture-package-helper.js`, gói ZIP SCORM/HTML5 bắt buộc
 - **Primary (Xanh Lục Quân):** `#166534` (Light) • `#10b981` (Dark) — Tượng trưng màu áo người lính Quân khu 7.
 - **Secondary (Vàng Kim Quân Hiệu & Đồng Cổ):** `#d97706` (Light) • `#fbbf24` (Dark) — Uy nghiêm, chuẩn mực.
 - **Accent/Alert (Đỏ Quân Kỳ):** `#b91c1c` (Light) • `#f87171` (Dark) — Cảnh báo cấp mật tối cao.
-- **Neutral (Tím Thư Viện):** `#722ED1` — Màu thương hiệu truyền thống của hệ thống Trung tâm Thư viện số QK7.
+- **Primary (Xanh Lục Quân):** `#166534` (Light) / `#10b981` (Dark) — Màu bản sắc chuẩn hóa toàn hệ thống Trung tâm Dữ liệu số Trường Quân sự Quân khu 7.
 - **Typography:** `Be Vietnam Pro` (văn bản hành chính) + `JetBrains Mono` (`font-mono tabular-nums` cho số liệu tọa độ, quân số, mật mã).
 
 ---

@@ -42,7 +42,7 @@ const swaggerSpec = {
 
       '**WebSocket Fingerprint Agent:** `ws://<host>/ws/fingerprint?bridge_token=<token>&device_id=<id>` — Agent ZK9500 kết nối tới BE. Heartbeat ping 30s, timeout 90s.\n\n' +
 
-      '**⚠️ 2FA Admin (hiện đang TẮT):** Khối kiểm tra vân tay Admin 2 bước trong `POST /api/auth/login` đã bị comment out — endpoint `POST /api/auth/login/admin-fp-verify` tồn tại nhưng **không thể đạt được qua luồng login chuẩn**. Hiện tại mọi user (kể cả Admin) đều nhận JWT ngay sau bước 1.\n\n' +
+      '**🔒 2FA Admin (BẮT BUỘC — Đang BẬT):** Mọi tài khoản Quản trị viên (bao gồm `USR-001` và các tài khoản có vai trò `ROL-01`) khi đăng nhập qua `POST /api/auth/login` sẽ nhận HTTP **202** kèm `temp_ticket` (opaque ticket hiệu lực 120s) và bắt buộc hoàn tất bước 2 quét vân tay ZK9500 tại `POST /api/auth/login/admin-fp-verify` để nhận JWT. Nếu chưa enroll vân tay sẽ bị chặn `403 ADMIN_FINGERPRINT_REQUIRED`.\n\n' +
 
       '**Fingerprint + PIN cho tài liệu mật:**\n' +
       '- Cấp 1-2: xem trực tiếp\n' +
@@ -151,15 +151,15 @@ const swaggerSpec = {
     '/api/auth/login': {
       post: {
         tags: ['Auth'],
-        summary: 'Đăng nhập — trả JWT (2FA vân tay Admin hiện đang TẮT)',
+        summary: 'Đăng nhập bước 1 — trả JWT (User thường) hoặc 202 temp_ticket (2FA vân tay Admin)',
         description:
-          '⚠️ **Lưu ý:** Khối kiểm tra 2FA vân tay Admin trong code hiện đang bị **COMMENT OUT** → endpoint này luôn trả **200** với JWT, không còn trả `202` + `temp_ticket`.\n\n' +
+          '🔒 **2FA Admin Bắt Buộc:** Với mọi tài khoản Quản trị viên (`USR-001` hoặc có vai trò `ROL-01`), endpoint trả **202** `{ require_admin_fp: true, temp_ticket, user_id, expires_in }` để tiếp tục xác thực vân tay tại `POST /api/auth/login/admin-fp-verify` (hoặc **403** `ADMIN_FINGERPRINT_REQUIRED` nếu chưa enroll vân tay).\n\n' +
           '**Cơ chế bảo mật đang hoạt động:**\n' +
           '- IP Whitelist cho `USR-001` (nếu `ADMIN_ALLOWED_IP` set trong .env)\n' +
           '- Lockout sau `LOCKOUT_MAX_ATTEMPTS` lần sai (mặc định 6 lần / 15 phút) — chỉ áp dụng cho non-Admin\n' +
           '- IP bị chặn sau 6 lần dò username hoặc 15 lần sai mật khẩu (30 phút)\n' +
           '- Login attempt + access log ghi đầy đủ\n' +
-          '- Session JWT được tạo và có thể bị revoke',
+          '- Session JWT được tạo và tự động thu hồi sau `SESSION_IDLE_TIMEOUT_MINUTES` (mặc định 30 phút)',
         security: [],
         requestBody: {
           required: true,
@@ -173,7 +173,7 @@ const swaggerSpec = {
         },
         responses: {
           200: {
-            description: 'Thành công — trả JWT + thông tin user + danh sách permissions',
+            description: 'Thành công (User thường) — trả JWT + thông tin user + danh sách permissions',
             content: { 'application/json': { schema: { type: 'object', properties: {
               success:    { type: 'boolean', example: true },
               token:      { type: 'string', description: 'JWT. Payload `{ user_id, clearance_level_id, roles, iat, exp }`' },
@@ -181,9 +181,21 @@ const swaggerSpec = {
               user:       { $ref: '#/components/schemas/UserFull' },
             } } } },
           },
+          202: {
+            description: 'Yêu cầu bước 2 xác thực vân tay 2FA cho Quản trị viên',
+            content: { 'application/json': { schema: { type: 'object', properties: {
+              success:            { type: 'boolean', example: true },
+              require_admin_fp:   { type: 'boolean', example: true },
+              temp_ticket:        { type: 'string', description: 'Opaque ticket dùng 1 lần (TTL 120s)' },
+              user_id:            { type: 'string', example: 'USR-001' },
+              is_protected_admin: { type: 'boolean', example: true },
+              expires_in:         { type: 'string', example: '120s' },
+              message:            { type: 'string' },
+            } } } },
+          },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { description: 'Sai tài khoản hoặc mật khẩu' },
-          403: { description: 'Tài khoản bị khóa / vô hiệu hóa / IP Admin không hợp lệ / chưa cấp mật khẩu' },
+          403: { description: 'Tài khoản bị khóa / vô hiệu hóa / IP Admin không hợp lệ / chưa cấp mật khẩu / Admin chưa enroll vân tay' },
           429: { description: 'IP bị chặn tạm thời — trả `{ error, reason, mins_left }`' },
           500: { $ref: '#/components/responses/ServerError' },
         },
@@ -193,11 +205,10 @@ const swaggerSpec = {
     '/api/auth/login/admin-fp-verify': {
       post: {
         tags: ['Auth'],
-        summary: '⚠️ DEPRECATED — 2FA vân tay Admin (luồng login đã tắt)',
-        deprecated: true,
+        summary: 'Đăng nhập bước 2 — Xác thực vân tay 2FA bắt buộc cho Quản trị viên',
         description:
-          'Endpoint vẫn hoạt động nếu client có `temp_ticket` hợp lệ, nhưng vì khối tạo `temp_ticket` trong `POST /api/auth/login` đã bị comment out → **không thể đạt được qua luồng login chuẩn**.\n\n' +
-          'Giữ lại cho mục đích test / tái kích hoạt sau này. Code vẫn đầy đủ: verify `temp_ticket` → load template vân tay từ DB → giải mã AES-256-GCM → gửi job quét xuống Agent → cấp JWT chính thức nếu khớp.',
+          'Hoàn tất đăng nhập 2FA cho Quản trị viên bằng `temp_ticket` nhận từ `POST /api/auth/login` (HTTP 202).\n\n' +
+          'Quy trình: verify opaque `temp_ticket` (dùng 1 lần, TTL 120s) → load template vân tay từ DB → giải mã AES-256-GCM → gửi job quét xuống Agent ZK9500 → cấp JWT chính thức nếu khớp.',
         security: [],
         requestBody: {
           required: true,
@@ -2539,8 +2550,8 @@ const swaggerSpec = {
                 requires_biometric:  { type: 'boolean', description: 'true = cần FP ZK9500 để xem chi tiết' },
               } } },
               requires_biometric: { type: 'boolean' },
-              retrieval_mode:     { type: 'string', enum: ['microservice', 'sql_fallback'] },
-              synthesis_mode:     { type: 'string', enum: ['microservice', 'sql_fallback', 'clearance_blocked', 'not_found'] },
+              retrieval_mode:     { type: 'string', enum: ['hybrid', 'bm25_only', 'sql_fallback'] },
+              synthesis_mode:     { type: 'string', enum: ['llm', 'extractive', 'not_accessible', 'sql_fallback'] },
               reasoning: { type: 'object', properties: {
                 mem:       { type: 'string' },
                 think:     { type: 'string' },
@@ -3192,17 +3203,16 @@ const swaggerSpec = {
 },
 
 // ═══════════════════════════════════════════════════════════
-// LECTURES — SCORM Package upload (extended)
+// LECTURES — SCORM / HTML5 / PDF Package Upload & Launch (scorm-package-routes.js)
 // ═══════════════════════════════════════════════════════════
 '/api/lectures/{lectureId}/scorm/upload': {
   post: {
     tags: [TAG_LECTURES],
-    summary: 'Upload gói ZIP SCORM → extract → parse imsmanifest → lưu SCORM_PACKAGE',
+    summary: 'Upload gói ZIP SCORM (tối đa 300MB) → lưu pending / extract → cập nhật DIGITAL_LECTURE',
     description:
-      '**Yêu cầu permission:** `LECTURE_CREATE` + phải là tác giả bài giảng.\n\n' +
-      '- Dung lượng tối đa 200 MB, chỉ chấp nhận `.zip`\n' +
-      '- Bắt buộc có `imsmanifest.xml`\n' +
-      '- Tự động phát hiện `entry_point` từ `<resource href="...">` hoặc `index.html`',
+      '**Yêu cầu permission:** `LECTURE_CREATE` + quyền quản lý bài giảng.\n\n' +
+      '- Dung lượng tối đa **300 MB**, chỉ chấp nhận `.zip` (chống Zip Slip & Zip Bomb)\n' +
+      '- Hỗ trợ SCORM 1.2 / 2004, ActivePresenter (`demo.html`), Articulate Storyline',
     parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
     requestBody: {
       required: true,
@@ -3214,48 +3224,112 @@ const swaggerSpec = {
     responses: {
       200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
         success:     { type: 'boolean' },
-        package_id:  { type: 'string', example: 'PKG-1760000000000' },
-        entry_point: { type: 'string', example: 'index.html' },
+        entry_point: { type: 'string', example: 'uploads/bai-giang-so/.../demo.html' },
       } } } } },
-      400: { description: 'File không phải .zip / thiếu imsmanifest.xml' },
-      403: { description: 'Không phải tác giả' },
+      400: { description: 'File không phải .zip hoặc vượt quá 300MB' },
+      403: { description: 'Không có quyền quản lý bài giảng' },
     },
   },
 },
 
-'/api/lectures/scorm/{packageId}/{path}': {
-  get: {
+'/api/lectures/{lectureId}/html5/upload': {
+  post: {
     tags: [TAG_LECTURES],
-    summary: 'Serve file tĩnh trong gói SCORM đã extract (cho iframe RTE)',
-    description:
-      '**Yêu cầu:** đăng nhập.\n\n' +
-      'Chặn path traversal — mọi `..` hoặc đường dẫn ngoài thư mục gói đều trả 403.',
-    parameters: [
-      { in: 'path', name: 'packageId', required: true, schema: { type: 'string' } },
-      { in: 'path', name: 'path',      required: true, schema: { type: 'string' } },
-    ],
+    summary: 'Upload gói ZIP HTML5 tương tác (tối đa 300MB)',
+    description: '**Yêu cầu permission:** `LECTURE_CREATE`. Dung lượng tối đa **300 MB**, chỉ chấp nhận `.zip`.',
+    parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'multipart/form-data': { schema: {
+        type: 'object', required: ['file'],
+        properties: { file: { type: 'string', format: 'binary' } },
+      } } },
+    },
     responses: {
-      200: { description: 'Trả file tĩnh (HTML/CSS/JS/ảnh/media...)' },
-      403: { description: 'Path traversal bị chặn' },
-      404: { description: 'Không tìm thấy file trong gói' },
+      200: { description: 'OK' },
+      400: { description: 'File không hợp lệ hoặc vượt quá 300MB' },
     },
   },
 },
 
-'/api/lectures/{lectureId}/scorm/info': {
+'/api/lectures/{lectureId}/pdf/upload': {
+  post: {
+    tags: [TAG_LECTURES],
+    summary: 'Upload tệp PDF giáo án bài giảng (tối đa 150MB)',
+    description: '**Yêu cầu permission:** `LECTURE_CREATE`. Dung lượng tối đa **150 MB**, chỉ chấp nhận `.pdf`.',
+    parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      required: true,
+      content: { 'multipart/form-data': { schema: {
+        type: 'object', required: ['file'],
+        properties: { file: { type: 'string', format: 'binary' } },
+      } } },
+    },
+    responses: {
+      200: { description: 'OK' },
+      400: { description: 'File không phải .pdf hoặc vượt quá 150MB' },
+    },
+  },
+},
+
+'/api/lectures/{lectureId}/pdf': {
   get: {
     tags: [TAG_LECTURES],
-    summary: 'Lấy entry_point + metadata gói SCORM để FE dựng iframe',
-    description: '**Yêu cầu permission:** `LECTURE_VIEW`.',
+    summary: 'Stream tệp PDF bài giảng (bắt buộc X-Fingerprint-Token / PIN với Cấp 3+)',
+    description:
+      '**Yêu cầu:** `LECTURE_VIEW` (hoặc Guest cho bài Cấp 1 đã xuất bản).\n\n' +
+      '- Cấp 3+: yêu cầu `X-Fingerprint-Token` (hoặc `?fp=`) khớp `lectureId` (Cấp 4–5 cần `pin_verified: true`), hoặc đang trong ca giảng `ONGOING`.',
     parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
     responses: {
-      200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
-        package_id:     { type: 'string' },
-        entry_point:    { type: 'string' },
-        schema_version: { type: 'string', example: '1.2' },
-        file_size:      { type: 'integer' },
-      } } } } },
+      200: { description: 'Binary PDF stream (`application/pdf`)' },
+      403: { description: 'Không đủ cấp mật hoặc thiếu token vân tay (`require_fingerprint: true`)' },
+      404: { description: 'Không tìm thấy tệp PDF' },
+    },
+  },
+},
+
+'/api/lectures/{lectureId}/scorm/launch': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Khởi chạy gói SCORM trong iframe (nhúng SCORM RTE bridge)',
+    description: '**Yêu cầu:** `LECTURE_VIEW`. Chống path traversal chặt chẽ trong `uploads/bai-giang-so/`.',
+    parameters: [
+      { in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } },
+      { in: 'query', name: 'file', schema: { type: 'string' }, description: 'Tệp HTML cụ thể (tuỳ chọn)' },
+    ],
+    responses: {
+      200: { description: 'Trang HTML khởi chạy gói SCORM' },
+      403: { description: 'Không đủ cấp mật / Path traversal bị chặn' },
       404: { description: 'Bài giảng chưa có gói SCORM' },
+    },
+  },
+},
+
+'/api/lectures/{lectureId}/html5/launch': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Khởi chạy gói HTML5 tương tác trong iframe',
+    description: '**Yêu cầu:** `LECTURE_VIEW`.',
+    parameters: [
+      { in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } },
+      { in: 'query', name: 'file', schema: { type: 'string' } },
+    ],
+    responses: {
+      200: { description: 'Trang HTML khởi chạy gói HTML5' },
+      404: { description: 'Bài giảng chưa có gói HTML5' },
+    },
+  },
+},
+
+'/api/lectures/{lectureId}/modes': {
+  get: {
+    tags: [TAG_LECTURES],
+    summary: 'Lấy danh sách các chế độ trình chiếu (HTML entry modes) của gói bài giảng',
+    description: '**Yêu cầu:** `LECTURE_VIEW`.',
+    parameters: [{ in: 'path', name: 'lectureId', required: true, schema: { type: 'string' } }],
+    responses: {
+      200: { description: 'Danh sách modes (`demo.html`, `tutorial.html`, `index.html`...)' },
+      404: { description: 'Không tìm thấy bài giảng' },
     },
   },
 },

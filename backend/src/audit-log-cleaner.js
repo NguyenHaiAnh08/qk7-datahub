@@ -19,11 +19,22 @@ async function ensureArchiveTable(pool) {
         [action] VARCHAR(50) NOT NULL,
         [timestamp] DATETIME NOT NULL,
         ip VARCHAR(50) NULL,
-        note NVARCHAR(255) NULL,
+        note NVARCHAR(1000) NULL,
         archived_at DATETIME NOT NULL DEFAULT GETDATE()
       );
       CREATE INDEX IX_ACCESS_LOG_ARCHIVE_timestamp ON ACCESS_LOG_ARCHIVE([timestamp] DESC);
       CREATE INDEX IX_ACCESS_LOG_ARCHIVE_user_id ON ACCESS_LOG_ARCHIVE(user_id);
+    END
+    ELSE IF EXISTS (
+      SELECT 1
+      FROM sys.columns
+      WHERE object_id = OBJECT_ID('ACCESS_LOG_ARCHIVE')
+        AND name = 'note'
+        AND max_length > 0
+        AND max_length < 2000
+    )
+    BEGIN
+      ALTER TABLE ACCESS_LOG_ARCHIVE ALTER COLUMN note NVARCHAR(1000) NULL;
     END
   `;
   await pool.request().query(query);

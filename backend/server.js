@@ -16,7 +16,7 @@ const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf, extractTextFromDigitalPdf, extractMetadata } = require('./pdf-parser');
-const { classifyPdf } = require('./src/pdf-router');
+// pdf-router.js và pdfWatermarkServer.js là module tiện ích độc lập (dùng cho test-pipeline.js)
 const { getAuthoritativeServerTime, detectOsClockTamper, syncFromDatabase } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 const createApprovalWorkflow = require('./src/approval-workflow');
@@ -4653,16 +4653,18 @@ app.use('/api/ai', requireAuth, aiLimiter, require('./src/ai-routes')({
   JWT_SECRET,
 }));
 
+// Gắn lecture-extended-routes TRƯỚC lecture-routes để route tĩnh /schedules/monitor
+// không bị route động /schedules/:id chặn (Route Shadowing).
+app.use('/api/lectures', require('./src/lecture-extended-routes')({
+  requireAuth, requirePermission, writeAccessLog, getClientIp,
+}));
+
 app.use('/api/lectures', require('./src/lecture-routes')({
   requireAuth,
   requirePermission,
   requireAnyPermission,
   writeAccessLog,
   getClientIp
-}));
-
-app.use('/api/lectures', require('./src/lecture-extended-routes')({
-  requireAuth, requirePermission, writeAccessLog, getClientIp,
 }));
 
 app.use('/api/lectures', require('./src/scorm-package-routes')({
@@ -4677,7 +4679,16 @@ app.use('/api/command', requireAuth, require('./src/command-routes')({ requirePe
 // ═══════════════════════════════════════════════════════════════
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File vượt quá 50MB', code: 'LIMIT_FILE_SIZE' });
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      const url = req.originalUrl || '';
+      let maxLabel = '50MB';
+      if (/\/api\/lectures\/[^/]+\/(scorm|html5)\/upload/i.test(url)) {
+        maxLabel = '300MB';
+      } else if (/\/api\/lectures\/[^/]+\/pdf\/upload/i.test(url)) {
+        maxLabel = '150MB';
+      }
+      return res.status(400).json({ error: `Tệp vượt quá giới hạn tối đa ${maxLabel}`, code: 'LIMIT_FILE_SIZE' });
+    }
     return res.status(400).json({ error: err.message, code: 'MULTER_ERROR' });
   }
   if (err) {

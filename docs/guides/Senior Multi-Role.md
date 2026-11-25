@@ -9,7 +9,7 @@
 ## Bối cảnh hệ thống & Kiến trúc
 
 - **Kiến trúc 5 tầng:** Client/Phần cứng (trình duyệt + máy quét ZKTeco ZK9500) → Presentation SPA (React 18 + TypeScript + Ant Design) → Gateway (Express 5, `:8000`) → AI Microservice (`boxchat` FastAPI, `:8001`, Qdrant local) → Storage (SQL Server `QK7_ThuVienSo`, ổ đĩa `uploads/`, Qdrant vector).
-- **Frontend:** SPA 1 `index.html` duy nhất, Auto-Discovery Routing qua `import.meta.glob`, tông màu Tím `#722ED1`, hỗ trợ Dual-Platform (Desktop PC Widescreen & iPad Air M4 Touch UI qua `DeviceModeContext`).
+- **Frontend:** SPA 1 `index.html` duy nhất, Auto-Discovery Routing qua `import.meta.glob`, tông màu Xanh Lục Quân `#166534` (Light) / `#10b981` (Dark), hỗ trợ Dual-Platform (Desktop PC Widescreen & iPad Air M4 Touch UI qua `DeviceModeContext`).
 - **Backend:** Express 5 Gateway, Auth & Clearance Middleware, WebSocket Server `/ws/fingerprint`, AI Gateway Router có Smart SQL Fallback.
 - **AI:** `boxchat` (FastAPI `:8001`) — PDFProcessor, HybridVectorStore (Qdrant), Agent Tutor, StudyBookGenerator, MediaTimelineManager.
 - **Sinh trắc học:** Local Fingerprint Agent (Python, `:9001`) giao tiếp `libzkfp.dll` qua ctypes, đối sánh 1:1 thuật toán zkfinger10, nối WebSocket 2 chiều tới Gateway.
@@ -44,7 +44,7 @@
 
 - Phạm vi: `boxchat/core/{pdf_processor, vector_store, agent_tutor, study_book_gen, media_timeline}.py`, FastAPI `:8001`, Qdrant cục bộ (`local_storage/qdrant_data`).
 - **An toàn dữ liệu mật là ưu tiên số một:** lọc `security_level_id <= user_clearance` ngay tại tầng truy vấn vector, không lọc sau khi đã sinh câu trả lời.
-- Toàn bộ pipeline (embedding, vector store, suy luận) chạy **cục bộ** (Qdrant local, Ollama `qwen2.5:7b` local) — không gọi AI qua Internet cho dữ liệu quân sự/nội bộ.
+- Toàn bộ pipeline (embedding, vector store, suy luận) chạy **cục bộ** (Qdrant local, Ollama `qwen2.5:3b` local) — không gọi AI qua Internet cho dữ liệu quân sự/nội bộ.
 - Mọi câu trả lời phải **có căn cứ trích dẫn** (`citations` kèm `file_id`, `page_number` xác minh được) — không bịa trích dẫn hay số trang.
 - Smart SQL Fallback khi `:8001` offline vẫn phải áp đúng điều kiện lọc cấp mật — không nới lỏng ở nhánh dự phòng.
 - `StudyBookGenerator` chỉ tổng hợp từ tài liệu đã nạp hợp lệ qua `/api/ai/ingest`, không tự suy diễn ngoài nguồn được cấp quyền.

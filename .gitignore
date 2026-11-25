@@ -125,3 +125,6 @@ deploy/https/may-chu/mkcert.exe
 
 # File nen san do backend/precompress-public.js tao
 backend/public/**/*.gz
+
+# Log do hieu nang
+backend/logs/

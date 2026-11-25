@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { installPreviewScormApi } from './previewScormApi';
 import { X, BookOpen, Shield, Maximize2, Minimize2, AlertTriangle, RefreshCw, FileText, Layers, ExternalLink } from 'lucide-react';
 import { Lecture } from '../../types/lecture';
 import { getAuthHeaders } from '../../services/http';
@@ -107,6 +108,12 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
       if (objUrl) URL.revokeObjectURL(objUrl);
     };
   }, [open, lecture?.lecture_id, lecture?.content_type, reloadKey]);
+
+  // API SCORM xem trước: phải có TRƯỚC khi gói bài giảng trong iframe chạy (useLayoutEffect)
+  useLayoutEffect(() => {
+    if (!open || !lecture || lecture.content_type === 'PDF') return;
+    return installPreviewScormApi();
+  }, [open, lecture?.lecture_id, lecture?.content_type, selectedFile, reloadKey]);
 
   // Nạp danh sách modes nếu là SCORM/HTML5
   useEffect(() => {

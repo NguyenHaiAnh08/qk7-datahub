@@ -2530,6 +2530,10 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
   }
 });
 
+// Báo cáo tài liệu trùng (chỉ đọc, chỉ Admin) — phải đặt TRƯỚC '/api/documents/:fileId'
+const { createDuplicateReportHandler } = require('./src/duplicate-docs');
+app.get('/api/documents/duplicates', requireAuth, createDuplicateReportHandler({ resolveUserRoles: (user) => resolveUserRoles(user) }));
+
 app.get('/api/documents/trash', requireAuth, requirePermission('DOC_TRASH_VIEW'), async (req, res) => {
   try {
     const pool = await getPool();

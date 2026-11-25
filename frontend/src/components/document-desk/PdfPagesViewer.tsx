@@ -89,19 +89,20 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        setPageStrokes(parsed);
-        const total = (Object.values(parsed) as any[]).reduce((sum: number, list: any) => sum + (list?.length || 0), 0);
-        onStrokeCountChange?.(total);
+        setPageStrokes(JSON.parse(saved));
       } else {
         setPageStrokes({});
-        onStrokeCountChange?.(0);
       }
     } catch {
       setPageStrokes({});
-      onStrokeCountChange?.(0);
     }
-  }, [fileId, storageKey, onStrokeCountChange]);
+  }, [fileId, storageKey]);
+
+  // Báo số nét vẽ cho thanh công cụ SAU khi state đổi (không gọi setState của component cha trong lúc render)
+  useEffect(() => {
+    const total = (Object.values(pageStrokes) as any[]).reduce((sum: number, list: any) => sum + (list?.length || 0), 0);
+    onStrokeCountChange?.(total);
+  }, [pageStrokes, onStrokeCountChange]);
 
   // Expose Undo và Clear cho thanh công cụ
   useEffect(() => {
@@ -119,8 +120,6 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
               try {
                 localStorage.setItem(storageKey, JSON.stringify(nextState));
               } catch (_) {}
-              const total = (Object.values(nextState) as any[]).reduce((sum: number, l: any) => sum + (l?.length || 0), 0);
-              onStrokeCountChange?.(total);
               return nextState;
             }
           }
@@ -132,13 +131,12 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
         try {
           localStorage.removeItem(storageKey);
         } catch (_) {}
-        onStrokeCountChange?.(0);
       },
       getStrokeCount: () => {
         return (Object.values(pageStrokes) as any[]).reduce((sum: number, list: any) => sum + (list?.length || 0), 0);
       },
     };
-  }, [highlighterRef, pageStrokes, storageKey, onStrokeCountChange]);
+  }, [highlighterRef, pageStrokes, storageKey]);
 
   // Phím tắt Ctrl + Z để Hoàn tác
   useEffect(() => {
@@ -542,8 +540,6 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
                     try {
                       localStorage.setItem(storageKey, JSON.stringify(nextState));
                     } catch (_) {}
-                    const total = (Object.values(nextState) as any[]).reduce((sum: number, l: any) => sum + (l?.length || 0), 0);
-                    onStrokeCountChange?.(total);
                     return nextState;
                   });
                 }}

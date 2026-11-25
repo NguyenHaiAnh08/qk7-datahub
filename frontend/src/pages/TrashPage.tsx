@@ -19,6 +19,7 @@ import { useAuth } from '../hooks/useAuth';
 import { DocumentItem } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
 import { LectureTrashPanel } from '../components/lectures/LectureTrashPanel';
+import { DuplicateDocumentsPanel } from '../components/document-desk/DuplicateDocumentsPanel';
 
 export interface TrashPageProps {
   /** Khi true: render inline trong AdminDashboardPage (không có Header riêng, không min-h-screen) */
@@ -29,8 +30,8 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
   const { hasPermission, user } = useAuth();
   const isAdminUser = (user?.roles || []).includes('ROL-01');
 
-  // Tab: thùng rác Tài liệu | Bài giảng (bài giảng chỉ Admin thấy)
-  const [trashTab, setTrashTab] = useState<'docs' | 'lectures'>('docs');
+  // Tab: thùng rác Tài liệu | Bài giảng | Tài liệu trùng (2 tab sau chỉ Admin thấy)
+  const [trashTab, setTrashTab] = useState<'docs' | 'lectures' | 'duplicates'>('docs');
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -664,7 +665,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
     </AnimatePresence>
   );
 
-  const tabBtn = (key: 'docs' | 'lectures', label: string) => (
+  const tabBtn = (key: 'docs' | 'lectures' | 'duplicates', label: string) => (
     <button
       type="button"
       onClick={() => setTrashTab(key)}
@@ -683,9 +684,16 @@ export const TrashPage: React.FC<TrashPageProps> = ({ embedded = false }) => {
         <div className="flex items-center gap-2">
           {tabBtn('docs', 'Tài liệu')}
           {tabBtn('lectures', 'Bài giảng')}
+          {tabBtn('duplicates', 'Tài liệu trùng')}
         </div>
       )}
-      {trashTab === 'lectures' && isAdminUser ? <LectureTrashPanel /> : pageContent}
+      {trashTab === 'lectures' && isAdminUser ? (
+        <LectureTrashPanel />
+      ) : trashTab === 'duplicates' && isAdminUser ? (
+        <DuplicateDocumentsPanel />
+      ) : (
+        pageContent
+      )}
     </>
   );
 

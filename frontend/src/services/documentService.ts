@@ -4,6 +4,39 @@ import { DocumentItem, DocumentFilterParams } from '../types/document';
 import fileService from './fileService';
 
 
+export interface DuplicateDocumentRef {
+  file_id: string;
+  document_code: string | null;
+  title: string;
+  security_level_id: number;
+  uploader_name: string | null;
+  unit_name: string | null;
+  created_at: string | null;
+  state: 'ACTIVE' | 'PENDING' | 'TRASH';
+  stored_path: string;
+  file_missing: boolean;
+}
+
+export interface DuplicateReport {
+  summary: {
+    scanned_files: number;
+    groups: number;
+    extra_files: number;
+    extra_bytes: number;
+    orphan_files: number;
+    missing_records: number;
+  };
+  groups: {
+    sha256: string;
+    size: number;
+    extra_files: number;
+    extra_bytes: number;
+    active_count: number;
+    files: { path: string; size: number; refs: number; proposals: number; orphan: boolean }[];
+    documents: DuplicateDocumentRef[];
+  }[];
+}
+
 export interface ParsedDocumentMetadata {
     document_code: string | null;
     document_number: string | null;
@@ -212,6 +245,10 @@ export const documentService = {
   // ═══════════════════════════════════════════════════════════
   // SOFT DELETE / TRASH / RESTORE / PURGE
   // ═══════════════════════════════════════════════════════════
+
+  getDuplicates: async (): Promise<DuplicateReport> => {
+    return http<DuplicateReport>('/api/documents/duplicates');
+  },
 
   getTrash: async (): Promise<{ total: number; items: DocumentItem[] }> => {
     return http<{ total: number; items: DocumentItem[] }>(API_ENDPOINTS.DOCUMENTS.TRASH);

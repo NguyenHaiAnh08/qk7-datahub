@@ -7,6 +7,7 @@ Chống bịa đặt 100%, tuân thủ nghiêm ngặt cấp độ mật và bắ
 import os
 import re
 import json
+import time
 import requests
 from typing import List, Dict, Any, Optional, Tuple, Set
 
@@ -36,6 +37,29 @@ class AgentTutor:
         self.keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "24h")
         # Tuple timeout: connect_timeout=2.0s, read_timeout=70.0s
         self.timeout = (2.0, float(os.getenv("OLLAMA_TIMEOUT", "70.0")))
+        # Cache nhẹ cho healthcheck Ollama (tránh gọi warm_up() mỗi lần scrape /metrics)
+        self._health_cache_ts: float = 0.0
+        self._health_cache_val: bool = False
+        # Trạng thái kiểm toán gần nhất cho Prometheus metrics
+        self._last_fallback_reason: Optional[str] = None
+        self._last_citation_stats: Dict[str, int] = {"valid": 0, "fabricated": 0}
+
+    def check_ollama_health(self, cache_ttl: float = 10.0) -> bool:
+        """
+        Kiểm tra nhanh trạng thái sống/chết của Ollama qua GET /api/tags (có cache 10s).
+        Tuyệt đối không gọi warm_up() hay /api/generate trên luồng /health hoặc /metrics.
+        """
+        now = time.monotonic()
+        if self._health_cache_ts > 0 and (now - self._health_cache_ts) < cache_ttl:
+            return self._health_cache_val
+        try:
+            resp = requests.get(f"{self.ollama_url}/api/tags", timeout=(1.0, 2.0))
+            ok = resp.status_code == 200
+        except Exception:
+            ok = False
+        self._health_cache_val = ok
+        self._health_cache_ts = now
+        return ok
 
     def _rewrite_query_with_history(self, query: str, history: List[Dict[str, Any]]) -> str:
         """
@@ -184,6 +208,10 @@ class AgentTutor:
         else:
             salutation = "Báo cáo đồng chí,"
 
+        # Reset bộ đếm metrics của lượt hiện tại
+        self._last_fallback_reason = None
+        self._last_citation_stats = {"valid": 0, "fabricated": 0}
+
         # NGUYÊN TẮC FAIL CLOSED: Lọc bỏ tuyệt đối 100% chunks có security_level_id > user_clearance
         # Không bao giờ để tài liệu vượt cấp mật xuất hiện trong quá trình suy luận hoặc trả về citations
         authorized_chunks = [
@@ -235,27 +263,32 @@ class AgentTutor:
                                 matching_all.append(c)
                                 break
 
+                # Chống Oracle (Information Disclosure): hợp nhất mọi trường hợp không tìm thấy
+                # hoặc tài liệu vượt quá cấp bảo mật thành 1 thông điệp trung tính duy nhất.
+                clr_label = "Nội bộ" if user_clearance == 2 else clearance_name
+                neutral_refusal = (
+                    f"Báo cáo đồng chí, không tìm thấy văn bản có số hiệu \"{target_doc_code}\" "
+                    f"trong phạm vi cấp quyền bảo mật hiện tại của đồng chí (Cấp {user_clearance} - {clr_label}). "
+                    f"Xin đồng chí vui lòng kiểm tra lại số hiệu văn bản hoặc tra cứu tài liệu khác thuộc thẩm quyền."
+                )
+
                 if matching_all:
                     min_sec_level = min(int(c.get("security_level_id", 1)) for c in matching_all)
                     if min_sec_level > user_clearance:
-                        refusal_answer = (
-                            f"Báo cáo đồng chí, tài liệu {target_doc_code} không phù hợp với cấp bảo mật hiện tại của đồng chí "
-                            f"(Cấp {user_clearance} - {'Nội bộ' if user_clearance == 2 else clearance_name}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật."
-                        )
                         return {
-                            "answer": refusal_answer,
+                            "answer": neutral_refusal,
                             "citations": [],
                             "reasoning": {
                                 "mem": mem_trace,
                                 "think": (
-                                    f"[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản {target_doc_code}. "
-                                    f"Văn bản này thuộc Cấp {min_sec_level}, vượt quá cấp quyền Cấp {user_clearance} ({clearance_name}). "
-                                    f"Áp dụng nguyên tắc Fail Closed: Từ chối trích dẫn."
+                                    f"[Access Guard] Không tìm thấy tài liệu số hiệu {target_doc_code} "
+                                    f"trong phạm vi cấp quyền Cấp {user_clearance} ({clearance_name}). "
+                                    f"Áp dụng nguyên tắc Anti-Oracle / Fail Closed: không xác nhận sự tồn tại và dừng trích dẫn."
                                 ),
-                                "tool_call": f"[Security Refusal] Chặn trích dẫn văn bản {target_doc_code} do vượt cấp bảo mật."
+                                "tool_call": f"[Access Guard] Dừng trích dẫn: tài liệu {target_doc_code} không khả dụng trong phạm vi cấp quyền hiện tại."
                             },
                             "retrieval_mode": retrieval_mode,
-                            "synthesis_mode": "clearance_blocked",
+                            "synthesis_mode": "not_accessible",
                             "requires_biometric": False
                         }
                     else:
@@ -265,46 +298,22 @@ class AgentTutor:
                             if int(c.get("security_level_id", 1)) <= user_clearance and c not in authorized_chunks:
                                 authorized_chunks.append(c)
                 else:
-                    if all_chunks is not None:
-                        not_found_answer = (
-                            f"Báo cáo đồng chí, không tìm thấy văn bản có số hiệu \"{target_doc_code}\" trong hệ thống dữ liệu số. "
-                            f"Xin đồng chí vui lòng kiểm tra lại số hiệu văn bản hoặc tra cứu tài liệu khác."
-                        )
-                        return {
-                            "answer": not_found_answer,
-                            "citations": [],
-                            "reasoning": {
-                                "mem": mem_trace,
-                                "think": (
-                                    f"[Lookup Guard] Tìm kiếm văn bản {target_doc_code} trong kho tài liệu nhưng không tìm thấy bản ghi nào khớp."
-                                ),
-                                "tool_call": f"[NotFound] Không tìm thấy văn bản {target_doc_code}."
-                            },
-                            "retrieval_mode": retrieval_mode,
-                            "synthesis_mode": "not_found",
-                            "requires_biometric": False
-                        }
-                    else:
-                        refusal_answer = (
-                            f"Báo cáo đồng chí, tài liệu {target_doc_code} không phù hợp với cấp bảo mật hiện tại của đồng chí "
-                            f"(Cấp {user_clearance} - {'Nội bộ' if user_clearance == 2 else clearance_name}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật."
-                        )
-                        return {
-                            "answer": refusal_answer,
-                            "citations": [],
-                            "reasoning": {
-                                "mem": mem_trace,
-                                "think": (
-                                    f"[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản {target_doc_code}. "
-                                    f"Văn bản này không thuộc phạm vi cấp quyền Cấp {user_clearance} ({clearance_name}). "
-                                    f"Áp dụng nguyên tắc Fail Closed: Từ chối trích dẫn và không suy đoán bừa."
-                                ),
-                                "tool_call": f"[Security Refusal] Chặn trích dẫn văn bản {target_doc_code} do vượt cấp bảo mật."
-                            },
-                            "retrieval_mode": retrieval_mode,
-                            "synthesis_mode": "clearance_blocked",
-                            "requires_biometric": False
-                        }
+                    return {
+                        "answer": neutral_refusal,
+                        "citations": [],
+                        "reasoning": {
+                            "mem": mem_trace,
+                            "think": (
+                                f"[Access Guard] Không tìm thấy tài liệu số hiệu {target_doc_code} "
+                                f"trong phạm vi cấp quyền Cấp {user_clearance} ({clearance_name}). "
+                                f"Áp dụng nguyên tắc Anti-Oracle / Fail Closed: không xác nhận sự tồn tại và dừng trích dẫn."
+                            ),
+                            "tool_call": f"[Access Guard] Dừng trích dẫn: tài liệu {target_doc_code} không khả dụng trong phạm vi cấp quyền hiện tại."
+                        },
+                        "retrieval_mode": retrieval_mode,
+                        "synthesis_mode": "not_accessible",
+                        "requires_biometric": False
+                    }
 
         # Kiểm tra ngưỡng bằng chứng & Cấp quyền
         if not authorized_chunks:
@@ -550,13 +559,16 @@ class AgentTutor:
 
         pattern = re.compile(r'\[(?:p\.\s*|trang\s*)(\d+)\]', re.IGNORECASE)
         fabricated_tags: List[str] = []
+        valid_count = 0
 
         def replace_fn(match: re.Match) -> str:
+            nonlocal valid_count
             tag = match.group(0)
             page_str = match.group(1)
             try:
                 page_num = int(page_str)
                 if page_num in valid_pages:
+                    valid_count += 1
                     return tag
                 else:
                     fabricated_tags.append(tag)
@@ -565,6 +577,11 @@ class AgentTutor:
                 return tag
 
         verified_text = pattern.sub(replace_fn, answer_text)
+        # Lưu thống kê trích dẫn phục vụ Prometheus metrics
+        self._last_citation_stats = {
+            "valid": valid_count,
+            "fabricated": len(fabricated_tags)
+        }
         # Chuẩn hóa khoảng trắng sau khi gỡ bỏ nhãn
         verified_text = re.sub(r' +([,.;:])', r'\1', verified_text)
         verified_text = re.sub(r' {2,}', ' ', verified_text)
@@ -637,6 +654,7 @@ class AgentTutor:
                 if turn_texts:
                     history_str = "NGỮ CẢNH HỘI THOẠI TRƯỚC ĐÓ:\n" + "\n".join(turn_texts) + "\n\n"
 
+            salut_clean = salutation.rstrip(",. ").strip()
             system_prompt = (
                 "Bạn là Trợ Lý Tác Chiến & Văn Thư AI của Bộ Tư Lệnh Quân Khu 7 (QK7 DataHub).\n"
                 "NGUYÊN TẮC THI HÀNH NHIỆM VỤ:\n"
@@ -736,9 +754,23 @@ class AgentTutor:
                             if len(prefix_part) > len(salutation) + 25:
                                 answer = prefix_part
 
+                    self._last_fallback_reason = None
                     return answer
-        except Exception:
-            pass
+                else:
+                    self._last_fallback_reason = "answer_too_short"
+                    print(f"[AgentTutor] ⚠️ Ollama trả lời quá ngắn ({len(answer)} ký tự), fallback sang extractive.")
+            else:
+                self._last_fallback_reason = "ollama_unreachable"
+                print(f"[AgentTutor] ⚠️ Ollama phản hồi HTTP {resp.status_code}: {resp.text[:160]}")
+        except requests.Timeout as e:
+            self._last_fallback_reason = "timeout"
+            print(f"[AgentTutor] ⚠️ Timeout gọi Ollama ({self.model_name}): {e}")
+        except requests.RequestException as e:
+            self._last_fallback_reason = "ollama_unreachable"
+            print(f"[AgentTutor] ⚠️ Không kết nối được Ollama ({self.ollama_url}): {e}")
+        except Exception as e:
+            self._last_fallback_reason = "unknown"
+            print(f"[AgentTutor] ❌ Lỗi không mong đợi trong _call_ollama ({self.model_name}): {type(e).__name__}: {e}")
 
         return None
 

@@ -32,6 +32,14 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 }) => {
   const { user: authUser, isAdmin: authIsAdmin } = useAuth();
   const isAdministrator = Boolean(propIsAdmin ?? (authIsAdmin || (authUser?.roles || []).includes('ROL-01')));
+  // Đồng bộ quyền bảo trì với Backend (Admin / Chỉ huy ROL-02 / Trưởng khoa / Trưởng BM / Trưởng phòng)
+  const canManageMaintenance = useMemo(() => {
+    if (isAdministrator) return true;
+    const roles = authUser?.roles || [];
+    if (roles.includes('ROL-02')) return true;
+    const pos = (authUser?.position || '').toLowerCase();
+    return pos.includes('trưởng khoa') || pos.includes('trưởng bộ môn') || pos.includes('trưởng phòng');
+  }, [isAdministrator, authUser]);
 
   // Responsive state
   const [windowWidth, setWindowWidth] = useState<number>(
@@ -50,7 +58,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
   const [viewMode, setViewMode] = useState<'radar' | 'list'>('radar');
 
   // Time shift filter: 'live' | 'morning' | 'afternoon' | 'evening'
-  const [timeShift] = useState<'live' | 'morning' | 'afternoon' | 'evening'>('live');
+  const [timeShift, setTimeShift] = useState<'live' | 'morning' | 'afternoon' | 'evening'>('live');
 
   // Radar state
   const [kpis, setKpis] = useState<RadarKpis>({
@@ -566,8 +574,37 @@ export const LiveMonitorPanel: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Right: View Mode Toggle & Refresh Button */}
-        <div className="flex items-center gap-2 ml-auto">
+        {/* Right: Time Shift Filter, View Mode Toggle & Refresh Button */}
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          {/* Bộ lọc Ca giảng dạy (Trực tiếp / Sáng / Chiều / Tối) trên Radar */}
+          {viewMode === 'radar' && (
+            <div
+              className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs"
+              role="group"
+              aria-label="Lọc theo ca giảng dạy"
+            >
+              {([
+                { key: 'live', label: 'Trực tiếp' },
+                { key: 'morning', label: 'Ca sáng' },
+                { key: 'afternoon', label: 'Ca chiều' },
+                { key: 'evening', label: 'Ca tối' },
+              ] as const).map((shift) => (
+                <button
+                  key={shift.key}
+                  type="button"
+                  onClick={() => setTimeShift(shift.key)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    timeShift === shift.key
+                      ? 'bg-[#166534] text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {shift.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* View mode toggle */}
           <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
             <button
@@ -925,7 +962,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
                     <div className="flex items-center gap-1 shrink-0">
                       {/* Maintenance Toggle Button */}
-                      {isAdministrator && (
+                      {canManageMaintenance && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1235,7 +1272,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
                   )}
 
                   {/* Maintenance Setting */}
-                  {isAdministrator && (
+                  {canManageMaintenance && (
                     <div className="p-4 rounded-xl border border-slate-200 dark:border-white/[0.06] bg-slate-50/50 dark:bg-slate-900/20 space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">

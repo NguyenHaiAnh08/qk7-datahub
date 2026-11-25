@@ -24,6 +24,8 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
   const AI_BASE = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8001';
   const AI_HEALTH_TIMEOUT_MS = 2000;
   const AI_CHAT_TIMEOUT_MS = parseInt(process.env.AI_CHAT_TIMEOUT_MS || '75000', 10);
+  const AI_STUDY_BOOK_TIMEOUT_MS = parseInt(process.env.AI_STUDY_BOOK_TIMEOUT_MS || '20000', 10);
+  const AI_SYNC_TIMEOUT_MS = parseInt(process.env.AI_SYNC_TIMEOUT_MS || '300000', 10);
 
   // ✅ Trích xuất file_id từ JWT token vân tay (chỉ chấp nhận purpose='file_access')
   async function getBiometricTokenFileId(req) {
@@ -94,13 +96,13 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
     return false;
   }
 
-  async function callAI(path, method = 'GET', body = null, timeoutMs = 3000) {
+  async function callAI(path, method = 'GET', body = null, timeoutMs = 3000, extraHeaders = {}) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const res = await fetch(`${AI_BASE}${path}`, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...extraHeaders },
         body: body ? JSON.stringify(body) : undefined,
         signal: ctrl.signal,
       });
@@ -294,44 +296,30 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
             `);
 
           const foundDoc = checkDocRes.recordset && checkDocRes.recordset[0];
-          if (foundDoc) {
-            if (foundDoc.security_level_id > user_clearance) {
-              const clrNames = {
-                1: 'Cấp 1 - Công khai',
-                2: 'Cấp 2 - Nội bộ',
-                3: 'Cấp 3 - Mật',
-                4: 'Cấp 4 - Tối mật',
-                5: 'Cấp 5 - Tuyệt mật',
-              };
-              const clrName = clrNames[user_clearance] || `Cấp ${user_clearance}`;
-              const refusalAnswer = `Báo cáo đồng chí, tài liệu ${docCodeMatches[0]} không phù hợp với cấp bảo mật hiện tại của đồng chí (${clrName}). Xin đồng chí vui lòng kiểm tra lại hoặc tra cứu tài liệu khác cùng cấp độ bảo mật.`;
-              return res.json({
-                answer: refusalAnswer,
-                citations: [],
-                reasoning: {
-                  mem: `[Smart SQL Fallback] Cấp bảo mật: ${clrName}`,
-                  think: `[Clearance Guard] Phát hiện câu hỏi yêu cầu văn bản ${docCodeMatches[0]} (Cấp ${foundDoc.security_level_id}), vượt quá cấp quyền Cấp ${user_clearance} (${clrName}).`,
-                  tool_call: `[Security Refusal] Chặn trích dẫn văn bản ${docCodeMatches[0]}.`,
-                },
-                retrieval_mode: 'sql_fallback',
-                synthesis_mode: 'clearance_blocked',
-                requires_biometric: false,
-              });
-            } else {
-              items.push(foundDoc);
-            }
+          if (foundDoc && foundDoc.security_level_id <= user_clearance) {
+            items.push(foundDoc);
           } else {
-            const notFoundAnswer = `Báo cáo đồng chí, không tìm thấy văn bản có số hiệu "${docCodeMatches[0]}" trong hệ thống thư viện dữ liệu số. Xin đồng chí vui lòng kiểm tra lại số hiệu văn bản hoặc tra cứu tài liệu khác.`;
+            // Chống Oracle (Information Disclosure): hợp nhất "vượt cấp mật" và "không tồn tại"
+            // thành 1 thông điệp trung tính duy nhất, tuyệt đối không tiết lộ sự tồn tại hay cấp mật thật.
+            const clrNames = {
+              1: 'Cấp 1 - Công khai',
+              2: 'Cấp 2 - Nội bộ',
+              3: 'Cấp 3 - Mật',
+              4: 'Cấp 4 - Tối mật',
+              5: 'Cấp 5 - Tuyệt mật',
+            };
+            const clrName = clrNames[user_clearance] || `Cấp ${user_clearance}`;
+            const neutralAnswer = `Báo cáo đồng chí, không tìm thấy văn bản có số hiệu "${docCodeMatches[0]}" trong phạm vi cấp quyền bảo mật hiện tại của đồng chí (${clrName}). Xin đồng chí vui lòng kiểm tra lại số hiệu văn bản hoặc tra cứu tài liệu khác thuộc thẩm quyền.`;
             return res.json({
-              answer: notFoundAnswer,
+              answer: neutralAnswer,
               citations: [],
               reasoning: {
-                mem: `[Smart SQL Fallback] Không tìm thấy văn bản: ${docCodeMatches[0]}`,
-                think: `[Lookup Guard] Không tìm thấy tài liệu có số hiệu ${docCodeMatches[0]} trong CSDL.`,
-                tool_call: `[NotFound] Văn bản không tồn tại.`,
+                mem: `[Smart SQL Fallback] Cấp bảo mật: ${clrName}`,
+                think: `[Access Guard] Không tìm thấy tài liệu số hiệu ${docCodeMatches[0]} trong phạm vi cấp quyền ${clrName}. Áp dụng chính sách Anti-Oracle / Fail Closed.`,
+                tool_call: `[Access Guard] Dừng trích dẫn: tài liệu ${docCodeMatches[0]} không khả dụng trong phạm vi cấp quyền hiện tại.`,
               },
               retrieval_mode: 'sql_fallback',
-              synthesis_mode: 'not_found',
+              synthesis_mode: 'not_accessible',
               requires_biometric: false,
             });
           }
@@ -407,6 +395,7 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
   router.get('/study-book/:fileId', requirePermission('AI_STUDY_BOOK'), async (req, res) => {
     try {
       const fileId = req.params.fileId;
+      const userClearance = req.user.clearance_level_id || 1;
       const pool = await getPool();
       const docRes = await pool.request()
         .input('fid', sql.VarChar(100), fileId)
@@ -414,7 +403,6 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
 
       if (docRes.recordset && docRes.recordset.length > 0) {
         const secLvl = docRes.recordset[0].security_level_id || 1;
-        const userClearance = req.user.clearance_level_id || 1;
         if (secLvl > userClearance) {
           await logAudit(req, 'AI_STUDY_BOOK_DENIED', `Từ chối tạo tài liệu ${fileId}: Không đủ cấp mật`, fileId);
           return res.status(403).json({ error: 'Không có quyền truy cập văn bản này' });
@@ -433,10 +421,14 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
       const r = await callAI(
         `/ai/study-book/${encodeURIComponent(fileId)}`,
         'GET',
+        null,
+        AI_STUDY_BOOK_TIMEOUT_MS,
+        { 'x-clearance': String(userClearance) },
       );
       res.json(r);
     } catch (err) {
-      res.status(503).json({ error: 'Trợ lý AI hiện không khả dụng', detail: err.message });
+      const status = err.status || (err.name === 'AbortError' ? 504 : 503);
+      res.status(status).json({ error: 'Trợ lý AI hiện không khả dụng', detail: err.message });
     }
   });
 
@@ -459,11 +451,17 @@ module.exports = function createAIRoutes({ requirePermission, writeAccessLog, ge
         security_level_id: d.security_level_id,
       }));
 
-      const aiRes = await callAI('/ai/sync-all', 'POST', { documents: docs });
+      const aiRes = await callAI('/ai/sync-all', 'POST', { documents: docs }, AI_SYNC_TIMEOUT_MS);
       res.json(aiRes);
     } catch (err) {
       console.error('[sync-all]', err);
-      res.status(503).json({ error: 'Không đồng bộ được', detail: err.message });
+      const status = err.name === 'AbortError' ? 504 : 503;
+      res.status(status).json({
+        error: err.name === 'AbortError'
+          ? `Quá thời gian chờ đồng bộ kho Vector AI (${Math.round(AI_SYNC_TIMEOUT_MS / 1000)}s)`
+          : 'Không đồng bộ được',
+        detail: err.message,
+      });
     }
   });
 

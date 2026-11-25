@@ -3,9 +3,9 @@ import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { ActiveSession } from '../types/user';
 
 export const sessionService = {
-  async listActive(userId?: string): Promise<{ items: ActiveSession[] }> {
+  async listActive(userId?: string): Promise<{ items: ActiveSession[]; idle_timeout_minutes?: number }> {
     const qs = userId ? `?user_id=${encodeURIComponent(userId)}` : '';
-    return http<{ items: ActiveSession[] }>(`${API_ENDPOINTS.ADMIN.SESSIONS}${qs}`);
+    return http<{ items: ActiveSession[]; idle_timeout_minutes?: number }>(`${API_ENDPOINTS.ADMIN.SESSIONS}${qs}`);
   },
 
   async kill(sessionId: string): Promise<{ success: boolean; killed_count: number }> {

@@ -397,6 +397,7 @@ def test_p0_clearance_guard_880_kh_tqs_level_2(agent_tutor):
     )
 
     assert res["citations"] == [], f"Citations must be empty, got {res['citations']}"
-    assert "880/KH-TQS không phù hợp với cấp bảo mật hiện tại của đồng chí (Cấp 2 - Nội bộ)" in res["answer"]
+    assert "không tìm thấy văn bản có số hiệu \"880/KH-TQS\" trong phạm vi cấp quyền bảo mật hiện tại của đồng chí (Cấp 2 - Nội bộ)" in res["answer"]
+    assert res["synthesis_mode"] == "not_accessible"
     assert "Quân khu 7" not in res["answer"]
     assert res["requires_biometric"] is False

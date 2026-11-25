@@ -83,7 +83,7 @@ export const NetworkStatusProvider: React.FC<{ children: React.ReactNode }> = ({
     window.addEventListener('online', handleBrowserOnline);
     window.addEventListener('offline', handleBrowserOffline);
 
-    // Kiểm tra định kỳ mỗi 15 giây khi online, hoặc mỗi 5 giây khi offline
+    // Kiểm tra định kỳ mỗi 8 giây khi offline
     const intervalTime = !isOnline ? 8000 : 0;
     const interval = intervalTime > 0 ? setInterval(() => {
       checkConnection();
@@ -176,7 +176,7 @@ export const NetworkStatusProvider: React.FC<{ children: React.ReactNode }> = ({
             </div>
 
             <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
-              Auto-reconnecting every 5s • Radar scan active
+              Auto-reconnecting every 8s • Radar scan active
             </div>
           </div>
         </div>

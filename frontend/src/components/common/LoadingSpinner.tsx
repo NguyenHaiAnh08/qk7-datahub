@@ -13,7 +13,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = 'large',
   fullScreen = false,
 }) => {
-  const antIcon = <LoadingOutlined style={{ fontSize: size === 'large' ? 36 : 24, color: '#722ED1' }} spin />;
+  const antIcon = <LoadingOutlined style={{ fontSize: size === 'large' ? 36 : 24, color: '#166534' }} spin />;
 
   const content = (
     <div className="flex flex-col items-center justify-center gap-3 p-6">

@@ -1809,7 +1809,11 @@ module.exports = function createLectureRoutes({
   });
 
       // API nhẹ: Lấy thông tin 1 ca dạy cụ thể (Dùng để phục hồi khi F5)
-  router.get('/schedules/:id', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res) => {
+  router.get('/schedules/:id', requireAuth, requirePermission('LECTURE_VIEW'), async (req, res, next) => {
+    // Phòng vệ bổ sung tránh route động :id nuốt các route tĩnh như /schedules/monitor
+    if (req.params.id === 'monitor' || req.params.id === 'live' || req.params.id === 'history') {
+      return next();
+    }
     try {
       const pool = await getPool();
       const r = await pool.request()

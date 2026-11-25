@@ -15,8 +15,12 @@ export const LecturePackageDropzone: React.FC<LecturePackageDropzoneProps> = ({
   selectedFile,
   onFileSelect,
   contentType,
-  maxSizeBytes = 200 * 1024 * 1024, // 200MB cho gói SCORM/HTML5
+  maxSizeBytes,
 }) => {
+  // Đồng bộ 100% với giới hạn Multer Backend: PDF 150MB, SCORM/HTML5 ZIP 300MB
+  const effectiveMaxSizeBytes =
+    maxSizeBytes ?? (contentType === 'PDF' ? 150 * 1024 * 1024 : 300 * 1024 * 1024);
+  const effectiveMaxSizeMb = Math.round(effectiveMaxSizeBytes / 1024 / 1024);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -108,8 +112,8 @@ export const LecturePackageDropzone: React.FC<LecturePackageDropzoneProps> = ({
         return;
       }
     }
-    if (file.size > maxSizeBytes) {
-      setErrorMsg(`Tệp vượt quá giới hạn ${(maxSizeBytes / 1024 / 1024).toFixed(0)}MB!`);
+    if (file.size > effectiveMaxSizeBytes) {
+      setErrorMsg(`Tệp vượt quá giới hạn tối đa ${effectiveMaxSizeMb}MB!`);
       setUploadStatus('error');
       return;
     }
@@ -130,7 +134,7 @@ export const LecturePackageDropzone: React.FC<LecturePackageDropzoneProps> = ({
         label: 'PDF',
         icon: <FileText className="w-5 h-5 text-rose-600 dark:text-rose-400" />,
         badge: 'bg-rose-500/15 border-rose-500/30 text-rose-700 dark:text-rose-400',
-        hint: 'Giáo án điện tử, tài liệu bài giảng số hóa định dạng PDF (tối đa 100MB)',
+        hint: 'Giáo án điện tử, tài liệu bài giảng số hóa định dạng PDF',
       };
     }
     if (contentType === 'SCORM') {
@@ -205,7 +209,7 @@ export const LecturePackageDropzone: React.FC<LecturePackageDropzoneProps> = ({
             : `hoặc kéo thả tệp ${contentType === 'PDF' ? '.pdf' : '.zip'} vào đây`}
         </div>
         <p className="relative z-2 text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
-          {fmt.hint} (Dung lượng tối đa 200MB)
+          {fmt.hint} (Dung lượng tối đa {effectiveMaxSizeMb}MB)
         </p>
       </div>
 

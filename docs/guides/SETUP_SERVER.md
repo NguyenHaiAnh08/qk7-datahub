@@ -82,7 +82,7 @@ Tạo hoặc mở file `boxchat\.env` (nếu chưa có thì tạo mới):
 BACKEND_UPLOADS_DIR=../backend/uploads
 QDRANT_STORAGE_PATH=./local_storage/qdrant_data
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_MODEL=qwen2.5:3b
 ```
 
 ---

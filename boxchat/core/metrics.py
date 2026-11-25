@@ -96,9 +96,9 @@ ACTIVE_MODEL = Gauge(
 
 
 def update_system_gauges(vector_store, agent_tutor):
-    """Cập nhật các gauge từ state thực tế. Gọi định kỳ hoặc theo request."""
+    """Cập nhật các gauge từ state thực tế (không chạy warm_up() đồng bộ trên /metrics)."""
     try:
-        OLLAMA_UP.set(1 if agent_tutor.warm_up() else 0)
+        OLLAMA_UP.set(1 if agent_tutor.check_ollama_health() else 0)
     except Exception:
         OLLAMA_UP.set(0)
 

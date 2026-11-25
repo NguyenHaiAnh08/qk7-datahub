@@ -62,6 +62,7 @@ export const AIChatWidget: React.FC = () => {
   const [fpTokenExpiresAt, setFpTokenExpiresAt] = useState<number | null>(null);
   // Lưu câu hỏi gần nhất của user để auto-retry sau khi quét vân tay
   const [lastQuery, setLastQuery] = useState<string>('');
+  const [isDecryptingRetry, setIsDecryptingRetry] = useState<boolean>(false);
   const lastUserQueryRef = useRef<string>('');
 
   // Lấy token vân tay còn hiệu lực nội bộ trong Chatbox (hạn 5 phút từ khi quét và đúng file)
@@ -218,6 +219,7 @@ export const AIChatWidget: React.FC = () => {
       setInputText('');
     }
 
+    setIsDecryptingRetry(Boolean(isRetry));
     setLoading(true);
 
     // Lấy 6 lượt lịch sử trao đổi gần nhất
@@ -274,6 +276,7 @@ export const AIChatWidget: React.FC = () => {
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
+      setIsDecryptingRetry(false);
       setLoading(false);
     }
   };
@@ -303,6 +306,7 @@ export const AIChatWidget: React.FC = () => {
     // Tự động retry câu hỏi gần nhất
     const queryToRetry = lastQuery || lastUserQueryRef.current || inputText.trim();
     if (queryToRetry) {
+      setIsDecryptingRetry(true);
       setLoading(true);
       // ✅ SỬA: Truyền targetScanFileId vào để Backend kiểm tra chéo token-file
       await handleSend(queryToRetry, validToken, true, targetScanFileId);
@@ -671,7 +675,7 @@ export const AIChatWidget: React.FC = () => {
               <AIThinkingBubble
                 compact
                 showRoleLabel={false}
-                isDecrypting={Boolean(lastQuery)}
+                isDecrypting={isDecryptingRetry}
               />
             )}
 

@@ -7,8 +7,8 @@ pause
 exit /b
 #PS#
 $ErrorActionPreference = 'Continue'
-$serverDefault = '192.168.1.229'
-$port = 8000
+$serverDefault = 'trungtamdulieuso.tqsqk7.edu'
+$port = 443   # may chu phuc vu HTTPS chuan o cong 443 (cong 8000 tren may chu co the khong phai TLS)
 $installDir = Join-Path $env:LOCALAPPDATA 'QK7Agent'
 
 # Doc dia chi may chu tu .env canh exe (neu co), neu khong thi hoi
@@ -16,7 +16,7 @@ $srv = $null
 $envFile = Join-Path $installDir '.env'
 if (Test-Path $envFile) {
     $m = Select-String -Path $envFile -Pattern '^\s*BACKEND_WS_URL\s*=\s*wss?://([^:/]+)(?::(\d+))?' | Select-Object -First 1
-    if ($m) { $srv = $m.Matches[0].Groups[1].Value; if ($m.Matches[0].Groups[2].Value) { $port = [int]$m.Matches[0].Groups[2].Value } }
+    if ($m) { $srv = $m.Matches[0].Groups[1].Value; if ($m.Matches[0].Groups[2].Value) { $port = [int]$m.Matches[0].Groups[2].Value } else { $port = 443 } }
 }
 if (-not $srv) {
     $in = Read-Host "Nhap IP/ten mien May chu [Enter = $serverDefault]"

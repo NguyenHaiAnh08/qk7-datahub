@@ -181,9 +181,9 @@ qk7-datahub/
 │   │   ├── ai-routes.js                    # Cổng giao tiếp với boxchat (:8001) & Smart SQL Fallback
 │   │   └── fingerprint-ws.js               # WebSocket Server (/ws/fingerprint) điều phối máy quét ZK9500
 │   │
-│   ├── uploads/                            # KHO LƯU TRỮ VẬT LÝ FILE PDF THẬT
+│   ├── uploads/                            # KHO LƯU TRỮ VẬT LÝ FILE PDF THẬT (Git ignored)
 │   │   ├── 2026/10/                        # Lưu trữ theo cây thư mục Năm/Tháng & mã hash SHA-256
-│   │   ├── Mat/, ToiMat/, TuyetMat/        # Thư mục phân loại theo cấp bảo mật
+│   │   └── Mat/, ToiMat/, TuyetMat/        # Thư mục phân loại theo cấp bảo mật
 │   │
 │   └── public/                             # THƯ MỤC BUILD PHÂN PHỐI TĨNH CHO SPA
 │       ├── index.html                      # Vỏ nạp ứng dụng duy nhất
@@ -192,7 +192,7 @@ qk7-datahub/
 ├── boxchat/                                # 🟣 MICROSERVICE TRỢ LÝ AI TÁC CHIẾN (:8001 - FastAPI)
 │   ├── main.py                             # Entry point FastAPI, CORS, API endpoints (/api/ai/query, /api/ai/study-book...)
 │   ├── requirements.txt                    # Dependencies: fastapi, uvicorn, qdrant-client, langchain, pypdf...
-│   ├── .env                                # Cấu hình Qdrant Storage, LLM API Key, Uploads Path
+│   ├── .env.example                        # Mẫu biến môi trường cấu hình AI microservice
 │   │
 │   ├── core/                               # CÁC MÔ-ĐUN LÕI TRÍ TUỆ NHÂN TẠO
 │   │   ├── pdf_processor.py                # Trích xuất văn bản PDF quân sự, phân trang, làm sạch nội dung
@@ -201,7 +201,7 @@ qk7-datahub/
 │   │   ├── study_book_gen.py               # Biên soạn cẩm nang học tập, tóm tắt tác chiến, trắc nghiệm quân sự
 │   │   └── media_timeline.py               # Quản lý dòng thời gian và tài liệu đa phương tiện
 │   │
-│   └── local_storage/                      # KHO VECTOR DATABASE CỤC BỘ (Qdrant Data)
+│   └── local_storage/                      # KHO VECTOR DATABASE CỤC BỘ (Qdrant Data - Git ignored)
 │       └── qdrant_data/                    # Dữ liệu vector embedding lưu trữ offline bảo mật
 │
 ├── fingerprint/                            # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001 - Python)
@@ -211,63 +211,74 @@ qk7-datahub/
 │   ├── device_id.txt                       # Mã định danh thiết bị máy quét gắn với trạm làm việc
 │   └── requirements.txt                    # Dependencies: websockets, aiohttp...
 │
-└── frontend/                               # 🔵 GIAO DIỆN CLIENT REACT 18 + TYPESCRIPT + ANT DESIGN
-    ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
-    ├── vite.config.ts                      # Cấu hình Vite build xuất sang ../backend/public, proxy :8000
-    ├── tsconfig.json                       # Cấu hình TypeScript compiler
-    ├── tailwind.config.js                  # Cấu hình TailwindCSS
-    │
-    └── src/
-        ├── App.tsx                         # Khởi tạo Ant Design ConfigProvider (Xanh Lục Quân #166534 / #10b981), Auth, Theme
-        ├── main.tsx                        # Gắn kết React createRoot
-        ├── index.css                       # Design System CSS, biến màu quân sự, hiệu ứng glassmorphism
-        │
-        ├── routes/                         # HỆ THỐNG AUTO-DISCOVERY ROUTING & GÁC CỔNG
-        │   ├── routePaths.ts               # Danh mục URL tập trung (/login, /portal, /document-desk...)
-        │   ├── routeAccess.ts              # Ma trận phân quyền kiểm soát Clearance Level & Login Guard
-        │   ├── getAppRoutes.ts             # Tự động quét modules/*.routes.tsx qua import.meta.glob
-        │   ├── RouterProvider.tsx          # Component điều hướng useRoutes hook
-        │   └── modules/                    # Định nghĩa tuyến đường theo từng module nghiệp vụ
-        │
-        ├── pages/                          # CÁC MÀN HÌNH CHỨC NĂNG CHÍNH
-        │   ├── LoginPage.tsx               # Màn hình đăng nhập quân nhân
-        │   ├── PortalPage.tsx              # Trung tâm thư viện số (Cổng tra cứu tài liệu)
-        │   ├── MyUnitPage.tsx              # Đơn vị của tôi (Quản lý tài liệu theo đơn vị trực thuộc)
-        │   ├── DocumentDeskPage.tsx        # Bàn làm việc số hóa văn thư
-        │   ├── AdminDashboardPage.tsx      # Bảng điều khiển quản trị trung tâm
-        │   ├── UsersPage.tsx               # Quản lý tài khoản quân nhân & cấp bậc
-        │   └── HttpErrorPage.tsx           # Trang mã trạng thái HTTP chuẩn Ant Design Result
-        │
-        ├── components/                     # THÀNH PHẦN GIAO DIỆN TÁI SỬ DỤNG
-        │   ├── common/                     # Header, Sidebar, Layout, DeviceModeSwitch, TouchIDFingerprint...
-        │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
-        │   ├── document-desk/              # FingerprintScanModal (Hộp thoại quét vân tay xác thực xem PDF)
-        │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal (Đăng ký vân tay 3 bước)
-        │   ├── auth/                       # LoginForm
-        │   ├── portal/                     # SecurityBanner, DocumentCard, PortalDocumentList
-        │   └── dashboard/                  # PHÂN HỆ QUẢN TRỊ & TRUNG TÂM KIỂM TOÁN SOC
-        │       ├── SecurityAuditLog.tsx    # Trung tâm SOC, Live Monitor, 4 KPI, Filter Pills, Raw JSON Drawer
-        │       ├── UnitTreeTable.tsx       # Bảng cây đơn vị 6 cấp bậc, bảo vệ mồ côi, tìm kiếm không dấu
-        │       ├── StatCard.tsx            # Thẻ thống kê chỉ số nghiệp vụ
-        │       └── DistributionChart.tsx   # Biểu đồ phân bổ loại văn bản & an ninh
-        │
-        ├── hooks/                          # REACT CUSTOM HOOKS
-        │   └── useDeviceMode.ts            # Hook điều khiển chế độ PC Widescreen & iPad Air M4 Touch UI
-        │
-        ├── utils/                          # TIỆN ÍCH HỆ THỐNG
-        │   └── exportAuditReportExcel.ts   # Xuất file Excel (.xlsx) chuẩn biểu mẫu báo cáo Quân đội
-        │
-        ├── services/                       # TẦNG DỊCH VỤ MẠNG & INTEGRATION
-        │   ├── http.ts                     # HTTP Client Wrapper với HttpError & Event phát lỗi toàn cục
-        │   ├── authService.ts              # Xác thực đăng nhập & quản lý phiên làm việc
-        │   ├── documentService.ts          # Nghiệp vụ tìm kiếm, tải lên, xem, sửa, xóa văn bản
-        │   ├── userService.ts              # Nghiệp vụ quản lý người dùng & phân quyền quân nhân
-        │   ├── fingerprintService.ts       # Giao tiếp với Local Agent (:9001) & Backend Biometric APIs
-        │   ├── aiService.ts                # Dịch vụ gửi truy vấn và nhận câu trả lời từ Trợ lý AI
-        │   └── ...                         # Các dịch vụ vai trò, quyền, đơn vị, danh mục, log
-        │
-        ├── contexts/                       # Quản lý trạng thái toàn cục (AuthContext, ThemeContext, DeviceModeContext)
-        └── types/                          # Định nghĩa kiểu dữ liệu TypeScript (document, user, role, ai...)
+├── ocr-service/                            # 🟡 MICROSERVICE OCR AIR-GAPPED OFFLINE (:8002 - FastAPI)
+│   ├── main.py                             # Entry point FastAPI PaddleOCR PP-OCRv3 offline
+│   ├── start-ocr.bat                       # Script khởi động tự động kiểm tra virtualenv & dependencies
+│   └── requirements.txt                    # Dependencies: paddlepaddle, paddleocr, fastapi...
+│
+├── frontend/                               # 🔵 GIAO DIỆN CLIENT REACT 18 + TYPESCRIPT + ANT DESIGN
+│   ├── index.html                          # DUY NHẤT 1 file HTML vỏ bọc cho toàn ứng dụng
+│   ├── vite.config.ts                      # Cấu hình Vite build xuất sang ../backend/public, proxy :8000
+│   ├── tsconfig.json                       # Cấu hình TypeScript compiler
+│   ├── tailwind.config.js                  # Cấu hình TailwindCSS
+│   │
+│   └── src/
+│       ├── App.tsx                         # Khởi tạo Ant Design ConfigProvider, Auth, Theme, Router
+│       ├── main.tsx                        # Gắn kết React createRoot
+│       ├── index.css                       # Design System CSS, biến màu quân sự, hiệu ứng glassmorphism
+│       │
+│       ├── routes/                         # HỆ THỐNG AUTO-DISCOVERY ROUTING & GÁC CỔNG
+│       │   ├── routePaths.ts               # Danh mục URL tập trung (/login, /portal, /document-desk...)
+│       │   ├── routeAccess.ts              # Ma trận phân quyền kiểm soát Clearance Level & Login Guard
+│       │   ├── getAppRoutes.ts             # Tự động quét modules/*.routes.tsx qua import.meta.glob
+│       │   ├── RouterProvider.tsx          # Component điều hướng useRoutes hook
+│       │   └── modules/                    # Định nghĩa tuyến đường theo từng module nghiệp vụ
+│       │
+│       ├── pages/                          # CÁC MÀN HÌNH CHỨC NĂNG CHÍNH
+│       │   ├── LoginPage.tsx               # Màn hình đăng nhập quân nhân
+│       │   ├── PortalPage.tsx              # Trung tâm thư viện số (Cổng tra cứu tài liệu)
+│       │   ├── MyUnitPage.tsx              # Đơn vị của tôi (Quản lý tài liệu theo đơn vị trực thuộc)
+│       │   ├── DocumentDeskPage.tsx        # Bàn làm việc số hóa văn thư
+│       │   ├── AdminDashboardPage.tsx      # Bảng điều khiển quản trị trung tâm
+│       │   ├── UsersPage.tsx               # Quản lý tài khoản quân nhân & cấp bậc
+│       │   ├── LecturesPage.tsx            # Phân hệ giảng dạy & giáo trình điện tử quân sự
+│       │   └── HttpErrorPage.tsx           # Trang mã trạng thái HTTP chuẩn Ant Design Result
+│       │
+│       ├── components/                     # THÀNH PHẦN GIAO DIỆN TÁI SỬ DỤNG
+│       │   ├── common/                     # Header, Sidebar, Layout, DeviceModeSwitch, TouchIDFingerprint...
+│       │   ├── ai-chat/                    # AIChatWidget (Cửa sổ trợ lý AI nổi, Markdown, LaTeX, Citations)
+│       │   ├── document-desk/              # FingerprintScanModal (Hộp thoại quét vân tay xác thực xem PDF)
+│       │   ├── users/                      # UserTable, UserFormModal, FingerprintEnrollModal
+│       │   ├── auth/                       # LoginForm
+│       │   ├── portal/                     # SecurityBanner, DocumentCard, PortalDocumentList
+│       │   ├── lectures/                   # Quản lý bài giảng, duyệt 2 tầng, xem SCORM/PDF
+│       │   └── dashboard/                  # PHÂN HỆ QUẢN TRỊ & TRUNG TÂM KIỂM TOÁN SOC
+│       │       ├── SecurityAuditLog.tsx    # Trung tâm SOC, Live Monitor, 4 KPI, Filter Pills, Raw JSON Drawer
+│       │       ├── UnitTreeTable.tsx       # Bảng cây đơn vị 6 cấp bậc, bảo vệ mồ côi, tìm kiếm không dấu
+│       │       ├── StatCard.tsx            # Thẻ thống kê chỉ số nghiệp vụ
+│       │       └── DistributionChart.tsx   # Biểu đồ phân bổ loại văn bản & an ninh
+│       │
+│       ├── hooks/                          # REACT CUSTOM HOOKS (useDeviceMode, useAuth...)
+│       ├── utils/                          # TIỆN ÍCH HỆ THỐNG (exportAuditReportExcel...)
+│       ├── services/                       # TẦNG DỊCH VỤ MẠNG & INTEGRATION (http, auth, document, ai, fingerprint...)
+│       ├── contexts/                       # Quản lý trạng thái toàn cục (Auth, Theme, DeviceMode, NetworkStatus)
+│       └── types/                          # Định nghĩa kiểu dữ liệu TypeScript (document, user, role, ai...)
+│
+├── docs/                                   # 📚 TÀI LIỆU KỸ THUẬT & KIẾN TRÚC HỆ THỐNG
+│   ├── architecture/                       # SYSTEM_ARCHITECTURE.md chi tiết
+│   ├── changelog/                          # Lịch sử các phiên bản phát hành
+│   ├── security/                           # Hướng dẫn kiểm toán an ninh mạng & SOC
+│   └── CHANGELOG.md                        # Nhật ký điều chỉnh kỹ thuật tổng hợp
+│
+└── [TÀI NGUYÊN CỤC BỘ MÁY PHÁT TRIỂN — BẢO VỆ QUA .GITIGNORE]
+    ├── ANTIGRAVITY_MASTER_BRAIN.md         # Bộ não tổng điều phối AI Agent (Lưu giữ cục bộ)
+    ├── .agents/                            # Kho Agent Skills & Company Log nội bộ (Lưu giữ cục bộ)
+    ├── .agent/                             # Cấu hình UI/UX agent phụ trợ (Lưu giữ cục bộ)
+    ├── .claude/                            # Cấu hình bộ kỹ năng Claude Code (Lưu giữ cục bộ)
+    ├── .design-references/                 # Bản thiết kế tham chiếu UI Sketchbook (Lưu giữ cục bộ)
+    ├── config/                             # Cấu hình hạ tầng mạng quân sự & PKI nội bộ (Lưu giữ cục bộ)
+    ├── tools/                              # Kịch bản công cụ hỗ trợ dev cục bộ (Lưu giữ cục bộ)
+    └── reports/                            # Nhật ký quét an ninh mạng & báo cáo kiểm thử (Lưu giữ cục bộ)
 ```
 
 ---

@@ -98,7 +98,12 @@ strix_runs/
 offline_packages/
 tools/gitleaks/
 
-# Local Agent Skills, AI Tooling & Design References (Chỉ lưu trên máy cá nhân, không đẩy lên Git)
+# Local Master Brain, Agent Skills, Config & Local Tools (Chỉ lưu trên máy cá nhân, không đẩy lên Git)
+ANTIGRAVITY_MASTER_BRAIN.md
+skills-lock.json
+config/
+tools/
+reports/
 .agent/
 .agents/
 .claude/

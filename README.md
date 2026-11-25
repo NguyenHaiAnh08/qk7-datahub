@@ -55,7 +55,7 @@ graph TD
 
 ## 📌 Danh Mục Tài Liệu Kỹ Thuật Dự Án
 
-* 🧠 **[ANTIGRAVITY_MASTER_BRAIN.md](./ANTIGRAVITY_MASTER_BRAIN.md)**: **Hiến pháp tối cao của dự án — AI Agent bắt buộc phải đọc đầu tiên**.
+* 🧠 **ANTIGRAVITY_MASTER_BRAIN.md**: **Hiến pháp tối cao của dự án — AI Agent bắt buộc phải đọc đầu tiên** *(tệp cấu hình nội bộ máy trạm, được bảo vệ qua `.gitignore`, lưu cục bộ trên máy phát triển)*.
 * 👉 **[SYSTEM_ARCHITECTURE.md](./docs/architecture/SYSTEM_ARCHITECTURE.md)**: Kiến trúc toàn diện 5 tầng, ERD, luồng dữ liệu, phân quyền bảo mật 3 lớp.
 * 👉 **[SETUP_SERVER.md](./docs/guides/SETUP_SERVER.md)**: Sổ tay hướng dẫn cài đặt Server, Client, ZKTeco SDK và kết nối phần cứng.
 * 👉 **[SECURITY.md](./docs/security/SECURITY.md)**: Chính sách an ninh thông tin, danh mục Security Headers và **DevSecOps Pipeline (4 Chốt Chặn)**.
@@ -210,59 +210,58 @@ Hệ thống tích hợp quy trình kiểm toán tự động hóa hoàn toàn t
 
 ```text
 qk7-datahub/
-├── ANTIGRAVITY_MASTER_BRAIN.md                 # 🧠 Hiến pháp tối cao dự án (AI bắt buộc đọc đầu tiên)
 ├── README.md                                   # Sổ tay hướng dẫn khởi động nhanh & hệ sinh thái
 ├── docker-compose.yml                          # Điều phối container Docker cho toàn hệ thống
 ├── package.json                                # Scripts điều phối monorepo
+├── s.bat / setup.bat                           # Script khởi động & cài đặt nhanh
+│
+├── backend/                                    # 🟢 MÁY CHỦ EXPRESS 5 & WEBSOCKET GATEWAY (:8000)
+│   ├── src/                                    # API nghiệp vụ, CSDL SQL Server, phân quyền, WebSocket
+│   ├── uploads/                                # Kho lưu trữ tệp PDF số hóa & bài giảng
+│   └── public/                                 # Static build phân phối cho ứng dụng SPA
+│
+├── boxchat/                                    # 🟣 MICROSERVICE TRỢ LÝ AI TÁC CHIẾN (:8001 - FastAPI)
+│   ├── core/                                   # RAG agent tutor, PDF processor, hybrid vector store
+│   └── local_storage/                          # Cơ sở dữ liệu vector Qdrant cục bộ
+│
+├── fingerprint/                                # 🔴 DỊCH VỤ PHẦN CỨNG MÁY QUÉT VÂN TAY (:9001 - Python)
+│   ├── agent.py                                # WebSocket Client kết nối Gateway & HTTP Server :9001
+│   ├── zk_service.py                           # CTypes wrapper giao tiếp máy quét quang học ZK9500
+│   └── libzkfp.dll                             # Thư viện liên kết động C++ ZKTeco
+│
+├── frontend/                                   # 🔵 GIAO DIỆN CLIENT REACT 18 + TYPESCRIPT + ANT DESIGN
+│   ├── src/                                    # Mã nguồn React, Auto-Discovery Routing, Dual-Platform
+│   └── index.html                              # Vỏ nạp ứng dụng SPA duy nhất
+│
+├── ocr-service/                                # 🟡 MICROSERVICE NHẬN DẠNG KÝ TỰ QUANG HỌC (:8002 - FastAPI)
+│   ├── main.py                                 # Engine bóc tách văn bản scan đa tầng (PaddleOCR, MonkeyOCR)
+│   └── start-ocr.bat                           # Khởi động dịch vụ OCR
+│
+├── deploy/                                     # 🛡️ CẤU HÌNH TRIỂN KHAI MẠNG QUÂN SỰ BẢO MẬT (HTTPS, RootCA)
 │
 ├── docs/                                       # 📚 TOÀN BỘ TÀI LIỆU KỸ THUẬT & HỆ THỐNG
-│   ├── architecture/
-│   │   └── SYSTEM_ARCHITECTURE.md              # Tài liệu kiến trúc toàn diện 5 tầng hệ thống
-│   ├── security/
-│   │   ├── SECURITY.md                         # Chính sách an ninh thông tin & DevSecOps 4 Chốt Chặn
-│   │   ├── SECURITY_AUDIT_REPORT.md            # Báo cáo kiểm toán & khắc phục lỗ hổng an ninh
-│   │   └── strix-pentest-instructions.md       # Kịch bản kiểm thử thâm nhập tự động
-│   ├── guides/
-│   │   ├── SETUP_SERVER.md                     # Hướng dẫn cài đặt Server, Client & ZKTeco SDK
-│   │   ├── ROUTING_CONVENTION.md               # Quy chuẩn định tuyến Frontend Auto-Discovery
-│   │   ├── TROUBLESHOOTING_HISTORY.md          # Sổ tay cứu hộ, sự cố & giải pháp kỹ thuật
-│   │   ├── AGENT_WORKFLOW.md                   # Quy trình làm việc bắt buộc với AI Agent
-│   │   └── Senior Multi-Role.md                # Quy tắc vận hành kỹ sư senior đa vai trò
-│   └── design/
-│       ├── DESIGN.md                           # Chuẩn mực thiết kế UI/UX Anti-AI-Slop Bản sắc Quân đội
-│       ├── SKILL.md                            # Kỹ năng thiết kế giao diện chi tiết & tương tác vật lý
-│       └── System Architect.md                 # Chỉ dẫn kiến trúc sư hệ thống UI/UX
+│   ├── architecture/                           # Tài liệu kiến trúc 5 tầng & hạ tầng tự chủ
+│   ├── security/                               # Chính sách an ninh thông tin, DevSecOps & kiểm toán
+│   ├── guides/                                 # Sổ tay cài đặt máy chủ, sự cố & quy trình
+│   └── design/                                 # Bản sắc thiết kế UI/UX quân sự & component
 │
 ├── scripts/                                    # ⚙️ TOÀN BỘ SCRIPT TIỆN ÍCH, SCANNER & KHỞI CHẠY
-│   ├── s.bat                                   # Khởi động toàn bộ hệ thống (Backend, AI, OCR)
-│   ├── s-dev.bat                               # Khởi động chế độ Development (kèm Vite dev)
-│   ├── start-ai.bat                            # Khởi động AI Boxchat & Ollama
-│   ├── load-env.bat                            # Nạp biến môi trường từ .env
-│   ├── generate-client-config.bat              # Sinh cấu hình kết nối cho trạm quét vân tay
-│   ├── mergecode.py                            # Tiện ích gộp mã nguồn an toàn BE & FE v5.0 (tự động loại trừ dependencies, .env, scripts, test, docs và che mờ bí mật)
-│   └── security-scan.ps1                       # Script quét an ninh tổng hợp (Gitleaks, Trivy, CSP)
+│   ├── s.bat / s-dev.bat                       # Khởi động toàn bộ microservice
+│   ├── start-ai.bat                            # Khởi động AI Boxchat & Ollama GPU Server
+│   ├── start-dns.bat / dns-server.js           # Máy chủ DNS nội bộ phục vụ LAN không cần sửa hosts
+│   └── cai-dat-may-con.bat                     # Tự động hóa cài đặt RootCA và cấu hình trạm máy con
 │
 ├── data/                                       # 📦 DỮ LIỆU TĨNH (Traineddata Tesseract / OCR)
 │   ├── eng.traineddata                         # Dữ liệu ngôn ngữ Tiếng Anh
 │   └── vie.traineddata                         # Dữ liệu ngôn ngữ Tiếng Việt
 │
-├── reports/                                    # 📊 BÁO CÁO QUÉT BẢO MẬT [GITIGNORE]
-│   └── security/                               # Kết quả quét Trivy, ZAP, Gitleaks, SBOM
-│
-├── config/                                     # 🔧 CẤU HÌNH PHỤ TRỢ (zap.yaml, tsconfig, client.info)
-│
-├── tools/                                      # 🛠️ CÔNG CỤ CLI QUẢN TRỊ & CỨU HỘ
-│   └── admin-fingerprint-tool.js               # Công cụ chẩn đoán, reset và xóa mẫu vân tay
-│
-├── backend/                                    # 🟢 MÁY CHỦ EXPRESS 5 & WEBSOCKET GATEWAY (:8000)
-│   ├── src/
-│   │   ├── db.js                               # Kết nối Microsoft SQL Server (QK7_ThuVienSo)
-│   │   ├── admin-routes.js                     # API quản trị CRUD (Users, Roles, Units, Permissions...)
-│   │   ├── ai-routes.js                        # Cổng giao tiếp AI boxchat (:8001) & Smart SQL Fallback
-│   │   ├── lecture-routes.js                   # API quản lý bài giảng số & lịch học
-│   │   ├── scorm-package-routes.js             # API gói học liệu SCORM/HTML5 (tải lên & phục vụ static)
-│   │   ├── lecture-package-helper.js           # Xử lý giải nén an toàn & parse manifest SCORM
-│   │   └── fingerprint-ws.js                   # WebSocket Server (/ws/fingerprint) quản lý ZK9500
+└── [TÀI NGUYÊN CỤC BỘ MÁY PHÁT TRIỂN — BẢO VỆ QUA .GITIGNORE]
+    ├── ANTIGRAVITY_MASTER_BRAIN.md             # 🧠 Hiến pháp tối cao vận hành AI Agent (lưu trên máy trạm)
+    ├── config/                                 # 🔧 Cấu hình hạ tầng phụ trợ & PKI (lưu trên máy trạm)
+    ├── tools/                                  # 🛠️ Công cụ quản trị, cứu hộ & quét mã (lưu trên máy trạm)
+    ├── reports/                                # 📊 Báo cáo kiểm toán bảo mật & rà soát (lưu trên máy trạm)
+    └── .agents/ & .agent/ & .claude/           # 🤖 Kỹ năng Agent, workflows & cấu hình AI (lưu trên máy trạm)
+```
 │   ├── uploads/                                # Kho lưu trữ tệp PDF thật (theo hash SHA-256)
 │   ├── public/                                 # Sản phẩm build tĩnh từ Frontend xuất sang
 │   └── server.js                               # Entry point Express API Gateway & Biometrics

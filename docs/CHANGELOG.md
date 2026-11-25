@@ -4,6 +4,19 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.11-clean-repository-and-local-tooling-security] — 2026-11-25
+
+### 1. Gỡ Bỏ Theo Dõi Git Cho Bộ Não Tổng & Công Cụ Quản Trị Cục Bộ (Local-First Security)
+- **Gỡ bỏ theo dõi Git an toàn qua `git rm -r --cached`:**
+  - Loại bỏ hoàn toàn `ANTIGRAVITY_MASTER_BRAIN.md`, `config/`, `tools/`, `skills-lock.json` khỏi Git index mà vẫn bảo toàn 100% dữ liệu vật lý trên máy trạm của kỹ sư.
+  - Ngăn ngừa đưa các cấu hình hạ tầng mạng quân sự nội bộ (`config/military-infra/`), công cụ kiểm thử vân tay (`tools/admin-fingerprint-tool.js`, `tools/them-giang-duong.js`), và bộ não điều phối AI lên GitHub repository.
+- **Tăng cường hàng rào `.gitignore`:**
+  - Bổ sung quy tắc bỏ qua tuyệt đối cho: `ANTIGRAVITY_MASTER_BRAIN.md`, `skills-lock.json`, `config/`, `tools/`, `reports/`, `.agent/`, `.agents/`, `.claude/`, `.design-references/`.
+- **Đồng bộ hóa tài liệu kiến trúc & cấu trúc thư mục ([`README.md`](../README.md), [`docs/architecture/SYSTEM_ARCHITECTURE.md`](architecture/SYSTEM_ARCHITECTURE.md)):**
+  - Cập nhật sơ đồ cây thư mục toàn diện, phân định rõ ràng giữa mã nguồn sản phẩm đẩy lên remote GitHub và tài nguyên cục bộ chỉ phục vụ máy phát triển.
+
+---
+
 ## [v1.8.10-gpu-vram-guard-and-ai-inference-optimization] — 2026-11-25
 
 ### 1. Tối Ưu Hóa GPU VRAM, Flash Attention & Bộ Đệm KV Cho Ollama AI Boxchat

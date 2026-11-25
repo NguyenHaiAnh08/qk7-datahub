@@ -187,6 +187,6 @@ chmod +x start-ocr.sh
 3. **Cơ chế Fallback nhiều tầng:**
    - Tầng 1: File số hóa (Digital) $\rightarrow$ Trích xuất text trực tiếp (< 100ms).
    - Tầng 2: File scan $\rightarrow$ MonkeyOCRv2 phân tích layout và đọc chữ.
-   - Tầng 2b: Nếu MonkeyOCRv2 chưa cài xong $\rightarrow$ Tự động chuyển PaddleOCR (PP-OCRv4).
+   - Tầng 2b: Nếu MonkeyOCRv2 chưa cài xong $\rightarrow$ Tự động chuyển PaddleOCR (PP-OCRv3: `en_PP-OCRv3_det_infer` + `latin_PP-OCRv3_rec_infer`).
    - Tầng 2c: Nếu dịch vụ Python offline $\rightarrow$ Fallback Tesseract.js cục bộ đảm bảo không đứt gãy luồng nghiệp vụ.
 

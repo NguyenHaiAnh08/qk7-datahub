@@ -146,8 +146,10 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
 
   const buildLaunchUrl = () => {
     const token = sessionStorage.getItem('qk7_token');
+    const fp = sessionStorage.getItem(`qk7_fp_lecture_${lecture.lecture_id}`);
     const params = new URLSearchParams();
     if (token) params.set('token', token);
+    if (fp) params.set('fp', fp);
     if (selectedFile) params.set('file', selectedFile);
     const qs = params.toString() ? `?${params.toString()}` : '';
     const type = lecture.content_type === 'SCORM' ? 'scorm' : 'html5';

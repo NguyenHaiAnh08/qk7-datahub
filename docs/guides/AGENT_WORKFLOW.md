@@ -39,7 +39,7 @@ Trước khi bắt đầu thực hiện bất kỳ lệnh shell, viết mã hay 
    * Không hardcode các khóa bí mật (`JWT_SECRET`, `FP_ENC_KEY`, `FINGERPRINT_BRIDGE_TOKEN`) vào mã nguồn.
 
 2. **Triển khai mã nguồn:**
-   * Áp dụng đúng công nghệ và quy chuẩn lập trình: TypeScript chặt chẽ, Ant Design theme tím `#722ED1`, xử lý trạng thái đầy đủ (loading, empty, error).
+   * Áp dụng đúng công nghệ và quy chuẩn lập trình: TypeScript chặt chẽ, Ant Design theme Xanh Lục Quân `#166534` (Light) / `#10b981` (Dark), xử lý trạng thái đầy đủ (loading, empty, error).
    * Tái sử dụng các module dùng chung: `services/http.ts`, `AuthContext`, `ThemeContext`, `DeviceModeContext`.
    * Ghi nhận đầy đủ nhật ký kiểm toán `ACCESS_LOG` đối với mọi hành vi nhạy cảm.
 

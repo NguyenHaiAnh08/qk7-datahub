@@ -19,6 +19,7 @@ from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -169,15 +170,17 @@ class SyncAllRequest(BaseModel):
 @app.get("/api/ai/health")
 async def health_check():
     """
-    Kiểm tra trạng thái sẵn sàng của boxchat và số lượng chunks đã nạp.
+    Kiểm tra trạng thái sẵn sàng của boxchat, kết nối Ollama thực tế (cache 10s) và số lượng chunks đã nạp.
     """
     total_chunks = vector_store.get_total_chunks()
+    ollama_ok = await run_in_threadpool(agent_tutor.check_ollama_health)
     return {
         "status": "online",
         "service": "boxchat",
         "port": 8001,
         "total_chunks_indexed": total_chunks,
-        "ollama_connected": True,
+        "ollama_connected": ollama_ok,
+        "ollama_model": agent_tutor.model_name,
         "security_enforcement": "Strict Pre-filtering (1-5)"
     }
 
@@ -185,9 +188,9 @@ async def health_check():
 @app.get("/metrics")
 async def prometheus_metrics():
     """
-    Prometheus metrics endpoint.
+    Prometheus metrics endpoint (không chạy warm_up đồng bộ).
     """
-    update_system_gauges(vector_store, agent_tutor)
+    await run_in_threadpool(update_system_gauges, vector_store, agent_tutor)
     return metrics_response()
 
 
@@ -195,16 +198,18 @@ async def prometheus_metrics():
 async def ingest_document(req: IngestRequest):
     """
     Bóc tách và nạp tài liệu PDF vào kho Vector Store ngay khi văn thư upload.
+    Hỗ trợ gọi OCR bất đồng bộ trong threadpool cho tệp PDF thuần scan.
     """
     try:
-        chunks = pdf_processor.extract_chunks(
+        chunks = await run_in_threadpool(
+            pdf_processor.extract_chunks,
             file_id=req.file_id,
             document_code=req.document_code,
             title=req.title,
             stored_path=req.stored_path,
             security_level_id=req.security_level_id
         )
-        added_count = vector_store.add_chunks(chunks)
+        added_count = await run_in_threadpool(vector_store.add_chunks, chunks)
         return {
             "success": True,
             "file_id": req.file_id,
@@ -235,7 +240,8 @@ async def sync_all_documents(req: SyncAllRequest):
 
     for doc in req.documents:
         try:
-            chunks = pdf_processor.extract_chunks(
+            chunks = await run_in_threadpool(
+                pdf_processor.extract_chunks,
                 file_id=doc.file_id,
                 document_code=doc.document_code or doc.file_id,
                 title=doc.title,
@@ -243,7 +249,7 @@ async def sync_all_documents(req: SyncAllRequest):
                 security_level_id=doc.security_level_id
             )
             if chunks:
-                added = vector_store.add_chunks(chunks)
+                added = await run_in_threadpool(vector_store.add_chunks, chunks)
                 total_new_chunks += added
                 success_count += 1
         except Exception as e:
@@ -321,15 +327,25 @@ async def chat_with_tutor(req: ChatRequest):
         synthesis_mode = result.get("synthesis_mode", "extractive")
         LLM_SYNTHESIS_MODE.labels(mode=synthesis_mode).inc()
 
+        fallback_reason = getattr(agent_tutor, "_last_fallback_reason", None)
+        if synthesis_mode == "extractive" and fallback_reason:
+            LLM_FALLBACK_TOTAL.labels(reason=fallback_reason).inc()
+
         answer_len = len(result.get("answer", ""))
         ANSWER_LENGTH.observe(answer_len)
 
         if result.get("requires_biometric"):
             BIOMETRIC_BLOCKS.inc()
 
-        # Track citations
+        # Track citations (emitted + verified inline citations)
         citations = result.get("citations", [])
         CITATIONS_EMITTED.inc(len(citations))
+
+        cit_stats = getattr(agent_tutor, "_last_citation_stats", None) or {}
+        if cit_stats.get("valid", 0) > 0:
+            CITATIONS_VALID.inc(cit_stats["valid"])
+        if cit_stats.get("fabricated", 0) > 0:
+            CITATIONS_FABRICATED.inc(cit_stats["fabricated"])
 
         # Track adversarial refusal (heuristic)
         if any(kw in result.get("answer", "").lower() for kw in ["không có", "không thể", "từ chối", "không đủ cấp"]):

@@ -108,6 +108,7 @@ export function parseUserAgent(ua?: string): ParsedUA {
 export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) => {
   const { user, hasPermission } = useAuth();
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  const [idleTimeoutMinutes, setIdleTimeoutMinutes] = useState<number>(30);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [animatingSessionId, setAnimatingSessionId] = useState<string | null>(null);
@@ -130,6 +131,9 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
     try {
       const r = await sessionService.listActive();
       setSessions(r.items || []);
+      if (typeof r.idle_timeout_minutes === 'number' && r.idle_timeout_minutes > 0) {
+        setIdleTimeoutMinutes(r.idle_timeout_minutes);
+      }
     } catch (err: any) {
       toast.error('Lỗi tải danh sách phiên: ' + (err.message || 'Lỗi không xác định'));
     } finally {
@@ -242,7 +246,8 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
       );
     }
 
-    if (idle <= 120) {
+    const warnThreshold = Math.max(5, Math.floor(idleTimeoutMinutes * 0.67));
+    if (idle <= warnThreshold) {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap shadow-xs">
           <span className="relative flex h-2 w-2">
@@ -260,13 +265,15 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
     return (
       <span
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30 whitespace-nowrap shadow-xs"
-        title={`Treo máy quá lâu. Sắp tự động ngắt kết nối sau ${Math.max(0, 180 - idle)} phút nữa`}
+        title={`Treo máy quá lâu. Sắp tự động ngắt kết nối sau ${Math.max(0, idleTimeoutMinutes - idle)} phút nữa`}
       >
         <span className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
         </span>
-        <span>Treo máy ({Math.floor(idle / 60)}h{idle % 60}p)</span>
+        <span>
+          Treo máy ({Math.floor(idle / 60) > 0 ? `${Math.floor(idle / 60)}h${idle % 60}p` : `${idle}p`})
+        </span>
       </span>
     );
   };
@@ -289,10 +296,10 @@ export const SessionsPage: React.FC<SessionsPageProps> = ({ embedded = false }) 
             <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
               {sessions.length}
             </span>{' '}
-            <span>phiên đang hoạt động (tương tác trong 3 giờ gần nhất)</span>
+            <span>phiên đang hoạt động (tương tác trong {idleTimeoutMinutes} phút gần nhất)</span>
             <span className="text-slate-400">•</span>
             <span className="text-rose-600 dark:text-rose-400 font-medium">
-              Tự động thoát nếu treo máy 180 phút
+              Tự động thoát nếu treo máy {idleTimeoutMinutes} phút
             </span>
           </p>
         </div>

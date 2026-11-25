@@ -1,7 +1,7 @@
 # ============================================================
 # QK7 DataHub - OCR Microservice v2.0
 # Engine chính: MonkeyOCRv2 (HuggingFace transformers / Qwen-VL)
-# Engine fallback: PaddleOCR PP-OCRv4
+# Engine fallback: PaddleOCR PP-OCRv3 (en_PP-OCRv3_det_infer + latin_PP-OCRv3_rec_infer)
 # ============================================================
 
 # ─── 1. FastAPI Web Server ──────────────────────────────────

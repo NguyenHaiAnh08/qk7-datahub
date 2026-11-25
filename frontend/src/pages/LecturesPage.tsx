@@ -135,8 +135,17 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
   const [readingLecture, setReadingLecture] = useState<Lecture | null>(null);
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
 
-  // Trạng thái chờ quét vân tay để mở ca dạy đối với bài giảng Cấp 3+
+  // Trạng thái chờ quét vân tay (và PIN nếu Cấp 4-5) để mở ca dạy hoặc đọc bài giảng Cấp 3+
   const [verifySessionLecture, setVerifySessionLecture] = useState<Lecture | null>(null);
+  const [verifyReadLecture, setVerifyReadLecture] = useState<Lecture | null>(null);
+
+  const handleRequestReadLecture = (lec: Lecture) => {
+    if (lec.security_level_id >= 3) {
+      setVerifyReadLecture(lec);
+    } else {
+      setReadingLecture(lec);
+    }
+  };
 
   // Modal từ chối & Hộp thoại xác nhận
   const [rejectingLecture, setRejectingLecture] = useState<Lecture | null>(null);
@@ -775,7 +784,7 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                       onSoftDelete={() => handleSoftDelete(lec)}
                       onEdit={() => handleEditClick(lec)}
                       onView={() => setViewingLecture(lec)}
-                      onRead={() => setReadingLecture(lec)}
+                      onRead={() => handleRequestReadLecture(lec)}
                       onStartSession={() => {
                         // KIỂM TRA CẤP ĐỘ BẢO MẬT
                         if (lec.security_level_id >= 3) {
@@ -853,13 +862,36 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
         />
       )}
 
+      {/* Modal Xác Thực Vân Tay (+ PIN nếu Cấp 4-5) Cho Đọc Bài Giảng Cấp 3+ */}
+      {verifyReadLecture && (
+        <FingerprintScanModal
+          open={!!verifyReadLecture}
+          fileId={verifyReadLecture.lecture_id}
+          onSuccess={(token) => {
+            if (token) {
+              sessionStorage.setItem(
+                `qk7_fp_lecture_${verifyReadLecture.lecture_id}`,
+                token
+              );
+            }
+            const target = verifyReadLecture;
+            setVerifyReadLecture(null);
+            setReadingLecture(target);
+            toast.success('Xác thực sinh trắc học thành công! Đang mở bài giảng...');
+          }}
+          onCancel={() => setVerifyReadLecture(null)}
+        />
+      )}
+
       <LectureDetailModal
         open={!!viewingLecture}
         lecture={viewingLecture}
         onClose={() => setViewingLecture(null)}
         onOpenReader={() => {
           if (viewingLecture) {
-            setReadingLecture(viewingLecture);
+            const target = viewingLecture;
+            setViewingLecture(null);
+            handleRequestReadLecture(target);
           }
         }}
       />

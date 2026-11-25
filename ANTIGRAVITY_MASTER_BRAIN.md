@@ -43,7 +43,7 @@ Khi cần tra cứu thông tin nghiệp vụ và kỹ thuật, BẮT BUỘC đ�
 
 ### 2.4. Quy chuẩn Thiết kế UI/UX — Anti-AI-Slop (`docs/design/`)
 - **Kim chỉ nam Thiết kế Bản sắc Quân sự:** [`docs/design/DESIGN.md`](./docs/design/DESIGN.md)
-  - Hệ màu: Xanh Lục Quân `#166534`, Vàng Kim `#fbbf24`, Đỏ Quân Kỳ `#b91c1c`, Tím Thư viện `#722ED1`.
+  - Hệ màu: Xanh Lục Quân `#166534` (Light) / `#10b981` (Dark), Vàng Kim `#fbbf24`, Đỏ Quân Kỳ `#b91c1c`.
   - Không dùng animation tuyến tính vô hồn; dùng Spring physics `cubic-bezier(.34, 1.45, .64, 1)`.
   - Phân tầng độ sâu bề mặt (Layered Surfaces), Animated Toast, `font-mono` tabular cho số liệu chỉ huy.
 - **Kỹ năng thiết kế chi tiết & Tham chiếu:** [`docs/design/SKILL.md`](./docs/design/SKILL.md) & [`docs/design/System Architect.md`](./docs/design/System%20Architect.md)

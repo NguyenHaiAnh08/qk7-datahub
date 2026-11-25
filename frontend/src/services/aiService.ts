@@ -121,9 +121,14 @@ export const aiService = {
   /**
    * Tạo gói học tập "Cuốn sách riêng" 3 Tab (01 Tài liệu, 02 Sơ đồ, 03 Kiểm tra)
    */
-  async getStudyBook(fileId: string): Promise<AIStudyBookResponse> {
+  async getStudyBook(fileId: string, fingerprintToken?: string): Promise<AIStudyBookResponse> {
+    const headers: Record<string, string> = {};
+    if (fingerprintToken) {
+      headers['X-Fingerprint-Token'] = fingerprintToken;
+    }
     return http<AIStudyBookResponse>(`/api/ai/study-book/${encodeURIComponent(fileId)}`, {
       method: 'GET',
+      headers,
       skipErrorNotification: false,
     });
   },

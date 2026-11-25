@@ -39,7 +39,7 @@ flowchart TD
 
     subgraph CORE ["4. TẦNG ỨNG DỤNG & CSDL CÔ LẬP (VLAN NỘI BỘ)"]
         GW["Cụm Express 5 Gateway (:8000 / :443)<br/>RBAC 5 Cấp Mật + 2FA Vân Tay + ACCESS_LOG"]
-        AI["AI Boxchat FastAPI (:8001 — Local Only)<br/>Qdrant Local + Ollama qwen2.5:7b"]
+        AI["AI Boxchat FastAPI (:8001 — Local Only)<br/>Qdrant Local + Ollama qwen2.5:3b"]
         OCR["OCR Microservice (:8002 — Local Only)"]
         DB["SQL Server Always On AG (:1433)<br/>QK7_ThuVienSo + Kho PDF SHA-256"]
         GW --> AI

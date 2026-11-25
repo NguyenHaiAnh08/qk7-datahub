@@ -16,7 +16,7 @@ const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { parseDocumentPdf, extractTextFromDigitalPdf, extractMetadata } = require('./pdf-parser');
-// pdf-router.js và pdfWatermarkServer.js là module tiện ích độc lập (dùng cho test-pipeline.js)
+// pdf-router.js và pdfWatermarkServer.js là module tiện ích độc lập
 const { getAuthoritativeServerTime, detectOsClockTamper, syncFromDatabase } = require('./src/clock-authority');
 const { sql, getPool, closePool, testConnection } = require('./src/db');
 const createApprovalWorkflow = require('./src/approval-workflow');

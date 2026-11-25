@@ -17,15 +17,33 @@ echo   QK7 DataHub - KHOI DONG AI BOXCHAT 8001
 echo ==========================================
 echo.
 
-REM --- 1. Kiem tra va Khoi dong Ollama ---
+REM --- 1. Cau hinh GPU/VRAM Guard va Khoi dong Ollama ---
+set "PORT=8001"
+if not defined OLLAMA_HOST set "OLLAMA_HOST=127.0.0.1:11434"
+if not defined OLLAMA_FLASH_ATTENTION set "OLLAMA_FLASH_ATTENTION=1"
+if not defined OLLAMA_KV_CACHE_TYPE set "OLLAMA_KV_CACHE_TYPE=q8_0"
+if not defined OLLAMA_NUM_PARALLEL set "OLLAMA_NUM_PARALLEL=1"
+if not defined OLLAMA_MAX_LOADED_MODELS set "OLLAMA_MAX_LOADED_MODELS=2"
+if not defined OLLAMA_KEEP_ALIVE set "OLLAMA_KEEP_ALIVE=3m"
+if not defined OLLAMA_NUM_CTX set "OLLAMA_NUM_CTX=4096"
+if not defined OLLAMA_EMBED_NUM_CTX set "OLLAMA_EMBED_NUM_CTX=2048"
+if not defined OLLAMA_NUM_GPU set "OLLAMA_NUM_GPU=99"
+
 echo [1/4] Kiem tra dich vu Ollama (http://127.0.0.1:11434)...
 curl.exe -s http://127.0.0.1:11434/api/tags >nul 2>&1
 if errorlevel 1 (
-    echo [Thong bao] Ollama chua chay, dang khoi dong Ollama service...
-    start "QK7 Ollama Server" cmd /c "ollama serve"
+    set "OLLAMA_BIN=ollama"
+    where ollama >nul 2>&1
+    if errorlevel 1 (
+        if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" (
+            set "OLLAMA_BIN=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+        )
+    )
+    echo [Thong bao] Ollama chua chay, dang khoi dong Ollama GPU service...
+    start "QK7 Ollama GPU Server" /min "!OLLAMA_BIN!" serve
     echo Dang cho Ollama san sang...
     set "OLLAMA_UP=0"
-    for /l %%i in (1,1,10) do (
+    for /l %%i in (1,1,15) do (
         if "!OLLAMA_UP!"=="0" (
             ping 127.0.0.1 -n 2 >nul
             curl.exe -s http://127.0.0.1:11434/api/tags >nul 2>&1
@@ -33,7 +51,7 @@ if errorlevel 1 (
         )
     )
     if "!OLLAMA_UP!"=="1" (
-        echo [OK] Ollama da khoi dong thanh cong tren cong 11434.
+        echo [OK] Ollama GPU Server da khoi dong thanh cong tren cong 11434.
     ) else (
         echo [CANH BAO] Ollama phan hoi cham, tiep tuc khoi dong boxchat voi che do fallback an toan.
     )

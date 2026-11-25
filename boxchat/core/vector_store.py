@@ -52,6 +52,10 @@ class HybridVectorStore:
         if "localhost" in self.ollama_url:
             self.ollama_url = self.ollama_url.replace("localhost", "127.0.0.1")
         self.embed_model = os.getenv("OLLAMA_EMBED_MODEL", embed_model)
+        
+        self.embed_keep_alive = os.getenv("OLLAMA_EMBED_KEEP_ALIVE", os.getenv("OLLAMA_KEEP_ALIVE", "3m"))
+        self.embed_num_ctx = int(os.getenv("OLLAMA_EMBED_NUM_CTX", "2048"))
+        self.embed_num_gpu = int(os.getenv("OLLAMA_NUM_GPU", "99"))
         # Tuple timeout (connect_timeout=1.5s, read_timeout=30.0s)
         self.embed_timeout = (1.5, float(os.getenv("OLLAMA_EMBED_TIMEOUT", "30.0")))
 
@@ -182,10 +186,16 @@ class HybridVectorStore:
             self.ollama_embed_available = True
 
         try:
+            embed_options: Dict[str, Any] = {"num_ctx": self.embed_num_ctx}
+            if self.embed_num_gpu >= 0:
+                embed_options["num_gpu"] = self.embed_num_gpu
+
             # 1. Thử Ollama /api/embed (chuẩn từ v0.1.34+)
             payload = {
                 "model": self.embed_model,
-                "input": texts
+                "input": texts,
+                "keep_alive": self.embed_keep_alive,
+                "options": embed_options,
             }
             resp = requests.post(
                 f"{self.ollama_url}/api/embed",
@@ -203,7 +213,12 @@ class HybridVectorStore:
             if resp.status_code == 404:
                 embeddings = []
                 for t in texts:
-                    old_payload = {"model": self.embed_model, "prompt": t}
+                    old_payload = {
+                        "model": self.embed_model,
+                        "prompt": t,
+                        "keep_alive": self.embed_keep_alive,
+                        "options": embed_options,
+                    }
                     r_old = requests.post(
                         f"{self.ollama_url}/api/embeddings",
                         json=old_payload,

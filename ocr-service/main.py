@@ -44,6 +44,7 @@ os.environ.setdefault("DISABLE_PADDLE_UPDATE_CHECK", "1")
 os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
 os.environ.setdefault("FLAGS_use_mkldnn", "0")
 
+import gc
 import json
 import re
 import logging
@@ -718,6 +719,7 @@ async def extract_ocr(
                         engine_used=engine_used,
                     ))
                     all_text_blocks_local.append(page_text)
+                    del pil_img
 
                 return (
                     total_pages_local,
@@ -728,6 +730,7 @@ async def extract_ocr(
                 )
             finally:
                 doc.close()
+                gc.collect()
 
         (
             total_pages,

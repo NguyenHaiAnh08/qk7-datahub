@@ -174,6 +174,7 @@ async def health_check():
     """
     total_chunks = vector_store.get_total_chunks()
     ollama_ok = await run_in_threadpool(agent_tutor.check_ollama_health)
+    loaded_models = await run_in_threadpool(agent_tutor.get_loaded_models) if ollama_ok else []
     return {
         "status": "online",
         "service": "boxchat",
@@ -181,6 +182,10 @@ async def health_check():
         "total_chunks_indexed": total_chunks,
         "ollama_connected": ollama_ok,
         "ollama_model": agent_tutor.model_name,
+        "ollama_embed_model": vector_store.embed_model,
+        "ollama_keep_alive": agent_tutor.keep_alive,
+        "ollama_num_ctx": agent_tutor.num_ctx,
+        "ollama_loaded_models": loaded_models,
         "security_enforcement": "Strict Pre-filtering (1-5)"
     }
 

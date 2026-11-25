@@ -4,6 +4,24 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.10-gpu-vram-guard-and-ai-inference-optimization] — 2026-11-25
+
+### 1. Tối Ưu Hóa GPU VRAM, Flash Attention & Bộ Đệm KV Cho Ollama AI Boxchat
+- **Cấu hình GPU VRAM Guard ([`scripts/start-ai.bat`](../scripts/start-ai.bat), [`boxchat/s.bat`](../boxchat/s.bat), [`.env.example`](../.env.example)):**
+  - Tích hợp các tham số tối ưu hóa phần cứng cao cấp: `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=3m`, `OLLAMA_NUM_CTX=4096`, `OLLAMA_NUM_GPU=99`.
+  - Tự động phát hiện thực thi `ollama.exe` trong cả `PATH` và `%LOCALAPPDATA%\Programs\Ollama\`.
+- **Đồng nhất Options & Giám sát VRAM Thời Gian Thực ([`boxchat/core/agent_tutor.py`](../boxchat/core/agent_tutor.py), [`boxchat/main.py`](../boxchat/main.py)):**
+  - Thêm phương thức `_build_ollama_options()` đồng nhất giữa `warm_up()` và `_call_ollama()`, giữ model 100% trên VRAM GPU, loại bỏ hiện tượng tải lại model khi đổi context.
+  - Bổ sung endpoint `/api/ai/runtime-status` và hàm `get_loaded_models()` truy vấn trực tiếp `/api/ps` của Ollama (cache 5s) hiển thị kích thước VRAM sử dụng và % GPU offload.
+
+### 2. Tối Ưu Tài Nguyên Cho Dịch Vụ OCR & Chống Rò Rỉ Bộ Nhớ
+- **Nhường 100% VRAM GPU cho AI Boxchat ([`ocr-service/start-ocr.bat`](../ocr-service/start-ocr.bat)):**
+  - Cấu hình mặc định `MONKEY_DEVICE=cpu` chạy PaddleOCR PP-OCRv3 siêu nhẹ trên CPU (~60-400MB RAM, 0MB VRAM).
+- **Giải phóng bộ nhớ triệt để ([`ocr-service/main.py`](../ocr-service/main.py)):**
+  - Bổ sung thu gom rác chủ động (`del pil_img; gc.collect()`) sau khi xử lý OCR từng trang tài liệu, triệt tiêu rò rỉ bộ nhớ khi xử lý file PDF lớn.
+
+---
+
 ## [v1.8.9-ai-rag-threadpool-and-lecture-route-order-hardening] — 2026-11-25
 
 ### 1. Khắc Phục Route Shadowing & Phân Định Hạn Mức Tải Lên Phân Hệ Bài Giảng

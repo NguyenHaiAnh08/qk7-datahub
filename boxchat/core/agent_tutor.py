@@ -34,15 +34,62 @@ class AgentTutor:
             self.ollama_url = self.ollama_url.replace("localhost", "127.0.0.1")
         self.model_name = os.getenv("OLLAMA_MODEL", model_name)
         self.temperature = float(os.getenv("OLLAMA_TEMPERATURE", temperature))
-        self.keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "24h")
+        
+        self.keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "3m")
+        self.num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
+        self.num_gpu = int(os.getenv("OLLAMA_NUM_GPU", "99"))
         # Tuple timeout: connect_timeout=2.0s, read_timeout=70.0s
         self.timeout = (2.0, float(os.getenv("OLLAMA_TIMEOUT", "70.0")))
-        # Cache nhẹ cho healthcheck Ollama (tránh gọi warm_up() mỗi lần scrape /metrics)
+        # Cache nhẹ cho healthcheck & runtime status Ollama (tránh gọi warm_up() mỗi lần scrape /metrics)
         self._health_cache_ts: float = 0.0
         self._health_cache_val: bool = False
+        self._ps_cache_ts: float = 0.0
+        self._ps_cache_val: List[Dict[str, Any]] = []
         # Trạng thái kiểm toán gần nhất cho Prometheus metrics
         self._last_fallback_reason: Optional[str] = None
         self._last_citation_stats: Dict[str, int] = {"valid": 0, "fabricated": 0}
+
+    def _build_ollama_options(self, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Tạo options thống nhất giữa warm_up() và _call_ollama() để giữ model ổn định 100% trên GPU VRAM,
+        tránh reload lại model khi đổi context window và không làm tràn VRAM sang RAM hệ thống.
+        """
+        opts: Dict[str, Any] = {
+            "num_ctx": self.num_ctx,
+        }
+        if self.num_gpu >= 0:
+            opts["num_gpu"] = self.num_gpu
+        if extra:
+            opts.update(extra)
+        return opts
+
+    def get_loaded_models(self, cache_ttl: float = 5.0) -> List[Dict[str, Any]]:
+        """
+        Truy vấn nhanh GET /api/ps của Ollama (cache 5s) để giám sát mức dùng VRAM/RAM thực tế.
+        """
+        now = time.monotonic()
+        if self._ps_cache_ts > 0 and (now - self._ps_cache_ts) < cache_ttl:
+            return self._ps_cache_val
+        models_info: List[Dict[str, Any]] = []
+        try:
+            resp = requests.get(f"{self.ollama_url}/api/ps", timeout=(1.0, 2.0))
+            if resp.status_code == 200:
+                for m in resp.json().get("models", []):
+                    size_bytes = int(m.get("size") or 0)
+                    vram_bytes = int(m.get("size_vram") or 0)
+                    gpu_pct = round((vram_bytes / size_bytes) * 100, 1) if size_bytes > 0 else 0.0
+                    models_info.append({
+                        "name": m.get("name", ""),
+                        "size_mb": round(size_bytes / (1024 * 1024), 1),
+                        "vram_mb": round(vram_bytes / (1024 * 1024), 1),
+                        "gpu_percent": gpu_pct,
+                        "context_length": m.get("context_length"),
+                    })
+        except Exception:
+            models_info = []
+        self._ps_cache_val = models_info
+        self._ps_cache_ts = now
+        return models_info
 
     def check_ollama_health(self, cache_ttl: float = 10.0) -> bool:
         """
@@ -146,20 +193,20 @@ class AgentTutor:
             except Exception as tag_err:
                 pass
 
-            print(f"[AgentTutor] Đang warm-up mô hình Ollama '{self.model_name}' (keep_alive={self.keep_alive})...")
+            print(f"[AgentTutor] Đang warm-up mô hình Ollama '{self.model_name}' (keep_alive={self.keep_alive}, num_ctx={self.num_ctx}, num_gpu={self.num_gpu})...")
             payload = {
                 "model": self.model_name,
                 "prompt": "Khởi động mô hình QK7 AI",
                 "stream": False,
                 "keep_alive": self.keep_alive,
-                "options": {
+                "options": self._build_ollama_options({
                     "num_predict": 1
-                }
+                })
             }
             resp = requests.post(
                 f"{self.ollama_url}/api/generate",
                 json=payload,
-                timeout=(2.0, 10.0)
+                timeout=(2.0, 25.0)
             )
             if resp.status_code == 200:
                 print(f"[AgentTutor] Warm-up thành công model '{self.model_name}'. Sẵn sàng phục vụ.")
@@ -685,11 +732,11 @@ class AgentTutor:
                 "prompt": prompt,
                 "stream": False,
                 "keep_alive": self.keep_alive,
-                "options": {
-                    "temperature": 0.0,
+                "options": self._build_ollama_options({
+                    "temperature": self.temperature,
                     "top_p": 0.9,
                     "num_predict": 600
-                }
+                })
             }
 
             resp = requests.post(

@@ -3,6 +3,7 @@ import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTE_PATHS } from '../../routes/routePaths';
 import { getDestinationByRole } from '../../contexts/AuthContext';
+import { authService } from '../../services/authService';
 
 export interface ProtectedRouteProps {
   children?: React.ReactNode;
@@ -12,6 +13,8 @@ export interface ProtectedRouteProps {
   redirectToLogin?: string;
   requiredPermission?: string;        // ⭐ MỚI
   requiredAnyOf?: string[];           // ⭐ MỚI
+  allowGuest?: boolean;               // ⭐ Cho phép phiên Đại biểu truy cập tài nguyên công khai
+  requiredPortal?: 'training';        // Chỉ phiên đăng nhập qua cổng Quản lý đào tạo (khu giám sát) mới vào được
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
@@ -22,12 +25,18 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   redirectToLogin = ROUTE_PATHS.LOGIN,
   requiredPermission,
   requiredAnyOf,
+  allowGuest = false,
+  requiredPortal,
 }) => {
   const { user, isAuthenticated, isAdmin, isStaff, hasPermission, hasAnyPermission } = useAuth();
   const location = useLocation();
 
-  if (!isAuthenticated || !user || user.user_id === 'GUEST') {
+  if ((!isAuthenticated || !user || user.user_id === 'GUEST') && !allowGuest) {
     return <Navigate to={redirectToLogin} state={{ from: location }} replace />;
+  }
+
+  if (requiredPortal && authService.getCurrentPortal() !== requiredPortal) {
+    return <Navigate to={ROUTE_PATHS.PORTAL} replace />;
   }
 
   if (adminOnly && !isAdmin) {
@@ -42,13 +51,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={ROUTE_PATHS.PORTAL} replace />;
   }
 
-  // ⭐ Permission checks
+    // ⭐ Permission checks
   if (requiredPermission && !hasPermission(requiredPermission)) {
-    return <Navigate to={getDestinationByRole(user)} replace />;
+    // Đẩy về Portal nếu không đủ quyền, tránh lặp vô hạn
+    return <Navigate to={ROUTE_PATHS.PORTAL} replace />;
   }
 
   if (requiredAnyOf && requiredAnyOf.length > 0 && !hasAnyPermission(requiredAnyOf)) {
-    return <Navigate to={getDestinationByRole(user)} replace />;
+    // Đẩy về Portal nếu không đủ quyền
+    return <Navigate to={ROUTE_PATHS.PORTAL} replace />;
   }
 
   return children ? <>{children}</> : <Outlet />;

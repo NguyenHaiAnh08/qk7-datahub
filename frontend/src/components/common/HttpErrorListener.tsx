@@ -14,8 +14,9 @@ export const HttpErrorListener: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ FIX: Dùng Ref để chặn spam Toast 403 (giới hạn 1 lần / 2 giây)
+  // ✅ FIX: Dùng Ref để chặn spam Toast 403 & 401 (giới hạn 1 lần / 2 giây)
   const last403TimeRef = useRef<number>(0);
+  const last401TimeRef = useRef<number>(0);
 
   useEffect(() => {
     const handleHttpError = (event: Event) => {
@@ -23,20 +24,38 @@ export const HttpErrorListener: React.FC = () => {
       const detail = customEvent.detail;
       if (!detail) return;
 
-      // Endpoint fingerprint tự xử lý lỗi riêng (agent offline, timeout...)
-      if (detail.url?.includes('/fingerprint/')) return;
+      // Endpoint fingerprint tự xử lý lỗi riêng (agent offline, timeout, hủy quét...)
+      if (
+        detail.url?.includes('/fingerprint/') ||
+        detail.url?.includes('admin-fp-verify') ||
+        /signal is aborted|aborted a request|operation was aborted/i.test(detail.message || '')
+      ) {
+        return;
+      }
 
       const { status, message, url, autoRedirect } = detail;
+      const statusNum = Number(status);
 
       // 401 trên chính request login = sai mật khẩu — KHÔNG redirect để user nhập lại
       const isLoginRequest = url?.includes('/auth/login');
 
       // Nếu đang là khách (Guest), không cần redirect khi 401 (do API yêu cầu auth)
       const currentUser = authService.getCurrentSession();
-      const isGuest = currentUser?.user_id === 'GUEST';
+      const isGuest = !currentUser || currentUser?.user_id === 'GUEST';
 
       // === 401: session hết hạn — clear + redirect ===
-      if (status === 401 && !isLoginRequest && !isGuest) {
+      if (statusNum === 401) {
+        if (isGuest || isLoginRequest) {
+          // Phiên khách hoặc login sai không bao giờ ném lỗi phiên hết hạn
+          return;
+        }
+
+        const now = Date.now();
+        if (now - last401TimeRef.current < 2000) {
+          return;
+        }
+        last401TimeRef.current = now;
+
         try {
           authService.clearSession();
         } catch {
@@ -54,18 +73,22 @@ export const HttpErrorListener: React.FC = () => {
 
       // Không hiển thị popup nếu đang ở trang lỗi tương ứng
       const isAlreadyOnErrorPage =
-        location.pathname === `/error/${status}` ||
-        location.pathname === `/${status}` ||
-        (location.pathname === ROUTE_PATHS.LOGIN && status === 401);
+        location.pathname === `/error/${statusNum}` ||
+        location.pathname === `/${statusNum}` ||
+        (location.pathname === ROUTE_PATHS.LOGIN && statusNum === 401);
 
       if (autoRedirect) {
-        navigate(`/error/${status}`, { state: { message, code: status, url } });
+        navigate(`/error/${statusNum}`, { state: { message, code: statusNum, url } });
         return;
       }
 
       if (isAlreadyOnErrorPage) return;
 
-      switch (status) {
+      switch (statusNum) {
+        case 401:
+          // Đã xử lý ở trên, không hiển thị popup mặc định
+          break;
+
         case 403: {
           // ✅ FIX: Chặn spam 403 (chỉ hiện 1 lần trong 2 giây)
           const now = Date.now();

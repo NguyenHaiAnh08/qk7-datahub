@@ -35,8 +35,24 @@ Thumbs.db
 merged_code*.txt
 merged_*.txt
 *_merged.txt
+mergecode*.txt
+*mergecode*.txt
+*FullSourceCode*.txt
+QK7_FullSourceCode.txt
 backend/uploads/scorm/*
 !backend/uploads/scorm/.gitkeep
+backend/uploads/lectures/*
+!backend/uploads/lectures/.gitkeep
+backend/uploads/temp/*
+!backend/uploads/temp/.gitkeep
+backend/uploads/van-ban-so/**
+!backend/uploads/van-ban-so/.gitkeep
+backend/uploads/bai-giang-so/**
+!backend/uploads/bai-giang-so/.gitkeep
+backend/uploads/thu-vien-so/**
+!backend/uploads/thu-vien-so/.gitkeep
+backend/uploads/**/20261113_LECTURE_*
+backend/uploads/**/*_LECTURE_*
 
 # Python cache & artifacts
 __pycache__/
@@ -78,4 +94,34 @@ zap-report.html
 zap-report.json
 strix_runs/
 
+# Air-gap Offline Packages & Downloaded Tools
+offline_packages/
+tools/gitleaks/
 
+# Virtual Company Logs & Local Agent Skills (Local AI Runtime & Talent Pool)
+.agents/company-*.md
+.agents/skills/*
+!.agents/skills/daub-ui/
+!.agents/skills/design-md/
+!.agents/skills/design-taste-frontend/
+!.agents/skills/huashu-design/
+!.agents/skills/qk7-design-orchestrator/
+!.agents/skills/ui-ux-pro-max/
+!.agents/skills/unslop/
+
+
+
+
+# Fingerprint agent build artifacts & secrets
+fingerprint/build_cfg/
+fingerprint/build_tmp/
+fingerprint/private-key.pem
+fingerprint/cert.pem.bak
+fingerprint/build_tmp_setup/
+
+# Goi trien khai
+QK7_release/
+deploy/https/may-chu/mkcert.exe
+
+# File nen san do backend/precompress-public.js tao
+backend/public/**/*.gz

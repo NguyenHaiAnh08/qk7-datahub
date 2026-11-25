@@ -10,6 +10,8 @@
   Tuyệt đối không bypass xác thực sinh trắc học vân tay 2FA (ZKTeco ZK9500), không hardcode secrets (`JWT_SECRET`, `FP_ENC_KEY`, `FINGERPRINT_BRIDGE_TOKEN`, mật khẩu DB/admin).
 - **KỶ LUẬT THƯ MỤC:** Chỉ được tạo file/thư mục theo đúng cấu trúc quy định tại Mục 3 dưới đây. Nghiêm cấm tạo file rác, file nháp, file dump ở thư mục gốc.
 - **DI CHUYỂN AN TOÀN:** Mọi thao tác di chuyển file phải dùng lệnh `git mv` để bảo toàn lịch sử mã nguồn (Git history). Tuyệt đối không copy/paste làm đứt gãy tracking.
+- **NGHIÊM CẤM TỰ ĐỘNG COMMIT VÀ PUSH (STRICT NO AUTO-COMMIT & NO AUTO-PUSH):** Tuyệt đối **KHÔNG** tự động thực thi `git commit` và **KHÔNG** tự ý thực thi `git push`. Khi hoàn thành bất kỳ tác vụ nào, mã nguồn chỉ được lưu giữ ở working tree để USER trực tiếp kiểm tra, đánh giá. Quy trình Commit và Push chỉ được kích hoạt (`git commit` và `git push origin <nhánh>`) khi nhận được câu lệnh cụ thể từ USER (ví dụ: *"đẩy lên nhánh haianh-dev github"*, *"triển khai đẩy lên nhánh main"*, *"commit và push lên nhánh..."*).
+- **TỰ ĐỘNG CẬP NHẬT TÀI LIỆU MARKDOWN TRƯỚC KHI COMMIT & PUSH:** Trước khi thực hiện commit và push lên bất kỳ nhánh nào theo lệnh của USER, Agent **BẮT BUỘC TỰ ĐỘNG RÀ SOÁT VÀ CẬP NHẬT TOÀN BỘ CÁC TÀI LIỆU MARKDOWN LIÊN QUAN** (`README.md`, `SYSTEM_ARCHITECTURE.md`, `docs/CHANGELOG.md`, `docs/guides/*`...) nếu dự án có bất kỳ thay đổi nào về mã nguồn, kịch bản, cấu hình hoặc tính năng mới. Tuyệt đối không để mã nguồn và tài liệu bị lệch pha.
 
 ---
 
@@ -35,6 +37,9 @@ Khi cần tra cứu thông tin nghiệp vụ và kỹ thuật, BẮT BUỘC đ�
 - **Quy trình làm việc của Agent:** [`docs/guides/AGENT_WORKFLOW.md`](./docs/guides/AGENT_WORKFLOW.md)
 - **Quy tắc kỹ sư đa vai trò:** [`docs/guides/Senior Multi-Role.md`](./docs/guides/Senior%20Multi-Role.md)
 - **Báo cáo tái cấu trúc chuẩn Enterprise:** [`docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md`](./docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md)
+- **Báo cáo triển khai & đóng gói OCR Microservice v2.0 (Air-Gapped VLAN):** [`docs/guides/OCR_DEPLOYMENT_REPORT.md`](./docs/guides/OCR_DEPLOYMENT_REPORT.md)
+- **Sổ tay Chiến lược, Vận hành & Bảo trì Tên miền Nội bộ & Hạ tầng Tự chủ Quân đội:** [`docs/guides/INTERNAL_DOMAIN_AND_MILITARY_INFRA_PLAYBOOK.md`](./docs/guides/INTERNAL_DOMAIN_AND_MILITARY_INFRA_PLAYBOOK.md)
+- **Kiến trúc Hạ tầng Quân đội Tự chủ 100% (DNS, 2-Tier PKI, Proxy HA):** [`docs/architecture/MILITARY_AUTONOMOUS_INFRASTRUCTURE.md`](./docs/architecture/MILITARY_AUTONOMOUS_INFRASTRUCTURE.md)
 
 ### 2.4. Quy chuẩn Thiết kế UI/UX — Anti-AI-Slop (`docs/design/`)
 - **Kim chỉ nam Thiết kế Bản sắc Quân sự:** [`docs/design/DESIGN.md`](./docs/design/DESIGN.md)
@@ -115,4 +120,17 @@ Khi xây dựng giao diện hoặc tích hợp API, BẮT BUỘC tuân thủ:
    - Frontend: Chạy `cd frontend && npm run build` (phải biên dịch thành công, không có lỗi TypeScript).
    - Backend: Chạy `cd backend && node -c server.js` (kiểm tra cú pháp Node.js sạch sẽ).
    - Scripts: Kiểm tra các đường dẫn tương đối trong `scripts/` bảo đảm hoạt động từ mọi thư mục.
+
+5. **NGHIÊM CẤM TỰ ĐỘNG COMMIT VÀ PUSH (STRICT NO AUTO-COMMIT & NO AUTO-PUSH):**
+   - AI Agent tuyệt đối **KHÔNG tự động commit** (`git commit`) và **KHÔNG tự động push** (`git push`).
+   - Mọi kết quả code/sửa file sau khi hoàn thành chỉ lưu lại ở working tree để USER rà soát.
+   - **Quy trình Commit & Push:** Chỉ kích hoạt `git commit` và `git push origin <nhánh>` khi nhận được câu lệnh cụ thể từ USER (ví dụ: *"đẩy lên nhánh haianh-dev github"*, *"triển khai đẩy lên nhánh haianh-dev"*...).
+
+6. **TỰ ĐỘNG CẬP NHẬT TOÀN BỘ MARKDOWN TRƯỚC KHI COMMIT VÀ PUSH:**
+   - Ngay khi nhận được lệnh commit & push từ USER, trước khi thực hiện `git add`/`git commit`, Agent **BẮT BUỘC tự động rà soát và cập nhật toàn bộ các tài liệu Markdown** nếu dự án có bất kỳ thay đổi nào:
+     - `README.md` & `docs/architecture/SYSTEM_ARCHITECTURE.md`: Cập nhật khi có thay đổi kiến trúc, tính năng mới, cấu trúc cây thư mục, kịch bản lệnh hoặc mở rộng dịch vụ.
+     - `docs/CHANGELOG.md`: Ghi chép chi tiết toàn bộ các thay đổi mã nguồn, tính năng, cấu hình và bản vá kỹ thuật vừa thực hiện.
+     - `docs/guides/TROUBLESHOOTING_HISTORY.md`: Cập nhật khi có sự cố kỹ thuật vừa được phân tích và khắc phục thành công.
+     - `docs/guides/SETUP_SERVER.md`: Cập nhật khi có thay đổi về biến môi trường, cổng dịch vụ, thư viện hoặc quy trình khởi chạy.
+   - Sau khi cập nhật Markdown đầy đủ, Agent kiểm chuẩn chất lượng (build sạch) và an ninh (`gitleaks protect --staged`) rồi mới tạo commit và push lên nhánh được chỉ định.
 

@@ -1,0 +1,126 @@
+{
+  "root": "navbar-search",
+  "elements": {
+    "navbar-search": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "nav-bar"
+      ]
+    },
+    "nav-bar": {
+      "type": "Surface",
+      "props": {
+        "variant": "card"
+      },
+      "children": [
+        "nav-inner"
+      ]
+    },
+    "nav-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 4,
+        "align": "center",
+        "justify": "between"
+      },
+      "children": [
+        "nav-left",
+        "nav-search-input",
+        "nav-right"
+      ]
+    },
+    "nav-left": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 4,
+        "align": "center"
+      },
+      "children": [
+        "nav-brand",
+        "nav-links"
+      ]
+    },
+    "nav-brand": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Coppice",
+        "weight": "bold"
+      }
+    },
+    "nav-links": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "link-explore",
+        "link-collections",
+        "link-trending"
+      ]
+    },
+    "link-explore": {
+      "type": "Link",
+      "props": {
+        "label": "Explore",
+        "href": "/explore"
+      }
+    },
+    "link-collections": {
+      "type": "Link",
+      "props": {
+        "label": "Collections",
+        "href": "/collections"
+      }
+    },
+    "link-trending": {
+      "type": "Link",
+      "props": {
+        "label": "Trending",
+        "href": "/trending"
+      }
+    },
+    "nav-search-input": {
+      "type": "Search",
+      "props": {
+        "placeholder": "Search products, brands, categories..."
+      }
+    },
+    "nav-right": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "nav-cart-btn",
+        "nav-avatar"
+      ]
+    },
+    "nav-cart-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Cart",
+        "variant": "ghost",
+        "size": "sm",
+        "icon": "shopping-cart"
+      }
+    },
+    "nav-avatar": {
+      "type": "Avatar",
+      "props": {
+        "initials": "KW",
+        "size": "sm"
+      }
+    }
+  }
+}

@@ -1,0 +1,226 @@
+# DAUB UI — Compact Reference
+
+> Version: 3.20.6
+> HTML catalog: 91 components | Browser/OpenUI/MCP: 89 renderer types
+> Full docs: https://daub.dev/llms.txt
+> CSS: https://daub.dev/daub.css | JS: https://daub.dev/daub.js
+> Classless: https://daub.dev/daub-classless.css
+> React: `npm install daub-react daub-ui` (React and React DOM 19+, typed JSX components and compound chat primitives; @shadcn/react 0.3.1 scroll engine; app bundler required)
+> Prefix: `db-` (classes), `--db-` (CSS vars)
+
+## Quick Start
+```html
+<link rel="stylesheet" href="https://daub.dev/daub.css">
+<script src="https://daub.dev/daub.js"></script>
+```
+
+## Chat Components
+
+Chat primitives: MessageScroller, Message, Bubble, Attachment, Marker, ChangeSummary, ChatComposer.
+Your app owns messages, AI transport, uploads, persistence, and reaction selection.
+Use ChatComposer for native rich input. Example: `chat-demo.html`.
+
+- `db-message-scroller` > `__viewport` > `__content` > `__item[data-db-message-id]`; mark anchors with `data-db-scroll-anchor="true"`. Sibling `__button[data-db-scroll-to="start|end"]` controls. Root height 360px; `data-db-auto-scroll="true|false"` (default true), `data-db-scroll-position="start|end|last-anchor"` (default end), `data-db-scroll-peek="0"` (nonnegative pixels). Run `DAUB.init(parent)` after adding markup.
+- `db-message` / `--end`; parts `__avatar`, `__content`, `__header`, `__footer`; group `db-message-group`.
+- `db-bubble` / `--primary` (default), `--secondary`, `--muted`, `--tinted`, `--outline`, `--ghost`, `--destructive`, `--end`; parts `__content`, `__reactions`; group `db-bubble-group`.
+- `db-attachment` / `--vertical`, `--sm`, `--xs`; parts `__media` (`--image`), `__content`, `__title`, `__description`, sibling overlay link `__trigger` and `__actions` > `__action`. Group `db-attachment-group`. `data-state="idle|uploading|processing|error|done"`. Keep buttons outside the overlay anchor; app controls state/progress.
+- `db-marker` / `--border`, `--separator`; parts `__icon`, `__content`. `role="status"` for live status; `aria-busy="true"` during work. `db-shimmer` on text, `db-scroll-fade` on scroll viewports.
+- `db-change-summary`: static framed file list with labelled `__additions` / `__deletions`, `__totals`, and optional `__actions` inside `__header`. Other parts: `__icon` (Lucide files, 14/16px), `__heading`, `__title`, `__description`, `__files` (ul), `__file` (li), `__path`, `__counts`. No `daub.js` requirement. Props: files `[{path:string,additions?:number,deletions?:number,status?:"added"|"modified"|"deleted"}]`, title?, description?, undoLabel?, undoDisabled?. Default `Edited N file(s)`; empty `No files changed`. Escape paths as plain text; floor finite counts and clamp rows/totals to `0..Number.MAX_SAFE_INTEGER`; other counts become 0. No file operations or implicit buttons. Spec children are host-wired action IDs; undoLabel/undoDisabled configure only React onUndo buttons. Examples: title `Prepared 2 demo files`, description `Demo changes`, no actions.
+- `db-chat-composer` on an empty `<form data-db-chat-options="escaped JSON">`. Requires `daub.js` and `daub.css`; `DAUB.init(parent)` enhances native roots. Options: models `[{id,label,efforts?:string[]}]`, model, effort, approval `ask|auto`, mode `chat|plan`, actions `[{id,label,icon?,disabled?}]`, capabilities `{queue?,steer?,attachments?,folders?,dictation?,approval?}` (boolean flags), busy, placeholder. Default models are demo-only (simulated). Queue, steer, attachments, approval, and supported dictation default on; folders need browser support. The queue sits outside the composer panel. Dictation requires a user command.
+
+OpenUI: children first, named metadata. Attachment/ChangeSummary children are actions; other
+chat children render inside content. Plain text props escape HTML; image/link
+URLs use the renderer URL guard. Bubble reactions accept `[{label,count,pressed}]`.
+
+```text
+MessageScroller(children, height, autoScroll, defaultScrollPosition, peek)
+Message(children, align, avatar, name, timestamp, messageId, scrollAnchor, footer)
+Bubble(children, content, variant, align, reactions)
+Attachment(children, name, description, src, alt, href, size, state, progress, orientation)
+Marker(children, content, icon, variant, status, busy)
+ChangeSummary(children, files, title, description, undoLabel, undoDisabled)
+ChatComposer(models, model, effort, approval, mode, actions, capabilities, busy, placeholder, id)
+```
+
+Native API (mount root first): `DAUB.createMessageScroller(root, {autoScroll,
+scrollPosition, scrollPeek})` returns a handle or null. Handle: `scrollToStart`,
+`scrollToEnd`, `scrollToMessage(id, {block, behavior})`, `getState`, `destroy`.
+Commands return booleans. State: `{atStart,atEnd,currentAnchorId,visibleMessageIds}`;
+listen for bubbling `db:message-scroll`. Native option names differ from renderer
+props `defaultScrollPosition` and `peek`. Destroy before discarding the handle.
+
+`DAUB.createChatComposer(root, options)` merges explicit options over
+`data-db-chat-options`. Controller: `getState`, `setBusy`, `setStatus`, `setDraft`, `clearDraft`,
+`attachFiles(File[])`, `getQueue`, `takeNext`, `removeQueued(id)`,
+`editQueued(id,text)`, `steerQueued(id)`, `setModel`, `setEffort`, `setMode`,
+`setApproval`, `setGoal(string|null)`, `startDictation`, `stopDictation`, `destroy`.
+Cancelable events: `db:chat-send/steer` (`detail.request`), `db:chat-stop`,
+`db:chat-action` (`detail.action`). Informational: `db:chat-queue/config/dictation`;
+`db:chat-change` carries `detail.state` for sidebar counts. `clearDraft()` clears
+pending text/files and preserves the queue.
+Prevent default to retain rejected drafts or queued items. Requests: id, text,
+local File[], model, effort, approval, mode, optional goal. Host sets busy during
+responses, drains the queue, and owns transport and approval enforcement.
+Configuration grants no access rights. No reading/uploading File content without
+host action. Destroy cancels dictation and disposes listeners/preview URLs.
+
+React `ChangeSummary`: typed `files`, title?, description?, undoLabel? (default
+Undo), undoDisabled? (default false), div props/ref, action children, and
+`onUndo` / `onViewChanges` (React button mouse event handlers). Each callback
+renders its button only when supplied. The host owns undo and diff views.
+No `daub.js` requirement; React escapes text and supports SSR.
+
+React `ChatComposer`: models, model, effort, approval, mode, actions, capabilities,
+busy, placeholder, plus id, form props, form ref, and `onReady(controller)`.
+Set an initial goal through `onReady(controller)` with `controller.setGoal(...)`;
+goal is not a React prop. Load `daub.js` before mounting; SSR needs no window.
+React-owned `data-db-react` roots skip native auto-init. `onSend`, `onSteer`,
+`onStop`, `onAction`, `onQueue`, `onConfig`, `onDictation`, `onChange` receive native
+CustomEvents; callbacks can preventDefault. Scalar props use native setters.
+Changes to models/actions/capabilities/placeholder update the existing controller
+and preserve drafts and queued requests. Unmount calls destroy.
+`onChange` receives `CustomEvent<{state: ChatComposerState}>`. Compose Sidebar and Navbar
+around MessageScroller plus ChatComposer; see the AI-facing recipe in
+`references/components.md`. The host supplies menu actions and sidebar views.
+
+## Top 15 Components
+
+### Button — `.db-btn`
+`db-btn--primary`, `db-btn--secondary`, `db-btn--ghost`, `db-btn--sm`, `db-btn--lg`, `db-btn--icon`, `db-btn--loading`
+```html
+<button class="db-btn db-btn--primary">Save</button>
+<button class="db-btn db-btn--secondary">Cancel</button>
+```
+
+### Card — `.db-card`
+Modifiers: `db-card--media`, `db-card--clip`, `db-card--interactive`
+```html
+<div class="db-card">
+  <div class="db-card__header"><h3 class="db-card__title">Title</h3></div>
+  <div class="db-card__footer"><button class="db-btn db-btn--primary db-btn--sm">Action</button></div>
+</div>
+```
+
+### Input — `.db-input`
+Sizes: `db-input--sm`, `db-input--lg`. Error: `db-input--error`.
+```html
+<input class="db-input" type="text" placeholder="Type here">
+```
+
+### Field — `.db-field`
+```html
+<div class="db-field">
+  <label class="db-field__label">Email</label>
+  <input class="db-field__input" type="email">
+  <span class="db-field__helper">Helper text</span>
+</div>
+```
+
+### Tabs — `.db-tabs`
+```html
+<div class="db-tabs">
+  <div class="db-tabs__list" role="tablist">
+    <button class="db-tabs__tab" aria-selected="true">Tab 1</button>
+    <button class="db-tabs__tab">Tab 2</button>
+  </div>
+  <div class="db-tabs__panel">Content 1</div>
+  <div class="db-tabs__panel" hidden>Content 2</div>
+</div>
+```
+CSS-only: add `db-tabs--static` with radio inputs. No JS needed.
+
+### Modal — `.db-modal-overlay`
+```html
+<div class="db-modal-overlay" id="my-modal" aria-hidden="true">
+  <div class="db-modal">
+    <div class="db-modal__header"><h3 class="db-modal__title">Title</h3><button class="db-modal__close">&times;</button></div>
+    <div class="db-modal__body">Content</div>
+    <div class="db-modal__footer"><button class="db-btn db-btn--primary" data-db-dismiss>OK</button></div>
+  </div>
+</div>
+```
+JS: `DAUB.openModal('my-modal')`, `DAUB.closeModal('my-modal')`. A button with `data-db-dismiss` closes the Modal, Alert Dialog, Sheet or Drawer it sits in; Escape closes the one on top.
+Dynamic: `DAUB.openModal('my-modal', { title: '...', body: '...', footer: '...' })`
+
+### Badge — `.db-badge`
+Semantic: `db-badge--new`, `db-badge--updated` / `--success`, `db-badge--warning`, `db-badge--error` / `--danger`
+Colors: `db-badge--green`, `db-badge--blue` / `--info`, `db-badge--purple`, `db-badge--amber`, `db-badge--red`, `db-badge--gray`
+```html
+<span class="db-badge db-badge--new">New</span>
+```
+
+### Chip — `.db-chip`
+Colors via `--db-chip-h`, `--db-chip-s`, `--db-chip-l`. Presets: `db-chip--green`, `db-chip--blue`, etc.
+Toggle: wrap in `[data-db-chip-toggle]`. Single-select: add `data-db-chip-mode="single"`.
+```html
+<span class="db-chip db-chip--blue">Tag</span>
+```
+
+### Grid — `.db-grid`
+`db-grid--2` to `db-grid--6`. Responsive: collapses at 640px (mobile) and 1024px (tablet).
+```html
+<div class="db-grid db-grid--3">
+  <div class="db-card">...</div>
+  <div class="db-card">...</div>
+  <div class="db-card">...</div>
+</div>
+```
+Empty state: `.db-empty` inside `.db-grid` auto-spans all columns.
+
+### Container — `.db-container`
+`db-container--wide` (1200px), `db-container--narrow` (640px). Default: 960px.
+For grids with 3+ columns, use `db-container--wide`.
+
+### Alert — `.db-alert`
+`db-alert--success`, `db-alert--warning`, `db-alert--error`
+```html
+<div class="db-alert db-alert--success"><strong>Done!</strong> Saved.</div>
+```
+
+### Toast — JS only
+```js
+DAUB.toast({ type: 'success', message: 'Saved!', duration: 3000 });
+```
+
+### Dropdown — `.db-dropdown`
+```html
+<div class="db-dropdown">
+  <button class="db-dropdown__trigger db-btn db-btn--secondary">Menu</button>
+  <div class="db-dropdown__content">
+    <button class="db-dropdown__item">Edit</button>
+    <button class="db-dropdown__item">Delete</button>
+  </div>
+</div>
+```
+
+### Accordion — `.db-accordion`
+```html
+<div class="db-accordion">
+  <div class="db-accordion__item">
+    <button class="db-accordion__trigger">Section 1</button>
+    <div class="db-accordion__content"><p>Content</p></div>
+  </div>
+</div>
+```
+
+### Switch — `.db-switch`
+```html
+<div class="db-switch" role="switch" tabindex="0" aria-checked="false">
+  <span class="db-switch__track"><span class="db-switch__thumb"></span></span>
+  Dark mode
+</div>
+```
+
+## Themes
+
+21 families × light/dark = 42 variants. Set: `<html data-theme="dark">`.
+JS: `DAUB.setFamily('dracula')`, `DAUB.setScheme('dark')`, `DAUB.cycleTheme()`
+
+## JS Init
+
+Call `DAUB.init()` on page load (auto). After dynamic HTML: `DAUB.init(parent)`.
+Pure CSS components (button, card, badge, input, grid) need no JS.
+
+## Breakpoints
+
+Mobile: `<640px` | Tablet: `640–1023px` | Desktop: `≥1024px`

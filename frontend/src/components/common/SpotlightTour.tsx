@@ -20,45 +20,94 @@ export interface SpotlightTourProps {
 
 export const DEFAULT_GUEST_STEPS: SpotlightTourStep[] = [
   {
+    target: '#tour-nav-brand, #tour-nav-brand-pc, a[href="/"]',
+    title: 'Trung tâm Dữ liệu số Trường Quân sự Quân khu 7',
+    badge: 'Bước 01 / 13 · Giới thiệu Hệ thống',
+    description: 'Chào mừng đồng chí đại biểu và cán bộ đến với nền tảng quản trị, lưu trữ và khai thác dữ liệu số chuẩn Quân sự. Hệ thống tích hợp toàn diện Kho văn bản số, Bài giảng số điện tử, Trợ lý AI RAG và xác thực sinh trắc học vân tay 2FA.',
+    placement: 'bottom',
+  },
+  {
     target: '#tour-nav-portal',
-    title: 'Không gian Dữ liệu số',
-    badge: 'Bước 01 / 06 · Điều hướng chính',
-    description: 'Khu vực chuyển đổi và tra cứu kho tài nguyên dữ liệu số công khai của Trường Quân sự Quân khu 7 dành cho đại biểu và cán bộ.',
+    title: 'Phân hệ Văn bản số',
+    badge: 'Bước 02 / 13 · Không gian Văn bản số',
+    description: 'Khu vực quản lý và tra cứu toàn bộ văn kiện, chỉ thị, nghị quyết, thông tư, kế hoạch huấn luyện và quy phạm quân sự của Nhà trường và Quân khu 7. Dành riêng cho cán bộ tra cứu nhanh chóng, chính xác theo đúng thẩm quyền bảo mật.',
+    placement: 'bottom',
+  },
+  {
+    target: '#tour-nav-lectures',
+    title: 'Phân hệ Bài giảng số & Giáo trình điện tử',
+    badge: 'Bước 03 / 13 · Phân hệ Bài giảng số',
+    description: 'Nền tảng đào tạo trực tuyến hiện đại: tích hợp kho bài giảng điện tử chuẩn SCORM tương tác, bài giảng PDF/Video và mô phỏng lớp học thông minh. Đại biểu được quyền xem toàn bộ bài giảng đã xuất bản ở cấp độ Công khai.',
     placement: 'bottom',
   },
   {
     target: '#tour-security-banner',
-    title: 'Phạm vi tra cứu tài liệu quân sự',
-    badge: 'Bước 02 / 06 · Cấp độ an ninh',
-    description: 'Hiển thị cấp độ an ninh hiện tại (Mức 1 - Công khai). Cán bộ có tài khoản có thể bấm "Đăng nhập nâng cấp quyền" để xác thực bảo mật và tra cứu tài liệu nghiệp vụ.',
+    title: 'Phạm vi an ninh & 5 Cấp độ mật quân sự',
+    badge: 'Bước 04 / 13 · Cấp độ an ninh',
+    description: 'Hệ thống phân cấp nghiêm ngặt: Cấp 1 Công khai, Cấp 2 Nội bộ, Cấp 3 Mật, Cấp 4 Tối Mật, Cấp 5 Tuyệt Mật. Phiên Đại biểu được cấp quyền khai thác Cấp 1 (Công khai). Mọi tài liệu từ Cấp 3 trở lên bắt buộc phải xác thực vân tay 2FA qua thiết bị ZKTeco.',
     placement: 'bottom',
   },
   {
+    target: '#tour-kpi-cards',
+    title: 'Bảng chỉ huy Telemetry toàn trường',
+    badge: 'Bước 05 / 13 · Chỉ số Telemetry',
+    description: '4 thẻ giám sát số hóa thời gian thực: Tổng số văn bản toàn trường, Tiến độ số hóa của 18 cơ quan/phòng ban/tiểu đoàn/khoa giáo viên trực thuộc, Tỷ lệ tài liệu khả dụng theo quyền và Tình trạng chuẩn hóa phân bổ tài liệu.',
+    placement: 'bottom',
+  },
+  {
+    target: '#tour-department-radar',
+    title: 'Tiến độ số hóa & Phân bổ theo Đơn vị',
+    badge: 'Bước 06 / 13 · Radar đơn vị',
+    description: 'Radar theo dõi trực quan khối lượng số hóa của từng đơn vị cha: Phòng Chính trị, Ban Giám hiệu, Phòng Tham mưu - Hành chính, Phòng Đào tạo, các Tiểu đoàn, Khoa giáo viên... Nhấn vào bất kỳ đơn vị nào để lọc nhanh tài liệu của đơn vị đó.',
+    placement: 'top',
+  },
+  {
+    target: '#tour-document-breakdown',
+    title: 'Cơ cấu văn bản theo Thể loại & Độ mật',
+    badge: 'Bước 07 / 13 · Thống kê phân loại',
+    description: 'Phân loại trực quan tài liệu theo các thể loại hành chính quân sự (Báo cáo, Biên bản, Chỉ thị, Công văn, Kế hoạch, Quyết định...) và tỷ trọng phân bổ theo từng cấp độ mật quân sự giúp chỉ huy nắm bắt tổng thể kho tài nguyên số.',
+    placement: 'top',
+  },
+  {
     target: '#tour-filter-bar',
-    title: 'Thanh tìm kiếm & Bộ lọc tác chiến',
-    badge: 'Bước 03 / 06 · Tra cứu dữ liệu',
-    description: 'Hỗ trợ tra cứu tức thời theo số hiệu văn bản, trích yếu nội dung, thể loại văn bản và đơn vị ban hành (TQS, Quân khu 7, Bộ Tổng Tham mưu, Tổng cục Chính trị...).',
+    title: 'Thanh tìm kiếm & Bộ lọc dữ liệu đa chiều',
+    badge: 'Bước 08 / 13 · Tra cứu tác chiến',
+    description: 'Tìm kiếm tức thì 0ms theo Số hiệu văn bản, Trích yếu nội dung, Người ký hoặc Đơn vị ban hành. Hỗ trợ lọc kết hợp linh hoạt theo Thể loại văn bản và Cơ quan ban hành (TQS, Quân khu 7, Bộ Quốc phòng...).',
     placement: 'bottom',
   },
   {
     target: '#tour-date-range',
     title: 'Bộ lọc khoảng ngày ban hành',
-    badge: 'Bước 04 / 06 · Mốc thời gian',
-    description: 'Chọn khoảng ngày (Từ ngày - Đến ngày) với lịch tương tác trượt mượt mà, giúp tra cứu chính xác tài liệu quân sự theo từng giai đoạn huấn luyện và công tác.',
+    badge: 'Bước 09 / 13 · Mốc thời gian',
+    description: 'Chọn khoảng ngày ban hành (Từ ngày - Đến ngày) với giao diện lịch tương tác tiện lợi, giúp khoanh vùng chính xác tài liệu quân sự theo từng giai đoạn huấn luyện, diễn tập hoặc niên độ công tác.',
     placement: 'bottom',
   },
   {
-    target: '#tour-document-card, [data-tour="document-card"], .document-card, tr[data-row-key]:first-child, tbody tr:first-child',
-    title: 'Thẻ văn bản quân sự mẫu',
-    badge: 'Bước 05 / 06 · Hồ sơ số',
-    description: 'Hiển thị thông tin tóm tắt số hiệu, trích yếu, đơn vị ban hành và cấp độ mật. Bạn có thể bấm "Xem văn bản PDF" để đọc trực tiếp hoặc "Tải về" theo đúng phân quyền được cấp.',
+    target: '#tour-document-list, #tour-document-card, [data-tour="document-card"], .document-card, tr[data-row-key]:first-child, tbody tr:first-child',
+    title: 'Danh sách văn bản quân sự & Trình đọc PDF an toàn',
+    badge: 'Bước 10 / 13 · Hồ sơ số & PDF',
+    description: 'Mỗi văn bản hiển thị đầy đủ Số hiệu, Trích yếu, Đơn vị, Ngày ban hành và Huy hiệu độ mật. Bạn có thể bấm "Xem chi tiết" để mở trình đọc PDF trực tuyến có chèn dấu Watermark an ninh chống sao chép và tải file theo đúng quyền.',
     placement: 'top',
   },
   {
-    target: '#tour-header-controls, #tour-header-controls-ipad',
-    title: 'Cụm công cụ hệ thống',
-    badge: 'Bước 06 / 06 · Tiện ích chỉ huy',
-    description: 'Kiểm tra trạng thái kết nối mạng LAN nội bộ, chuyển đổi tỉ lệ hiển thị (PC / iPad), bật tắt giao diện Sáng/Tối và quản lý menu phiên tài khoản Đại biểu.',
+    target: '#tour-device-switch, #tour-header-controls-ipad',
+    title: 'Chuyển đổi giao diện Dual-Platform (PC & iPad M4)',
+    badge: 'Bước 11 / 13 · Chế độ thiết bị',
+    description: 'Tùy biến hiển thị tối ưu cho 2 nền tảng: Chế độ Desktop PC (chuột/bàn phím, độ trễ 0ms) và Chế độ iPad Touch UI (nút bấm to, thao tác cảm ứng vuốt chạm thuận tiện cho sĩ quan chỉ huy khi đi cơ động hoặc kiểm tra giảng đường).',
+    placement: 'bottom',
+  },
+  {
+    target: '#tour-header-controls',
+    title: 'Trợ lý AI RAG & Công cụ chỉ huy',
+    badge: 'Bước 12 / 13 · Tiện ích chỉ huy',
+    description: 'Trợ lý AI tích hợp sẵn hỗ trợ hỏi đáp, tra cứu văn kiện và tự động trích dẫn số trang chính xác. Cùng nút bật/tắt Giao diện Sáng (chống chói ban ngày) và Giao diện Tối (bảo vệ mắt trong ca trực đêm), cùng giám sát mạng LAN nội bộ.',
+    placement: 'bottom',
+  },
+  {
+    target: '#tour-upgrade-btn',
+    title: 'Đăng nhập nâng cấp quyền cán bộ sĩ quan',
+    badge: 'Bước 13 / 13 · Nâng cấp quyền hạn',
+    description: 'Khi cán bộ, giảng viên của Trường hoặc các đơn vị cần thực hiện nhiệm vụ nghiệp vụ (soạn thảo bài giảng, đăng tải văn bản, duyệt văn bản, mở ca giảng dạy), bấm nút này để đăng nhập tài khoản chính thức và xác thực vân tay 2FA.',
     placement: 'bottom',
   },
 ];
@@ -73,6 +122,52 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [viewportSize, setViewportSize] = useState({ w: window.innerWidth, h: window.innerHeight });
   const tipRef = useRef<HTMLDivElement>(null);
+
+  // Scroll smoothly to target element both horizontally and vertically with sticky header clearance
+  const scrollTargetIntoView = useCallback((el: Element, placement?: string) => {
+    // 1. Kéo mượt thanh cuộn ngang của các thẻ cha (ví dụ thanh MainNavBar hoặc bảng rộng)
+    let parent = el.parentElement;
+    while (parent && parent !== document.body && parent !== document.documentElement) {
+      const style = window.getComputedStyle(parent);
+      const ox = style.overflowX;
+      if ((ox === 'auto' || ox === 'scroll') && parent.scrollWidth > parent.clientWidth) {
+        const pRect = parent.getBoundingClientRect();
+        const cRect = el.getBoundingClientRect();
+        const offsetLeft = cRect.left - pRect.left + parent.scrollLeft;
+        const targetScrollLeft = offsetLeft - (parent.clientWidth - cRect.width) / 2;
+        parent.scrollTo({ left: Math.max(0, targetScrollLeft), behavior: 'smooth' });
+      }
+      parent = parent.parentElement;
+    }
+
+    // 2. Tự động kéo cuộn trang dọc và ngang
+    const isHeaderOrNav = !!el.closest('header, nav');
+    if (isHeaderOrNav) {
+      // Nút thuộc Header hoặc Navbar -> đưa trang về đỉnh (top = 0)
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      const headerHeight = 115; // Chiều cao Header (64px) + MainNavBar (44px) + đệm an toàn
+      const rect = el.getBoundingClientRect();
+      const docTop = window.scrollY + rect.top;
+      const docLeft = window.scrollX + rect.left;
+      const visibleH = window.innerHeight - headerHeight;
+
+      let targetY: number;
+      if (placement === 'bottom') {
+        // Đặt phần tử ở khoảng 1/3 phía trên vùng nhìn thấy để chừa không gian rộng rãi cho thẻ hướng dẫn bên dưới
+        targetY = Math.max(0, docTop - headerHeight - 40);
+      } else if (placement === 'top') {
+        // Đặt phần tử ở khoảng dưới để thẻ hướng dẫn nổi phía trên
+        targetY = Math.max(0, docTop - headerHeight - (visibleH - rect.height) + 50);
+      } else {
+        // Căn giữa vào khoảng giữa màn hình
+        targetY = Math.max(0, docTop - headerHeight - (visibleH - rect.height) / 2);
+      }
+
+      const targetX = Math.max(0, docLeft - (window.innerWidth - rect.width) / 2);
+      window.scrollTo({ top: targetY, left: targetX, behavior: 'smooth' });
+    }
+  }, []);
 
   // Update target rect with scroll into view
   const updateTargetPosition = useCallback(() => {
@@ -90,7 +185,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({
     setViewportSize({ w: window.innerWidth, h: window.innerHeight });
   }, [isOpen, steps, currentStep]);
 
-  // When step changes, smooth scroll target into view
+  // When step changes, smooth scroll target into view with continuous animation tracking
   useEffect(() => {
     if (!isOpen) return;
 
@@ -98,22 +193,32 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({
     if (stepData) {
       const el = document.querySelector(stepData.target);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        scrollTargetIntoView(el, stepData.placement);
       }
     }
 
-    // Delay slightly to let scroll settle then calculate rect
-    const timer = setTimeout(() => {
+    // Theo dõi liên tục từng frame trong 850ms của animation cuộn trang
+    const animStart = performance.now();
+    let rafId: number;
+    const stepTrack = () => {
       updateTargetPosition();
-    }, 120);
+      if (performance.now() - animStart < 850) {
+        rafId = requestAnimationFrame(stepTrack);
+      }
+    };
+    rafId = requestAnimationFrame(stepTrack);
 
-    const raf = requestAnimationFrame(updateTargetPosition);
+    const t1 = setTimeout(updateTargetPosition, 100);
+    const t2 = setTimeout(updateTargetPosition, 350);
+    const t3 = setTimeout(updateTargetPosition, 850);
 
     return () => {
-      clearTimeout(timer);
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
     };
-  }, [isOpen, currentStep, steps, updateTargetPosition]);
+  }, [isOpen, currentStep, steps, updateTargetPosition, scrollTargetIntoView]);
 
   // Global listeners for resize, scroll
   useEffect(() => {
@@ -226,8 +331,11 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({
     tipLeft = Math.max(16, Math.min(viewportSize.w - tooltipWidth - 16, idealLeft));
     arrowLeft = Math.max(24, Math.min(tooltipWidth - 24, targetCX - tipLeft));
 
+    const spaceAbove = targetRect.top - 115; // Khoảng trống phía trên tính từ chân Sticky Header
+    const spaceBelow = viewportSize.h - targetRect.bottom; // Khoảng trống phía dưới tính tới đáy màn hình
+
     if (step.placement === 'top') {
-      if (targetRect.top - estimatedH - tipPad > 12) {
+      if (spaceAbove > estimatedH + tipPad) {
         tipTop = targetRect.top - estimatedH - tipPad;
         arrowPlacement = 'bottom';
       } else {
@@ -235,17 +343,21 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({
         arrowPlacement = 'top';
       }
     } else {
-      // placement === 'bottom' or auto
-      if (targetRect.bottom + estimatedH + tipPad < viewportSize.h - 12) {
+      // placement === 'bottom' hoặc auto
+      if (spaceBelow > estimatedH + tipPad) {
         tipTop = targetRect.bottom + tipPad;
         arrowPlacement = 'top';
-      } else if (targetRect.top - estimatedH - tipPad > 12) {
+      } else if (spaceAbove > estimatedH + tipPad) {
         tipTop = targetRect.top - estimatedH - tipPad;
         arrowPlacement = 'bottom';
       } else {
-        tipTop = Math.max(16, Math.round((viewportSize.h - estimatedH) / 2));
+        tipTop = targetRect.bottom + tipPad;
+        arrowPlacement = 'top';
       }
     }
+
+    // Luôn khóa thẻ hướng dẫn hiển thị trọn vẹn, không lọt vào thanh header và không tràn đáy
+    tipTop = Math.max(115, Math.min(viewportSize.h - estimatedH - 16, tipTop));
   }
 
   return (

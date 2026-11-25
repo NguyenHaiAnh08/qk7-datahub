@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HelpCircle, X } from 'lucide-react';
-import { LoginForm } from '../components/auth/LoginForm';
+import { HelpCircle, X, GraduationCap } from 'lucide-react';
+import { DualGatewayPortal } from '../components/auth/DualGatewayPortal';
 import { Toast, ToastState, toast } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { DeviceModeSwitch } from '../components/common/DeviceModeSwitch';
@@ -18,11 +18,31 @@ import { DongSonDrumBackground } from '../components/auth/DongSonDrumBackground'
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated } = useAuth();
-  const { deviceMode, orientation } = useDeviceMode();
-  const isIPadLandscape = deviceMode === 'ipad' && orientation === 'landscape';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const portalQuery = searchParams.get('portal');
 
+  const { user, isAuthenticated } = useAuth();
+  const { deviceMode } = useDeviceMode();
+
+  const [activePortal, setActivePortal] = useState<'datahub' | 'training'>(
+    portalQuery === 'training' ? 'training' : 'datahub'
+  );
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showTrainingSupportModal, setShowTrainingSupportModal] = useState(false);
+
+  // Đồng bộ state khi URL param thay đổi (ví dụ ?portal=training)
+  useEffect(() => {
+    if (portalQuery === 'training' && activePortal !== 'training') {
+      setActivePortal('training');
+    } else if (portalQuery === 'datahub' && activePortal !== 'datahub') {
+      setActivePortal('datahub');
+    }
+  }, [portalQuery]);
+
+  const handlePortalChange = (portal: 'datahub' | 'training') => {
+    setActivePortal(portal);
+    setSearchParams({ portal }, { replace: true });
+  };
 
   // Nếu user đã đăng nhập hợp lệ, tự động chuyển về trang tương ứng theo Role
   useEffect(() => {
@@ -63,11 +83,15 @@ export const LoginPage: React.FC = () => {
   };
 
   const handleLoginSuccess = (loggedInUser: User) => {
-    toast.success(`Chào mừng đồng chí ${loggedInUser.full_name || loggedInUser.user_id} đã đăng nhập thành công vào Trung Tâm Dữ Liệu Số.`, {
-      title: 'XÁC THỰC THÀNH CÔNG',
-      badge: loggedInUser.clearance_name || `CẤP ${loggedInUser.clearance_level_id || 1}`,
-      duration: 4000,
-    });
+    const portalName = activePortal === 'training' ? 'Hệ Thống Quản Lý Đào Tạo' : 'Trung Tâm Dữ Liệu Số';
+    toast.success(
+      `Chào mừng đồng chí ${loggedInUser.full_name || loggedInUser.user_id} đã đăng nhập thành công vào ${portalName}.`,
+      {
+        title: 'XÁC THỰC THÀNH CÔNG',
+        badge: loggedInUser.clearance_name || `CẤP ${loggedInUser.clearance_level_id || 1}`,
+        duration: 2000,
+      }
+    );
 
     // Khi đăng nhập Admin thì vô thẳng admin-dashboard luôn
     if (isUserAdmin(loggedInUser)) {
@@ -93,7 +117,6 @@ export const LoginPage: React.FC = () => {
       if (redirectUrl && redirectUrl !== ROUTE_PATHS.LOGIN && redirectUrl !== ROUTE_PATHS.INDEX) {
         navigate(redirectUrl, { replace: true });
       } else {
-        // Phân quyền điều hướng theo Role
         const targetPath = getDestinationByRole(loggedInUser);
         navigate(targetPath, { replace: true });
       }
@@ -101,7 +124,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full bg-slate-50 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+    <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full bg-slate-200 dark:bg-[#090e17] text-slate-900 dark:text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
       {/* ══════════════════════════════════════════════════════════════════
           LỚP z-0 (ĐÁY): THẺ VIDEO NỀN CÔNG NGHỆ CHẠY VÒNG LẶP (HTML5 VIDEO)
           ══════════════════════════════════════════════════════════════════ */}
@@ -113,9 +136,14 @@ export const LoginPage: React.FC = () => {
       <DongSonDrumBackground />
 
       {/* ══════════════════════════════════════════════════════════════════
+          LỚP z-15: AMBIENT GRADIENT CỐ ĐỊNH (GIỮ NGUYÊN MÀU TRUNG TÂM DỮ LIỆU SỐ)
+          ══════════════════════════════════════════════════════════════════ */}
+      <div className="fixed inset-0 pointer-events-none z-15 bg-gradient-to-tr from-emerald-950/30 via-transparent to-amber-900/20" />
+
+      {/* ══════════════════════════════════════════════════════════════════
           LỚP z-30 (TRÊN CÙNG): CỐ ĐỊNH TOP BAR (HEADER) & FOOTER
           ══════════════════════════════════════════════════════════════════ */}
-      {/* Top Bar — Cố định 100% ở đỉnh màn hình (Fixed Top Bar, không hở viền, hỗ trợ Safe Area) */}
+      {/* Top Bar — Cố định 100% ở đỉnh màn hình (Fixed Top Bar) */}
       <header className="fixed top-0 left-0 right-0 z-30 px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md shadow-xs pt-[max(env(safe-area-inset-top),0.625rem)] transition-colors duration-200">
         <div className="flex items-center space-x-2.5 select-none">
           <img
@@ -128,9 +156,22 @@ export const LoginPage: React.FC = () => {
             <span className="block font-extrabold text-sm tracking-wider text-slate-900 dark:text-white whitespace-nowrap">
               Trường Quân Sự Quân Khu 7
             </span>
-            <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wider uppercase">
-              Trung tâm dữ liệu số
-            </span>
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={activePortal}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.2 }}
+                className={`block text-[10px] font-bold tracking-wider uppercase transition-colors ${
+                  activePortal === 'training'
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-emerald-700 dark:text-emerald-400'
+                }`}
+              >
+                {activePortal === 'datahub' ? 'Trung tâm dữ liệu số' : 'Hệ thống quản lý đào tạo'}
+              </motion.span>
+            </AnimatePresence>
           </div>
         </div>
 
@@ -147,49 +188,23 @@ export const LoginPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Center Login Card — Chiếm trọn không gian giữa Header & Footer cố định, tự căn giữa hoàn hảo và cho phép cuộn nội dung độc lập */}
+      {/* Center Dual-Gateway Portal Container */}
       <div className="relative z-20 flex-1 w-full overflow-y-auto overflow-x-hidden no-scrollbar flex items-center justify-center px-4 pt-[calc(3.75rem+env(safe-area-inset-top,0px))] pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] min-h-0">
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className={`w-full mx-auto my-auto bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-xl ${
-            isIPadLandscape ? 'max-w-4xl' : 'max-w-md'
-          }`}
-        >
-          {!isIPadLandscape && (
-            <div className="text-center mb-5">
-              <div className="inline-flex items-center justify-center mb-2.5">
-                <img
-                  src="/Logo_QSQK7.png"
-                  alt="Logo Trường Quân Sự Quân Khu 7"
-                  style={{ aspectRatio: '1074 / 1465' }}
-                  className="h-16 w-auto object-contain drop-shadow-md"
-                />
-              </div>
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                Đăng nhập
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Hệ Thống Quản Lý Dữ Liệu Tập Trung
-              </p>
-            </div>
-          )}
-
-          <LoginForm
-            onSuccess={handleLoginSuccess}
-            onToast={showToast}
-            isSplitDeck={isIPadLandscape}
-          />
-        </motion.div>
+        <DualGatewayPortal
+          activePortal={activePortal}
+          onPortalChange={handlePortalChange}
+          onLoginSuccess={handleLoginSuccess}
+          onToast={showToast}
+          onOpenTrainingSupport={() => setShowTrainingSupportModal(true)}
+        />
       </div>
 
-      {/* Footer — Cố định 100% ở đáy màn hình (Fixed Footer, không hở viền, hỗ trợ Safe Area) */}
+      {/* Footer — Cố định 100% ở đáy màn hình */}
       <footer className="fixed bottom-0 left-0 right-0 z-30 px-6 py-2.5 sm:py-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex items-center justify-center text-[11px] text-slate-500 dark:text-slate-400 text-center pb-[max(env(safe-area-inset-bottom),0.625rem)] transition-colors duration-200">
         <div>Bản quyền © 2026 Trường Quân sự Quân khu 7.</div>
       </footer>
 
-      {/* Support Modal */}
+      {/* Support Modal Dữ Liệu Số */}
       <AnimatePresence>
         {showSupportModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -202,7 +217,7 @@ export const LoginPage: React.FC = () => {
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <HelpCircle className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                  Hỗ Trợ Kỹ Thuật
+                  Hỗ Trợ Kỹ Thuật Dữ Liệu Số
                 </h3>
                 <button
                   onClick={() => setShowSupportModal(false)}
@@ -233,6 +248,50 @@ export const LoginPage: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* Support Modal Đào Tạo & Huấn Luyện */}
+      <AnimatePresence>
+        {showTrainingSupportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl text-xs space-y-4 text-slate-700 dark:text-slate-300"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                  Hỗ Trợ Quản Lý Đào Tạo
+                </h3>
+                <button
+                  onClick={() => setShowTrainingSupportModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p>
+                Trường hợp quên mật khẩu tài khoản Quản Lý Đào Tạo hoặc cần phân quyền giảng dạy, vui lòng liên hệ:
+              </p>
+              <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-1.5 font-mono text-[11px]">
+                <div className="font-semibold text-slate-800 dark:text-slate-200">Phòng Đào tạo - Trường Quân sự QK7</div>
+                <div>
+                  • Số điện thoại:{' '}
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">08.68.38.78.69</span>
+                  {' '}- Đ/c Tuấn - Đào tạo
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTrainingSupportModal(false)}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition cursor-pointer shadow-md shadow-blue-600/30"
+              >
+                Đã hiểu
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
+

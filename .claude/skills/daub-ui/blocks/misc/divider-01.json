@@ -1,0 +1,39 @@
+{
+  "root": "divider-root",
+  "elements": {
+    "divider-root": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3,
+        "align": "center",
+        "container": "wide"
+      },
+      "children": [
+        "divider-line-left",
+        "divider-text",
+        "divider-line-right"
+      ]
+    },
+    "divider-line-left": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "divider-text": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "or",
+        "variant": "muted"
+      }
+    },
+    "divider-line-right": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    }
+  }
+}

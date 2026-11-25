@@ -18,7 +18,7 @@ export const unitService = {
     });
   },
 
-  updateUnit: async (unitId: string, data: { name: string; parent_id?: string; unit_type?: string }): Promise<{ success: boolean }> => {
+  updateUnit: async (unitId: string, data: { unit_id?: string; name: string; parent_id?: string; unit_type?: string }): Promise<{ success: boolean; unit_id?: string }> => {
     return http(API_ENDPOINTS.ADMIN.UNIT_DETAIL(unitId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

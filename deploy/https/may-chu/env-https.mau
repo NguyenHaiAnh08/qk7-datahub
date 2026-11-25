@@ -1,0 +1,16 @@
+# Mau cau hinh HTTPS cho MAY CHU — chep cac dong can thiet vao backend/.env (KHONG ghi de ca file .env)
+# Duong dan tuong doi duoc tinh tu thu muc backend/
+
+USE_HTTPS=true
+SSL_KEY_PATH=../deploy/https/may-chu/certs/server.key
+SSL_CERT_PATH=../deploy/https/may-chu/certs/server.crt
+
+# Dia chi web nguoi dung truy cap (dung cho CORS)
+SERVER_DOMAIN=trungtamdulieuso.tqsqk7.edu
+SERVER_IP=172.22.1.111
+
+# BAT BUOC liet ke ro kem cong (code chi tu them origin KHONG co cong)
+CORS_ALLOWED_ORIGINS=https://trungtamdulieuso.tqsqk7.edu:8000,https://trungtamdulieuso.tqsqk7.edu,https://172.22.1.111:8000
+
+# Tuy chon: neu dung may chu moi, doi 2 dong tren + IP trong cap-chung-chi-may-chu.bat, cap lai chung chi.
+# May con KHONG phai lam gi them (da tin Root CA).

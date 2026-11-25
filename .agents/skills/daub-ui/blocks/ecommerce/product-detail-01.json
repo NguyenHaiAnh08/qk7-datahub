@@ -1,0 +1,367 @@
+{
+  "root": "product-detail",
+  "elements": {
+    "product-detail": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 6,
+        "container": true
+      },
+      "children": [
+        "gallery-section",
+        "details-section"
+      ]
+    },
+    "gallery-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "main-image",
+        "thumbnail-row"
+      ]
+    },
+    "main-image": {
+      "type": "AspectRatio",
+      "children": [
+        "hero-image"
+      ]
+    },
+    "hero-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/boseultra/600/600",
+        "alt": "Bose QuietComfort Ultra headphones front view"
+      }
+    },
+    "thumbnail-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2
+      },
+      "children": [
+        "thumb-1",
+        "thumb-2",
+        "thumb-3",
+        "thumb-4"
+      ]
+    },
+    "thumb-1": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/boseultra/120/120",
+        "alt": "Front view",
+        "width": 120,
+        "height": 120
+      }
+    },
+    "thumb-2": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/boseultra/120/120?grayscale",
+        "alt": "Side view",
+        "width": 120,
+        "height": 120
+      }
+    },
+    "thumb-3": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/boseultra/120/120?blur=2",
+        "alt": "Folded view",
+        "width": 120,
+        "height": 120
+      }
+    },
+    "thumb-4": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/boseultra/120/120?grayscale&blur=2",
+        "alt": "Case view",
+        "width": 120,
+        "height": 120
+      }
+    },
+    "details-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "breadcrumb-nav",
+        "product-title",
+        "rating-row",
+        "price-section",
+        "separator-1",
+        "color-section",
+        "size-section",
+        "separator-2",
+        "action-row",
+        "shipping-info",
+        "features-list"
+      ]
+    },
+    "breadcrumb-nav": {
+      "type": "Breadcrumbs",
+      "props": {
+        "items": [
+          {
+            "label": "Home",
+            "href": "#"
+          },
+          {
+            "label": "Audio",
+            "href": "#"
+          },
+          {
+            "label": "Headphones",
+            "href": "#"
+          },
+          {
+            "label": "Bose QuietComfort Ultra"
+          }
+        ]
+      }
+    },
+    "product-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h1",
+        "content": "Bose QuietComfort Ultra Headphones",
+        "weight": "bold"
+      }
+    },
+    "rating-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "stars-text",
+        "review-count",
+        "review-link"
+      ]
+    },
+    "stars-text": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "\u2605\u2605\u2605\u2605\u2605 4.8",
+        "weight": "bold"
+      }
+    },
+    "review-count": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "3,102 reviews",
+        "variant": "muted"
+      }
+    },
+    "review-link": {
+      "type": "Link",
+      "props": {
+        "label": "Write a review"
+      }
+    },
+    "price-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "sale-price",
+        "original-price",
+        "save-badge"
+      ]
+    },
+    "sale-price": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "$379.00",
+        "weight": "bold"
+      }
+    },
+    "original-price": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "$429.00",
+        "variant": "muted"
+      }
+    },
+    "save-badge": {
+      "type": "Badge",
+      "props": {
+        "text": "Save $50",
+        "variant": "success"
+      }
+    },
+    "separator-1": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "color-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "color-label",
+        "color-options"
+      ]
+    },
+    "color-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Color: Black",
+        "weight": "bold"
+      }
+    },
+    "color-options": {
+      "type": "ToggleGroup",
+      "props": {
+        "selected": "black",
+        "options": [
+          {
+            "label": "Black",
+            "value": "black"
+          },
+          {
+            "label": "White Smoke",
+            "value": "white-smoke"
+          },
+          {
+            "label": "Sandstone",
+            "value": "sandstone"
+          }
+        ]
+      }
+    },
+    "size-section": {
+      "type": "Select",
+      "props": {
+        "label": "Ear Cushion Size",
+        "options": [
+          {
+            "label": "Standard",
+            "value": "standard"
+          },
+          {
+            "label": "Large",
+            "value": "large"
+          }
+        ]
+      }
+    },
+    "separator-2": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "action-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2
+      },
+      "children": [
+        "quantity-select",
+        "add-to-cart-btn",
+        "wishlist-btn"
+      ]
+    },
+    "quantity-select": {
+      "type": "Select",
+      "props": {
+        "label": "Qty",
+        "options": [
+          {
+            "label": "1",
+            "value": "1"
+          },
+          {
+            "label": "2",
+            "value": "2"
+          },
+          {
+            "label": "3",
+            "value": "3"
+          },
+          {
+            "label": "4",
+            "value": "4"
+          },
+          {
+            "label": "5",
+            "value": "5"
+          }
+        ]
+      }
+    },
+    "add-to-cart-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Add to Cart",
+        "variant": "primary",
+        "size": "lg",
+        "icon": "shopping-cart"
+      }
+    },
+    "wishlist-btn": {
+      "type": "Button",
+      "props": {
+        "label": "",
+        "variant": "outline",
+        "size": "lg",
+        "icon": "heart"
+      }
+    },
+    "shipping-info": {
+      "type": "Alert",
+      "props": {
+        "title": "Free shipping & returns",
+        "description": "Arrives by March 14-17. Free 90-day return policy.",
+        "variant": "info"
+      }
+    },
+    "features-list": {
+      "type": "List",
+      "props": {
+        "items": [
+          {
+            "title": "Immersive Audio",
+            "secondary": "Bose Immersive Audio with head tracking for spatial sound"
+          },
+          {
+            "title": "CustomTune",
+            "secondary": "Personalized noise cancellation and sound shaped to your ears"
+          },
+          {
+            "title": "24-Hour Battery",
+            "secondary": "Up to 24 hours of battery life with quick charge"
+          },
+          {
+            "title": "Multipoint Connection",
+            "secondary": "Switch seamlessly between two Bluetooth devices"
+          }
+        ]
+      }
+    }
+  }
+}

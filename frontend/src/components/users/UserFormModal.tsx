@@ -166,27 +166,51 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   );
   const unitTree = React.useMemo(() => buildUnitTree(filteredUnits), [filteredUnits]);
 
+  // ── Khóa mở rộng mặc định: Chỉ mở cấp Quân khu (Level 0) và cấp Nhà trường (Level 1) để cây gọn gàng ──
   const defaultExpandedKeys = React.useMemo(() => {
     const keys: string[] = [];
-    const collectParentKeys = (nodes: any[]) => {
-      for (const n of nodes) {
-        if (n.children && n.children.length > 0) {
-          keys.push(String(n.key));
-          collectParentKeys(n.children);
+
+    // Chỉ tự động mở cấp Gốc (Quân khu) và cấp Con trực tiếp (Nhà trường / Sư đoàn)
+    for (const root of unitTree) {
+      if (root.children && root.children.length > 0) {
+        keys.push(String(root.key));
+        for (const child of root.children) {
+          if (child.children && child.children.length > 0) {
+            keys.push(String(child.key));
+          }
         }
       }
-    };
-    collectParentKeys(unitTree);
-    return keys;
-  }, [unitTree]);
+    }
+
+    // Nếu người dùng đã chọn sẵn đơn vị (sửa user), tự động mở rộng chuỗi cha để lộ ra node đang chọn
+    if (formData.unit_id) {
+      const findAncestors = (nodes: any[], targetId: string, currentPath: string[]): boolean => {
+        for (const n of nodes) {
+          if (String(n.key) === targetId || String(n.value) === targetId) {
+            keys.push(...currentPath);
+            return true;
+          }
+          if (n.children && n.children.length > 0) {
+            if (findAncestors(n.children, targetId, [...currentPath, String(n.key)])) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      findAncestors(unitTree, formData.unit_id, []);
+    }
+
+    return Array.from(new Set(keys));
+  }, [unitTree, formData.unit_id]);
 
   const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
 
   useEffect(() => {
-    if (defaultExpandedKeys.length > 0) {
+    if (open && defaultExpandedKeys.length > 0) {
       setTreeExpandedKeys(defaultExpandedKeys);
     }
-  }, [defaultExpandedKeys]);
+  }, [open, defaultExpandedKeys]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -213,6 +237,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         clearance_level_id: user.clearance_level_id,
         status: user.status || 'active',
         role_id: user.roles && user.roles.length > 0 ? user.roles[0] : '',
+        roles: user.roles ? [...user.roles] : [],
       });
     } else if (open) {
       const calculateAndSet = (list: User[]) => {
@@ -272,6 +297,11 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       return;
     }
 
+    if (isEdit && user?.roles && user.roles.length > 0 && (formData.roles || []).length === 0) {
+      setError('Tài khoản phải có ít nhất một vai trò.');
+      return;
+    }
+
     if (!isEdit) {
       if (!formData.username || !formData.username.trim()) {
         setError('Tên đăng nhập (Username) không được để trống!');
@@ -290,14 +320,17 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
     setSubmitting(true);
     try {
+      // Sửa: gửi đủ danh sách vai trò (quyền = hợp quyền của mọi vai trò). Tạo mới: giữ 1 vai trò.
+      const selectedRoles = isEdit ? (formData.roles || []) : undefined;
       const payload: Partial<User> & { username?: string; password?: string; role_id?: string } = {
         ...formData,
+        ...(isEdit ? { roles: selectedRoles, role_id: selectedRoles?.[0] || undefined } : {}),
         user_id: formData.user_id?.trim(),
         full_name: formData.full_name?.trim(),
         username: formData.username?.trim().toLowerCase(),
         password: formData.password ? formData.password : undefined,
         clearance_level_id: Number(formData.clearance_level_id),
-        role_id: formData.role_id || undefined,
+        ...(isEdit ? {} : { role_id: formData.role_id || undefined }),
       };
 
       await onSave(payload);
@@ -588,8 +621,59 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Vai trò hệ thống</label>
+              <div className={isEdit ? 'col-span-2' : ''}>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  {isEdit ? 'Vai trò hệ thống (có thể chọn nhiều)' : 'Vai trò hệ thống'}
+                </label>
+                {isEdit ? (
+                  <div>
+                    <div className="flex flex-wrap gap-2">
+                      {availableRoles.map((r) => {
+                        const checked = (formData.roles || []).includes(r.role_id);
+                        return (
+                          <label
+                            key={r.role_id}
+                            className={`inline-flex items-center gap-2 px-3 min-h-[40px] rounded-xl border cursor-pointer select-none text-sm transition ${
+                              checked
+                                ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-900 dark:text-emerald-300 font-semibold'
+                                : 'border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 accent-emerald-600"
+                              checked={checked}
+                              onChange={() =>
+                                setFormData((prev) => {
+                                  const cur = prev.roles || [];
+                                  return {
+                                    ...prev,
+                                    roles: cur.includes(r.role_id)
+                                      ? cur.filter((x) => x !== r.role_id)
+                                      : [...cur, r.role_id],
+                                  };
+                                })
+                              }
+                            />
+                            {r.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {(() => {
+                      const availableIds = new Set(availableRoles.map((r) => r.role_id));
+                      const locked = (formData.roles || []).filter((id) => !availableIds.has(id));
+                      return locked.length > 0 ? (
+                        <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          Vai trò giữ nguyên (bạn không có quyền thay đổi): {locked.join(', ')}
+                        </p>
+                      ) : null;
+                    })()}
+                    <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                      Người dùng có tổng quyền của tất cả vai trò được chọn.
+                    </p>
+                  </div>
+                ) : (
                 <select
                   value={formData.role_id || ''}
                   onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
@@ -602,6 +686,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                     </option>
                   ))}
                 </select>
+                )}
               </div>
 
               <div>

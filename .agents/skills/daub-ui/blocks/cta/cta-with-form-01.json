@@ -1,0 +1,116 @@
+{
+  "root": "cta-with-form",
+  "elements": {
+    "cta-with-form": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "align": "center",
+        "container": "narrow"
+      },
+      "children": [
+        "form-heading",
+        "form-subheading",
+        "form-row",
+        "form-note",
+        "form-avatars"
+      ]
+    },
+    "form-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Get the weekly engineering digest",
+        "align": "center"
+      }
+    },
+    "form-subheading": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Join 42,000+ developers who get our curated roundup of tools, tutorials, and industry news every Thursday.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "form-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "end",
+        "justify": "center"
+      },
+      "children": [
+        "form-email-field",
+        "form-submit"
+      ]
+    },
+    "form-email-field": {
+      "type": "Field",
+      "props": {
+        "label": "Email address"
+      },
+      "children": [
+        "form-email-input"
+      ]
+    },
+    "form-email-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "developer@company.com",
+        "type": "email"
+      }
+    },
+    "form-submit": {
+      "type": "Button",
+      "props": {
+        "label": "Subscribe",
+        "variant": "primary"
+      }
+    },
+    "form-note": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "No spam. Unsubscribe in one click.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "form-avatars": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center",
+        "justify": "center",
+        "wrap": false
+      },
+      "children": [
+        "avatar-group",
+        "avatar-label"
+      ]
+    },
+    "avatar-group": {
+      "type": "AvatarGroup",
+      "props": {
+        "avatars": [
+          { "initials": "KL", "src": "https://i.pravatar.cc/48?u=kate-lin" },
+          { "initials": "MR", "src": "https://i.pravatar.cc/48?u=mike-ross" },
+          { "initials": "TA", "src": "https://i.pravatar.cc/48?u=tina-ali" },
+          { "initials": "JD", "src": "https://i.pravatar.cc/48?u=jake-doe" }
+        ]
+      }
+    },
+    "avatar-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Join engineers from Vercel, Stripe, and Shopify",
+        "variant": "muted"
+      }
+    }
+  }
+}

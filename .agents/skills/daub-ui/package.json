@@ -1,0 +1,51 @@
+{
+  "name": "daub-ui",
+  "version": "3.20.6",
+  "description": "Considered CSS component library — 91 components, 21 theme families, zero build step",
+  "main": "daub.js",
+  "style": "daub.css",
+  "types": "daub.d.ts",
+  "jsdelivr": "daub.css",
+  "unpkg": "daub.css",
+  "files": [
+    "daub.css",
+    "daub-classless.css",
+    "daub.js",
+    "daub.d.ts",
+    "llms.txt",
+    "llms-compact.txt",
+    "components.json"
+  ],
+  "keywords": [
+    "css",
+    "ui-kit",
+    "components",
+    "neo-skeuomorphic",
+    "design-system",
+    "themes",
+    "accessible",
+    "drop-in",
+    "no-build",
+    "ai-friendly",
+    "llms-txt",
+    "dark-mode",
+    "light-mode",
+    "dashboard",
+    "skeuomorphic"
+  ],
+  "homepage": "https://daub.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sliday/daub.git"
+  },
+  "scripts": {
+    "test": "node --test tests/**/*.test.{js,mjs}",
+    "test:components": "node tests/component-audit/audit.mjs",
+    "test:contrast": "node scripts/wcag-audit.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.2"
+  },
+  "license": "MIT",
+  "author": "Sliday"
+}

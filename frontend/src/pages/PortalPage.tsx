@@ -14,7 +14,6 @@ import {
   FileCheck,
 } from 'lucide-react';
 import { Header } from '../components/common/Header';
-import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { toast } from '../components/common/Toast';
 import { SecurityBanner } from '../components/portal/SecurityBanner';
 import { SchoolOverviewSection } from '../components/portal/SchoolOverviewSection';
@@ -27,7 +26,7 @@ import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useAuth } from '../hooks/useAuth';
 import { DocumentItem, MetaData, Unit } from '../types';
-import { getMainIssuingUnits, getSchoolDepartmentsTree } from '../utils/unitTree';
+import { getMainIssuingUnits, getSchoolDepartmentsTree, isSchoolUnitId, findSchoolUnit } from '../utils/unitTree';
 import { useDebounce } from '../hooks/useDebounce';
 
 const ITEMS_PER_PAGE = 30;
@@ -133,12 +132,13 @@ export const PortalPage: React.FC = () => {
       let queryUnit: string | undefined = undefined;
       let includeChildren: boolean | undefined = undefined;
 
-      if (selectedUnit === 'TQS') {
+      const isSchool = isSchoolUnitId(selectedUnit, meta.units);
+      if (isSchool) {
         if (selectedDepartment) {
           queryUnit = selectedDepartment;
           includeChildren = true;
         } else {
-          queryUnit = 'TQS';
+          queryUnit = selectedUnit;
           includeChildren = true;
         }
       } else if (selectedUnit) {
@@ -174,12 +174,16 @@ export const PortalPage: React.FC = () => {
 
   // Xử lý lọc dữ liệu tương tác từ Radar Tiến Độ Phòng Ban
   const handleSelectDepartmentFromRadar = (unitId: string, isDeptOfTqs: boolean) => {
+    const schoolUnit = findSchoolUnit(meta.units);
+    const schoolId = schoolUnit?.unit_id || 'TQS-QK7';
+    const isSchool = isSchoolUnitId(selectedUnit, meta.units);
+
     if (isDeptOfTqs) {
-      if (selectedDepartment === unitId && selectedUnit === 'TQS') {
+      if (selectedDepartment === unitId && isSchool) {
         setSelectedDepartment('');
         setSelectedUnit('');
       } else {
-        setSelectedUnit('TQS');
+        setSelectedUnit(schoolId);
         setSelectedDepartment(unitId);
       }
     } else {
@@ -293,7 +297,7 @@ export const PortalPage: React.FC = () => {
   }, [documents, currentPage]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
       {/* Header */}
       <Header
         activeNav="portal"
@@ -303,8 +307,6 @@ export const PortalPage: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
-        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
-        <DataHubSubNav activeTab="portal" />
         {/* Security Banner */}
         <SecurityBanner
           user={user}
@@ -445,7 +447,7 @@ export const PortalPage: React.FC = () => {
 
               {/* Col 3: Ô chọn phòng ban (Nằm ở Cột 3 - ĐỐI DIỆN VÀ NẰM NGAY DƯỚI Ô "Đơn vị ban hành") */}
               <div>
-                {selectedUnit === 'TQS' ? (
+                {isSchoolUnitId(selectedUnit, meta.units) ? (
                   <div className="animate-in fade-in duration-200">
                     <select
                       id="portal-department-select"
@@ -586,36 +588,38 @@ export const PortalPage: React.FC = () => {
         </div>
 
         {/* Document Content View */}
-        {viewMode === 'grid' ? (
-          <PortalDocumentList
-            documents={paginatedDocs}
-            userClearanceLevel={user?.clearance_level_id || 1}
-            loading={loading}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={documents.length}
-            searchQuery={searchQuery}
-            onClearFilters={handleClearFilters}
-            onPageChange={setCurrentPage}
-            onPreview={(doc) => setPreviewDoc(doc)}
-            onDownload={handleDownload}
-            onCancelDownload={handleCancelDownload}
-          />
-        ) : (
-          <DocumentTable
-            documents={paginatedDocs}
-            userClearanceLevel={user?.clearance_level_id || 1}
-            loading={loading}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={documents.length}
-            onClearFilters={handleClearFilters}
-            onPageChange={setCurrentPage}
-            onPreview={(doc) => setPreviewDoc(doc)}
-            onDownload={handleDownload}
-            onCancelDownload={handleCancelDownload}
-          />
-        )}
+        <div id="tour-document-list">
+          {viewMode === 'grid' ? (
+            <PortalDocumentList
+              documents={paginatedDocs}
+              userClearanceLevel={user?.clearance_level_id || 1}
+              loading={loading}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={documents.length}
+              searchQuery={searchQuery}
+              onClearFilters={handleClearFilters}
+              onPageChange={setCurrentPage}
+              onPreview={(doc) => setPreviewDoc(doc)}
+              onDownload={handleDownload}
+              onCancelDownload={handleCancelDownload}
+            />
+          ) : (
+            <DocumentTable
+              documents={paginatedDocs}
+              userClearanceLevel={user?.clearance_level_id || 1}
+              loading={loading}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={documents.length}
+              onClearFilters={handleClearFilters}
+              onPageChange={setCurrentPage}
+              onPreview={(doc) => setPreviewDoc(doc)}
+              onDownload={handleDownload}
+              onCancelDownload={handleCancelDownload}
+            />
+          )}
+        </div>
       </main>
 
       {/* Preview Modal */}

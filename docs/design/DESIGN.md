@@ -66,6 +66,8 @@ Trước khi tự sáng chế layout, hãy tra cứu các hệ sinh thái thiế
   - Prompt #025: Khung nhập liệu nhãn bay vào khe viền (`NotchedInput`).
   - Prompt #219: Hiệu ứng vòng tròn lan tỏa quét sáng khi đổi theme (`ThemeToggle`).
   - Prompt #058: Thanh trượt vệt sáng bám dính khi chuyển tab (`Header Glider`).
+  - Prompt #449: Thanh phân trang chuẩn toàn hệ thống (`PaginationBar` — `.u449`, viên thuốc nảy lò xo + cuộn chữ số cố định 7 ô). **BẮT BUỘC dùng `PaginationBar` cho mọi bảng/danh sách có phân trang mới.**
+  - Prompt #406: Ô nhập mã xác minh / PIN 6 chữ số (`VerificationCodeInput` — `.u406`, pop chữ số lò xo + dán toàn bộ + rung báo lỗi + gộp 6 ô thành dấu tích khi thành công).
 - **JolyUI Animated Toast (`jolyui.dev`):** Toàn bộ thông báo nảy lò xo, đếm ngược tự đóng và xếp tầng thông minh.
 - **Awesome DESIGN.md (`github.com/VoltAgent/awesome-design-md`):** Chuẩn cấu trúc tài liệu kiến trúc giao diện.
 - **AI Website Cloner Template (`github.com/JCodesMore/ai-website-cloner-template`):** Phương pháp bóc tách 4 tầng (Layout -> Typography -> Surface -> Physics).
@@ -149,13 +151,13 @@ Mọi kỹ sư hoặc AI Agent khi tham gia xây dựng/sửa đổi UI trên d�
   - *Lớp Surface:* Kính mờ quang học `background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(16px);`.
   - *Lớp Border:* Viền siêu mảnh có độ trong suốt cao `border: 1px solid rgba(255, 255, 255, 0.08)` trên nền tối, hoặc `border: 1px solid rgba(16, 185, 129, 0.2)` trên các khối dữ liệu quân sự trọng yếu.
 
-#### Quy tắc 3: Toàn bộ phản hồi hệ thống dùng `AnimatedToast` (chuẩn JolyUI)
+#### Quy tắc 3: Toàn bộ phản hồi hệ thống dùng `Stacking Toasts` (chuẩn Lucian #070 · `.u070`)
 - **Cấm:** Dùng `window.alert()`, modal xác nhận thô kệch cho các phản hồi tức thì, hoặc toast phẳng biến mất đột ngột không báo trước.
-- **Bắt buộc:** Dùng `AnimatedToastProvider` tích hợp sẵn:
-  - Có thanh đếm ngược tự đóng (Dynamic Countdown Progress Bar) chạy mượt dưới đáy.
-  - Hỗ trợ xếp chồng (Stacking) thông minh, tự động thu hẹp khi nhiều thông báo xuất hiện cùng lúc.
-  - Icon trạng thái có hiệu ứng nảy (Spring Pop) kèm viền sáng phát quang (Glow Halo).
-  - Tạm dừng đếm ngược khi người dùng rê chuột lên thông báo (Hover Pause).
+- **Bắt buộc:** Dùng `ToastProvider` tích hợp sẵn (`frontend/src/components/common/Toast.tsx` + `Toast.css`):
+  - Thông báo mới trồi lên từ đáy ra trước (`.u070-t.enter` → `0.5s var(--ux-spring)`), thông báo cũ xếp lùi gọn phía sau và thu nhỏ (`--y: -14px * i`, `--s: 1 - 0.06 * i`).
+  - Rê chuột / focus / chạm lên chồng thông báo sẽ xòe quạt thành danh sách dọc và tự động tạm dừng đếm ngược (Hover/Focus Pause).
+  - Vuốt ngang (`|dx| > 90px`) hoặc bấm nút `×` để đóng riêng từng thẻ; hỗ trợ trạng thái `toast.loading()` xoay vòng rồi chuyển mượt sang `success`/`error` qua `toast.update()`.
+  - Thanh tiến trình đếm ngược dưới đáy (`.u070-bar`) chạy mượt bằng `requestAnimationFrame` ở thẻ trên cùng.
 
 #### Quy tắc 4: Typography có phân cấp sắc bén (Sharply Defined Telemetry Hierarchy)
 - **Văn bản mô tả & Tiêu đề:** Dùng font tiếng Việt chuẩn quân đội `Be Vietnam Pro` (weights: 400 Regular, 600 SemiBold, 700 Bold, 800 ExtraBold).
@@ -214,7 +216,10 @@ Mỗi khi thiết kế hoặc refactor bất kỳ trang/thành phần nào trong
 | Thành phần | Nguồn tham chiếu | Mô tả tương tác | Trạng thái tích hợp |
 | :--- | :--- | :--- | :--- |
 | **Rolling Number (Odometer)** | Lucian Prompt #098 | Cuộn số đồng hồ cơ khí độc lập từng chữ số, nảy lò xo, diff thông minh | Đã tích hợp (`RollingNumber` trên 4 thẻ KPI, biểu đồ phân bố & Dashboard) |
-| **Animated Toast** | `jolyui.dev` Animated Toast | Xếp chồng lò xo, thanh tiến trình tự đóng, icon phát quang | Đã tích hợp toàn hệ thống |
+| **Stacking Toasts** | Lucian Prompt #070 (`.u070`) | Xếp chồng thông minh ở góc dưới phải, hover xòe quạt & tạm dừng, vuốt ngang đóng từng thẻ, trạng thái `loading` xoay rồi chuyển hoàn tất | Đã tích hợp toàn hệ thống (`Toast.tsx`, `Toast.css`) |
+| **Stretching Pagination & Page Stage** | Lucian Prompt #449 + #043 (`.u449`, `.u043`) | Thanh phân trang 7 khe cố định màu Xanh Lục Quân, viên thuốc kéo giãn từ mép trước (`go-r`/`go-l`) kết hợp lưới/hàng nội dung đuổi nhau theo hướng chuyển trang | Đã tích hợp toàn bộ 12 bảng/lưới phân trang (`PaginationBar`, `PageTransitionStage`) |
+| **2-Tier Approval Stepper** | Lucian Prompt #444 (`.u444`) | Tiến trình duyệt bài giảng 2 tầng (Soạn thảo → Khoa duyệt → BGH duyệt → Xuất bản), nối dây `scaleX`, tick xanh bật nảy, vòng thở mềm cho bước hiện tại | Đã tích hợp (`ApprovalStepper` trên `LectureCard` & `LectureDetailModal`) |
+| **Verification Code Input (6-Digit PIN)** | Lucian Prompt #406 (`.u406`) | Ô nhập mã PIN 6 số bảo vệ văn bản Cấp 4–5, bật nảy lò xo từng ô, hỗ trợ dán và lắc lỗi | Đã tích hợp (`VerificationCodeInput` trên `PinVerifyModal`) |
 | **Circular Reveal Theme** | Lucian Prompt #219 | Chuyển đổi Dark/Light mode bằng đường tròn quét từ tâm nút bấm | Đã tích hợp (`ThemeToggle`) |
 | **Sliding Pill Nav** | Lucian Prompt #058 | Vệt sáng trượt bám dính theo tab đang chọn, chuyển động 2 chiều | Đã tích hợp (`Header`, `DeviceModeSwitch`) |
 | **Compact Progress Button** | Lucian Prompt #004 | Nút tải tệp PDF biến hình thành thanh tiến trình phần trăm | Đã tích hợp (`CompactDownloadButton`) |

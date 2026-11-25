@@ -1,0 +1,390 @@
+import { http } from './http';
+import {
+  Lecture,
+  LectureListFilters,
+  CreateLecturePayload,
+  Subject,
+  TrainingClass,
+  TeachingSchedule,
+  StartSchedulePayload,
+  HistoryKpi,
+  LectureQuizQuestion,
+  CreateQuizPayload,
+  ScormTrackingData,
+  ScormCommitPayload,
+  RadarOverviewResponse,
+  RadarFloorPlanResponse,
+  RadarRoomDetailResponse,
+  ClassroomBuilding,
+  LectureRoomOption,
+} from '../types/lecture';
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+export const lectureService = {
+  // ── Catalogs ──
+  async getSubjects(): Promise<Subject[]> {
+    const res: any = await http('/api/lectures/catalogs/subjects');
+    return res?.items || [];
+  },
+
+  async getClasses(): Promise<TrainingClass[]> {
+    const res: any = await http('/api/lectures/catalogs/classes');
+    return res?.items || [];
+  },
+
+  async getRooms(): Promise<LectureRoomOption[]> {
+    const res: any = await http('/api/lectures/catalogs/rooms');
+    return res?.items || [];
+  },
+
+  async getVenues(): Promise<{ venue_name: string; usage_count: number }[]> {
+    const res: any = await http('/api/lectures/catalogs/venues');
+    return res?.items || [];
+  },
+
+  // ── Lecture CRUD ──
+  async list(filters: LectureListFilters = {}): Promise<{ items: Lecture[]; total: number }> {
+    const p = new URLSearchParams();
+    if (filters.status) p.set('status', filters.status);
+    if (filters.subject_id) p.set('subject_id', filters.subject_id);
+    if (filters.faculty_unit_id) p.set('faculty_unit_id', filters.faculty_unit_id);
+    if (filters.q) p.set('q', filters.q);
+    if (filters.scope) p.set('scope', filters.scope);
+    const qs = p.toString();
+    return http(`/api/lectures${qs ? `?${qs}` : ''}`);
+  },
+
+  async getById(id: string): Promise<Lecture> {
+    return http(`/api/lectures/${encodeURIComponent(id)}`);
+  },
+
+  async create(payload: CreateLecturePayload): Promise<{ lecture_id: string }> {
+    return http('/api/lectures', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async update(id: string, payload: Partial<CreateLecturePayload>): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // ── Xoá mềm / Khôi phục / Xoá vĩnh viễn ──
+  // Backend đã đổi DELETE /:id thành soft delete (status → DELETED)
+  async delete(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  // Khôi phục từ thùng rác (DELETED → DRAFT)
+  async restore(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+  },
+
+  // Xoá vĩnh viễn — chỉ áp dụng cho bài giảng đang ở trạng thái DELETED
+  async purge(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/purge`, { method: 'DELETE' });
+  },
+
+  // ⚠️ DEPRECATED — giữ để tương thích ngược, sẽ bị xoá ở phiên bản sau.
+  // Tương đương delete() vì backend đã đổi DELETE /:id thành soft delete.
+  async archive(id: string): Promise<void> {
+    return this.delete(id);
+  },
+
+  // ── Duyệt 2 tầng ──
+  async submit(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/submit`, { method: 'POST' });
+  },
+
+  async approve(id: string): Promise<{ new_status?: string; validated?: boolean; message?: string }> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/approve`, { method: 'POST' });
+  },
+
+  async reject(id: string, reason: string): Promise<{ validated?: boolean; message?: string }> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/reject`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  // ── Upload gói SCORM/HTML5 hoặc tệp giáo án PDF ──
+  async uploadPackage(
+    lectureId: string,
+    file: File,
+    type: 'HTML5' | 'SCORM' | 'PDF'
+  ): Promise<{ success: boolean; status: string; pending_scorm_path?: string; file_id?: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = type === 'SCORM'
+      ? `/api/lectures/${encodeURIComponent(lectureId)}/scorm/upload`
+      : type === 'HTML5'
+      ? `/api/lectures/${encodeURIComponent(lectureId)}/html5/upload`
+      : `/api/lectures/${encodeURIComponent(lectureId)}/pdf/upload`;
+
+    // Không set Content-Type — browser sẽ tự thêm multipart boundary
+    return http(endpoint, {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  getScormLaunchUrl(lectureId: string): string {
+    return `/api/lectures/${encodeURIComponent(lectureId)}/scorm/launch`;
+  },
+
+  getHtml5LaunchUrl(lectureId: string): string {
+    return `/api/lectures/${encodeURIComponent(lectureId)}/html5/launch`;
+  },
+
+    // ── Ca giảng dạy ──
+  async startSchedule(payload: StartSchedulePayload, fingerprintToken?: string): Promise<{ schedule_id: string }> {
+    const headers: Record<string, string> = { ...JSON_HEADERS };
+    if (fingerprintToken) {
+      headers['X-Fingerprint-Token'] = fingerprintToken;
+    }
+
+    return http('/api/lectures/schedules/start', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async endSchedule(id: string): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(id)}/end`, { method: 'POST' });
+  },
+
+  async getLiveSchedules(): Promise<{ items: TeachingSchedule[]; total: number }> {
+    return http('/api/lectures/schedules/live');
+  },
+
+  // ✅ FIX: return type tường minh + guard runtime (chỉ trả về khi có schedule_id)
+  async getScheduleById(id: string): Promise<TeachingSchedule | null> {
+    try {
+      const res: any = await http(
+        `/api/lectures/schedules/${encodeURIComponent(id)}`,
+        { silent: true }
+      );
+      // Chỉ trả về nếu có schedule_id (tránh trường hợp server trả {} rỗng)
+      if (res && res.schedule_id) return res as TeachingSchedule;
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  async forceEndSchedule(id: string): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(id)}/force-end`, { method: 'POST' });
+  },
+
+  async updateSlide(scheduleId: string, slideIndex: number, slideTotal?: number): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/slide`, {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ slide_index: slideIndex, slide_total: slideTotal }),
+    });
+  },
+
+  async updateProgress(scheduleId: string, currentPage: number): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/progress`, {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ current_page: currentPage }),
+    });
+  },
+
+  async getHistory(filters: { from?: string; to?: string } = {}): Promise<{
+    items: TeachingSchedule[];
+    total: number;
+    kpi: HistoryKpi;
+  }> {
+    const p = new URLSearchParams();
+    if (filters.from) p.set('from', filters.from);
+    if (filters.to) p.set('to', filters.to);
+    const qs = p.toString();
+    return http(`/api/lectures/schedules/history${qs ? `?${qs}` : ''}`);
+  },
+
+  async getAdvancedMonitor(): Promise<{
+    ongoing_count: number;
+    hanging_count: number;
+    items: TeachingSchedule[];
+  }> {
+    return http('/api/lectures/schedules/monitor');
+  },
+
+  // ── Quiz tương tác ──
+  async getQuizzes(lectureId: string): Promise<{ total: number; items: LectureQuizQuestion[] }> {
+    return http(`/api/lectures/${encodeURIComponent(lectureId)}/quiz`);
+  },
+
+  async createQuiz(lectureId: string, payload: CreateQuizPayload): Promise<{ success: boolean; question_id: string }> {
+    return http(`/api/lectures/${encodeURIComponent(lectureId)}/quiz`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateQuiz(lectureId: string, questionId: string, payload: Partial<CreateQuizPayload>): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(lectureId)}/quiz/${encodeURIComponent(questionId)}`, {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteQuiz(lectureId: string, questionId: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(lectureId)}/quiz/${encodeURIComponent(questionId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async activateQuiz(scheduleId: string, questionId: string): Promise<{ success: boolean; activated: boolean }> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/quiz/${encodeURIComponent(questionId)}/activate`, {
+      method: 'POST',
+    });
+  },
+
+  // ── SCORM RTE Tracking ──
+  async commitScorm(scheduleId: string, payload: ScormCommitPayload): Promise<void> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/scorm/commit`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getScormTracking(scheduleId: string): Promise<ScormTrackingData | null> {
+    return http(`/api/lectures/schedules/${encodeURIComponent(scheduleId)}/scorm/tracking`);
+  },
+
+  // ── Phân khoa ──
+  async getFacultyLectures(facultyUnitId: string): Promise<{ total: number; items: Lecture[] }> {
+    return http(`/api/lectures/faculty/${encodeURIComponent(facultyUnitId)}`);
+  },
+
+  // ─── ADMIN CRUD — LECTURE CATALOGS ───
+  async adminListSubjects(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/subjects');
+  },
+  async adminCreateSubject(data: any): Promise<{ success: boolean; subject_id: string }> {
+    return http('/api/admin/lectures/subjects', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateSubject(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/subjects/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteSubject(id: string): Promise<{ success: boolean; soft_deleted?: boolean; note?: string }> {
+    return http(`/api/admin/lectures/subjects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async adminListClasses(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/classes');
+  },
+  async adminCreateClass(data: any): Promise<{ success: boolean; class_id: string }> {
+    return http('/api/admin/lectures/classes', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateClass(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/classes/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteClass(id: string): Promise<{ success: boolean; soft_deleted?: boolean; note?: string }> {
+    return http(`/api/admin/lectures/classes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async adminListClassrooms(): Promise<{ total: number; items: any[] }> {
+    return http('/api/admin/lectures/classrooms');
+  },
+  async adminCreateClassroom(data: any): Promise<{ success: boolean; room_id: string }> {
+    return http('/api/admin/lectures/classrooms', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateClassroom(id: string, data: any): Promise<void> {
+    return http(`/api/admin/lectures/classrooms/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteClassroom(id: string): Promise<{ success: boolean; soft_deleted?: boolean }> {
+    return http(`/api/admin/lectures/classrooms/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  // ── Khu giảng đường (CLASSROOM_BUILDING) ──
+  async adminListBuildings(): Promise<{ total: number; items: ClassroomBuilding[] }> {
+    return http('/api/admin/lectures/buildings');
+  },
+  async adminCreateBuilding(data: {
+    building_code: string;
+    building_name: string;
+    display_order?: number;
+  }): Promise<{ success: boolean; building_code: string }> {
+    return http('/api/admin/lectures/buildings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+  async adminUpdateBuilding(
+    code: string,
+    data: { building_name: string; display_order?: number; active?: boolean }
+  ): Promise<{ success: boolean }> {
+    return http(`/api/admin/lectures/buildings/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+  async adminDeleteBuilding(code: string): Promise<{ success: boolean }> {
+    return http(`/api/admin/lectures/buildings/${encodeURIComponent(code)}`, { method: 'DELETE' });
+  },
+
+  // ─── QK7 LECTURE HALL RADAR ───
+  async getRadarOverview(): Promise<RadarOverviewResponse> {
+    return http('/api/lectures/radar/overview');
+  },
+
+  async getRadarFloorPlan(params: {
+    building_code?: string;
+    floor_number?: number;
+    time_shift?: string;
+  } = {}): Promise<RadarFloorPlanResponse> {
+    const p = new URLSearchParams();
+    if (params.building_code) p.set('building_code', params.building_code);
+    if (params.floor_number) p.set('floor_number', String(params.floor_number));
+    if (params.time_shift) p.set('time_shift', params.time_shift);
+    const qs = p.toString();
+    return http(`/api/lectures/radar/floor-plan${qs ? `?${qs}` : ''}`);
+  },
+
+  async getRadarRoomDetail(roomId: string): Promise<RadarRoomDetailResponse> {
+    return http(`/api/lectures/radar/rooms/${encodeURIComponent(roomId)}/detail`);
+  },
+
+  async toggleRoomMaintenance(
+    roomId: string,
+    data: { is_maintenance: boolean; maintenance_reason?: string }
+  ): Promise<{ success: boolean; is_maintenance: boolean; maintenance_reason?: string }> {
+    return http(`/api/lectures/radar/rooms/${encodeURIComponent(roomId)}/maintenance`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(data),
+    });
+  },
+};
+
+export default lectureService;

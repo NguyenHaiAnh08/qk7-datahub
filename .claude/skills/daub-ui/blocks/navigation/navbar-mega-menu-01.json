@@ -1,0 +1,275 @@
+{
+  "root": "navbar-mega",
+  "elements": {
+    "navbar-mega": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "nav-bar",
+        "mega-platform-panel"
+      ]
+    },
+    "nav-bar": {
+      "type": "Surface",
+      "props": {
+        "variant": "card"
+      },
+      "children": [
+        "nav-inner"
+      ]
+    },
+    "nav-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 4,
+        "align": "center",
+        "justify": "between"
+      },
+      "children": [
+        "nav-left",
+        "mega-actions"
+      ]
+    },
+    "nav-left": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 4,
+        "align": "center"
+      },
+      "children": [
+        "nav-brand",
+        "nav-links"
+      ]
+    },
+    "nav-brand": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Arcline",
+        "weight": "bold"
+      }
+    },
+    "nav-links": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "link-platform",
+        "link-developers",
+        "link-enterprise",
+        "link-pricing"
+      ]
+    },
+    "link-platform": {
+      "type": "Link",
+      "props": {
+        "label": "Platform",
+        "href": "/platform"
+      }
+    },
+    "link-developers": {
+      "type": "Link",
+      "props": {
+        "label": "Developers",
+        "href": "/developers"
+      }
+    },
+    "link-enterprise": {
+      "type": "Link",
+      "props": {
+        "label": "Enterprise",
+        "href": "/enterprise"
+      }
+    },
+    "link-pricing": {
+      "type": "Link",
+      "props": {
+        "label": "Pricing",
+        "href": "/pricing"
+      }
+    },
+    "mega-actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "mega-login",
+        "mega-cta"
+      ]
+    },
+    "mega-login": {
+      "type": "Button",
+      "props": {
+        "label": "Sign In",
+        "variant": "ghost",
+        "size": "sm"
+      }
+    },
+    "mega-cta": {
+      "type": "Button",
+      "props": {
+        "label": "Start Free Trial",
+        "variant": "primary",
+        "size": "sm"
+      }
+    },
+    "mega-platform-panel": {
+      "type": "Surface",
+      "props": {
+        "variant": "raised"
+      },
+      "children": [
+        "mega-platform-grid"
+      ]
+    },
+    "mega-platform-grid": {
+      "type": "Grid",
+      "props": {
+        "columns": 3,
+        "gap": 4
+      },
+      "children": [
+        "mega-col-analytics",
+        "mega-col-automation",
+        "mega-col-integrations"
+      ]
+    },
+    "mega-col-analytics": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "mega-col-analytics-title",
+        "mega-link-dashboards",
+        "mega-link-reports",
+        "mega-link-alerts"
+      ]
+    },
+    "mega-col-analytics-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h6",
+        "content": "Analytics",
+        "weight": "semibold"
+      }
+    },
+    "mega-link-dashboards": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Dashboards"
+      }
+    },
+    "mega-link-reports": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Custom Reports"
+      }
+    },
+    "mega-link-alerts": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Real-time Alerts"
+      }
+    },
+    "mega-col-automation": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "mega-col-automation-title",
+        "mega-link-workflows",
+        "mega-link-triggers",
+        "mega-link-templates"
+      ]
+    },
+    "mega-col-automation-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h6",
+        "content": "Automation",
+        "weight": "semibold"
+      }
+    },
+    "mega-link-workflows": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Workflow Builder"
+      }
+    },
+    "mega-link-triggers": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Event Triggers"
+      }
+    },
+    "mega-link-templates": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Pre-built Templates"
+      }
+    },
+    "mega-col-integrations": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2
+      },
+      "children": [
+        "mega-col-integrations-title",
+        "mega-link-api",
+        "mega-link-webhooks",
+        "mega-link-marketplace"
+      ]
+    },
+    "mega-col-integrations-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h6",
+        "content": "Integrations",
+        "weight": "semibold"
+      }
+    },
+    "mega-link-api": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "REST & GraphQL APIs"
+      }
+    },
+    "mega-link-webhooks": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Webhooks"
+      }
+    },
+    "mega-link-marketplace": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "App Marketplace"
+      }
+    }
+  }
+}

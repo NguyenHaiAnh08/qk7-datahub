@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -94,6 +95,18 @@ const REJECT_QUICK_CHIPS = [
   'Đề nghị bổ sung thêm tài liệu căn cứ',
   'Đơn vị ban hành không khớp',
 ];
+
+/** Tự động chuẩn hóa lỗi bảng mã Unicode / font chữ tiếng Việt bị lỗi */
+const cleanProposalNote = (note?: string): string => {
+  if (!note) return '';
+  return note
+    .replace(/Y[eê]u\s*c\?u\s*ph[eê]\s*duy\?t\s*dang\s*t\?i\s*van\s*b\?n\s*m\?i/gi, 'Yêu cầu phê duyệt đăng tải văn bản mới')
+    .replace(/Yêu c\?u phê duy\?t/gi, 'Yêu cầu phê duyệt')
+    .replace(/dang t\?i/gi, 'đăng tải')
+    .replace(/van b\?n m\?i/gi, 'văn bản mới')
+    .replace(/van b\?n/gi, 'văn bản')
+    .trim();
+};
 
 export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
   open,
@@ -209,6 +222,8 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
     (user?.permissions || []).includes('APPROVAL_VALIDATE');
 
   const canApprove = isAdminRole || isCommanderRole;
+  // Chính thức = Admin hoặc đúng vai trò Chỉ huy (ROL-02); người chỉ có quyền duyệt trong bảng quyền chỉ THẨM ĐỊNH
+  const isFinalApprover = isAdminRole || (user?.roles || []).includes('ROL-02');
 
   // Kiểm tra tài liệu nội bộ phòng
   const isInternalUnit = Boolean(
@@ -219,7 +234,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
   );
 
   const isSelfRequest = activeProposal.requester_id === user?.user_id;
-  const blockSelfApprove = isSelfRequest && !canApprove;
+  const blockSelfApprove = isSelfRequest && !isFinalApprover;
 
   const handleConfirmReject = async () => {
     if (!rejectReason.trim()) {
@@ -275,7 +290,9 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
   const isNewUpload = Boolean(
     activeProposal.is_new_upload ||
     activeProposal.deleted_reason === 'PENDING_APPROVAL' ||
-    activeProposal.note?.includes('Đăng tải')
+    activeProposal.note?.toLowerCase().includes('đăng tải') ||
+    activeProposal.note?.toLowerCase().includes('dang tai') ||
+    activeProposal.note?.toLowerCase().includes('dang t?i')
   );
 
   const diffFields = [
@@ -349,9 +366,9 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
   const changedCount = diffFields.filter((f) => f.hasChanged).length;
   const visibleFields = onlyChanged ? diffFields.filter((f) => f.hasChanged) : diffFields;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 overflow-hidden font-sans">
+      <div className="fixed inset-0 z-[100] overflow-hidden font-sans">
         {/* ========================================================= */}
         {/* BACKDROP LỚP PHỦ MỜ TẬP TRUNG SỰ CHÚ Ý                   */}
         {/* ========================================================= */}
@@ -361,19 +378,19 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
           onClick={() => !isProcessing && onClose()}
-          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm cursor-pointer"
+          className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm cursor-pointer"
         />
 
         {/* ========================================================= */}
-        {/* ULTRA-WIDE SLIDE-OVER DRAWER (85% - 90% MÀN HÌNH)         */}
+        {/* TOÀN MÀN HÌNH FULL-SCREEN (100% RỘNG, KHÔNG HỞ TRÁI)       */}
         {/* ========================================================= */}
-        <div className="fixed inset-y-0 right-0 z-50 flex max-w-full pointer-events-none">
+        <div className="fixed inset-0 z-[100] flex w-full h-full pointer-events-none">
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
-            className="pointer-events-auto w-screen lg:w-[88vw] xl:w-[85vw] max-w-[1440px] h-screen bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden"
+            className="pointer-events-auto w-full h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden"
           >
             {/* ========================================================= */}
             {/* STICKY HEADER: TIÊU ĐỀ + MÃ + QUEUE SWITCHER             */}
@@ -680,7 +697,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
                     <strong className="block text-amber-800 dark:text-amber-300 mb-1 font-bold">
                       Lý do đề xuất từ cán bộ:
                     </strong>
-                    <p className="italic leading-relaxed">"{activeProposal.note}"</p>
+                    <p className="italic leading-relaxed">"{cleanProposalNote(activeProposal.note)}"</p>
                   </div>
                 </div>
               )}
@@ -815,7 +832,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
                             <Check className="w-4 h-4 stroke-[2.5]" />
                           )}
                           <span>
-                            {isNewUpload ? 'Phê duyệt & Tiếp nhận văn bản' : 'Phê duyệt & Cập nhật'}
+                            {!isFinalApprover ? 'Thẩm định (chờ Chỉ huy xác nhận)' : isNewUpload ? 'Phê duyệt & Tiếp nhận văn bản' : 'Phê duyệt & Cập nhật'}
                           </span>
                         </button>
                       </>
@@ -835,6 +852,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
           </motion.div>
         </div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

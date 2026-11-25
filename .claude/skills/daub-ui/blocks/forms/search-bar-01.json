@@ -1,0 +1,135 @@
+{
+  "root": "search-section",
+  "elements": {
+    "search-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "search-row",
+        "filter-chips",
+        "search-suggestions"
+      ]
+    },
+    "search-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "main-search",
+        "btn-search"
+      ]
+    },
+    "main-search": {
+      "type": "Search",
+      "props": {
+        "placeholder": "Search documentation, articles, and guides..."
+      }
+    },
+    "btn-search": {
+      "type": "Button",
+      "props": {
+        "label": "Search",
+        "variant": "default",
+        "icon": "search"
+      }
+    },
+    "filter-chips": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "chip-all",
+        "chip-docs",
+        "chip-tutorials",
+        "chip-api",
+        "chip-blog",
+        "chip-community"
+      ]
+    },
+    "chip-all": {
+      "type": "Chip",
+      "props": {
+        "label": "All Results"
+      }
+    },
+    "chip-docs": {
+      "type": "Chip",
+      "props": {
+        "label": "Documentation"
+      }
+    },
+    "chip-tutorials": {
+      "type": "Chip",
+      "props": {
+        "label": "Tutorials"
+      }
+    },
+    "chip-api": {
+      "type": "Chip",
+      "props": {
+        "label": "API Reference"
+      }
+    },
+    "chip-blog": {
+      "type": "Chip",
+      "props": {
+        "label": "Blog Posts"
+      }
+    },
+    "chip-community": {
+      "type": "Chip",
+      "props": {
+        "label": "Community"
+      }
+    },
+    "search-suggestions": {
+      "type": "Surface",
+      "props": {
+        "variant": "bordered"
+      },
+      "children": [
+        "suggestions-list"
+      ]
+    },
+    "suggestions-list": {
+      "type": "List",
+      "props": {
+        "items": [
+          {
+            "primary": "Getting Started with Authentication",
+            "secondary": "Documentation - Learn how to set up OAuth 2.0 and API keys",
+            "icon": "file-text",
+            "meta": "Updated 2 days ago"
+          },
+          {
+            "primary": "Rate Limiting Best Practices",
+            "secondary": "API Reference - Token bucket configuration and headers",
+            "icon": "zap",
+            "meta": "Updated 1 week ago"
+          },
+          {
+            "primary": "Building a REST API with Node.js",
+            "secondary": "Tutorial - Step-by-step guide with Express and PostgreSQL",
+            "icon": "book-open",
+            "meta": "Updated 3 days ago"
+          },
+          {
+            "primary": "Webhook Event Types",
+            "secondary": "API Reference - Complete list of webhook events and payloads",
+            "icon": "webhook",
+            "meta": "Updated 5 days ago"
+          }
+        ]
+      }
+    }
+  }
+}

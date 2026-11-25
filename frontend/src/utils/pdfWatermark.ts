@@ -111,9 +111,12 @@ export async function stampWatermarkOnPdf(
     }
 
     const modifiedBytes = await pdfDoc.save();
-    return new Blob([modifiedBytes as unknown as BlobPart], { type: 'application/pdf' });
+    const stampedBlob = new Blob([modifiedBytes as unknown as BlobPart], { type: 'application/pdf' });
+    (stampedBlob as any).__isWatermarked = true;
+    return stampedBlob;
   } catch (err) {
     console.warn('[stampWatermarkOnPdf] Fallback to original blob:', err);
+    (pdfBlob as any).__isWatermarked = false;
     return pdfBlob;
   }
 }

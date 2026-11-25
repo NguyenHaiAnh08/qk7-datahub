@@ -1,0 +1,175 @@
+{
+  "root": "social-login",
+  "elements": {
+    "social-login": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0,
+        "align": "center",
+        "justify": "center",
+        "container": "narrow"
+      },
+      "children": [
+        "social-card"
+      ]
+    },
+    "social-card": {
+      "type": "Card",
+      "props": {
+        "title": "Sign in to your account",
+        "description": "Choose your preferred sign-in method"
+      },
+      "children": [
+        "card-body"
+      ]
+    },
+    "card-body": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "google-btn",
+        "github-btn",
+        "apple-btn",
+        "microsoft-btn",
+        "divider-row",
+        "or-text",
+        "email-section",
+        "signup-prompt"
+      ]
+    },
+    "google-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Continue with Google",
+        "icon": "chrome",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "github-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Continue with GitHub",
+        "icon": "github",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "apple-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Continue with Apple",
+        "icon": "apple",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "microsoft-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Continue with Microsoft",
+        "icon": "monitor",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "divider-row": {
+      "type": "Separator",
+      "props": {
+        "orientation": "horizontal"
+      }
+    },
+    "or-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Or continue with email",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "email-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "email-field",
+        "password-field",
+        "signin-btn"
+      ]
+    },
+    "email-field": {
+      "type": "Field",
+      "props": {
+        "label": "Email"
+      },
+      "children": [
+        "email-input"
+      ]
+    },
+    "email-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "you@example.com",
+        "type": "email"
+      }
+    },
+    "password-field": {
+      "type": "Field",
+      "props": {
+        "label": "Password"
+      },
+      "children": [
+        "password-input"
+      ]
+    },
+    "password-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Your password",
+        "type": "password"
+      }
+    },
+    "signin-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Sign In",
+        "variant": "primary",
+        "size": "lg"
+      }
+    },
+    "signup-prompt": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 1,
+        "align": "center",
+        "justify": "center"
+      },
+      "children": [
+        "signup-text",
+        "signup-link"
+      ]
+    },
+    "signup-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Don't have an account?",
+        "variant": "muted"
+      }
+    },
+    "signup-link": {
+      "type": "Link",
+      "props": {
+        "label": "Create one"
+      }
+    }
+  }
+}

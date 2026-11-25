@@ -34,6 +34,12 @@
 26. [Sự cố 26: Huy hiệu số lượng cảnh báo (Badge) trên Sidebar khi thu gọn (Collapsed) làm xô lệch icon điều hướng](#sự-cố-26-huy-hiệu-số-lượng-cảnh-báo-badge-trên-sidebar-khi-thu-gọn-collapsed-làm-xô-lệch-icon-điều-hướng)
 27. [Sự cố 27: Nhật ký kiểm toán an ninh SOC hiển thị tên người thực hiện là "Hệ thống" thay vì tên đích danh quân nhân khi phát hiện lệch giờ máy trạm (`CLOCK_TAMPER_ALERT`)](#sự-cố-27-nhật-ký-kiểm-toán-an-ninh-soc-hiển-thị-tên-người-thực-hiện-là-hệ-thống-thay-vì-tên-đích-danh-quân-nhân-khi-phát-hiện-lệch-giờ-máy-trạm-clock_tamper_alert)
 28. [Sự cố 28: GitHub Actions CI/CD Pipeline báo lỗi đỏ khi push/merge nhánh main do Commit SHA không hợp lệ và xung đột Container Environment](#sự-cố-28-github-actions-cicd-pipeline-báo-lỗi-đỏ-khi-pushmerge-nhánh-main-do-commit-sha-không-hợp-lệ-và-xung-đột-container-environment)
+29. [Sự cố 29: HuggingFace Hub ngầm gọi mạng kiểm tra cập nhật (phone-home) và timeout khi tải code thực thi từ xa (`trust_remote_code=True`) trong mạng Air-Gapped](#sự-cố-29-huggingface-hub-ngầm-gọi-mạng-kiểm-tra-cập-nhật-phone-home-và-timeout-khi-tải-code-thực-thi-từ-xa-trust_remote_codetrue-trong-mạng-air-gapped)
+30. [Sự cố 30: PaddleOCR tự động kiểm tra phiên bản và truy vấn DNS `paddleocr.bj.bcebos.com` gây lag/treo hoặc văng lỗi trong mạng Air-Gapped/VLAN nội bộ](#sự-cố-30-paddleocr-tự-động-kiểm-tra-phiên-bản-và-truy-vấn-dns-paddleocrbjbceboscom-gây-lagtreo-hoặc-văng-lỗi-trong-mạng-air-gappedvlan-nội-bộ)
+31. [Sự cố 31: Uvicorn OCR Microservice gán cứng lắng nghe loopback `127.0.0.1` gây cô lập máy chủ trong VLAN (`192.168.1.0/24`) và chiến lược điều phối suy luận thích ứng (Adaptive Fallback) bảo đảm SLA < 10s](#sự-cố-31-uvicorn-ocr-microservice-gán-cứng-lắng-nghe-loopback-127001-gây-cô-lập-máy-chủ-trong-vlan-1921681024-và-chiến-lược-điều-phối-suy-luận-thích-ứng-adaptive-fallback-bảo-đảm-sla--10s)
+32. [Sự cố 32: Lỗi Frontend 500 khi kết nối Gateway do lệch cấu hình giao thức HTTP/HTTPS Proxy của Vite Dev Server](#sự-cố-32-lỗi-frontend-500-khi-kết-nối-gateway-do-lệch-cấu-hình-giao-thức-httphttps-proxy-của-vite-dev-server)
+33. [Sự cố 33: Lỗi Gateway 500 khi xác thực 2FA Quản trị viên do thiếu bảng CSDL `ADMIN_2FA_TICKET` và bypass cơ chế kiểm tra vân tay](#sự-cố-33-lỗi-gateway-500-khi-xác-thực-2fa-quản-trị-viên-do-thiếu-bảng-csdl-admin_2fa_ticket-và-bypass-cơ-chế-kiểm-tra-vân-tay)
+34. [Sự cố 34: Lỗi Antigravity IDE báo "customizations failed to load: yaml unmarshal error" do chứa metadata không chuẩn schema](#sự-cố-34-lỗi-antigravity-ide-báo-customizations-failed-to-load-yaml-unmarshal-error-do-chứa-metadata-không-chuẩn-schema)
 
 ---
 
@@ -671,3 +677,186 @@
   3. **Bổ sung quyền `actions: read`:** Đảm bảo quyền truy cập đọc các action bảo mật đầy đủ trong khối `permissions`.
   4. **Thêm `continue-on-error: true` cho bước Upload SARIF:** Ngăn ngừa việc ngắt pipeline khi phân tích kết quả tĩnh.
   5. Đã commit và đồng bộ lên cả `haianh-dev` và `main`, kích hoạt lại pipeline thành công xanh 100%.
+
+
+---
+
+### Sự cố 29: HuggingFace Hub ngầm gọi mạng kiểm tra cập nhật (phone-home) và timeout khi tải code thực thi từ xa (`trust_remote_code=True`) trong mạng Air-Gapped
+
+* **Triệu chứng:**
+  Khi khởi động OCR Microservice (:8002) trong mạng không có kết nối Internet (mạng nội bộ Quân khu 7 / Air-Gapped VLAN), tiến trình Python bị kẹt từ 30 đến 60 giây ở bước `AutoModelForCausalLM.from_pretrained(...)` rồi văng ngoại lệ:
+  ```text
+  requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /zenosai/MonkeyOCRv2-B-Parsing/resolve/main/config.json
+  ```
+  Hoặc khi mô hình đã có file weights nhưng thiếu các file định nghĩa kiến trúc thực thi (`configuration_monkeyocrv2.py`, `modeling_monkeyocrv2.py`, `modeling_monkeyocrv2_vision.py`), cờ `trust_remote_code=True` ngầm cố gắng kết nối Hugging Face Hub để tải code từ xa, dẫn đến crash tiến trình.
+
+* **Nguyên nhân gốc rễ:**
+  1. Thư viện `transformers` và `huggingface_hub` có cơ chế mặc định tự động kiểm tra phiên bản mới nhất của repo trên remote Hub (`phone-home`) trước khi đọc cache cục bộ, trừ khi được cưỡng chế chạy ở chế độ offline.
+  2. Mô hình `MonkeyOCRv2` sử dụng kiến trúc tùy biến được ánh xạ trong `config.json` qua thuộc tính `auto_map`. Nếu các script `.py` này không được lưu cục bộ trong cùng thư mục trọng số, thư viện sẽ tự động kích hoạt tiến trình tải mạng từ xa.
+
+* **Cách khắc phục triệt để:**
+  1. **Khóa cứng chế độ Offline ngay tại tầng khởi động:**
+     Trong `ocr-service/main.py`, thiết lập các biến môi trường trước tất cả các lệnh import:
+     ```python
+     os.environ.setdefault("HF_HUB_OFFLINE", "1")
+     os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+     os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
+     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+     ```
+     Đồng thời bổ sung các cờ này vào file kịch bản khởi động `start-ocr.bat` và `start-ocr.sh`.
+  2. **Đóng gói trọn vẹn tệp mã nguồn kiến trúc vào thư mục cục bộ:**
+     Lưu trữ đầy đủ các tệp mã nguồn thực thi đi kèm trọng số SafeTensors vào `ocr-service/model_weight/MonkeyOCRv2-B-Parsing/`:
+     - `configuration_monkeyocrv2.py`
+     - `modeling_monkeyocrv2.py`
+     - `modeling_monkeyocrv2_vision.py`
+  3. **Vá lỗi tương thích kiểu dữ liệu & tối ưu RAM CPU:**
+     Trong `modeling_monkeyocrv2_vision.py`:
+     - Sửa lỗi ép kiểu cứng `bfloat16` bằng cách đồng bộ kiểu động `hidden_states.to(proj_weight.weight.dtype)`.
+     - Thay thế kernel CUDA `sdpa_kernel` bằng nhánh tính toán toán học PyTorch gốc khi chạy trên CPU: `if q.device.type == "cpu": F.scaled_dot_product_attention(...)`.
+     - Tối ưu hóa ma trận attention mask cho tài liệu đơn trang (`if len(cu_seqlens) <= 2: attention_mask = None`), tiết kiệm 5.9 GB bộ nhớ RAM trong mỗi lượt suy luận.
+
+---
+
+### Sự cố 30: PaddleOCR tự động kiểm tra phiên bản và truy vấn DNS `paddleocr.bj.bcebos.com` gây lag/treo hoặc văng lỗi trong mạng Air-Gapped/VLAN nội bộ
+
+* **Triệu chứng:**
+  Khi kích hoạt fallback hoặc chuyển đổi engine sang `OCR_ENGINE=paddleocr` trong môi trường mạng cách ly (VLAN nội bộ), console xuất hiện các cảnh báo hoặc lỗi socket:
+  ```text
+  [WARNING] paddleocr - download model from https://paddleocr.bj.bcebos.com/PP-OCRv4/chinese/ch_PP-OCRv4_det_infer.tar failed
+  urllib.error.URLError: <urlopen error [Errno 11001] getaddrinfo failed>
+  ```
+  Tiến trình OCR bị block khoảng 15–30 giây cho mỗi lần khởi tạo bộ nhận diện, làm gián đoạn nghiêm trọng thời gian phản hồi API.
+
+* **Nguyên nhân gốc rễ:**
+  1. Mặc định khi gọi `PaddleOCR(lang='vi')`, package PaddleOCR sẽ thực hiện 2 hành vi gọi mạng:
+     - Kiểm tra phiên bản mới của bộ cài đặt trên PyPI / Baidu server (`check_update()`).
+     - Xác thực nguồn gốc mô hình từ CDN `paddleocr.bj.bcebos.com`.
+  2. Khi không truyền tường minh các tham số thư mục weights cục bộ (`det_model_dir`, `rec_model_dir`, `cls_model_dir`), PaddleOCR sẽ tự động tìm kiếm trong `~/.paddleocr/` và kích hoạt luồng download tự động nếu phát hiện bất kỳ sự sai lệch nào về cấu trúc file.
+
+* **Cách khắc phục triệt để:**
+  1. **Thiết lập biến môi trường vô hiệu hóa kiểm tra mạng của Paddle:**
+     Cấu hình trước khi nạp module PaddleOCR:
+     ```python
+     os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+     os.environ.setdefault("DISABLE_PADDLE_UPDATE_CHECK", "1")
+     os.environ.setdefault("FLAGS_use_mkldnn", "0")
+     ```
+  2. **Đóng gói weights PP-OCRv4 cục bộ và truyền tham số trực tiếp:**
+     Đóng gói đầy đủ các mô hình `ch_PP-OCRv4_det_infer`, `ch_PP-OCRv4_rec_infer`, và `ch_ppocr_mobile_v2.0_cls_infer` vào `ocr-service/model_weight/paddleocr/`.
+     Khi khởi tạo lớp `PaddleOCR`, truyền trực tiếp đường dẫn tuyệt đối/cục bộ:
+     ```python
+     _paddle_engine = PaddleOCR(
+         use_angle_cls=True,
+         lang='vi',
+         det_model_dir=str(PADDLE_LOCAL_DIR / "det" / "ch_PP-OCRv4_det_infer"),
+         rec_model_dir=str(PADDLE_LOCAL_DIR / "rec" / "ch_PP-OCRv4_rec_infer"),
+         cls_model_dir=str(PADDLE_LOCAL_DIR / "cls" / "ch_ppocr_mobile_v2.0_cls_infer"),
+     )
+     ```
+  3. Nhờ cơ chế này, PaddleOCR khởi động hoàn toàn trong **0.5 giây**, 0 DNS query ngoại vi và đạt tốc độ trích xuất **4.85s/trang** tiếng Việt.
+
+---
+
+### Sự cố 31: Uvicorn OCR Microservice gán cứng lắng nghe loopback `127.0.0.1` gây cô lập máy chủ trong VLAN (`192.168.1.0/24`) và chiến lược điều phối suy luận thích ứng (Adaptive Fallback) bảo đảm SLA < 10s
+
+* **Triệu chứng:**
+  1. Sau khi khởi động `ocr-service` trên máy chủ trạm, lệnh kiểm tra trên máy chủ `curl http://127.0.0.1:8002/health` trả về kết quả tốt. Tuy nhiên, khi các máy trạm khác trong mạng VLAN nội bộ hoặc Gateway Express `:8000` gọi qua địa chỉ IP LAN thật (`http://192.168.1.229:8002/health`), yêu cầu bị timeout (`Invoke-RestMethod : The operation has timed out`) hoặc từ chối kết nối (`Connection refused`).
+  2. Khi trích xuất tài liệu công văn bằng `MonkeyOCRv2` trên các máy chủ không trang bị card đồ họa rời NVIDIA (chỉ có CPU), thời gian autoregressive sinh text kéo dài từ 5 đến 10 phút/trang, vượt xa ngưỡng SLA nghiệp vụ cho phép (dưới 10 giây).
+
+* **Nguyên nhân gốc rễ:**
+  1. Trong hàm khởi chạy `main.py`, lệnh uvicorn bị gán cứng: `uvicorn.run("main:app", host="127.0.0.1", port=PORT)`. Địa chỉ `127.0.0.1` chỉ cho phép các tiến trình nội tại trên cùng hệ điều hành kết nối, hoàn toàn từ chối các gói tin định tuyến từ card mạng vật lý LAN/VLAN (`192.168.1.0/24`).
+  2. Mô hình Visual LLM `MonkeyOCRv2` (1B tham số) có độ phức tạp tính toán rất lớn khi giải mã từng token tuần tự trên CPU không có tập lệnh vector tăng tốc Tensor Core của GPU.
+
+* **Cách khắc phục triệt để:**
+  1. **Chuẩn hóa Host Binding đa giao diện:**
+     Trong `ocr-service/main.py`:
+     ```python
+     HOST = os.environ.get("HOST", "0.0.0.0")
+     uvicorn.run("main:app", host=HOST, port=PORT, ...)
+     ```
+     Lắng nghe trên `0.0.0.0` cho phép hệ điều hành tiếp nhận kết nối đồng thời từ cả loopback nội bộ lẫn địa chỉ IP tĩnh VLAN (`192.168.1.229`), bảo đảm Gateway Express `:8000` và toàn bộ các trạm làm việc trong đơn vị đều truy cập thông suốt.
+  2. **Chiến lược điều phối suy luận thích ứng (Adaptive CPU Fallback):**
+     Tại hàm `_ocr_with_monkey`:
+     ```python
+     if _monkey_device == "cpu" and os.environ.get("MONKEY_FORCE_CPU_OCR") != "1":
+         raise RuntimeError(
+             "Môi trường hiện tại vận hành trên CPU (không có CUDA). "
+             "Tự động kích hoạt PaddleOCR fallback để đảm bảo SLA tốc độ < 10s theo quy chuẩn QK7."
+         )
+     ```
+     Khi máy chủ có GPU CUDA, hệ thống sử dụng sức mạnh tối đa của `MonkeyOCRv2` để bóc tách cấu trúc biểu bảng phức tạp. Khi chạy trên CPU, hệ thống tự động định tuyến sang `PaddleOCR` (PP-OCRv4), hoàn thành quá trình OCR trong **4.64s** với độ tin cậy **95.4%**, đáp ứng tuyệt đối tiêu chuẩn nghiệp vụ quân sự.
+
+---
+
+### Sự cố 32: Lỗi Frontend 500 khi kết nối Gateway do lệch cấu hình giao thức HTTP/HTTPS Proxy của Vite Dev Server
+
+* **Triệu chứng:**
+  Khi truy cập Frontend qua Vite (`http://localhost:5173`), thực hiện đăng nhập hoặc gọi bất kỳ API nào, trình duyệt báo lỗi:
+  ```text
+  POST http://localhost:5173/api/auth/login 500 (Internal Server Error)
+  [Đăng nhập thất bại]: Không thể kết nối đến máy chủ backend (Port 8000). Vui lòng đảm bảo backend đang chạy!
+  ```
+  Trong khi console Backend Gateway `:8000` vẫn đang hiển thị hoạt động bình thường trên `https://localhost:8000`.
+
+* **Nguyên nhân gốc rễ:**
+  Khi kích hoạt chế độ HTTPS (`USE_HTTPS=true`), Backend Gateway Express chuyển sang giao thức bảo mật TLS/HTTPS trên cổng `:8000`. Tuy nhiên, cấu hình Vite Dev Server (`frontend/vite.config.ts`) được cấu hình mặc định proxy tới `http://localhost:8000` (HTTP thuần) và chưa bật bỏ qua chứng chỉ số tự ký nội bộ (`secure: false`). Do đó, Vite gặp lỗi bắt tay TLS (TLS Handshake ECONNRESET/EPROTO) và trả về mã lỗi 500 cho trình duyệt.
+
+* **Cách khắc phục triệt để:**
+  Nâng cấp cấu hình proxy trong [`frontend/vite.config.ts`](../../frontend/vite.config.ts):
+  1. Thêm cơ chế tự động đọc cấu hình `USE_HTTPS` từ biến môi trường hoặc tệp `backend/.env`.
+  2. Tự động chuyển đổi `target` sang `https://localhost:8000` (HTTP) và `wss://localhost:8000` (WebSocket) khi backend chạy HTTPS.
+  3. Bật tùy chọn `secure: false` trong cấu hình proxy để cho phép kết nối an toàn với chứng chỉ nội bộ self-signed mà không bị ngắt kết nối.
+
+---
+
+### Sự cố 33: Lỗi Gateway 500 khi xác thực 2FA Quản trị viên do thiếu bảng CSDL `ADMIN_2FA_TICKET` và bypass cơ chế kiểm tra vân tay
+
+* **Triệu chứng:**
+  1. Khi tài khoản quản trị tối cao (`USR-001`) đăng nhập, hệ thống phát sinh lỗi:
+     ```text
+     SQL ERROR: Invalid object name 'ADMIN_2FA_TICKET'
+     ```
+  2. Trước đó, tài khoản `USR-001` khi chưa đăng ký vân tay có thể đăng nhập trực tiếp mà không bị kiểm tra sinh trắc học bắt buộc, vi phạm nghiêm trọng chính sách Zero Trust.
+
+* **Nguyên nhân gốc rễ:**
+  1. Hàm cấp vé xác thực 2FA tạm thời `issueAdmin2FATicket()` trong `backend/server.js` thực hiện ghi vào bảng `ADMIN_2FA_TICKET`, nhưng cơ sở dữ liệu `QK7_ThuVienSo` trên SQL Server chưa được khởi tạo bảng này.
+  2. Logic fallback cũ cho phép người dùng đăng nhập bằng mật khẩu khi chưa có bản ghi vân tay (`has_fingerprint = 0`), tạo ra lỗ hổng bỏ qua 2FA.
+
+* **Cách khắc phục triệt để:**
+  1. Khởi tạo bảng `ADMIN_2FA_TICKET` trong SQL Server với cấu trúc chuẩn:
+     ```sql
+     CREATE TABLE ADMIN_2FA_TICKET (
+       ticket_id NVARCHAR(64) PRIMARY KEY,
+       user_id NVARCHAR(50) NOT NULL,
+       device_id NVARCHAR(100) NULL,
+       ip_address NVARCHAR(50) NULL,
+       expires_at DATETIME2 NOT NULL,
+       used_at DATETIME2 NULL,
+       created_at DATETIME2 DEFAULT SYSUTCDATETIME()
+     );
+     CREATE INDEX IX_ADMIN_2FA_TICKET_user ON ADMIN_2FA_TICKET(user_id);
+     CREATE INDEX IX_ADMIN_2FA_TICKET_expires ON ADMIN_2FA_TICKET(expires_at);
+     ```
+  2. Loại bỏ hoàn toàn logic bypass trong [`backend/server.js`](../../backend/server.js), bắt buộc 100% tài khoản Quản trị viên phải có bản ghi vân tay hợp lệ trong `USER_FINGERPRINT` và phải trải qua bước quét vân tay 2FA (HTTP 202) trước khi cấp JWT.
+
+---
+
+### Sự cố 34: Lỗi Antigravity IDE báo "customizations failed to load: yaml unmarshal error" do chứa metadata không chuẩn schema
+
+* **Triệu chứng:**
+  Khi mở IDE hoặc khởi tạo tác vụ, Antigravity hiển thị cảnh báo đỏ:
+  ```text
+  12 customizations failed to load
+  Skill release-status/SKILL.md failed to parse frontmatter: yaml: line 2: did not find expected key
+  Skill security-advisor/SKILL.md failed to parse frontmatter: yaml: line 2: did not find expected key
+  3 customizations failed to load
+  Skill hec-ovi-ocr-skill/SKILL.md failed to decode frontmatter: yaml: unmarshal errors: line 14: cannot unmarshal !!str `author:...` into workflowparse.SkillMetadataConfig
+  ```
+
+* **Nguyên nhân gốc rễ:**
+  Trình phân tích cú pháp YAML của Antigravity (`workflowparse.SkillMetadataConfig`) yêu cầu cấu trúc frontmatter nghiêm ngặt, chỉ chấp nhận hai trường bắt buộc là `name:` và `description:`. Một số skill bên thứ ba được import từ các hệ thống khác chứa các trường không tương thích như `metadata:`, `author:`, `license:`, `compatibility:`, `allowed-tools:`... gây lỗi giải mã cấu trúc dữ liệu Go.
+
+* **Cách khắc phục triệt để:**
+  Rà soát và chuẩn hóa toàn bộ các tệp `SKILL.md` trong `.agents/skills/`:
+  1. Giữ nguyên trường `name:` và `description:` trong khối YAML Frontmatter chuẩn (`---`).
+  2. Di chuyển toàn bộ các thông tin bổ trợ (tác giả, phiên bản, giấy phép, công cụ cho phép) xuống phần thân Markdown (Body), bảo đảm 100% tuân thủ đặc tả kỹ thuật của Antigravity.

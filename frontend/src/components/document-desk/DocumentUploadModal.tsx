@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock,
@@ -57,6 +57,12 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const { user } = useAuth();
   const isEdit = Boolean(document);
 
+  // ── Lọc danh sách Độ Mật chỉ hiển thị tối đa mức Clearance của User ──
+  const userClearanceLevel = user?.clearance_level_id || 1;
+  const availableLevels = useMemo(() => {
+    return (levels || []).filter((lvl) => lvl.level_id <= userClearanceLevel);
+  }, [levels, userClearanceLevel]);
+
   // ── Form Input States ──
   const [code, setCode] = useState('');
   const [title, setTitle] = useState('');
@@ -72,9 +78,22 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [error, setError] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // ── Cây đơn vị cho TreeSelect ──
+  // ── Cây đơn vị cho TreeSelect (Chỉ mở cấp Gốc & Nhà trường để gọn gàng) ──
   const unitTree = useMemo(() => buildUnitTree(units), [units]);
-  const rootUnitKeys = useMemo(() => unitTree.map((node) => String(node.key)), [unitTree]);
+  const rootUnitKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const root of unitTree) {
+      if (root.children && root.children.length > 0) {
+        keys.push(String(root.key));
+        for (const child of root.children) {
+          if (child.children && child.children.length > 0) {
+            keys.push(String(child.key));
+          }
+        }
+      }
+    }
+    return keys;
+  }, [unitTree]);
   const [treeExpandedKeys, setTreeExpandedKeys] = useState<string[]>([]);
 
   useEffect(() => {
@@ -252,7 +271,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setTitle(document.title || '');
       setTypeId(document.doc_type_id || document.type_id || '');
       setUnitId(document.issuing_unit_id || document.unit_id || '');
-      setSecurityLevel(document.security_level_id || '');
+      const rawSecLevel = document.security_level_id || '';
+      setSecurityLevel(rawSecLevel && Number(rawSecLevel) <= userClearanceLevel ? rawSecLevel : '');
       setSigner(document.signer || '');
       const rawDate = document.issued_date || document.issue_date;
       setIssueDate(rawDate ? rawDate.split('T')[0] : '');
@@ -1024,7 +1044,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     <option value="" className="text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900">
                       Chọn độ mật
                     </option>
-                    {levels.map((lvl) => (
+                    {availableLevels.map((lvl) => (
                       <option
                         key={lvl.level_id}
                         value={lvl.level_id}

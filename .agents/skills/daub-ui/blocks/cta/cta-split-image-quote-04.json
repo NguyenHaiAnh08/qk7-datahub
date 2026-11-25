@@ -1,0 +1,170 @@
+{
+  "root": "cta-split-image-quote-04",
+  "elements": {
+    "cta-split-image-quote-04": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "top-section",
+        "bottom-section"
+      ]
+    },
+    "top-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "top-image",
+        "quote-bar"
+      ]
+    },
+    "top-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cta-split-image-quote-04-top-image/1440/400",
+        "alt": "CTA background",
+        "objectFit": "cover"
+      }
+    },
+    "quote-bar": {
+      "type": "Surface",
+      "props": {
+        "variant": "frosted",
+        "padding": [
+          4,
+          8
+        ]
+      },
+      "children": [
+        "quote-bar-inner"
+      ]
+    },
+    "quote-bar-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 4,
+        "align": "center",
+        "justify": "center"
+      },
+      "children": [
+        "quote-text",
+        "quote-author-row"
+      ]
+    },
+    "quote-text": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Daub has completely transformed how our team works.",
+        "variant": "inverted",
+        "style": "italic"
+      }
+    },
+    "quote-author-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "quote-avatar",
+        "quote-author-name"
+      ]
+    },
+    "quote-avatar": {
+      "type": "Avatar",
+      "props": {
+        "initials": "AK",
+        "size": "sm"
+      }
+    },
+    "quote-author-name": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Alex Kim, CTO",
+        "variant": "inverted"
+      }
+    },
+    "bottom-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6,
+        "align": "center",
+        "padding": [
+          12,
+          0
+        ],
+        "container": "narrow"
+      },
+      "children": [
+        "bottom-content",
+        "bottom-actions"
+      ]
+    },
+    "bottom-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "align": "center"
+      },
+      "children": [
+        "bottom-heading",
+        "bottom-description"
+      ]
+    },
+    "bottom-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Ready to get started?",
+        "align": "center"
+      }
+    },
+    "bottom-description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Join over 4,000+ startups already growing with Daub.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "bottom-actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3
+      },
+      "children": [
+        "btn-learn-more",
+        "btn-get-started"
+      ]
+    },
+    "btn-learn-more": {
+      "type": "Button",
+      "props": {
+        "label": "Learn more",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "btn-get-started": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg"
+      }
+    }
+  }
+}

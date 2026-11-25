@@ -8,6 +8,7 @@ import {
   Flag,
   GraduationCap,
   Landmark,
+  Compass,
   ChevronDown,
   ChevronRight,
   Plus,
@@ -28,6 +29,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { Unit } from '../../types';
+import { getMilitaryUnitSortWeight } from '../../utils/unitTree';
 
 export type UnitCategory =
   | 'all'
@@ -35,7 +37,11 @@ export type UnitCategory =
   | 'quan_khu'
   | 'su_doan'
   | 'trung_doan'
+  | 'tieu_doan'
+  | 'dai_doi'
+  | 'ban_chi_huy'
   | 'nha_truong'
+  | 'trung_tam'
   | 'co_quan'
   | 'khoa'
   | 'bo_mon'
@@ -82,7 +88,11 @@ export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
       t === 'quan_khu' ||
       t === 'su_doan' ||
       t === 'trung_doan' ||
+      t === 'tieu_doan' ||
+      t === 'dai_doi' ||
+      t === 'ban_chi_huy' ||
       t === 'nha_truong' ||
+      t === 'trung_tam' ||
       t === 'co_quan' ||
       t === 'khoa' ||
       t === 'bo_mon' ||
@@ -126,9 +136,25 @@ export const getUnitCategory = (unit: Unit): ConcreteUnitCategory => {
   if (id.startsWith('SD') || name.includes('sư đoàn')) {
     return 'su_doan';
   }
-  // 5. Trung đoàn
+  // 5. Trung đoàn / Lữ đoàn
   if (id.startsWith('TD') || name.includes('trung đoàn') || name.includes('lữ đoàn')) {
     return 'trung_doan';
+  }
+  // 5.1. Ban Chỉ huy
+  if (name.includes('ban chỉ huy') || name.includes('bch') || id.startsWith('BCH-') || id.startsWith('BCH_') || id.startsWith('BCH')) {
+    return 'ban_chi_huy';
+  }
+  // 5.2. Tiểu đoàn
+  if (name.includes('tiểu đoàn') || id.startsWith('D-') || id.startsWith('D_') || id.startsWith('TD_')) {
+    return 'tieu_doan';
+  }
+  // 5.3. Đại đội
+  if (name.includes('đại đội') || id.startsWith('C-') || id.startsWith('C_')) {
+    return 'dai_doi';
+  }
+  // 5.4. Trung tâm
+  if (name.includes('trung tâm') || id.startsWith('TT-') || id.startsWith('TT_') || id.startsWith('TT')) {
+    return 'trung_tam';
   }
   // 6. Khoa
   if (name.includes('khoa') || id.startsWith('K-') || id.startsWith('K_')) {
@@ -196,12 +222,36 @@ export const CATEGORY_CONFIG: Record<
       'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30',
   },
   trung_doan: {
-    label: 'Trung đoàn',
+    label: 'Trung đoàn / Lữ đoàn',
     icon: ShieldCheck,
     badgeClass:
       'bg-cyan-100 text-cyan-900 border-cyan-300 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/30',
     iconBgClass:
       'bg-cyan-100 text-cyan-800 border border-cyan-300 dark:bg-cyan-500/15 dark:text-cyan-300 dark:border-cyan-500/30',
+  },
+  tieu_doan: {
+    label: 'Tiểu đoàn',
+    icon: Shield,
+    badgeClass:
+      'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30',
+    iconBgClass:
+      'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30',
+  },
+  dai_doi: {
+    label: 'Đại đội',
+    icon: Flag,
+    badgeClass:
+      'bg-teal-100 text-teal-900 border-teal-300 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+    iconBgClass:
+      'bg-teal-100 text-teal-800 border border-teal-300 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-500/30',
+  },
+  ban_chi_huy: {
+    label: 'Ban Chỉ huy',
+    icon: Award,
+    badgeClass:
+      'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+    iconBgClass:
+      'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
   },
   nha_truong: {
     label: 'Nhà trường / Viện',
@@ -210,6 +260,14 @@ export const CATEGORY_CONFIG: Record<
       'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
     iconBgClass:
       'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
+  },
+  trung_tam: {
+    label: 'Trung tâm',
+    icon: Compass,
+    badgeClass:
+      'bg-violet-100 text-violet-900 border-violet-300 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/30',
+    iconBgClass:
+      'bg-violet-100 text-violet-800 border border-violet-300 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30',
   },
   co_quan: {
     label: 'Cơ quan',
@@ -287,9 +345,17 @@ export const getCategoryFilterLabel = (cat: UnitCategory): string => {
     case 'su_doan':
       return 'Sư đoàn';
     case 'trung_doan':
-      return 'Trung đoàn';
+      return 'Trung đoàn / Lữ đoàn';
+    case 'tieu_doan':
+      return 'Tiểu đoàn';
+    case 'dai_doi':
+      return 'Đại đội';
+    case 'ban_chi_huy':
+      return 'Ban Chỉ huy';
     case 'nha_truong':
       return 'Nhà trường / Viện';
+    case 'trung_tam':
+      return 'Trung tâm';
     case 'co_quan':
       return 'Cơ quan';
     case 'khoa':
@@ -367,33 +433,16 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
     // 1. Cấp Quân khu (Quân khu 7)
     // 2. Nhà trường / Viện (Trường Quân sự QK7)
     // 3. Sư đoàn (Sư đoàn 5)
-    // 4. Các cơ quan Cấp Trung ương / Bộ nằm ở dưới Sư đoàn 5 (BQP, BTTM, CP, TCCT)
-    const getSortWeight = (u: Unit): number => {
-      const cat = getUnitCategory(u);
-      const id = (u.unit_id || '').toUpperCase();
-
-      if (cat === 'quan_khu') return 1;
-      if (cat === 'nha_truong') return 2;
-      if (cat === 'su_doan') return 3;
-      if (cat === 'co_quan') return 4;
-      if (cat === 'khoa') return 5;
-      if (cat === 'bo_mon') return 6;
-      if (cat === 'phong') return 7;
-      if (cat === 'ban') return 8;
-      if (cat === 'to') return 9;
-      if (cat === 'lop') return 10;
-      if (cat === 'trung_doan') return 11;
-
-      // Cấp Trung ương / Bộ nằm ở dưới Sư đoàn 5
-      if (cat === 'trung_uong') {
-        if (id === 'BQP') return 15;
-        if (id === 'BTTM') return 16;
-        if (id === 'CP') return 17;
-        if (id === 'TCCT') return 18;
-        return 19;
-      }
-      return 30;
-    };
+    // 4. Ban Chỉ huy, Trung đoàn
+    // 5. Ủy Ban kiểm tra Đảng / Cơ quan Đảng (ở TRÊN Ban Giám hiệu)
+    // 6. Ban Giám hiệu (ở DƯỚI Ủy Ban kiểm tra Đảng)
+    // 7. Các Phòng chức năng: Phòng Đào tạo -> Phòng Chính trị -> Phòng Hậu cần - Kỹ thuật -> Phòng Tham mưu - Hành chính
+    // 8. Các Tiểu đoàn (nằm dưới Phòng Tham mưu - Hành chính)
+    // 9. Các Khoa giáo viên (XẾP DƯỚI các Tiểu đoàn)
+    // 10. Trung tâm (Trung Tâm GDQP & AN)
+    // 11. Lớp đào tạo / Lớp học viên (như Lớp Học viện Chính trị ở DƯỚI các Khoa & DƯỚI Tiểu đoàn 5)
+    // 12. Đại đội, Bộ môn, Ban, Tổ
+    const getSortWeight = (u: Unit): number => getMilitaryUnitSortWeight(u);
 
     const sortUnits = (list: Unit[]) => {
       list.sort((a, b) => {
@@ -445,19 +494,24 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
     };
   }, [units]);
 
-  // ── Mở rộng toàn bộ cây mặc định ban đầu để người dùng thấy đầy đủ các cấp ──
-  useEffect(() => {
-    const allParentKeys = new Set<string>();
-    const collectParents = (nodes: UnitTreeNode[]) => {
-      for (const node of nodes) {
-        if (node.children.length > 0) {
-          allParentKeys.add(node.unit.unit_id);
-          collectParents(node.children);
+  // ── Tính toán các key mở mặc định gọn gàng (chỉ mở cấp Quân khu level 0 và Nhà trường / Sư đoàn level 1) ──
+  const getDefaultExpandedKeys = (nodes: UnitTreeNode[]): Set<string> => {
+    const keys = new Set<string>();
+    const collect = (list: UnitTreeNode[]) => {
+      for (const node of list) {
+        if (node.level <= 1 && node.children.length > 0) {
+          keys.add(node.unit.unit_id);
+          collect(node.children);
         }
       }
     };
-    collectParents(rootNodes);
-    setExpandedKeys(allParentKeys);
+    collect(nodes);
+    return keys;
+  };
+
+  // ── Mở mặc định gọn gàng ban đầu: Chỉ mở đến cấp Nhà trường / Sư đoàn, các phòng ban/tiểu đoàn thu gọn ──
+  useEffect(() => {
+    setExpandedKeys(getDefaultExpandedKeys(rootNodes));
   }, [rootNodes]);
 
   // ── Tính toán Mini Stat Pills ──
@@ -475,6 +529,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
 
       if (
         cat === 'nha_truong' ||
+        cat === 'trung_tam' ||
         cat === 'phong' ||
         cat === 'ban' ||
         cat === 'co_quan' ||
@@ -483,7 +538,8 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
         cat === 'to' ||
         cat === 'lop' ||
         cat === 'phong_ban' ||
-        u.parent_id === 'TQS'
+        u.parent_id === 'TQS' ||
+        u.parent_id === 'TQS-QK7'
       ) {
         schoolAndDepts++;
       }
@@ -508,6 +564,7 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
       if (selectedCategory === 'school_and_depts') {
         const isSchoolOrDept =
           node.category === 'nha_truong' ||
+          node.category === 'trung_tam' ||
           node.category === 'phong' ||
           node.category === 'ban' ||
           node.category === 'co_quan' ||
@@ -517,8 +574,11 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
           node.category === 'lop' ||
           node.category === 'phong_ban' ||
           node.unit.unit_id === 'TQS' ||
+          node.unit.unit_id === 'TQS-QK7' ||
           node.unit.parent_id === 'TQS' ||
-          node.parent?.unit_id === 'TQS';
+          node.unit.parent_id === 'TQS-QK7' ||
+          node.parent?.unit_id === 'TQS' ||
+          node.parent?.unit_id === 'TQS-QK7';
         if (!isSchoolOrDept) return false;
       } else {
         if (node.category !== selectedCategory) return false;
@@ -607,7 +667,27 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
   };
 
   const handleCollapseAll = () => {
-    setExpandedKeys(new Set());
+    setExpandedKeys((prev) => {
+      const defaultKeys = getDefaultExpandedKeys(rootNodes);
+      let hasDeepKeys = false;
+      for (const k of prev) {
+        if (!defaultKeys.has(k)) {
+          hasDeepKeys = true;
+          break;
+        }
+      }
+      if (hasDeepKeys) {
+        return defaultKeys;
+      }
+      const rootOnly = new Set<string>();
+      for (const r of rootNodes) {
+        if (r.children.length > 0) rootOnly.add(r.unit.unit_id);
+      }
+      if (prev.size > rootOnly.size) {
+        return rootOnly;
+      }
+      return new Set();
+    });
   };
 
   // ── Làm phẳng cây thành danh sách hàng hiển thị (Flatten for Table) ──
@@ -893,7 +973,12 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               <option value="quan_khu">Cấp Quân khu</option>
               <option value="school_and_depts">Trường QS & Trực thuộc</option>
               <option value="su_doan">Sư đoàn</option>
+              <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
+              <option value="tieu_doan">Tiểu đoàn</option>
+              <option value="dai_doi">Đại đội</option>
+              <option value="ban_chi_huy">Ban Chỉ huy</option>
               <option value="nha_truong">Nhà trường / Viện</option>
+              <option value="trung_tam">Trung tâm</option>
               <option value="co_quan">Cơ quan</option>
               <option value="khoa">Khoa</option>
               <option value="bo_mon">Bộ môn</option>
@@ -901,7 +986,6 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
               <option value="ban">Ban</option>
               <option value="to">Tổ</option>
               <option value="lop">Lớp</option>
-              <option value="trung_doan">Trung đoàn / Lữ đoàn</option>
             </select>
           </div>
         </div>
@@ -1011,10 +1095,10 @@ export const UnitTreeTable: React.FC<UnitTreeTableProps> = ({
                                       {/* Đầu nối nhánh L cho cấp hiện tại */}
                                       {isLastLevel && (
                                         <>
-                                          <div className="absolute -top-3.5 bottom-1/2 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
+                                          <div className="absolute -top-3.5 h-[calc(50%+14px)] left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
                                           <div className="absolute top-1/2 left-3 w-3.5 border-b border-slate-300 dark:border-slate-700/70" />
                                           {!isLastChild && (
-                                            <div className="absolute top-1/2 -bottom-3.5 left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
+                                            <div className="absolute top-1/2 h-[calc(50%+14px)] left-3 w-px bg-slate-300 dark:bg-slate-700/70" />
                                           )}
                                         </>
                                       )}

@@ -444,15 +444,50 @@ async function extractTextItems(buffer) {
     return { pages, fullText };
 }
 
-// [PATCH 3 — 4.5] renderPdfToImages đọc scale mặc định từ PARSER_THRESHOLDS
+// [v2026.11] Đường dẫn WASM (jbig2.wasm, openjpeg.wasm) & tessdata cục bộ (Air-Gapped)
+const PDFJS_WASM_URL = (() => {
+    try {
+        const pdfjsRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
+        const wasmDir = path.join(pdfjsRoot, 'wasm');
+        if (fs.existsSync(wasmDir)) {
+            return wasmDir.replace(/\\/g, '/') + '/';
+        }
+    } catch (_) {}
+    return undefined;
+})();
+
+const TESSDATA_DIR = (() => {
+    const candidates = [__dirname, path.join(__dirname, '..', 'data')];
+    for (const dir of candidates) {
+        if (
+            fs.existsSync(path.join(dir, 'vie.traineddata')) &&
+            fs.existsSync(path.join(dir, 'eng.traineddata'))
+        ) {
+            return dir;
+        }
+    }
+    return null;
+})();
+
+// [PATCH 3 — 4.5] renderPdfToImages đọc scale mặc định từ PARSER_THRESHOLDS + truyền wasmUrl giải mã JBIG2
 async function renderPdfToImages(buffer, scale = PARSER_THRESHOLDS.renderScale, maxPages = 2) {
     try {
         const { pdf: pdfToImg } = await import('pdf-to-img');
         const images = [];
-        const document = await pdfToImg(buffer, { scale });
-        for await (const page of document) {
-            images.push(page);
-            if (maxPages && images.length >= maxPages) break;
+        const renderOpts = { scale };
+        if (PDFJS_WASM_URL) {
+            renderOpts.docInitParams = { wasmUrl: PDFJS_WASM_URL };
+        }
+        const document = await pdfToImg(buffer, renderOpts);
+        try {
+            for await (const page of document) {
+                images.push(page);
+                if (maxPages && images.length >= maxPages) break;
+            }
+        } finally {
+            if (typeof document.destroy === 'function') {
+                await document.destroy().catch(() => {});
+            }
         }
         return images;
     } catch (err) {
@@ -463,7 +498,13 @@ async function renderPdfToImages(buffer, scale = PARSER_THRESHOLDS.renderScale, 
 
 async function ocrImage(imageBuffer) {
     try {
-        const { data: { text } } = await Tesseract.recognize(imageBuffer, 'vie+eng', { logger: () => {} });
+        const tessOpts = { logger: () => {} };
+        if (TESSDATA_DIR) {
+            tessOpts.langPath = TESSDATA_DIR;
+            tessOpts.gzip = false;
+            tessOpts.cacheMethod = 'none';
+        }
+        const { data: { text } } = await Tesseract.recognize(imageBuffer, 'vie+eng', tessOpts);
         return text || '';
     } catch (err) {
         console.error('[ocrImage]', err.message);
@@ -535,10 +576,16 @@ async function ocrNumberFromHeader(buffer, pages) {
 
         if (darkRatio < PARSER_THRESHOLDS.headerOcrDarkRatioMin) return null;
 
-        const { data } = await Tesseract.recognize(croppedBuffer, 'eng', {
+        const headerTessOpts = {
             tessedit_char_whitelist: '0123456789',
             logger: () => {},
-        });
+        };
+        if (TESSDATA_DIR) {
+            headerTessOpts.langPath = TESSDATA_DIR;
+            headerTessOpts.gzip = false;
+            headerTessOpts.cacheMethod = 'none';
+        }
+        const { data } = await Tesseract.recognize(croppedBuffer, 'eng', headerTessOpts);
 
         const cleaned = data.text.replace(/\D/g, '').trim();
         const confidence = data.confidence || 0;
@@ -816,13 +863,23 @@ function extractMetadata(rawText, catalog = null) {
 
     if (!result.title) {
         const normLines = lines.map(l => removeDiacritics(l).toUpperCase());
-        const docTypeIdx = normLines.findIndex(l => 
-            /^(NGHI DINH|NGHI QUYET|QUYET DINH|THONG TU|KE HOACH|THONG BAO|BAO CAO)\b/.test(l)
+        const docTypeIdx = normLines.findIndex(l =>
+            /^(NGHI DINH|NGHI QUYET|QUYET DINH|THONG TU|KE HOACH|THONG BAO|BAO CAO|QUY CHE|QUY DINH|CHI THI|CONG VAN|HUONG DAN|TO TRINH|BIEN BAN|CHUONG TRINH|DIEU LE|PHUONG AN)\b/.test(l)
         );
         if (docTypeIdx >= 0 && docTypeIdx + 1 < lines.length) {
-            const candidateTitle = lines[docTypeIdx + 1];
-            if (candidateTitle && !COMPILED.titleStop.test(candidateTitle) && candidateTitle.length > 10) {
-                result.title = candidateTitle;
+            const titleParts = [];
+            for (let j = docTypeIdx + 1; j < Math.min(docTypeIdx + 4, lines.length); j++) {
+                const candidate = lines[j];
+                if (!candidate || candidate.length < 5) break;
+                if (COMPILED.titleStop.test(candidate)) break;
+                if (COMPILED.romanHeading.test(candidate)) break;
+                if (/^(CAN CU|KINH GUI|THUC HIEN|NOI DUNG|NOI NHAN|CHUONG\s|DIEU\s)/i.test(removeDiacritics(candidate))) break;
+                if (titleParts.length > 0 && /^[A-Z0-9\s\.\-]+$/.test(removeDiacritics(candidate)) && candidate.length > 8) break;
+                titleParts.push(candidate);
+            }
+            const joinedTitle = titleParts.join(' ').trim();
+            if (joinedTitle.length > 10) {
+                result.title = joinedTitle;
             }
         }
     }
@@ -1176,7 +1233,7 @@ async function parseDocumentPdf(buffer, deps = {}, options = {}) {
             const ocrResp = await fetch(`${OCR_SERVICE_URL}/api/ocr/extract`, {
                 method: 'POST',
                 body: formData,
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.timeout(30000),
             });
             if (ocrResp.ok) {
                 const data = await ocrResp.json();

@@ -27,14 +27,33 @@ if sys.platform == "win32":
             reconfig_err(encoding="utf-8", errors="replace")
     except Exception:
         pass
+
+# ═══════════════════════════════════════════════════════════════
+# Air-Gapped Hardening: Ép offline mode và triệt tiêu telemetry
+# ═══════════════════════════════════════════════════════════════
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+os.environ.setdefault("DO_NOT_TRACK", "1")
+os.environ.setdefault("DISABLE_TELEMETRY", "1")
+os.environ.setdefault("SCARF_NO_ANALYTICS", "1")
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+os.environ.setdefault("DISABLE_PADDLE_UPDATE_CHECK", "1")
+os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
+os.environ.setdefault("FLAGS_use_mkldnn", "0")
+
 import json
 import re
 import logging
+import concurrent.futures
 from typing import List, Optional, Any, Tuple
 from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pymupdf
@@ -61,6 +80,9 @@ OCR_ENGINE = os.environ.get("OCR_ENGINE", "auto").lower()
 LOCAL_MODEL_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "model_weight", "MonkeyOCRv2-B-Parsing"
 )
+LOCAL_PADDLE_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "model_weight", "paddleocr"
+)
 if os.path.isdir(LOCAL_MODEL_DIR) and not os.environ.get("MONKEY_MODEL_ID"):
     MONKEY_MODEL_ID = LOCAL_MODEL_DIR
 else:
@@ -70,7 +92,21 @@ else:
 MONKEY_DEVICE = os.environ.get("MONKEY_DEVICE", "auto")  # "auto" | "cpu" | "cuda"
 DEFAULT_DPI    = int(os.environ.get("OCR_DEFAULT_DPI", "150"))
 MAX_DPI        = int(os.environ.get("OCR_MAX_DPI", "300"))
-PORT           = int(os.environ.get("PORT", "8002"))
+# Ưu tiên OCR_PORT / PORT_OCR; tự bảo vệ khỏi rò rỉ PORT=8000 của Backend từ root .env
+_explicit_ocr_port = os.environ.get("OCR_PORT") or os.environ.get("PORT_OCR")
+if _explicit_ocr_port:
+    PORT = int(_explicit_ocr_port)
+else:
+    _env_port = os.environ.get("PORT", "8002")
+    if _env_port == "8000":
+        logger.warning(
+            "[CONFIG] Phát hiện PORT=8000 (cổng Backend) bị kế thừa từ biến môi trường cha. "
+            "Tự động ép OCR Microservice về cổng chuẩn 8002 để tránh xung đột!"
+        )
+        PORT = 8002
+    else:
+        PORT = int(_env_port)
+HOST           = os.environ.get("HOST", "0.0.0.0")
 
 
 
@@ -100,6 +136,9 @@ def _load_monkey():
         device = MONKEY_DEVICE
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        if os.environ.get("HF_HUB_OFFLINE") == "1":
+            logger.info("[MonkeyOCRv2] Offline mode is enabled (HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1)")
 
         logger.info(
             f"[MonkeyOCRv2] Nạp model '{MONKEY_MODEL_ID}' lên {device}..."
@@ -143,21 +182,61 @@ def _load_monkey():
 
 
 # ─── PaddleOCR loader (fallback) ─────────────────────────────
-def _load_paddle():
-    """Lazy-load PaddleOCR làm fallback hoặc engine chính."""
+def _load_paddle(set_active: bool = True):
+    """Lazy-load PaddleOCR làm fallback hoặc engine chính (ưu tiên weights nội bộ)."""
     global _paddle_engine, _active_engine
     if _paddle_engine is not None:
+        if set_active and not _active_engine:
+            _active_engine = "paddleocr"
         return True
     try:
-        logger.info("[PaddleOCR] Khởi tạo PaddleOCR(use_angle_cls=True, lang='vi')...")
         from paddleocr import PaddleOCR  # pyright: ignore[reportMissingImports] # type: ignore
-        _paddle_engine = PaddleOCR(use_angle_cls=True, lang="vi", show_log=False)
+        det_dir = os.path.join(LOCAL_PADDLE_DIR, "det", "en_PP-OCRv3_det_infer")
+        rec_dir = os.path.join(LOCAL_PADDLE_DIR, "rec", "latin_PP-OCRv3_rec_infer")
+        cls_dir = os.path.join(LOCAL_PADDLE_DIR, "cls", "ch_ppocr_mobile_v2.0_cls_infer")
+
+        if os.path.isdir(det_dir) and os.path.isdir(rec_dir) and os.path.isdir(cls_dir):
+            logger.info(f"[PaddleOCR] Sử dụng trọng số nội bộ: {LOCAL_PADDLE_DIR}")
+            _paddle_engine = PaddleOCR(
+                use_angle_cls=True,
+                lang="vi",
+                det_model_dir=det_dir,
+                rec_model_dir=rec_dir,
+                cls_model_dir=cls_dir,
+                show_log=False,
+            )
+        else:
+            logger.info("[PaddleOCR] Khởi tạo PaddleOCR(use_angle_cls=True, lang='vi')...")
+            _paddle_engine = PaddleOCR(use_angle_cls=True, lang="vi", show_log=False)
         logger.info("[PaddleOCR] ✅ Sẵn sàng!")
-        _active_engine = "paddleocr"
+        if set_active:
+            _active_engine = "paddleocr"
         return True
     except Exception as e:
         logger.error(f"[PaddleOCR] ❌ Không khởi tạo được: {e}")
         return False
+
+
+def _should_use_paddle_first() -> bool:
+    """
+    Chế độ CPU Adaptive SLA:
+    Khi OCR_ENGINE='auto' trên máy CPU (không GPU CUDA) và không ép MONKEY_FORCE_CPU_OCR=1,
+    bỏ qua việc nạp MonkeyOCRv2 (~3.6GB RAM float32) vào CPU vì thực thi luôn chuyển sang
+    PaddleOCR — tránh OOM crash trên máy 8GB RAM và giúp khởi động < 10s.
+    """
+    if OCR_ENGINE != "auto":
+        return False
+    if os.environ.get("MONKEY_FORCE_CPU_OCR") == "1":
+        return False
+    if MONKEY_DEVICE == "cpu":
+        return True
+    if MONKEY_DEVICE == "auto":
+        try:
+            import torch  # pyright: ignore[reportMissingImports] # type: ignore
+            return not torch.cuda.is_available()
+        except Exception:
+            return True
+    return False
 
 
 def _ensure_engine():
@@ -165,6 +244,14 @@ def _ensure_engine():
     Đảm bảo ít nhất 1 engine hoạt động.
     Trả về "monkey" | "paddleocr" | None
     """
+    if _should_use_paddle_first():
+        logger.info(
+            "[OCR] Chế độ CPU Adaptive SLA (MONKEY_DEVICE=cpu / không CUDA): "
+            "Sử dụng trực tiếp PaddleOCR nội bộ để tối ưu RAM và tốc độ < 5s/trang "
+            "(đặt MONKEY_FORCE_CPU_OCR=1 hoặc OCR_ENGINE=monkey để ép nạp MonkeyOCRv2 trên CPU)."
+        )
+        if _load_paddle():
+            return "paddleocr"
 
     if OCR_ENGINE in ("monkey", "auto"):
         if _load_monkey():
@@ -186,6 +273,14 @@ async def lifespan(app: FastAPI):
         engine = _ensure_engine()
         if engine:
             logger.info(f"[startup] Engine hoạt động: {engine}")
+            if (
+                engine == "monkey"
+                and _monkey_device == "cpu"
+                and OCR_ENGINE == "auto"
+                and os.environ.get("MONKEY_FORCE_CPU_OCR") != "1"
+            ):
+                logger.info("[startup] Chế độ CPU Adaptive SLA: Pre-warm sẵn PaddleOCR cục bộ...")
+                _load_paddle(set_active=False)
         else:
             logger.warning("[startup] Chưa có engine — sẽ thử lại khi nhận request đầu tiên.")
     except Exception as e:
@@ -215,8 +310,20 @@ allowed_origins_ocr = [
 ]
 server_ip = os.environ.get("SERVER_IP")
 if server_ip:
-    allowed_origins_ocr.append(f"http://{server_ip}:8000")
-    allowed_origins_ocr.append(f"http://{server_ip}:5173")
+    allowed_origins_ocr.extend([
+        f"http://{server_ip}:8000",
+        f"http://{server_ip}:5173",
+        f"https://{server_ip}:8000",
+        f"https://{server_ip}",
+    ])
+server_domain = os.environ.get("SERVER_DOMAIN")
+if server_domain:
+    allowed_origins_ocr.extend([
+        f"https://{server_domain}",
+        f"https://{server_domain}:8000",
+        f"http://{server_domain}",
+        f"http://{server_domain}:8000",
+    ])
 
 env_cors = os.environ.get("CORS_ALLOWED_ORIGINS", "")
 if env_cors:
@@ -280,32 +387,62 @@ def _ocr_with_monkey(pil_image: Image.Image) -> Tuple[str, float]:
     if _monkey_processor is None or _monkey_model is None:
         raise RuntimeError("MonkeyOCRv2 model hoặc processor chưa được khởi tạo!")
 
+    if _monkey_device == "cpu" and os.environ.get("MONKEY_FORCE_CPU_OCR") != "1":
+        raise RuntimeError(
+            "Môi trường hiện tại vận hành trên CPU (không có CUDA). "
+            "Tự động kích hoạt PaddleOCR fallback để đảm bảo SLA tốc độ < 10s theo quy chuẩn QK7."
+        )
+
     import torch  # pyright: ignore[reportMissingImports] # type: ignore
 
-    prompt = (
-        "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
-        "<|im_start|>user\n<image>\n"
-        "Please recognize the text in this document image. "
-        "Preserve the reading order and layout structure. "
-        "Output structured text with correct Vietnamese diacritics. "
-        "For two-column layout, output left column first then right column.\n"
-        "<|im_end|>\n<|im_start|>assistant\n"
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": pil_image},
+                {
+                    "type": "text",
+                    "text": (
+                        "Please recognize the text in this document image. "
+                        "Preserve the reading order and layout structure. "
+                        "Output structured text with correct Vietnamese diacritics. "
+                        "For two-column layout, output left column first then right column."
+                    ),
+                },
+            ],
+        }
+    ]
+    prompt = _monkey_processor.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
     )
 
     inputs = _monkey_processor(
-        text=prompt,
-        images=pil_image,
+        text=[prompt],
+        images=[pil_image],
+        padding=True,
         return_tensors="pt",
     ).to(_monkey_device)
 
-    with torch.no_grad():
-        output_ids = _monkey_model.generate(
-            **inputs,
-            max_new_tokens=2048,
-            do_sample=False,
-            temperature=1.0,
-            repetition_penalty=1.05,
-        )
+    def _do_generate():
+        with torch.no_grad():
+            return _monkey_model.generate(
+                **inputs,
+                max_new_tokens=int(os.environ.get("MONKEY_MAX_NEW_TOKENS", "512")),
+                do_sample=False,
+                temperature=1.0,
+                repetition_penalty=1.05,
+            )
+
+    timeout = float(os.environ.get("MONKEY_TIMEOUT", "4.0" if _monkey_device == "cpu" else "60.0"))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_do_generate)
+        try:
+            output_ids = future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise TimeoutError(
+                f"MonkeyOCRv2 vượt quá ngưỡng thời gian {timeout}s trên {_monkey_device}. "
+                "Tự động kích hoạt PaddleOCR fallback để đảm bảo SLA < 10s."
+            )
 
     # Chỉ lấy phần sinh ra (bỏ input tokens)
     input_len  = inputs["input_ids"].shape[1]
@@ -499,87 +636,113 @@ async def extract_ocr(
         if not content:
             raise HTTPException(status_code=400, detail="Tệp tải lên rỗng")
 
-        # ── 2. Mở PDF bằng PyMuPDF ───────────────────────────
-        doc         = pymupdf.open(stream=content, filetype="pdf")
-        total_pages = len(doc)
-
-        # ── 3. Parse danh sách trang ─────────────────────────
-        pages_to_process = _parse_pages_param(pages, total_pages)
-        logger.info(
-            f"[OCR] Engine={engine}, {len(pages_to_process)} trang cần xử lý: {pages_to_process}"
-        )
-
-        page_results    = []
-        all_text_blocks = []
-
-        # ── 4. OCR từng trang ────────────────────────────────
-        for p_num in pages_to_process:
-            p_idx = p_num - 1
-            t_page = time.time()
-
+        # ── 2-4. Thực thi render + OCR trong threadpool để không block Event Loop FastAPI ──
+        def _process_pdf_sync() -> Tuple[int, List[int], List[PageOcrResult], List[str], str]:
+            doc = pymupdf.open(stream=content, filetype="pdf")
             try:
-                pil_img = _render_page_to_image(doc, p_idx, dpi)
-            except Exception as render_err:
-                logger.error(f"[OCR] Render trang {p_num} lỗi: {render_err}")
-                continue
+                total_pages_local = len(doc)
+                pages_to_process_local = _parse_pages_param(pages, total_pages_local)
+                logger.info(
+                    f"[OCR] Engine={engine}, {len(pages_to_process_local)} trang cần xử lý: {pages_to_process_local}"
+                )
 
-            # ── Gọi engine tương ứng ──
-            page_text   = ""
-            avg_conf    = 0.0
-            engine_used = engine
+                page_results_local: List[PageOcrResult] = []
+                all_text_blocks_local: List[str] = []
+                effective_engine_local = engine
 
-            if engine == "monkey":
-                try:
-                    raw_md, avg_conf = _ocr_with_monkey(pil_img)
-                    page_text = _markdown_to_plain(raw_md)
-                except Exception as mono_err:
-                    logger.warning(
-                        f"[MonkeyOCRv2] Trang {p_num} lỗi: {mono_err}. "
-                        "Thử PaddleOCR fallback..."
-                    )
-                    # Fallback ngay tại chỗ về PaddleOCR
-                    if _load_paddle():
+                for p_num in pages_to_process_local:
+                    p_idx = p_num - 1
+                    t_page = time.time()
+
+                    try:
+                        pil_img = _render_page_to_image(doc, p_idx, dpi)
+                    except Exception as render_err:
+                        logger.error(f"[OCR] Render trang {p_num} lỗi: {render_err}")
+                        continue
+
+                    page_text = ""
+                    avg_conf = 0.0
+                    engine_used = engine
+
+                    if engine == "monkey":
+                        # Nếu chạy CPU và không ép MONKEY_FORCE_CPU_OCR=1 -> chuyển trực tiếp sang PaddleOCR đã pre-warm
+                        if _monkey_device == "cpu" and os.environ.get("MONKEY_FORCE_CPU_OCR") != "1":
+                            if _load_paddle(set_active=False):
+                                try:
+                                    page_text, avg_conf = _ocr_with_paddle(pil_img)
+                                    engine_used = "paddleocr_fallback"
+                                except Exception as pad_err:
+                                    logger.error(f"[PaddleOCR fallback] Trang {p_num} lỗi: {pad_err}")
+                            else:
+                                logger.error(f"[OCR] Trang {p_num}: không khởi tạo được PaddleOCR fallback")
+                        else:
+                            try:
+                                raw_md, avg_conf = _ocr_with_monkey(pil_img)
+                                page_text = _markdown_to_plain(raw_md)
+                            except Exception as mono_err:
+                                logger.warning(
+                                    f"[MonkeyOCRv2] Trang {p_num} lỗi: {mono_err}. "
+                                    "Thử PaddleOCR fallback..."
+                                )
+                                if _load_paddle(set_active=False):
+                                    try:
+                                        page_text, avg_conf = _ocr_with_paddle(pil_img)
+                                        engine_used = "paddleocr_fallback"
+                                    except Exception as pad_err:
+                                        logger.error(f"[PaddleOCR fallback] Trang {p_num} lỗi: {pad_err}")
+                                else:
+                                    logger.error(f"[OCR] Trang {p_num}: cả 2 engine đều thất bại")
+
+                    elif engine == "paddleocr":
                         try:
                             page_text, avg_conf = _ocr_with_paddle(pil_img)
-                            engine_used = "paddleocr_fallback"
+                            engine_used = "paddleocr"
                         except Exception as pad_err:
-                            logger.error(f"[PaddleOCR fallback] Trang {p_num} lỗi: {pad_err}")
-                    else:
-                        logger.error(f"[OCR] Trang {p_num}: cả 2 engine đều thất bại")
+                            logger.error(f"[PaddleOCR] Trang {p_num} lỗi: {pad_err}")
 
-            elif engine == "paddleocr":
-                try:
-                    page_text, avg_conf = _ocr_with_paddle(pil_img)
-                    engine_used = "paddleocr"
-                except Exception as pad_err:
-                    logger.error(f"[PaddleOCR] Trang {p_num} lỗi: {pad_err}")
+                    effective_engine_local = engine_used
+                    elapsed_page = round(time.time() - t_page, 2)
+                    lines_list = [l for l in page_text.splitlines() if l.strip()]
 
-            elapsed_page = round(time.time() - t_page, 2)
-            lines_list   = [l for l in page_text.splitlines() if l.strip()]
+                    logger.info(
+                        f"[OCR] Trang {p_num}: {len(lines_list)} dòng, "
+                        f"conf={avg_conf:.3f}, engine={engine_used}, {elapsed_page}s"
+                    )
 
-            logger.info(
-                f"[OCR] Trang {p_num}: {len(lines_list)} dòng, "
-                f"conf={avg_conf:.3f}, engine={engine_used}, {elapsed_page}s"
-            )
+                    page_results_local.append(PageOcrResult(
+                        page=p_num,
+                        text=page_text,
+                        lines=lines_list,
+                        line_count=len(lines_list),
+                        confidence_avg=round(avg_conf, 3),
+                        engine_used=engine_used,
+                    ))
+                    all_text_blocks_local.append(page_text)
 
-            page_results.append(PageOcrResult(
-                page=p_num,
-                text=page_text,
-                lines=lines_list,
-                line_count=len(lines_list),
-                confidence_avg=round(avg_conf, 3),
-                engine_used=engine_used,
-            ))
-            all_text_blocks.append(page_text)
+                return (
+                    total_pages_local,
+                    pages_to_process_local,
+                    page_results_local,
+                    all_text_blocks_local,
+                    effective_engine_local,
+                )
+            finally:
+                doc.close()
 
-        doc.close()
+        (
+            total_pages,
+            pages_to_process,
+            page_results,
+            all_text_blocks,
+            effective_engine,
+        ) = await run_in_threadpool(_process_pdf_sync)
 
         elapsed      = round(time.time() - t0, 2)
         combined     = "\n\n".join(b for b in all_text_blocks if b)
 
         logger.info(
             f"[OCR] ✅ Hoàn tất {len(pages_to_process)} trang "
-            f"({len(combined)} ký tự) trong {elapsed}s"
+            f"({len(combined)} ký tự, engine={effective_engine}) trong {elapsed}s"
         )
 
         return OcrExtractResponse(
@@ -589,7 +752,7 @@ async def extract_ocr(
             results=page_results,
             combined_text=combined,
             elapsed_seconds=elapsed,
-            engine_used=engine,
+            engine_used=effective_engine,
             error=None,
         )
 
@@ -636,12 +799,50 @@ def list_engines():
 
 
 # ═══════════════════════════════════════════════════════════════
+# GET /api/ocr/weights-status — Trạng thái trọng số Air-Gapped
+# ═══════════════════════════════════════════════════════════════
+@app.get("/api/ocr/weights-status")
+def weights_status():
+    """Kiểm tra sự tồn tại và tính sẵn sàng của weights trong môi trường Air-Gapped."""
+    det_dir = os.path.join(LOCAL_PADDLE_DIR, "det", "en_PP-OCRv3_det_infer")
+    rec_dir = os.path.join(LOCAL_PADDLE_DIR, "rec", "latin_PP-OCRv3_rec_infer")
+    cls_dir = os.path.join(LOCAL_PADDLE_DIR, "cls", "ch_ppocr_mobile_v2.0_cls_infer")
+    paddle_complete = os.path.isdir(det_dir) and os.path.isdir(rec_dir) and os.path.isdir(cls_dir)
+
+    monkey_safetensors = os.path.join(LOCAL_MODEL_DIR, "model.safetensors")
+    monkey_complete = os.path.isdir(LOCAL_MODEL_DIR) and os.path.isfile(monkey_safetensors)
+
+    return {
+        "status": "ok",
+        "air_gapped_ready": monkey_complete and paddle_complete,
+        "engine_active": _active_engine or "not_loaded",
+        "monkey": {
+            "model_id": MONKEY_MODEL_ID,
+            "is_local_path": os.path.isdir(MONKEY_MODEL_ID),
+            "local_dir": LOCAL_MODEL_DIR,
+            "exists": monkey_complete,
+            "safetensors_present": os.path.isfile(monkey_safetensors),
+            "loaded": _monkey_model is not None,
+            "device": _monkey_device or "n/a",
+        },
+        "paddleocr": {
+            "local_dir": LOCAL_PADDLE_DIR,
+            "exists": paddle_complete,
+            "det_exists": os.path.isdir(det_dir),
+            "rec_exists": os.path.isdir(rec_dir),
+            "cls_exists": os.path.isdir(cls_dir),
+            "loaded": _paddle_engine is not None,
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
 # Entry point
 # ═══════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
+        host=HOST,
         port=PORT,
         reload=False,
         workers=1,

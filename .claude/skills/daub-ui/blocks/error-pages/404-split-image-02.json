@@ -1,0 +1,91 @@
+{
+  "root": "not-found-split-02",
+  "elements": {
+    "not-found-split-02": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 0
+      },
+      "children": [
+        "text-panel",
+        "image-panel"
+      ]
+    },
+    "text-panel": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "justify": "end",
+        "padding": [
+          8,
+          6
+        ],
+        "gap": 6
+      },
+      "children": [
+        "heading-group",
+        "search-row"
+      ]
+    },
+    "heading-group": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "heading",
+        "description"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h1",
+        "content": "Uh oh, we can't find that page..."
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Sorry, the page you are looking for doesn't exist or has been moved. Try searching our site.",
+        "variant": "secondary"
+      }
+    },
+    "search-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3
+      },
+      "children": [
+        "search-input",
+        "search-btn"
+      ]
+    },
+    "search-input": {
+      "type": "Search",
+      "props": {
+        "placeholder": "Search our site"
+      }
+    },
+    "search-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Search",
+        "variant": "primary"
+      }
+    },
+    "image-panel": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/404-split-image-02-image-panel/720/960",
+        "alt": "404 abstract gradient",
+        "objectFit": "cover",
+        "fullHeight": true
+      }
+    }
+  }
+}

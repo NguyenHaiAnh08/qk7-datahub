@@ -1,5 +1,6 @@
 // src/admin-routes.js
-const bcrypt = require('bcryptjs');
+const bcrypt = require('./bcrypt-lib');
+const { createApprovalAuthority, delegatedReady } = require('./approval-authority');
 const { AUTO_PERMISSIONS, getAutoRequiredPermission } = require('./route-permissions');
 let invalidateCatalogCache;
 try {
@@ -41,7 +42,7 @@ module.exports = (app, deps) => {
     
 
     const approvalModule = require('./approval-workflow')({
-        sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission,
+        sql, getPool, writeAccessLog, getClientIp, getAutoRequiredPermission, getUserPermissions,
     });
     const { approvalInterceptor, loadProtectedPermissions, isProtectedAdmin } = approvalModule;
 
@@ -106,13 +107,16 @@ module.exports = (app, deps) => {
           WHERE p.requester_id = @uid
         `;
         if (status === 'PENDING_REJECTED') {
-          propQuery += ` AND p.status IN ('PENDING', 'REJECTED')`;
+          propQuery += ` AND p.status IN ('PENDING_OWNER', 'PENDING', 'REJECTED')`;
         } else if (status === 'APPROVED') {
           propQuery += ` AND p.status IN ('APPROVED', 'EXECUTED')`;
+        } else if (status === 'PENDING') {
+          propQuery += ` AND p.status IN ('PENDING_OWNER', 'PENDING')`;
         } else if (status !== 'ALL') {
           propQuery += ` AND p.status = @pstatus`;
           propReq.input('pstatus', sql.VarChar(20), status);
         }
+        propQuery += ` AND p.status <> 'CANCELLED'`; // đề xuất đã rút lại không hiện trong danh sách
         propQuery += ` ORDER BY p.created_at DESC`;
         const propResult = await propReq.query(propQuery);
 
@@ -126,12 +130,13 @@ module.exports = (app, deps) => {
             http_method: 'PUT',
             http_path: `/api/documents/${p.file_id}`,
             target_summary: `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
-            status: p.status,
+            status: p.status === 'PENDING_OWNER' ? 'PENDING' : p.status,
+            stage: p.status === 'PENDING_OWNER' ? 'WAITING_OWNER' : undefined,
             reviewed_by: p.reviewed_by,
             reviewed_at: p.reviewed_at,
             review_note: p.review_note,
             created_at: p.created_at,
-            request_reason: p.note || 'Đề xuất chuẩn hóa thông tin văn bản',
+            request_reason: (p.status === 'PENDING_OWNER' ? '[Đang chờ người đăng văn bản xem xét] ' : '') + (p.note || 'Đề xuất chuẩn hóa thông tin văn bản'),
             document_code: docCodeDisplay,
             doc_title: p.title,
           };
@@ -191,7 +196,11 @@ module.exports = (app, deps) => {
 
         try {
             const codes = await getUserPermissions(req.user.user_id);
-            if (codes.includes(requiredPerm)) return next();
+            if (codes.includes(requiredPerm)) {
+                // Tầng 2: quyền XEM bị khóa bảo vệ → cần được duyệt cho đối tượng này
+                if (!(await approvalModule.enforceViewGate(req, res, [requiredPerm]))) return;
+                return next();
+            }
             return res.status(403).json({
                 error: `Bạn không có quyền thực hiện thao tác này (thiếu: ${requiredPerm})`,
                 code: 'PERMISSION_DENIED',
@@ -246,7 +255,7 @@ module.exports = (app, deps) => {
         try {
             const pool = await getPool();
             const r = await pool.request()
-                .input('uid', sql.VarChar(50), unitId)
+                .input('uid', sql.NVarChar(50), unitId)
                 .query(`
                     WITH unit_tree AS (
                         SELECT unit_id FROM UNIT WHERE unit_id = @uid
@@ -271,28 +280,30 @@ module.exports = (app, deps) => {
     // ═══════════════════════════════════════════════════════════════
     const APPROVAL_MODE = (process.env.UNIT_APPROVAL_MODE || 'subtree').toLowerCase();
 
+    // Thẩm quyền duyệt theo BẢNG QUYỀN (APPROVAL_VALIDATE): Admin/Chỉ huy duyệt CHÍNH THỨC; người khác được cấp quyền
+    // chỉ THẨM ĐỊNH (chờ Chỉ huy cấp trên xác nhận). Trả về 'FINAL' | 'DELEGATE' | false.
+    const approvalAuthority = createApprovalAuthority({ getUserPermissions, resolveUserRoles });
     const canUserApproveRequest = async (req, requestUnitId) => {
-        // 1. Protected Admin duyệt mọi yêu cầu
-        if (req.user.user_id === 'USR-001') return true;
+        const auth = await approvalAuthority.getAuthority(req.user, 'APPROVAL_VALIDATE');
+        if (auth.level === 'NONE') return false;
+        // Chế độ Strict: chỉ đúng đơn vị mình; mặc định Subtree: đơn vị mình + toàn bộ cấp dưới
+        if (!approvalAuthority.covers(auth, [requestUnitId], { strict: APPROVAL_MODE === 'strict' })) return false;
+        return auth.level;
+    };
 
-        // 2. Phải có vai trò Chỉ huy (ROL-02) hoặc Admin (ROL-01)
-        const roles = await resolveUserRoles(req.user);
-        if (!roles.includes('ROL-02') && !roles.includes('ROL-01')) return false;
-
-        // 3. Phải có đơn vị công tác
-        const userUnitId = await resolveUserUnitId(req.user);
-        if (!userUnitId) return false;
-
-        // 4. So khớp đơn vị
-        if (APPROVAL_MODE === 'strict') {
-            // Chế độ Strict: Chỉ duyệt đúng đơn vị mình
-            return userUnitId === requestUnitId;
+    // Người được ủy quyền (không phải Chỉ huy/Admin) duyệt/từ chối = chỉ THẨM ĐỊNH, chưa chính thức
+    const delegateValidate = async (req, res, { table, id, requesterId, decision, note }) => {
+        if (requesterId && requesterId === req.user.user_id) {
+            return res.status(403).json({ error: 'Bạn không thể tự thẩm định yêu cầu của chính mình', code: 'SELF_VALIDATE' });
         }
-
-        // Chế độ Subtree (mặc định): duyệt được cho đơn vị mình + toàn bộ đơn vị con
-        // VD: CH Phòng Chính trị (U-CT) duyệt được cho Ban tuyên huấn, Cơ quan hành chính
-        const subtree = await getSubtreeUnits(userUnitId);
-        return subtree.includes(requestUnitId);
+        const n = await approvalAuthority.recordValidation({ table, id, userId: req.user.user_id, decision, note });
+        if (n === 0) return res.status(400).json({ error: 'Yêu cầu không còn ở trạng thái chờ duyệt' });
+        await log(req, decision === 'APPROVE' ? 'APPROVAL_VALIDATED' : 'APPROVAL_VALIDATE_REJECT',
+            `Thẩm định ${id} (${decision === 'APPROVE' ? 'đề nghị duyệt' : 'đề nghị từ chối'})${note ? ' — ' + note : ''}`);
+        return res.json({
+            success: true, validated: true, final: false, request_id: id,
+            message: 'Đã thẩm định — yêu cầu chờ Chỉ huy cấp trên xác nhận mới chính thức thành công',
+        });
     };
 
 
@@ -450,7 +461,7 @@ module.exports = (app, deps) => {
                 .input('full_name', sql.NVarChar(100), full_name)
                 .input('rank', sql.NVarChar(50), rank_name || null)
                 .input('position', sql.NVarChar(100), position || null)
-                .input('unit_id', sql.VarChar(50), unit_id || null)
+                .input('unit_id', sql.NVarChar(50), unit_id || null)
                 .input('status', sql.VarChar(20), status || 'active')
                 .input('clearance_level_id', sql.Int, targetClearance)
                 .input('password_hash', sql.VarChar(255), passwordHash)
@@ -550,7 +561,7 @@ module.exports = (app, deps) => {
             .input('full_name', sql.NVarChar(100), full_name)
             .input('rank', sql.NVarChar(50), rank_name || null)
             .input('position', sql.NVarChar(100), position || null)
-            .input('unit_id', sql.VarChar(50), unit_id || null)
+            .input('unit_id', sql.NVarChar(50), unit_id || null)
             .input('status', sql.VarChar(20), status || targetUser.status || 'active')
             .input('clearance_level_id', sql.Int,
                 canChangeClearance && clearance_level_id !== undefined
@@ -806,6 +817,93 @@ module.exports = (app, deps) => {
         } catch (err) {
             console.error('[assign-role]', err);
             res.status(500).json({ error: err.message });
+        }
+    });
+
+    // PUT — đặt tập vai trò của user trong 1 transaction. Quyền của user = HỢP quyền của mọi vai trò.
+    // Vai trò đang giữ được GIỮ NGUYÊN (kể cả hạn dùng riêng); chỉ gỡ vai trò không còn trong danh sách
+    // và thêm vai trò mới (expires_at nếu có chỉ áp cho vai trò mới thêm).
+    app.put('/api/admin/users/:id/roles', async (req, res) => {
+        const userId = req.params.id;
+        const { roles, expires_at } = req.body || {};
+        if (!Array.isArray(roles) || roles.some(r => typeof r !== 'string' || !r.trim())) {
+            return res.status(400).json({ error: 'roles phải là mảng role_id hợp lệ', code: 'INVALID_ROLES' });
+        }
+        const newRoles = [...new Set(roles.map(r => r.trim()))];
+        let tx;
+        try {
+            const pool = await getPool();
+            const callerIsAdmin = (req.user?.roles || []).includes('ROL-01');
+
+            const userChk = await pool.request().input('u', sql.VarChar(50), userId)
+                .query(`SELECT user_id FROM [USER] WHERE user_id = @u`);
+            if (!userChk.recordset.length) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+            const curRes = await pool.request().input('u', sql.VarChar(50), userId)
+                .query(`SELECT role_id FROM USER_ROLE WHERE user_id = @u`);
+            const currentRoles = curRes.recordset.map(r => r.role_id);
+            const targetIsAdmin = currentRoles.includes('ROL-01');
+            const touchesAdmin = targetIsAdmin !== newRoles.includes('ROL-01');
+
+            if (!callerIsAdmin) {
+                if (targetIsAdmin) return res.status(403).json({ error: 'Người dùng có vai trò Quản trị viên, không thể sửa', code: 'ADMIN_ROLE_LOCKED' });
+                if (touchesAdmin) return res.status(403).json({ error: 'Chỉ Admin mới có thể gán vai trò Admin (ROL-01)', code: 'PERMISSION_DENIED' });
+                if (userId === req.user.user_id) return res.status(403).json({ error: 'Không thể tự thay đổi vai trò của chính mình', code: 'PERMISSION_DENIED' });
+            }
+
+            if (newRoles.length) {
+                const valid = await pool.request().query(`SELECT role_id FROM [ROLE]`);
+                const known = new Set(valid.recordset.map(r => r.role_id));
+                const bad = newRoles.filter(r => !known.has(r));
+                if (bad.length) return res.status(400).json({ error: `Vai trò không tồn tại: ${bad.join(', ')}`, code: 'ROLE_NOT_FOUND' });
+            }
+
+            let finalExpiresAt = null;
+            if (expires_at) {
+                finalExpiresAt = new Date(expires_at);
+                if (isNaN(finalExpiresAt.getTime())) return res.status(400).json({ error: 'Ngày hết hạn không hợp lệ.', code: 'INVALID_EXPIRY' });
+                finalExpiresAt.setHours(23, 59, 59, 999);
+                if (finalExpiresAt <= new Date()) return res.status(400).json({ error: 'Ngày hết hạn phải lớn hơn thời điểm hiện tại.', code: 'INVALID_EXPIRY' });
+            }
+
+            tx = new sql.Transaction(pool);
+            await tx.begin();
+            try {
+                // 1) Gỡ các vai trò không còn trong danh sách mới
+                const delReq = new sql.Request(tx).input('u', sql.VarChar(50), userId);
+                let delSql = `DELETE FROM USER_ROLE WHERE user_id = @u`;
+                if (newRoles.length) {
+                    const names = newRoles.map((rid, i) => { delReq.input(`k${i}`, sql.VarChar(50), rid); return `@k${i}`; });
+                    delSql += ` AND role_id NOT IN (${names.join(',')})`;
+                }
+                await delReq.query(delSql);
+                // 2) Thêm vai trò mới (vai trò đã có thì giữ nguyên)
+                for (const rid of newRoles) {
+                    if (currentRoles.includes(rid)) continue;
+                    await new sql.Request(tx)
+                        .input('u', sql.VarChar(50), userId)
+                        .input('r', sql.VarChar(50), rid)
+                        .input('exp', sql.DateTime, finalExpiresAt)
+                        .query(`INSERT INTO USER_ROLE (user_id, role_id, expires_at) VALUES (@u, @r, @exp)`);
+                }
+                await tx.commit();
+            } catch (dbErr) {
+                try { await tx.rollback(); } catch (_) {}
+                if (dbErr.message.includes('The transaction ended in the trigger') || dbErr.message.includes('Không thể gỡ vai trò Admin')) {
+                    return res.status(403).json({
+                        error: 'Hệ thống từ chối thay đổi. Tài khoản này đang giữ vai trò Quản trị viên cuối cùng hoặc bị khóa bởi quy tắc bảo vệ.',
+                        code: 'TRIGGER_BLOCKED',
+                    });
+                }
+                throw dbErr;
+            }
+
+            await log(req, 'ASSIGN_ROLE', `Đặt vai trò của ${userId}: [${currentRoles.join(', ')}] → [${newRoles.join(', ')}]`);
+            _invalidateUser(userId);
+            res.json({ success: true, roles: newRoles, expires_at: finalExpiresAt });
+        } catch (e) {
+            console.error('[set-user-roles]', e);
+            res.status(500).json({ error: e.message });
         }
     });
 
@@ -1268,9 +1366,9 @@ module.exports = (app, deps) => {
             if (!unit_id || !name) return res.status(400).json({ error: 'Thiếu unit_id/name' });
             const pool = await getPool();
             await pool.request()
-                .input('id', sql.VarChar(50), unit_id)
+                .input('id', sql.NVarChar(50), unit_id)
                 .input('n', sql.NVarChar(200), name)
-                .input('p', sql.VarChar(50), parent_id || null)
+                .input('p', sql.NVarChar(50), parent_id || null)
                 .input('t', sql.VarChar(50), unit_type || null)
                 .query(`INSERT INTO UNIT (unit_id, name, parent_id, unit_type) VALUES (@id, @n, @p, @t)`);
             res.json({ success: true });
@@ -1282,23 +1380,122 @@ module.exports = (app, deps) => {
 
     app.put('/api/admin/units/:id', async (req, res) => {
         try {
-            const { name, parent_id, unit_type } = req.body;
+            const oldId = req.params.id ? req.params.id.trim() : '';
+            const { unit_id, name, parent_id, unit_type } = req.body;
+            const newId = (unit_id && typeof unit_id === 'string' && unit_id.trim()) ? unit_id.trim() : oldId;
+            const trimmedName = (name && typeof name === 'string') ? name.trim() : '';
+            const trimmedParentId = (parent_id && typeof parent_id === 'string' && parent_id.trim()) ? parent_id.trim() : null;
+
+            if (!oldId || !trimmedName) {
+                return res.status(400).json({ error: 'Thiếu thông tin bắt buộc (mã hoặc tên đơn vị)' });
+            }
+
+            if (trimmedParentId && (trimmedParentId === newId || trimmedParentId === oldId)) {
+                return res.status(400).json({ error: 'Đơn vị không thể là cấp trên của chính nó' });
+            }
+
             const pool = await getPool();
-            const r = await pool.request()
-                .input('id', sql.VarChar(50), req.params.id)
-                .input('n', sql.NVarChar(200), name)
-                .input('p', sql.VarChar(50), parent_id || null)
-                .input('t', sql.VarChar(50), unit_type || null)
-                .query(`UPDATE UNIT SET name=@n, parent_id=@p, unit_type=@t WHERE unit_id=@id`);
-            if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy' });
-            res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+
+            // Kiểm tra xem đơn vị cũ có tồn tại không
+            const oldUnitCheck = await pool.request()
+                .input('oldId', sql.NVarChar(50), oldId)
+                .query(`SELECT unit_id FROM UNIT WHERE unit_id = @oldId`);
+            if (oldUnitCheck.recordset.length === 0) {
+                return res.status(404).json({ error: 'Không tìm thấy đơn vị cần chỉnh sửa' });
+            }
+
+            // Nếu mã đơn vị thay đổi (newId !== oldId)
+            if (newId !== oldId) {
+                // Kiểm tra xem newId đã tồn tại chưa
+                const dupCheck = await pool.request()
+                    .input('newId', sql.NVarChar(50), newId)
+                    .query(`SELECT 1 FROM UNIT WHERE unit_id = @newId`);
+                if (dupCheck.recordset.length > 0) {
+                    return res.status(409).json({ error: `Mã đơn vị "${newId}" đã tồn tại trên hệ thống, vui lòng chọn mã khác` });
+                }
+
+                // Thực thi Transaction Cascade an toàn
+                const queryCascade = `
+                    SET QUOTED_IDENTIFIER ON;
+                    SET ANSI_NULLS ON;
+                    BEGIN TRANSACTION;
+
+                    -- 1. Tạm thời NOCHECK các Foreign Key liên quan đến UNIT
+                    ALTER TABLE UNIT NOCHECK CONSTRAINT FK_UNIT_PARENT;
+                    ALTER TABLE DOCUMENT NOCHECK CONSTRAINT FK_DOC_UNIT;
+                    ALTER TABLE DOCUMENT_REVISION_PROPOSAL NOCHECK CONSTRAINT FK_PROPOSAL_UNIT;
+                    ALTER TABLE UNIT_ALIAS NOCHECK CONSTRAINT FK_UA_UNIT;
+                    ALTER TABLE DIGITAL_LECTURE NOCHECK CONSTRAINT FK_DL_UNIT;
+                    ALTER TABLE SUBJECT NOCHECK CONSTRAINT FK_SUB_UNIT;
+                    ALTER TABLE TRAINING_CLASS NOCHECK CONSTRAINT FK_TC_UNIT;
+                    ALTER TABLE [USER] NOCHECK CONSTRAINT FK_USER_UNIT;
+
+                    -- 2. Cập nhật bản ghi chính UNIT
+                    UPDATE UNIT SET unit_id = @new_id, name = @n, parent_id = @p, unit_type = @t WHERE unit_id = @old_id;
+
+                    -- 3. Cascade cập nhật mã đơn vị sang toàn bộ các bảng tham chiếu
+                    UPDATE UNIT SET parent_id = @new_id WHERE parent_id = @old_id;
+                    UPDATE [USER] SET unit_id = @new_id WHERE unit_id = @old_id;
+                    UPDATE DOCUMENT SET issuing_unit_id = @new_id WHERE issuing_unit_id = @old_id;
+                    UPDATE DOCUMENT_VERSION SET issuing_unit_id = @new_id WHERE issuing_unit_id = @old_id;
+                    UPDATE DOCUMENT_REVISION_PROPOSAL SET issuing_unit_id = @new_id WHERE issuing_unit_id = @old_id;
+                    UPDATE APPROVAL_REQUEST SET requester_unit_id = @new_id WHERE requester_unit_id = @old_id;
+                    UPDATE SUBJECT SET faculty_unit_id = @new_id WHERE faculty_unit_id = @old_id;
+                    UPDATE TRAINING_CLASS SET unit_id = @new_id WHERE unit_id = @old_id;
+                    UPDATE DIGITAL_LECTURE SET faculty_unit_id = @new_id WHERE faculty_unit_id = @old_id;
+                    UPDATE TEACHING_SCHEDULE SET faculty_unit_id = @new_id WHERE faculty_unit_id = @old_id;
+                    UPDATE TEACHING_HISTORY SET unit_id = @new_id WHERE unit_id = @old_id;
+                    UPDATE UNIT_ALIAS SET unit_id = @new_id WHERE unit_id = @old_id;
+
+                    -- 4. Bật lại và thẩm định toàn vẹn Foreign Key constraints
+                    ALTER TABLE UNIT WITH CHECK CHECK CONSTRAINT FK_UNIT_PARENT;
+                    ALTER TABLE DOCUMENT WITH CHECK CHECK CONSTRAINT FK_DOC_UNIT;
+                    ALTER TABLE DOCUMENT_REVISION_PROPOSAL WITH CHECK CHECK CONSTRAINT FK_PROPOSAL_UNIT;
+                    ALTER TABLE UNIT_ALIAS WITH CHECK CHECK CONSTRAINT FK_UA_UNIT;
+                    ALTER TABLE DIGITAL_LECTURE WITH CHECK CHECK CONSTRAINT FK_DL_UNIT;
+                    ALTER TABLE SUBJECT WITH CHECK CHECK CONSTRAINT FK_SUB_UNIT;
+                    ALTER TABLE TRAINING_CLASS WITH CHECK CHECK CONSTRAINT FK_TC_UNIT;
+                    ALTER TABLE [USER] WITH CHECK CHECK CONSTRAINT FK_USER_UNIT;
+
+                    COMMIT TRANSACTION;
+                `;
+
+                await pool.request()
+                    .input('old_id', sql.NVarChar(50), oldId)
+                    .input('new_id', sql.NVarChar(50), newId)
+                    .input('n', sql.NVarChar(200), trimmedName)
+                    .input('p', sql.NVarChar(50), trimmedParentId)
+                    .input('t', sql.VarChar(50), unit_type || null)
+                    .query(queryCascade);
+
+                await log(req, 'UPDATE_UNIT_ID', `Đổi mã đơn vị từ "${oldId}" sang "${newId}", tên: "${trimmedName}"`);
+            } else {
+                // Mã đơn vị không đổi -> Chỉ cập nhật thông tin đơn vị
+                await pool.request()
+                    .input('id', sql.NVarChar(50), oldId)
+                    .input('n', sql.NVarChar(200), trimmedName)
+                    .input('p', sql.NVarChar(50), trimmedParentId)
+                    .input('t', sql.VarChar(50), unit_type || null)
+                    .query(`UPDATE UNIT SET name = @n, parent_id = @p, unit_type = @t WHERE unit_id = @id`);
+
+                await log(req, 'UPDATE_UNIT', `Cập nhật thông tin đơn vị ${oldId}: "${trimmedName}"`);
+            }
+
+            if (invalidateCatalogCache) invalidateCatalogCache();
+            res.json({ success: true, unit_id: newId });
+        } catch (e) {
+            console.error('[PUT /api/admin/units/:id]', e);
+            if (e.message.includes('PRIMARY KEY') || e.message.includes('UNIQUE')) {
+                return res.status(409).json({ error: 'Trùng mã đơn vị hoặc tên đơn vị đã tồn tại trong hệ thống' });
+            }
+            res.status(500).json({ error: e.message });
+        }
     });
 
     app.delete('/api/admin/units/:id', async (req, res) => {
         try {
             const pool = await getPool();
-            const r = await pool.request().input('id', sql.VarChar(50), req.params.id).query(`DELETE FROM UNIT WHERE unit_id = @id`);
+            const r = await pool.request().input('id', sql.NVarChar(50), req.params.id).query(`DELETE FROM UNIT WHERE unit_id = @id`);
             if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy' });
             res.json({ success: true });
         } catch (e) {
@@ -1654,7 +1851,7 @@ module.exports = (app, deps) => {
             const pool = await getPool();
             const r = pool.request();
             let query = `SELECT ua.alias_id, ua.unit_id, u.name AS unit_name, ua.alias_text, ua.priority, ua.created_at FROM UNIT_ALIAS ua JOIN UNIT u ON u.unit_id = ua.unit_id WHERE 1=1`;
-            if (req.query.unit_id) { query += ` AND ua.unit_id = @uid`; r.input('uid', sql.VarChar(50), req.query.unit_id); }
+            if (req.query.unit_id) { query += ` AND ua.unit_id = @uid`; r.input('uid', sql.NVarChar(50), req.query.unit_id); }
             query += ` ORDER BY ua.unit_id, ua.priority DESC, ua.alias_text`;
             const result = await r.query(query);
             res.json({ items: result.recordset });
@@ -1666,15 +1863,15 @@ module.exports = (app, deps) => {
             const { unit_id, alias_text, priority } = req.body;
             if (!unit_id || !alias_text) return res.status(400).json({ error: 'Thiếu unit_id hoặc alias_text' });
             const pool = await getPool();
-            const chk = await pool.request().input('uid', sql.VarChar(50), unit_id).query(`SELECT 1 FROM UNIT WHERE unit_id = @uid`);
+            const chk = await pool.request().input('uid', sql.NVarChar(50), unit_id).query(`SELECT 1 FROM UNIT WHERE unit_id = @uid`);
             if (chk.recordset.length === 0) return res.status(404).json({ error: 'Đơn vị không tồn tại' });
             const dup = await pool.request()
-                .input('uid', sql.VarChar(50), unit_id)
+                .input('uid', sql.NVarChar(50), unit_id)
                 .input('a', sql.NVarChar(200), alias_text.trim())
                 .query(`SELECT 1 FROM UNIT_ALIAS WHERE unit_id = @uid AND alias_text = @a`);
             if (dup.recordset.length > 0) return res.status(409).json({ error: 'Alias này đã có cho đơn vị' });
             const r = await pool.request()
-                .input('uid', sql.VarChar(50), unit_id)
+                .input('uid', sql.NVarChar(50), unit_id)
                 .input('a', sql.NVarChar(200), alias_text.trim())
                 .input('p', sql.Int, priority || 0)
                 .query(`INSERT INTO UNIT_ALIAS (unit_id, alias_text, priority) OUTPUT INSERTED.alias_id VALUES (@uid, @a, @p)`);
@@ -1778,20 +1975,23 @@ module.exports = (app, deps) => {
             const request = pool.request();
 
             const currentUserId = req.user.user_id;
-            const isProtected = isProtectedAdmin(req.user);
-            const userRoles = await resolveUserRoles(req.user);
-            const isCommander = userRoles.includes('ROL-02');
+            // Thấy danh sách theo BẢNG QUYỀN: Admin thấy hết; Chỉ huy / người được ủy quyền thấy trong phạm vi đơn vị; còn lại chỉ thấy của mình
+            const auth = await approvalAuthority.getAuthority(req.user, 'APPROVAL_VALIDATE');
+            const isProtected = isProtectedAdmin(req.user) || auth.all === true;
+            const isCommander = auth.level !== 'NONE' && !auth.all;
+            const dReady = await delegatedReady();
 
             let query = `
                 SELECT ar.*, u.full_name AS requester_name, u.[rank] AS requester_rank,
                        u.position AS requester_position,
                        u.unit_id AS requester_unit_id,
                        req_unit.name AS requester_unit_name,
-                       rv.full_name AS reviewer_name
+                       rv.full_name AS reviewer_name${dReady ? ', vb.full_name AS validated_by_name' : ''}
                 FROM APPROVAL_REQUEST ar
                 LEFT JOIN [USER] u ON u.user_id = ar.requester_id
                 LEFT JOIN UNIT req_unit ON req_unit.unit_id = u.unit_id
                 LEFT JOIN [USER] rv ON rv.user_id = ar.reviewed_by
+                ${dReady ? 'LEFT JOIN [USER] vb ON vb.user_id = ar.validated_by' : ''}
                 WHERE 1=1
             `;
 
@@ -1803,7 +2003,7 @@ module.exports = (app, deps) => {
                     if (allowedUnits.length > 0) {
                         const params = allowedUnits.map((_, i) => `@aru_${i}`);
                         query += ` AND u.unit_id IN (${params.join(', ')})`;
-                        allowedUnits.forEach((u, i) => request.input(`aru_${i}`, sql.VarChar(50), u));
+                        allowedUnits.forEach((u, i) => request.input(`aru_${i}`, sql.NVarChar(50), u));
                     } else {
                         query += ` AND 1=0`;
                     }
@@ -1832,6 +2032,7 @@ module.exports = (app, deps) => {
                 SELECT 
                   p.proposal_id, p.file_id, p.requester_id, p.status, p.note, p.review_note,
                   p.reviewed_by, p.reviewed_at, p.created_at, p.updated_at,
+                  ${dReady ? 'p.validated_by, p.validated_at, p.validate_decision, p.validate_note, vb.full_name AS validated_by_name,' : ''}
                   p.document_code, p.title, p.doc_type_id, p.issued_date, p.issuing_unit_id,
                   p.signer, p.summary, p.security_level_id,
                   p.new_original_name, p.new_file_size,
@@ -1853,6 +2054,7 @@ module.exports = (app, deps) => {
                 JOIN [USER] u ON u.user_id = p.requester_id
                 LEFT JOIN UNIT req_unit ON req_unit.unit_id = u.unit_id
                 LEFT JOIN [USER] rv ON rv.user_id = p.reviewed_by
+                ${dReady ? 'LEFT JOIN [USER] vb ON vb.user_id = p.validated_by' : ''}
                 LEFT JOIN UNIT unit ON unit.unit_id = p.issuing_unit_id
                 LEFT JOIN UNIT cur_unit ON cur_unit.unit_id = d.issuing_unit_id
                 LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = p.security_level_id
@@ -1868,7 +2070,7 @@ module.exports = (app, deps) => {
                     if (allowedUnits.length > 0) {
                         const params = allowedUnits.map((_, i) => `@pu_${i}`);
                         propQuery += ` AND (d.issuing_unit_id IN (${params.join(', ')}) OR p.issuing_unit_id IN (${params.join(', ')}) OR u.unit_id IN (${params.join(', ')}))`;
-                        allowedUnits.forEach((u, i) => propRequest.input(`pu_${i}`, sql.VarChar(50), u));
+                        allowedUnits.forEach((u, i) => propRequest.input(`pu_${i}`, sql.NVarChar(50), u));
                     } else {
                         propQuery += ` AND 1=0`;
                     }
@@ -1914,6 +2116,11 @@ module.exports = (app, deps) => {
                   ? `Đăng tải văn bản mới [${docCodeDisplay}]: ${p.title}`
                   : `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
                 status: p.status,
+                validated_by: p.validated_by,
+                validated_by_name: p.validated_by_name,
+                validated_at: p.validated_at,
+                validate_decision: p.validate_decision,
+                validate_note: p.validate_note,
                 reviewed_by: p.reviewed_by,
                 reviewer_name: p.reviewer_name,
                 reviewed_at: p.reviewed_at,
@@ -2025,16 +2232,23 @@ module.exports = (app, deps) => {
             if (id.startsWith('PROP-')) {
                 const checkProp = await pool.request()
                     .input('pid', sql.VarChar(50), id)
-                    .query(`SELECT u.unit_id
+                    .query(`SELECT u.unit_id, p.requester_id, d.issuing_unit_id AS doc_unit_id
                             FROM DOCUMENT_REVISION_PROPOSAL p
                             JOIN [USER] u ON u.user_id = p.requester_id
+                            LEFT JOIN DOCUMENT d ON d.file_id = p.file_id
                             WHERE p.proposal_id = @pid AND p.status = 'PENDING'`);
                 if (checkProp.recordset.length === 0) {
                     return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
                 }
-                const hasPermission = await canUserApproveRequest(req, checkProp.recordset[0].unit_id);
-                if (!hasPermission) {
+                // Chỉ huy đơn vị của NGƯỜI ĐỀ XUẤT hoặc của đơn vị BAN HÀNH văn bản đều được duyệt
+                const level = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
+                    || (checkProp.recordset[0].doc_unit_id && await canUserApproveRequest(req, checkProp.recordset[0].doc_unit_id));
+                if (!level) {
                     return res.status(403).json({ error: 'Bạn không có thẩm quyền duyệt đề xuất của đơn vị này' });
+                }
+                if (level === 'DELEGATE') {
+                    return delegateValidate(req, res, { table: 'DOCUMENT_REVISION_PROPOSAL', id,
+                        requesterId: checkProp.recordset[0].requester_id, decision: 'APPROVE', note: req.body?.review_note });
                 }
                 if (deps.approveProposalCore) {
                     const result = await deps.approveProposalCore({
@@ -2051,16 +2265,20 @@ module.exports = (app, deps) => {
             // ─── [STANDARD] Kiểm tra đơn vị người yêu cầu ───
             const checkReq = await pool.request()
                 .input('rid', sql.VarChar(50), id)
-                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id
+                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id, ar.requester_id
                         FROM APPROVAL_REQUEST ar
                         LEFT JOIN [USER] u ON u.user_id = ar.requester_id
                         WHERE ar.request_id = @rid AND ar.status = 'PENDING'`);
             if (checkReq.recordset.length === 0) {
                 return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
             }
-            const hasPermission = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
-            if (!hasPermission) {
+            const level = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
+            if (!level) {
                 return res.status(403).json({ error: 'Bạn không có thẩm quyền duyệt yêu cầu của đơn vị này' });
+            }
+            if (level === 'DELEGATE') {
+                return delegateValidate(req, res, { table: 'APPROVAL_REQUEST', id,
+                    requesterId: checkReq.recordset[0].requester_id, decision: 'APPROVE', note: req.body?.review_note });
             }
 
             const r = await pool.request()
@@ -2088,16 +2306,23 @@ module.exports = (app, deps) => {
             if (id.startsWith('PROP-')) {
                 const checkProp = await pool.request()
                     .input('pid', sql.VarChar(50), id)
-                    .query(`SELECT u.unit_id
+                    .query(`SELECT u.unit_id, p.requester_id, d.issuing_unit_id AS doc_unit_id
                             FROM DOCUMENT_REVISION_PROPOSAL p
                             JOIN [USER] u ON u.user_id = p.requester_id
+                            LEFT JOIN DOCUMENT d ON d.file_id = p.file_id
                             WHERE p.proposal_id = @pid AND p.status = 'PENDING'`);
                 if (checkProp.recordset.length === 0) {
                     return res.status(400).json({ error: 'Đề xuất không ở trạng thái PENDING' });
                 }
-                const hasPermission = await canUserApproveRequest(req, checkProp.recordset[0].unit_id);
-                if (!hasPermission) {
+                // Chỉ huy đơn vị của NGƯỜI ĐỀ XUẤT hoặc của đơn vị BAN HÀNH văn bản đều được duyệt
+                const level = (await canUserApproveRequest(req, checkProp.recordset[0].unit_id))
+                    || (checkProp.recordset[0].doc_unit_id && await canUserApproveRequest(req, checkProp.recordset[0].doc_unit_id));
+                if (!level) {
                     return res.status(403).json({ error: 'Bạn không có thẩm quyền từ chối đề xuất của đơn vị này' });
+                }
+                if (level === 'DELEGATE') {
+                    return delegateValidate(req, res, { table: 'DOCUMENT_REVISION_PROPOSAL', id,
+                        requesterId: checkProp.recordset[0].requester_id, decision: 'REJECT', note: note.trim() });
                 }
                 if (deps.rejectProposalCore) {
                     const result = await deps.rejectProposalCore({
@@ -2114,16 +2339,20 @@ module.exports = (app, deps) => {
             // ─── [STANDARD] ───
             const checkReq = await pool.request()
                 .input('rid', sql.VarChar(50), id)
-                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id
+                .query(`SELECT COALESCE(ar.requester_unit_id, u.unit_id) AS unit_id, ar.requester_id
                         FROM APPROVAL_REQUEST ar
                         LEFT JOIN [USER] u ON u.user_id = ar.requester_id
                         WHERE ar.request_id = @rid AND ar.status = 'PENDING'`);
             if (checkReq.recordset.length === 0) {
                 return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
             }
-            const hasPermission = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
-            if (!hasPermission) {
+            const level = await canUserApproveRequest(req, checkReq.recordset[0].unit_id);
+            if (!level) {
                 return res.status(403).json({ error: 'Bạn không có thẩm quyền từ chối yêu cầu của đơn vị này' });
+            }
+            if (level === 'DELEGATE') {
+                return delegateValidate(req, res, { table: 'APPROVAL_REQUEST', id,
+                    requesterId: checkReq.recordset[0].requester_id, decision: 'REJECT', note: note.trim() });
             }
 
             const r = await pool.request()
@@ -2252,5 +2481,410 @@ module.exports = (app, deps) => {
                 res.status(500).json({ error: e.message });
             }
         });
+
+        // ═══════════════════════════════════════════════════════════
+// LECTURE CATALOGS — Môn học / Lớp học / Giảng đường
+// ═══════════════════════════════════════════════════════════
+
+// ── MÔN HỌC ──
+app.get('/api/admin/lectures/subjects', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT s.subject_id, s.subject_code, s.name, s.faculty_unit_id,
+             s.security_level_id, s.active, s.description,
+             u.name AS faculty_name
+      FROM SUBJECT s
+      LEFT JOIN UNIT u ON u.unit_id = s.faculty_unit_id
+      ORDER BY s.active DESC, s.name
+    `);
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/lectures/subjects', async (req, res) => {
+  try {
+    const { subject_id, subject_code, name, faculty_unit_id, security_level_id, description } = req.body;
+    if (!subject_id || !name) return res.status(400).json({ error: 'Thiếu subject_id hoặc name' });
+    const pool = await getPool();
+    // Giới hạn cấp độ bảo mật môn học: Cấp 1 (Công khai) đến Cấp 3 (Mật)
+    const validLevel = security_level_id ? Math.min(3, Math.max(1, Number(security_level_id))) : 2;
+    await pool.request()
+      .input('id', sql.VarChar(50), subject_id)
+      .input('code', sql.VarChar(50), subject_code || subject_id)
+      .input('name', sql.NVarChar(200), name)
+      .input('fac', sql.NVarChar(50), faculty_unit_id || null)
+      .input('lvl', sql.Int, validLevel)
+      .input('desc', sql.NVarChar(500), description || null)
+      .query(`INSERT INTO SUBJECT (subject_id, subject_code, name, faculty_unit_id, security_level_id, description, active)
+              VALUES (@id, @code, @name, @fac, @lvl, @desc, 1)`);
+    await log(req, 'LECTURE_SUBJECT_CREATE', `Tạo môn học ${subject_id} - ${name} (Cấp ${validLevel})`);
+    res.json({ success: true, subject_id });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'subject_id đã tồn tại' });
+    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'subject_code đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/subjects/:id', async (req, res) => {
+  try {
+    const { subject_code, name, faculty_unit_id, security_level_id, description, active } = req.body;
+    const pool = await getPool();
+    // Giới hạn cấp độ bảo mật môn học: Cấp 1 (Công khai) đến Cấp 3 (Mật)
+    const validLevel = security_level_id !== undefined && security_level_id !== null && security_level_id !== ''
+      ? Math.min(3, Math.max(1, Number(security_level_id)))
+      : null;
+    const r = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .input('code', sql.VarChar(50), subject_code || null)
+      .input('name', sql.NVarChar(200), name)
+      .input('fac', sql.NVarChar(50), faculty_unit_id || null)
+      .input('lvl', sql.Int, validLevel)
+      .input('desc', sql.NVarChar(500), description || null)
+      .input('act', sql.Bit, active !== false ? 1 : 0)
+      .query(`UPDATE SUBJECT SET
+              subject_code = COALESCE(@code, subject_code),
+              name = @name,
+              faculty_unit_id = @fac,
+              security_level_id = COALESCE(@lvl, security_level_id),
+              description = @desc,
+              active = @act
+              WHERE subject_id = @id`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy môn học' });
+    await log(req, 'LECTURE_SUBJECT_UPDATE', `Sửa môn học ${req.params.id}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/subjects/:id', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .query(`SELECT COUNT(*) AS n FROM DIGITAL_LECTURE WHERE subject_id = @id`);
+    if (used.recordset[0].n > 0) {
+      await pool.request().input('id', sql.VarChar(50), req.params.id)
+        .query(`UPDATE SUBJECT SET active = 0 WHERE subject_id = @id`);
+      return res.json({ success: true, soft_deleted: true, note: `${used.recordset[0].n} bài giảng đang dùng → chỉ ẩn` });
+    }
+    await pool.request().input('id', sql.VarChar(50), req.params.id)
+      .query(`DELETE FROM SUBJECT WHERE subject_id = @id`);
+    await log(req, 'LECTURE_SUBJECT_DELETE', `Xóa môn học ${req.params.id}`);
+    res.json({ success: true, soft_deleted: false });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── LỚP HỌC ──
+app.get('/api/admin/lectures/classes', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT c.class_id, c.class_name, c.unit_id, c.course_year,
+             c.student_total, c.description, c.active,
+             u.name AS unit_name
+      FROM TRAINING_CLASS c
+      LEFT JOIN UNIT u ON u.unit_id = c.unit_id
+      ORDER BY c.active DESC, c.class_name
+    `);
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/lectures/classes', async (req, res) => {
+  try {
+    const { class_id, class_name, unit_id, course_year, student_total, description } = req.body;
+    if (!class_id || !class_name) return res.status(400).json({ error: 'Thiếu class_id hoặc class_name' });
+    const total = parseInt(student_total, 10);
+    if (!Number.isFinite(total) || total < 0) return res.status(400).json({ error: 'student_total không hợp lệ' });
+    const pool = await getPool();
+    await pool.request()
+      .input('id', sql.VarChar(50), class_id)
+      .input('name', sql.NVarChar(100), class_name)
+      .input('unit', sql.NVarChar(50), unit_id || 'TQS')
+      .input('year', sql.NVarChar(50), course_year ? String(course_year) : null)
+      .input('total', sql.Int, total)
+      .input('desc', sql.NVarChar(500), description || null)
+      .query(`INSERT INTO TRAINING_CLASS (class_id, class_name, unit_id, course_year, student_total, description, active)
+              VALUES (@id, @name, @unit, @year, @total, @desc, 1)`);
+    await log(req, 'LECTURE_CLASS_CREATE', `Tạo lớp học ${class_id} - ${class_name} (${total} HV)`);
+    res.json({ success: true, class_id });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'class_id đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/classes/:id', async (req, res) => {
+  try {
+    const { class_name, unit_id, course_year, student_total, description, active } = req.body;
+    const pool = await getPool();
+    const totalVal = (student_total !== undefined && student_total !== null && student_total !== '')
+      ? parseInt(student_total, 10) : null;
+    const r = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .input('name', sql.NVarChar(100), class_name)
+      .input('unit', sql.NVarChar(50), unit_id || null)
+      .input('year', sql.NVarChar(50), course_year ? String(course_year) : null)
+      .input('total', sql.Int, totalVal)
+      .input('desc', sql.NVarChar(500), description || null)
+      .input('act', sql.Bit, active !== false ? 1 : 0)
+      .query(`UPDATE TRAINING_CLASS SET
+              class_name = @name,
+              unit_id = COALESCE(@unit, unit_id),
+              course_year = @year,
+              student_total = @total,
+              description = @desc,
+              active = @act
+              WHERE class_id = @id`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy lớp học' });
+    await log(req, 'LECTURE_CLASS_UPDATE', `Sửa lớp học ${req.params.id}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/classes/:id', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .query(`SELECT COUNT(*) AS n FROM TEACHING_SCHEDULE WHERE class_id = @id`);
+    if (used.recordset[0].n > 0) {
+      await pool.request().input('id', sql.VarChar(50), req.params.id)
+        .query(`UPDATE TRAINING_CLASS SET active = 0 WHERE class_id = @id`);
+      return res.json({ success: true, soft_deleted: true, note: `${used.recordset[0].n} ca dạy đang dùng → chỉ ẩn` });
+    }
+    await pool.request().input('id', sql.VarChar(50), req.params.id)
+      .query(`DELETE FROM TRAINING_CLASS WHERE class_id = @id`);
+    await log(req, 'LECTURE_CLASS_DELETE', `Xóa lớp học ${req.params.id}`);
+    res.json({ success: true, soft_deleted: false });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GIẢNG ĐƯỜNG ──
+// Tra khu theo mã trong bảng CLASSROOM_BUILDING (null nếu không có hoặc chưa tạo bảng)
+async function findBuilding(pool, code) {
+  if (!code) return null;
+  try {
+    const r = await pool.request().input('c', sql.VarChar(20), String(code))
+      .query(`SELECT building_code, building_name, active FROM CLASSROOM_BUILDING WHERE building_code = @c`);
+    return r.recordset[0] || null;
+  } catch (_) { return null; }
+}
+
+app.get('/api/admin/lectures/classrooms', async (req, res) => {
+  try {
+    const pool = await getPool();
+    let r;
+    try {
+      // Tên khu lấy từ danh mục khu (CLASSROOM_BUILDING)
+      r = await pool.request().query(`
+        SELECT c.room_id, c.room_name, c.building_code,
+               COALESCE(b.building_name, c.building_name) AS building_name,
+               c.room_type, c.capacity, c.description, c.active
+        FROM CLASSROOM c
+        LEFT JOIN CLASSROOM_BUILDING b ON b.building_code = c.building_code
+        ORDER BY c.active DESC, c.room_name
+      `);
+    } catch (_) {
+      // Chưa chạy migration create_classroom_building → giữ cách đọc cũ
+      r = await pool.request().query(`
+        SELECT room_id, room_name, building_code, building_name, room_type, capacity, description, active
+        FROM CLASSROOM
+        ORDER BY active DESC, room_name
+      `);
+    }
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/lectures/classrooms', async (req, res) => {
+  try {
+    const { room_id, room_name, building_name, building_code, room_type, capacity, description } = req.body;
+    if (!room_id || !room_name) return res.status(400).json({ error: 'Thiếu room_id hoặc room_name' });
+    const validTypes = ['LECTURE_HALL', 'COMPUTER_LAB', 'SEMINAR'];
+    const rt = validTypes.includes(room_type) ? room_type : 'LECTURE_HALL';
+    const pool = await getPool();
+
+    // Có chọn khu → phải là khu có thật; tên khu lấy từ danh mục (không tin tên client gửi lên)
+    let bCode = null, bName = building_name || null;
+    if (building_code) {
+      const b = await findBuilding(pool, building_code);
+      if (!b) return res.status(400).json({ error: `Khu "${building_code}" không tồn tại`, code: 'BUILDING_NOT_FOUND' });
+      bCode = b.building_code; bName = b.building_name;
+    }
+
+    const request = pool.request()
+      .input('id', sql.VarChar(50), room_id)
+      .input('name', sql.NVarChar(100), room_name)
+      .input('bld', sql.NVarChar(100), bName)
+      .input('type', sql.VarChar(30), rt)
+      .input('cap', sql.Int, capacity || null)
+      .input('desc', sql.NVarChar(500), description || null);
+    if (bCode) {
+      request.input('bcode', sql.VarChar(20), bCode);
+      await request.query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, building_code, room_type, capacity, description, active)
+              VALUES (@id, @name, @bld, @bcode, @type, @cap, @desc, 1)`);
+    } else {
+      await request.query(`INSERT INTO CLASSROOM (room_id, room_name, building_name, room_type, capacity, description, active)
+              VALUES (@id, @name, @bld, @type, @cap, @desc, 1)`);
+    }
+    await log(req, 'LECTURE_CLASSROOM_CREATE', `Tạo giảng đường ${room_id} - ${room_name}`);
+    res.json({ success: true, room_id });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'room_id đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/classrooms/:id', async (req, res) => {
+  try {
+    const { room_name, building_name, building_code, room_type, capacity, description, active } = req.body;
+    const validTypes = ['LECTURE_HALL', 'COMPUTER_LAB', 'SEMINAR'];
+    const rt = validTypes.includes(room_type) ? room_type : null;
+    const pool = await getPool();
+
+    let bCode = null, bName = building_name || null;
+    if (building_code) {
+      const b = await findBuilding(pool, building_code);
+      if (!b) return res.status(400).json({ error: `Khu "${building_code}" không tồn tại`, code: 'BUILDING_NOT_FOUND' });
+      bCode = b.building_code; bName = b.building_name;
+    }
+
+    const r = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .input('name', sql.NVarChar(100), room_name)
+      .input('bld', sql.NVarChar(100), bName)
+      .input('bcode', sql.VarChar(20), bCode)
+      .input('type', sql.VarChar(30), rt)
+      .input('cap', sql.Int, capacity || null)
+      .input('desc', sql.NVarChar(500), description || null)
+      .input('act', sql.Bit, active !== false ? 1 : 0)
+      .query(`UPDATE CLASSROOM SET
+              room_name = @name,
+              building_name = @bld,
+              building_code = COALESCE(@bcode, building_code),
+              room_type = COALESCE(@type, room_type),
+              capacity = @cap,
+              description = @desc,
+              active = @act
+              WHERE room_id = @id`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy giảng đường' });
+    await log(req, 'LECTURE_CLASSROOM_UPDATE', `Sửa giảng đường ${req.params.id}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/classrooms/:id', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request()
+      .input('id', sql.VarChar(50), req.params.id)
+      .query(`SELECT COUNT(*) AS n FROM TEACHING_SCHEDULE WHERE room_id = @id`);
+    if (used.recordset[0].n > 0) {
+      await pool.request().input('id', sql.VarChar(50), req.params.id)
+        .query(`UPDATE CLASSROOM SET active = 0 WHERE room_id = @id`);
+      return res.json({ success: true, soft_deleted: true });
+    }
+    await pool.request().input('id', sql.VarChar(50), req.params.id)
+      .query(`DELETE FROM CLASSROOM WHERE room_id = @id`);
+    await log(req, 'LECTURE_CLASSROOM_DELETE', `Xóa giảng đường ${req.params.id}`);
+    res.json({ success: true, soft_deleted: false });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── KHU GIẢNG ĐƯỜNG (CLASSROOM_BUILDING) — quản lý thay cho danh sách viết cứng ──
+const BUILDING_CODE_RE = /^[A-Za-z0-9_-]{1,20}$/;
+
+app.get('/api/admin/lectures/buildings', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT b.building_code, b.building_name, b.display_order, b.active,
+             (SELECT COUNT(*) FROM CLASSROOM c WHERE c.building_code = b.building_code) AS room_count
+      FROM CLASSROOM_BUILDING b
+      ORDER BY b.display_order, b.building_code
+    `);
+    res.json({ total: r.recordset.length, items: r.recordset });
+  } catch (e) {
+    const missing = /Invalid object name 'CLASSROOM_BUILDING'/i.test(e.message);
+    res.status(500).json({
+      error: missing
+        ? 'Chưa có bảng CLASSROOM_BUILDING. Hãy chạy migration create_classroom_building.'
+        : e.message,
+      code: missing ? 'BUILDING_TABLE_MISSING' : undefined,
+    });
+  }
+});
+
+app.post('/api/admin/lectures/buildings', async (req, res) => {
+  try {
+    const code = String(req.body.building_code || '').trim().toUpperCase();
+    const name = String(req.body.building_name || '').trim();
+    const order = Number.isFinite(Number(req.body.display_order)) ? Math.trunc(Number(req.body.display_order)) : 0;
+    if (!BUILDING_CODE_RE.test(code)) {
+      return res.status(400).json({ error: 'Mã khu chỉ gồm chữ, số, "-" hoặc "_" (tối đa 20 ký tự)' });
+    }
+    if (!name || name.length > 100) return res.status(400).json({ error: 'Tên khu bắt buộc, tối đa 100 ký tự' });
+    const pool = await getPool();
+    await pool.request()
+      .input('c', sql.VarChar(20), code)
+      .input('n', sql.NVarChar(100), name)
+      .input('o', sql.Int, order)
+      .query(`INSERT INTO CLASSROOM_BUILDING (building_code, building_name, display_order, active)
+              VALUES (@c, @n, @o, 1)`);
+    await log(req, 'LECTURE_BUILDING_CREATE', `Tạo khu giảng đường ${code} - ${name}`);
+    res.json({ success: true, building_code: code });
+  } catch (e) {
+    if (e.message.includes('PRIMARY KEY')) return res.status(409).json({ error: 'Mã khu đã tồn tại' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/lectures/buildings/:code', async (req, res) => {
+  try {
+    const name = String(req.body.building_name || '').trim();
+    const order = Number.isFinite(Number(req.body.display_order)) ? Math.trunc(Number(req.body.display_order)) : 0;
+    if (!name || name.length > 100) return res.status(400).json({ error: 'Tên khu bắt buộc, tối đa 100 ký tự' });
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('c', sql.VarChar(20), req.params.code)
+      .input('n', sql.NVarChar(100), name)
+      .input('o', sql.Int, order)
+      .input('a', sql.Bit, req.body.active === false ? 0 : 1)
+      .query(`UPDATE CLASSROOM_BUILDING
+              SET building_name = @n, display_order = @o, active = @a
+              WHERE building_code = @c`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy khu' });
+    // Giữ tên khu ghi kèm từng phòng đồng bộ với danh mục khu
+    await pool.request()
+      .input('c', sql.VarChar(20), req.params.code)
+      .input('n', sql.NVarChar(100), name)
+      .query(`UPDATE CLASSROOM SET building_name = @n WHERE building_code = @c`);
+    await log(req, 'LECTURE_BUILDING_UPDATE', `Sửa khu giảng đường ${req.params.code}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/lectures/buildings/:code', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const used = await pool.request().input('c', sql.VarChar(20), req.params.code)
+      .query(`SELECT COUNT(*) AS n FROM CLASSROOM WHERE building_code = @c`);
+    const n = used.recordset[0].n;
+    if (n > 0) {
+      return res.status(409).json({
+        error: `Khu còn ${n} phòng học. Hãy chuyển hoặc xóa các phòng đó trước, hoặc tắt khu thay vì xóa.`,
+        code: 'BUILDING_NOT_EMPTY',
+        room_count: n,
+      });
+    }
+    const r = await pool.request().input('c', sql.VarChar(20), req.params.code)
+      .query(`DELETE FROM CLASSROOM_BUILDING WHERE building_code = @c`);
+    if (r.rowsAffected[0] === 0) return res.status(404).json({ error: 'Không tìm thấy khu' });
+    await log(req, 'LECTURE_BUILDING_DELETE', `Xóa khu giảng đường ${req.params.code}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 };

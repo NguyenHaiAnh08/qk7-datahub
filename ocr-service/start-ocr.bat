@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title QK7 DataHub - OCR Service v2 (:8002)
+title QK7 DataHub - OCR Service (:8002)
 cd /d "%~dp0"
 
 echo ==========================================
-echo   QK7 DataHub - OCR MICROSERVICE v2.0
+echo   QK7 DataHub - OCR 
 echo   Engine: MonkeyOCRv2 / PaddleOCR
 echo   Port  : 8002
 echo ==========================================
@@ -35,15 +35,44 @@ echo [INFO] Su dung Python mac dinh tren he thong.
 
 :env_ready
 
-REM --- 2. Giai phong port 8002 neu bi chiem ---
-echo.
-echo [1/3] Kiem tra va giai phong port 8002...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "try { $pids = (Get-NetTCPConnection -LocalPort 8002 -State Listen -ErrorAction Stop).OwningProcess | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Port 8002 dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port 8002.' } else { Write-Host '[OK] Port 8002 san sang.' } } catch { Write-Host '[OK] Port 8002 san sang.' }; exit 0"
+REM --- 2. Xac dinh cong OCR (tranh bi PORT=8000 tu .env root ghi de) ---
+if not defined PORT_OCR set "PORT_OCR=8002"
+set "OCR_PORT=%PORT_OCR%"
+set "PORT=%PORT_OCR%"
 
-REM --- 3. Cau hinh engine va tham so ---
+REM --- 3. Giai phong port OCR neu bi chiem ---
+echo.
+echo [1/3] Kiem tra va giai phong port %PORT%...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "try { $pids = (Get-NetTCPConnection -LocalPort %PORT% -ErrorAction SilentlyContinue).OwningProcess | Where-Object { $_ -gt 0 } | Select-Object -Unique; if ($pids) { Write-Host ('[CANH BAO] Port %PORT% dang bi chiem boi PID: ' + ($pids -join ', ') + '. Dang giai phong...'); Stop-Process -Id $pids -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Write-Host '[OK] Da giai phong port %PORT%.' } else { Write-Host '[OK] Port %PORT% san sang.' } } catch { Write-Host '[OK] Port %PORT% san sang.' }; exit 0"
+
+REM --- 4. Cau hinh engine va tham so ---
 echo.
 echo [2/3] Cau hinh OCR Engine...
+
+REM Air-Gapped Offline Environment: Triet tieu moi request ra ngoai Internet
+set "HF_HUB_OFFLINE=1"
+set "TRANSFORMERS_OFFLINE=1"
+set "HF_DATASETS_OFFLINE=1"
+set "HF_HUB_VERBOSITY=debug"
+set "HF_HUB_DISABLE_TELEMETRY=1"
+set "DO_NOT_TRACK=1"
+set "DISABLE_TELEMETRY=1"
+set "SCARF_NO_ANALYTICS=1"
+set "ANONYMIZED_TELEMETRY=False"
+
+REM --- PaddleOCR & Albumentations offline hardening ---
+set "PADDLE_HOME=%~dp0model_weight\paddleocr"
+set "PADDLEOCR_HOME=%~dp0model_weight\paddleocr"
+set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True"
+set "DISABLE_PADDLE_UPDATE_CHECK=1"
+set "NO_ALBUMENTATIONS_UPDATE=1"
+set "FLAGS_use_mkldnn=0"
+
+REM Uu tien model weight noi bo neu ton tai
+if exist "%~dp0model_weight\MonkeyOCRv2-B-Parsing" (
+    if not defined MONKEY_MODEL_ID set "MONKEY_MODEL_ID=%~dp0model_weight\MonkeyOCRv2-B-Parsing"
+)
 
 REM OCR_ENGINE: "auto"      = thu MonkeyOCRv2 truoc, fallback PaddleOCR
 REM             "monkey"    = chi MonkeyOCRv2
@@ -56,11 +85,15 @@ if not defined MONKEY_DEVICE set "MONKEY_DEVICE=cpu"
 
 echo    OCR_ENGINE   = %OCR_ENGINE%
 echo    MONKEY_DEVICE= %MONKEY_DEVICE%
-echo    PORT         = 8002
+echo    MONKEY_MODEL = %MONKEY_MODEL_ID%
+echo    PORT         = %PORT%
+echo    HOST         = 0.0.0.0 (VLAN ^& Local)
+echo    OFFLINE_MODE = HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1, NO_ALBUMENTATIONS_UPDATE=1
+set "HOST=0.0.0.0"
 
-REM --- 4. Khoi dong Microservice ---
+REM --- 5. Khoi dong Microservice ---
 echo.
-echo [3/3] Khoi dong OCR Microservice tren cong 8002...
+echo [3/3] Khoi dong OCR Microservice tren cong %PORT%...
 echo -------------------------------------------
 
 "%PYTHON_EXE%" main.py

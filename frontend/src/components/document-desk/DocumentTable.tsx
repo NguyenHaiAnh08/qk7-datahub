@@ -6,8 +6,6 @@ import {
   Pencil,
   Trash2,
   Lock,
-  ChevronLeft,
-  ChevronRight,
   HardDrive
 } from 'lucide-react';
 import { Tooltip, Skeleton } from 'antd';
@@ -16,6 +14,8 @@ import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
 import { CompactDownloadButton } from '../common/CompactDownloadButton';
+import { PaginationBar } from '../common/PaginationBar';
+import { usePageTransition } from '../common/PageTransitionStage';
 import { useAuth } from '../../hooks/useAuth';
 
 export interface DocumentTableProps {
@@ -52,6 +52,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   onDelete,
 }) => {
   const { user, hasPermission } = useAuth();
+  const tbodyRef = usePageTransition<HTMLTableSectionElement>(currentPage, { mode: 'row' });
   const isAdminUser = (user?.roles || []).includes('ROL-01');
   const getLevelBadgeClass = (lv: number) => {
     switch (lv) {
@@ -84,7 +85,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+          <tbody ref={tbodyRef} className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
               Array.from({ length: 6 }).map((_, idx) => (
                 <tr key={`table-skeleton-${idx}`} className="border-b border-slate-100 dark:border-white/[0.04]">
@@ -205,29 +206,6 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                             );
                           })()}
                           {onEdit && (() => {
-                            const docUnit = doc.issuing_unit_id || doc.unit_id;
-                            const isOwner = Boolean(doc.uploaded_by && doc.uploaded_by === user?.user_id);
-                            const isSameUnit = Boolean(!docUnit || !user?.unit_id || docUnit === user.unit_id || user.unit_id === 'TQS');
-                            const canLocalEdit = isAdminUser || isOwner || isSameUnit;
-
-                            if (!canLocalEdit) {
-                              return (
-                                <Tooltip
-                                  title={`Chỉ cán bộ thuộc đơn vị ban hành (${doc.unit_name || docUnit}) mới có quyền đề xuất chỉnh sửa văn bản này`}
-                                  placement="top"
-                                  arrow
-                                >
-                                  <button
-                                    type="button"
-                                    disabled
-                                    className="p-1.5 opacity-35 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-lg cursor-not-allowed border border-transparent"
-                                  >
-                                    <Pencil className="w-3.5 h-3.5" />
-                                  </button>
-                                </Tooltip>
-                              );
-                            }
-
                             return (
                               <button
                                 onClick={() => onEdit(doc)}
@@ -281,48 +259,16 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       {totalPages > 1 && (
         <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60">
           <div>
-            Hiển thị trang{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{currentPage}</span> /{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{totalPages}</span> (Tổng{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{totalItems}</span> tài liệu)
+            Đang hiển thị tài liệu{' '}
+            <strong className="font-bold text-slate-900 dark:text-white">{(currentPage - 1) * 30 + 1} - {Math.min(currentPage * 30, totalItems)}</strong> /{' '}
+            <strong className="font-bold text-emerald-700 dark:text-emerald-400">{totalItems}</strong> tài liệu
+            {' '}(Trang <strong className="font-bold text-slate-900 dark:text-white">{currentPage}</strong>/{totalPages})
           </div>
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage <= 1}
-              className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-              .map((p, idx, arr) => {
-                const prev = arr[idx - 1];
-                const showEllipsis = prev && p - prev > 1;
-                return (
-                  <React.Fragment key={p}>
-                    {showEllipsis && <span className="px-1 text-slate-400">...</span>}
-                    <button
-                      onClick={() => onPageChange(p)}
-                      className={`px-2.5 py-1 rounded transition text-xs ${
-                        currentPage === p
-                          ? 'bg-[#166534] dark:bg-emerald-600 text-white font-bold shadow-xs'
-                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  </React.Fragment>
-                );
-              })}
-            <button
-              onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage >= totalPages}
-              className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
         </div>
       )}
     </div>

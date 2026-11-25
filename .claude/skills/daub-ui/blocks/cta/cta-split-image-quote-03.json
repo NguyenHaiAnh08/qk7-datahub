@@ -1,0 +1,150 @@
+{
+  "root": "cta-split-image-quote-03",
+  "elements": {
+    "cta-split-image-quote-03": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 8,
+        "container": "wide",
+        "padding": [
+          24,
+          0
+        ]
+      },
+      "children": [
+        "left-col",
+        "right-col"
+      ]
+    },
+    "left-col": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 8,
+        "justify": "center"
+      },
+      "children": [
+        "left-content",
+        "left-actions"
+      ]
+    },
+    "left-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5
+      },
+      "children": [
+        "left-heading",
+        "left-description"
+      ]
+    },
+    "left-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Start your free trial"
+      }
+    },
+    "left-description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Join over 4,000+ startups already growing with Daub.",
+        "variant": "muted"
+      }
+    },
+    "left-actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3
+      },
+      "children": [
+        "btn-learn-more",
+        "btn-get-started"
+      ]
+    },
+    "btn-learn-more": {
+      "type": "Button",
+      "props": {
+        "label": "Learn more",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "btn-get-started": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg"
+      }
+    },
+    "right-col": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "right-image",
+        "right-author-row"
+      ]
+    },
+    "right-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cta-split-image-quote-03-right-image/600/360",
+        "alt": "CTA hero",
+        "objectFit": "cover"
+      }
+    },
+    "right-author-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3,
+        "align": "center"
+      },
+      "children": [
+        "right-avatar",
+        "right-author-info"
+      ]
+    },
+    "right-avatar": {
+      "type": "Avatar",
+      "props": {
+        "initials": "LT",
+        "size": "sm"
+      }
+    },
+    "right-author-info": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 0
+      },
+      "children": [
+        "right-author-name",
+        "right-author-role"
+      ]
+    },
+    "right-author-name": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Lana Turner"
+      }
+    },
+    "right-author-role": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "VP of Engineering, Catalog",
+        "variant": "muted"
+      }
+    }
+  }
+}

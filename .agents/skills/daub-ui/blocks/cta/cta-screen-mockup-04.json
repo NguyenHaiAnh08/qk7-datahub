@@ -1,0 +1,190 @@
+{
+  "root": "cta-screen-mockup-04",
+  "elements": {
+    "cta-screen-mockup-04": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 10,
+        "padding": [
+          24,
+          0
+        ]
+      },
+      "children": [
+        "layout-grid"
+      ]
+    },
+    "layout-grid": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 16,
+        "container": "wide",
+        "align": "center"
+      },
+      "children": [
+        "mockup-image",
+        "content-side"
+      ]
+    },
+    "mockup-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cta-screen-mockup-04-mockup-image/800/533",
+        "alt": "Dashboard mockup"
+      }
+    },
+    "content-side": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 8
+      },
+      "children": [
+        "content-inner",
+        "buttons"
+      ]
+    },
+    "content-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6
+      },
+      "children": [
+        "heading",
+        "description",
+        "check-list"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Beautiful analytics to grow smarter"
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Powerful, self-serve product and growth analytics.",
+        "variant": "muted"
+      }
+    },
+    "check-list": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "check-item-1",
+        "check-item-2",
+        "check-item-3"
+      ]
+    },
+    "check-item-1": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "check-icon-1",
+        "check-text-1"
+      ]
+    },
+    "check-icon-1": {
+      "type": "Badge",
+      "props": {
+        "text": "\u2713",
+        "variant": "success"
+      }
+    },
+    "check-text-1": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Share team inboxes"
+      }
+    },
+    "check-item-2": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "check-icon-2",
+        "check-text-2"
+      ]
+    },
+    "check-icon-2": {
+      "type": "Badge",
+      "props": {
+        "text": "\u2713",
+        "variant": "success"
+      }
+    },
+    "check-text-2": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Deliver instant answers"
+      }
+    },
+    "check-item-3": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "check-icon-3",
+        "check-text-3"
+      ]
+    },
+    "check-icon-3": {
+      "type": "Badge",
+      "props": {
+        "text": "\u2713",
+        "variant": "success"
+      }
+    },
+    "check-text-3": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Manage your team with reports"
+      }
+    },
+    "buttons": {
+      "type": "ButtonGroup",
+      "children": [
+        "btn-outline",
+        "btn-primary"
+      ]
+    },
+    "btn-outline": {
+      "type": "Button",
+      "props": {
+        "label": "Learn more",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "btn-primary": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg"
+      }
+    }
+  }
+}

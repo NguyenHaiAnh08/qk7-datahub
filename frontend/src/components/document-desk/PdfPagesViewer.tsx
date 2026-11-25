@@ -3,6 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/web/pdf_viewer.css';
 import { Loader2 } from 'lucide-react';
+import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -17,26 +18,65 @@ export interface HighlighterStroke {
 export interface PdfPagesViewerProps {
   blobUrl: string;
   fileId: string;
+  initialPage?: number;
+  isAiCitation?: boolean;
   securityLevel?: number;
   isHighlighterActive: boolean;
   highlighterColor: string;
   onStrokeCountChange?: (count: number) => void;
   highlighterRef?: React.MutableRefObject<{ undo: () => void; clear: () => void; getStrokeCount: () => number } | null>;
+  onReadingProgressChange?: (progress: ReadingProgress) => void;
+  viewerRef?: React.MutableRefObject<{ scrollToPage: (page: number) => void; scrollToTop: () => void; scrollToNext: () => void } | null>;
+  showFloatingProgressRing?: boolean;
+  /** Văn bản watermark dự phòng vẽ trực tiếp lên Canvas nếu pdf-lib fallback */
+  fallbackWatermarkText?: string;
 }
 
 export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
   blobUrl,
   fileId,
+  initialPage = 1,
+  isAiCitation = false,
   securityLevel = 1,
   isHighlighterActive,
   highlighterColor,
   onStrokeCountChange,
   highlighterRef,
+  onReadingProgressChange,
+  viewerRef,
+  showFloatingProgressRing = true,
+  fallbackWatermarkText,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number }[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(initialPage || 1);
+  const [readingPercent, setReadingPercent] = useState<number>(0);
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
+
+  // Đo chiều rộng hiển thị chuẩn của container để tính toán kích thước trang đồng nhất 100% từ frame đầu tiên
+  const [targetWidth, setTargetWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return Math.min(880, Math.max(360, window.innerWidth - 48));
+    }
+    return 880;
+  });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateWidth = () => {
+      if (containerRef.current) {
+        const w = containerRef.current.clientWidth;
+        if (w > 100) {
+          setTargetWidth(Math.min(880, Math.max(360, w - 48)));
+        }
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
   
   // Lưu trữ nét vẽ theo từng trang: Map<pageNumber, HighlighterStroke[]>
   const [pageStrokes, setPageStrokes] = useState<Record<number, HighlighterStroke[]>>({});
@@ -136,13 +176,21 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
         pdfDocRef.current = doc;
         setNumPages(doc.numPages);
 
-        // Lấy kích thước trang
-        const dims: { width: number; height: number }[] = [];
-        for (let i = 1; i <= doc.numPages; i++) {
-          const page = await doc.getPage(i);
-          const viewport = page.getViewport({ scale: 1.0 });
-          dims.push({ width: viewport.width, height: viewport.height });
+        // Khởi tạo kích thước trang siêu tốc: lấy trang 1 làm kích thước chuẩn
+        const firstPage = await doc.getPage(1);
+        const firstVp = firstPage.getViewport({ scale: 1.0 });
+        const defaultDim = { width: firstVp.width, height: firstVp.height };
+        const dims: { width: number; height: number }[] = Array(doc.numPages).fill(defaultDim);
+
+        // Nếu có initialPage cụ thể (>1), đọc trước kích thước trang đích để đảm bảo tuyệt đối chuẩn xác
+        if (initialPage && initialPage > 1 && initialPage <= doc.numPages) {
+          try {
+            const targetP = await doc.getPage(initialPage);
+            const targetVp = targetP.getViewport({ scale: 1.0 });
+            dims[initialPage - 1] = { width: targetVp.width, height: targetVp.height };
+          } catch (_) {}
         }
+
         if (!isCancelled) {
           setPageDimensions(dims);
           setLoading(false);
@@ -158,18 +206,278 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
     return () => {
       isCancelled = true;
     };
-  }, [blobUrl]);
+  }, [blobUrl, initialPage]);
+
+  // 📍 Tự động nhảy và cuộn chính xác 100% đến đúng số trang trích dẫn (ví dụ: Trang 267)
+  useEffect(() => {
+    if (loading || numPages <= 0 || !initialPage || initialPage <= 1) return;
+    const targetPage = Math.min(Math.max(1, initialPage), numPages);
+
+    const performScroll = (behavior: ScrollBehavior = 'instant') => {
+      const container = containerRef.current;
+      if (!container) return;
+      const pageEl = container.querySelector(`[data-page="${targetPage}"]`) as HTMLElement;
+      if (pageEl) {
+        const containerRect = container.getBoundingClientRect();
+        const pageRect = pageEl.getBoundingClientRect();
+        const targetTop = container.scrollTop + (pageRect.top - containerRect.top) - 16;
+        container.scrollTo({
+          top: Math.max(0, targetTop),
+          behavior,
+        });
+      }
+    };
+
+    // 1. Nhảy lập tức bằng 'instant' để tránh bị ngắt quãng/giới hạn thời gian của smooth-scroll trên tài liệu dài
+    performScroll('instant');
+
+    // 2. Tái khẳng định vị trí chính xác ở các mốc thời gian layout ổn định
+    const t1 = setTimeout(() => performScroll('instant'), 50);
+    const t2 = setTimeout(() => performScroll('instant'), 150);
+    const t3 = setTimeout(() => performScroll('instant'), 350);
+    const t4 = setTimeout(() => performScroll('instant'), 600);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
+  }, [loading, numPages, initialPage, fileId, targetWidth]);
+
+  const onReadingProgressChangeRef = useRef(onReadingProgressChange);
+  useEffect(() => {
+    onReadingProgressChangeRef.current = onReadingProgressChange;
+  }, [onReadingProgressChange]);
+
+  const hasInitializedRef = useRef<string | null>(null);
+  // Cờ dành riêng cho tài liệu 1 trang không có thanh cuộn (vừa khít màn hình) sau khi đã xem xong
+  const singlePageCompletedRef = useRef<boolean>(false);
+
+  // Cuộn mượt đến trang chỉ định
+  const scrollToPage = useCallback((pageNum: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const targetPage = Math.min(Math.max(1, pageNum), numPages);
+    const pageEl = container.querySelector(`[data-page="${targetPage}"]`) as HTMLElement;
+    if (pageEl) {
+      const containerRect = container.getBoundingClientRect();
+      const pageRect = pageEl.getBoundingClientRect();
+      const targetTop = container.scrollTop + (pageRect.top - containerRect.top) - 16;
+      container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    }
+  }, [numPages]);
+
+  // Cuộn về đầu trang (Trang 1)
+  const scrollToTop = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      if (container && container.scrollTop > 0) {
+        container.scrollTop = 0;
+      }
+    }, 350);
+  }, []);
+
+  // Cuộn xuống cuối trang (dành cho tài liệu 1 trang hoặc muốn xem nhanh khối ký duyệt)
+  const scrollToBottom = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+  }, []);
+
+  // Cuộn đến trang tiếp theo
+  const scrollToNext = useCallback(() => {
+    if (currentPage < numPages) {
+      scrollToPage(currentPage + 1);
+    } else {
+      scrollToTop();
+    }
+  }, [currentPage, numPages, scrollToPage, scrollToTop]);
+
+  // Expose các hàm điều hướng qua viewerRef
+  useEffect(() => {
+    if (!viewerRef) return;
+    viewerRef.current = {
+      scrollToPage,
+      scrollToTop,
+      scrollToNext,
+      scrollToBottom,
+    } as any;
+  }, [viewerRef, scrollToPage, scrollToTop, scrollToNext, scrollToBottom]);
+
+  // Xử lý cuộn & Scroll-Spy nhận diện trang và tiến độ đọc chuẩn UX/UI
+  const handleScroll = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || numPages <= 0) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const maxScroll = Math.max(0, scrollHeight - clientHeight);
+
+    // Scroll-Spy: Dùng BoundingClientRect so với tầm mắt người đọc (35% từ trên container xuống)
+    const containerRect = container.getBoundingClientRect();
+    const targetY = containerRect.top + containerRect.height * 0.35;
+
+    const pageEls = container.querySelectorAll<HTMLElement>('[data-page]');
+    let detectedPage = 1;
+
+    for (let i = 0; i < pageEls.length; i++) {
+      const el = pageEls[i];
+      const rect = el.getBoundingClientRect();
+      if (rect.top <= targetY && rect.bottom >= targetY) {
+        detectedPage = parseInt(el.getAttribute('data-page') || '1', 10);
+        break;
+      }
+      if (rect.top > targetY) {
+        detectedPage = Math.max(1, parseInt(el.getAttribute('data-page') || '1', 10) - 1);
+        break;
+      }
+      if (i === pageEls.length - 1) {
+        detectedPage = numPages;
+      }
+    }
+
+    let percent = 0;
+    let completed = false;
+
+    // A. XỬ LÝ CHO TÀI LIỆU CÓ 1 TRANG (numPages === 1)
+    // Người dùng mở tài liệu ban đầu BẮT BUỘC ở 0% (hoặc đang đọc).
+    // Chỉ khi cuộn xuống tới cuối trang (chạm khối ký duyệt, con dấu) mới tính ĐÃ ĐỌC XONG (100%).
+    // Khi người dùng cuộn ngược lên lại thì cập nhật đúng vị trí cuộn hiện tại, không giữ cố định 100%.
+    if (numPages === 1) {
+      if (maxScroll > 15) {
+        const isAtBottom = (scrollTop + clientHeight >= scrollHeight - 35) || (maxScroll > 0 && (scrollTop / maxScroll) >= 0.94);
+
+        if (isAtBottom) {
+          percent = 100;
+          completed = true;
+        } else if (scrollTop <= 15) {
+          percent = 0;
+          completed = false;
+        } else {
+          const scrollRatio = scrollTop / maxScroll;
+          percent = Math.min(99, Math.max(1, Math.round(scrollRatio * 100)));
+          completed = false;
+        }
+      } else {
+        // Trang ngắn vừa vặn màn hình không cần thanh cuộn
+        if (singlePageCompletedRef.current) {
+          percent = 100;
+          completed = true;
+        } else {
+          percent = 0;
+          completed = false;
+        }
+      }
+    } else {
+      // B. XỬ LÝ CHO TÀI LIỆU NHIỀU TRANG (numPages > 1)
+      // Theo dõi thời gian thực vị trí trang người dùng đang đọc:
+      // Khi cuộn ngược về các trang trước (ví dụ trang 37/121), lập tức hiển thị "Trang 37/121 (30%)".
+      // Chỉ khi cuộn đến sát đáy trang cuối cùng mới hiển thị "Đã đọc xong (100%)".
+      const isAtBottom = (scrollTop + clientHeight >= scrollHeight - 35) || (detectedPage === numPages && maxScroll > 0 && (scrollTop / maxScroll) >= 0.96);
+
+      if (isAtBottom) {
+        percent = 100;
+        completed = true;
+      } else if (scrollTop <= 15 && detectedPage === 1) {
+        percent = 0;
+        completed = false;
+      } else {
+        const pageRatio = (detectedPage - 1) / Math.max(1, numPages - 1);
+        const scrollRatio = maxScroll > 0 ? scrollTop / maxScroll : 0;
+        const blended = pageRatio * 0.7 + scrollRatio * 0.3;
+        percent = Math.min(99, Math.max(1, Math.round(blended * 100)));
+        completed = false;
+      }
+    }
+
+    const finalCompleted = percent === 100;
+    setCurrentPage(detectedPage);
+    setReadingPercent(percent);
+    setIsCompleted(finalCompleted);
+
+    onReadingProgressChangeRef.current?.({
+      currentPage: detectedPage,
+      totalPages: numPages,
+      percent,
+      isCompleted: finalCompleted,
+    });
+  }, [numPages]);
+
+  // Thông báo tiến độ khởi tạo khi nạp xong tài liệu (chỉ chạy 1 lần khi đổi fileId hoặc khi numPages tải xong)
+  useEffect(() => {
+    if (numPages > 0 && hasInitializedRef.current !== fileId) {
+      hasInitializedRef.current = fileId;
+      singlePageCompletedRef.current = false;
+      const initialProg = {
+        currentPage: initialPage || 1,
+        totalPages: numPages,
+        percent: 0,
+        isCompleted: false,
+      };
+      setCurrentPage(initialProg.currentPage);
+      setReadingPercent(0);
+      setIsCompleted(false);
+      onReadingProgressChangeRef.current?.(initialProg);
+    }
+  }, [numPages, initialPage, fileId]);
+
+  // Dành riêng cho tài liệu 1 trang vừa khít khung nhìn (không có thanh cuộn)
+  // Sau 3.5s đọc hoặc khi người dùng cuộn con lăn xuống dưới, hệ thống tự động ghi nhận hoàn thành
+  useEffect(() => {
+    if (numPages !== 1) return;
+    const checkTimer = setTimeout(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+      if (maxScroll <= 15 && !singlePageCompletedRef.current) {
+        singlePageCompletedRef.current = true;
+        setReadingPercent(100);
+        setIsCompleted(true);
+        onReadingProgressChangeRef.current?.({
+          currentPage: 1,
+          totalPages: 1,
+          percent: 100,
+          isCompleted: true,
+        });
+      }
+    }, 3500);
+
+    return () => clearTimeout(checkTimer);
+  }, [numPages, fileId]);
 
   return (
-    <div
-      ref={containerRef}
-      className={`w-full h-full overflow-y-auto bg-slate-100 dark:bg-slate-950 flex flex-col items-center py-6 px-2 sm:px-4 relative transition-colors ${
-        isHighSecurity ? 'select-none' : 'select-text'
-      }`}
-      style={{
-        scrollbarWidth: 'thin',
-      }}
-    >
+    <div className="relative w-full h-full overflow-hidden flex flex-col">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        onWheel={(e) => {
+          if (numPages === 1 && !singlePageCompletedRef.current && e.deltaY > 0) {
+            const container = containerRef.current;
+            if (container) {
+              const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+              if (maxScroll <= 15) {
+                singlePageCompletedRef.current = true;
+                setReadingPercent(100);
+                setIsCompleted(true);
+                onReadingProgressChangeRef.current?.({
+                  currentPage: 1,
+                  totalPages: 1,
+                  percent: 100,
+                  isCompleted: true,
+                });
+              }
+            }
+          }
+        }}
+        className={`w-full h-full overflow-y-auto overscroll-contain scrollbar-thin bg-slate-100 dark:bg-slate-950 flex flex-col items-center py-6 px-2 sm:px-4 relative transition-colors ${
+          isHighSecurity ? 'select-none' : 'select-text'
+        }`}
+        style={{
+          scrollbarWidth: 'thin',
+        }}
+      >
       <style>{`
         .textLayer {
           position: absolute;
@@ -211,18 +519,21 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
         <div className="flex flex-col items-center space-y-6 w-full max-w-4xl">
           {Array.from({ length: numPages }, (_, index) => {
             const pageNum = index + 1;
-            const originalDim = pageDimensions[index] || { width: 595, height: 842 };
+            const originalDim = pageDimensions[index] || { width: 595.3, height: 842.0 };
             return (
               <SinglePdfPage
                 key={`pdf-page-${pageNum}`}
                 pdfDoc={pdfDocRef.current}
                 pageNum={pageNum}
+                isCitedPage={Boolean(isAiCitation) && pageNum === initialPage && initialPage > 0}
                 securityLevel={securityLevel}
+                targetWidth={targetWidth}
                 originalWidth={originalDim.width}
                 originalHeight={originalDim.height}
                 isHighlighterActive={isHighlighterActive}
                 highlighterColor={highlighterColor}
                 strokes={pageStrokes[pageNum] || EMPTY_STROKES}
+                fallbackWatermarkText={fallbackWatermarkText}
                 onSaveStroke={(newStroke) => {
                   setPageStrokes((prev) => {
                     const currentList = prev[pageNum] || EMPTY_STROKES;
@@ -241,6 +552,27 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
           })}
         </div>
       )}
+      </div>
+
+      {/* ⭕ Floating Scroll-Spy Reading Completion Ring */}
+      {showFloatingProgressRing && numPages > 0 && !loading && (
+        <DocumentReadingRing
+          currentPage={currentPage}
+          totalPages={numPages}
+          percent={readingPercent}
+          isCompleted={isCompleted}
+          variant="floating"
+          onClick={() => {
+            if (isCompleted || currentPage > 1 || readingPercent > 0) {
+              scrollToTop();
+            } else if (numPages === 1) {
+              scrollToBottom();
+            } else {
+              scrollToNext();
+            }
+          }}
+        />
+      )}
     </div>
   );
 });
@@ -248,24 +580,30 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
 interface SinglePdfPageProps {
   pdfDoc: any;
   pageNum: number;
+  isCitedPage?: boolean;
   securityLevel: number;
+  targetWidth: number;
   originalWidth: number;
   originalHeight: number;
   isHighlighterActive: boolean;
   highlighterColor: string;
   strokes: HighlighterStroke[];
+  fallbackWatermarkText?: string;
   onSaveStroke: (stroke: HighlighterStroke) => void;
 }
 
 const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
   pdfDoc,
   pageNum,
+  isCitedPage = false,
   securityLevel,
+  targetWidth,
   originalWidth,
   originalHeight,
   isHighlighterActive,
   highlighterColor,
   strokes,
+  fallbackWatermarkText,
   onSaveStroke,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -273,10 +611,42 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
   const textLayerRef = useRef<HTMLDivElement>(null);
   const highlightCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [displayWidth, setDisplayWidth] = useState<number>(originalWidth);
-  const [displayHeight, setDisplayHeight] = useState<number>(originalHeight);
+  // Tính toán kích thước hiển thị đồng nhất cố định (Zero Layout Shift)
+  const scale = targetWidth / (originalWidth || 595.3);
+  const displayWidth = targetWidth;
+  const displayHeight = Math.round((originalHeight || 842.0) * scale);
 
   const isLowSecurity = securityLevel <= 2; // Cấp 1 Công khai & Cấp 2 Nội bộ
+
+  // Cơ chế Virtualization qua IntersectionObserver: chỉ tải và render canvas khi ở gần viewport
+  // Nếu là trang trích dẫn (isCitedPage), luôn kích hoạt render tức thì 100%
+  const [isInView, setIsInView] = useState<boolean>(isCitedPage);
+
+  useEffect(() => {
+    if (isCitedPage) {
+      setIsInView(true);
+      return;
+    }
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setIsInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsInView(true);
+        }
+      },
+      {
+        rootMargin: '1200px 0px', // Đón trước 1-2 trang để người dùng cuộn mượt mà không cảm nhận độ trễ
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isCitedPage]);
 
   // Vẽ lại toàn bộ strokes của trang này lên highlightCanvas
   const redrawStrokes = useCallback(() => {
@@ -317,23 +687,16 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
     });
   }, [strokes]);
 
-  // Render trang PDF và TextLayer bằng pdf.js
+  // Render trang PDF và TextLayer bằng pdf.js khi isInView = true
   useEffect(() => {
-    if (!pdfDoc) return;
+    if (!pdfDoc || !isInView) return;
     let renderTask: any = null;
 
     (async () => {
       try {
         const page = await pdfDoc.getPage(pageNum);
-        const parentWidth = containerRef.current?.parentElement?.clientWidth || window.innerWidth;
-        const targetWidth = Math.min(880, Math.max(360, parentWidth - 48));
-        const scale = targetWidth / originalWidth;
         const viewport = page.getViewport({ scale });
-
         const dpr = Math.min(2, window.devicePixelRatio || 1);
-
-        setDisplayWidth(viewport.width);
-        setDisplayHeight(viewport.height);
 
         // 1. Render Canvas PDF
         const pdfCanvas = pdfCanvasRef.current;
@@ -351,6 +714,28 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
               viewport: viewport,
             });
             await renderTask.promise;
+
+            // 🛡️ Fallback Watermark trực tiếp lên Canvas 2D nếu pdf-lib không nhúng được vào Blob
+            if (fallbackWatermarkText) {
+              const isLandscape = viewport.width > viewport.height;
+              const angle = (isLandscape ? -18 : -25) * (Math.PI / 180);
+              const yPositions = [0.18, 0.38, 0.62, 0.82];
+              const fontSize = Math.max(13, Math.round((viewport.width / 880) * 17));
+              ctx.save();
+              ctx.font = `normal ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+              ctx.fillStyle = '#b91c1c';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.globalAlpha = 0.18;
+              for (const yRatio of yPositions) {
+                ctx.save();
+                ctx.translate(viewport.width / 2, viewport.height * yRatio);
+                ctx.rotate(angle);
+                ctx.fillText(fallbackWatermarkText, 0, 0);
+                ctx.restore();
+              }
+              ctx.restore();
+            }
           }
         }
 
@@ -399,12 +784,14 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
         } catch (_) {}
       }
     };
-  }, [pdfDoc, pageNum, originalWidth, originalHeight, isLowSecurity]);
+  }, [pdfDoc, pageNum, scale, isLowSecurity, isInView]);
 
   // Vẽ lại khi strokes thay đổi
   useEffect(() => {
-    redrawStrokes();
-  }, [redrawStrokes]);
+    if (isInView) {
+      redrawStrokes();
+    }
+  }, [redrawStrokes, isInView]);
 
   // Thao tác vẽ bút dạ quang trên trang này
   const isDrawingRef = useRef(false);
@@ -494,19 +881,46 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
   return (
     <div
       ref={containerRef}
-      className={`relative bg-white shadow-2xl ring-1 ring-slate-900/10 dark:ring-white/10 rounded-sm transition-transform duration-150 overflow-hidden ${
-        isLowSecurity ? 'select-text' : 'select-none'
-      }`}
+      id={`pdf-page-${pageNum}`}
+      data-page={pageNum}
+      className={`relative bg-white shadow-2xl rounded-sm transition-all duration-300 overflow-hidden ${
+        isCitedPage
+          ? 'ring-4 ring-amber-500 shadow-2xl shadow-amber-500/30 z-10'
+          : 'ring-1 ring-slate-900/10 dark:ring-white/10'
+      } ${isLowSecurity ? 'select-text' : 'select-none'}`}
       style={{
         width: displayWidth,
         height: displayHeight,
       }}
     >
+      {/* 🌟 Biểu ngữ nổi bật chỉ báo đoạn trích dẫn AI ở đầu trang */}
+      {isCitedPage && (
+        <div className="absolute top-0 inset-x-0 bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-amber-950 text-[11px] sm:text-xs font-extrabold py-1.5 px-4 flex items-center justify-between shadow-md z-30 select-none">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">⭐</span>
+            <span className="tracking-wide">ĐOẠN TRÍCH DẪN ĐƯỢC ĐỒNG CHÍ TRỢ LÝ AI TRÍCH XUẤT</span>
+          </div>
+          <span className="font-mono bg-amber-950/20 text-white px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold">
+            TRANG {pageNum}
+          </span>
+        </div>
+      )}
+
+      {/* ⏳ Khung đệm placeholder khi trang chưa vào vùng nhìn (Luôn giữ nền giấy trắng sáng đồng nhất với trang PDF) */}
+      {!isInView && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-500 select-none">
+          <div className="w-10 h-10 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center text-xs font-mono tabular-nums font-bold text-slate-600 shadow-2xs">
+            {pageNum}
+          </div>
+          <span className="text-[11px] font-mono tabular-nums mt-1.5 text-slate-500 font-semibold">Trang {pageNum}</span>
+        </div>
+      )}
+
       {/* 📄 Lớp 1: Canvas PDF hiển thị nét chữ & Watermark */}
       <canvas ref={pdfCanvasRef} className="block w-full h-full pointer-events-none select-none" />
 
       {/* 🔤 Lớp 2: TextLayer DOM (Cho phép bôi đen, sao chép Ctrl+C và dán Ctrl+V ở Cấp 1 & 2) */}
-      {isLowSecurity && (
+      {isLowSecurity && isInView && (
         <div
           ref={textLayerRef}
           className={`textLayer ${
@@ -535,9 +949,15 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
         }}
       />
 
-      {/* Số trang góc dưới */}
-      <div className="absolute bottom-2 right-3 px-2 py-0.5 rounded text-[10px] font-mono font-medium text-slate-400 bg-slate-50/80 border border-slate-200 pointer-events-none z-20">
-        Trang {pageNum}
+      {/* Số trang góc dưới — Tiệp màu giấy trắng A4 (không đảo màu đen khi bật Dark Mode) */}
+      <div
+        className={`absolute bottom-2.5 right-3 px-2.5 py-0.5 rounded-md text-[10px] font-mono tabular-nums pointer-events-none z-20 transition-all ${
+          isCitedPage
+            ? 'bg-amber-500 text-amber-950 font-extrabold shadow-md border border-amber-600 animate-pulse'
+            : 'bg-slate-100/95 text-slate-600 border border-slate-300/80 shadow-2xs font-semibold backdrop-blur-[2px]'
+        }`}
+      >
+        {isCitedPage ? `⭐ ĐOẠN TRÍCH DẪN • TRANG ${pageNum}` : `Trang ${pageNum}`}
       </div>
     </div>
   );

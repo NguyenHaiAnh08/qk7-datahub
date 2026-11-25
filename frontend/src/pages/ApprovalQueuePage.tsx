@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShieldCheck,
   Clock,
@@ -30,6 +31,9 @@ import { ApprovalDiffModal, DiffProposalData, getInitials } from '../components/
 const formatRequestAction = (method: string, path: string): string => {
   const m = method.toUpperCase();
   const cleanPath = path.split('?')[0];
+
+  // Yêu cầu XEM (quyền đọc bị khóa bảo vệ)
+  if (m === 'GET') return `Xin phép xem: ${cleanPath}`;
 
   // ✅ Nhận diện yêu cầu cấp PIN
   if (cleanPath.includes('/pin') || cleanPath.includes('generate-pin')) {
@@ -136,6 +140,12 @@ export const ApprovalQueuePage: React.FC = () => {
   const isAdminRole = (user?.roles || []).includes('ROL-01') || user?.user_id === 'USR-001';
   const isCommanderRole = (user?.roles || []).includes('ROL-02');
   const canSelfApprove = isAdminRole || isCommanderRole;
+  // Có quyền duyệt trong bảng quyền nhưng không phải Admin/Chỉ huy → chỉ THẨM ĐỊNH (chờ Chỉ huy cấp trên xác nhận)
+  const isDelegate = !canSelfApprove && (user?.permissions || []).includes('APPROVAL_VALIDATE');
+  const delegateToast = (msg?: string) => toast.info(msg || 'Đã thẩm định — chờ Chỉ huy cấp trên xác nhận mới chính thức thành công', {
+    title: 'ĐÃ THẨM ĐỊNH',
+    badge: 'CHỜ CHỈ HUY',
+  });
 
   // Danh sách các đề xuất văn bản (PROP-) đang chờ duyệt để phục vụ duyệt liên hoàn
   const pendingPropList: DiffProposalData[] = React.useMemo(() => {
@@ -202,10 +212,16 @@ export const ApprovalQueuePage: React.FC = () => {
   const handleApproveProposal = async (proposalId: string, note?: string) => {
     setProcessing(true);
     try {
-      await approvalService.approve(
+      const aRes: any = await approvalService.approve(
         proposalId,
         note || (isCommanderRole ? 'Chỉ huy cấp Phòng đã phê duyệt & chuẩn hóa' : 'Quản trị viên đã phê duyệt & áp dụng')
       );
+      if (aRes?.validated) {
+        delegateToast(aRes.message);
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
       toast.success(`Đã phê duyệt và áp dụng thành công đề xuất chuẩn hóa văn bản ${proposalId}!`, {
         title: 'PHÊ DUYỆT THÀNH CÔNG',
         badge: 'APPROVED',
@@ -236,7 +252,13 @@ export const ApprovalQueuePage: React.FC = () => {
   const handleRejectProposal = async (proposalId: string, reason: string) => {
     setProcessing(true);
     try {
-      await approvalService.reject(proposalId, reason);
+      const rRes: any = await approvalService.reject(proposalId, reason);
+      if (rRes?.validated) {
+        delegateToast('Đã ghi nhận đề nghị từ chối — chờ Chỉ huy cấp trên xác nhận mới chính thức');
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
       toast.info(`Đã từ chối đề xuất ${proposalId}`, {
         title: 'ĐÃ TỪ CHỐI',
         badge: 'REJECTED',
@@ -287,7 +309,26 @@ export const ApprovalQueuePage: React.FC = () => {
     if (!selected) return;
     setProcessing(true);
     try {
-      await approvalService.approve(selected.request_id);
+      const sRes: any = await approvalService.approve(selected.request_id);
+      if (sRes?.validated) {
+        delegateToast(sRes.message);
+        setSelected(null);
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
+
+      // Yêu cầu XEM: duyệt xong là người dùng tự xem được (cấp quyền theo thời hạn), không chạy lại API
+      if (String(selected.http_method).toUpperCase() === 'GET') {
+        toast.success(`Đã cho phép xem (${selected.request_id})`, {
+          title: 'ĐÃ DUYỆT',
+          badge: 'APPROVED',
+        });
+        setSelected(null);
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
 
       const isPinRequest = selected.http_path.includes('/pin') || selected.required_permission === 'PIN_GENERATE';
 
@@ -348,11 +389,15 @@ export const ApprovalQueuePage: React.FC = () => {
     }
     setProcessing(true);
     try {
-      await approvalService.reject(selected.request_id, rejectNote);
-      toast.info(`Đã từ chối yêu cầu ${selected.request_id}`, {
-        title: 'ĐÃ TỪ CHỐI',
-        badge: 'REJECTED',
-      });
+      const sjRes: any = await approvalService.reject(selected.request_id, rejectNote);
+      if (sjRes?.validated) {
+        delegateToast('Đã ghi nhận đề nghị từ chối — chờ Chỉ huy cấp trên xác nhận mới chính thức');
+      } else {
+        toast.info(`Đã từ chối yêu cầu ${selected.request_id}`, {
+          title: 'ĐÃ TỪ CHỐI',
+          badge: 'REJECTED',
+        });
+      }
       setSelected(null);
       setRejectNote('');
       setActionInputMode('idle');
@@ -648,9 +693,9 @@ export const ApprovalQueuePage: React.FC = () => {
       {/* ========================================================= */}
       {/* MODAL 2: DUYỆT CÁC YÊU CẦU CẤP PIN HOẶC QUẢN TRỊ HỆ THỐNG */}
       {/* ========================================================= */}
-      {selected && (!selected.request_id.startsWith('PROP-') || !selectedProposalData) && (
+      {selected && (!selected.request_id.startsWith('PROP-') || !selectedProposalData) && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans"
           onClick={() => !processing && setSelected(null)}
         >
           <div
@@ -686,6 +731,16 @@ export const ApprovalQueuePage: React.FC = () => {
                 <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-2">
                   <Lock className="w-4 h-4 shrink-0" />
                   <span>Cảnh báo: Đây là yêu cầu do chính bạn tạo ra. Bạn không thể tự phê duyệt.</span>
+                </div>
+              )}
+
+              {selected.status === 'PENDING' && selected.validated_by && (
+                <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-xl text-sky-700 dark:text-sky-300 font-semibold flex items-center gap-2">
+                  <Check className="w-4 h-4 shrink-0" />
+                  <span>
+                    Đã được {selected.validated_by_name || selected.validated_by} thẩm định ({selected.validate_decision === 'REJECT' ? 'đề nghị từ chối' : 'đề nghị duyệt'})
+                    {selected.validate_note ? `: ${selected.validate_note}` : ''} — chờ Chỉ huy cấp trên xác nhận.
+                  </span>
                 </div>
               )}
 
@@ -808,20 +863,21 @@ export const ApprovalQueuePage: React.FC = () => {
                     ) : (
                       <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                     )}
-                    <span>{selected.http_path.includes('/pin') ? 'Duyệt & Cấp PIN' : 'Phê duyệt & Thực thi'}</span>
+                    <span>{isDelegate ? 'Thẩm định (chờ Chỉ huy xác nhận)' : selected.http_path.includes('/pin') ? 'Duyệt & Cấp PIN' : 'Phê duyệt & Thực thi'}</span>
                   </button>
                 </>
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================= */}
       {/* MODAL HIỂN THỊ MÃ PIN SAU KHI DUYỆT THÀNH CÔNG           */}
       {/* ========================================================= */}
-      {generatedPinResult && (
-        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
+      {generatedPinResult && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-emerald-500/30 text-center animate-in zoom-in-95">
             <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
@@ -866,7 +922,8 @@ export const ApprovalQueuePage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

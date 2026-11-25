@@ -36,15 +36,15 @@ export interface EnrollStatusResponse {
   state: string;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Local Agent URLs — phần cứng ZKTeco ZK9500 giao tiếp qua agent loopback (127.0.0.1:9001)
-// Tự động thích ứng giao thức (HTTP/HTTPS) hoặc ghi đè qua biến môi trường VITE_FINGERPRINT_AGENT_URL
-// ─────────────────────────────────────────────────────────────
+// Local Fingerprint Agent chạy trên loopback (HTTPS nếu có cert, ngược lại HTTP).
+// getLocalDeviceId() tự thử cả https/http; có thể ép bằng VITE_FINGERPRINT_AGENT_URL.
+const AGENT_BASE_OVERRIDE =
+  (import.meta.env.VITE_FINGERPRINT_AGENT_URL as string) || '';
 
-const LOCAL_AGENT_PROTO = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https:' : 'http:';
-const AGENT_BASE = (import.meta.env.VITE_FINGERPRINT_AGENT_URL as string) || `${LOCAL_AGENT_PROTO}//127.0.0.1:9001`;
-const DEVICE_ID_URL = `${AGENT_BASE}/device-id`;
-const ENROLL_STATUS_URL = `${AGENT_BASE}/enroll-status`;
+// Nhớ địa chỉ Local Agent đã phản hồi thành công để lần sau không thử sai giao thức.
+let lastWorkingAgentUrl = '';
+
+
 
 // ─────────────────────────────────────────────────────────────
 // Service
@@ -57,50 +57,125 @@ export const fingerprintService = {
    * - Trên iPad Air M4 (hoặc khi Local Agent chưa bật): Tự động fallback sang Express Gateway (:8000)
    *   gọi /api/admin/fingerprint/agents để lấy máy quét ZK9500 đang trực tuyến tại Server/bàn thuyết trình.
    */
-    async getLocalDeviceId(timeoutMs: number = 1200): Promise<string> {
-    const isIPad =
-      typeof document !== 'undefined' &&
-      (document.documentElement.getAttribute('data-device-mode') === 'ipad' ||
-        (typeof navigator !== 'undefined' &&
-          (navigator.maxTouchPoints >= 2 ||
-            /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
-            (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1))));
 
-    // 1. Nếu không phải iPad, thử gọi Local Agent trước
-    if (!isIPad) {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeoutMs);   // ← Honor full timeout (F6)
-      try {
-        // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
-        const res = await fetch(DEVICE_ID_URL, { signal: ctrl.signal });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.device_id) return data.device_id;
-        }
-      } catch {
-        // Local agent không có trên máy này -> fallback sang Server (silent)
-      } finally {
-        clearTimeout(timer);
-      }
-    }
+async getLocalDeviceId(timeoutMs: number = 2500): Promise<string> {
+  const isHttpsPage =
+    typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-    // 2. Fallback cho iPad Air M4 hoặc Server Presentation Station
+  const isIPad =
+    typeof document !== 'undefined' &&
+    (
+      document.documentElement.getAttribute('data-device-mode') === 'ipad' ||
+      (
+        typeof navigator !== 'undefined' &&
+        (
+          navigator.maxTouchPoints >= 2 ||
+          /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+          (
+            /Macintosh/i.test(navigator.userAgent) &&
+            navigator.maxTouchPoints > 1
+          )
+        )
+      )
+    );
+
+  const fetchGatewayAgents = async (): Promise<string[]> => {
     try {
-      const serverAgents = await http<{ items: Array<{ device_id: string }> }>(
-        '/api/admin/fingerprint/agents',
-        { method: 'GET', skipErrorNotification: true }
-      );
-      if (serverAgents?.items?.length > 0 && serverAgents.items[0].device_id) {
-        return serverAgents.items[0].device_id;
-      }
-    } catch {
-      // Bỏ qua lỗi fallback
-    }
+      // 1. Thử trực tiếp endpoint /api/fingerprint/device-id
+      try {
+        const direct = await http<{ device_id: string }>(
+          '/api/fingerprint/device-id',
+          {
+            method: 'GET',
+            skipErrorNotification: true,
+            silent: true,
+            signal: AbortSignal.timeout(Math.min(timeoutMs, 1500)),
+          }
+        );
+        if (direct?.device_id && typeof direct.device_id === 'string' && direct.device_id.trim()) {
+          return [direct.device_id.trim()];
+        }
+      } catch (_) {}
 
+      // 2. Dự phòng danh sách /api/fingerprint/agents-online
+      const res = await http<{ items: Array<{ device_id: string }> }>(
+        '/api/fingerprint/agents-online',
+        {
+          method: 'GET',
+          skipErrorNotification: true,
+          silent: true,
+          signal: AbortSignal.timeout(Math.min(timeoutMs, 3000)),
+        }
+      );
+      return (res?.items ?? [])
+        .map((i) => (typeof i?.device_id === 'string' ? i.device_id.trim() : ''))
+        .filter(Boolean);
+    } catch (error) {
+      console.warn('[Fingerprint] Không lấy được danh sách agent từ Gateway:', error);
+      return [];
+    }
+  };
+
+  // iPad/điện thoại không có đầu đọc cục bộ: dùng đầu đọc online tại Server/bàn thuyết trình.
+  if (isIPad) {
+    const agents = await fetchGatewayAgents();
+    if (agents.length > 0) return agents[0];
     throw new Error('AGENT_NOT_RUNNING');
-  },
+  }
+
+  // PC: LUÔN ưu tiên Local Agent của chính máy này (127.0.0.1) để nhiều máy con
+  // cùng kết nối 1 Server mà không bị gán nhầm đầu đọc của máy khác.
+  const override = AGENT_BASE_OVERRIDE.replace(/\/+$/, '');
+  const candidates = Array.from(
+    new Set(
+      [
+        lastWorkingAgentUrl,
+        override,
+        'https://127.0.0.1:9001',
+        ...(isHttpsPage ? [] : ['http://127.0.0.1:9001']),
+      ].filter(Boolean)
+    )
+  );
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(`${url}/device-id`, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(Math.min(timeoutMs, 1500)),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (typeof data?.device_id === 'string' && data.device_id.trim()) {
+        lastWorkingAgentUrl = url;
+        return data.device_id.trim();
+      }
+    } catch (_) {
+      // thử ứng viên tiếp theo
+    }
+  }
+
+  // Fallback: Lấy qua Gateway khi Local Agent chưa phản hồi trực tiếp (vd: trình duyệt chặn mixed content HTTPS)
+  const agents = await fetchGatewayAgents();
+  if (agents.length > 0) {
+    if (agents.length > 1) {
+      console.warn('[Fingerprint] Có nhiều agent online, tự động chọn agent đầu tiên:', agents[0]);
+    }
+    return agents[0];
+  }
+
+  throw new Error('AGENT_NOT_RUNNING');
+},
+
 
   /**
+   * Xác thực vân tay cho 1 file cụ thể.
+   * @param signal AbortSignal — để FE có thể hủy request khi user đóng modal.
+   */
+     /**
    * Xác thực vân tay cho 1 file cụ thể.
    * @param signal AbortSignal — để FE có thể hủy request khi user đóng modal.
    */
@@ -109,16 +184,43 @@ export const fingerprintService = {
     deviceId: string,
     signal?: AbortSignal
   ): Promise<FingerprintVerifyResponse> {
-    return http<FingerprintVerifyResponse>('/api/auth/fingerprint/verify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Device-FP': deviceId,
-      },
-      body: JSON.stringify({ file_id: fileId, device_id: deviceId }),
-      skipErrorNotification: true,
-      signal,
-    });
+    // Tạo timeout 40s chống treo
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), 40000);
+
+    // Kết hợp signal từ bên ngoài (nếu user bấm Hủy) và signal timeout (an toàn cho mọi trình duyệt)
+    const controller = new AbortController();
+    const abortHandler = () => controller.abort();
+
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener('abort', abortHandler);
+    }
+
+    const timeoutHandler = () => controller.abort();
+    timeoutController.signal.addEventListener('abort', timeoutHandler);
+
+    try {
+      return await http<FingerprintVerifyResponse>('/api/auth/fingerprint/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-FP': deviceId,
+        },
+        body: JSON.stringify({ file_id: fileId, device_id: deviceId }),
+        skipErrorNotification: true,
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      if (err.name === 'AbortError' && !signal?.aborted) {
+        throw new Error('Quá thời gian chờ phản hồi từ máy quét (40s). Vui lòng kiểm tra lại cáp USB và phần mềm Agent.');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+      if (signal) signal.removeEventListener('abort', abortHandler);
+      timeoutController.signal.removeEventListener('abort', timeoutHandler);
+    }
   },
 
   /**

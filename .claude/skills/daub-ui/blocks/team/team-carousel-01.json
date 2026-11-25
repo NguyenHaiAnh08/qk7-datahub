@@ -1,0 +1,229 @@
+{
+  "root": "team-carousel",
+  "elements": {
+    "team-carousel": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "container": true,
+        "align": "center"
+      },
+      "children": [
+        "tc-header",
+        "tc-sub",
+        "tc-grid",
+        "tc-nav"
+      ]
+    },
+    "tc-header": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "The People Behind the Product",
+        "weight": "bold",
+        "align": "center"
+      }
+    },
+    "tc-sub": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "A world-class team passionate about building tools developers love.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "tc-grid": {
+      "type": "Grid",
+      "props": {
+        "columns": 3,
+        "gap": 3
+      },
+      "children": [
+        "tc-card-1",
+        "tc-card-2",
+        "tc-card-3"
+      ]
+    },
+    "tc-card-1": {
+      "type": "Card",
+      "children": [
+        "tc-c1-inner"
+      ]
+    },
+    "tc-c1-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "tc-c1-img",
+        "tc-c1-name",
+        "tc-c1-role",
+        "tc-c1-bio"
+      ]
+    },
+    "tc-c1-img": {
+      "type": "Avatar",
+      "props": {
+        "src": "https://picsum.photos/seed/mia-torres/200/200",
+        "initials": "MT",
+        "size": "xl"
+      }
+    },
+    "tc-c1-name": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Mia Torres",
+        "weight": "bold"
+      }
+    },
+    "tc-c1-role": {
+      "type": "Chip",
+      "props": {
+        "label": "Frontend Lead",
+        "variant": "secondary"
+      }
+    },
+    "tc-c1-bio": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "React and TypeScript specialist. Built design systems used by Fortune 500 companies.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "tc-card-2": {
+      "type": "Card",
+      "children": [
+        "tc-c2-inner"
+      ]
+    },
+    "tc-c2-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "tc-c2-img",
+        "tc-c2-name",
+        "tc-c2-role",
+        "tc-c2-bio"
+      ]
+    },
+    "tc-c2-img": {
+      "type": "Avatar",
+      "props": {
+        "src": "https://picsum.photos/seed/alex-novak/200/200",
+        "initials": "AN",
+        "size": "xl"
+      }
+    },
+    "tc-c2-name": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Alex Novak",
+        "weight": "bold"
+      }
+    },
+    "tc-c2-role": {
+      "type": "Chip",
+      "props": {
+        "label": "Backend Lead",
+        "variant": "secondary"
+      }
+    },
+    "tc-c2-bio": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Distributed systems expert. Previously scaled APIs to 100M+ requests/day at Uber.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "tc-card-3": {
+      "type": "Card",
+      "children": [
+        "tc-c3-inner"
+      ]
+    },
+    "tc-c3-inner": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 2,
+        "align": "center"
+      },
+      "children": [
+        "tc-c3-img",
+        "tc-c3-name",
+        "tc-c3-role",
+        "tc-c3-bio"
+      ]
+    },
+    "tc-c3-img": {
+      "type": "Avatar",
+      "props": {
+        "src": "https://picsum.photos/seed/zara-williams/200/200",
+        "initials": "ZW",
+        "size": "xl"
+      }
+    },
+    "tc-c3-name": {
+      "type": "Text",
+      "props": {
+        "tag": "h3",
+        "content": "Zara Williams",
+        "weight": "bold"
+      }
+    },
+    "tc-c3-role": {
+      "type": "Chip",
+      "props": {
+        "label": "Design Director",
+        "variant": "secondary"
+      }
+    },
+    "tc-c3-bio": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Award-winning designer. Led brand and product design at Spotify for 6 years.",
+        "variant": "muted",
+        "align": "center"
+      }
+    },
+    "tc-nav": {
+      "type": "ButtonGroup",
+      "children": [
+        "tc-prev",
+        "tc-next"
+      ]
+    },
+    "tc-prev": {
+      "type": "Button",
+      "props": {
+        "label": "Previous",
+        "variant": "outline",
+        "icon": "chevron-left"
+      }
+    },
+    "tc-next": {
+      "type": "Button",
+      "props": {
+        "label": "Next",
+        "variant": "outline",
+        "icon": "chevron-right"
+      }
+    }
+  }
+}

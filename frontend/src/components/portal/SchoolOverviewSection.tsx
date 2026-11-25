@@ -21,6 +21,7 @@ import { DocumentItem, MetaData, Unit, User } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { RollingNumber } from '../common/RollingNumber';
+import { getMilitaryUnitSortWeight } from '../../utils/unitTree';
 
 export interface SchoolOverviewSectionProps {
   documents: DocumentItem[];
@@ -79,14 +80,17 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
     });
   }, [documents]);
 
-  // 2. Thống kê tiến độ các phòng ban trực thuộc Trường Quân sự Quân khu 7
+  // 2. Thống kê tiến độ các phòng ban/đơn vị cha trực thuộc Trường Quân sự Quân khu 7
   const schoolUnitsList = useMemo(() => {
-    // Chỉ lấy duy nhất các phòng ban con của Trường Quân sự Quân khu 7 (loại bỏ hoàn toàn cơ quan bên ngoài/cấp trên)
-    return tqsDepartments.map((d) => ({
-      unit_id: d.unit_id,
-      name: d.unit_id === 'U-BGH' ? 'Ban Giám hiệu' : d.name,
-      isDeptOfTqs: true,
-    }));
+    // Chỉ lấy các đơn vị cha trực thuộc Trường Quân sự Quân khu 7 (level 0 trong cây phân cấp)
+    // Giúp bảng báo cáo cô đọng, không phải cuộn 79 phòng ban
+    return tqsDepartments
+      .filter((d: any) => d.level === 0 || d.level === undefined)
+      .map((d) => ({
+        unit_id: d.unit_id,
+        name: d.unit_id === 'U-BGH' ? 'Ban Giám hiệu' : d.name,
+        isDeptOfTqs: true,
+      }));
   }, [tqsDepartments]);
 
   const unitStats = useMemo(() => {
@@ -95,6 +99,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
       const uId = d.issuing_unit_id;
       return (
         uId === 'TQS' ||
+        uId === 'TQS-QK7' ||
         uId === 'U-TQS' ||
         tqsDepartments.some((dept) => dept.unit_id === uId) ||
         (d.unit_name &&
@@ -104,17 +109,36 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
     });
     const totalSchoolDocs = tqsDocs.length > 0 ? tqsDocs.length : 1;
 
+    // Helper thu thập toàn bộ ID các đơn vị con cháu (con, cháu, chắt...) của 1 đơn vị cha
+    const getDescendantIds = (parentUnitId: string): Set<string> => {
+      const set = new Set<string>();
+      const queue = [parentUnitId];
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        for (const u of meta.units) {
+          if (u.parent_id === cur && !set.has(u.unit_id)) {
+            set.add(u.unit_id);
+            queue.push(u.unit_id);
+          }
+        }
+      }
+      return set;
+    };
+
     return schoolUnitsList
       .map((unit) => {
-        const subUnitIds = meta.units.filter((u) => u.parent_id === unit.unit_id).map((u) => u.unit_id);
+        const descendantIds = getDescendantIds(unit.unit_id);
 
         const unitDocs = documents.filter((d) => {
-          if (unit.unit_id === 'U-BGH') {
-            // Ban Giám hiệu phụ trách các văn bản do Nhà trường / Ban Giám hiệu ký (TQS, U-TQS, U-BGH)
+          if (unit.unit_id === 'U-BGH' || unit.unit_id === 'BGH-TQSQK') {
+            // Ban Giám hiệu phụ trách các văn bản do Nhà trường / Ban Giám hiệu ký (TQS, U-TQS, U-BGH, BGH-TQSQK)
             return (
               d.issuing_unit_id === 'U-BGH' ||
+              d.issuing_unit_id === 'BGH-TQSQK' ||
               d.issuing_unit_id === 'TQS' ||
+              d.issuing_unit_id === 'TQS-QK7' ||
               d.issuing_unit_id === 'U-TQS' ||
+              descendantIds.has(d.issuing_unit_id) ||
               (d.unit_name &&
                 (d.unit_name.toLowerCase().includes('ban giám hiệu') ||
                   d.unit_name.toLowerCase().includes('trường quân sự')))
@@ -122,8 +146,8 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
           }
           if (d.issuing_unit_id === unit.unit_id) return true;
           if (d.unit_name && d.unit_name.toLowerCase() === unit.name.toLowerCase()) return true;
-          // Bao gồm cả tài liệu của các đơn vị con trực thuộc (ví dụ Bếp cơ quan con của Phòng Hậu cần - Kỹ thuật)
-          if (subUnitIds.includes(d.issuing_unit_id)) return true;
+          // Thừa kế tổng hợp: Bao gồm toàn bộ tài liệu của các đơn vị con cháu trực thuộc
+          if (descendantIds.has(d.issuing_unit_id)) return true;
           return false;
         });
 
@@ -162,11 +186,14 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
         };
       })
       .sort((a, b) => {
-        // Đơn vị nhiều tài liệu lên trước, các đơn vị 0 tài liệu xếp sau
+        // Đơn vị nhiều tài liệu lên trước, các đơn vị chưa nộp xếp theo chuẩn phân cấp quân sự
         if (b.count !== a.count) return b.count - a.count;
+        const wA = getMilitaryUnitSortWeight(a);
+        const wB = getMilitaryUnitSortWeight(b);
+        if (wA !== wB) return wA - wB;
         return a.name.localeCompare(b.name, 'vi');
       });
-  }, [schoolUnitsList, documents, tqsDepartments]);
+  }, [schoolUnitsList, documents, tqsDepartments, meta.units]);
 
   const totalUnitsCount = unitStats.length;
   const unitsWithDocsCount = unitStats.filter((u) => u.count > 0).length;
@@ -291,7 +318,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
       {/* ============================================================ */}
       {/* PHẦN 1: 4 THẺ KPI VĨ MÔ TOÀN TRƯỜNG (4 MACRO KPI CARDS)       */}
       {/* ============================================================ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div id="tour-kpi-cards" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* THẺ 1: TỔNG VĂN BẢN TOÀN TRƯỜNG */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -493,7 +520,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
       {/* ============================================================ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* BẢNG TRÁI (7 CỘT): TIẾN ĐỘ SỐ HÓA & PHÂN BỔ THEO ĐƠN VỊ */}
-        <div className="lg:col-span-7 bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-3.5 shadow-xs">
+        <div id="tour-department-radar" className="lg:col-span-7 bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-3.5 shadow-xs">
           {/* Header Bảng Trái: Thiết kế 2 tầng chuẩn Command Center chống ngắt dòng */}
           <div className="pb-3 border-b border-slate-100 dark:border-white/[0.06] space-y-2.5">
             {/* Hàng 1: Tiêu đề và Subtitle độc lập toàn dải */}
@@ -512,9 +539,9 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
                 </div>
               </div>
 
-              {/* Badge tổng số phòng ban */}
+              {/* Badge tổng số phòng ban/đơn vị cha */}
               <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/[0.05] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 shrink-0">
-                {unitStats.length} phòng ban
+                {unitStats.length} đơn vị trực thuộc
               </span>
             </div>
 
@@ -665,7 +692,7 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
         </div>
 
         {/* BẢNG PHẢI (5 CỘT): CƠ CẤU THỂ LOẠI & MỨC BẢO MẬT TOÀN TRƯỜNG */}
-        <div className="lg:col-span-5 bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-3.5 shadow-xs flex flex-col justify-between">
+        <div id="tour-document-breakdown" className="lg:col-span-5 bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-3.5 shadow-xs flex flex-col justify-between">
           <div>
             {/* Header Bảng Phải kèm Mini Segmented Tabs */}
             <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-white/[0.06]">

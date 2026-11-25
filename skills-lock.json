@@ -1,0 +1,120 @@
+{
+  "version": 2,
+  "skills": {
+    "ai-development-guide": {
+      "source": "shinpr/claude-code-workflows",
+      "commit": "e9118a0d7cc741abfce9e9f010d23ae739e18ecf",
+      "sourceType": "github",
+      "skillPath": "skills/ai-development-guide/SKILL.md",
+      "computedHash": "4b90bb61fde28b23663e2a8c42cc32fa1673abd22d1faf2d9ecfe68dee59e3f8"
+    },
+    "api-design-principles": {
+      "source": "wshobson/agents",
+      "commit": "9c61ab243def98f72da12abd41cfcf5bcd91af9d",
+      "sourceType": "github",
+      "skillPath": "plugins/backend-development/skills/api-design-principles/SKILL.md",
+      "computedHash": "cd8889e86d651fbc7ec5f1cdf1920cdc0fa6bd2ca6ca01b8d93e9d2f6b54c7a6"
+    },
+    "architecture-patterns": {
+      "source": "wshobson/agents",
+      "commit": "9c61ab243def98f72da12abd41cfcf5bcd91af9d",
+      "sourceType": "github",
+      "skillPath": "plugins/backend-development/skills/architecture-patterns/SKILL.md",
+      "computedHash": "bfd02e3b52c08838d3a93ac17def96318a41a00f77798f162bfb78669d38e713"
+    },
+    "coding-principles": {
+      "source": "shinpr/claude-code-workflows",
+      "commit": "e9118a0d7cc741abfce9e9f010d23ae739e18ecf",
+      "sourceType": "github",
+      "skillPath": "skills/coding-principles/SKILL.md",
+      "computedHash": "4a79357240132cc41e732fae7d49708df5261732415bbb8487da97eba0497908"
+    },
+    "cqrs-implementation": {
+      "source": "wshobson/agents",
+      "commit": "9c61ab243def98f72da12abd41cfcf5bcd91af9d",
+      "sourceType": "github",
+      "skillPath": "plugins/backend-development/skills/cqrs-implementation/SKILL.md",
+      "computedHash": "efed1fc32e0a96b084df14e09eafced2a70447633ed178dce023cd6d6c42b2bf"
+    },
+    "daub-ui": {
+      "source": "sliday/daub",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": ""
+    },
+    "design-md": {
+      "source": "nexu-io/open-design",
+      "sourceType": "github",
+      "skillPath": "skills/design-md/SKILL.md",
+      "computedHash": "2d2d6f3ab325ea39da88a2efe0499ae75aa4b8c6b6780bf5c173ae107207c608"
+    },
+    "huashu-design": {
+      "source": "alchaincyf/huashu-design",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": ""
+    },
+    "microservices-patterns": {
+      "source": "wshobson/agents",
+      "commit": "9c61ab243def98f72da12abd41cfcf5bcd91af9d",
+      "sourceType": "github",
+      "skillPath": "plugins/backend-development/skills/microservices-patterns/SKILL.md",
+      "computedHash": "6bd575e75894f828f8c922b55d3d10a118849d37db7d69185c4fc0476372a5e8"
+    },
+    "new-app": {
+      "source": "cfboy/skills",
+      "commit": "d331b03da8b09384bc152be563c66f22a75ef422",
+      "sourceType": "github",
+      "skillPath": "skills/new-app/SKILL.md",
+      "computedHash": "6f0479b73a987f832a81083b121e081c8fd6ce5422557504029bef3a5aebc4b8"
+    },
+    "prisma-database-setup": {
+      "source": "prisma/skills",
+      "commit": "a6f192959cf43b08aa330fe1ffca090267215812",
+      "sourceType": "github",
+      "skillPath": "prisma-database-setup/SKILL.md",
+      "computedHash": "79848d903a92d69c3ee173fe26e565381b7b8a2ca66f82da156093e981087ce5"
+    },
+    "recipe-implement": {
+      "source": "shinpr/claude-code-workflows",
+      "commit": "e9118a0d7cc741abfce9e9f010d23ae739e18ecf",
+      "sourceType": "github",
+      "skillPath": "skills/recipe-implement/SKILL.md",
+      "computedHash": "5537c704849d3b87128e6a9b1a886d63cf86a054c1107e54c2e39f39273ed48b"
+    },
+    "saga-orchestration": {
+      "source": "wshobson/agents",
+      "commit": "9c61ab243def98f72da12abd41cfcf5bcd91af9d",
+      "sourceType": "github",
+      "skillPath": "plugins/backend-development/skills/saga-orchestration/SKILL.md",
+      "computedHash": "ef1a8f8f283e73fd3f72a00cbd28b3ffeb73a46b5c97f6f89ef81c327a37dffc"
+    },
+    "security-audit": {
+      "source": "cloudflare/security-audit-skill",
+      "commit": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit/SKILL.md",
+      "computedHash": "8513eb3b2c39b8d05ef4f47b32ef4d18280b93a5efb91d8df6272f7435034af5"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "commit": "c9be0e931b7930f7d02126d04774d904c381e7d7",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "3eb972c2d7c818e544e35cc33ea8d7147d4d78ae08142ef40037b0fbac7a2505"
+    },
+    "testing-principles": {
+      "source": "shinpr/claude-code-workflows",
+      "commit": "e9118a0d7cc741abfce9e9f010d23ae739e18ecf",
+      "sourceType": "github",
+      "skillPath": "skills/testing-principles/SKILL.md",
+      "computedHash": "6ac3e6a90cf3f15926c59fcd2d890c3abb0f7262b0e49f182b9ad195608fdb45"
+    },
+    "unslop": {
+      "source": "heydamir/unslop",
+      "sourceType": "github",
+      "skillPath": "skills/unslop/SKILL.md",
+      "computedHash": ""
+    }
+  }
+}

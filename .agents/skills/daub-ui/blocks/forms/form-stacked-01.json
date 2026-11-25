@@ -1,0 +1,304 @@
+{
+  "root": "contact-form",
+  "elements": {
+    "contact-form": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 5
+      },
+      "children": [
+        "form-heading",
+        "section-personal",
+        "separator-1",
+        "section-address",
+        "separator-2",
+        "section-preferences",
+        "form-actions"
+      ]
+    },
+    "form-heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Contact Information",
+        "weight": "bold"
+      }
+    },
+    "section-personal": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "section-personal-label",
+        "row-name",
+        "field-email",
+        "field-phone"
+      ]
+    },
+    "section-personal-label": {
+      "type": "Text",
+      "props": {
+        "tag": "h4",
+        "content": "Personal Details",
+        "weight": "semibold"
+      }
+    },
+    "row-name": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 3
+      },
+      "children": [
+        "field-first-name",
+        "field-last-name"
+      ]
+    },
+    "field-first-name": {
+      "type": "Field",
+      "props": {
+        "label": "First Name"
+      },
+      "children": [
+        "input-first-name"
+      ]
+    },
+    "input-first-name": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Sarah",
+        "type_input": "text"
+      }
+    },
+    "field-last-name": {
+      "type": "Field",
+      "props": {
+        "label": "Last Name"
+      },
+      "children": [
+        "input-last-name"
+      ]
+    },
+    "input-last-name": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Mitchell",
+        "type_input": "text"
+      }
+    },
+    "field-email": {
+      "type": "Field",
+      "props": {
+        "label": "Email Address"
+      },
+      "children": [
+        "input-email"
+      ]
+    },
+    "input-email": {
+      "type": "Input",
+      "props": {
+        "placeholder": "sarah.mitchell@example.com",
+        "type_input": "email"
+      }
+    },
+    "field-phone": {
+      "type": "Field",
+      "props": {
+        "label": "Phone Number"
+      },
+      "children": [
+        "input-phone"
+      ]
+    },
+    "input-phone": {
+      "type": "Input",
+      "props": {
+        "placeholder": "+1 (555) 123-4567",
+        "type_input": "tel"
+      }
+    },
+    "separator-1": {
+      "type": "Separator"
+    },
+    "section-address": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "section-address-label",
+        "field-street",
+        "row-city-state",
+        "field-zip"
+      ]
+    },
+    "section-address-label": {
+      "type": "Text",
+      "props": {
+        "tag": "h4",
+        "content": "Mailing Address",
+        "weight": "semibold"
+      }
+    },
+    "field-street": {
+      "type": "Field",
+      "props": {
+        "label": "Street Address"
+      },
+      "children": [
+        "input-street"
+      ]
+    },
+    "input-street": {
+      "type": "Input",
+      "props": {
+        "placeholder": "742 Evergreen Terrace",
+        "type_input": "text"
+      }
+    },
+    "row-city-state": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 3
+      },
+      "children": [
+        "field-city",
+        "field-state"
+      ]
+    },
+    "field-city": {
+      "type": "Field",
+      "props": {
+        "label": "City"
+      },
+      "children": [
+        "input-city"
+      ]
+    },
+    "input-city": {
+      "type": "Input",
+      "props": {
+        "placeholder": "San Francisco",
+        "type_input": "text"
+      }
+    },
+    "field-state": {
+      "type": "Field",
+      "props": {
+        "label": "State"
+      },
+      "children": [
+        "select-state"
+      ]
+    },
+    "select-state": {
+      "type": "Select",
+      "props": {
+        "options": [
+          {
+            "label": "California",
+            "value": "CA"
+          },
+          {
+            "label": "New York",
+            "value": "NY"
+          },
+          {
+            "label": "Texas",
+            "value": "TX"
+          },
+          {
+            "label": "Washington",
+            "value": "WA"
+          }
+        ]
+      }
+    },
+    "field-zip": {
+      "type": "Field",
+      "props": {
+        "label": "ZIP Code"
+      },
+      "children": [
+        "input-zip"
+      ]
+    },
+    "input-zip": {
+      "type": "Input",
+      "props": {
+        "placeholder": "94102",
+        "type_input": "text"
+      }
+    },
+    "separator-2": {
+      "type": "Separator"
+    },
+    "section-preferences": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "section-preferences-label",
+        "field-message"
+      ]
+    },
+    "section-preferences-label": {
+      "type": "Text",
+      "props": {
+        "tag": "h4",
+        "content": "Additional Info",
+        "weight": "semibold"
+      }
+    },
+    "field-message": {
+      "type": "Field",
+      "props": {
+        "label": "Message"
+      },
+      "children": [
+        "textarea-message"
+      ]
+    },
+    "textarea-message": {
+      "type": "Textarea",
+      "props": {
+        "placeholder": "Tell us how we can help you...",
+        "rows": 4
+      }
+    },
+    "form-actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2,
+        "justify": "flex-end"
+      },
+      "children": [
+        "btn-cancel",
+        "btn-submit"
+      ]
+    },
+    "btn-cancel": {
+      "type": "Button",
+      "props": {
+        "label": "Cancel",
+        "variant": "outline"
+      }
+    },
+    "btn-submit": {
+      "type": "Button",
+      "props": {
+        "label": "Submit",
+        "variant": "default"
+      }
+    }
+  }
+}

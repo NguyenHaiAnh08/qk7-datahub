@@ -1,0 +1,220 @@
+{
+  "root": "product-grid-section",
+  "elements": {
+    "product-grid-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "container": true
+      },
+      "children": [
+        "grid-header",
+        "grid-toolbar",
+        "products-grid",
+        "load-more-row"
+      ]
+    },
+    "grid-header": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "justify": "space-between",
+        "align": "center"
+      },
+      "children": [
+        "grid-title",
+        "results-count"
+      ]
+    },
+    "grid-title": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Wireless Headphones",
+        "weight": "bold"
+      }
+    },
+    "results-count": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "Showing 8 of 124 products",
+        "variant": "muted"
+      }
+    },
+    "grid-toolbar": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "justify": "space-between",
+        "align": "center",
+        "gap": 2
+      },
+      "children": [
+        "sort-select",
+        "filter-chips"
+      ]
+    },
+    "sort-select": {
+      "type": "Select",
+      "props": {
+        "label": "Sort by",
+        "options": [
+          {
+            "label": "Most Popular",
+            "value": "popular"
+          },
+          {
+            "label": "Price: Low to High",
+            "value": "price-asc"
+          },
+          {
+            "label": "Price: High to Low",
+            "value": "price-desc"
+          },
+          {
+            "label": "Highest Rated",
+            "value": "rating"
+          },
+          {
+            "label": "Newest",
+            "value": "newest"
+          }
+        ]
+      }
+    },
+    "filter-chips": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 1
+      },
+      "children": [
+        "chip-all",
+        "chip-on-sale",
+        "chip-in-stock",
+        "chip-top-rated"
+      ]
+    },
+    "chip-all": {
+      "type": "Chip",
+      "props": {
+        "label": "All",
+        "variant": "primary"
+      }
+    },
+    "chip-on-sale": {
+      "type": "Chip",
+      "props": {
+        "label": "On Sale",
+        "variant": "default"
+      }
+    },
+    "chip-in-stock": {
+      "type": "Chip",
+      "props": {
+        "label": "In Stock",
+        "variant": "default"
+      }
+    },
+    "chip-top-rated": {
+      "type": "Chip",
+      "props": {
+        "label": "Top Rated",
+        "variant": "default"
+      }
+    },
+    "products-grid": {
+      "type": "Grid",
+      "props": {
+        "columns": 4,
+        "gap": 3
+      },
+      "children": [
+        "product-1",
+        "product-2",
+        "product-3",
+        "product-4",
+        "product-5",
+        "product-6",
+        "product-7",
+        "product-8"
+      ]
+    },
+    "product-1": {
+      "type": "Card",
+      "props": {
+        "title": "Sony WH-1000XM5",
+        "description": "$328.00 — ★★★★★ (2,847)"
+      }
+    },
+    "product-2": {
+      "type": "Card",
+      "props": {
+        "title": "Apple AirPods Max",
+        "description": "$449.00 — ★★★★☆ (1,923)"
+      }
+    },
+    "product-3": {
+      "type": "Card",
+      "props": {
+        "title": "Bose QuietComfort Ultra",
+        "description": "$379.00 — ★★★★★ (3,102)"
+      }
+    },
+    "product-4": {
+      "type": "Card",
+      "props": {
+        "title": "Sennheiser Momentum 4",
+        "description": "$299.95 — ★★★★☆ (1,456)"
+      }
+    },
+    "product-5": {
+      "type": "Card",
+      "props": {
+        "title": "Beats Studio Pro",
+        "description": "$249.99 — ★★★★☆ (2,108)"
+      }
+    },
+    "product-6": {
+      "type": "Card",
+      "props": {
+        "title": "Jabra Elite 85h",
+        "description": "$199.99 — ★★★★☆ (987)"
+      }
+    },
+    "product-7": {
+      "type": "Card",
+      "props": {
+        "title": "Bang & Olufsen Beoplay HX",
+        "description": "$499.00 — ★★★★★ (642)"
+      }
+    },
+    "product-8": {
+      "type": "Card",
+      "props": {
+        "title": "Marshall Monitor II ANC",
+        "description": "$279.99 — ★★★★☆ (1,234)"
+      }
+    },
+    "load-more-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "justify": "center"
+      },
+      "children": [
+        "load-more-button"
+      ]
+    },
+    "load-more-button": {
+      "type": "Button",
+      "props": {
+        "label": "Load More Products",
+        "variant": "outline",
+        "icon": "chevron-down"
+      }
+    }
+  }
+}

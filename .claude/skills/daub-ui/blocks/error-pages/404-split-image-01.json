@@ -1,0 +1,95 @@
+{
+  "root": "not-found-split-01",
+  "elements": {
+    "not-found-split-01": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 0
+      },
+      "children": [
+        "text-panel",
+        "image-panel"
+      ]
+    },
+    "text-panel": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "justify": "end",
+        "padding": [
+          8,
+          6
+        ],
+        "gap": 6
+      },
+      "children": [
+        "heading-group",
+        "actions"
+      ]
+    },
+    "heading-group": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "heading",
+        "description"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h1",
+        "content": "Page not found"
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Sorry, the page you are looking for doesn't exist or has been moved. Here are some helpful links:",
+        "variant": "secondary"
+      }
+    },
+    "actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3
+      },
+      "children": [
+        "back-btn",
+        "home-btn"
+      ]
+    },
+    "back-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Go back",
+        "variant": "outline",
+        "size": "lg",
+        "icon": "arrow-left"
+      }
+    },
+    "home-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Take me home",
+        "variant": "primary",
+        "size": "lg"
+      }
+    },
+    "image-panel": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/404-split-image-01-image-panel/720/960",
+        "alt": "Abstract purple gradient",
+        "objectFit": "cover",
+        "fullHeight": true
+      }
+    }
+  }
+}

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, RotateCw, FileCheck, Clock } from 'lucide-react';
 import { PendingProposalsModal, PendingProposalItem } from '../components/document-desk/PendingProposalsModal';
 import { Header } from '../components/common/Header';
-import { DataHubSubNav } from '../components/common/DataHubSubNav';
 import { Toast, ToastState, toast } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { DocumentFilters } from '../components/document-desk/DocumentFilters';
@@ -11,12 +10,14 @@ import { DocumentUploadModal } from '../components/document-desk/DocumentUploadM
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
+import { approvalService } from '../services/approvalService';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAuth } from '../hooks/useAuth';
 import { isUserAdmin } from '../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { DocumentItem, MetaData, DocumentType, Unit, SecurityLevel } from '../types';
 import { isApprovalRequired } from '../utils/approvalUtils';
+import { isSchoolUnitId } from '../utils/unitTree';
 
 const ITEMS_PER_PAGE = 30;
 
@@ -49,6 +50,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<DocumentItem | null>(null);
   const [proposalsModalOpen, setProposalsModalOpen] = useState(false);
   const [pendingProposals, setPendingProposals] = useState<PendingProposalItem[]>([]);
+  const [ownerWaiting, setOwnerWaiting] = useState(0);
 
   const canApproveProposals = useMemo(() => {
     if (!user) return false;
@@ -60,9 +62,9 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
     const isCommander = (user.roles || []).includes('ROL-02');
 
-    // Admin HOẶC Chỉ huy được duyệt đề xuất chỉnh sửa văn bản
-    // (ROL-03 KHÔNG được duyệt — tránh mở rộng nhầm qua isUserManager)
-    return isAdmin || isCommander;
+    // Quyền duyệt do BẢNG QUYỀN quyết định (APPROVAL_VALIDATE): Admin/Chỉ huy duyệt chính thức,
+    // người được cấp quyền chỉ thẩm định (chờ Chỉ huy cấp trên xác nhận).
+    return isAdmin || isCommander || (user.permissions || []).includes('APPROVAL_VALIDATE');
   }, [user]);
 
   const loadPendingProposals = useCallback(async () => {
@@ -71,6 +73,12 @@ const canUpload = hasPermission('DOC_UPLOAD');
       setPendingProposals(res.items || []);
     } catch (e) {
       console.error('[loadPendingProposals]', e);
+    }
+    try {
+      const o = await approvalService.awaitingOwner();
+      setOwnerWaiting((o.items || []).length);
+    } catch {
+      setOwnerWaiting(0);
     }
   }, []);
 
@@ -99,14 +107,14 @@ const canUpload = hasPermission('DOC_UPLOAD');
       let queryUnit: string | undefined = undefined;
       let includeChildren: boolean | undefined = undefined;
 
-      const isSchool = selectedUnit === 'TQS' || selectedUnit === 'U-TQS';
+      const isSchool = isSchoolUnitId(selectedUnit, meta.units);
 
       if (isSchool) {
         if (selectedDepartment) {
           queryUnit = selectedDepartment;
           includeChildren = true;
         } else {
-          queryUnit = 'TQS';
+          queryUnit = selectedUnit;
           includeChildren = true;
         }
       } else if (selectedUnit) {
@@ -289,7 +297,7 @@ const canUpload = hasPermission('DOC_UPLOAD');
   }, [documents, currentPage]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
       {/* Header */}
       <Header
         activeNav="desk"
@@ -299,8 +307,6 @@ const canUpload = hasPermission('DOC_UPLOAD');
 
       {/* Main Container */}
       <main className="flex-1 min-w-0 p-3.5 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6">
-        {/* Tactical Sub-Navigation Phân hệ Dữ liệu số */}
-        <DataHubSubNav activeTab="desk" />
         {/* Top Action & Title Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -324,9 +330,9 @@ const canUpload = hasPermission('DOC_UPLOAD');
           >
             <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             <span>Đề Xuất Chờ Duyệt</span>
-            {pendingProposals.length > 0 && (
+            {pendingProposals.length + ownerWaiting > 0 && (
               <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">
-                {pendingProposals.length}
+                {pendingProposals.length + ownerWaiting}
               </span>
             )}
           </button>

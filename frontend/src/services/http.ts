@@ -44,13 +44,41 @@ export function getAuthHeaders(): Record<string, string> {
   let token: string | null = null;
   if (typeof window !== 'undefined') {
     try {
+      // 1. Nếu người dùng đang là Đại biểu (Guest) trong phiên -> Không gửi token cũ, luôn bật X-Guest-Mode
+      const rawUser = sessionStorage.getItem('qk7_user');
+      if (rawUser) {
+        try {
+          const parsed = JSON.parse(rawUser);
+          if (parsed?.user_id === 'GUEST') {
+            return { 'X-Guest-Mode': 'true' };
+          }
+        } catch (_) {}
+      }
+
       token = sessionStorage.getItem('qk7_token');
+      // 2. Tự động kiểm tra hạn token phía client chống gửi token đã hết hạn lên server
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          try {
+            const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+            const payload = JSON.parse(atob(padded));
+            if (payload && payload.exp && payload.exp * 1000 <= Date.now()) {
+              // Token đã hết hạn -> xóa khỏi storage và trả về Guest mode
+              sessionStorage.removeItem('qk7_token');
+              sessionStorage.removeItem('qk7_user');
+              token = null;
+            }
+          } catch (_) {}
+        }
+      }
     } catch (_) {}
   }
   if (token) {
     return { 'Authorization': `Bearer ${token}` };
   }
-  return {};
+  return { 'X-Guest-Mode': 'true' };
 }
 
 export async function http<T>(url: string, options: HttpOptions = {}): Promise<T> {
@@ -135,6 +163,17 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
 
     return data as T;
   } catch (err: any) {
+    // Nếu request bị hủy chủ động qua AbortController (khi đóng modal quét vân tay, chuyển trang...)
+    // Tuyệt đối không biến thành lỗi 503 Sự Cố Máy Chủ hay bắn sự kiện qk7:http-error.
+    const isAborted =
+      err?.name === 'AbortError' ||
+      options.signal?.aborted === true ||
+      /signal is aborted|aborted a request|operation was aborted/i.test(err?.message || '');
+
+    if (isAborted) {
+      throw err;
+    }
+
     // Nếu là lỗi mạng không phản hồi (fetch failed/offline/Safari Load failed)
     if (!(err instanceof HttpError)) {
       const isLoadFailed =

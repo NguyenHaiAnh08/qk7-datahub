@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Tooltip,
-  Spin
-} from 'antd';
+import { Tooltip } from 'antd';
 import {
   MessageOutlined,
   CloseOutlined,
@@ -23,6 +20,7 @@ import { toast } from '../common/Toast';
 import { FingerprintScanModal } from '../users/FingerprintScanModal';
 import { DocumentPreviewModal } from '../document-desk/DocumentPreviewModal';
 import { DocumentItem } from '../../types';
+import { AIThinkingBubble } from './AIThinkingBubble';
 
 interface ChatMessage {
   id: string;
@@ -37,13 +35,6 @@ interface ChatMessage {
     tool_call?: string;
   };
 }
-
-const QUICK_PROMPTS = [
-  '📋 Tóm tắt các văn bản mới nhất',
-  '🔒 Quy định 5 cấp độ bảo mật quân sự',
-  '🎯 Kế hoạch tác chiến và huấn luyện',
-  '⚡ Quy trình lưu trữ và băm tệp SHA-256'
-];
 
 export const AIChatWidget: React.FC = () => {
   const { isDark } = useTheme();
@@ -489,7 +480,7 @@ export const AIChatWidget: React.FC = () => {
           </div>
 
           {/* DANH SÁCH TIN NHẮN */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3.5 scrollbar-thin">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -510,8 +501,8 @@ export const AIChatWidget: React.FC = () => {
                     }
                   `}
                 >
-                  {/* Nội dung tin nhắn (hỗ trợ markdown đơn giản) */}
-                  <div className="whitespace-pre-wrap font-sans">
+                  {/* Nội dung tin nhắn (hỗ trợ markdown đơn giản, tương phản cao cho người dùng) */}
+                  <div className={`whitespace-pre-wrap font-sans ${msg.sender === 'user' ? '!text-white font-medium select-text' : ''}`}>
                     {msg.text.split('\n').map((line, lIdx) => (
                       <p key={lIdx} className={lIdx > 0 ? 'mt-1.5' : ''}>
                         {renderFormattedText(line)}
@@ -675,41 +666,17 @@ export const AIChatWidget: React.FC = () => {
               </div>
             ))}
 
-            {/* Trạng thái đang tải */}
+            {/* Trạng thái AI đang suy nghĩ — bong bóng 3 dấu chấm nhấp nháy */}
             {loading && (
-              <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/20 animate-pulse">
-                <Spin size="small" />
-                <span className="font-medium">
-                  {lastQuery ? 'Đang lấy câu trả lời...' : 'Trợ lý AI đang tra cứu kho dữ liệu số...'}
-                </span>
-              </div>
+              <AIThinkingBubble
+                compact
+                showRoleLabel={false}
+                isDecrypting={Boolean(lastQuery)}
+              />
             )}
 
             <div ref={messagesEndRef} />
           </div>
-
-          {/* GỢI Ý CÂU HỎI NHANH */}
-          {messages.length <= 2 && (
-            <div className="px-3 py-1.5 flex flex-wrap gap-1.5 border-t border-emerald-500/15">
-              {QUICK_PROMPTS.map((prompt, pIdx) => (
-                <button
-                  key={pIdx}
-                  onClick={() => handleSend(prompt)}
-                  disabled={loading}
-                  className={`
-                    text-[11px] px-2.5 py-1 rounded-full transition-colors truncate max-w-full
-                    ${
-                      isDark
-                        ? 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-800/40'
-                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
-                    }
-                  `}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Ô NHẬP LIỆU CHAT DƯỚI CÙNG */}
           <div
@@ -728,16 +695,23 @@ export const AIChatWidget: React.FC = () => {
                 }
               `}
             >
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSend();
+                onChange={(e) => {
+                  setInputText(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`;
                 }}
-                placeholder="Tra cứu văn thư hoặc hỏi đáp tác chiến..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Tra cứu văn thư hoặc hỏi đáp tác chiến... (Shift+Enter để xuống dòng)"
                 className={`
-                  flex-1 bg-transparent text-xs focus:outline-none px-1
+                  flex-1 bg-transparent text-xs focus:outline-none px-1 resize-none max-h-[100px] py-1.5 scrollbar-thin
                   ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}
                 `}
                 disabled={loading}
@@ -747,7 +721,7 @@ export const AIChatWidget: React.FC = () => {
                 onClick={() => handleSend()}
                 disabled={loading || !inputText.trim()}
                 className={`
-                  w-8 h-8 rounded-full flex items-center justify-center text-white transition-all
+                  w-8 h-8 rounded-full flex items-center justify-center text-white transition-all shrink-0 mb-0.5
                   ${
                     inputText.trim() && !loading
                       ? 'bg-gradient-to-r from-[#14532d] via-[#166534] to-[#15803d] hover:from-[#166534] hover:to-[#15803d] active:scale-95 shadow-sm border border-amber-500/30'
@@ -779,6 +753,7 @@ export const AIChatWidget: React.FC = () => {
         open={previewOpen}
         document={previewDoc}
         page={previewPage}
+        isAiCitation={true}
         initialToken={getActiveFpToken(previewDoc?.file_id)}
         onClose={() => {
           setPreviewOpen(false);

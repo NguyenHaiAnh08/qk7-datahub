@@ -1,6 +1,8 @@
 import React, { ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { TacticalEmptyState } from './TacticalEmptyState';
+import { PaginationBar } from './PaginationBar';
+import { usePageTransition } from './PageTransitionStage';
 
 export interface Column<T> {
   key: string;
@@ -41,6 +43,10 @@ export function DataTable<T>({
   rowClassName,
   onRowClick
 }: DataTableProps<T>) {
+  const tbodyRef = usePageTransition<HTMLTableSectionElement>(pagination?.currentPage ?? 1, {
+    mode: 'row',
+  });
+
   return (
     <div className="w-full flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto w-full">
@@ -58,7 +64,7 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+          <tbody ref={tbodyRef} className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-16 text-center">
@@ -109,52 +115,17 @@ export function DataTable<T>({
       </div>
 
       {pagination && pagination.totalPages > 1 && (
-        <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
           <div>
             Hiển thị trang <span className="font-semibold text-slate-800 dark:text-slate-200">{pagination.currentPage}</span> /{' '}
             <span className="font-semibold text-slate-800 dark:text-slate-200">{pagination.totalPages}</span> (Tổng{' '}
             <span className="font-semibold text-slate-800 dark:text-slate-200">{pagination.totalItems}</span> bản ghi)
           </div>
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => pagination.onPageChange(Math.max(1, pagination.currentPage - 1))}
-              disabled={pagination.currentPage <= 1}
-              className="px-2.5 py-1 rounded border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              Trước
-            </button>
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-              .filter((p) => {
-                const curr = pagination.currentPage;
-                return p === 1 || p === pagination.totalPages || Math.abs(p - curr) <= 1;
-              })
-              .map((p, idx, arr) => {
-                const prev = arr[idx - 1];
-                const showEllipsis = prev && p - prev > 1;
-                return (
-                  <React.Fragment key={p}>
-                    {showEllipsis && <span className="px-1 text-slate-400">...</span>}
-                    <button
-                      onClick={() => pagination.onPageChange(p)}
-                      className={`px-2.5 py-1 rounded border transition-colors ${
-                        pagination.currentPage === p
-                          ? 'bg-emerald-600 border-emerald-600 text-white font-medium'
-                          : 'border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  </React.Fragment>
-                );
-              })}
-            <button
-              onClick={() => pagination.onPageChange(Math.min(pagination.totalPages, pagination.currentPage + 1))}
-              disabled={pagination.currentPage >= pagination.totalPages}
-              className="px-2.5 py-1 rounded border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              Sau
-            </button>
-          </div>
+          <PaginationBar
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.onPageChange}
+          />
         </div>
       )}
     </div>

@@ -12,7 +12,7 @@ import { ToastProvider } from './components/common/Toast';
 import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
 import AIChatDrawer from './components/ai-chat/AIChatDrawer';
 import { ApprovalProvider } from './contexts/ApprovalContext';
-import { AIChatProvider } from './contexts/AIChatContext'
+import { AIChatProvider } from './contexts/AIChatContext';
 import './index.css';
 
 /**
@@ -24,7 +24,11 @@ import './index.css';
  */
 const getCspNonce = () => {
   if (typeof document === 'undefined') return undefined;
-  return document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') || undefined;
+  return (
+    (typeof window !== 'undefined' && (window as any).__CSP_NONCE__) ||
+    document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') ||
+    undefined
+  );
 };
 
 const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {

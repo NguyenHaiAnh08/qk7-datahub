@@ -1,0 +1,103 @@
+{
+  "root": "cta-split-image",
+  "elements": {
+    "cta-split-image": {
+      "type": "Grid",
+      "props": {
+        "columns": 2,
+        "gap": 0
+      },
+      "children": [
+        "left-image",
+        "right-content"
+      ]
+    },
+    "left-image": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cta-split-image-04-left-image/720/720",
+        "alt": "CTA hero",
+        "objectFit": "cover",
+        "fullHeight": true
+      }
+    },
+    "right-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 8,
+        "padding": [
+          24,
+          8
+        ],
+        "justify": "center"
+      },
+      "children": [
+        "content-group",
+        "cta-buttons"
+      ]
+    },
+    "content-group": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6
+      },
+      "children": [
+        "heading",
+        "description",
+        "check-list"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Start your free trial today"
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Join over 4,000+ startups already growing with Daub.",
+        "variant": "secondary"
+      }
+    },
+    "check-list": {
+      "type": "List",
+      "props": {
+        "variant": "check",
+        "gap": 4,
+        "items": [
+          "30-day free trial",
+          "Pesonalized onboarding",
+          "Access to all features"
+        ]
+      }
+    },
+    "cta-buttons": {
+      "type": "ButtonGroup",
+      "children": [
+        "btn-learn",
+        "btn-start"
+      ]
+    },
+    "btn-learn": {
+      "type": "Button",
+      "props": {
+        "label": "Learn more",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "btn-start": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg"
+      }
+    }
+  }
+}

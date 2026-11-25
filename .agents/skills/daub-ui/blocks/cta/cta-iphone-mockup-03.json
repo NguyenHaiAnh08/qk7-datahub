@@ -1,0 +1,93 @@
+{
+  "root": "cta-iphone-mockup-03",
+  "elements": {
+    "cta-iphone-mockup-03": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 10,
+        "align": "center",
+        "padding": [
+          24,
+          0
+        ]
+      },
+      "children": [
+        "top-content",
+        "phone-mockup"
+      ]
+    },
+    "top-content": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6,
+        "align": "center",
+        "container": "narrow"
+      },
+      "children": [
+        "text-block",
+        "button-group"
+      ]
+    },
+    "text-block": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4,
+        "align": "center"
+      },
+      "children": [
+        "heading",
+        "description"
+      ]
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h2",
+        "content": "Start your free trial",
+        "align": "center"
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Join over 4,000+ startups already growing with Daub.",
+        "variant": "secondary",
+        "align": "center"
+      }
+    },
+    "button-group": {
+      "type": "ButtonGroup",
+      "children": [
+        "btn-outline",
+        "btn-primary"
+      ]
+    },
+    "btn-outline": {
+      "type": "Button",
+      "props": {
+        "label": "Learn more",
+        "variant": "outline",
+        "size": "lg"
+      }
+    },
+    "btn-primary": {
+      "type": "Button",
+      "props": {
+        "label": "Get started",
+        "variant": "primary",
+        "size": "lg"
+      }
+    },
+    "phone-mockup": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/cta-iphone-mockup-03-phone-mockup/480/640",
+        "alt": "Mobile app mockup"
+      }
+    }
+  }
+}

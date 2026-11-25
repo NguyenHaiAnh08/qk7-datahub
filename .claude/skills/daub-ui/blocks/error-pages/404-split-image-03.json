@@ -1,0 +1,105 @@
+{
+  "root": "not-found-split-03",
+  "elements": {
+    "not-found-split-03": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "align": "center",
+        "justify": "center",
+        "gap": 6,
+        "container": true,
+        "padding": [
+          8,
+          0
+        ]
+      },
+      "children": [
+        "text-section",
+        "image-section"
+      ]
+    },
+    "text-section": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6
+      },
+      "children": [
+        "heading-group",
+        "actions"
+      ]
+    },
+    "heading-group": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "error-label",
+        "heading",
+        "description"
+      ]
+    },
+    "error-label": {
+      "type": "Text",
+      "props": {
+        "tag": "span",
+        "content": "404 error",
+        "variant": "brand"
+      }
+    },
+    "heading": {
+      "type": "Text",
+      "props": {
+        "tag": "h1",
+        "content": "Page not found"
+      }
+    },
+    "description": {
+      "type": "Text",
+      "props": {
+        "tag": "p",
+        "content": "Sorry, the page you are looking for doesn't exist. Here are some helpful links:",
+        "variant": "secondary"
+      }
+    },
+    "actions": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 3
+      },
+      "children": [
+        "back-btn",
+        "home-btn"
+      ]
+    },
+    "back-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Go back",
+        "variant": "outline",
+        "size": "lg",
+        "icon": "arrow-left"
+      }
+    },
+    "home-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Take me home",
+        "variant": "primary",
+        "size": "lg"
+      }
+    },
+    "image-section": {
+      "type": "Image",
+      "props": {
+        "src": "https://picsum.photos/seed/404-split-image-03-image-section/592/640",
+        "alt": "Abstract placeholder",
+        "rounded": true
+      }
+    }
+  }
+}

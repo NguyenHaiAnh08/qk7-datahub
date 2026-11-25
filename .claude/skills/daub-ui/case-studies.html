@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DAUB — Case studies</title>
+  <meta name="description" content="Real products built with DAUB. See how teams use DAUB's considered CSS components in production.">
+  <meta name="keywords" content="DAUB case studies, Dashrock, AWS Bedrock analytics, Tamp, Claude API proxy, token compression, Dwarf Land, AI civilization simulator, DAUB UI examples, production DAUB">
+  <meta name="theme-color" content="#C67B5C">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://daub.dev/case-studies.html">
+  <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM documentation">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DAUB — Case studies">
+  <meta property="og:description" content="Real products built with DAUB. See how teams use DAUB's considered CSS components in production.">
+  <meta property="og:url" content="https://daub.dev/case-studies.html">
+  <meta property="og:site_name" content="DAUB UI">
+  <meta property="og:image" content="https://daub.dev/og-image.png?v=3.20.6">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="DAUB Case Studies — Real Products in Production">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="DAUB — Case studies">
+  <meta name="twitter:description" content="Real products built with DAUB. See how teams use DAUB's considered CSS components in production.">
+  <meta name="twitter:image" content="https://daub.dev/og-image.png?v=3.20.6">
+  <meta name="twitter:site" content="@staskulesh">
+
+  <!-- FOUC prevention -->
+  <script>
+    (function(){try{var t=localStorage.getItem('db-theme');if(t)document.documentElement.setAttribute('data-theme',t);var s=localStorage.getItem('db-scheme');if(s)document.documentElement.setAttribute('data-scheme',s);var a=localStorage.getItem('db-accent');if(a)document.documentElement.style.setProperty('--db-terracotta',a)}catch(e){}})();
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@0.576.0/dist/umd/lucide.min.js" integrity="sha384-b05ba3pt6xaC7F4r130arhf8cF18GH/gKu9JDz/NMf+BhLlBVwIWUdAZSpf1IWRZ" crossorigin="anonymous"></script>
+
+  <!-- DAUB -->
+  <link rel="stylesheet" href="daub.css?v=3.20.6">
+  <script src="site-nav.js" defer></script>
+
+  <style>
+    body { margin: 0; overflow-x: hidden; }
+
+    /* Nav (matches index.html) */
+    .db-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--db-cream);
+      border-bottom: 1px solid var(--db-sand);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+      font-family: var(--db-font-ui);
+      backdrop-filter: blur(8px);
+    }
+    .db-nav__brand {
+      font-family: var(--db-font-heading);
+      font-weight: 800;
+      font-size: 1.125rem;
+      color: var(--db-ink);
+      text-decoration: none;
+    }
+    .db-nav__links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .db-nav__links a {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--db-charcoal);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: var(--db-radius-2);
+      transition: color var(--db-transition), background var(--db-transition);
+    }
+    .db-nav__links a:hover {
+      color: var(--db-terracotta);
+      background: color-mix(in srgb, var(--db-ink) 7%, transparent);
+    }
+    .db-nav__link--active {
+      color: var(--db-terracotta) !important;
+      background: color-mix(in srgb, var(--db-terracotta) 15%, transparent) !important;
+    }
+    .db-nav__github {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--db-charcoal);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: var(--db-radius-2);
+      border: 1px solid var(--db-sand);
+      transition: border-color var(--db-transition);
+    }
+    .db-nav__github:hover {
+      border-color: var(--db-terracotta);
+    }
+    .db-nav__toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: none;
+      border: 1px solid var(--db-sand);
+      border-radius: var(--db-radius-2);
+      cursor: pointer;
+      color: var(--db-ink);
+      flex-shrink: 0;
+    }
+    .db-nav__toggle:hover { background: color-mix(in srgb, var(--db-ink) 5%, transparent); }
+    @media (max-width: 768px) {
+      .db-nav__toggle { display: flex; }
+      .db-nav__links {
+        display: none;
+        position: absolute;
+        top: 48px;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        background: var(--db-cream);
+        border-bottom: 1px solid var(--db-sand);
+        padding: 8px 16px;
+        gap: 0;
+        box-shadow: var(--db-shadow-2);
+        z-index: 99;
+      }
+      .db-nav__links li { width: 100%; }
+      .db-nav__links a { display: block; width: 100%; padding: 10px 12px; font-size: 0.875rem; }
+      .db-nav__github { width: 100%; justify-content: flex-start; border: none; padding: 10px 12px !important; }
+      .db-nav--open .db-nav__links { display: flex; }
+    }
+
+    /* Hero */
+    .cs-hero { text-align: center; padding: 80px 24px 48px; max-width: 720px; margin: 0 auto; }
+    .cs-hero h1 { font-family: var(--db-font-heading); font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.15; margin: 0 0 12px; color: var(--db-color-text); }
+    .cs-hero p { font-size: 1.1rem; line-height: 1.65; color: var(--db-color-text-secondary); margin: 0; max-width: 480px; margin-left: auto; margin-right: auto; }
+
+    /* Case study container */
+    .cs-article { max-width: 800px; margin: 0 auto; padding: 0 24px 64px; }
+
+    /* Project header */
+    .cs-project-header { margin-bottom: 40px; }
+    .cs-project-header h2 { font-family: var(--db-font-heading); font-size: 2rem; margin: 0 0 8px; color: var(--db-color-text); }
+    .cs-project-header .cs-tagline { font-size: 1.15rem; color: var(--db-color-text-secondary); margin: 0 0 16px; line-height: 1.5; }
+    .cs-project-links { display: flex; flex-wrap: wrap; gap: 12px; }
+    .cs-project-links a {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.85rem; font-weight: 600; color: var(--db-terracotta);
+      text-decoration: none; padding: 6px 14px;
+      border: 1px solid color-mix(in srgb, var(--db-terracotta) 30%, transparent);
+      border-radius: var(--db-radius-2);
+      transition: background var(--db-transition);
+    }
+    .cs-project-links a:hover { background: color-mix(in srgb, var(--db-terracotta) 10%, transparent); }
+
+    /* Quote */
+    .cs-quote {
+      margin: 0 0 40px;
+      padding: 20px 24px;
+      background: color-mix(in srgb, var(--db-terracotta) 8%, transparent);
+      border-left: 3px solid var(--db-terracotta);
+      border-radius: 0 var(--db-radius-2) var(--db-radius-2) 0;
+      font-style: italic;
+      font-size: 1.05rem;
+      line-height: 1.6;
+      color: var(--db-color-text);
+    }
+    .cs-quote cite {
+      display: block; margin-top: 12px;
+      font-style: normal; font-size: 0.85rem;
+      color: var(--db-color-text-muted);
+    }
+    .cs-quote cite a { color: var(--db-terracotta); text-decoration: none; }
+
+    /* Sections */
+    .cs-section { margin-bottom: 40px; }
+    .cs-section h3 {
+      font-family: var(--db-font-heading); font-size: 1.25rem;
+      margin: 0 0 12px; color: var(--db-color-text);
+      padding-bottom: 8px; border-bottom: 1px solid var(--db-color-border);
+    }
+    .cs-section p, .cs-section li {
+      font-size: 0.95rem; line-height: 1.7;
+      color: var(--db-color-text-secondary);
+    }
+    .cs-section ul { padding-left: 20px; margin: 0; }
+    .cs-section li { margin-bottom: 6px; }
+
+    /* Screenshot gallery */
+    .cs-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px; }
+    .cs-gallery figure { margin: 0; }
+    .cs-gallery img {
+      width: 100%; display: block;
+      border: 1px solid var(--db-color-border);
+      border-radius: var(--db-radius-2);
+    }
+    .cs-gallery figcaption {
+      font-size: 0.8rem; color: var(--db-color-text-muted);
+      text-align: center; margin-top: 8px; font-family: var(--db-font-ui);
+    }
+    @media (max-width: 560px) {
+      .cs-gallery { grid-template-columns: 1fr; }
+    }
+
+    /* Tech stack pills */
+    .cs-stack { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 40px; }
+    .cs-stack-pill {
+      font-size: 0.8rem; padding: 5px 14px;
+      border-radius: 20px; font-family: var(--db-font-ui);
+      background: var(--db-color-bg); border: 1px solid var(--db-color-border);
+      color: var(--db-color-text-secondary);
+    }
+    .cs-stack-pill--highlight {
+      background: color-mix(in srgb, var(--db-terracotta) 12%, transparent);
+      border-color: color-mix(in srgb, var(--db-terracotta) 30%, transparent);
+      color: var(--db-terracotta); font-weight: 600;
+    }
+
+    /* Tweet embed */
+    .cs-tweet-img {
+      width: 100%; max-width: 520px; display: block;
+      border: 1px solid var(--db-color-border);
+      border-radius: var(--db-radius-2);
+      margin: 0 auto 40px;
+    }
+
+    /* CTA */
+    .cs-cta {
+      text-align: center; padding: 48px 24px; margin-top: 24px;
+      border-top: 1px solid var(--db-color-border);
+    }
+    .cs-cta h3 { font-family: var(--db-font-heading); font-size: 1.4rem; margin: 0 0 8px; color: var(--db-color-text); }
+    .cs-cta p { font-size: 0.95rem; color: var(--db-color-text-secondary); margin: 0 0 20px; }
+    .cs-cta a {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--db-font-ui); font-size: 0.9rem; font-weight: 600;
+      color: var(--db-terracotta); text-decoration: none;
+      padding: 10px 20px; border: 1px solid var(--db-terracotta);
+      border-radius: var(--db-radius-2);
+      transition: background var(--db-transition);
+    }
+    .cs-cta a:hover { background: color-mix(in srgb, var(--db-terracotta) 10%, transparent); }
+
+    /* Footer */
+    .cs-footer { text-align: center; padding: 32px 24px; border-top: 1px solid var(--db-color-border); color: var(--db-color-text-muted); font-size: 0.85rem; }
+    .cs-footer a { color: var(--db-terracotta); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <!-- Nav -->
+  <nav class="db-nav" role="navigation" aria-label="Main">
+    <a href="/" class="db-nav__brand">DAUB</a>
+    <button class="db-nav__toggle" aria-label="Menu" aria-expanded="false" onclick="this.closest('.db-nav').classList.toggle('db-nav--open');this.setAttribute('aria-expanded',this.closest('.db-nav').classList.contains('db-nav--open'))">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <ul class="db-nav__links">
+      <li><a href="components.html">Components</a></li>
+      <li><a href="docs.html">Docs</a></li>
+      <li><a href="demo.html">Layouts</a></li>
+      <li><a href="playground.html">Playground</a></li>
+      <li><a href="themes.html">Themes</a></li>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="case-studies.html" class="db-nav__link--active">Case studies</a></li>
+      <li><a href="llms.txt">AI Docs</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <section class="cs-hero">
+    <h1>Case studies</h1>
+    <p>Real products built with DAUB</p>
+  </section>
+
+  <!-- Dashrock Case Study -->
+  <article class="cs-article">
+
+    <div class="cs-project-header">
+      <h2>Dashrock</h2>
+      <p class="cs-tagline">Open-source AWS Bedrock analytics dashboard. Track usage, cost, and performance by team and app. Deploys in ~3 minutes via SST.</p>
+      <div class="cs-project-links">
+        <a href="https://dashrock.app" target="_blank" rel="noopener">
+          <i data-lucide="globe" style="width:14px;height:14px;"></i> dashrock.app
+        </a>
+        <a href="https://github.com/maratgaliev/dashrock" target="_blank" rel="noopener">
+          <i data-lucide="github" style="width:14px;height:14px;"></i> GitHub
+        </a>
+        <a href="https://marat.ca/dashrock-open-source-aws-bedrock-analytics/" target="_blank" rel="noopener">
+          <i data-lucide="file-text" style="width:14px;height:14px;"></i> Blog Post
+        </a>
+      </div>
+    </div>
+
+    <blockquote class="cs-quote">
+      "Built dashrock.app, needed to beautifully collect stats on Bedrock, separate respect to @staskulesh for the UI tool."
+      <cite>
+        <a href="https://x.com/Marat_Galiev" target="_blank" rel="noopener">@Marat_Galiev</a> (Marat Galiev) &middot; Mar 9, 2026 &middot; 3,342 views &middot; 19 likes &middot; 17 bookmarks
+      </cite>
+    </blockquote>
+
+    <div class="cs-section">
+      <h3>What it does</h3>
+      <p>
+        Dashrock is a serverless analytics platform for AWS Bedrock. It collects and visualizes LLM usage data across teams and applications — costs, token counts, model distribution, latency, and trends over time. Teams define apps and members in a simple YAML config, deploy via SST in minutes, and get a full analytics dashboard with no ongoing infrastructure to manage.
+      </p>
+    </div>
+
+    <div class="cs-gallery">
+      <figure>
+        <img src="case-studies/dashrock-overview.jpg" alt="Dashrock overview dashboard showing key metrics" loading="lazy">
+        <figcaption>Overview Dashboard</figcaption>
+      </figure>
+      <figure>
+        <img src="case-studies/dashrock-apps.jpg" alt="Dashrock AI Adoption dashboard" loading="lazy">
+        <figcaption>AI Adoption</figcaption>
+      </figure>
+      <figure>
+        <img src="case-studies/dashrock-usage.jpg" alt="Dashrock token usage breakdown" loading="lazy">
+        <figcaption>Token Usage</figcaption>
+      </figure>
+      <figure>
+        <img src="case-studies/dashrock-trends.jpg" alt="Dashrock usage trends over time" loading="lazy">
+        <figcaption>Usage Trends</figcaption>
+      </figure>
+    </div>
+
+    <div class="cs-section">
+      <h3>Tech stack</h3>
+    </div>
+    <div class="cs-stack">
+      <span class="cs-stack-pill">Next.js</span>
+      <span class="cs-stack-pill">SST (Ion)</span>
+      <span class="cs-stack-pill">Chart.js</span>
+      <span class="cs-stack-pill cs-stack-pill--highlight">DAUB</span>
+      <span class="cs-stack-pill">AWS Lambda</span>
+      <span class="cs-stack-pill">AWS S3</span>
+      <span class="cs-stack-pill">AWS CloudFront</span>
+      <span class="cs-stack-pill">AWS EventBridge</span>
+    </div>
+
+    <div class="cs-section">
+      <h3>How DAUB is used</h3>
+      <p>
+        Dashrock uses DAUB for the entire dashboard UI — cards, tables, navigation, layout containers, and form elements. The classless CSS approach let Marat build clean, consistent interfaces rapidly with AI code assistance. DAUB's theme variables provide dark/light mode and the tactile, considered aesthetic that makes the analytics feel polished rather than utilitarian.
+      </p>
+      <p>
+        DAUB is credited in the project footer ("UI/UX built with daub.dev") and listed as a key dependency in the README tech stack.
+      </p>
+    </div>
+
+    <div class="cs-section">
+      <h3>Key features</h3>
+      <ul>
+        <li>7 dashboard views: Overview, Applications, Models, Teams, Token Usage, Usage Trends, Cost Analysis</li>
+        <li>YAML-based team and application configuration</li>
+        <li>CSV export for all data tables</li>
+        <li>Date range filtering with presets</li>
+        <li>Custom domain support via CloudFront</li>
+        <li>HTTP Basic Auth for access control</li>
+        <li>~3 minute deploy via SST</li>
+      </ul>
+    </div>
+
+    <img src="case-studies/dashrock-stack.jpg" alt="Dashrock README showing DAUB in the tech stack" class="cs-tweet-img" loading="lazy">
+
+    <div class="cs-section" style="margin-top:32px;">
+      <blockquote style="border-left:3px solid var(--db-terracotta);padding:12px 16px;margin:0;background:var(--db-cream-dark);border-radius:0 var(--db-radius-2) var(--db-radius-2) 0;display:flex;gap:14px;align-items:flex-start;">
+        <img src="case-studies/marat-avatar.jpg" alt="Marat" width="36" height="36" style="border-radius:50%;flex-shrink:0;border:1.5px solid var(--db-sand);">
+        <div>
+          <p style="font-style:italic;margin:0 0 6px;font-size:0.9375rem;line-height:1.55;color:var(--db-charcoal);">"Daub gives you the speed of a utility framework with the polish of a design system. Built two production apps with it and would reach for it again without hesitation."</p>
+          <span style="font-family:var(--db-font-ui);font-size:0.75rem;font-weight:600;color:var(--db-ink);">Marat, Dashrock</span>
+        </div>
+      </blockquote>
+    </div>
+
+  </article>
+
+  <!-- Tamp Case Study -->
+  <article class="cs-article" id="tamp">
+
+    <div class="cs-project-header">
+      <h2>Tamp</h2>
+      <p class="cs-tagline">Transparent HTTP proxy that compresses Claude API requests in real-time. Save up to 50% on input tokens — zero config, zero latency.</p>
+      <div class="cs-project-links">
+        <a href="https://tamp.dev" target="_blank" rel="noopener">
+          <i data-lucide="globe" style="width:14px;height:14px;"></i> tamp.dev
+        </a>
+        <a href="https://github.com/sliday/tamp" target="_blank" rel="noopener">
+          <i data-lucide="github" style="width:14px;height:14px;"></i> GitHub
+        </a>
+        <a href="https://www.npmjs.com/package/@sliday/tamp" target="_blank" rel="noopener">
+          <i data-lucide="package" style="width:14px;height:14px;"></i> npm
+        </a>
+      </div>
+    </div>
+
+    <blockquote class="cs-quote">
+      "Claude Code sends full conversation history every turn — tool results pile up fast. Tamp sits between your client and Anthropic, compressing input tokens by up to 50% without changing a thing about how Claude behaves."
+      <cite>The problem Tamp solves &#183; Mar 2026</cite>
+    </blockquote>
+
+    <div class="cs-section">
+      <h3>What it does</h3>
+      <p>
+        Tamp is a local HTTP proxy that intercepts Claude API requests and applies a multi-stage compression pipeline before forwarding them upstream. Claude Code (and any Anthropic API client) sends verbose tool results on every turn — pretty-printed JSON from Read, raw CLI output from Bash, full file listings from Grep and Glob. These accumulate to 100K+ tokens in minutes, driving up cost and exhausting context windows.
+      </p>
+      <p>
+        Tamp fixes this transparently. Set <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">ANTHROPIC_BASE_URL=http://localhost:7778</code>, run <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">npx @sliday/tamp</code>, and every API call gets compressed on the fly. Responses stream back untouched. Claude doesn't know the difference.
+      </p>
+    </div>
+
+    <div class="cs-gallery">
+      <figure>
+        <img src="case-studies/tamp-terminal.jpg" alt="Tamp proxy running in terminal showing real-time compression stats" loading="lazy">
+        <figcaption>Live compression stats: 50%+ savings per block</figcaption>
+      </figure>
+      <figure style="display:flex;flex-direction:column;justify-content:center;">
+        <div style="padding:24px;background:var(--db-cream-dark);border:1px solid var(--db-color-border);border-radius:var(--db-radius-2);">
+          <div style="font-family:var(--db-font-heading);font-size:2rem;color:var(--db-terracotta);font-weight:800;margin-bottom:4px;">~50%</div>
+          <div style="font-family:var(--db-font-ui);font-size:0.85rem;color:var(--db-color-text-secondary);margin-bottom:16px;">average input token savings</div>
+          <div style="font-family:var(--db-font-ui);font-size:0.8rem;color:var(--db-color-text-muted);line-height:1.6;">
+            package.json: 334 &#8594; 165 chars <strong>(-50.6%)</strong><br>
+            JS source: 4,630 &#8594; 2,214 chars <strong>(-52.2%)</strong><br>
+            Bash output: 1,046 &#8594; 516 chars <strong>(-50.7%)</strong>
+          </div>
+        </div>
+      </figure>
+    </div>
+
+    <div class="cs-section">
+      <h3>3-stage compression pipeline</h3>
+      <p>
+        Tamp classifies each content block (JSON, prose, already-compressed) and routes it through the appropriate stages:
+      </p>
+      <ul>
+        <li><strong>Stage 1 — JSON Minification:</strong> Pretty-printed JSON is minified. Zero risk — Claude handles minified JSON perfectly. ~15-20% savings.</li>
+        <li><strong>Stage 2 — TOON Encoding:</strong> Tabular/array JSON is converted to TOON format, a compact alternative representation. ~40-60% savings over minified JSON.</li>
+        <li><strong>Stage 3 — LLMLingua-2 (optional):</strong> Natural language prose is compressed via a Python sidecar. Lossy but meaning-preserving. 2-20x compression.</li>
+      </ul>
+      <p>
+        Images, system blocks, tool schemas, and content under 200 characters are never touched. A cache-safe mode (default) only compresses new content in the latest user message, preserving Anthropic prompt cache hit rates.
+      </p>
+    </div>
+
+    <div class="cs-section">
+      <h3>Tech stack</h3>
+    </div>
+    <div class="cs-stack">
+      <span class="cs-stack-pill">Node.js</span>
+      <span class="cs-stack-pill">@toon-format/toon</span>
+      <span class="cs-stack-pill">LLMLingua-2</span>
+      <span class="cs-stack-pill">FastAPI</span>
+      <span class="cs-stack-pill cs-stack-pill--highlight">DAUB</span>
+      <span class="cs-stack-pill">Cloudflare Pages</span>
+    </div>
+
+    <div class="cs-section">
+      <h3>How DAUB is used</h3>
+      <p>
+        The Tamp marketing site (<a href="https://tamp.dev" target="_blank" rel="noopener" style="color:var(--db-terracotta);text-decoration:none;">tamp.dev</a>) is built entirely with DAUB's classless CSS. The landing page uses DAUB's typography system, spacing tokens, and theme variables to create a clean developer-focused presentation — no custom CSS classes needed. DAUB's CDN delivery (<code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">daub-ui@latest</code>) means the site loads fast with zero build step.
+      </p>
+      <p>
+        The tactile aesthetic works particularly well for developer tools — it makes a terminal proxy feel polished rather than bare-bones, which matters when you're asking developers to route their API traffic through your software.
+      </p>
+    </div>
+
+    <div class="cs-section">
+      <h3>Key features</h3>
+      <ul>
+        <li>One-command install: <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">npx @sliday/tamp</code></li>
+        <li>Per-block compression stats logged in real-time</li>
+        <li>Session-wide savings tracking (cumulative chars saved)</li>
+        <li>Selective compression — only POST /v1/messages, passthrough everything else</li>
+        <li>Cache-safe mode preserves Anthropic prompt cache hits</li>
+        <li>Graceful error recovery — compression failures fall back to original content</li>
+        <li>Optional LLMLingua-2 sidecar for prose compression</li>
+        <li>570 LOC total — small, auditable, no framework dependencies</li>
+      </ul>
+    </div>
+
+    <div class="cs-section">
+      <h3>Why it matters</h3>
+      <p>
+        Extended Claude Code sessions with heavy tool use can burn through context windows and rack up significant API costs. Tamp addresses this at the transport layer — no changes to your workflow, no changes to Claude's behavior, just smaller requests. The 50% savings compound across a full development session: a typical hour of Claude Code work that would consume 500K input tokens drops to ~250K. That's real money at Anthropic's pricing.
+      </p>
+    </div>
+
+  </article>
+
+
+  <!-- Dwarf Land Case Study -->
+  <article class="cs-article" id="dwarf-land">
+
+    <div class="cs-project-header">
+      <h2>Dwarf Land</h2>
+      <p class="cs-tagline">AI-powered civilization simulator. Up to 300 autonomous dwarves live across 125+ real-world cities, making decisions with tiered LLMs. The world runs 24/7 on Cloudflare Workers.</p>
+      <div class="cs-project-links">
+        <a href="https://dwarf.land" target="_blank" rel="noopener">
+          <i data-lucide="globe" style="width:14px;height:14px;"></i> dwarf.land
+        </a>
+        <a href="https://github.com/sliday/dwarf-land" target="_blank" rel="noopener">
+          <i data-lucide="github" style="width:14px;height:14px;"></i> GitHub
+        </a>
+      </div>
+    </div>
+
+    <blockquote class="cs-quote">
+      "A living world of AI-powered dwarves. Click any dwarf to inspect their stats, backstory, and personality. Sponsor their brain to upgrade their AI reasoning. The world lives while you watch."
+      <cite>The welcome screen &middot; dwarf.land</cite>
+    </blockquote>
+
+    <div class="cs-section">
+      <h3>What it does</h3>
+      <p>
+        Dwarf Land is a persistent civilization simulator rendered as an emoji tile planet — continents, oceans, mountains, jungles, deserts, and a map that wraps horizontally like a globe. Dwarves with D&amp;D stats and culturally accurate names mine, farm, craft, trade, raise families, tame animals, and build roads between cities. Nobody scripts their behavior: each decision comes from an LLM call routed through a 4-tier model system, and the world keeps running whether you watch or not. State saves every 60 seconds; your dwarves remember everything.
+      </p>
+    </div>
+
+    <div class="cs-gallery">
+      <figure>
+        <img src="case-studies/dwarf-welcome.jpg" alt="Dwarf Land welcome modal built with DAUB over the world map" loading="lazy">
+        <figcaption>Welcome modal — pure DAUB</figcaption>
+      </figure>
+      <figure>
+        <img src="case-studies/dwarf-world.jpg" alt="Honolulu island in Dwarf Land with city, jungle, and beaches" loading="lazy">
+        <figcaption>Honolulu, Year 45</figcaption>
+      </figure>
+      <figure>
+        <img src="case-studies/dwarf-america.jpg" alt="Central American cities connected by roads and railroads" loading="lazy">
+        <figcaption>Roads &amp; railroads between cities</figcaption>
+      </figure>
+      <figure>
+        <img src="case-studies/dwarf-europe.jpg" alt="Desert coastline near Baghdad with mountains and beaches" loading="lazy">
+        <figcaption>Biome transitions near Baghdad</figcaption>
+      </figure>
+    </div>
+
+    <div class="cs-section">
+      <h3>4-tier AI brains</h3>
+      <p>
+        Every dwarf thinks through OpenRouter via the Vercel AI SDK. Model routing depends on the decision's complexity — and on sponsorship:
+      </p>
+      <ul>
+        <li><strong>Simple</strong> — basic needs: eat, sleep, mine. The free default.</li>
+        <li><strong>Medium</strong> — social behavior and planning. Bronze sponsorship ($1, 100 calls).</li>
+        <li><strong>Complex</strong> — strategy and relationships. Silver ($3, 75 calls).</li>
+        <li><strong>Premium</strong> — deep reasoning with full personality context. Gold ($10, 100 calls).</li>
+      </ul>
+      <p>
+        AI calls are fire-and-forget: the game never blocks on a response. An intent cache stores each decision until the dwarf is idle enough to execute it, and hard budget caps ($8.50/hr total) keep the world from thinking itself bankrupt. Sponsoring a dwarf's brain goes through Polar.sh checkout — the dwarf gets a star badge and visibly smarter behavior.
+      </p>
+    </div>
+
+    <div class="cs-section">
+      <h3>Tech stack</h3>
+    </div>
+    <div class="cs-stack">
+      <span class="cs-stack-pill">Cloudflare Workers</span>
+      <span class="cs-stack-pill">Hono</span>
+      <span class="cs-stack-pill">Cloudflare D1</span>
+      <span class="cs-stack-pill">Vercel AI SDK</span>
+      <span class="cs-stack-pill">OpenRouter</span>
+      <span class="cs-stack-pill">Polar.sh</span>
+      <span class="cs-stack-pill">Canvas 2D</span>
+      <span class="cs-stack-pill cs-stack-pill--highlight">DAUB</span>
+      <span class="cs-stack-pill">Vitest</span>
+    </div>
+
+    <div class="cs-section">
+      <h3>How DAUB is used</h3>
+      <p>
+        The entire game chrome is DAUB in the grunge theme (<code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">data-theme="grunge"</code>) — dark, tactile HUD panels that let the emoji world own the screen. The welcome and How-it-works overlays are <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">db-modal</code> with <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">db-prose</code> content, sponsorship pricing renders as a compact <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">db-table</code>, and buttons, scroll areas, and toasts come straight from the component library — driven at runtime by <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">DAUB.openModal()</code> and <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">DAUB.toast()</code>.
+      </p>
+      <p>
+        The whole frontend is a single HTML file pulling <code style="font-size:0.85em;padding:2px 6px;background:var(--db-cream-dark);border-radius:4px;">daub-ui@3.19.12</code> from CDN. No build step, no framework — vanilla JS canvas for the world, DAUB for everything with text in it.
+      </p>
+    </div>
+
+    <div class="cs-section">
+      <h3>Key features</h3>
+      <ul>
+        <li>Up to 300 autonomous dwarves with D&amp;D stats, aging, families, and AI-generated backstories</li>
+        <li>125+ real-world cities across 7 continents with culturally named populations</li>
+        <li>4-tier road system (dirt &#8594; gravel &#8594; asphalt &#8594; railroad) built, upgraded, and repaired by dwarves</li>
+        <li>Infinite crafting: combine any two items — unknown combos resolved by AI and cached forever</li>
+        <li>24 wildlife species with taming, hunting, and combat encounters</li>
+        <li>Horse carts, cars, and trains; autonomous freight balances resources between cities</li>
+        <li>Live sponsorship via Polar.sh upgrades individual dwarves' AI reasoning</li>
+        <li>453 Vitest tests; world state autosaves every 60 seconds</li>
+      </ul>
+    </div>
+
+    <div class="cs-section">
+      <h3>Why it matters</h3>
+      <p>
+        Most DAUB deployments are dashboards and marketing sites. Dwarf Land stretches the library into game HUD territory — modals, tables, and toasts floating over a 60fps canvas — and the grunge theme handles it without a line of custom component CSS. It also demonstrates LLM calls as a game mechanic with real economics: budget caps on the house's spend, micro-payments to raise a single agent's intelligence.
+      </p>
+    </div>
+
+  </article>
+
+  <div class="cs-cta">
+    <h3>Built something with DAUB?</h3>
+    <p>We'd love to feature your project. Share it with us.</p>
+    <a href="https://x.com/staskulesh" target="_blank" rel="noopener">
+      <i data-lucide="message-circle" style="width:16px;height:16px;"></i> Tell @staskulesh on X
+    </a>
+  </div>
+
+
+  <footer style="text-align:center; padding:8px; background:var(--db-cream-dark); color:var(--db-warm-gray); margin-top:16px; font-family:var(--db-font-ui); font-size:0.75rem;">
+    Made by <a href="https://x.com/staskulesh" target="_blank" rel="noopener" style="color:var(--db-terracotta); text-decoration:none;">@staskulesh</a> <a href="https://aichess.co/static/easter-egg/index.html" title="&#127875;" style="text-decoration:none; display:inline-block; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'">&#128007;</a>
+  </footer>
+
+  <div class="db-theme-switcher"></div>
+  <script src="daub.js?v=3.20.6"></script>
+</body>
+</html>

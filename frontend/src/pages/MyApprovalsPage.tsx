@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Header } from '../components/common/Header';
 import { approvalService, ApprovalRequest } from '../services/approvalService';
 import { toast } from '../components/common/Toast';
+import { OwnerReviewSection } from '../components/document-desk/OwnerReviewSection';
 import {
   Clock, CheckCircle2, XCircle, FileText, ShieldAlert,
   RotateCw, RefreshCw, Trash2, KeyRound, Shield,
@@ -139,6 +140,17 @@ export const MyApprovalsPage: React.FC = () => {
     });
   };
 
+  const withdraw = async (id: string) => {
+    if (!window.confirm('Rút lại đề xuất này? Người đăng văn bản sẽ không còn thấy đề xuất nữa.')) return;
+    try {
+      await approvalService.withdrawProposal(id);
+      toast.success('Đã rút lại đề xuất');
+      load(true);
+    } catch (err: any) {
+      toast.error('Không rút lại được: ' + err.message);
+    }
+  };
+
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -168,7 +180,7 @@ export const MyApprovalsPage: React.FC = () => {
   }, [filter]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 flex flex-col">
       <Header activeNav="admin" title="Trường Quân Sự Quân Khu 7" subtitle="Trung tâm dữ liệu số" />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl w-full mx-auto space-y-5">
@@ -191,6 +203,9 @@ export const MyApprovalsPage: React.FC = () => {
             Làm mới
           </button>
         </div>
+
+        {/* Đề xuất sửa văn bản do tôi đăng, chờ tôi xem trước khi chuyển lên cấp trên */}
+        <OwnerReviewSection onChanged={() => load(true)} />
 
         {/* Filter Tabs (Tất cả, Đang chờ, Đã Duyệt, Từ chối) */}
         <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
@@ -301,8 +316,17 @@ export const MyApprovalsPage: React.FC = () => {
                       {isPending && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/40">
                           <Clock className="w-3.5 h-3.5 animate-pulse" />
-                          Chờ duyệt
+                          {req.stage === 'WAITING_OWNER' ? 'Chờ người đăng xem' : 'Chờ duyệt'}
                         </span>
+                      )}
+                      {isPending && req.stage === 'WAITING_OWNER' && (
+                        <button
+                          type="button"
+                          onClick={() => withdraw(req.request_id)}
+                          className="mt-2 w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 cursor-pointer"
+                        >
+                          Rút lại đề xuất
+                        </button>
                       )}
                       {isRejected && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/40">

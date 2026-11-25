@@ -4,6 +4,21 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.12-test-suite-cleanup-and-pipeline-hardening] — 2026-11-25
+
+### 1. Dọn Dẹp Mã Nguồn & Loại Bỏ Tệp Kiểm Thử Lỗi Thời (Test Suite Modernization)
+- **Chuẩn hóa script kiểm tra cú pháp Backend ([`backend/package.json`](../backend/package.json), [`backend/server.js`](../backend/server.js)):**
+  - Chuyển lệnh `npm test` sang kiểm tra cú pháp Node.js tự động (`node -c server.js && node -c pdf-parser.js`), loại bỏ phụ thuộc vào tệp kiểm thử tích hợp cũ cần máy chủ sống.
+  - Cập nhật chú thích và tài liệu hướng dẫn trong [`README.md`](../README.md) chuẩn hóa luồng đóng dấu watermark và trích xuất PDF.
+- **Loại bỏ các tệp test & nhật ký đánh giá lỗi thời theo kết quả Test Audit:**
+  - Xóa bỏ các kịch bản kiểm thử lỗi thời / hardcode tài khoản: `backend/test-pipeline.js`, `backend/test-scan-parse.js`, `boxchat/measure_chunking.py`, `boxchat/test_e2e_15_scenarios.py`.
+  - Dọn dẹp các tệp nhật ký đánh giá tĩnh cũ: `docs/E2E_TEST_RESULTS.md`, `docs/e2e_results.json`, `docs/eval_results_3b.txt`, `docs/eval_results_3b_run2.txt`, `docs/ragas_evaluation_results.json`.
+  - Dọn dẹp kịch bản bash/PowerShell trùng lặp hoặc không còn phù hợp: `scripts/rescan_check.sh`, `scripts/run-strix.ps1`.
+- **Đồng bộ hóa tài liệu bàn giao ([`docs/HANDOVER_CHECKLIST.md`](HANDOVER_CHECKLIST.md)):**
+  - Cập nhật danh mục kiểm thử hồi quy loại bỏ `test_e2e_15_scenarios.py`, tập trung vào bộ Unit Test cốt lõi (`boxchat/test_*.py`) và RAGAS (`boxchat/eval_ragas_quality.py`).
+
+---
+
 ## [v1.8.11-clean-repository-and-local-tooling-security] — 2026-11-25
 
 ### 1. Gỡ Bỏ Theo Dõi Git Cho Bộ Não Tổng & Công Cụ Quản Trị Cục Bộ (Local-First Security)

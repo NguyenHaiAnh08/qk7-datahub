@@ -163,7 +163,7 @@ graph TD
 
 ### 15. Phân hệ OCR Microservice & Trích xuất PDF Siêu tốc (MonkeyOCRv2 + PaddleOCR PP-OCRv3)
 * **Giải quyết dứt điểm nút thắt cổ chai PDF Scan 5MB (121 trang):** Thay thế pipeline cũ chạy đồng bộ (gây treo Event Loop và 121 lỗi `Jbig2Error`) bằng kiến trúc bất đồng bộ chuyên biệt.
-* **Tầng 1 - Module tiện ích phân loại PDF (`pdf-router.js` & `pdfWatermarkServer.js`):** Cung cấp bộ phân loại `TextBased`/`Scanned`/`Mixed` và đóng dấu watermark PDF server-side phục vụ kiểm thử pipeline (`test-pipeline.js`).
+* **Tầng 1 - Module tiện ích phân loại PDF (`pdf-router.js` & `pdfWatermarkServer.js`):** Cung cấp bộ phân loại `TextBased`/`Scanned`/`Mixed` và đóng dấu watermark PDF server-side phục vụ xử lý văn bản PDF.
 * **Tầng 2 - Microservice OCR độc lập (`ocr-service/`, cổng `:8002`):**
   * Hỗ trợ song song **MonkeyOCRv2** (VLM) và **PaddleOCR 2.9.1 (PP-OCRv3: `en_PP-OCRv3_det_infer` + `latin_PP-OCRv3_rec_infer` + `ch_ppocr_mobile_v2.0_cls_infer`)** với khả năng nhận diện tiếng Việt (`lang='vi'`), tự động xoay góc chữ (`use_angle_cls=True`) và phân tách bố cục 2 cột (Quốc hiệu / Đơn vị ban hành).
   * Render ảnh trực tiếp bằng thư viện C **PyMuPDF** với độ phân giải tối ưu (150 DPI), không cần binary Poppler bên ngoài.

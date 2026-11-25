@@ -142,7 +142,7 @@ export const LecturePackageDropzone: React.FC<LecturePackageDropzoneProps> = ({
         label: 'SCORM',
         icon: <Layers className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
         badge: 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-400',
-        hint: 'Tương thích gói SCORM 1.2 / 2004 (ActivePresenter / Storyline)',
+        hint: 'Gói SCORM 2004 xuất từ ActivePresenter (nén toàn bộ bên trong thư mục xuất ra)',
       };
     }
     return {

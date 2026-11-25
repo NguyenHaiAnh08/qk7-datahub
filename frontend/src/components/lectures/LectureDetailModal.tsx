@@ -90,6 +90,20 @@ export const LectureDetailModal: React.FC<Props> = ({ open, lecture, onClose, on
             )}
           </div>
 
+          {lecture.status === 'PUBLISHED' && lecture.update_status && (
+            <div className={`p-3 rounded-xl border ${lecture.update_status === 'REJECTED'
+              ? 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300'
+              : 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300'}`}>
+              <span className="font-bold block text-[11px]">
+                Bản mới: {STATUS_CONFIG[lecture.update_status].label}
+              </span>
+              {lecture.update_status === 'REJECTED' && lecture.update_reject_reason && (
+                <p className="text-xs whitespace-pre-line mt-0.5">{lecture.update_reject_reason}</p>
+              )}
+              <p className="text-[11px] mt-0.5">Học viên vẫn xem bản đang xuất bản cho đến khi bản mới được duyệt xong.</p>
+            </div>
+          )}
+
           {/* Mini Stepper Flow (Lucian #444) */}
           <div className="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/[0.06]">
             <ApprovalStepper

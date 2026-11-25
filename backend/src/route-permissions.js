@@ -68,6 +68,7 @@ const AUTO_PERMISSIONS = {
     [/^\/api\/lectures\/upload-scorm$/,           'LECTURE_CREATE'],
     [/^\/api\/lectures$/,                         'LECTURE_CREATE'],
     [/^\/api\/lectures\/[^/]+\/submit$/,          'LECTURE_CREATE'],
+    [/^\/api\/lectures\/[^/]+\/discard-empty$/,   'LECTURE_CREATE'],
     [/^\/api\/lectures\/[^/]+\/(scorm|html5|pdf)\/upload$/, 'LECTURE_CREATE'],
     [/^\/api\/lectures\/[^/]+\/approve$/,         'LECTURE_APPROVE'],
     [/^\/api\/lectures\/[^/]+\/reject$/,          'LECTURE_APPROVE'],

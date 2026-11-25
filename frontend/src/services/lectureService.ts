@@ -97,12 +97,17 @@ export const lectureService = {
     return this.delete(id);
   },
 
+  /** Bỏ bài nháp rỗng vừa tạo khi tệp tải lên không đạt */
+  async discardEmptyDraft(id: string): Promise<void> {
+    return http(`/api/lectures/${encodeURIComponent(id)}/discard-empty`, { method: 'POST', skipErrorNotification: true });
+  },
+
   // ── Duyệt 2 tầng ──
   async submit(id: string): Promise<void> {
     return http(`/api/lectures/${encodeURIComponent(id)}/submit`, { method: 'POST' });
   },
 
-  async approve(id: string): Promise<{ new_status?: string; validated?: boolean; message?: string }> {
+  async approve(id: string): Promise<{ new_status?: string; is_update?: boolean; validated?: boolean; message?: string }> {
     return http(`/api/lectures/${encodeURIComponent(id)}/approve`, { method: 'POST' });
   },
 
@@ -119,7 +124,7 @@ export const lectureService = {
     lectureId: string,
     file: File,
     type: 'HTML5' | 'SCORM' | 'PDF'
-  ): Promise<{ success: boolean; status: string; pending_scorm_path?: string; file_id?: string }> {
+  ): Promise<{ success: boolean; status: string; pending_scorm_path?: string; file_id?: string; message?: string }> {
     const formData = new FormData();
     formData.append('file', file);
 

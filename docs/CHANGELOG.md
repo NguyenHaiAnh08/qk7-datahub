@@ -4,12 +4,22 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
-## [v1.8.14-pdf-text-export] — 2026-11-26
+## [v1.8.14-ocr-hybrid-paddleocr-vietocr-and-python313-upgrade] — 2026-11-26
 
-### 1. Công Cụ Kiểm Tra Nội Dung PDF
-- Thêm [`scripts/xuat-noi-dung-pdf.js`](../scripts/xuat-noi-dung-pdf.js): theo dõi văn bản mới lưu và xuất toàn bộ chữ của tệp PDF (mọi trang; trang scan được OCR) ra `backend/exports/noi-dung-pdf/*.txt`.
-- Chỉ đọc CSDL và tệp; mặc định bỏ qua văn bản cấp mật 3–5 (cần `--mat`); thư mục xuất không đưa vào Git.
-- Chạy: `node scripts/xuat-noi-dung-pdf.js` (hoặc `--moi-nhat`, `<file_id>`, `--tep <đường dẫn>`).
+### 1. Nâng Cấp Toàn Diện Engine OCR Sang Hybrid PaddleOCR 3.7+ (PP-OCRv5) & VietOCR (Python 3.13)
+- **Tương thích Python 3.13.17 & PaddlePaddle 3.3.0 ([`ocr-service/main.py`](../ocr-service/main.py), [`ocr-service/requirements.txt`](../ocr-service/requirements.txt)):**
+  - Nâng cấp tương thích hoàn toàn Python 3.13 với `paddlepaddle-gpu==3.3.0` (CUDA 11.8 cho kiến trúc Turing GTX 1650/RTX 20xx) và `paddleocr>=3.7.0` (`PP-OCRv5`).
+  - Tích hợp **VietOCR** nhận dạng lại văn bản với bộ từ điển Quốc ngữ 229 ký tự chuẩn xác 100% dấu tiếng Việt.
+  - Bổ sung cơ chế bảo vệ VRAM GPU 4GB (`FLAGS_allocator_strategy=auto_growth`, `FLAGS_fraction_of_gpu_memory_to_use=0.25`, giải phóng cache `empty_cache()`) để chạy song song mượt mà cùng Ollama AI Boxchat.
+  - Bộ chuẩn hóa từ vựng quân sự tiếng Việt (`_correct_vietnamese_military_text`) tự động sửa các lỗi OCR thường gặp ở văn kiện quân sự.
+- **Hiện đại hóa bộ script cài đặt & khởi chạy OCR ([`ocr-service/setup.bat`](../ocr-service/setup.bat), [`ocr-service/setup.sh`](../ocr-service/setup.sh), [`ocr-service/start-ocr.bat`](../ocr-service/start-ocr.bat), [`ocr-service/check_environment.py`](../ocr-service/check_environment.py)):**
+  - Tự động phát hiện và cấu hình môi trường Conda / venv với Python 3.13.
+  - Cập nhật script `check_environment.py` chẩn đoán chi tiết trạng thái CUDA, PaddlePaddle, PaddleOCR và VietOCR.
+- **Đồng bộ hóa môi trường Container & DevSecOps CI/CD ([`backend/boxchat/Dockerfile`](../backend/boxchat/Dockerfile), [`boxchat/Dockerfile`](../boxchat/Dockerfile), [`ocr-service/Dockerfile`](../ocr-service/Dockerfile), [`.github/workflows/security.yml`](../.github/workflows/security.yml), [`scripts/security-scan.ps1`](../scripts/security-scan.ps1)):**
+  - Nâng cấp base image sang `python:3.13-slim`.
+  - Cập nhật workflow GitHub Actions `security.yml` và script quét an ninh nội bộ đồng bộ với Python 3.13.
+- **Đồng bộ hóa tài liệu kỹ thuật ([`docs/BASELINE_STATE.md`](BASELINE_STATE.md), [`docs/HANDOVER_CHECKLIST.md`](HANDOVER_CHECKLIST.md), [`docs/REMEDIATION_LOG.md`](REMEDIATION_LOG.md), [`docs/guides/SETUP_SERVER.md`](guides/SETUP_SERVER.md), [`ocr-service/setup_environment.md`](../ocr-service/setup_environment.md)):**
+  - Cập nhật tài liệu hướng dẫn cài đặt và nghiệm thu môi trường OCR thế hệ mới.
 
 ---
 

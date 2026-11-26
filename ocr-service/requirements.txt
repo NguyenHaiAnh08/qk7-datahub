@@ -1,7 +1,7 @@
 # ============================================================
-# QK7 DataHub - OCR Microservice v2.0
+# QK7 DataHub - OCR Microservice v2.0 (Python 3.13.17 Ready)
 # Engine chính: MonkeyOCRv2 (HuggingFace transformers / Qwen-VL)
-# Engine fallback: PaddleOCR PP-OCRv3 (en_PP-OCRv3_det_infer + latin_PP-OCRv3_rec_infer)
+# Engine fallback: PaddleOCR 3.7+ (PP-OCRv5 + PaddlePaddle 3.3.0)
 # ============================================================
 
 # ─── 1. FastAPI Web Server ──────────────────────────────────
@@ -11,32 +11,38 @@ python-multipart>=0.0.9
 pydantic>=2.0.0
 
 # ─── 2. PDF & Image Processing ──────────────────────────────
-pymupdf>=1.24.0
+pymupdf>=1.24.11
 pypdfium2>=4.30.0
 pillow>=10.3.0
 opencv-python>=4.8.0
-numpy<2.0.0
+numpy>=2.1.0,<2.4.0
 
 # ─── 3. MonkeyOCRv2 / Vision-Language Model ─────────────────
-# LƯU Ý: Cài đặt PyTorch phù hợp trước:
-#   - GPU (CUDA 12.6): pip install torch==2.8.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
-#   - CPU only:       pip install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
-transformers>=5.22.2
+# LƯU Ý: Cài đặt PyTorch tương thích Python 3.13 trước:
+#   - GPU (CUDA 12.6): pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+#   - CPU only:       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+transformers==4.57.1
 accelerate==1.11.0
 qwen_vl_utils==0.0.14
 einops>=0.8.0
 sentencepiece>=0.2.0
 
 # ─── 4. Model Downloading & Hub Clients ─────────────────────
-huggingface_hub>=0.24.0
-modelscope>=1.15.0
+huggingface_hub>=0.34.0,<1.0
+modelscope>=1.28.0
 
 # ─── 5. UI & Testing Utilities (Tùy chọn) ───────────────────
-gradio>=4.0.0
+# gradio>=4.0.0
 
-# ─── 6. PaddleOCR Engine (Fallback khi MonkeyOCR offline) ────
-# Cài đặt paddlepaddle trước:
-#   pip install paddlepaddle==2.6.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
-paddlepaddle==2.6.2
-paddleocr==2.9.1
+# ─── 6. PaddleOCR Engine (Python 3.13 + PaddlePaddle 3.3.0) ──
+# Cài đặt PaddlePaddle 3.3.0 trước khi chạy pip install -r requirements.txt:
+#   - GPU NVIDIA CUDA 11.8 (khuyến nghị trên Windows / card Turing GTX 16xx, RTX 20xx):
+#       python -m pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+#   - CPU only:
+#       python -m pip install paddlepaddle==3.3.0
+paddleocr>=3.7.0
 opencv-python-headless>=4.8.0
+# ─── 7. VietOCR (Bộ từ điển 229 ký tự Quốc ngữ đủ 100% dấu tiếng Việt) ────
+# Cài đặt với: pip install gdown && pip install --no-deps vietocr>=0.3.13
+gdown>=6.0.0
+vietocr>=0.3.13

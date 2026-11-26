@@ -43,15 +43,21 @@ os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 os.environ.setdefault("DISABLE_PADDLE_UPDATE_CHECK", "1")
 os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
 os.environ.setdefault("FLAGS_use_mkldnn", "0")
+# Bảo vệ VRAM trên GPU 4GB (GTX 1650) khi chạy song song với Ollama AI Boxchat:
+# cấp phát tăng dần (auto_growth) và giới hạn tỷ lệ bộ nhớ GPU tối đa 25% (~1GB)
+os.environ.setdefault("FLAGS_allocator_strategy", "auto_growth")
+os.environ.setdefault("FLAGS_fraction_of_gpu_memory_to_use", "0.25")
 
 import gc
 import json
 import re
+import unicodedata
 import logging
 import concurrent.futures
 from typing import List, Optional, Any, Tuple
 from contextlib import asynccontextmanager
 
+import cv2
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -84,6 +90,14 @@ LOCAL_MODEL_DIR = os.path.join(
 LOCAL_PADDLE_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "model_weight", "paddleocr"
 )
+LOCAL_PADDLEX_CACHE = os.path.join(LOCAL_PADDLE_DIR, "paddlex_cache")
+os.environ.setdefault("PADDLE_PDX_CACHE_HOME", LOCAL_PADDLEX_CACHE)
+LOCAL_VIETOCR_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "model_weight", "vietocr"
+)
+LOCAL_VIETOCR_WEIGHTS = os.path.join(LOCAL_VIETOCR_DIR, "vgg_seq2seq.pth")
+PADDLE_DEVICE = os.environ.get("PADDLE_DEVICE", "auto")  # "auto" | "gpu:0" | "cpu"
+USE_VIETOCR = os.environ.get("USE_VIETOCR", "1").strip().lower() not in ("0", "false", "no")
 if os.path.isdir(LOCAL_MODEL_DIR) and not os.environ.get("MONKEY_MODEL_ID"):
     MONKEY_MODEL_ID = LOCAL_MODEL_DIR
 else:
@@ -118,6 +132,7 @@ _monkey_model: Optional[Any] = None
 _monkey_processor: Optional[Any] = None
 _monkey_device: Optional[str] = None
 _paddle_engine: Optional[Any] = None
+_vietocr_predictor: Optional[Any] = None
 _active_engine: Optional[str] = None   # "monkey" | "paddleocr" | None
 
 # ─── MonkeyOCRv2 loader ───────────────────────────────────────
@@ -182,39 +197,135 @@ def _load_monkey():
         return False
 
 
-# ─── PaddleOCR loader (fallback) ─────────────────────────────
+# ─── PaddleOCR loader (fallback / PaddlePaddle 3.3 + PP-OCRv5 GPU/CPU) ───
+def _resolve_paddle_device() -> str:
+    """Xác định thiết bị cho PaddleOCR 3.x ('gpu:0' nếu có CUDA, ngược lại 'cpu')."""
+    if PADDLE_DEVICE and PADDLE_DEVICE != "auto":
+        return PADDLE_DEVICE
+    try:
+        import paddle  # pyright: ignore[reportMissingImports] # type: ignore
+        if paddle.device.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0:
+            return "gpu:0"
+    except Exception:
+        pass
+    return "cpu"
+
+
 def _load_paddle(set_active: bool = True):
-    """Lazy-load PaddleOCR làm fallback hoặc engine chính (ưu tiên weights nội bộ)."""
+    """Lazy-load PaddleOCR làm fallback hoặc engine chính (hỗ trợ cả PaddleOCR 3.x & 2.x, ưu tiên weights nội bộ)."""
     global _paddle_engine, _active_engine
     if _paddle_engine is not None:
         if set_active and not _active_engine:
             _active_engine = "paddleocr"
         return True
     try:
+        import inspect
         from paddleocr import PaddleOCR  # pyright: ignore[reportMissingImports] # type: ignore
-        det_dir = os.path.join(LOCAL_PADDLE_DIR, "det", "en_PP-OCRv3_det_infer")
-        rec_dir = os.path.join(LOCAL_PADDLE_DIR, "rec", "latin_PP-OCRv3_rec_infer")
-        cls_dir = os.path.join(LOCAL_PADDLE_DIR, "cls", "ch_ppocr_mobile_v2.0_cls_infer")
 
-        if os.path.isdir(det_dir) and os.path.isdir(rec_dir) and os.path.isdir(cls_dir):
-            logger.info(f"[PaddleOCR] Sử dụng trọng số nội bộ: {LOCAL_PADDLE_DIR}")
-            _paddle_engine = PaddleOCR(
-                use_angle_cls=True,
-                lang="vi",
-                det_model_dir=det_dir,
-                rec_model_dir=rec_dir,
-                cls_model_dir=cls_dir,
-                show_log=False,
-            )
+        init_params = inspect.signature(PaddleOCR.__init__).parameters
+        is_v3_api = "text_detection_model_dir" in init_params
+
+        if is_v3_api:
+            paddle_device = _resolve_paddle_device()
+            v5_mobile_det_dir = os.path.join(LOCAL_PADDLEX_CACHE, "official_models", "PP-OCRv5_mobile_det")
+            v5_server_det_dir = os.path.join(LOCAL_PADDLEX_CACHE, "official_models", "PP-OCRv5_server_det")
+            v5_rec_dir = os.path.join(LOCAL_PADDLEX_CACHE, "official_models", "latin_PP-OCRv5_mobile_rec")
+
+            # Ưu tiên PP-OCRv5_mobile_det để tiết kiệm VRAM (~250MB thay vì ~2GB của server_det)
+            # giúp chạy song song an toàn với Ollama trên GPU 4GB (GTX 1650)
+            if os.path.isdir(v5_mobile_det_dir) and os.path.isdir(v5_rec_dir):
+                det_name, det_path = "PP-OCRv5_mobile_det", v5_mobile_det_dir
+            elif os.path.isdir(v5_server_det_dir) and os.path.isdir(v5_rec_dir):
+                det_name, det_path = "PP-OCRv5_server_det", v5_server_det_dir
+            else:
+                det_name, det_path = None, None
+
+            if det_name and det_path:
+                logger.info(
+                    f"[PaddleOCR v3] Sử dụng trọng số nội bộ {det_name} + latin_PP-OCRv5_mobile_rec "
+                    f"({LOCAL_PADDLEX_CACHE}) trên {paddle_device}"
+                )
+                _paddle_engine = PaddleOCR(
+                    text_detection_model_name=det_name,
+                    text_detection_model_dir=det_path,
+                    text_recognition_model_name="latin_PP-OCRv5_mobile_rec",
+                    text_recognition_model_dir=v5_rec_dir,
+                    use_doc_orientation_classify=False,
+                    use_doc_unwarping=False,
+                    use_textline_orientation=False,
+                    device=paddle_device,
+                )
+            else:
+                logger.info(
+                    f"[PaddleOCR v3] Khởi tạo PaddleOCR(PP-OCRv5_mobile_det + latin_PP-OCRv5_mobile_rec, device='{paddle_device}')..."
+                )
+                _paddle_engine = PaddleOCR(
+                    text_detection_model_name="PP-OCRv5_mobile_det",
+                    text_recognition_model_name="latin_PP-OCRv5_mobile_rec",
+                    use_doc_orientation_classify=False,
+                    use_doc_unwarping=False,
+                    use_textline_orientation=False,
+                    device=paddle_device,
+                )
         else:
-            logger.info("[PaddleOCR] Khởi tạo PaddleOCR(use_angle_cls=True, lang='vi')...")
-            _paddle_engine = PaddleOCR(use_angle_cls=True, lang="vi", show_log=False)
+            det_dir = os.path.join(LOCAL_PADDLE_DIR, "det", "en_PP-OCRv3_det_infer")
+            rec_dir = os.path.join(LOCAL_PADDLE_DIR, "rec", "latin_PP-OCRv3_rec_infer")
+            cls_dir = os.path.join(LOCAL_PADDLE_DIR, "cls", "ch_ppocr_mobile_v2.0_cls_infer")
+
+            if os.path.isdir(det_dir) and os.path.isdir(rec_dir) and os.path.isdir(cls_dir):
+                logger.info(f"[PaddleOCR v2] Sử dụng trọng số nội bộ: {LOCAL_PADDLE_DIR}")
+                _paddle_engine = PaddleOCR(
+                    use_angle_cls=True,
+                    lang="vi",
+                    det_model_dir=det_dir,
+                    rec_model_dir=rec_dir,
+                    cls_model_dir=cls_dir,
+                    show_log=False,
+                )
+            else:
+                logger.info("[PaddleOCR v2] Khởi tạo PaddleOCR(use_angle_cls=True, lang='vi')...")
+                _paddle_engine = PaddleOCR(use_angle_cls=True, lang="vi", show_log=False)
+
         logger.info("[PaddleOCR] ✅ Sẵn sàng!")
+        if USE_VIETOCR:
+            _load_vietocr()
         if set_active:
             _active_engine = "paddleocr"
         return True
     except Exception as e:
-        logger.error(f"[PaddleOCR] ❌ Không khởi tạo được: {e}")
+        logger.error(f"[PaddleOCR] ❌ Không khởi tạo được: {e}", exc_info=True)
+        return False
+
+
+def _load_vietocr() -> bool:
+    """
+    Lazy-load VietOCR (vgg_seq2seq, 229 ký tự Quốc ngữ đủ 100% dấu tiếng Việt)
+    chạy hoàn toàn Air-Gapped offline trên CPU (0 MB VRAM GPU) kết hợp với
+    PP-OCRv5_mobile_det trên GPU CUDA 11.8.
+    """
+    global _vietocr_predictor
+    if _vietocr_predictor is not None:
+        return True
+    if not USE_VIETOCR:
+        return False
+    try:
+        from vietocr.tool.config import Cfg  # pyright: ignore[reportMissingImports] # type: ignore
+        from vietocr.tool.predictor import Predictor  # pyright: ignore[reportMissingImports] # type: ignore
+
+        cfg = Cfg.load_config_from_name("vgg_seq2seq")
+        cfg["device"] = os.environ.get("VIETOCR_DEVICE", "cpu")
+        cfg["cnn"]["pretrained"] = False
+        cfg["predictor"]["beamsearch"] = False
+        if os.path.isfile(LOCAL_VIETOCR_WEIGHTS):
+            cfg["weights"] = LOCAL_VIETOCR_WEIGHTS
+            logger.info(f"[VietOCR] Sử dụng trọng số Tiếng Việt nội bộ: {LOCAL_VIETOCR_WEIGHTS}")
+        _vietocr_predictor = Predictor(cfg)
+        logger.info(
+            f"[VietOCR] ✅ Sẵn sàng (bộ chữ Quốc ngữ {len(cfg.get('vocab', ''))} ký tự, device={cfg['device']})!"
+        )
+        return True
+    except Exception as e:
+        logger.warning(f"[VietOCR] ⚠️ Không nạp được VietOCR (sẽ dùng bộ đọc mặc định của PaddleOCR): {e}")
         return False
 
 
@@ -505,26 +616,211 @@ def _sort_reading_order(boxes_with_text, row_tolerance_px: int = 12):
     return sorted_text_lines, flat_items
 
 
+# ═══════════════════════════════════════════════════════════════
+# TỪ ĐIỂN CHUẨN HÓA CHÍNH TẢ HÀNH CHÍNH - QUÂN SỰ QK7 (VIETNAMESE LEXICON)
+# Khôi phục dấu tiếng Việt và chuẩn hóa thuật ngữ quân đội bị nhiễu khi scan/mộc đỏ
+# ═══════════════════════════════════════════════════════════════
+_VIETNAMESE_MILITARY_LEXICON: List[Tuple[re.Pattern, str]] = [
+    # Quốc hiệu, Tiêu ngữ, Đảng hiệu
+    (re.compile(r"\bĐ[ẢAĂÂ]?NG\s+C[ỘOỌÔ]?NG\s+S[ẢAĂ]?N\s+VI[ỆEÊ]?T\s+NAM\b", re.IGNORECASE), "ĐẢNG CỘNG SẢN VIỆT NAM"),
+    (re.compile(r"\bC[ỘOỌÔ]?NG\s+H[ÒOỌ]A\s+X[ÃA]\s+H[ỘOỌÔ]?I\s+CH[ỦU]\s+NGH[ĨI]A\s+VI[ỆEÊ]?T\s+NAM\b", re.IGNORECASE), "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"),
+    (re.compile(r"\bĐ[ộo]c\s+l[ậa]p\s*[-–—]\s*T[ựu]\s+do\s*[-–—]\s*H[ạa]nh\s+ph[úu]c\b", re.IGNORECASE), "Độc lập - Tự do - Hạnh phúc"),
+    # Cơ quan, đơn vị Quân khu 7 & Trường Quân sự
+    (re.compile(r"\bĐ[ẢAĂÂ]?NG\s+B[ỘOỌÔ]?\s+QU[ÂAĂ]?N\s+KHU\s*7\b", re.IGNORECASE), "ĐẢNG BỘ QUÂN KHU 7"),
+    (re.compile(r"\bB[ỘOỌÔ]?\s+T[ƯU]\s+L[ỆEÊ]?NH\s+QU[ÂAĂ]?N\s+KHU\s*7\b", re.IGNORECASE), "BỘ TƯ LỆNH QUÂN KHU 7"),
+    (re.compile(r"\bQU[ÂAĂ]?N\s+KHU\s*7\b"), "QUÂN KHU 7"),
+    (re.compile(r"\bĐ[ẢAĂÂ]?NG\s+[ỦUỶY]?\s+TR[ƯU][ỜOÒ]NG\s+QU[ÂAĂ]?N\s+S[ỰU]\b", re.IGNORECASE), "ĐẢNG ỦY TRƯỜNG QUÂN SỰ"),
+    (re.compile(r"\bTR[ƯU][ỜOÒ]NG\s+QU[ÂAĂ]?N\s+S[ỰU]\s+QU[ÂAĂ]?N\s+KHU\s*7\b", re.IGNORECASE), "TRƯỜNG QUÂN SỰ QUÂN KHU 7"),
+    (re.compile(r"\bTR[ƯU][ỜOÒ]NG\s+QU[ÂAĂ]?N\s+S[ỰU]\b"), "TRƯỜNG QUÂN SỰ"),
+    (re.compile(r"\bTh[àa]nh\s+ph[ốoóò]\s+H[ồoò]\s+Ch[íi]\s+Minh\b", re.IGNORECASE), "Thành phố Hồ Chí Minh"),
+    # Tên loại văn bản hành chính - quân sự (in hoa đầu dòng)
+    (re.compile(r"^\s*K[ẾEÊ]?\s+HO[ẠA]CH\s*$"), "KẾ HOẠCH"),
+    (re.compile(r"^\s*QUY[ẾEÊ]?T\s+Đ[ỊI]NH\s*$"), "QUYẾT ĐỊNH"),
+    (re.compile(r"^\s*NGH[ỊI]\s+QUY[ẾEÊ]?T\s*$"), "NGHỊ QUYẾT"),
+    (re.compile(r"^\s*CH[ỈI]\s+TH[ỊI]\s*$"), "CHỈ THỊ"),
+    (re.compile(r"^\s*B[ÁA]O\s+C[ÁA]O\s*$"), "BÁO CÁO"),
+    (re.compile(r"^\s*T[ỜO]\s+TR[ÌI]NH\s*$"), "TỜ TRÌNH"),
+    (re.compile(r"^\s*TH[ÔO]NG\s+B[ÁA]O\s*$"), "THÔNG BÁO"),
+    (re.compile(r"^\s*H[ƯU][ỚO]NG\s+D[ẪA]N\s*$"), "HƯỚNG DẪN"),
+    (re.compile(r"^\s*C[ÔO]NG\s+V[ĂA]N\s*$"), "CÔNG VĂN"),
+    (re.compile(r"^\s*QUY\s+CH[ẾEÊ]?\s*$"), "QUY CHẾ"),
+    (re.compile(r"^\s*QUY\s+Đ[ỊI]NH\s*$"), "QUY ĐỊNH"),
+    (re.compile(r"^\s*CH[ƯU][ƠO]NG\s+TR[ÌI]NH\s*$"), "CHƯƠNG TRÌNH"),
+    # Đề mục & Thể thức ký duyệt
+    (re.compile(r"\bN[ỘOỌQ]I\s+DUNG\b"), "NỘI DUNG"),
+    (re.compile(r"\bTH[ỬUÚỨ]\s*'\s*NGHI[ỆEÊ]?M\b|\bTH[ỬUÚỨ]\s+NGHI[ỆEÊ]?M\b"), "THỬ NGHIỆM"),
+    (re.compile(r"\bT/M\s+BAN\s+TH[ƯU][ỜOÒ'\s]*NG\s+V[ỤU]?\b", re.IGNORECASE), "T/M BAN THƯỜNG VỤ"),
+    (re.compile(r"\bTM\.?\s+BAN\s+TH[ƯU][ỜOÒ'\s]*NG\s+V[ỤU]?\b", re.IGNORECASE), "TM. BAN THƯỜNG VỤ"),
+    (re.compile(r"\bBAN\s+TH[ƯU][ỜOÒ'\s]*NG\s+V[ỤU]\b"), "BAN THƯỜNG VỤ"),
+    (re.compile(r"\bB[ÍI]\s+TH[ƯUÚ]'?\b"), "BÍ THƯ"),
+    (re.compile(r"\bPH[ÓO]\s+B[ÍI]\s+TH[ƯUÚ]'?\b"), "PHÓ BÍ THƯ"),
+    (re.compile(r"\bHI[ỆEÊ]?U\s+TR[ƯU][ỞO]NG\b"), "HIỆU TRƯỞNG"),
+    (re.compile(r"\bCH[ÍI]NH\s+[ỦUỶY]\b"), "CHÍNH ỦY"),
+    (re.compile(r"\bN[ơo]i\s+nh[ậa]n\s*:", re.IGNORECASE), "Nơi nhận:"),
+    (re.compile(r"\bK[íi]nh\s+g[ửu]i\s*:", re.IGNORECASE), "Kính gửi:"),
+    # Cụm từ chuyên ngành & đơn vị trực thuộc
+    (re.compile(r"\bTh[ưưu][ờo]ng\s+v[ụu]\s+ĐUQK\b", re.IGNORECASE), "Thường vụ ĐUQK"),
+    (re.compile(r"\bC[ụu]c\s+Ch[íi]nh\s+tr[ịi]\b", re.IGNORECASE), "Cục Chính trị"),
+    (re.compile(r"\bB[ộo]\s+Tham\s+m[ưu]u\b", re.IGNORECASE), "Bộ Tham mưu"),
+    (re.compile(r"\bC[ụu]c\s+H[ậa]u\s+c[ầa]n\s*[-–]\s*K[ỹy]\s+thu[ậa]t\b", re.IGNORECASE), "Cục Hậu cần - Kỹ thuật"),
+    (re.compile(r"\bchuyn\s+đ[ổo]i\s+s[ốo]?\b|\bchuy[ểe]n\s+đ[ổo]i\s+s[ốo]?\b", re.IGNORECASE), "chuyển đổi số"),
+    (re.compile(r"\bĐ[ảa]ng\s+b[ộo]\s+Nh[àa]\s+tr[ưưu][ờo]ng\b", re.IGNORECASE), "Đảng bộ Nhà trường"),
+    (re.compile(r"\(\s*đ[ểe]\s+b/c\s*\)", re.IGNORECASE), "(để b/c)"),
+]
+
+
+def _correct_vietnamese_military_text(text: str) -> str:
+    """
+    Chuẩn hóa Unicode NFC và áp dụng Từ điển Chính tả Hành chính - Quân sự QK7
+    cho từng dòng văn bản sau OCR.
+    """
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFC", text)
+    corrected_lines: List[str] = []
+    for line in text.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        # Loại bỏ dấu nháy đơn rác do OCR nhầm râu chữ Ư/Ơ (ví dụ: TRU'ỜNG -> TRƯỜNG, BÍ THU' -> BÍ THƯ)
+        s = re.sub(r"([UuƯưOoƠơ])'", r"\1", s)
+        for pattern, replacement in _VIETNAMESE_MILITARY_LEXICON:
+            s = pattern.sub(replacement, s)
+        corrected_lines.append(s)
+    return "\n".join(corrected_lines)
+
+
+def _crop_polygon_to_pil(img_np: np.ndarray, poly: Any, pad_x: int = 4, pad_y: int = 3) -> Optional[Image.Image]:
+    """
+    Cắt và nắn thẳng (perspective transform) vùng dòng chữ 4 đỉnh từ ảnh gốc
+    kèm đệm biên (padding) để không mất dấu mũ/dấu nặng tiếng Việt.
+    """
+    try:
+        pts = np.array(poly, dtype=np.float32)
+        if pts.shape != (4, 2):
+            x_min = max(0, int(np.min(pts[:, 0])) - pad_x)
+            y_min = max(0, int(np.min(pts[:, 1])) - pad_y)
+            x_max = min(img_np.shape[1], int(np.max(pts[:, 0])) + pad_x)
+            y_max = min(img_np.shape[0], int(np.max(pts[:, 1])) + pad_y)
+            if x_max <= x_min or y_max <= y_min:
+                return None
+            return Image.fromarray(img_np[y_min:y_max, x_min:x_max])
+
+        # Mở rộng nhẹ 4 đỉnh ra ngoài để giữ nguyên vẹn dấu tiếng Việt (Ấ, Ể, Ộ, Ự...)
+        h_img, w_img = img_np.shape[:2]
+        pts[0, 0] = max(0, pts[0, 0] - pad_x)
+        pts[0, 1] = max(0, pts[0, 1] - pad_y)
+        pts[1, 0] = min(w_img, pts[1, 0] + pad_x)
+        pts[1, 1] = max(0, pts[1, 1] - pad_y)
+        pts[2, 0] = min(w_img, pts[2, 0] + pad_x)
+        pts[2, 1] = min(h_img, pts[2, 1] + pad_y)
+        pts[3, 0] = max(0, pts[3, 0] - pad_x)
+        pts[3, 1] = min(h_img, pts[3, 1] + pad_y)
+
+        crop_w = int(max(np.linalg.norm(pts[0] - pts[1]), np.linalg.norm(pts[2] - pts[3])))
+        crop_h = int(max(np.linalg.norm(pts[0] - pts[3]), np.linalg.norm(pts[1] - pts[2])))
+        if crop_w < 4 or crop_h < 4:
+            return None
+
+        dst_pts = np.array(
+            [[0, 0], [crop_w, 0], [crop_w, crop_h], [0, crop_h]],
+            dtype=np.float32,
+        )
+        matrix = cv2.getPerspectiveTransform(pts, dst_pts)
+        warped = cv2.warpPerspective(
+            img_np,
+            matrix,
+            (crop_w, crop_h),
+            borderMode=cv2.BORDER_REPLICATE,
+            flags=cv2.INTER_CUBIC,
+        )
+        if crop_h > crop_w * 1.8:
+            warped = np.rot90(warped)
+        return Image.fromarray(warped)
+    except Exception:
+        return None
+
+
 def _ocr_with_paddle(pil_image: Image.Image) -> Tuple[str, float]:
     """
-    OCR 1 ảnh bằng PaddleOCR. Trả về: (text, avg_confidence)
+    Hybrid OCR chuyên biệt Tiếng Việt:
+      - Bước 1: Dùng PaddleOCR (PP-OCRv5_mobile_det trên GPU CUDA 11.8) để phát hiện tọa độ các hộp chữ.
+      - Bước 2: Dùng VietOCR (vgg_seq2seq, 229 ký tự Quốc ngữ đủ 100% dấu) để nhận dạng từng hộp chữ.
+      - Bước 3: Sắp xếp thứ tự đọc 2 cột hành chính và chuẩn hóa qua Từ điển Chính tả Quân sự QK7.
+    Trả về: (text, avg_confidence)
     """
     if _paddle_engine is None:
         raise RuntimeError("PaddleOCR engine chưa được khởi tạo!")
 
-    img_np  = np.array(pil_image)
-    ocr_res = _paddle_engine.ocr(img_np, cls=True)
+    img_np = np.array(pil_image)
+    boxes_with_text = []
 
-    if ocr_res and len(ocr_res) > 0 and ocr_res[0]:
-        sorted_lines, flat_items = _sort_reading_order(ocr_res[0])
-        page_text = "\n".join(sorted_lines)
-        avg_conf  = (
+    if hasattr(_paddle_engine, "predict"):
+        # PaddleOCR 3.x (PaddleX backend + PaddlePaddle 3.3.x)
+        results = list(_paddle_engine.predict(img_np))
+        if results:
+            res0 = results[0]
+            rec_texts = res0.get("rec_texts", []) if hasattr(res0, "get") else getattr(res0, "rec_texts", [])
+            rec_scores = res0.get("rec_scores", []) if hasattr(res0, "get") else getattr(res0, "rec_scores", [])
+            rec_polys = res0.get("rec_polys", None) if hasattr(res0, "get") else getattr(res0, "rec_polys", None)
+            if rec_polys is None:
+                rec_polys = res0.get("dt_polys", []) if hasattr(res0, "get") else getattr(res0, "dt_polys", [])
+
+            raw_entries = []
+            for poly, txt, score in zip(rec_polys, rec_texts, rec_scores):
+                pts = poly.tolist() if hasattr(poly, "tolist") else poly
+                raw_entries.append((pts, str(txt), float(score)))
+
+            # Nếu VietOCR sẵn sàng -> nhận dạng lại các hộp chữ bằng bộ từ vựng Quốc ngữ 229 ký tự
+            if _vietocr_predictor is not None and raw_entries:
+                crops: List[Image.Image] = []
+                valid_indices: List[int] = []
+                for idx, (pts, _, _) in enumerate(raw_entries):
+                    crop_pil = _crop_polygon_to_pil(img_np, pts)
+                    if crop_pil is not None:
+                        crops.append(crop_pil)
+                        valid_indices.append(idx)
+
+                if crops:
+                    try:
+                        vi_texts, vi_probs = _vietocr_predictor.predict_batch(crops, return_prob=True)
+                        for idx, vi_txt, vi_prob in zip(valid_indices, vi_texts, vi_probs):
+                            pts, fallback_txt, fallback_score = raw_entries[idx]
+                            clean_vi = str(vi_txt).strip()
+                            prob_val = float(vi_prob) if vi_prob is not None else fallback_score
+                            if clean_vi:
+                                raw_entries[idx] = (pts, clean_vi, prob_val)
+                    except Exception as vi_err:
+                        logger.warning(f"[VietOCR] Batch predict lỗi, fallback từng dòng: {vi_err}")
+                        for idx, crop_pil in zip(valid_indices, crops):
+                            try:
+                                vi_txt, vi_prob = _vietocr_predictor.predict(crop_pil, return_prob=True)
+                                clean_vi = str(vi_txt).strip()
+                                if clean_vi:
+                                    pts, _, _ = raw_entries[idx]
+                                    raw_entries[idx] = (pts, clean_vi, float(vi_prob))
+                            except Exception:
+                                pass
+
+            for pts, txt, score in raw_entries:
+                boxes_with_text.append((pts, (txt, score)))
+    else:
+        # PaddleOCR 2.x legacy fallback
+        ocr_res = _paddle_engine.ocr(img_np, cls=True)
+        if ocr_res and len(ocr_res) > 0 and ocr_res[0]:
+            boxes_with_text = ocr_res[0]
+
+    if boxes_with_text:
+        sorted_lines, flat_items = _sort_reading_order(boxes_with_text)
+        raw_page_text = "\n".join(sorted_lines)
+        page_text = _correct_vietnamese_military_text(raw_page_text)
+        avg_conf = (
             sum(it["score"] for it in flat_items) / len(flat_items)
             if flat_items else 0.0
         )
     else:
         page_text = ""
-        avg_conf  = 0.0
+        avg_conf = 0.0
 
     return page_text, avg_conf
 
@@ -731,6 +1027,13 @@ async def extract_ocr(
             finally:
                 doc.close()
                 gc.collect()
+                # Giải phóng VRAM GPU tồn dư sau mỗi phiên OCR để nhường bộ nhớ cho Ollama AI Boxchat
+                try:
+                    import paddle  # pyright: ignore[reportMissingImports] # type: ignore
+                    if paddle.device.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0:
+                        paddle.device.cuda.empty_cache()
+                except Exception:
+                    pass
 
         (
             total_pages,
@@ -810,7 +1113,12 @@ def weights_status():
     det_dir = os.path.join(LOCAL_PADDLE_DIR, "det", "en_PP-OCRv3_det_infer")
     rec_dir = os.path.join(LOCAL_PADDLE_DIR, "rec", "latin_PP-OCRv3_rec_infer")
     cls_dir = os.path.join(LOCAL_PADDLE_DIR, "cls", "ch_ppocr_mobile_v2.0_cls_infer")
-    paddle_complete = os.path.isdir(det_dir) and os.path.isdir(rec_dir) and os.path.isdir(cls_dir)
+    v5_mobile_det_dir = os.path.join(LOCAL_PADDLEX_CACHE, "official_models", "PP-OCRv5_mobile_det")
+    v5_server_det_dir = os.path.join(LOCAL_PADDLEX_CACHE, "official_models", "PP-OCRv5_server_det")
+    v5_rec_dir = os.path.join(LOCAL_PADDLEX_CACHE, "official_models", "latin_PP-OCRv5_mobile_rec")
+    paddle_v3_complete = os.path.isdir(det_dir) and os.path.isdir(rec_dir) and os.path.isdir(cls_dir)
+    paddle_v5_complete = (os.path.isdir(v5_mobile_det_dir) or os.path.isdir(v5_server_det_dir)) and os.path.isdir(v5_rec_dir)
+    paddle_complete = paddle_v5_complete or paddle_v3_complete
 
     monkey_safetensors = os.path.join(LOCAL_MODEL_DIR, "model.safetensors")
     monkey_complete = os.path.isdir(LOCAL_MODEL_DIR) and os.path.isfile(monkey_safetensors)

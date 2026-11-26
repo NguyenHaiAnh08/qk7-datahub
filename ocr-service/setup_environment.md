@@ -10,7 +10,7 @@
 | Thành phần | Yêu cầu tối thiểu | Khuyến nghị (Production) |
 | :--- | :--- | :--- |
 | **Hệ điều hành** | Windows 10/11 (64-bit), Windows Server 2019/2022, Linux (Ubuntu 20.04/22.04 LTS) | Windows Server hoặc Ubuntu 22.04 LTS |
-| **Python** | 3.10 | **3.11** (khuyến nghị cho độ tương thích cao nhất với PyTorch, transformers & vLLM) |
+| **Python** | 3.10 | **3.13.17** (hỗ trợ đầy đủ PaddlePaddle 3.3.0 CUDA 11.8, PaddleOCR 3.7+ và PyTorch trên Python 3.13) |
 | **RAM** | 8 GB | **16 GB – 32 GB** (khi chạy suy luận trên CPU) |
 | **CPU** | 4 Cores (x86_64 / AVX2) | 8 Cores trở lên |
 | **GPU (Tùy chọn)** | Không bắt buộc (có thể chạy CPU) | NVIDIA GPU (VRAM $\ge$ 8GB, ví dụ RTX 3060/4060, RTX A4000, T4, A10) |
@@ -20,11 +20,11 @@
 
 ## 2. Quy Trình Cài Đặt Môi Trường (Conda)
 
-### Bước 1: Tạo môi trường Conda với Python 3.11
+### Bước 1: Tạo môi trường Conda với Python 3.13
 Mở **Anaconda Prompt** (Windows) hoặc terminal (Linux) và chạy lệnh:
 
 ```bash
-conda create -n MonkeyOCRv2Parsing python=3.11 -y
+conda create -n MonkeyOCRv2Parsing python=3.13 -y
 conda activate MonkeyOCRv2Parsing
 ```
 
@@ -61,8 +61,9 @@ pip install opencv-python einops pypdfium2 gradio pillow sentencepiece
 # 3. Phục vụ Microservice FastAPI & xử lý PDF
 pip install fastapi>=0.110.0 uvicorn>=0.28.0 python-multipart>=0.0.9 pymupdf>=1.24.0
 
-# 4. Engine dự phòng PaddleOCR (Fallback khi cần)
-pip install paddlepaddle==2.6.2 paddleocr==2.9.1 opencv-python-headless
+# 4. Engine PaddleOCR 3.7+ trên PaddlePaddle 3.3.0 (Python 3.13 + CUDA 11.8 khuyến nghị cho card Turing)
+python -m pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+pip install paddleocr>=3.7.0 opencv-python-headless
 ```
 
 Hoặc cài nhanh toàn bộ từ file `requirements.txt`:
@@ -180,7 +181,7 @@ chmod +x start-ocr.sh
 
 ## 6. Lưu Ý Quan Trọng Cho Triển Khai QK7 DataHub
 
-1. **Phiên bản Python 3.11:** Đảm bảo sử dụng Python 3.11 để tránh xung đột ABI giữa C-extensions của PyMuPDF, OpenCV và PyTorch.
+1. **Phiên bản Python 3.13.17:** Đã tương thích hoàn toàn với `paddlepaddle-gpu==3.3.0` (CUDA 11.8 ổn định cho dòng GPU NVIDIA Turing như GTX 1650/RTX 20xx), `paddleocr>=3.7.0` (`PP-OCRv5`), `numpy>=2.1,<2.4`, `pymupdf>=1.24.11` và PyTorch.
 2. **Chế độ CPU trên máy chủ vật lý:**
    - Nếu không có GPU, thời gian xử lý 1 trang PDF scan phức tạp là khoảng 6–12 giây trên CPU Core i7/Xeon.
    - Nhờ kiến trúc không đồng bộ (Async) ở Gateway Node.js (:8000), tiến trình của người dùng khác **không bị block Event Loop**.

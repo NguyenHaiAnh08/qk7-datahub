@@ -35,10 +35,10 @@ echo [INFO] Sử dụng Python mặc định trên hệ thống.
 
 :env_ready
 echo.
-echo [1/3] Đang cài đặt PyTorch CPU (phiên bản ổn định 2.5.1+cpu)...
+echo [1/3] Đang cài đặt PyTorch CPU tương thích Python 3.13...
 echo       (Quá trình tải có thể mất vài phút tùy tốc độ mạng)
 echo -----------------------------------------------------------------
-"%PIP_EXE%" install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+"%PIP_EXE%" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 if %ERRORLEVEL% neq 0 (
     echo [CẢNH BÁO] Không tải được từ download.pytorch.org. Thử cài đặt torch từ PyPI...
     "%PIP_EXE%" install torch torchvision torchaudio

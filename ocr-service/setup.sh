@@ -11,8 +11,8 @@ echo "=============================================================="
 echo "     QK7 DATAHUB - THIẾT LẬP MÔI TRƯỜNG MONKEYOCRV2"
 echo "=============================================================="
 echo "Script này sẽ tự động:"
-echo "  1. Tạo môi trường Python 3.11 (Conda hoặc venv)"
-echo "  2. Cài đặt PyTorch (Tùy chọn GPU CUDA 12.6 hoặc CPU)"
+echo "  1. Tạo môi trường Python 3.13 (Conda hoặc venv)"
+echo "  2. Cài đặt PaddlePaddle 3.3.0 (CUDA 11.8 hoặc CPU) và PyTorch"
 echo "  3. Cài đặt transformers, accelerate, qwen_vl_utils, v.v."
 echo "  4. Tải trọng số mô hình MonkeyOCRv2 vào ./model_weight/"
 echo "  5. Kiểm tra tính sẵn sàng của mô hình"
@@ -36,8 +36,8 @@ else
 fi
 
 if [ "$ENV_CHOICE" = "1" ]; then
-    echo "--- Đang tạo Conda env 'MonkeyOCRv2Parsing' (Python 3.11) ---"
-    conda create -n MonkeyOCRv2Parsing python=3.11 -y
+    echo "--- Đang tạo Conda env 'MonkeyOCRv2Parsing' (Python 3.13) ---"
+    conda create -n MonkeyOCRv2Parsing python=3.13 -y
     # Kích hoạt conda env trong subshell
     eval "$(conda shell.bash hook)"
     conda activate MonkeyOCRv2Parsing
@@ -49,19 +49,23 @@ fi
 
 echo ""
 echo "=============================================================="
-echo "Chọn phần cứng mục tiêu cho PyTorch:"
-echo "  1: GPU NVIDIA (CUDA 12.6)"
+echo "Chọn phần cứng mục tiêu cho PaddlePaddle 3.3.0 & PyTorch:"
+echo "  1: GPU NVIDIA (PaddlePaddle 3.3.0 CUDA 11.8 + PyTorch)"
 echo "  2: CPU Only (Mặc định cho máy chủ không GPU rời)"
 echo "=============================================================="
 read -p "Nhập lựa chọn [1-2] (Mặc định: 2): " HW_CHOICE
 HW_CHOICE=${HW_CHOICE:-2}
 
 if [ "$HW_CHOICE" = "1" ]; then
+    echo "[PaddlePaddle] Đang cài đặt PaddlePaddle 3.3.0 GPU (CUDA 11.8)..."
+    python -m pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/ --extra-index-url https://pypi.org/simple
     echo "[PyTorch] Đang cài đặt PyTorch cho GPU (CUDA 12.6)..."
-    pip install torch==2.8.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 else
+    echo "[PaddlePaddle] Đang cài đặt PaddlePaddle 3.3.0 CPU..."
+    python -m pip install paddlepaddle==3.3.0
     echo "[PyTorch] Đang cài đặt PyTorch cho CPU..."
-    pip install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 fi
 
 echo ""

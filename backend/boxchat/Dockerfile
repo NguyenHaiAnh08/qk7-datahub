@@ -2,7 +2,7 @@
 # boxchat/Dockerfile — QK7 AI Microservice (FastAPI)
 # ============================================================
 
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 RUN groupadd -r qk7 && useradd -r -g qk7 qk7
 

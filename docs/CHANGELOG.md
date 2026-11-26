@@ -4,6 +4,15 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.14-pdf-text-export] — 2026-11-26
+
+### 1. Công Cụ Kiểm Tra Nội Dung PDF
+- Thêm [`scripts/xuat-noi-dung-pdf.js`](../scripts/xuat-noi-dung-pdf.js): theo dõi văn bản mới lưu và xuất toàn bộ chữ của tệp PDF (mọi trang; trang scan được OCR) ra `backend/exports/noi-dung-pdf/*.txt`.
+- Chỉ đọc CSDL và tệp; mặc định bỏ qua văn bản cấp mật 3–5 (cần `--mat`); thư mục xuất không đưa vào Git.
+- Chạy: `node scripts/xuat-noi-dung-pdf.js` (hoặc `--moi-nhat`, `<file_id>`, `--tep <đường dẫn>`).
+
+---
+
 ## [v1.8.13-performance-monitor] — 2026-11-26
 
 ### 1. Bảng Đo Hiệu Năng Từng Bước (chỉ Quản trị viên ROL-01)

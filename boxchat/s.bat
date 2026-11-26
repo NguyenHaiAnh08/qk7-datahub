@@ -4,6 +4,11 @@ setlocal enabledelayedexpansion
 title QK7 DataHub - AI Boxchat (:8001)
 cd /d "%~dp0"
 
+REM --- Tu dong bo sung Python 3.13 vao PATH neu terminal/Explorer chua lam moi PATH ---
+if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
+    set "PATH=%LOCALAPPDATA%\Programs\Python\Python313;%LOCALAPPDATA%\Programs\Python\Python313\Scripts;%PATH%"
+)
+
 echo ==========================================
 echo   QK7 DataHub - AI BOXCHAT MICROSERVICE
 echo ==========================================

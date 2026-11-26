@@ -5,6 +5,11 @@ title QK7 DataHub - Khoi dong AI Boxchat 8001
 cd /d "%~dp0.."
 set "ROOT=%CD%\"
 
+REM --- Tu dong bo sung Python 3.13 vao PATH ---
+if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
+    set "PATH=%LOCALAPPDATA%\Programs\Python\Python313;%LOCALAPPDATA%\Programs\Python\Python313\Scripts;%PATH%"
+)
+
 REM --- Load .env goc neu ton tai ---
 if exist "%~dp0load-env.bat" (
     call "%~dp0load-env.bat" >nul 2>&1

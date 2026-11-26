@@ -5,6 +5,11 @@ cd /d "%~dp0.."
 set "ROOT=%CD%\"
 set "FRONTEND_BUILT=0"
 
+REM --- Tu dong bo sung Python 3.13 vao PATH cho toan bo cua so con ---
+if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
+    set "PATH=%LOCALAPPDATA%\Programs\Python\Python313;%LOCALAPPDATA%\Programs\Python\Python313\Scripts;%PATH%"
+)
+
 REM Doc cau hinh tu .env root (neu co)
 if exist "%ROOT%.env" call "%~dp0load-env.bat" >nul 2>&1
 if not defined PORT_BACKEND set "PORT_BACKEND=8000"

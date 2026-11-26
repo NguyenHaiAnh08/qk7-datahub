@@ -4,6 +4,22 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.15-auto-path-python313-startup-scripts] — 2026-11-26
+
+### 1. Tự Động Định Tuyến & Bổ Sung Python 3.13 Vào PATH Trong Bộ Kịch Bản Khởi Động
+- **Khắc phục lỗi môi trường khi khởi chạy dịch vụ qua Batch Script:**
+  - Bổ sung cơ chế tự động phát hiện Python 3.13 tại `%LOCALAPPDATA%\Programs\Python\Python313` và nạp vào biến môi trường `PATH` của phiên làm việc.
+  - Áp dụng đồng bộ cho toàn bộ 6 tệp khởi chạy hệ thống:
+    + [`boxchat/s.bat`](../boxchat/s.bat): Dịch vụ AI Boxchat (:8001).
+    + [`fingerprint/s-agent.bat`](../fingerprint/s-agent.bat): Dịch vụ sinh trắc học vân tay Local Agent (:9001).
+    + [`ocr-service/start-ocr.bat`](../ocr-service/start-ocr.bat): Dịch vụ OCR Air-Gapped (:8002).
+    + [`scripts/s-dev.bat`](../scripts/s-dev.bat): Kịch bản khởi chạy đồng thời toàn bộ môi trường phát triển (Fullstack Dev).
+    + [`scripts/s.bat`](../scripts/s.bat): Kịch bản khởi chạy vận hành máy chủ tổng thể.
+    + [`scripts/start-ai.bat`](../scripts/start-ai.bat): Kịch bản khởi động AI Boxchat độc lập kèm bảo vệ VRAM.
+  - Triệt tiêu hoàn toàn lỗi `python is not recognized` khi người dùng kích hoạt dịch vụ từ Windows Explorer hoặc terminal chưa tải lại biến môi trường hệ thống.
+
+---
+
 ## [v1.8.14-ocr-hybrid-paddleocr-vietocr-and-python313-upgrade] — 2026-11-26
 
 ### 1. Nâng Cấp Toàn Diện Engine OCR Sang Hybrid PaddleOCR 3.7+ (PP-OCRv5) & VietOCR (Python 3.13)

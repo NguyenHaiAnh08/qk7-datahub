@@ -3,6 +3,11 @@ chcp 65001 >nul
 title QK7 Fingerprint Agent - Server
 cd /d "%~dp0"
 
+REM --- Tu dong bo sung Python 3.13 vao PATH ---
+if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
+    set "PATH=%LOCALAPPDATA%\Programs\Python\Python313;%LOCALAPPDATA%\Programs\Python\Python313\Scripts;%PATH%"
+)
+
 echo ==========================================
 echo   QK7 FINGERPRINT AGENT - SERVER
 echo ==========================================

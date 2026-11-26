@@ -64,10 +64,15 @@ set "ANONYMIZED_TELEMETRY=False"
 REM --- PaddleOCR & Albumentations offline hardening ---
 set "PADDLE_HOME=%~dp0model_weight\paddleocr"
 set "PADDLEOCR_HOME=%~dp0model_weight\paddleocr"
+set "PADDLE_PDX_CACHE_HOME=%~dp0model_weight\paddleocr\paddlex_cache"
 set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True"
 set "DISABLE_PADDLE_UPDATE_CHECK=1"
 set "NO_ALBUMENTATIONS_UPDATE=1"
 set "FLAGS_use_mkldnn=0"
+REM --- Toi uu VRAM cho GPU 4GB (GTX 1650) chay song song Ollama ---
+set "FLAGS_allocator_strategy=auto_growth"
+set "FLAGS_fraction_of_gpu_memory_to_use=0.25"
+if not defined PADDLE_DEVICE set "PADDLE_DEVICE=auto"
 
 REM Uu tien model weight noi bo neu ton tai
 if exist "%~dp0model_weight\MonkeyOCRv2-B-Parsing" (

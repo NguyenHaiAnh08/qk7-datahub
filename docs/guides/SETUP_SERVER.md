@@ -12,7 +12,7 @@ Mở **PowerShell** và chạy các lệnh:
 ```powershell
 node --version        # Yêu cầu >= 22.13 (Tải tại: https://nodejs.org/)
 npm --version
-python --version      # Yêu cầu >= 3.10  (Tải tại: https://www.python.org/downloads/)
+python --version      # Yêu cầu Python 3.13.17 (Tải tại: https://www.python.org/downloads/)
 ```
 
 ### 2. Kiểm tra dịch vụ Microsoft SQL Server

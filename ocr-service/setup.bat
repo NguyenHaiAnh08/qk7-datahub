@@ -8,9 +8,9 @@ echo      QK7 DATAHUB - THIẾT LẬP MÔI TRƯỜNG MONKEYOCRV2
 echo ==============================================================
 echo.
 echo Script này sẽ tự động:
-echo   1. Tạo môi trường Python 3.11 (Conda hoặc venv)
-echo   2. Cài đặt PyTorch (Tùy chọn GPU CUDA 12.6 hoặc CPU)
-echo   3. Cài đặt transformers, accelerate, qwen_vl_utils, v.v.
+echo   1. Tạo môi trường Python 3.13 (Conda hoặc venv)
+echo   2. Cài đặt PaddlePaddle 3.3.0 (GPU CUDA 11.8 hoặc CPU) và PyTorch
+echo   3. Cài đặt transformers, accelerate, qwen_vl_utils, paddleocr 3.7+
 echo   4. Tải trọng số mô hình MonkeyOCRv2 vào ./model_weight/
 echo   5. Kiểm tra tính sẵn sàng của mô hình
 echo ==============================================================
@@ -29,7 +29,7 @@ if %ERRORLEVEL% equ 0 (
 echo.
 echo Chọn loại môi trường cài đặt:
 if %USE_CONDA% equ 1 (
-    echo   [1] Conda Environment (Khuyến nghị: MonkeyOCRv2Parsing, Python 3.11)
+    echo   [1] Conda Environment (Khuyến nghị: MonkeyOCRv2Parsing, Python 3.13)
     echo   [2] Python Virtualenv (Thư mục local ./venv)
     set /p ENV_CHOICE="Nhập lựa chọn [1-2] (Mặc định: 1): "
     if not defined ENV_CHOICE set ENV_CHOICE=1
@@ -39,8 +39,8 @@ if %USE_CONDA% equ 1 (
 
 if "%ENV_CHOICE%"=="1" (
     echo.
-    echo --- Đang tạo Conda env 'MonkeyOCRv2Parsing' (Python 3.11) ---
-    call conda create -n MonkeyOCRv2Parsing python=3.11 -y
+    echo --- Đang tạo Conda env 'MonkeyOCRv2Parsing' (Python 3.13) ---
+    call conda create -n MonkeyOCRv2Parsing python=3.13 -y
     echo Kích hoạt môi trường MonkeyOCRv2Parsing...
     call conda activate MonkeyOCRv2Parsing
 ) else (
@@ -52,21 +52,25 @@ if "%ENV_CHOICE%"=="1" (
 
 echo.
 echo ==============================================================
-echo Chọn phần cứng mục tiêu cho PyTorch:
-echo   [1] GPU NVIDIA (CUDA 12.6) - Yêu cầu card RTX / Quadro / Tesla
+echo Chọn phần cứng mục tiêu cho PaddlePaddle 3.3.0 ^& PyTorch:
+echo   [1] GPU NVIDIA (PaddlePaddle 3.3.0 CUDA 11.8 + PyTorch CPU/CUDA) - Khuyến nghị Turing/RTX
 echo   [2] CPU Only (Máy chủ thông thường, không card đồ họa rời)
 echo ==============================================================
-set /p HW_CHOICE="Nhập lựa chọn [1-2] (Mặc định: 2 cho CPU): "
-if not defined HW_CHOICE set HW_CHOICE=2
+set /p HW_CHOICE="Nhập lựa chọn [1-2] (Mặc định: 1 cho GPU): "
+if not defined HW_CHOICE set HW_CHOICE=1
 
 if "%HW_CHOICE%"=="1" (
     echo.
-    echo [PyTorch] Đang cài đặt PyTorch cho GPU (CUDA 12.6)...
-    pip install torch==2.8.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+    echo [PaddlePaddle] Đang cài đặt PaddlePaddle 3.3.0 GPU ^(CUDA 11.8^)...
+    python -m pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/ --extra-index-url https://pypi.org/simple
+    echo [PyTorch] Đang cài đặt PyTorch CPU ^(nhường VRAM cho Ollama ^& PaddleOCR^)...
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 ) else (
     echo.
-    echo [PyTorch] Đang cài đặt PyTorch cho CPU...
-    pip install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+    echo [PaddlePaddle] Đang cài đặt PaddlePaddle 3.3.0 CPU...
+    python -m pip install paddlepaddle==3.3.0
+    echo [PyTorch] Đang cài đặt PyTorch CPU...
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 )
 
 echo.

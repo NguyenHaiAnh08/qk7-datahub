@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # QK7 DataHub — Bộ Kịch Bản Tự Động Quét & Kiểm Tra An Ninh Cục Bộ (DevSecOps)
 # Tiêu chuẩn: OWASP Top 10, CWE/SANS Top 25, HCL AppScan Cleanliness Baseline
 # ==============================================================================
@@ -14,7 +14,7 @@ $ErrorActionPreference = "Continue"
 
 # 1. Bổ sung các đường dẫn cài đặt công cụ vào PATH tạm thời của phiên
 $toolPaths = @(
-    "$env:LOCALAPPDATA\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\Scripts",
+    "$env:LOCALAPPDATA\Programs\Python\Python313\Scripts",
     "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Gitleaks.Gitleaks_Microsoft.Winget.Source_8wekyb3d8bbwe",
     "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe",
     "$env:APPDATA\npm"

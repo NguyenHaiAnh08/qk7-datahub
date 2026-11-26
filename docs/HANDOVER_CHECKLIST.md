@@ -111,8 +111,8 @@ Khi có bất kỳ thay đổi cấu hình hạ tầng hoặc cập nhật dữ 
 ## 6. Ghi Nhận Nợ Kỹ Thuật & Khuyến Nghị Dài Hạn
 
 1. **Python Runtime:**
-   - *Hiện trạng:* Đang sử dụng Python từ WindowsApps UWP.
-   - *Khuyến nghị:* Cài đặt Python 3.12 MSI chuẩn từ `python.org` vào `C:\Python312` khi có lịch bảo trì máy chủ định kỳ.
+   - *Hiện trạng:* Đã nâng cấp lên Python 3.13.17 chuẩn chính thức từ `python.org` tại `C:\Users\PC\AppData\Local\Programs\Python\Python313`.
+   - *Đánh giá:* Vận hành tối ưu hiệu năng CPython 3.13, loại bỏ hoàn toàn phụ thuộc vào gói WindowsApps UWP.
 2. **Mở rộng phần cứng VRAM:**
    - *Hiện trạng:* GPU GTX 1650 (4.0 GB VRAM) vận hành hoàn hảo với `qwen2.5:3b` (~3.3s/lượt).
    - *Đề xuất:* Khi nâng cấp máy chủ lên GPU có $\ge 8\text{ GB}$ VRAM (như RTX 3060/4060 hoặc Quadro), có thể nâng cấp mô hình lên `qwen2.5:7b` theo phân tích tại [MODEL_DECISION.md](./MODEL_DECISION.md).

@@ -1,10 +1,10 @@
-FROM python:3.10-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
-# Cai dat dependencies he thong cho OpenCV va MuPDF
+# Cai dat dependencies he thong cho OpenCV va MuPDF (Python 3.13 / Debian Bookworm-Trixie)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libgomp1 \
     curl \
@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd -r qk7 && useradd -r -g qk7 qk7
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir paddlepaddle==3.3.0 && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 

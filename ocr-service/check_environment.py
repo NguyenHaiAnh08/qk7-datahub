@@ -83,13 +83,21 @@ def check_transformers_stack():
 
 
 def check_paddle_stack():
-    print_banner("4. KIỂM TRA PADDLEOCR STACK (FALLBACK ENGINE)")
+    print_banner("4. KIỂM TRA HYBRID PADDLEOCR + VIETOCR STACK (CUDA 11.8 & QUỐC NGỮ)")
     all_ok = True
-    for pkg_name, desc in [("paddle", "PaddlePaddle Deep Learning Engine"), ("paddleocr", "PaddleOCR Engine")]:
+    for pkg_name, desc in [
+        ("paddle", "PaddlePaddle Deep Learning Engine"),
+        ("paddleocr", "PaddleOCR Layout & Detection Engine"),
+        ("vietocr", "VietOCR 229-Char Vietnamese Recognition Engine"),
+    ]:
         try:
             mod = __import__(pkg_name)
             ver = getattr(mod, "__version__", "đã cài")
             print(f"  [OK] {pkg_name:<16}: v{ver:<10} ({desc})")
+            if pkg_name == "paddle":
+                cuda_compiled = mod.device.is_compiled_with_cuda()
+                gpu_count = mod.device.cuda.device_count() if cuda_compiled else 0
+                print(f"  • Paddle CUDA       : {'Có (GPU count: ' + str(gpu_count) + ')' if cuda_compiled and gpu_count > 0 else 'CPU only'}")
         except ImportError:
             print(f"  [THIẾU] ⚠️ {pkg_name:<14}: Chưa cài đặt ({desc})")
             all_ok = False

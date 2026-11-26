@@ -11,7 +11,7 @@
 ## Phase 0: Pre-Flight Check & Snapshot Môi Trường
 - **Branching:** Tạo branch `feature/complete-boxchat-v1` từ checkpoint `d58e4975`.
 - **Phần cứng:** NVIDIA GeForce GTX 1650 (Tổng VRAM: 4096 MiB / 4.0 GB).
-- **Môi trường:** Python 3.12.10 (WindowsApps), Ollama 0.40.11, models: `qwen2.5:3b` (1.9 GB), `bge-m3:latest` (1.2 GB).
+- **Môi trường:** Python 3.13.17 (Python.org 64-bit), Ollama 0.40.11, models: `qwen2.5:3b` (1.9 GB), `bge-m3:latest` (1.2 GB).
 - **Artifact:** `docs/BASELINE_STATE.md`.
 - **Trạng thái:** Gate 0 PASSED.
 
@@ -78,7 +78,7 @@
 ### 3.5. Ghi nhận Technical Debt về Python Runtime
 - **Hiện trạng:** Máy chủ đang sử dụng Python từ WindowsApps (`C:\Users\PC\AppData\Local\Microsoft\WindowsApps\python.exe`).
 - **Đánh giá rủi ro:** Phân quyền UWP có thể gây xung đột khi cấu hình venv hoặc cài đặt thư viện nhị phân C-extension, mã hóa mặc định `cp1252` cần cờ xử lý UTF-8.
-- **Khuyến nghị dài hạn:** Cài đặt Python 3.12 chuẩn từ `python.org` vào `C:\Python312` khi bàn giao môi trường sản xuất chính thức. Hiện tại giữ nguyên để đảm bảo 100% tính ổn định cho toàn bộ dịch vụ.
+- **Khuyến nghị dài hạn:** Đã nâng cấp toàn diện lên Python 3.13.17 64-bit chuẩn từ `python.org` tại `C:\Users\PC\AppData\Local\Programs\Python\Python313`, đồng thời loại bỏ hoàn toàn gói Python 3.12 WindowsApps UWP. Đã kiểm thử tính tương thích cho toàn bộ dịch vụ.
 - **Trạng thái:** Gate 3 COMPLETED (Đã được USER xác nhận [YES]).
 
 ---

@@ -10,11 +10,11 @@ NVIDIA GeForce GTX 1650, 4096 MiB, 1241 MiB
 ```
 - **Python:**
 ```
-Python 3.12.10
+Python 3.13.17
 ```
 - **Python path:**
 ```
-C:\Users\PC\AppData\Local\Microsoft\WindowsApps\python.exe
+C:\Users\PC\AppData\Local\Programs\Python\Python313\python.exe
 ```
 - **Ollama:**
 ```
@@ -36,7 +36,7 @@ bge-m3:latest    790764642607    1.2 GB    14 hours ago
 - **pytest:**
 ```
 ============================= test session starts =============================
-platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.7.0 -- C:\Users\PC\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\python.exe
+platform win32 -- Python 3.13.17, pytest-9.1.1, pluggy-1.7.0 -- C:\Users\PC\AppData\Local\Programs\Python\Python313\python.exe
 cachedir: .pytest_cache
 rootdir: D:\QK7_DataHub\qk7-datahub\boxchat
 plugins: anyio-4.9.0

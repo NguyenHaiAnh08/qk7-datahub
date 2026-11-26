@@ -4,6 +4,11 @@ title QK7 DataHub - Development
 cd /d "%~dp0.."
 set "ROOT=%CD%\"
 
+REM --- Tu dong bo sung Python 3.13 vao PATH cho toan bo cua so con ---
+if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
+    set "PATH=%LOCALAPPDATA%\Programs\Python\Python313;%LOCALAPPDATA%\Programs\Python\Python313\Scripts;%PATH%"
+)
+
 REM ─── Đọc .env root ───
 call "%~dp0load-env.bat"
 if errorlevel 1 (

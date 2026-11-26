@@ -204,6 +204,13 @@ Hệ thống tích hợp quy trình kiểm toán tự động hóa hoàn toàn t
 * 🏗️ **Build Verification:** Đảm bảo code trên `main` chắc chắn build được thành công (không bị lỗi TypeScript hay thiếu file), tránh tình trạng kéo code về máy chủ triển khai thì bị vỡ giao diện.
 
 
+### 18. Bảng Đo Hiệu Năng Từng Bước (Quản Trị Viên)
+Đăng nhập bằng tài khoản Quản trị viên (ROL-01), bấm **Đo hiệu năng** ở góc dưới trái hoặc nhấn `Ctrl+Shift+M`:
+* **Tác vụ trên máy này:** mỗi lần bấm, chuyển trang, tải trang được tách thành từng bước, kèm các bước tương ứng trên máy chủ.
+* **Máy chủ:** mọi yêu cầu gần nhất và tác vụ nền, gồm thời gian, CPU, bộ nhớ, SQL, tệp, dịch vụ ngoài.
+* **Tổng hợp bước / Tài nguyên:** thống kê theo từng loại bước; CPU, RAM, ổ đĩa, CSDL, dịch vụ, tiến trình.
+* Số liệu giữ trong bộ nhớ (mất khi khởi động lại). Trình duyệt không cho đo % CPU, % RAM, % GPU của máy con.
+
 ---
 
 ## 📁 Cấu Trúc Dự Án Toàn Diện

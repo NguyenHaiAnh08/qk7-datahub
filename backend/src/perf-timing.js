@@ -12,11 +12,16 @@
  * Cấu hình (.env): PERF_TIMING=false tắt hẳn · PERF_LOG=false chỉ tắt ghi file ·
  *   PERF_SLOW_MS=1000 · PERF_SQL_SLOW_MS=100 · PERF_STALL_MS=200 · PERF_SUMMARY_MINUTES=10 (0 = tắt)
  * Xem số liệu trong bộ nhớ: GET /api/admin/perf (chỉ ROL-01) ; ?reset=1 để xoá số liệu.
+ * Dấu vết từng bước của mỗi request (perf-trace.js) và tài nguyên máy chủ (perf-system.js), chỉ ROL-01:
+ *   GET /api/admin/perf/traces · /traces/:id · /steps · /background · /system
+ *   Phản hồi mỗi request mang tiêu đề X-Perf-Id để máy con ghép với bước đo trên máy chủ.
  */
 const fs = require('fs');
 const path = require('path');
-const { AsyncLocalStorage } = require('async_hooks');
+const express = require('express');
 const { monitorEventLoopDelay } = require('perf_hooks');
+const perfTrace = require('./perf-trace');
+const perfSystem = require('./perf-system');
 
 const ENABLED = process.env.PERF_TIMING !== 'false';
 const FILE_LOG = ENABLED && process.env.PERF_LOG !== 'false';
@@ -32,7 +37,7 @@ const MAX_FILE_BYTES = 100 * 1024 * 1024; // chặn đầy đĩa
 
 const stats = new Map();
 let since = Date.now();
-const context = new AsyncLocalStorage();
+const { context } = perfTrace;
 const active = new Set();
 
 // ───────────────────────── Ghi file ─────────────────────────
@@ -73,15 +78,25 @@ const msSince = (t0) => Number(process.hrtime.bigint() - t0) / 1e6;
 const normalizePath = (p) => p.split('/').map((s) => (/\d/.test(s) ? ':id' : s)).join('/');
 
 // ───────────────────────── SQL ─────────────────────────
-function describeSql(command) {
+// Tên bước ổn định để cộng dồn: "SQL SELECT DOCUMENT"
+function sqlName(method, command) {
+  if (method === 'bulk') return `SQL BULK ${command?.name || ''}`.trim();
+  const text = cleanSql(command); // lấy cả câu: mệnh đề FROM có thể nằm sau danh sách cột dài
+  const verb = /\b(SELECT|INSERT|UPDATE|DELETE|MERGE|EXEC)\b/i.exec(text)?.[1]?.toUpperCase() || 'KHÁC';
+  const table = /\b(?:FROM|INTO|UPDATE|MERGE|EXEC)\s+([\[\]\w.]+)/i.exec(text)?.[1]?.replace(/[\[\]]/g, '');
+  return `SQL ${verb}${table ? ` ${table}` : ''}`;
+}
+
+function cleanSql(command) {
   const text = Array.isArray(command) ? command.join('?') : String(command || '');
   return text
     .replace(/--[^\n]*/g, ' ')
     .replace(/'(?:[^']|'')*'/g, "'?'") // che chuỗi hằng (có thể chứa dữ liệu)
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 400);
+    .trim();
 }
+
+const describeSql = (command) => cleanSql(command).slice(0, 400);
 
 function instrumentSql() {
   const { Request } = require('mssql');
@@ -91,9 +106,18 @@ function instrumentSql() {
     Request.prototype[method] = function timed(...args) {
       const ctx = context.getStore();
       const t0 = process.hrtime.bigint();
+      const endStep = perfTrace.startStep('sql', sqlName(method, args[0]));
+      const params = Object.keys(this.parameters || {}).length; // chỉ đếm, không ghi giá trị
       const done = (err, result) => {
         const ms = msSince(t0);
         if (ctx) { ctx.dbMs += ms; ctx.dbN += 1; }
+        endStep({
+          'Số dòng trả về': result?.recordset?.length ?? 0,
+          'Số dòng bị tác động': (result?.rowsAffected || []).reduce((a, b) => a + b, 0),
+          'Số tham số': params,
+          'Câu lệnh': method === 'bulk' ? `BULK ${args[0]?.name || ''}` : describeSql(args[0]),
+          ...(err ? { 'Lỗi': String(err.message).slice(0, 200) } : {}),
+        });
         if (ms >= SQL_SLOW_MS || err) {
           writeLog({
             type: 'sql', ms: round(ms),
@@ -129,15 +153,21 @@ function instrumentFetch() {
     const ctx = context.getStore();
     const t0 = process.hrtime.bigint();
     let target = '?';
-    try { const u = new URL(input?.url || String(input)); target = u.host + u.pathname; } catch (_) {}
-    const done = (status, error) => {
+    let host = '?';
+    try { const u = new URL(input?.url || String(input)); target = u.host + u.pathname; host = u.host; } catch (_) {}
+    const endStep = perfTrace.startStep('external', `Gọi dịch vụ ${host}`);
+    const done = (status, error, bytes) => {
       const ms = msSince(t0);
       if (ctx) ctx.extMs += ms;
+      endStep({
+        'Địa chỉ': target, 'Mã trả về': status,
+        ...(bytes ? { 'KB trả về': bytes / 1024 } : {}), ...(error ? { 'Lỗi': error } : {}),
+      });
       writeLog({ type: 'ext', ms: round(ms), target, status, route: ctx?.label || '(nền)', error });
     };
     try {
       const res = await original.call(this, input, init);
-      done(res.status);
+      done(res.status, undefined, Number(res.headers.get('content-length') || 0));
       return res;
     } catch (e) {
       done(0, String(e.cause?.code || e.message).slice(0, 200));
@@ -160,6 +190,7 @@ function watchEventLoop() {
 }
 
 if (ENABLED) {
+  perfTrace.install();
   instrumentSql();
   instrumentFetch();
   watchEventLoop();
@@ -202,11 +233,17 @@ function snapshot() {
 // ───────────────────────── Middleware ─────────────────────────
 function middleware() {
   if (!ENABLED) return (req, res, next) => next();
-  return (req, res, next) => {
+  return function perfTimingMiddleware(req, res, next) {
     const url = req.originalUrl.split('?')[0];
     const isApi = url.startsWith('/api');
     const t0 = process.hrtime.bigint();
-    const ctx = { label: `${req.method} ${normalizePath(url)}`, dbMs: 0, dbN: 0, extMs: 0 };
+    // Không đo, không ghi log chính các API của bảng đo để số liệu không bị nhiễu
+    const ofMonitor = url.startsWith('/api/admin/perf');
+    const ctx = perfTrace.startTrace({ method: req.method, path: url, ignore: ofMonitor });
+    ctx.label = `${req.method} ${normalizePath(url)}`;
+    req.__perf = ctx;
+    if (ctx.id) res.setHeader('X-Perf-Id', ctx.id);
+    let sendStart = null;
     const readStart = req.socket?.bytesRead || 0;
     const writeStart = req.socket?.bytesWritten || 0;
     let ttfb = null;
@@ -214,7 +251,10 @@ function middleware() {
 
     const writeHead = res.writeHead;
     res.writeHead = function timedWriteHead(...args) {
-      if (ttfb === null) ttfb = msSince(t0);
+      if (ttfb === null) {
+        ttfb = msSince(t0);
+        sendStart = perfTrace.startStep('network', 'Gửi phản hồi về máy con', undefined, ctx);
+      }
       return writeHead.apply(this, args);
     };
 
@@ -227,10 +267,19 @@ function middleware() {
       const pattern = req.route?.path
         ? `${req.baseUrl || ''}${typeof req.route.path === 'string' ? req.route.path : '(regex)'}`
         : null;
-      if (isApi) record(`${req.method} ${pattern || '(no-route)'}`, ms, res.statusCode);
+      if (isApi && !ofMonitor) record(`${req.method} ${pattern || '(no-route)'}`, ms, res.statusCode);
 
-      if (isApi || ms >= STATIC_MIN_MS) {
-        const inBytes = Number(req.headers['content-length'] || 0) || Math.max(0, (req.socket?.bytesRead || 0) - readStart);
+      const inBytes = Number(req.headers['content-length'] || 0) || Math.max(0, (req.socket?.bytesRead || 0) - readStart);
+      const outKb = Math.max(0, (req.socket?.bytesWritten || writeStart) - writeStart) / 1024;
+      for (const finish of [...ctx.pending]) finish(); // các bước còn mở kết thúc cùng phản hồi
+      sendStart?.({ 'Mã trả về': res.statusCode, 'KB gửi đi': outKb });
+      perfTrace.finishTrace(ctx, {
+        route: pattern ? `${req.method} ${pattern}` : ctx.label,
+        status: res.statusCode, ms, ttfb_ms: ttfb, in_kb: inBytes / 1024, out_kb: outKb,
+        user: req.user?.user_id || null, aborted: aborted || undefined,
+      });
+
+      if (!ofMonitor && (isApi || ms >= STATIC_MIN_MS)) {
         writeLog({
           type: 'req',
           route: pattern ? `${req.method} ${pattern}` : ctx.label,
@@ -242,7 +291,7 @@ function middleware() {
           db_n: ctx.dbN,
           ext_ms: ctx.extMs ? round(ctx.extMs) : undefined,
           in_kb: round(inBytes / 1024),
-          out_kb: round(Math.max(0, (req.socket?.bytesWritten || writeStart) - writeStart) / 1024),
+          out_kb: round(outKb),
           user: req.user?.user_id,
           aborted: aborted || undefined,
         });
@@ -280,9 +329,12 @@ function startSummary() {
   t.unref();
 }
 
+const isPerfAdmin = (req) => (req.user?.roles || []).includes('ROL-01');
+const PERF_DENIED = { error: 'Chỉ Quản trị viên tối cao (ROL-01) được xem số liệu hiệu năng.' };
+
 function reportHandler(req, res) {
-  if (!(req.user?.roles || []).includes('ROL-01')) {
-    return res.status(403).json({ error: 'Chỉ Quản trị viên tối cao (ROL-01) được xem số liệu hiệu năng.' });
+  if (!isPerfAdmin(req)) {
+    return res.status(403).json(PERF_DENIED);
   }
   const data = snapshot().sort((a, b) => b.total_ms - a.total_ms);
   const out = { since: new Date(since).toISOString(), slow_threshold_ms: SLOW_MS, routes: data };
@@ -290,4 +342,27 @@ function reportHandler(req, res) {
   res.json(out);
 }
 
-module.exports = { middleware, startSummary, reportHandler };
+/** Các API của bảng đo hiệu năng (chỉ đọc). Gắn tại /api/admin/perf, sau requireAuth. */
+function monitorRouter(getPool) {
+  if (ENABLED) perfSystem.start(getPool);
+  const report = perfSystem.createReporter(getPool);
+  const router = express.Router();
+  const guard = (req, res, next) => (isPerfAdmin(req) ? next() : res.status(403).json(PERF_DENIED));
+  router.get('/traces', guard, (req, res) => res.json({
+    enabled: perfTrace.ENABLED,
+    traces: perfTrace.list({ limit: req.query.limit, full: req.query.full === '1' }),
+  }));
+  router.get('/traces/:id', guard, (req, res) => {
+    const trace = perfTrace.get(req.params.id);
+    if (!trace) return res.status(404).json({ error: 'Không còn dấu vết của tác vụ này (máy chủ chỉ giữ số lượng gần nhất)' });
+    res.json(trace);
+  });
+  router.get('/steps', guard, (req, res) => res.json({ enabled: perfTrace.ENABLED, steps: perfTrace.stepSummary() }));
+  router.get('/background', guard, (req, res) => res.json({ items: perfTrace.listBackground(Number(req.query.limit) || 200) }));
+  router.get('/system', guard, async (req, res) => {
+    try { res.json(await report()); } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  return router;
+}
+
+module.exports = { middleware, startSummary, reportHandler, monitorRouter };

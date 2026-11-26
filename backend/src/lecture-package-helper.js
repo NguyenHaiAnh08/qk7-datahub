@@ -6,6 +6,7 @@ const fs = require('fs');
 const AdmZip = require('adm-zip');
 const { getModuleUploadPath, MODULES, sanitizeFolderName } = require('./storage-helper');
 const { validatePackage, writePackage, formatIssues } = require('./lecture-package-validator');
+const perfTrace = require('./perf-trace');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const UPLOADS_ROOT = path.join(PROJECT_ROOT, 'uploads');
@@ -24,7 +25,8 @@ async function extractAndParse({ lectureId, pendingPath, title, createdAt }) {
 
     // Kiểm tra lại ngay trước khi giải nén (gói chờ duyệt có thể đã bị thay trên đĩa).
     // Kiểm tra và ghi cùng một dữ liệu trong bộ nhớ; không đạt thì không ghi tệp nào.
-    const check = validatePackage(new AdmZip(zipAbsPath));
+    const check = perfTrace.step('Kiểm tra gói bài giảng trước khi giải nén',
+        () => validatePackage(new AdmZip(zipAbsPath)), (r) => ({ 'Số tệp trong gói': r.files.length, 'Đạt': r.ok ? 'Có' : 'Không' }));
     if (!check.ok) throw new Error(formatIssues(check.issues));
 
     // ✅ THƯ MỤC: bai-giang-so/YYYY/MM/Ten_Bai_Giang_MaLecture/goi-<phiên bản>
@@ -40,7 +42,8 @@ async function extractAndParse({ lectureId, pendingPath, title, createdAt }) {
 
     try {
         fs.mkdirSync(targetDir, { recursive: true });
-        writePackage(check.files, targetDir);
+        perfTrace.step('Giải nén gói bài giảng', () => writePackage(check.files, targetDir),
+            () => ({ 'Số tệp ghi ra': check.files.length }));
 
         const manifestPath = path.join(targetDir, 'imsmanifest.xml');
 

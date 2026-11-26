@@ -4,6 +4,19 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.13-performance-monitor] — 2026-11-26
+
+### 1. Bảng Đo Hiệu Năng Từng Bước (chỉ Quản trị viên ROL-01)
+- **Cửa sổ nổi "Đo hiệu năng"** ([`PerfMonitorPopup.tsx`](../frontend/src/components/common/PerfMonitorPopup.tsx)): ẩn/hiện bằng nút góc dưới trái hoặc `Ctrl+Shift+M`, di chuyển bằng thanh tiêu đề, kéo 4 cạnh và 4 góc để đổi kích thước (tối thiểu 720×260), phóng to toàn màn hình. Bốn tab: Tác vụ trên máy này, Máy chủ, Tổng hợp bước, Tài nguyên. Bảng có sắp xếp, tìm kiếm, phân trang, xuất CSV; số thập phân làm tròn 4 chữ số.
+- **Đo trên máy con** ([`perfRecorder.ts`](../frontend/src/utils/perfRecorder.ts)): tải trang, thao tác bấm, chuyển trang, gọi API, tải tài nguyên, luồng giao diện bị chặn, đóng dấu mờ PDF, mở và vẽ trang PDF. Số liệu chỉ giữ trong bộ nhớ trình duyệt.
+- **Đo trên máy chủ** ([`perf-trace.js`](../backend/src/perf-trace.js), [`perf-system.js`](../backend/src/perf-system.js)): từng lớp xử lý, xử lý nghiệp vụ, truy vấn SQL, gọi dịch vụ ngoài, đọc/ghi tệp, băm dữ liệu, kiểm tra mật khẩu, kiểm tra và giải nén gói bài giảng, gửi phản hồi, tác vụ nền; CPU, bộ nhớ, tiến trình, ổ đĩa, thư mục dữ liệu, CSDL, dịch vụ, GPU NVIDIA.
+- **API mới (chỉ đọc):** `/api/admin/perf/{traces,traces/:id,steps,background,system}`, đã khai trong Swagger. Phản hồi có thêm tiêu đề `X-Perf-Id`. API cũ `/api/admin/perf` giữ nguyên.
+- **Bảo mật:** chỉ ROL-01 (kiểm tra ở cả giao diện và Gateway). Không ghi giá trị tham số SQL, chuỗi hằng trong câu lệnh được che, không ghi tham số trên đường dẫn, không ghi nội dung gửi/nhận hay mật khẩu.
+- **Thay đổi kèm theo:** middleware đo được đưa lên đầu chuỗi xử lý trong [`server.js`](../backend/server.js); các hàm trung gian được đặt tên để hiện trên bảng.
+- **Cấu hình:** `PERF_TRACE=false` tắt đo từng bước, `PERF_TRACE_KEEP` (600), `PERF_SAMPLE_MS` (2000).
+
+---
+
 ## [v1.8.12-test-suite-cleanup-and-pipeline-hardening] — 2026-11-25
 
 ### 1. Dọn Dẹp Mã Nguồn & Loại Bỏ Tệp Kiểm Thử Lỗi Thời (Test Suite Modernization)

@@ -135,6 +135,12 @@ const {
 // ═══════════════════════════════════════════════════════════════
 // SECURITY MIDDLEWARE
 // ═══════════════════════════════════════════════════════════════
+// Đo thời gian và tài nguyên từng bước (log [SLOW], tổng kết định kỳ, bảng đo hiệu năng của Admin).
+// Đặt trước mọi lớp xử lý khác để lớp nào cũng được đo.
+const perfTiming = require('./src/perf-timing');
+const perfTrace = require('./src/perf-trace');
+app.use(perfTiming.middleware());
+perfTiming.startSummary();
 // [FIX CWE-1021 / CWE-79 / FINDINGS #5-#36] Middleware bảo mật tập trung (HSTS, CSP Nonce, Permissions-Policy, COOP, CORP)
 app.use(createSecurityHeadersMiddleware());
 // Nén gzip/deflate cho phản hồi text (JS/CSS/HTML/JSON...): giảm mạnh băng thông khi nhiều người tải cùng lúc.
@@ -156,10 +162,6 @@ if (process.env.COMPRESSION !== 'false') {
     console.warn('[COMPRESSION] ⚠️ Thư viện compression chưa được cài đặt (chạy npm install trong backend/), bỏ qua nén HTTP:', e.message);
   }
 }
-// Đo thời gian API (log [SLOW], tổng kết định kỳ, GET /api/admin/perf)
-const perfTiming = require('./src/perf-timing');
-app.use(perfTiming.middleware());
-perfTiming.startSummary();
 // [FIX CWE-942] Whitelist Origin CORS - Khong dung wildcard cho API van ban quan su
 const defaultCorsOrigins = [
   'http://localhost:5173',
@@ -197,12 +199,12 @@ app.use(cors({
     return callback(null, false);
   },
   credentials: true,
-  exposedHeaders: ['X-Server-Time', 'X-Trace-Id', 'X-Clock-Timestamp', 'Content-Disposition'],
+  exposedHeaders: ['X-Server-Time', 'X-Trace-Id', 'X-Clock-Timestamp', 'Content-Disposition', 'X-Perf-Id'],
 }));
 app.use(express.json({ limit: '2mb' }));
 app.disable('x-powered-by');
 
-app.use((req, res, next) => {
+app.use(function chuanHoaPhanHoi(req, res, next) {
   const origJson = res.json.bind(res);
   res.json = (data) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -281,6 +283,17 @@ const adminFpIpLimiter = rateLimit({
   },
 });
 
+// Tên bước trong bảng đo hiệu năng
+Object.entries({
+  'Giới hạn tần suất toàn hệ thống': globalLimiter,
+  'Giới hạn đăng nhập sai': loginLimiter,
+  'Giới hạn thao tác vân tay': fingerprintLimiter,
+  'Giới hạn hỏi đáp Trợ lý AI': aiLimiter,
+  'Giới hạn phân tích tài liệu': parseLimiter,
+  'Giới hạn xác thực 2FA toàn hệ thống': adminFpGlobalLimiter,
+  'Giới hạn xác thực 2FA theo IP': adminFpIpLimiter,
+}).forEach(([name, limiter]) => { limiter.perfName = name; });
+
 app.use('/api', globalLimiter);
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/fingerprint/scan', fingerprintLimiter);
@@ -292,7 +305,7 @@ app.use('/api/auth/fingerprint/verify', fingerprintLimiter);
 // ═══════════════════════════════════════════════════════════════
 // Phát file .gz nén sẵn (do precompress-public.js tạo) khi trình duyệt hỗ trợ gzip: không tốn CPU nén mỗi request.
 // Bỏ qua nếu .gz không tồn tại hoặc cũ hơn file gốc (tránh phát nội dung cũ sau khi build lại).
-app.use((req, res, next) => {
+app.use(function phatTepNenSan(req, res, next) {
   if (req.method !== 'GET' || !/\.(js|mjs|css|svg|json|map|txt|xml)$/i.test(req.path)) return next();
   if (!/\bgzip\b/i.test(req.headers['accept-encoding'] || '')) return next();
   let rel;
@@ -686,7 +699,7 @@ function requireGuestOrAuth(req, res, next) {
 // ═══════════════════════════════════════════════════════════════
 // AUTH MIDDLEWARE — JWT + Session validation
 // ═══════════════════════════════════════════════════════════════
-app.use('/api', async (req, res, next) => {
+app.use('/api', async function xacThucPhien(req, res, next) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.removeHeader('ETag');
 
@@ -1802,6 +1815,7 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
 // Nhịp tim nhẹ: trình duyệt đang mở gọi định kỳ để phiên được tính là "đang dùng"
 // (requireAuth tự cập nhật last_seen_at). Đóng trình duyệt → dừng gọi → hết cửa sổ ACCOUNT_IN_USE_WINDOW_MINUTES.
 app.get('/api/admin/perf', requireAuth, perfTiming.reportHandler);
+app.use('/api/admin/perf', requireAuth, perfTiming.monitorRouter(getPool));
 
 app.get('/api/auth/ping', requireAuth, (req, res) => {
   res.json({ ok: true });
@@ -2679,11 +2693,11 @@ app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('D
     // ─────────────────────────────────────────────────────────────
     // 4. Nhận text sạch (từ Digital hoặc OCR), bóc tách Metadata
     // ─────────────────────────────────────────────────────────────
-    let result = await parseDocumentPdf(buffer, { sql, getPool }, {
+    let result = await perfTrace.step('Đọc và trích thông tin văn bản PDF', () => parseDocumentPdf(buffer, { sql, getPool }, {
       preExtractedText,
       source,
       engine: usedEngine,
-    });
+    }), () => ({ 'KB tệp': buffer.length / 1024, 'Nguồn chữ': source, 'Bộ đọc': usedEngine }));
 
     // Nếu là tài liệu scan nhiều trang và trang 1 chưa tìm thấy người ký -> OCR nhanh trang cuối qua :8002
     if (source === 'ocr' && ocrTotalPages > 1 && !result?.parsed?.signer) {
@@ -2701,11 +2715,11 @@ app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('D
           const tailData = await tailResp.json();
           if (tailData.success && tailData.combined_text && tailData.combined_text.trim().length > 10) {
             const combinedWithTail = `${preExtractedText}\n\n${tailData.combined_text}`;
-            const mergedResult = await parseDocumentPdf(buffer, { sql, getPool }, {
+            const mergedResult = await perfTrace.step('Trích người ký từ trang cuối', () => parseDocumentPdf(buffer, { sql, getPool }, {
               preExtractedText: combinedWithTail,
               source,
               engine: usedEngine,
-            });
+            }));
             if (mergedResult?.parsed?.signer) {
               result.parsed.signer = mergedResult.parsed.signer;
               if (!result.parsed.signer_position && mergedResult.parsed.signer_position) {

@@ -18,6 +18,12 @@ if (!isMainThread) {
 
 /** @returns {Promise<{ok:boolean, format:string|null, issues:{file:string,reason:string}[]}>} */
 function checkPackageFile(zipPath) {
+  const perfTrace = require('./perf-trace'); // chỉ nạp ở luồng chính
+  return perfTrace.step('Kiểm tra gói bài giảng (luồng riêng)', () => runWorker(zipPath),
+    (r) => ({ 'Đạt': r.ok ? 'Có' : 'Không', 'Định dạng': r.format || '(không rõ)', 'Số lỗi': r.issues.length }));
+}
+
+function runWorker(zipPath) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(__filename, {
       workerData: { zipPath },

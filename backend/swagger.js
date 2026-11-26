@@ -79,6 +79,27 @@ const swaggerSpec = {
     // ═══════════════════════════════════════════════════════════
     // SYSTEM
     // ═══════════════════════════════════════════════════════════
+    // ── Đo hiệu năng (chỉ Quản trị viên ROL-01, chỉ đọc) ──
+    ...Object.fromEntries([
+      ['/api/admin/perf', 'Thời gian phản hồi cộng dồn theo API (reset=1 để xóa)', ['reset']],
+      ['/api/admin/perf/traces', 'Các tác vụ gần nhất trên máy chủ; full=1 kèm mọi bước', ['limit', 'full']],
+      ['/api/admin/perf/traces/{id}', 'Các bước của một tác vụ (id lấy từ tiêu đề phản hồi X-Perf-Id)', []],
+      ['/api/admin/perf/steps', 'Tổng hợp thời gian và CPU theo từng loại bước', []],
+      ['/api/admin/perf/background', 'Các bước của tác vụ chạy nền', ['limit']],
+      ['/api/admin/perf/system', 'CPU, bộ nhớ, tiến trình, ổ đĩa, CSDL, dịch vụ của máy chủ', []],
+    ].map(([route, summary, query]) => [route, {
+      get: {
+        tags: ['System'], summary, security: [{ BearerAuth: [] }],
+        parameters: [
+          ...(route.includes('{id}') ? [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }] : []),
+          ...query.map((name) => ({ name, in: 'query', required: false, schema: { type: 'string' } })),
+        ],
+        responses: {
+          200: { description: 'Số liệu' }, 401: { description: 'Chưa đăng nhập' }, 403: { description: 'Không phải ROL-01' },
+          ...(route.includes('{id}') ? { 404: { description: 'Không còn dấu vết' } } : {}),
+        },
+      },
+    }])),
     '/api/health': {
       get: {
         tags: ['System'],

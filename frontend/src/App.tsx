@@ -13,6 +13,7 @@ import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
 import AIChatDrawer from './components/ai-chat/AIChatDrawer';
 import { ApprovalProvider } from './contexts/ApprovalContext';
 import { AIChatProvider } from './contexts/AIChatContext';
+import { PerfMonitorGate } from './components/common/PerfMonitorGate';
 import './index.css';
 
 /**
@@ -166,6 +167,7 @@ export const App: React.FC = () => {
                     <ApprovalProvider pollMs={0}>
                       <RouterProvider />
                       <AIChatWrapper />
+                      <PerfMonitorGate />
                     </ApprovalProvider>
                   </AIChatProvider>
                 </AuthProvider>

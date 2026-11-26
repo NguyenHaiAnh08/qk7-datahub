@@ -1,0 +1,26 @@
+/* Nút mở bảng đo hiệu năng (góc dưới trái; góc phải dành cho thông báo) */
+.qk7perf-launch {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 8900;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(22, 101, 52, 0.35);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #166534;
+  font: 600 13px 'Be Vietnam Pro', system-ui, sans-serif;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(.34, 1.45, .64, 1);
+}
+.qk7perf-launch:hover { transform: translateY(-1px); }
+.qk7perf-launch:active { transform: scale(0.97); }
+.qk7perf-launch:focus-visible { outline: 2px solid #d97706; outline-offset: 2px; }
+.dark .qk7perf-launch { background: #111827; color: #10b981; border-color: rgba(16, 185, 129, 0.35); }
+@media (max-width: 640px) { .qk7perf-launch span { display: none; } }
+@media (prefers-reduced-motion: reduce) { .qk7perf-launch { transition: none; } }

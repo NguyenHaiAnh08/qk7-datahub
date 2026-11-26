@@ -57,7 +57,7 @@ module.exports = function createPermissionsModule({
   }
 
   function requirePermission(requiredCode) {
-    return async (req, res, next) => {
+    const handler = async (req, res, next) => {
       if (!req.user?.is_authenticated) {
         return res.status(401).json({
           error: 'Cần đăng nhập để thực hiện thao tác này',
@@ -92,10 +92,12 @@ module.exports = function createPermissionsModule({
         res.status(500).json({ error: 'Lỗi kiểm tra phân quyền' });
       }
     };
+    handler.perfName = `Kiểm tra quyền ${requiredCode}`; // tên bước trong bảng đo hiệu năng
+    return handler;
   }
 
   function requireAnyPermission(requiredCodes) {
-    return async (req, res, next) => {
+    const handler = async (req, res, next) => {
       if (!req.user?.is_authenticated) {
         return res.status(401).json({ error: 'Cần đăng nhập', code: 'UNAUTHENTICATED' });
       }
@@ -117,6 +119,8 @@ module.exports = function createPermissionsModule({
         res.status(500).json({ error: err.message });
       }
     };
+    handler.perfName = `Kiểm tra một trong các quyền ${requiredCodes.join(', ')}`;
+    return handler;
   }
 
   return { getUserPermissions, invalidateCache, requirePermission, requireAnyPermission };

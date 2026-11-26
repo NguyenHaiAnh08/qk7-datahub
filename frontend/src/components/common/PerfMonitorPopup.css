@@ -1,0 +1,172 @@
+/* Bảng đo hiệu năng. Nền đặc, không kính mờ và không hoạt ảnh lặp: bảng đo không được tự gây tốn GPU. */
+.qk7perf {
+  --pm-bg: #ffffff;
+  --pm-head: #f1f5f9;
+  --pm-row: rgba(22, 101, 52, 0.06);
+  --pm-line: #e2e8f0;
+  --pm-border: rgba(22, 101, 52, 0.35);
+  --pm-text: #0f172a;
+  --pm-muted: #64748b;
+  --pm-accent: #166534;
+  --pm-warn: #b45309;
+  --pm-bad: #b91c1c;
+  position: fixed;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  background: var(--pm-bg);
+  color: var(--pm-text);
+  border: 1px solid var(--pm-border);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28);
+  font: 400 12px 'Be Vietnam Pro', system-ui, sans-serif;
+}
+.dark .qk7perf {
+  --pm-bg: #111827;
+  --pm-head: #0f172a;
+  --pm-row: rgba(16, 185, 129, 0.12);
+  --pm-line: #1e293b;
+  --pm-border: rgba(16, 185, 129, 0.35);
+  --pm-text: #f1f5f9;
+  --pm-muted: #94a3b8;
+  --pm-accent: #10b981;
+  --pm-warn: #fbbf24;
+  --pm-bad: #f87171;
+}
+.qk7perf.is-max { inset: 0; border-radius: 0; }
+
+.qk7perf button { font: inherit; color: inherit; cursor: pointer; }
+.qk7perf button:focus-visible,
+.qk7perf input:focus-visible { outline: 2px solid var(--pm-warn); outline-offset: 1px; }
+
+.qk7perf-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 14px;
+  background: var(--pm-head);
+  border-bottom: 1px solid var(--pm-line);
+  border-radius: 11px 11px 0 0;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+.qk7perf.is-max .qk7perf-head { cursor: default; border-radius: 0; }
+.qk7perf-head strong { font-size: 13px; font-weight: 700; color: var(--pm-accent); }
+.qk7perf-head-actions { margin-left: auto; display: flex; gap: 4px; }
+.qk7perf-head-actions button {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border: 0; border-radius: 8px; background: transparent;
+}
+.qk7perf-head-actions button:hover { background: var(--pm-row); }
+
+.qk7perf-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--pm-line); }
+.qk7perf-tabs button {
+  min-height: 36px; padding: 0 12px; border: 0; border-bottom: 3px solid transparent;
+  background: transparent; color: var(--pm-muted); font-weight: 600;
+}
+.qk7perf .qk7perf-tabs button.is-on { color: var(--pm-accent); border-bottom-color: var(--pm-accent); }
+
+.qk7perf-toolbar,
+.qk7perf-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.qk7perf-toolbar { padding: 8px 10px; border-bottom: 1px solid var(--pm-line); }
+.qk7perf-filters { margin-bottom: 8px; }
+.qk7perf-toolbar input[type='search'] {
+  flex: 1 1 160px; min-width: 0; min-height: 32px; padding: 0 10px;
+  border: 1px solid var(--pm-line); border-radius: 8px; background: var(--pm-bg); color: inherit; font: inherit;
+}
+.qk7perf-toolbar button,
+.qk7perf-seg button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
+  border: 1px solid var(--pm-line); border-radius: 8px; background: var(--pm-bg);
+  transition: transform 0.2s cubic-bezier(.34, 1.45, .64, 1);
+}
+.qk7perf-toolbar button:active,
+.qk7perf-seg button:active { transform: scale(0.97); }
+.qk7perf-toolbar button:disabled { opacity: 0.55; cursor: default; }
+.qk7perf .qk7perf-toolbar button.is-on,
+.qk7perf .qk7perf-seg button.is-on { background: var(--pm-accent); border-color: var(--pm-accent); color: var(--pm-bg); }
+.qk7perf-seg { display: inline-flex; gap: 4px; }
+.qk7perf-check { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; cursor: pointer; }
+
+.qk7perf-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px 12px; container-type: inline-size; }
+
+/* Cột chia theo tỷ lệ chiều rộng cửa sổ; nội dung dài tự xuống dòng nên luôn hiện đủ */
+.qk7perf-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.qk7perf-table th,
+.qk7perf-table td {
+  padding: 5px 6px; border-bottom: 1px solid var(--pm-line); text-align: left; vertical-align: top;
+  white-space: normal; overflow-wrap: anywhere; line-height: 1.45;
+}
+.qk7perf-table th { background: var(--pm-head); font-weight: 600; vertical-align: bottom; overflow-wrap: break-word; }
+.qk7perf-body > .qk7perf-tablewrap > .qk7perf-table > thead th { position: sticky; top: -8px; z-index: 1; }
+.qk7perf-table th button { width: 100%; padding: 0; border: 0; background: transparent; text-align: inherit; font-weight: 600; }
+.qk7perf-table .is-num { text-align: right; font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.qk7perf-table th.is-num { font-family: inherit; }
+.qk7perf-table td.is-warn { color: var(--pm-warn); font-weight: 700; }
+.qk7perf-table td.is-bad { color: var(--pm-bad); font-weight: 700; }
+.qk7perf-table tr.is-expandable { cursor: pointer; }
+.qk7perf-table tr.is-expandable:hover,
+.qk7perf-table tr.is-open { background: var(--pm-row); }
+.qk7perf .qk7perf-toggle {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; margin: 0 2px 0 -4px; padding: 0;
+  border: 0; background: transparent; vertical-align: -5px;
+}
+.qk7perf-detail > td { padding: 6px 0 10px 14px; border-left: 3px solid var(--pm-accent); }
+.qk7perf-empty { padding: 20px 6px !important; text-align: center !important; color: var(--pm-muted); }
+.qk7perf-sub { display: block; padding-left: 12px; color: var(--pm-muted); }
+.qk7perf-values { margin: 0; padding: 0; list-style: none; }
+.qk7perf-values span { color: var(--pm-muted); }
+.qk7perf-values b { font: 500 11px 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.qk7perf-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; }
+.qk7perf-h { margin: 14px 0 6px; font-size: 12px; font-weight: 700; color: var(--pm-accent); }
+.qk7perf-h:first-child { margin-top: 0; }
+.qk7perf-muted { color: var(--pm-muted); }
+.qk7perf-note { margin: 4px 0 8px; color: var(--pm-muted); }
+.qk7perf-error { margin: 4px 0 8px; color: var(--pm-bad); font-weight: 600; }
+
+/* Cửa sổ hẹp: thu cỡ chữ để bảng nhiều cột vẫn đọc được */
+@container (max-width: 980px) {
+  .qk7perf-table { font-size: 11px; }
+  .qk7perf-table th,
+  .qk7perf-table td { padding: 4px 3px; }
+  .qk7perf-values b { font-size: 10px; }
+}
+@container (max-width: 780px) {
+  .qk7perf-table { font-size: 9.5px; }
+  .qk7perf-table th,
+  .qk7perf-table td { padding: 3px 2px; }
+  .qk7perf-values b { font-size: 9px; }
+  .qk7perf-detail > td { padding-left: 4px; }
+  .qk7perf-table td.is-num { padding-left: 1px; padding-right: 2px; font-size: 9px; letter-spacing: -0.05em; }
+}
+
+/* Vùng kéo đổi kích thước: 4 cạnh và 4 góc */
+.qk7perf-grip { position: absolute; z-index: 2; touch-action: none; }
+.qk7perf-grip.is-n, .qk7perf-grip.is-s { left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
+.qk7perf-grip.is-e, .qk7perf-grip.is-w { top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }
+.qk7perf-grip.is-n { top: -4px; }
+.qk7perf-grip.is-s { bottom: -4px; }
+.qk7perf-grip.is-e { right: -4px; }
+.qk7perf-grip.is-w { left: -4px; }
+.qk7perf-grip.is-ne, .qk7perf-grip.is-nw, .qk7perf-grip.is-se, .qk7perf-grip.is-sw { width: 16px; height: 16px; }
+.qk7perf-grip.is-ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.qk7perf-grip.is-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.qk7perf-grip.is-nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.qk7perf-grip.is-se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+.qk7perf-grip.is-se::after {
+  content: ''; position: absolute; right: 7px; bottom: 7px; width: 7px; height: 7px;
+  border-right: 2px solid var(--pm-accent); border-bottom: 2px solid var(--pm-accent);
+}
+
+/* iPad: vùng chạm lớn hơn */
+@media (pointer: coarse) {
+  .qk7perf-tabs button,
+  .qk7perf-toolbar button,
+  .qk7perf-toolbar input[type='search'],
+  .qk7perf-seg button { min-height: 44px; }
+  .qk7perf-head-actions button { width: 44px; height: 44px; }
+  .qk7perf-grip.is-n, .qk7perf-grip.is-s { height: 16px; }
+  .qk7perf-grip.is-e, .qk7perf-grip.is-w { width: 16px; }
+  .qk7perf-grip.is-ne, .qk7perf-grip.is-nw, .qk7perf-grip.is-se, .qk7perf-grip.is-sw { width: 28px; height: 28px; }
+}

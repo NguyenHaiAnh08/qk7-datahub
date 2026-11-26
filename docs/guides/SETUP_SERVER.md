@@ -155,6 +155,19 @@ New-NetFirewallRule -DisplayName "QK7 Backend 8000" -Direction Inbound -LocalPor
 
 ---
 
+### Đo hiệu năng (tùy chọn, trong `backend/.env`)
+
+| Biến | Mặc định | Ý nghĩa |
+| :--- | :--- | :--- |
+| `PERF_TIMING` | `true` | `false` tắt toàn bộ đo thời gian |
+| `PERF_TRACE` | `true` | `false` tắt đo từng bước (bảng đo không còn dấu vết máy chủ) |
+| `PERF_TRACE_KEEP` | `600` | Số tác vụ gần nhất giữ trong bộ nhớ |
+| `PERF_SAMPLE_MS` | `2000` | Chu kỳ lấy mẫu tài nguyên máy chủ (ms) |
+
+Xem số liệu: đăng nhập tài khoản ROL-01, nhấn `Ctrl+Shift+M`. Sau khi cập nhật mã cần build lại giao diện và khởi động lại backend.
+
+---
+
 ## PHẦN C — SETUP MÁY CLIENT (192.168.1.X)
 
 ### 1. Cài driver ZK9500 & Python

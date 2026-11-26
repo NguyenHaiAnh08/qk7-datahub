@@ -1658,5 +1658,20 @@ Tại `backend/src/lecture-package-helper.js`, gói ZIP SCORM/HTML5 bắt buộc
 - **Chống Replay Attack:** Bổ sung `jti: crypto.randomUUID()` vào JWT payload của mọi phiên đăng nhập và vé 2FA vân tay.
 - **Cô lập quyền hạn Đại biểu:** Tự động gán `can_teach = false` và `peer_unit = false` trong `lecture-routes.js`, đảm bảo khách tham quan chỉ được xem nội dung Cấp 1 Công khai.
 
+---
 
+## 36. Kiến Trúc Bảng Đo Hiệu Năng Từng Bước (v1.8.13)
 
+```text
+Trình duyệt                               Gateway Express (:8000)
+perfRecorder.ts                           perf-timing.js (đứng đầu chuỗi xử lý)
+  thao tác → bước máy con                   └─ perf-trace.js: mỗi request một dấu vết
+  fetch ──── X-Perf-Id ◄───────────────────      lớp xử lý · SQL · dịch vụ ngoài · tệp · băm · bcrypt
+PerfMonitorPopup (chỉ ROL-01)             perf-system.js: lấy mẫu CPU/RAM/pool, đo ổ đĩa, CSDL, dịch vụ
+  ── GET /api/admin/perf/* ───────────────► requireAuth + kiểm tra ROL-01
+```
+
+- Số liệu chỉ nằm trong bộ nhớ: máy chủ giữ 600 tác vụ và 500 bước nền gần nhất; trình duyệt giữ 300 tác vụ.
+- CPU và bộ nhớ của một bước là mức thay đổi của **cả tiến trình** trong lúc bước chạy; khi nhiều request chạy cùng lúc thì lẫn phần của nhau. Trên Windows, thời gian CPU có độ mịn khoảng 15 ms.
+- Chi phí đo trên máy phát triển (6000 request thử): thêm khoảng 0,1–0,25 ms mỗi request và khoảng 40–50 MB bộ nhớ.
+- Dịch vụ AI, OCR và agent vân tay chỉ được đo từ phía Gateway (thời gian gọi, trạng thái kết nối), chưa đo từng bước bên trong.

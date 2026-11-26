@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/web/pdf_viewer.css';
+import { perfStep } from '../../utils/perfRecorder';
 import { Loader2 } from 'lucide-react';
 import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
 
@@ -168,7 +169,9 @@ export const PdfPagesViewer: React.FC<PdfPagesViewerProps> = React.memo(({
           cMapPacked: true,
           standardFontDataUrl: '/standard_fonts/',
         });
-        const doc = await loadingTask.promise;
+        const doc: any = await perfStep('Mở tệp PDF trong trình đọc', () => loadingTask.promise, {
+          result: (d: any) => ({ 'Số trang': d.numPages }),
+        });
         if (isCancelled) return;
 
         pdfDocRef.current = doc;
@@ -709,7 +712,11 @@ const SinglePdfPage: React.FC<SinglePdfPageProps> = React.memo(({
               canvasContext: ctx,
               viewport: viewport,
             });
-            await renderTask.promise;
+            await perfStep('Vẽ một trang PDF', () => renderTask.promise, {
+              type: 'render',
+              values: { 'Trang': pageNum, 'Điểm ảnh ngang': pdfCanvas.width, 'Điểm ảnh dọc': pdfCanvas.height,
+                'Bộ nhớ khung vẽ (MB)': (pdfCanvas.width * pdfCanvas.height * 4) / 1048576 },
+            });
 
             // 🛡️ Fallback Watermark trực tiếp lên Canvas 2D nếu pdf-lib không nhúng được vào Blob
             if (fallbackWatermarkText) {

@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import { perfStep } from './perfRecorder';
 
 export interface WatermarkOptions {
   userDisplayName: string;
@@ -74,7 +75,17 @@ export function generateWatermarkCanvasPng(
  * - Khớp tỷ lệ khung hình 1:1, ngăn chặn 100% tình trạng chữ bị kéo méo, dẹp hay biến dạng trên các file khổ ngang như 880/KH.
  * - Giữ nguyên cỡ chữ, góc nghiêng và tính thẩm mỹ đồng nhất trên toàn bộ các tài liệu.
  */
-export async function stampWatermarkOnPdf(
+export function stampWatermarkOnPdf(
+  pdfBlob: Blob,
+  options: WatermarkOptions
+): Promise<Blob> {
+  return perfStep('Đóng dấu mờ lên tệp PDF', () => stampPages(pdfBlob, options), {
+    values: { 'KB tệp gốc': pdfBlob.size / 1024 },
+    result: (out) => ({ 'KB sau đóng dấu': out.size / 1024, 'Đóng dấu được': (out as any).__isWatermarked ? 'Có' : 'Không' }),
+  });
+}
+
+async function stampPages(
   pdfBlob: Blob,
   options: WatermarkOptions
 ): Promise<Blob> {

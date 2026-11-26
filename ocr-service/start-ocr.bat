@@ -3,9 +3,12 @@ chcp 65001 >nul
 title QK7 DataHub - OCR Service (:8002)
 cd /d "%~dp0"
 
-REM --- Tu dong bo sung Python 3.13 vao PATH ---
+REM --- Tu dong bo sung Python 3.13 va Ccache vao PATH ---
 if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
     set "PATH=%LOCALAPPDATA%\Programs\Python\Python313;%LOCALAPPDATA%\Programs\Python\Python313\Scripts;%PATH%"
+)
+if exist "%LOCALAPPDATA%\Microsoft\WinGet\Links" (
+    set "PATH=%LOCALAPPDATA%\Microsoft\WinGet\Links;%PATH%"
 )
 
 echo ==========================================
@@ -33,6 +36,7 @@ REM Kiem tra thu muc venv cuc bo
 if exist "%~dp0venv\Scripts\python.exe" (
     echo [OK] Su dung virtualenv cuc bo: %~dp0venv
     set "PYTHON_EXE=%~dp0venv\Scripts\python.exe"
+    set "PATH=%~dp0venv\Scripts;%PATH%"
     goto :env_ready
 )
 
@@ -74,6 +78,7 @@ set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True"
 set "DISABLE_PADDLE_UPDATE_CHECK=1"
 set "NO_ALBUMENTATIONS_UPDATE=1"
 set "FLAGS_use_mkldnn=0"
+set "GLOG_minloglevel=2"
 REM --- Toi uu VRAM cho GPU 4GB (GTX 1650) chay song song Ollama ---
 set "FLAGS_allocator_strategy=auto_growth"
 set "FLAGS_fraction_of_gpu_memory_to_use=0.25"

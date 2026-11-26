@@ -43,6 +43,9 @@ os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 os.environ.setdefault("DISABLE_PADDLE_UPDATE_CHECK", "1")
 os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
 os.environ.setdefault("FLAGS_use_mkldnn", "0")
+os.environ.setdefault("GLOG_minloglevel", "2")
+import warnings
+warnings.filterwarnings("ignore", message=".*No ccache found.*", category=UserWarning)
 # Bảo vệ VRAM trên GPU 4GB (GTX 1650) khi chạy song song với Ollama AI Boxchat:
 # cấp phát tăng dần (auto_growth) và giới hạn tỷ lệ bộ nhớ GPU tối đa 25% (~1GB)
 os.environ.setdefault("FLAGS_allocator_strategy", "auto_growth")

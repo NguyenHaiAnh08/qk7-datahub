@@ -4,6 +4,16 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.16-ocr-log-cleanliness-and-ccache-path] — 2026-11-26
+
+### 1. Khử Nhiễu Log C++ & Tối Ưu Hóa Đường Dẫn Ccache Cho Dịch Vụ OCR
+- **Lọc bỏ cảnh báo và log mức thấp ([`ocr-service/main.py`](../ocr-service/main.py), [`ocr-service/start-ocr.bat`](../ocr-service/start-ocr.bat)):**
+  - Cấu hình biến môi trường `GLOG_minloglevel=2` để PaddlePaddle và Google glog lọc bỏ các thông điệp chẩn đoán C++ mức thấp (INFO/VERBOSE), giữ cho log khởi động và vận hành sạch sẽ.
+  - Tích hợp bộ lọc `warnings.filterwarnings` triệt tiêu cảnh báo `No ccache found` của PyTorch khi không tìm thấy trình tăng tốc biên dịch Ccache.
+  - Tự động bổ sung `%LOCALAPPDATA%\Microsoft\WinGet\Links` và `%~dp0venv\Scripts` vào biến `PATH` trong kịch bản `start-ocr.bat` để ưu tiên thực thi các công cụ tiện ích.
+
+---
+
 ## [v1.8.15-auto-path-python313-startup-scripts] — 2026-11-26
 
 ### 1. Tự Động Định Tuyến & Bổ Sung Python 3.13 Vào PATH Trong Bộ Kịch Bản Khởi Động

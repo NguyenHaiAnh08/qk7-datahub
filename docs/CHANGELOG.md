@@ -4,6 +4,16 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.17-pdf-preview-jpeg2000-csp] — 2026-11-27
+
+### 1. Sửa Lỗi Trình Xem PDF Mất Ảnh Trang Scan JPEG 2000
+- **Hiện tượng:** PDF scan nén ảnh JPEG 2000 (`/JPXDecode`) hiển thị chữ vỡ, mất con dấu và chữ ký; thực chất là ảnh trang không vẽ được nên lộ lớp chữ OCR nằm bên dưới. Tệp gốc không bị thay đổi.
+- **Nguyên nhân:** `pdf.js` giải nén JPEG 2000 bằng WebAssembly, trong khi Content-Security-Policy của SPA không cho biên dịch WebAssembly.
+- **Khắc phục ([`backend/src/security-headers.js`](../backend/src/security-headers.js)):** thêm `'wasm-unsafe-eval'` vào `script-src` của CSP chính. Chỉ cho phép biên dịch WebAssembly, không mở `eval()` JavaScript. Cập nhật [`docs/security/SECURITY.md`](security/SECURITY.md).
+- **Triển khai:** khởi động lại backend; không cần build lại frontend. Trình duyệt đang mở cần tải lại trang.
+
+---
+
 ## [v1.8.16-ocr-log-cleanliness-and-ccache-path] — 2026-11-26
 
 ### 1. Khử Nhiễu Log C++ & Tối Ưu Hóa Đường Dẫn Ccache Cho Dịch Vụ OCR

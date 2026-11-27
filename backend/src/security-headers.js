@@ -52,7 +52,9 @@ function createSecurityHeadersMiddleware() {
       // Findings #13, #16, #19, #22, #25, #28, #31, #34
       const cspDirectives = [
         "default-src 'self'",
-        `script-src 'self' 'nonce-${nonce}'`,
+        // 'wasm-unsafe-eval': trình xem PDF (pdf.js) giải nén ảnh JPEG 2000 bằng WebAssembly. Thiếu quyền này,
+        // trang scan mất ảnh và lộ lớp chữ OCR nằm bên dưới. Chỉ cho biên dịch WASM, KHÔNG mở eval() JavaScript.
+        `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval'`,
         `style-src 'self' 'nonce-${nonce}'`,
         "img-src 'self' data: blob:",
         "media-src 'self' data: blob:",

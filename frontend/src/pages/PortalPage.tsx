@@ -21,6 +21,7 @@ import { PortalDocumentList } from '../components/portal/PortalDocumentList';
 import { DocumentTable } from '../components/document-desk/DocumentTable';
 import { DocumentPreviewModal } from '../components/document-desk/DocumentPreviewModal';
 import { DateRangePicker } from '../components/common/DateRangePicker';
+import { SegmentedTabs } from '../components/common/SegmentedTabs';
 import { SpotlightTour } from '../components/common/SpotlightTour';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
@@ -471,32 +472,30 @@ export const PortalPage: React.FC = () => {
 
               {/* Col 4: Nút điều khiển & chuyển chế độ xem */}
               <div className="flex items-center space-x-2 justify-end">
-                <div className="p-0.5 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center space-x-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('grid')}
-                    className={`p-1.5 rounded transition ${
-                      viewMode === 'grid'
-                        ? 'bg-[#166534] dark:bg-emerald-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-                    }`}
-                    title="Dạng lưới thẻ"
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('table')}
-                    className={`p-1.5 rounded transition ${
-                      viewMode === 'table'
-                        ? 'bg-[#166534] dark:bg-emerald-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-                    }`}
-                    title="Dạng bảng chi tiết"
-                  >
-                    <List className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                <SegmentedTabs
+                  ariaLabel="Chế độ hiển thị văn bản"
+                  size="xs"
+                  iconOnly
+                  value={viewMode}
+                  onChange={setViewMode}
+                  className="shrink-0"
+                  items={[
+                    {
+                      value: 'grid',
+                      icon: <LayoutGrid className="w-3.5 h-3.5" />,
+                      title: 'Dạng lưới thẻ',
+                      ariaLabel: 'Hiển thị dạng lưới thẻ',
+                      activeTone: 'emerald',
+                    },
+                    {
+                      value: 'table',
+                      icon: <List className="w-3.5 h-3.5" />,
+                      title: 'Dạng bảng chi tiết',
+                      ariaLabel: 'Hiển thị dạng bảng chi tiết',
+                      activeTone: 'emerald',
+                    },
+                  ]}
+                />
 
                 <button
                   type="button"

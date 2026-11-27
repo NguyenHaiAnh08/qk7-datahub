@@ -1,0 +1,379 @@
+/* Lucian UX/UI Prompt #416 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#416 */
+
+.u416,
+.u416 *,
+.u416 *::before,
+.u416 *::after {
+  box-sizing: border-box;
+}
+
+.u416 {
+  --ux-surface: #FFFFFF;
+  --ux-surface-2: #F1F5F9;
+  --ux-surface-3: #E2E8F0;
+  --ux-ink: #0F172A;
+  --ux-ink-2: #334155;
+  --ux-ink-3: #64748B;
+  --ux-line: rgba(15, 23, 42, 0.1);
+  --ux-line-2: rgba(15, 23, 42, 0.16);
+  --ux-accent: #166534;
+  --ux-accent-2: #15803D;
+  --ux-accent-soft: rgba(22, 101, 52, 0.12);
+  --ux-accent-ink: #FFFFFF;
+  --ux-mint: #166534;
+  --ux-warn: #D97706;
+  --ux-danger: #B91C1C;
+  --ux-slate: #334155;
+  --ux-shadow: rgba(15, 23, 42, 0.08);
+  --ux-shadow-strong: rgba(15, 23, 42, 0.22);
+  --ux-ease: cubic-bezier(.2, .8, .2, 1);
+  --ux-spring: cubic-bezier(.34, 1.45, .64, 1);
+
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  max-width: 100%;
+  color: var(--ux-ink);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -.01em;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.u416.u416-full {
+  display: flex;
+  width: 100%;
+}
+
+:root.dark .u416,
+:root[data-theme="dark"] .u416 {
+  --ux-surface: #1E293B;
+  --ux-surface-2: #0F172A;
+  --ux-surface-3: #334155;
+  --ux-ink: #F8FAFC;
+  --ux-ink-2: rgba(241, 245, 249, 0.82);
+  --ux-ink-3: rgba(148, 163, 184, 0.85);
+  --ux-line: rgba(255, 255, 255, 0.09);
+  --ux-line-2: rgba(255, 255, 255, 0.16);
+  --ux-accent: #059669;
+  --ux-accent-2: #10B981;
+  --ux-accent-soft: rgba(16, 185, 129, 0.18);
+  --ux-accent-ink: #FFFFFF;
+  --ux-mint: #059669;
+  --ux-warn: #D97706;
+  --ux-danger: #DC2626;
+  --ux-slate: #475569;
+  --ux-shadow: rgba(0, 0, 0, 0.42);
+  --ux-shadow-strong: rgba(0, 0, 0, 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.light) .u416 {
+    --ux-surface: #1E293B;
+    --ux-surface-2: #0F172A;
+    --ux-surface-3: #334155;
+    --ux-ink: #F8FAFC;
+    --ux-ink-2: rgba(241, 245, 249, 0.82);
+    --ux-ink-3: rgba(148, 163, 184, 0.85);
+    --ux-line: rgba(255, 255, 255, 0.09);
+    --ux-line-2: rgba(255, 255, 255, 0.16);
+    --ux-accent: #059669;
+    --ux-accent-2: #10B981;
+    --ux-accent-soft: rgba(16, 185, 129, 0.18);
+    --ux-accent-ink: #FFFFFF;
+    --ux-mint: #059669;
+    --ux-warn: #D97706;
+    --ux-danger: #DC2626;
+    --ux-slate: #475569;
+    --ux-shadow: rgba(0, 0, 0, 0.42);
+    --ux-shadow-strong: rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* ── Track (Khung viên thuốc) ── */
+.u416-tl {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: 9999px;
+  background: var(--ux-surface-2);
+  box-shadow: inset 0 0 0 1px var(--ux-line);
+  overflow: hidden;
+}
+
+.u416.u416-md .u416-tl {
+  padding: 4px;
+  border-radius: 9999px;
+}
+
+.u416.u416-xs .u416-tl {
+  padding: 3px;
+  border-radius: 9999px;
+}
+
+.u416.u416-icon .u416-tl {
+  padding: 3px;
+  border-radius: 12px;
+}
+
+.u416.u416-surface .u416-tl {
+  background: var(--ux-surface);
+  box-shadow: inset 0 0 0 1px var(--ux-line-2), 0 1px 2px var(--ux-shadow);
+}
+
+:root.dark .u416.u416-surface .u416-tl,
+:root[data-theme="dark"] .u416.u416-surface .u416-tl {
+  background: #111827;
+}
+
+.u416.u416-full .u416-tl {
+  display: flex;
+  width: 100%;
+}
+
+/* ── Jelly-stretching Sliding Thumb (Exact #416 Physics) ── */
+.u416-th {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: var(--l, 4px);
+  right: var(--r, 4px);
+  border-radius: 9999px;
+  background: var(--ux-surface);
+  box-shadow:
+    0 0 0 1px var(--ux-line),
+    0 1px 2px var(--ux-shadow),
+    0 6px 14px -8px var(--ux-shadow-strong);
+  pointer-events: none;
+  will-change: left, right;
+  transition:
+    left var(--tl, .5s) cubic-bezier(.3, 1.25, .45, 1),
+    right var(--tr, .5s) cubic-bezier(.3, 1.25, .45, 1),
+    background-color .28s var(--ux-ease),
+    box-shadow .28s var(--ux-ease);
+}
+
+.u416.u416-xs .u416-th {
+  top: 3px;
+  bottom: 3px;
+}
+
+.u416.u416-icon .u416-th {
+  top: 3px;
+  bottom: 3px;
+  border-radius: 9px;
+}
+
+/* Semantic Active Thumb Tones (Military Triad + Neutral) */
+.u416-th[data-tone="emerald"] {
+  background: var(--ux-mint);
+  box-shadow:
+    0 1px 2px rgba(22, 101, 52, 0.25),
+    0 6px 14px -8px rgba(22, 101, 52, 0.45);
+}
+
+.u416-th[data-tone="amber"] {
+  background: var(--ux-warn);
+  box-shadow:
+    0 1px 2px rgba(217, 119, 6, 0.25),
+    0 6px 14px -8px rgba(217, 119, 6, 0.45);
+}
+
+.u416-th[data-tone="danger"] {
+  background: var(--ux-danger);
+  box-shadow:
+    0 1px 2px rgba(185, 28, 28, 0.25),
+    0 6px 14px -8px rgba(185, 28, 28, 0.45);
+}
+
+.u416-th[data-tone="slate"] {
+  background: var(--ux-slate);
+  box-shadow:
+    0 1px 2px var(--ux-shadow),
+    0 6px 14px -8px var(--ux-shadow-strong);
+}
+
+.u416-th[data-tone="navy"] {
+  background: #1E3A8A;
+  box-shadow:
+    0 1px 2px rgba(30, 58, 138, 0.25),
+    0 6px 14px -8px rgba(30, 58, 138, 0.45);
+}
+
+/* ── Tab Button (Constant font-weight: 600 to prevent width jitter!) ── */
+.u416-tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 9999px;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ux-ink-3);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color .25s var(--ux-ease), text-shadow .25s var(--ux-ease);
+}
+
+.u416.u416-md .u416-tab {
+  min-height: 36px;
+  padding: 6px 16px;
+  font-size: 12.5px;
+}
+
+.u416.u416-xs .u416-tab {
+  min-height: 26px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+}
+
+.u416.u416-icon .u416-tab {
+  min-width: 30px;
+  min-height: 28px;
+  padding: 5px 7px;
+  border-radius: 9px;
+}
+
+.u416.u416-full .u416-tab {
+  flex: 1 1 0%;
+}
+
+.u416-tab:hover:not(:disabled) {
+  color: var(--ux-ink-2);
+}
+
+.u416-tab[aria-selected="true"] {
+  color: var(--ux-ink);
+  text-shadow: 0.2px 0 0 currentColor, -0.2px 0 0 currentColor;
+}
+
+.u416-tab[aria-selected="true"][data-tone="emerald"],
+.u416-tab[aria-selected="true"][data-tone="amber"],
+.u416-tab[aria-selected="true"][data-tone="danger"],
+.u416-tab[aria-selected="true"][data-tone="slate"],
+.u416-tab[aria-selected="true"][data-tone="navy"] {
+  color: var(--ux-accent-ink);
+}
+
+.u416-tab[aria-selected="true"][data-tone="emerald-text"] {
+  color: #166534;
+}
+
+:root.dark .u416-tab[aria-selected="true"][data-tone="emerald-text"],
+:root[data-theme="dark"] .u416-tab[aria-selected="true"][data-tone="emerald-text"] {
+  color: #34D399;
+}
+
+.u416-tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.u416-tab:focus-visible {
+  outline: 2px solid var(--ux-accent);
+  outline-offset: 2px;
+}
+
+.u416-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "zero" 0;
+  opacity: 0.8;
+}
+
+.u416-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "zero" 0;
+  background: var(--ux-surface-2);
+  color: var(--ux-ink-2);
+  transition: background-color .25s, color .25s;
+}
+
+.u416-tab[aria-selected="true"][data-tone="emerald"] .u416-pill-badge,
+.u416-tab[aria-selected="true"][data-tone="amber"] .u416-pill-badge,
+.u416-tab[aria-selected="true"][data-tone="danger"] .u416-pill-badge,
+.u416-tab[aria-selected="true"][data-tone="slate"] .u416-pill-badge,
+.u416-tab[aria-selected="true"][data-tone="navy"] .u416-pill-badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: #FFFFFF;
+}
+
+/* ── Optional Directional Glide Panel (Exact #416 Panel Physics) ── */
+.u416-pv {
+  position: relative;
+  overflow: hidden;
+}
+
+.u416-pn {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(calc(var(--d, 1) * 22px));
+  filter: blur(3px);
+  transition:
+    opacity .25s,
+    transform .35s var(--ux-ease),
+    filter .25s,
+    visibility 0s .35s;
+}
+
+.u416-pn.is-on {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  filter: none;
+  transition:
+    opacity .35s var(--ux-ease) .06s,
+    transform .6s cubic-bezier(.3, 1.3, .45, 1) .04s,
+    filter .35s .06s,
+    visibility 0s;
+}
+
+.u416-pn:focus-visible {
+  outline: 2px solid var(--ux-accent);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+
+/* Touch ergonomics for iPad / coarse pointers */
+@media (pointer: coarse) {
+  .u416-tab {
+    min-height: 38px;
+  }
+  .u416.u416-md .u416-tab {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u416,
+  .u416 *,
+  .u416 *::before,
+  .u416 *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .u416-th,
+  .u416-pn {
+    transition: none !important;
+  }
+}

@@ -1610,7 +1610,7 @@ Nhằm loại bỏ triệt để phong cách giao diện rập khuôn kiểu AI 
 - **Primary (Xanh Lục Quân):** `#166534` (Light) • `#10b981` (Dark) — Màu bản sắc chuẩn hóa toàn hệ thống Trung tâm Dữ liệu số Trường Quân sự Quân khu 7.
 - **Secondary (Vàng Kim Quân Hiệu & Đồng Cổ):** `#d97706` (Light) • `#fbbf24` (Dark) • `#d4af37` (Accent) — Điểm nhấn điều hướng iPad, chờ duyệt, Cấp 3 Mật.
 - **Accent/Alert (Đỏ Quân Kỳ):** `#b91c1c` (Light) • `#f87171` (Dark) — Cảnh báo an ninh SOC, xóa vĩnh viễn, Cấp 5 Tuyệt Mật.
-- **Typography:** `Be Vietnam Pro` (văn bản hành chính) + `JetBrains Mono` (`font-mono tabular-nums` cho số liệu KPI, mã đơn vị, mã quân nhân, IP, timestamp, SHA-256).
+- **Typography:** Thống nhất toàn hệ thống `Be Vietnam Pro` thân thiện tiếng Việt (`tabular-nums lining-nums`, tắt số `0` chấm giữa cho KPI, mã đơn vị, mã quân nhân, IP, timestamp, SHA-256; đã loại bỏ hoàn toàn `JetBrains Mono`).
 
 ---
 

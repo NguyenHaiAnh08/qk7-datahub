@@ -12,7 +12,7 @@ Mọi thay đổi liên quan đến giao diện trong `frontend/src/` phải vư
 - [ ] **Không dùng chuỗi thẻ icon lặp khung kiểu landing page** trong màn hình vận hành (`Operate Mode`).
 - [ ] **Không lạm dụng emoji trang trí** trong tiêu đề bảng, nhãn nút hay cảnh báo an ninh (dùng biểu tượng nhất quán từ `lucide-react` hoặc `@ant-design/icons`).
 - [ ] **Đủ 7 trạng thái cho thành phần tương tác:** `default`, `hover`, `focus-visible`, `active`, `disabled`, `loading`, `error`.
-- [ ] **Số liệu & Mã quân sự thẳng hàng:** Mọi KPI, mã văn bản, mã đơn vị, IP, timestamp, SHA-256 đều dùng `font-mono tabular-nums`.
+- [ ] **Typography thân thiện tiếng Việt (không font lập trình AI):** Toàn bộ văn bản, huy hiệu, KPI, mã văn bản, ngày giờ dùng thống nhất `Be Vietnam Pro` (`tabular-nums lining-nums`, không số `0` chấm giữa); tuyệt đối không sử dụng `JetBrains Mono` hay font monospace lập trình.
 - [ ] **Ngôn ngữ tiếng Việt chuẩn hành chính-quân sự:** Ngắn gọn, tự nhiên, không văn phong dịch máy, đúng thuật ngữ QK7 DataHub.
 - [ ] **Thống nhất bo góc (`6px` / `8px` / `12px`)** theo `App.tsx ConfigProvider`, không trộn lẫn các bán kính ngẫu nhiên.
 - [ ] **Kỷ luật chuyển động (`150–250ms` cho thao tác thường):** Không có hiệu ứng tự chạy cản trở thao tác vào trang hoặc `transition: linear`.

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 import { permissionService } from '../../services/permissionService';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { Role, Permission, SubGroupInfo, SubGroupTone } from '../../types/user';
 import {
   SUBGROUP_TONE_STYLE,
@@ -319,26 +320,17 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700">
-              {([
-                { k: 'all',        l: `Tất cả (${stats.total})` },
-                { k: 'assigned',   l: `Đã gán (${stats.assigned})` },
-                { k: 'unassigned', l: `Chưa gán (${stats.unassigned})` },
-                { k: 'changed',    l: `Thay đổi (${stats.totalChanges})` },
-              ] as const).map(({ k, l }) => (
-                <button
-                  key={k}
-                  onClick={() => setTab(k)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
-                    tab === k
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
+            <SegmentedTabs
+              ariaLabel="Lọc danh sách quyền vai trò"
+              value={tab}
+              onChange={setTab}
+              items={[
+                { value: 'all', label: 'Tất cả', count: stats.total, activeTone: 'neutral' },
+                { value: 'assigned', label: 'Đã gán', count: stats.assigned, activeTone: 'emerald' },
+                { value: 'unassigned', label: 'Chưa gán', count: stats.unassigned, activeTone: 'slate' },
+                { value: 'changed', label: 'Thay đổi', count: stats.totalChanges, activeTone: 'amber' },
+              ]}
+            />
 
             <Input
               placeholder="Tìm mã quyền / mô tả..."

@@ -23,25 +23,26 @@
 
   html,
   body,
-  input:not(.font-mono):not([class*="font-mono"]),
-  button:not(.font-mono):not([class*="font-mono"]),
+  input,
+  button,
   select,
   textarea,
-  optgroup {
-    font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  }
-
+  optgroup,
   code,
   kbd,
   samp,
   pre,
   .font-mono,
   [class*="font-mono"] {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-feature-settings: "zero" 0;
   }
 
+  .font-mono,
+  [class*="font-mono"],
   .tabular-nums {
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "zero" 0;
   }
 
   /* Remove number input spinners globally across all browsers */
@@ -1693,8 +1694,9 @@ html.dark .u058-pill {
   vertical-align: baseline;
   -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
   mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
-  font-variant-numeric: tabular-nums;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "zero" 0;
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .u098-col {
@@ -1742,8 +1744,10 @@ html.dark .u058-pill {
 }
 
 .u089-num {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-weight: 900;
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "zero" 0;
+  font-weight: 800;
   letter-spacing: -0.05em;
   transform: perspective(600px) rotateX(calc(var(--tilt-y, 0) * -8deg)) rotateY(calc(var(--tilt-x, 0) * 10deg));
   transition: transform 0.12s ease-out;
@@ -1771,7 +1775,9 @@ html.dark .u058-pill {
 }
 
 .u089-url-bar {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "zero" 0;
 }
 
 .u089-wavy {

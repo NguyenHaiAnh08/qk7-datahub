@@ -23,6 +23,7 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { TacticalEmptyState } from '../components/common/TacticalEmptyState';
 import { RollingNumber } from '../components/common/RollingNumber';
 import { PaginationBar } from '../components/common/PaginationBar';
+import { SegmentedTabs } from '../components/common/SegmentedTabs';
 import { usePageTransition } from '../components/common/PageTransitionStage';
 import { FingerprintScanModal } from '../components/users/FingerprintScanModal';
 import { Lecture, LectureStatus, Subject, TeachingSchedule, reviewStageOf } from '../types/lecture';
@@ -673,24 +674,30 @@ export const LecturesPage: React.FC<{ mode?: LecturesPageMode }> = ({ mode = 'li
                   </select>
 
                   {/* Nút chuyển chế độ Lưới / Bảng */}
-                  <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl self-start sm:self-auto shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('grid')}
-                      title="Hiển thị dạng lưới tác chiến"
-                      className={`p-1.5 rounded-lg transition ${viewMode === 'grid' ? 'bg-[#166534] text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('table')}
-                      title="Hiển thị dạng bảng danh mục"
-                      className={`p-1.5 rounded-lg transition ${viewMode === 'table' ? 'bg-[#166534] text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}
-                    >
-                      <List className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <SegmentedTabs
+                    ariaLabel="Chế độ hiển thị bài giảng"
+                    size="xs"
+                    iconOnly
+                    value={viewMode}
+                    onChange={setViewMode}
+                    className="self-start sm:self-auto"
+                    items={[
+                      {
+                        value: 'grid',
+                        icon: <LayoutGrid className="w-4 h-4" />,
+                        title: 'Hiển thị dạng lưới tác chiến',
+                        ariaLabel: 'Hiển thị dạng lưới tác chiến',
+                        activeTone: 'emerald',
+                      },
+                      {
+                        value: 'table',
+                        icon: <List className="w-4 h-4" />,
+                        title: 'Hiển thị dạng bảng danh mục',
+                        ariaLabel: 'Hiển thị dạng bảng danh mục',
+                        activeTone: 'emerald',
+                      },
+                    ]}
+                  />
                 </div>
               </div>
 

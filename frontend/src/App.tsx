@@ -50,6 +50,7 @@ const AntdAppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
           colorLinkHover: isDark ? '#6ee7b7' : '#15803d',
           borderRadius: 8,
           fontFamily: `'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
+          fontFamilyCode: `'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
           // Phân lớp bề mặt Dark/Light Mode chuẩn Quân đội & SOC
           ...(isDark
             ? {

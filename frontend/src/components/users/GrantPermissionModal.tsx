@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 import { permissionService } from '../../services/permissionService';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import {
   User,
   Permission,
@@ -477,26 +478,17 @@ export const GrantPermissionModal: React.FC<GrantPermissionModalProps> = ({
 
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700">
-                {([
-                  { k: 'all',       l: `Tất cả (${rows.length})` },
-                  { k: 'role',      l: `Từ role (${stats.fromRole})` },
-                  { k: 'direct',    l: `Trực tiếp (${stats.direct})` },
-                  { k: 'available', l: `Chưa cấp (${stats.available})` },
-                ] as const).map(({ k, l }) => (
-                  <button
-                    key={k}
-                    onClick={() => setTab(k)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
-                      tab === k
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
+              <SegmentedTabs
+                ariaLabel="Lọc danh sách quyền người dùng"
+                value={tab}
+                onChange={setTab}
+                items={[
+                  { value: 'all', label: 'Tất cả', count: rows.length, activeTone: 'neutral' },
+                  { value: 'role', label: 'Từ role', count: stats.fromRole, activeTone: 'emerald' },
+                  { value: 'direct', label: 'Trực tiếp', count: stats.direct, activeTone: 'amber' },
+                  { value: 'available', label: 'Chưa cấp', count: stats.available, activeTone: 'slate' },
+                ]}
+              />
 
               <Input
                 placeholder="Tìm mã quyền / mô tả..."

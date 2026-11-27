@@ -36,7 +36,7 @@ typography:
     lineHeight: 1.25
     letterSpacing: "-0.015em"
   mono:
-    fontFamily: "JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+    fontFamily: "Be Vietnam Pro, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
     fontWeight: 500
 rounded:
   sm: "6px"
@@ -116,9 +116,9 @@ Không dùng màu tím AI (`#722ED1`, violet, indigo) hay màu pastel ngẫu nhi
 
 ## 3. Typography & Mật độ Thông tin
 
-- **Hai họ font duy nhất (khai báo cục bộ trong `frontend/src/fonts.css`, không gọi Google Fonts CDN):**
-  1. **`Be Vietnam Pro`** (`400`, `500`, `600`, `700`): Toàn bộ tiêu đề, điều hướng, nhãn nút, bảng dữ liệu và văn bản hành chính tiếng Việt.
-  2. **`JetBrains Mono`** (`tabular-nums`): Chỉ áp dụng cho **số liệu thống kê KPI, mã văn bản, mã đơn vị (`QK7`, `TRGQS-QK7`), mã quân nhân (`USR-001`), địa chỉ IP, dấu thời gian kiểm toán và mã băm SHA-256**. Không dùng monospace làm tiêu đề trang trí hoặc nhãn văn bản thường.
+- **Họ font thống nhất duy nhất (khai báo cục bộ trong `frontend/src/fonts.css`, không gọi Google Fonts CDN):**
+  1. **`Be Vietnam Pro`** (`300`, `400`, `500`, `600`, `700`, `800`): Áp dụng đồng bộ cho toàn bộ hệ thống — từ tiêu đề, điều hướng, nhãn nút, văn bản hành chính tiếng Việt đến số liệu thống kê KPI, mã văn bản, mã đơn vị (`QK7`, `TRGQS-QK7`), mã quân nhân (`USR-001`), địa chỉ IP, dấu thời gian kiểm toán và mã băm SHA-256 (kết hợp `tabular-nums lining-nums`, tắt số `0` chấm/gạch chéo `font-feature-settings: "zero" 0`).
+  2. **Cấm dùng `JetBrains Mono` hoặc font lập trình monospace kiểu AI** (số `0` có chấm giữa, chữ tiếng Việt vuông cứng kiểu terminal) trên giao diện người dùng QK7 DataHub.
 - **Thang kích thước cố định cho Operate Mode (`rem`, tỷ lệ 1.15–1.2):**
   - Tiêu đề trang (`h1`): `1.375rem`–`1.5rem` (`22px`–`24px`, `font-weight: 700`, tối đa 1–2 dòng).
   - Tiêu đề phân khu (`h2` / Card title): `1rem`–`1.125rem` (`16px`–`18px`, `font-weight: 600`).
@@ -195,7 +195,7 @@ Kỹ sư bắt buộc tái sử dụng các thành phần đã chuẩn hóa dư�
 | :--- | :--- | :--- |
 | **Bảng màu** | Sót màu tím AI mặc định (`#722ED1`), dùng gradient cầu vồng hoặc glow neon trên thẻ dữ liệu. | Tuân thủ Triad Quân đội (`#166534` / `#10b981`, `#d97706` / `#fbbf24`, `#b91c1c` / `#f87171`) và bề mặt trung tính sạch. |
 | **Bề mặt & Viền** | Phủ `backdrop-blur` lên mọi card trong bảng dài; đổ bóng nặng ở trạng thái nghỉ. | Phân tầng bằng sắc độ nền + viền `1px`; chỉ đổ bóng/mờ cho thành phần thực sự nổi (modal, drawer, menu). |
-| **Typography** | Dùng `font-mono` cho tiêu đề; hiển thị số KPI/IP/ngày giờ bằng chữ thường bị nhảy cột khi cập nhật. | `Be Vietnam Pro` cho văn bản; `JetBrains Mono` + `tabular-nums` cho số liệu, mã hiệu, IP, timestamp, SHA-256. |
+| **Typography** | Dùng `JetBrains Mono` hoặc font lập trình monospace (số `0` chấm giữa, dấu tiếng Việt thô cứng kiểu AI/terminal). | Thống nhất `Be Vietnam Pro` thân thiện tiếng Việt cho toàn hệ thống, kèm `tabular-nums lining-nums` (tắt `zero`) cho số liệu, mã hiệu, IP, timestamp, SHA-256. |
 | **Phân trang & Cột** | Tự viết nút chuyển trang riêng lẻ ở từng màn hình; để chuỗi `User-Agent` thô làm lệch bảng. | Dùng `PaginationBar` thống nhất; tóm gọn `HĐH • Trình duyệt` kèm icon và căn cột rõ ràng. |
 | **Thông báo & Lỗi** | Dùng `window.alert()`, toast đứng yên che nút bấm, hoặc để toast lỗi `403` bắn liên tục. | Dùng `ToastProvider` (`Toast.tsx`) với throttle 2s cho lỗi `403`; thông báo lỗi form đặt ngay dưới ô nhập. |
 | **Hành động nguy hiểm** | Xóa vĩnh viễn chỉ bằng 1 cú click hoặc xác nhận sơ sài. | Hộp thoại `ConfirmDialog` màu Đỏ Quân Kỳ, nêu rõ hậu quả và yêu cầu xác nhận 2 bước. |

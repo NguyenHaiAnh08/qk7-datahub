@@ -82,15 +82,17 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [slideActive, setSlideActive] = useState(false);
 
-  // Đồng bộ props vào temp states khi mở popover
+  // Đồng bộ props vào temp states chỉ khi mở popover (không ghi đè viewMonth khi người dùng bấm Đặt lại bên trong)
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setTempStart(startDate);
       setTempEnd(endDate);
       setHoverDate(null);
       const d = parseISODate(startDate) || new Date();
       setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
     }
+    wasOpenRef.current = isOpen;
   }, [isOpen, startDate, endDate]);
 
   // Đóng popover khi click ra ngoài hoặc bấm Escape
@@ -166,8 +168,22 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     setIsOpen(false);
   };
 
-  // Đặt lại / Xóa bộ lọc ngày
-  const handleReset = () => {
+  // Đặt lại ngày đang chọn bên trong popover (GIỮ MỞ khung lịch để người dùng chọn ngay khoảng ngày khác)
+  const handleResetDraft = () => {
+    setTempStart('');
+    setTempEnd('');
+    setHoverDate(null);
+    if (startDate || endDate) {
+      if (onClear) {
+        onClear();
+      } else {
+        onChange('', '');
+      }
+    }
+  };
+
+  // Xóa nhanh bộ lọc ngày từ nút X ngoài thanh trigger
+  const handleQuickClear = () => {
     setTempStart('');
     setTempEnd('');
     setHoverDate(null);
@@ -300,20 +316,49 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           title="Chọn khoảng thời gian lọc dữ liệu"
         >
           <CalendarIcon
-            className={`w-3.5 h-3.5 transition-colors ${
+            className={`w-3.5 h-3.5 transition-colors shrink-0 ${
               hasSelection
                 ? 'text-emerald-600 dark:text-emerald-400'
                 : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'
             }`}
           />
-          <span className="font-mono tabular-nums truncate max-w-[240px] sm:max-w-none">
-            {triggerLabel}
-          </span>
+          {hasSelection ? (
+            <span className="font-sans truncate max-w-[260px] sm:max-w-none flex items-center gap-1">
+              {startDate && endDate ? (
+                startDate === endDate ? (
+                  <span className="font-mono tabular-nums font-semibold">{formatDisplayDate(startDate)}</span>
+                ) : (
+                  <>
+                    <span className="font-mono tabular-nums font-semibold">
+                      {formatDisplayDate(startDate)} – {formatDisplayDate(endDate)}
+                    </span>
+                    <span className="font-sans font-medium text-emerald-700/80 dark:text-emerald-300/80">
+                      ({getDaysBetween(startDate, endDate)} ngày)
+                    </span>
+                  </>
+                )
+              ) : startDate ? (
+                <>
+                  <span className="font-sans font-medium">Từ:</span>
+                  <span className="font-mono tabular-nums font-semibold">{formatDisplayDate(startDate)}</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-sans font-medium">Đến:</span>
+                  <span className="font-mono tabular-nums font-semibold">{formatDisplayDate(endDate)}</span>
+                </>
+              )}
+            </span>
+          ) : (
+            <span className="font-sans font-medium tracking-normal text-slate-600 dark:text-slate-300 truncate max-w-[240px] sm:max-w-none">
+              {triggerLabel}
+            </span>
+          )}
           {hasSelection && (
             <span
               onClick={(e) => {
                 e.stopPropagation();
-                handleReset();
+                handleQuickClear();
               }}
               className="p-0.5 rounded-md hover:bg-emerald-200/50 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 transition"
               title="Xóa bộ lọc ngày"
@@ -344,7 +389,13 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 Từ ngày
               </div>
-              <div className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">
+              <div
+                className={`text-xs mt-0.5 truncate ${
+                  tempStart
+                    ? 'font-mono tabular-nums font-bold text-slate-800 dark:text-slate-200'
+                    : 'font-sans font-medium text-slate-400 dark:text-slate-500'
+                }`}
+              >
                 {tempStart ? formatDisplayDate(tempStart) : 'Chưa chọn'}
               </div>
             </div>
@@ -360,12 +411,18 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                 <span>Đến ngày</span>
                 {tempStart && !tempEnd && (
-                  <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">
+                  <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal normal-case tracking-normal">
                     Chọn ngày kết thúc
                   </span>
                 )}
               </div>
-              <div className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">
+              <div
+                className={`text-xs mt-0.5 truncate ${
+                  tempEnd
+                    ? 'font-mono tabular-nums font-bold text-slate-800 dark:text-slate-200'
+                    : 'font-sans font-medium text-slate-400 dark:text-slate-500'
+                }`}
+              >
                 {tempEnd ? formatDisplayDate(tempEnd) : 'Chưa chọn'}
               </div>
             </div>
@@ -414,7 +471,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white font-mono">
+            <span className="font-sans font-bold text-xs sm:text-sm text-slate-900 dark:text-white tracking-tight tabular-nums">
               Tháng {viewMonth.getMonth() + 1}, {viewMonth.getFullYear()}
             </span>
 
@@ -524,10 +581,10 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
           {/* Footer Bar: Tóm tắt số ngày & Nút hành động */}
           <div className="u030-foot mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-sans">
               {tempStart && tempEnd ? (
                 <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
-                  {selectedDaysCount} ngày được chọn
+                  <span className="font-mono tabular-nums">{selectedDaysCount}</span> ngày được chọn
                 </span>
               ) : tempStart ? (
                 <span className="text-amber-600 dark:text-amber-400 font-medium">
@@ -541,10 +598,13 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={handleReset}
-                className="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium text-[11px] transition"
+                onClick={handleResetDraft}
+                disabled={!tempStart && !tempEnd && !hasSelection}
+                className="px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium text-[11px] transition flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Xóa các ngày đang chọn để chọn lại"
               >
-                Đặt lại
+                <RotateCcw className="w-3 h-3" />
+                <span>Đặt lại</span>
               </button>
 
               <button

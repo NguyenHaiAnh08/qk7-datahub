@@ -21,6 +21,7 @@ import { DocumentItem, MetaData, Unit, User } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatFileSize';
 import { RollingNumber } from '../common/RollingNumber';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { getMilitaryUnitSortWeight } from '../../utils/unitTree';
 
 export interface SchoolOverviewSectionProps {
@@ -704,30 +705,16 @@ export const SchoolOverviewSection: React.FC<SchoolOverviewSectionProps> = ({
               </div>
 
               {/* Mini Segmented Switcher */}
-              <div className="p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setRightPanelTab('type')}
-                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                    rightPanelTab === 'type'
-                      ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs font-bold'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Thể loại
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRightPanelTab('level')}
-                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                    rightPanelTab === 'level'
-                      ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs font-bold'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Độ mật
-                </button>
-              </div>
+              <SegmentedTabs
+                ariaLabel="Phân loại cơ cấu văn bản"
+                size="xs"
+                value={rightPanelTab}
+                onChange={setRightPanelTab}
+                items={[
+                  { value: 'type', label: 'Thể loại', activeTone: 'emerald-text' },
+                  { value: 'level', label: 'Độ mật', activeTone: 'emerald-text' },
+                ]}
+              />
             </div>
 
             {/* Nội dung Tab 1: Phân bố theo Thể loại */}

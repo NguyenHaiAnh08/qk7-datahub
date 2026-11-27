@@ -1,5 +1,6 @@
 // frontend/src/pages/ProtectedPermissionsConfigPage.tsx
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { SegmentedTabs } from '../components/common/SegmentedTabs';
 import {
   ShieldCheck,
   Lock,
@@ -570,43 +571,29 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
           </div>
 
           {/* Lọc theo trạng thái */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60 shrink-0 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                statusFilter === 'all'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              Tất cả ({stats.total})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('locked')}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                statusFilter === 'locked'
-                  ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'
-              }`}
-            >
-              <Lock className="w-3 h-3 text-rose-500" />
-              <span>Đang khóa ({stats.lockedCount})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('unlocked')}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                statusFilter === 'unlocked'
-                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-amber-600'
-              }`}
-            >
-              <Unlock className="w-3 h-3 text-amber-500" />
-              <span>Chưa khóa ({stats.unlockedCount})</span>
-            </button>
-          </div>
+          <SegmentedTabs
+            ariaLabel="Lọc theo trạng thái khóa bảo vệ"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            className="shrink-0 self-start sm:self-auto"
+            items={[
+              { value: 'all', label: 'Tất cả', count: stats.total, activeTone: 'neutral' },
+              {
+                value: 'locked',
+                label: 'Đang khóa',
+                count: stats.lockedCount,
+                icon: <Lock className="w-3 h-3" />,
+                activeTone: 'danger',
+              },
+              {
+                value: 'unlocked',
+                label: 'Chưa khóa',
+                count: stats.unlockedCount,
+                icon: <Unlock className="w-3 h-3" />,
+                activeTone: 'amber',
+              },
+            ]}
+          />
         </div>
 
         {/* Lọc theo Phân hệ Pills với nút điều hướng siêu mượt */}

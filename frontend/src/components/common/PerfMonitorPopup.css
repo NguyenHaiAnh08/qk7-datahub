@@ -101,7 +101,7 @@
 .qk7perf-table th { background: var(--pm-head); font-weight: 600; vertical-align: bottom; overflow-wrap: break-word; }
 .qk7perf-body > .qk7perf-tablewrap > .qk7perf-table > thead th { position: sticky; top: -8px; z-index: 1; }
 .qk7perf-table th button { width: 100%; padding: 0; border: 0; background: transparent; text-align: inherit; font-weight: 600; }
-.qk7perf-table .is-num { text-align: right; font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.qk7perf-table .is-num { text-align: right; font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "zero" 0; }
 .qk7perf-table th.is-num { font-family: inherit; }
 .qk7perf-table td.is-warn { color: var(--pm-warn); font-weight: 700; }
 .qk7perf-table td.is-bad { color: var(--pm-bad); font-weight: 700; }
@@ -117,7 +117,7 @@
 .qk7perf-sub { display: block; padding-left: 12px; color: var(--pm-muted); }
 .qk7perf-values { margin: 0; padding: 0; list-style: none; }
 .qk7perf-values span { color: var(--pm-muted); }
-.qk7perf-values b { font: 500 11px 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.qk7perf-values b { font: 500 11px 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "zero" 0; }
 .qk7perf-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; }
 .qk7perf-h { margin: 14px 0 6px; font-size: 12px; font-weight: 700; color: var(--pm-accent); }
 .qk7perf-h:first-child { margin-top: 0; }

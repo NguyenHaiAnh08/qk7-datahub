@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { TreeSelect } from 'antd';
 import { PaginationBar } from '../components/common/PaginationBar';
+import { SegmentedTabs } from '../components/common/SegmentedTabs';
 import { usePageTransition } from '../components/common/PageTransitionStage';
 import { Unit } from '../types/user';
 import { unitService } from '../services/unitService';
@@ -399,41 +400,17 @@ export const LectureCatalogsPage: React.FC<Props> = ({ catalogType }) => {
 
         <div className="flex items-center gap-1.5 overflow-x-auto">
           {/* Bộ lọc trạng thái */}
-          <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-950/80 border border-slate-200/80 dark:border-slate-800 shrink-0">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                statusFilter === 'all'
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              Tất cả
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('active')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                statusFilter === 'active'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400'
-              }`}
-            >
-              Đang dùng
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('inactive')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                statusFilter === 'inactive'
-                  ? 'bg-slate-700 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              Đã ẩn
-            </button>
-          </div>
+          <SegmentedTabs
+            ariaLabel="Lọc theo trạng thái sử dụng"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            className="shrink-0"
+            items={[
+              { value: 'all', label: 'Tất cả', activeTone: 'neutral' },
+              { value: 'active', label: 'Đang dùng', activeTone: 'emerald' },
+              { value: 'inactive', label: 'Đã ẩn', activeTone: 'slate' },
+            ]}
+          />
 
           {/* Bộ lọc loại phòng (nếu là giảng đường) */}
           {catalogType === 'classrooms' && (

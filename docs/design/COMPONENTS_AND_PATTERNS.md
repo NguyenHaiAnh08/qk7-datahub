@@ -13,7 +13,7 @@ Tài liệu hướng dẫn cách lắp ráp màn hình nghiệp vụ nhất quá
   - Trên iPad Portrait (`834×1178`), toolbar tự động ngắt thành 2 hàng gọn, giữ chiều cao điều khiển `≥44px`.
 - **Bảng (`DataTable.tsx` + AntD `Table`):**
   - Không dùng viền kẻ dọc chằng chịt; chỉ dùng đường phân cách hàng ngang mảnh (`#f1f5f9` Light / `#1e293b` Dark) và hover hàng nhẹ (`rgba(22,101,52,0.06)` Light / `rgba(16,185,129,0.12)` Dark).
-  - Các cột **Mã hiệu, IP, Thời gian, Dung lượng, Số lượng** bắt buộc dùng `font-mono tabular-nums` và căn lề nhất quán (cột số căn phải hoặc giữa theo chuẩn cột; cột văn bản căn trái).
+  - Các cột **Mã hiệu, IP, Thời gian, Dung lượng, Số lượng** dùng `Be Vietnam Pro` kết hợp `tabular-nums` và căn lề nhất quán (cột số căn phải hoặc giữa theo chuẩn cột; cột văn bản căn trái), không dùng font monospace lập trình.
   - Dữ liệu `User-Agent` tại `SessionsPage` được phân tích gọn thành `HĐH • Trình duyệt` kèm icon thiết bị, không đổ nguyên chuỗi thô làm xô cột.
 - **Phân trang:** Toàn bộ bảng/lưới phân trang dùng thống nhất [`PaginationBar.tsx`](../../frontend/src/components/common/PaginationBar.tsx) kết hợp `PageTransitionStage.tsx` khi chuyển trang.
 

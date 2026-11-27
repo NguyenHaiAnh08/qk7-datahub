@@ -17,6 +17,7 @@ import {
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { TacticalEmptyState } from '../common/TacticalEmptyState';
 import { PaginationBar } from '../common/PaginationBar';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { usePageTransition } from '../common/PageTransitionStage';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -56,9 +57,6 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
   // View mode: 'radar' (Sơ đồ mặt bằng) | 'list' (Danh sách ca dạy)
   const [viewMode, setViewMode] = useState<'radar' | 'list'>('radar');
-
-  // Time shift filter: 'live' | 'morning' | 'afternoon' | 'evening'
-  const [timeShift, setTimeShift] = useState<'live' | 'morning' | 'afternoon' | 'evening'>('live');
 
   // Radar state
   const [kpis, setKpis] = useState<RadarKpis>({
@@ -155,7 +153,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
           lectureService.getRadarFloorPlan({
             building_code: selectedBuilding,
             floor_number: fl,
-            time_shift: timeShift,
+            time_shift: 'live',
           })
         )
       );
@@ -163,7 +161,7 @@ export const LiveMonitorPanel: React.FC<Props> = ({
     } catch (err) {
       console.error('Load floor plan failed:', err);
     }
-  }, [selectedBuilding, floorsKey, timeShift]);
+  }, [selectedBuilding, floorsKey]);
 
   // Load Legacy Live Schedules
   const loadLegacySessions = useCallback(async () => {
@@ -574,64 +572,30 @@ export const LiveMonitorPanel: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Right: Time Shift Filter, View Mode Toggle & Refresh Button */}
+        {/* Right: View Mode Toggle & Refresh Button */}
         <div className="flex flex-wrap items-center gap-2 ml-auto">
-          {/* Bộ lọc Ca giảng dạy (Trực tiếp / Sáng / Chiều / Tối) trên Radar */}
-          {viewMode === 'radar' && (
-            <div
-              className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs"
-              role="group"
-              aria-label="Lọc theo ca giảng dạy"
-            >
-              {([
-                { key: 'live', label: 'Trực tiếp' },
-                { key: 'morning', label: 'Ca sáng' },
-                { key: 'afternoon', label: 'Ca chiều' },
-                { key: 'evening', label: 'Ca tối' },
-              ] as const).map((shift) => (
-                <button
-                  key={shift.key}
-                  type="button"
-                  onClick={() => setTimeShift(shift.key)}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                    timeShift === shift.key
-                      ? 'bg-[#166534] text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {shift.label}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* View mode toggle */}
-          <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setViewMode('radar')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                viewMode === 'radar'
-                  ? 'bg-white dark:bg-[#111827] text-emerald-700 dark:text-emerald-400 shadow-xs border border-slate-200/60 dark:border-transparent'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Sơ đồ giảng đường</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                viewMode === 'list'
-                  ? 'bg-white dark:bg-[#111827] text-emerald-700 dark:text-emerald-400 shadow-xs border border-slate-200/60 dark:border-transparent'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>Danh sách ({sessions.length})</span>
-            </button>
-          </div>
+          <SegmentedTabs
+            ariaLabel="Chuyển chế độ hiển thị giảng đường"
+            value={viewMode}
+            onChange={setViewMode}
+            items={[
+              {
+                value: 'radar',
+                label: 'Sơ đồ giảng đường',
+                icon: <LayoutGrid className="w-3.5 h-3.5" />,
+                activeTone: 'emerald-text',
+              },
+              {
+                value: 'list',
+                label: 'Danh sách',
+                count: sessions.length,
+                icon: <List className="w-3.5 h-3.5" />,
+                activeTone: 'emerald-text',
+              },
+            ]}
+          />
 
           {/* Refresh button */}
           <button
@@ -940,13 +904,13 @@ export const LiveMonitorPanel: React.FC<Props> = ({
 
             {/* ── COLUMN 3: INSPECTOR (DOCK PANEL ON >= 1200PX) ── */}
             {isDesktop && activeRoom && (
-              <div className="w-84 lg:w-92 xl:w-96 shrink-0 sticky top-4 space-y-3 animate-in fade-in slide-in-from-right-4 duration-200">
-                <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 sm:p-5 shadow-xs space-y-4">
+              <div className="w-[21rem] lg:w-[23rem] xl:w-96 shrink-0 sticky top-[calc(7.75rem+env(safe-area-inset-top,0px))] self-start z-10 space-y-3">
+                <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-white/[0.08] p-4 sm:p-5 shadow-xs space-y-4 max-h-[calc(100dvh-8.75rem-env(safe-area-inset-top,0px))] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-200">
                   {/* Header */}
                   <div className="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-white/[0.04]">
                     <div className="min-w-0 pr-2">
                       <div className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 tracking-wider">
-                        03. Chi Tiết Giảng Đường
+                        Chi Tiết Giảng Đường
                       </div>
                       <h4 className="font-black text-base text-slate-900 dark:text-white mt-0.5 truncate">
                         {activeRoom.room_name}

@@ -14,6 +14,7 @@ import { DocumentPreviewModal } from '../components/document-desk/DocumentPrevie
 import { PendingProposalsModal, PendingProposalItem } from '../components/document-desk/PendingProposalsModal';
 import { isUserAdmin, isUserManager } from '../contexts/AuthContext';
 import { DateRangePicker } from '../components/common/DateRangePicker';
+import { SegmentedTabs } from '../components/common/SegmentedTabs';
 import { documentsApi } from '../services/documentsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { useDebounce } from '../hooks/useDebounce';
@@ -36,6 +37,8 @@ export const MyUnitPage: React.FC = () => {
   const [dateTo, setDateTo] = useState('');
 
   const [selectedUnitId, setSelectedUnitId] = useState<string>(() => user?.unit_id || '');
+  const [unitScopeFilter, setUnitScopeFilter] = useState<string>('');
+  const [subtreeUnitIds, setSubtreeUnitIds] = useState<string[]>([]);
   const [canSelectUnit, setCanSelectUnit] = useState(false);
   const [currentUnit, setCurrentUnit] = useState<{ unit_id: string; name: string; parent_id?: string; parent_name?: string } | null>(() => {
     if (user?.unit_id && user?.unit_name) {
@@ -159,6 +162,7 @@ export const MyUnitPage: React.FC = () => {
       setDocuments(res.items || []);
       setCanSelectUnit(res.can_select_unit);
       setCurrentUnit(res.unit);
+      setSubtreeUnitIds(res.subtree_unit_ids || []);
       if (!selectedUnitId && res.selected_unit_id) {
         setSelectedUnitId(res.selected_unit_id);
       }
@@ -198,6 +202,8 @@ export const MyUnitPage: React.FC = () => {
     setSelectedLevel('');
     setDateFrom('');
     setDateTo('');
+    setUnitScopeFilter('');
+    setCurrentPage(1);
     if (user?.unit_id) {
       setSelectedUnitId(user.unit_id);
     }
@@ -270,12 +276,6 @@ export const MyUnitPage: React.FC = () => {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(documents.length / ITEMS_PER_PAGE));
-  const paginatedDocs = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return documents.slice(start, start + ITEMS_PER_PAGE);
-  }, [documents, currentPage]);
-
   const userClearance = user?.clearance_level_id || 1;
   const userLevelObj = meta.levels.find((l) => l.level_id === userClearance);
   const userLevelName =
@@ -323,6 +323,83 @@ export const MyUnitPage: React.FC = () => {
     return null;
   }, [currentUnit, user?.unit_id, meta.units]);
 
+  // Danh sách các đơn vị được phép lọc trong "Đơn vị của tôi" (bao gồm Đơn vị cha & Đơn vị con trực thuộc)
+  const unitFilterOptions = useMemo(() => {
+    const options: Array<{ unit_id: string; name: string; badge: string }> = [];
+    const seen = new Set<string>();
+    const curId = currentUnit?.unit_id || user?.unit_id || '';
+    const curName = currentUnit?.name || user?.unit_name || '';
+
+    // 1. Đơn vị cha (nếu có, vd: Phòng Tham mưu - Hành chính)
+    if (parentUnit?.unit_id && parentUnit?.name) {
+      options.push({
+        unit_id: parentUnit.unit_id,
+        name: parentUnit.name,
+        badge: 'Đơn vị cha',
+      });
+      seen.add(parentUnit.unit_id);
+    }
+
+    // 2. Đơn vị hiện tại (vd: Công Nghệ Thông Tin)
+    if (curId && curName && !seen.has(curId)) {
+      options.push({
+        unit_id: curId,
+        name: curName,
+        badge: parentUnit ? 'Đơn vị con' : 'Đơn vị cha',
+      });
+      seen.add(curId);
+    }
+
+    // 3. Các đơn vị con trực thuộc khác nằm trong phạm vi subtree được backend cấp quyền
+    for (const uid of subtreeUnitIds) {
+      if (!uid || seen.has(uid)) continue;
+      if (uid === 'TQS-QK7' || uid === 'TQS' || uid === 'U-TQS' || uid === 'QK7') continue;
+      const metaUnit = meta.units.find((u) => u.unit_id === uid);
+      if (metaUnit) {
+        options.push({
+          unit_id: metaUnit.unit_id,
+          name: metaUnit.name,
+          badge: 'Đơn vị con',
+        });
+        seen.add(uid);
+      }
+    }
+
+    return options;
+  }, [currentUnit, user?.unit_id, user?.unit_name, parentUnit, subtreeUnitIds, meta.units]);
+
+  // Lọc tài liệu theo đơn vị cha / con đã chọn (trên tập tài liệu đã qua kiểm soát bảo mật 3 tầng từ backend)
+  const filteredDocuments = useMemo(() => {
+    if (!unitScopeFilter) return documents;
+    const selectedOpt = unitFilterOptions.find((u) => u.unit_id === unitScopeFilter);
+    const targetName = selectedOpt?.name?.trim().toLowerCase();
+    return documents.filter((doc) => {
+      const docUnitId = doc.issuing_unit_id || doc.unit_id || '';
+      if (docUnitId && docUnitId === unitScopeFilter) return true;
+      if (!docUnitId && targetName && (doc.unit_name || '').trim().toLowerCase() === targetName) return true;
+      return false;
+    });
+  }, [documents, unitScopeFilter, unitFilterOptions]);
+
+  const scopedAllUnitDocuments = useMemo(() => {
+    const base = allUnitDocuments.length > 0 ? allUnitDocuments : documents;
+    if (!unitScopeFilter) return base;
+    const selectedOpt = unitFilterOptions.find((u) => u.unit_id === unitScopeFilter);
+    const targetName = selectedOpt?.name?.trim().toLowerCase();
+    return base.filter((doc) => {
+      const docUnitId = doc.issuing_unit_id || doc.unit_id || '';
+      if (docUnitId && docUnitId === unitScopeFilter) return true;
+      if (!docUnitId && targetName && (doc.unit_name || '').trim().toLowerCase() === targetName) return true;
+      return false;
+    });
+  }, [allUnitDocuments, documents, unitScopeFilter, unitFilterOptions]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE));
+  const paginatedDocs = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredDocuments.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredDocuments, currentPage]);
+
   const unitHeadingTitle = useMemo(() => {
     const baseName = currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7';
     if (parentUnit && parentUnit.name && parentUnit.name.toLowerCase() !== baseName.toLowerCase()) {
@@ -331,8 +408,8 @@ export const MyUnitPage: React.FC = () => {
     return baseName;
   }, [currentUnit?.name, user?.unit_name, parentUnit]);
 
-  // Dữ liệu văn bản dùng tính toán thống kê (ưu tiên toàn bộ văn bản của đơn vị)
-  const targetDocs = allUnitDocuments.length > 0 ? allUnitDocuments : documents;
+  // Dữ liệu văn bản dùng tính toán thống kê (ưu tiên toàn bộ văn bản trong phạm vi lọc đơn vị hiện tại)
+  const targetDocs = scopedAllUnitDocuments;
 
   // Phân bố theo Mức Bảo Mật (5 cấp độ chuẩn theo quy chuẩn quân sự)
   const levelDistribution = useMemo(() => {
@@ -479,8 +556,8 @@ export const MyUnitPage: React.FC = () => {
               className="overflow-hidden space-y-3.5"
             >
               <UnitOverviewStrip
-                documents={documents}
-                allUnitDocuments={allUnitDocuments}
+                documents={filteredDocuments}
+                allUnitDocuments={scopedAllUnitDocuments}
                 userClearanceLevel={userClearance}
                 userLevelName={userLevelName}
                 userName={user?.full_name}
@@ -534,18 +611,41 @@ export const MyUnitPage: React.FC = () => {
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+              <label
+                htmlFor={unitFilterOptions.length > 1 ? 'myunit-unit-select' : 'myunit-unit-input'}
+                className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1"
+              >
                 Đơn vị
               </label>
-              <input
-                id="myunit-unit-input"
-                name="myunit_unit"
-                type="text"
-                readOnly
-                value={currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none cursor-default select-none truncate"
-                title={currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
-              />
+              {unitFilterOptions.length > 1 ? (
+                <select
+                  id="myunit-unit-select"
+                  name="myunit_unit"
+                  value={unitScopeFilter}
+                  onChange={(e) => {
+                    setUnitScopeFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 cursor-pointer [&>option]:bg-white [&>option]:text-slate-800 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
+                >
+                  <option value="">Tất cả</option>
+                  {unitFilterOptions.map((u) => (
+                    <option key={u.unit_id} value={u.unit_id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="myunit-unit-input"
+                  name="myunit_unit"
+                  type="text"
+                  readOnly
+                  value={currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none cursor-default select-none truncate"
+                  title={currentUnit?.name || user?.unit_name || 'Trường Quân sự Quân khu 7'}
+                />
+              )}
             </div>
 
             <div>
@@ -620,24 +720,29 @@ export const MyUnitPage: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2 justify-end">
-              <div className="p-0.5 bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 rounded-lg flex items-center space-x-1">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
-                  title="Dạng lưới"
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('table')}
-                  className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
-                  title="Dạng bảng"
-                >
-                  <List className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <SegmentedTabs
+                ariaLabel="Chế độ hiển thị tài liệu đơn vị"
+                size="xs"
+                iconOnly
+                value={viewMode}
+                onChange={setViewMode}
+                items={[
+                  {
+                    value: 'grid',
+                    icon: <LayoutGrid className="w-3.5 h-3.5" />,
+                    title: 'Dạng lưới',
+                    ariaLabel: 'Hiển thị dạng lưới',
+                    activeTone: 'emerald',
+                  },
+                  {
+                    value: 'table',
+                    icon: <List className="w-3.5 h-3.5" />,
+                    title: 'Dạng bảng',
+                    ariaLabel: 'Hiển thị dạng bảng',
+                    activeTone: 'emerald',
+                  },
+                ]}
+              />
               <button
                 type="button"
                 onClick={handleResetFilters}
@@ -658,9 +763,26 @@ export const MyUnitPage: React.FC = () => {
           </div>
 
           {/* Active Filter Chips (Shopify Polaris Pattern) */}
-          {(searchQuery || selectedType || selectedLevel !== '' || dateFrom || dateTo) && (
+          {(unitScopeFilter || searchQuery || selectedType || selectedLevel !== '' || dateFrom || dateTo) && (
             <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100 dark:border-white/[0.04]">
               <span className="text-xs text-slate-500 dark:text-slate-400 font-medium mr-1">Đang lọc theo:</span>
+              {unitScopeFilter && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-medium">
+                  <span>
+                    Đơn vị: {unitFilterOptions.find((u) => u.unit_id === unitScopeFilter)?.name || unitScopeFilter}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUnitScopeFilter('');
+                      setCurrentPage(1);
+                    }}
+                    className="hover:text-rose-500 cursor-pointer font-bold"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
               {searchQuery && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-slate-100 dark:bg-white/[0.05] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10">
                   <span>Tìm kiếm: "{searchQuery}"</span>
@@ -693,7 +815,7 @@ export const MyUnitPage: React.FC = () => {
                 Xóa tất cả
               </button>
               <span className="ml-auto text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                Khớp <strong className="text-emerald-700 dark:text-emerald-400">{documents.length}</strong> văn bản
+                Khớp <strong className="text-emerald-700 dark:text-emerald-400">{filteredDocuments.length}</strong> văn bản
               </span>
             </div>
           )}
@@ -706,7 +828,7 @@ export const MyUnitPage: React.FC = () => {
             loading={loading}
             currentPage={currentPage}
             totalPages={totalPages}
-            totalItems={documents.length}
+            totalItems={filteredDocuments.length}
             searchQuery={searchQuery}
             onClearFilters={handleResetFilters}
             onPageChange={setCurrentPage}
@@ -721,7 +843,7 @@ export const MyUnitPage: React.FC = () => {
             loading={loading}
             currentPage={currentPage}
             totalPages={totalPages}
-            totalItems={documents.length}
+            totalItems={filteredDocuments.length}
             searchQuery={searchQuery}
             onClearFilters={handleResetFilters}
             onPageChange={setCurrentPage}

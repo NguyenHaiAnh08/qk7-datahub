@@ -3,6 +3,7 @@ import { Copy, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { documentsApi } from '../../services/documentsApi';
 import type { DuplicateReport, DuplicateDocumentRef } from '../../services/documentService';
 import { PaginationBar } from '../common/PaginationBar';
+import { TacticalEmptyState } from '../common/TacticalEmptyState';
 
 const GROUPS_PER_PAGE = 20;
 
@@ -45,46 +46,57 @@ export const DuplicateDocumentsPanel: React.FC = () => {
   const s = report?.summary;
 
   return (
-    <>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-              <Copy className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+    <div className="space-y-4">
+      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 border-l-4 border-l-amber-600 dark:border-l-amber-400 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200/80 dark:border-amber-500/30 flex items-center justify-center shrink-0 text-amber-700 dark:text-amber-400">
+              <Copy className="w-5 h-5 stroke-[2]" />
             </div>
-            <span>Tài Liệu Trùng</span>
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Các văn bản có nội dung tệp PDF giống hệt nhau. Trang này chỉ để kiểm tra, không xóa hay sửa dữ liệu.
-          </p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  Đối Soát Tài Liệu Trùng
+                </h1>
+                {s && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold font-mono tabular-nums bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-500/30">
+                    {s.groups} nhóm trùng
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Phát hiện các văn bản có mã băm SHA-256 tệp PDF giống hệt nhau. Trang này chỉ phục vụ kiểm tra đối soát, không tự động xóa hay sửa dữ liệu.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={load}
+            className="min-h-[38px] px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer select-none self-start sm:self-center disabled:opacity-40 shrink-0"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#166534] dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
+            <span>Quét lại</span>
+          </button>
         </div>
-        <button
-          type="button"
-          disabled={loading}
-          onClick={load}
-          className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/90 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer select-none self-start disabled:opacity-40"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
-          <span>Quét lại</span>
-        </button>
-      </div>
 
-      {s && !error && (
-        <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
-          {[
-            ['Tệp PDF đã quét', s.scanned_files],
-            ['Nhóm trùng', s.groups],
-            ['Tệp dư', `${s.extra_files} (${formatSize(s.extra_bytes)})`],
-            ['Tệp không bản ghi nào dùng', s.orphan_files],
-            ['Bản ghi bị thiếu tệp', s.missing_records],
-          ].map(([label, value]) => (
-            <div key={String(label)} className="flex items-baseline gap-1.5">
-              <dt>{label}:</dt>
-              <dd className="font-mono tabular-nums font-bold text-slate-900 dark:text-white">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+        {s && !error && (
+          <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+            {[
+              ['Tệp PDF đã quét', s.scanned_files],
+              ['Nhóm trùng', s.groups],
+              ['Tệp dư', `${s.extra_files} (${formatSize(s.extra_bytes)})`],
+              ['Tệp mồ côi', s.orphan_files],
+              ['Bản ghi thiếu tệp', s.missing_records],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800">
+                <dt className="text-[11px] text-slate-500 dark:text-slate-400">{label}</dt>
+                <dd className="font-mono tabular-nums font-bold text-sm text-slate-900 dark:text-white mt-0.5">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
 
       {error ? (
         <div className="flex items-center gap-2 p-4 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:border-rose-500/30 dark:text-rose-300 text-xs font-medium">
@@ -97,16 +109,20 @@ export const DuplicateDocumentsPanel: React.FC = () => {
           <span className="text-xs font-medium">Đang quét thư mục lưu trữ...</span>
         </div>
       ) : groups.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 py-16 flex flex-col items-center gap-2">
-          <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Không có tài liệu trùng</span>
+        <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-slate-800 py-10 px-4 shadow-xs">
+          <TacticalEmptyState
+            title="Không có tài liệu trùng"
+            description="Toàn bộ tệp PDF trong kho lưu trữ hiện có mã băm SHA-256 duy nhất, không phát hiện tệp trùng nội dung."
+            icon={<CheckCircle2 className="w-7 h-7 text-[#166534] dark:text-emerald-400" />}
+            compact
+          />
         </div>
       ) : (
         <div className="space-y-3">
           {pageGroups.map((g, index) => (
             <section
               key={g.sha256}
-              className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+              className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden"
             >
               <header className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                 <span className="font-bold text-slate-900 dark:text-white">
@@ -193,6 +209,6 @@ export const DuplicateDocumentsPanel: React.FC = () => {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 };

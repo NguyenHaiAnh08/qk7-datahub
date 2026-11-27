@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useVirtualScroll } from '../../hooks/useVirtualScroll';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { Skeleton } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -791,44 +792,24 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
           </button>
 
           {/* Chọn chu kỳ Auto-refresh */}
-          <div className="flex items-center bg-slate-100 border border-slate-200 dark:bg-slate-900/80 dark:border-slate-800 rounded-xl p-0.5 text-xs shadow-xs">
-            <button
-              onClick={() => {
-                setAutoRefreshInterval(10);
+          <SegmentedTabs
+            ariaLabel="Chọn chu kỳ tự động làm mới nhật ký an ninh"
+            size="xs"
+            value={isPaused ? 'off' : String(autoRefreshInterval)}
+            onChange={(val) => {
+              if (val === 'off') {
+                setIsPaused(true);
+              } else {
+                setAutoRefreshInterval(Number(val));
                 setIsPaused(false);
-              }}
-              className={`px-2 py-1 rounded-lg transition cursor-pointer ${
-                autoRefreshInterval === 10 && !isPaused
-                  ? 'bg-[#166534] dark:bg-emerald-600 text-white font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-            >
-              10s
-            </button>
-            <button
-              onClick={() => {
-                setAutoRefreshInterval(30);
-                setIsPaused(false);
-              }}
-              className={`px-2 py-1 rounded-lg transition cursor-pointer ${
-                autoRefreshInterval === 30 && !isPaused
-                  ? 'bg-[#166534] dark:bg-emerald-600 text-white font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-            >
-              30s
-            </button>
-            <button
-              onClick={() => setIsPaused(true)}
-              className={`px-2 py-1 rounded-lg transition cursor-pointer ${
-                isPaused
-                  ? 'bg-slate-200 text-slate-800 font-semibold dark:bg-slate-800 dark:text-slate-200'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-            >
-              Tắt
-            </button>
-          </div>
+              }
+            }}
+            items={[
+              { value: '10', label: '10s', activeTone: 'emerald' },
+              { value: '30', label: '30s', activeTone: 'emerald' },
+              { value: 'off', label: 'Tắt', activeTone: 'slate' },
+            ]}
+          />
 
           {/* Nút Làm Mới thủ công */}
           <button
@@ -975,42 +956,33 @@ export const SecurityAuditLog: React.FC<SecurityAuditLogProps> = ({ showToast })
         {/* Dòng 1: Bộ chọn Chu kỳ Scope + Bộ lọc hành động & Tìm kiếm */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           {/* Scope Toggle: Tháng hiện tại (Hoạt động) / Kho lưu trữ / Tất cả */}
-          <div className="flex items-center bg-slate-100 border border-slate-200 dark:bg-slate-900/90 dark:border-slate-800 rounded-xl p-0.5 text-xs shadow-xs shrink-0 self-start sm:self-auto">
-            <button
-              onClick={() => setScopeFilter('active')}
-              className={`px-2.5 py-1 rounded-lg transition cursor-pointer font-medium ${
-                scopeFilter === 'active'
-                  ? 'bg-white text-emerald-800 font-bold shadow-xs dark:bg-emerald-600 dark:text-white'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-              title="Sự kiện của tháng hiện tại (không giới hạn, tự động làm sạch vào ngày 01 đầu tháng)"
-            >
-              Tháng {new Date().getMonth() + 1} (Hiện tại)
-            </button>
-            <button
-              onClick={() => setScopeFilter('archive')}
-              className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 font-medium ${
-                scopeFilter === 'archive'
-                  ? 'bg-white text-purple-800 font-bold shadow-xs dark:bg-purple-700 dark:text-white'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-              title="Kho lưu trữ các tháng trước đã được dọn dẹp"
-            >
-              <Archive className="w-3 h-3" />
-              Lưu trữ
-            </button>
-            <button
-              onClick={() => setScopeFilter('all')}
-              className={`px-2.5 py-1 rounded-lg transition cursor-pointer font-medium ${
-                scopeFilter === 'all'
-                  ? 'bg-white text-emerald-800 font-bold shadow-xs dark:bg-emerald-600 dark:text-white'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-              title="Toàn bộ lịch sử (hiện tại và kho lưu trữ)"
-            >
-              Tất cả
-            </button>
-          </div>
+          <SegmentedTabs
+            ariaLabel="Phạm vi thời gian nhật ký kiểm toán"
+            value={scopeFilter}
+            onChange={setScopeFilter}
+            className="shrink-0 self-start sm:self-auto"
+            items={[
+              {
+                value: 'active',
+                label: `Tháng ${new Date().getMonth() + 1} (Hiện tại)`,
+                title: 'Sự kiện của tháng hiện tại (không giới hạn, tự động làm sạch vào ngày 01 đầu tháng)',
+                activeTone: 'emerald',
+              },
+              {
+                value: 'archive',
+                label: 'Lưu trữ',
+                icon: <Archive className="w-3 h-3" />,
+                title: 'Kho lưu trữ các tháng trước đã được dọn dẹp',
+                activeTone: 'amber',
+              },
+              {
+                value: 'all',
+                label: 'Tất cả',
+                title: 'Toàn bộ lịch sử (hiện tại và kho lưu trữ)',
+                activeTone: 'emerald',
+              },
+            ]}
+          />
 
           {/* Action Dropdown & Search Input */}
           <div className="flex flex-wrap items-center gap-2">

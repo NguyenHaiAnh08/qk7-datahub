@@ -5,6 +5,7 @@ import { Lecture } from '../../types/lecture';
 import { getAuthHeaders } from '../../services/http';
 import { PdfPagesViewer } from '../document-desk/PdfPagesViewer';
 import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { useAuth } from '../../hooks/useAuth';
 import { formatUserDisplayName, formatWatermarkDateTime } from '../../hooks/useFloatingWatermark';
 import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
@@ -221,22 +222,18 @@ export const LectureViewerModal: React.FC<Props> = ({ open, lecture, onClose }) 
 
             {/* Bộ chọn mode nếu có nhiều file html */}
             {modes.length > 1 && (
-              <div className="hidden sm:flex items-center gap-1 mr-2 bg-slate-200/60 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
-                {modes.map(m => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setSelectedFile(m.file)}
-                    className={`px-2 py-1 rounded-md text-[11px] font-semibold transition ${
-                      selectedFile === m.file
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {m.title}
-                  </button>
-                ))}
-              </div>
+              <SegmentedTabs
+                ariaLabel="Chọn chế độ trình chiếu bài giảng"
+                size="xs"
+                className="hidden sm:inline-flex mr-2"
+                value={selectedFile}
+                onChange={setSelectedFile}
+                items={modes.map((m) => ({
+                  value: m.file,
+                  label: m.title,
+                  activeTone: 'emerald',
+                }))}
+              />
             )}
 
             <button

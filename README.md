@@ -64,7 +64,7 @@ graph TD
 * 👉 **[ROUTING_CONVENTION.md](./docs/guides/ROUTING_CONVENTION.md)**: Quy chuẩn định tuyến Frontend Auto-Discovery.
 * 👉 **[TROUBLESHOOTING_HISTORY.md](./docs/guides/TROUBLESHOOTING_HISTORY.md)**: **Sổ tay tổng hợp toàn bộ sự cố kỹ thuật từ trước đến nay và phương án khắc phục dứt điểm**.
 * 👉 **[ENTERPRISE_RESTRUCTURING_REPORT.md](./docs/guides/ENTERPRISE_RESTRUCTURING_REPORT.md)**: Báo cáo thực thi thiết lập Bộ Não Tổng & Tái cấu trúc mã nguồn.
-* 👉 **[DESIGN.md](./docs/design/DESIGN.md)** & **[SKILL.md](./docs/design/SKILL.md)**: Quy chuẩn thiết kế UI/UX Anti-AI-Slop và Design System Bản sắc Quân đội.
+* 👉 **[docs/design/README.md](./docs/design/README.md)** & **[DESIGN.md](./docs/design/DESIGN.md)**: Hệ thống Tài liệu Thiết kế UX/UI Chuẩn Kỹ sư (`TOKENS.md`, `COMPONENTS_AND_PATTERNS.md`, `REVIEW_CHECKLIST.md`).
 * 👉 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**: Nhật ký thay đổi và các mốc phát hành phiên bản.
 
 ---

@@ -1,3 +1,9 @@
+> [!CAUTION]
+> **TÀI LIỆU LƯU TRỮ LỊCH SỬ (DEPRECATED)** — Đây là bản AI prompt cũ trước khi thành lập Khối Thiết kế QK7 DataHub. **Không sử dụng làm chuẩn phát triển.**
+> Tài liệu chuẩn Kỹ sư hiện hành nằm tại: [docs/design/README.md](../README.md) và [docs/design/DESIGN.md](../DESIGN.md).
+
+---
+
 Hãy đóng vai một Principal UI/UX Engineer & Design Systems Architect. Mục tiêu tối thượng của tôi cho dự án **"Trung Tâm Dữ Liệu Số - Trường Quân Sự Quân Khu 7"** là: **Giao diện phải có chiều sâu, có hồn, mang cá tính thiết kế thủ công cao cấp (Human-crafted & Bespoke UI), tuyệt đối KHÔNG mang dáng dấp công nghiệp, vô hồn hay rập khuôn do AI tạo ra.**
 
 Để đạt được điều này, tôi yêu cầu bạn thiết lập quy trình làm việc và cập nhật tài liệu kiến trúc Markdown của dự án dựa trên 6 nguồn tài nguyên mã nguồn mở dưới đây:

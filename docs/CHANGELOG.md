@@ -4,13 +4,37 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
-## [v1.8.17-pdf-preview-jpeg2000-csp] — 2026-11-27
+## [v1.8.19-pdf-preview-jpeg2000-csp] — 2026-11-27
 
 ### 1. Sửa Lỗi Trình Xem PDF Mất Ảnh Trang Scan JPEG 2000
 - **Hiện tượng:** PDF scan nén ảnh JPEG 2000 (`/JPXDecode`) hiển thị chữ vỡ, mất con dấu và chữ ký; thực chất là ảnh trang không vẽ được nên lộ lớp chữ OCR nằm bên dưới. Tệp gốc không bị thay đổi.
 - **Nguyên nhân:** `pdf.js` giải nén JPEG 2000 bằng WebAssembly, trong khi Content-Security-Policy của SPA không cho biên dịch WebAssembly.
 - **Khắc phục ([`backend/src/security-headers.js`](../backend/src/security-headers.js)):** thêm `'wasm-unsafe-eval'` vào `script-src` của CSP chính. Chỉ cho phép biên dịch WebAssembly, không mở `eval()` JavaScript. Cập nhật [`docs/security/SECURITY.md`](security/SECURITY.md).
 - **Triển khai:** khởi động lại backend; không cần build lại frontend. Trình duyệt đang mở cần tải lại trang.
+
+---
+
+## [v1.8.18-untrack-qdrant-local-storage] — 2026-11-27
+
+### 1. Gỡ Theo Dõi Git Cho Kho Dữ Liệu Runtime Qdrant (`boxchat/local_storage/qdrant_data/`)
+- **Bảo toàn dữ liệu cục bộ & tránh xung đột khóa tệp SQLite (`.gitignore`):**
+  - Thực hiện `git rm -r --cached boxchat/local_storage/qdrant_data/` để gỡ bỏ 4 tệp runtime Qdrant (`storage.sqlite`, `meta.json`, `metadata_chunks.json`) khỏi GitHub nhưng vẫn giữ nguyên 100% trên ổ đĩa máy trạm để dịch vụ `boxchat` vận hành bình thường.
+  - Cập nhật [`.gitignore`](../.gitignore) bỏ qua toàn bộ thư mục `boxchat/local_storage/qdrant_data/`, chấm dứt lỗi khóa tệp Windows (`unable to unlink storage.sqlite`) và xung đột nhị phân khi đồng bộ nhánh.
+
+---
+
+## [v1.8.17-design-system-docs-and-vietocr-airgapped-hardening] — 2026-11-27
+
+### 1. Chuẩn Hóa Hệ Thống Tài Liệu Thiết Kế UX/UI (`docs/design/`)
+- **Tái cấu trúc bộ tài liệu thiết kế theo chuẩn kỹ sư sản phẩm ([`docs/design/README.md`](../design/README.md), [`docs/design/DESIGN.md`](../design/DESIGN.md)):**
+  - Chuyển đổi từ đặc tả prompt AI sang 5 tài liệu kỹ thuật đồng bộ trực tiếp với mã nguồn (`React 18 + TypeScript + Ant Design v6 + Tailwind CSS v3`): `README.md`, `DESIGN.md`, `TOKENS.md`, `COMPONENTS_AND_PATTERNS.md`, `REVIEW_CHECKLIST.md`.
+  - Lưu trữ các tài liệu thiết kế thời kỳ đầu (`System Architect.md`, `SKILL.md`) vào [`docs/design/archive/`](../design/archive/) (`legacy-ai-prompt-v1.md`, `legacy-tasteskill-v2.md`).
+  - Cập nhật tham chiếu tại [`README.md`](../../README.md) và Mục 33 [`docs/architecture/SYSTEM_ARCHITECTURE.md`](architecture/SYSTEM_ARCHITECTURE.md).
+
+### 2. Khóa Cứng VietOCR Chạy 100% Air-Gapped Offline (`ocr-service/main.py`)
+- **Loại bỏ hoàn toàn nguy cơ gọi Internet khi nạp cấu hình VietOCR ([`ocr-service/main.py`](../ocr-service/main.py)):**
+  - Chuyển từ `Cfg.load_config_from_name("vgg_seq2seq")` sang `Cfg.load_config_from_file(LOCAL_VIETOCR_CONFIG)` nạp trực tiếp `vgg_seq2seq.yml` và `vgg_seq2seq.pth` cục bộ.
+  - Bổ sung kiểm tra đầy đủ trạng thái `vietocr` (`config_exists`, `weights_exists`, `loaded`) vào endpoint chẩn đoán `/weights-status` và biến `air_gapped_ready`.
 
 ---
 

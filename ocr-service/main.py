@@ -98,6 +98,7 @@ os.environ.setdefault("PADDLE_PDX_CACHE_HOME", LOCAL_PADDLEX_CACHE)
 LOCAL_VIETOCR_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "model_weight", "vietocr"
 )
+LOCAL_VIETOCR_CONFIG = os.path.join(LOCAL_VIETOCR_DIR, "vgg_seq2seq.yml")
 LOCAL_VIETOCR_WEIGHTS = os.path.join(LOCAL_VIETOCR_DIR, "vgg_seq2seq.pth")
 PADDLE_DEVICE = os.environ.get("PADDLE_DEVICE", "auto")  # "auto" | "gpu:0" | "cpu"
 USE_VIETOCR = os.environ.get("USE_VIETOCR", "1").strip().lower() not in ("0", "false", "no")
@@ -305,6 +306,7 @@ def _load_vietocr() -> bool:
     Lazy-load VietOCR (vgg_seq2seq, 229 ký tự Quốc ngữ đủ 100% dấu tiếng Việt)
     chạy hoàn toàn Air-Gapped offline trên CPU (0 MB VRAM GPU) kết hợp với
     PP-OCRv5_mobile_det trên GPU CUDA 11.8.
+    Tuyệt đối KHÔNG gọi Internet ra ngoài (chỉ nạp từ file YAML & PTH nội bộ).
     """
     global _vietocr_predictor
     if _vietocr_predictor is not None:
@@ -315,16 +317,28 @@ def _load_vietocr() -> bool:
         from vietocr.tool.config import Cfg  # pyright: ignore[reportMissingImports] # type: ignore
         from vietocr.tool.predictor import Predictor  # pyright: ignore[reportMissingImports] # type: ignore
 
-        cfg = Cfg.load_config_from_name("vgg_seq2seq")
+        if not os.path.isfile(LOCAL_VIETOCR_CONFIG):
+            logger.warning(
+                f"[VietOCR] ⚠️ Thiếu file cấu hình offline {LOCAL_VIETOCR_CONFIG}. "
+                "Không gọi Internet ra ngoài để bảo đảm Air-Gapped."
+            )
+            return False
+        if not os.path.isfile(LOCAL_VIETOCR_WEIGHTS):
+            logger.warning(
+                f"[VietOCR] ⚠️ Thiếu trọng số offline {LOCAL_VIETOCR_WEIGHTS}. "
+                "Không gọi Internet ra ngoài để bảo đảm Air-Gapped."
+            )
+            return False
+
+        cfg = Cfg.load_config_from_file(LOCAL_VIETOCR_CONFIG)
         cfg["device"] = os.environ.get("VIETOCR_DEVICE", "cpu")
         cfg["cnn"]["pretrained"] = False
         cfg["predictor"]["beamsearch"] = False
-        if os.path.isfile(LOCAL_VIETOCR_WEIGHTS):
-            cfg["weights"] = LOCAL_VIETOCR_WEIGHTS
-            logger.info(f"[VietOCR] Sử dụng trọng số Tiếng Việt nội bộ: {LOCAL_VIETOCR_WEIGHTS}")
+        cfg["weights"] = LOCAL_VIETOCR_WEIGHTS
+        logger.info(f"[VietOCR] Nạp cấu hình & trọng số 100% offline: {LOCAL_VIETOCR_DIR}")
         _vietocr_predictor = Predictor(cfg)
         logger.info(
-            f"[VietOCR] ✅ Sẵn sàng (bộ chữ Quốc ngữ {len(cfg.get('vocab', ''))} ký tự, device={cfg['device']})!"
+            f"[VietOCR] ✅ Sẵn sàng (bộ chữ Quốc ngữ {len(cfg.get('vocab', ''))} ký tự, device={cfg['device']}, offline=True)!"
         )
         return True
     except Exception as e:
@@ -1125,10 +1139,11 @@ def weights_status():
 
     monkey_safetensors = os.path.join(LOCAL_MODEL_DIR, "model.safetensors")
     monkey_complete = os.path.isdir(LOCAL_MODEL_DIR) and os.path.isfile(monkey_safetensors)
+    vietocr_complete = os.path.isfile(LOCAL_VIETOCR_CONFIG) and os.path.isfile(LOCAL_VIETOCR_WEIGHTS)
 
     return {
         "status": "ok",
-        "air_gapped_ready": monkey_complete and paddle_complete,
+        "air_gapped_ready": monkey_complete and paddle_complete and vietocr_complete,
         "engine_active": _active_engine or "not_loaded",
         "monkey": {
             "model_id": MONKEY_MODEL_ID,
@@ -1146,6 +1161,13 @@ def weights_status():
             "rec_exists": os.path.isdir(rec_dir),
             "cls_exists": os.path.isdir(cls_dir),
             "loaded": _paddle_engine is not None,
+        },
+        "vietocr": {
+            "local_dir": LOCAL_VIETOCR_DIR,
+            "config_exists": os.path.isfile(LOCAL_VIETOCR_CONFIG),
+            "weights_exists": os.path.isfile(LOCAL_VIETOCR_WEIGHTS),
+            "exists": vietocr_complete,
+            "loaded": _vietocr_predictor is not None,
         },
     }
 

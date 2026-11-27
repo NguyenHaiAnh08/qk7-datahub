@@ -4,6 +4,15 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.18-untrack-qdrant-local-storage] — 2026-11-27
+
+### 1. Gỡ Theo Dõi Git Cho Kho Dữ Liệu Runtime Qdrant (`boxchat/local_storage/qdrant_data/`)
+- **Bảo toàn dữ liệu cục bộ & tránh xung đột khóa tệp SQLite (`.gitignore`):**
+  - Thực hiện `git rm -r --cached boxchat/local_storage/qdrant_data/` để gỡ bỏ 4 tệp runtime Qdrant (`storage.sqlite`, `meta.json`, `metadata_chunks.json`) khỏi GitHub nhưng vẫn giữ nguyên 100% trên ổ đĩa máy trạm để dịch vụ `boxchat` vận hành bình thường.
+  - Cập nhật [`.gitignore`](../.gitignore) bỏ qua toàn bộ thư mục `boxchat/local_storage/qdrant_data/`, chấm dứt lỗi khóa tệp Windows (`unable to unlink storage.sqlite`) và xung đột nhị phân khi đồng bộ nhánh.
+
+---
+
 ## [v1.8.17-design-system-docs-and-vietocr-airgapped-hardening] — 2026-11-27
 
 ### 1. Chuẩn Hóa Hệ Thống Tài Liệu Thiết Kế UX/UI (`docs/design/`)

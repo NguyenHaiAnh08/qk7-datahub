@@ -1588,23 +1588,29 @@ Tại `backend/src/lecture-package-helper.js`, gói ZIP SCORM/HTML5 bắt buộc
 
 ---
 
-## 33. Kiến Trúc Bộ Điều Phối Thiết Kế UI/UX Bản Sắc Quân Đội (QK7 Multi-Engine Design Orchestrator)
+## 33. Kiến Trúc Hệ Thống Thiết Kế UI/UX Chuẩn Kỹ Sư & Khối Thiết Kế QK7
 
-### 33.1. Nguyên Lý Điều Phối Đa Kỹ Năng (7-Skill Integrated Engine)
-Để giải quyết triệt để tình trạng giao diện AI-slop (gradient tím hồng lòe loẹt, icon bóng bẩy vô nghĩa, hiệu ứng hoạt họa sáo rỗng), hệ thống thiết lập bộ điều phối thiết kế chuyên sâu tại `.agents/skills/qk7-design-orchestrator/` kết hợp cùng 6 kỹ năng con theo quy trình 6 bước tại workflow [`thiet-ke-ux-ui.md`](file:///d:/QK7_DataHub/qk7-datahub/.agents/workflows/thiet-ke-ux-ui.md):
-1. **`design-md`:** Trích xuất Design Tokens, bảng màu Quân đội và quy chuẩn typography.
-2. **`ui-ux-pro-max` + `design-taste-frontend`:** Định hình phong cách, phân lớp chiều sâu (layered surfaces), nhãn nhỏ sắc nét, viền `border-white/10`.
-3. **`huashu-design`:** Đề xuất concept trực quan trước khi viết code.
-4. **`daub-ui` & `sketchbook-ui`:** Tham chiếu component bản vẽ kỹ thuật quân sự, hand-drawn wireframes và thư viện component phi AI-slop.
-5. **`unslop`:** Kiểm tra 9 tầng diệt gradient cầu vồng, card bo tròn quá mức và copy vô cảm.
-6. **Linter & Audit:** Chạy `node .agents/skills/design-taste-frontend/scripts/lint.mjs` bảo đảm 100% tiêu chí thô ráp, uy nghiêm, trang trọng của Nhà trường Quân đội.
+### 33.1. Bộ Tài liệu Thiết kế Chuẩn Hóa (`docs/design/`)
+Nhằm loại bỏ triệt để phong cách giao diện rập khuôn kiểu AI (lạm dụng kính mờ, glow neon, gradient cầu vồng, thẻ lặp khung vô nghĩa), toàn bộ đặc tả UX/UI được tổ chức thành hệ thống 5 tài liệu kỹ thuật đồng bộ với mã nguồn thực tế (`frontend/src/App.tsx`, `tailwind.config.js`, `index.css`):
+1. **[`docs/design/README.md`](../design/README.md):** Cổng tài liệu, phân vai Khối Thiết kế và quy trình kỹ thuật 5 giai đoạn.
+2. **[`docs/design/DESIGN.md`](../design/DESIGN.md):** Đặc tả thiết kế lõi (Operate/Read mode, bảng màu Triad Quân đội & 5 cấp độ mật, typography, Dual-Platform PC/iPad Air M4, phân tầng bề mặt, danh mục component thực tế).
+3. **[`docs/design/TOKENS.md`](../design/TOKENS.md):** Đối chiếu Design Tokens (Ant Design v6 `ConfigProvider` + Tailwind CSS v3 + CSS custom properties) và danh sách nợ kỹ thuật CSS.
+4. **[`docs/design/COMPONENTS_AND_PATTERNS.md`](../design/COMPONENTS_AND_PATTERNS.md):** Mẫu tương tác nghiệp vụ chuẩn (bảng mật độ cao, luồng 2FA ZKTeco Portal, form, trạng thái, UX copywriting tiếng Việt) và quy chế chuyển hóa từ `uiverse-galaxy`.
+5. **[`docs/design/REVIEW_CHECKLIST.md`](../design/REVIEW_CHECKLIST.md):** Bảng kiểm duyệt chất lượng trước bàn giao (10 tiêu chí chống AI-slop, PC/iPad/Zoom, Light/Dark WCAG AA, Build & Bảo mật 3 tầng).
 
-### 33.2. Bảng Triad Màu Quân Sự Chuẩn Mực
-- **Primary (Xanh Lục Quân):** `#166534` (Light) • `#10b981` (Dark) — Tượng trưng màu áo người lính Quân khu 7.
-- **Secondary (Vàng Kim Quân Hiệu & Đồng Cổ):** `#d97706` (Light) • `#fbbf24` (Dark) — Uy nghiêm, chuẩn mực.
-- **Accent/Alert (Đỏ Quân Kỳ):** `#b91c1c` (Light) • `#f87171` (Dark) — Cảnh báo cấp mật tối cao.
-- **Primary (Xanh Lục Quân):** `#166534` (Light) / `#10b981` (Dark) — Màu bản sắc chuẩn hóa toàn hệ thống Trung tâm Dữ liệu số Trường Quân sự Quân khu 7.
-- **Typography:** `Be Vietnam Pro` (văn bản hành chính) + `JetBrains Mono` (`font-mono tabular-nums` cho số liệu tọa độ, quân số, mật mã).
+### 33.2. Nhân sự Khối Thiết kế trong Công ty Ảo (`.agents/skills/`)
+- **`impeccable`:** Phê bình thiết kế (`critique`), kiểm toán kỹ thuật (`audit`), tinh chỉnh (`polish`) theo chuẩn `Operate/Read` mode.
+- **`baoyu-design`:** Định hướng bố cục trực quan, vẽ sơ đồ SVG và khung màn hình.
+- **`uiverse-galaxy`:** Chuyên viên vi thành phần UI quản lý kho `3,802` thành phần thủ công từ `uiverse-io/galaxy` (MIT License) chạy 100% offline kèm công cụ `search-galaxy.mjs`, sàng lọc và chuyển hóa sang token QK7.
+- **`daub-ui` & `ui-ux-pro-max`:** Tham chiếu bố cục và hệ thống thành phần mở rộng.
+- **`humanizer` & `gentle-ai`:** Chuẩn hóa câu chữ giao diện tiếng Việt hành chính-quân sự tự nhiên, ít tải nhận thức.
+- **`senior-frontend`:** Hiện thực hóa React 18 + TypeScript + Ant Design v6 + Tailwind CSS v3 và kiểm chuẩn build.
+
+### 33.3. Bảng Triad Màu Quân Sự & Typography Chuẩn Mực
+- **Primary (Xanh Lục Quân):** `#166534` (Light) • `#10b981` (Dark) — Màu bản sắc chuẩn hóa toàn hệ thống Trung tâm Dữ liệu số Trường Quân sự Quân khu 7.
+- **Secondary (Vàng Kim Quân Hiệu & Đồng Cổ):** `#d97706` (Light) • `#fbbf24` (Dark) • `#d4af37` (Accent) — Điểm nhấn điều hướng iPad, chờ duyệt, Cấp 3 Mật.
+- **Accent/Alert (Đỏ Quân Kỳ):** `#b91c1c` (Light) • `#f87171` (Dark) — Cảnh báo an ninh SOC, xóa vĩnh viễn, Cấp 5 Tuyệt Mật.
+- **Typography:** `Be Vietnam Pro` (văn bản hành chính) + `JetBrains Mono` (`font-mono tabular-nums` cho số liệu KPI, mã đơn vị, mã quân nhân, IP, timestamp, SHA-256).
 
 ---
 

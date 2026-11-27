@@ -4,6 +4,21 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.17-design-system-docs-and-vietocr-airgapped-hardening] — 2026-11-27
+
+### 1. Chuẩn Hóa Hệ Thống Tài Liệu Thiết Kế UX/UI (`docs/design/`)
+- **Tái cấu trúc bộ tài liệu thiết kế theo chuẩn kỹ sư sản phẩm ([`docs/design/README.md`](../design/README.md), [`docs/design/DESIGN.md`](../design/DESIGN.md)):**
+  - Chuyển đổi từ đặc tả prompt AI sang 5 tài liệu kỹ thuật đồng bộ trực tiếp với mã nguồn (`React 18 + TypeScript + Ant Design v6 + Tailwind CSS v3`): `README.md`, `DESIGN.md`, `TOKENS.md`, `COMPONENTS_AND_PATTERNS.md`, `REVIEW_CHECKLIST.md`.
+  - Lưu trữ các tài liệu thiết kế thời kỳ đầu (`System Architect.md`, `SKILL.md`) vào [`docs/design/archive/`](../design/archive/) (`legacy-ai-prompt-v1.md`, `legacy-tasteskill-v2.md`).
+  - Cập nhật tham chiếu tại [`README.md`](../../README.md) và Mục 33 [`docs/architecture/SYSTEM_ARCHITECTURE.md`](architecture/SYSTEM_ARCHITECTURE.md).
+
+### 2. Khóa Cứng VietOCR Chạy 100% Air-Gapped Offline (`ocr-service/main.py`)
+- **Loại bỏ hoàn toàn nguy cơ gọi Internet khi nạp cấu hình VietOCR ([`ocr-service/main.py`](../ocr-service/main.py)):**
+  - Chuyển từ `Cfg.load_config_from_name("vgg_seq2seq")` sang `Cfg.load_config_from_file(LOCAL_VIETOCR_CONFIG)` nạp trực tiếp `vgg_seq2seq.yml` và `vgg_seq2seq.pth` cục bộ.
+  - Bổ sung kiểm tra đầy đủ trạng thái `vietocr` (`config_exists`, `weights_exists`, `loaded`) vào endpoint chẩn đoán `/weights-status` và biến `air_gapped_ready`.
+
+---
+
 ## [v1.8.16-ocr-log-cleanliness-and-ccache-path] — 2026-11-26
 
 ### 1. Khử Nhiễu Log C++ & Tối Ưu Hóa Đường Dẫn Ccache Cho Dịch Vụ OCR

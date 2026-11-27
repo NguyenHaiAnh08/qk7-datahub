@@ -1,255 +1,203 @@
-# HỆ THỐNG THIẾT KẾ TRUNG TÂM DỮ LIỆU SỐ — TRƯỜNG QUÂN SỰ QUÂN KHU 7
-> **DESIGN.md** — Tài liệu đặc tả chuẩn mực về ngôn ngữ thiết kế, hệ thống thị giác (Design System) và nguyên tắc tương tác người dùng (UI/UX Specification).  
-> *Được biên soạn theo chuẩn `VoltAgent/awesome-design-md`, tích hợp triết lý Anti-AI-Slop từ `Leonxlnx/taste-skill`, vật lý vi tương tác từ `Seokwoooo/lucian-uxui-prompt`, và hệ thống phản hồi thị giác từ `jolyui.dev`.*
+---
+name: qk7-datahub-design-system
+description: Hệ thống Thiết kế Giao diện & Trải nghiệm Người dùng cho Trung tâm Dữ liệu Số — Trường Quân sự Quân khu 7.
+colors:
+  primary-light: "#166534"
+  primary-hover-light: "#14532d"
+  primary-active-light: "#15803d"
+  primary-dark: "#10b981"
+  primary-hover-dark: "#059669"
+  secondary-light: "#d97706"
+  secondary-dark: "#fbbf24"
+  gold-accent: "#d4af37"
+  danger-light: "#b91c1c"
+  danger-dark: "#f87171"
+  canvas-light: "#e2e8f0"
+  surface-light: "#ffffff"
+  surface-subtle-light: "#f8fafc"
+  border-light: "#e2e8f0"
+  text-light: "#0f172a"
+  text-muted-light: "#64748b"
+  canvas-dark: "#090e17"
+  surface-dark: "#111827"
+  surface-elevated-dark: "#1e293b"
+  text-dark: "#f1f5f9"
+  text-muted-dark: "#94a3b8"
+  navy-900: "#0b1b29"
+typography:
+  body:
+    fontFamily: "Be Vietnam Pro, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 400
+    lineHeight: 1.5
+  heading:
+    fontFamily: "Be Vietnam Pro, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
+    fontWeight: 700
+    lineHeight: 1.25
+    letterSpacing: "-0.015em"
+  mono:
+    fontFamily: "JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+    fontWeight: 500
+rounded:
+  sm: "6px"
+  md: "8px"
+  lg: "12px"
+  pill: "9999px"
+spacing:
+  xs: "4px"
+  sm: "8px"
+  md: "16px"
+  lg: "24px"
+  xl: "32px"
+components:
+  button-primary:
+    backgroundColor: "{colors.primary-light}"
+    textColor: "{colors.surface-light}"
+    rounded: "{rounded.md}"
+    height: "38px"
+  card-surface:
+    backgroundColor: "{colors.surface-light}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.lg}"
+  input-control:
+    backgroundColor: "{colors.surface-light}"
+    rounded: "{rounded.md}"
+    height: "38px"
+---
 
+# Đặc tả Hệ thống Thiết kế — QK7 DataHub (`DESIGN.md`)
+
+> Tài liệu chuẩn kỹ thuật (Single Source of Truth) cho toàn bộ giao diện React 18 + Ant Design v6 + Tailwind CSS v3 tại `frontend/`.  
+> Tham chiếu kèm: [`TOKENS.md`](./TOKENS.md) · [`COMPONENTS_AND_PATTERNS.md`](./COMPONENTS_AND_PATTERNS.md) · [`REVIEW_CHECKLIST.md`](./REVIEW_CHECKLIST.md).
 
 ---
 
-## 0. QUY TRÌNH TƯ DUY & TÌM KIẾM UX/UI BẮT BUỘC (MANDATORY UX/UI DISCOVERY WORKFLOW)
-> **BẮT BUỘC THỰC HIỆN TRƯỚC KHI VIẾT CODE:** Bất kỳ khi nào kỹ sư hoặc AI Agent nhận yêu cầu thiết kế mới, sửa đổi giao diện, thêm component hay tối ưu UX/UI trong dự án TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB, **BẮT BUỘC** phải tuân thủ nghiêm ngặt quy trình 3 bước sau đây:
+## 1. Tổng quan & Chế độ Sản phẩm (Overview & Modes)
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│               QUY TRÌNH 3 BƯỚC THIẾT KẾ & TỐI ƯU UX/UI BẮT BUỘC                        │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ BƯỚC 1: ĐỌC & KÍCH HOẠT TASTE-SKILL V2 (`SKILL.md`)                                    │
-│   • Kích hoạt tư duy chống thẩm mỹ AI đại trà (Anti-AI-Slop).                          │
-│   • Áp dụng quy chuẩn màn hình ứng dụng (`references/app-screens.md`).                  │
-│   • Kiểm soát chặt chẽ tỷ lệ khoảng trắng, cấu trúc bề mặt đa tầng (Surface Hierarchy).│
-│   • Ràng buộc Typography dứt khoát (`font-mono tabular-nums`), chuyển động lò xo.      │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ BƯỚC 2: TRA CỨU & ĐỐI CHIẾU TỪ AWESOME DESIGN SYSTEMS & KHO MICRO-INTERACTIONS         │
-│   • Tra cứu chuẩn mực từ: https://github.com/alexpate/awesome-design-systems           │
-│     (Carbon, Primer, Polaris, Atlassian, Geist, USWDS...) theo đúng bài toán nghiệp vụ.│
-│   • Kết hợp kho vi tương tác:                                                          │
-│     - Lucian Prompts (https://github.com/Seokwoooo/lucian-uxui-prompt): #098, #004... │
-│     - JolyUI & Animated Toast (https://www.jolyui.dev/docs/components/feedback/toast)  │
-│     - Awesome DESIGN.md (https://github.com/VoltAgent/awesome-design-md)               │
-│     - AI Website Cloner Template (https://github.com/JCodesMore/ai-website-cloner)     │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ BƯỚC 3: BẢN ĐỊA HÓA BẢN SẮC QUÂN ĐỘI NHÂN DÂN VIỆT NAM (TRIAD MILITARY COLOR SYSTEM)    │
-│   • Primary: Xanh Lục Quân (#166534 / emerald).                                        │
-│   • Secondary: Vàng Kim Quân Hiệu & Đồng Cổ (#fbbf24 / amber).                         │
-│   • Accent/Danger: Đỏ Quân Kỳ (#b91c1c / red).                                         │
-│   • Vận hành sắc nét và đồng bộ trên cả Light Mode & Dark Mode.                        │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
+QK7 DataHub là phần mềm nghiệp vụ nội bộ phục vụ quản trị văn bản số bảo mật đa cấp độ, bài giảng điện tử SCORM/HTML5, điều hành giảng đường và giám sát an ninh SOC. Giao diện tuân theo hai chế độ sử dụng rõ rệt:
 
-### Chi tiết 3 bước thực hiện:
+- **Operate Mode (~90% màn hình):** `PortalPage`, `DocumentDeskPage`, `MyUnitPage`, `AdminDashboardPage`, `UsersPage`, `ApprovalQueuePage`, `ClassroomsPage`, `SessionsPage`, `TrashPage`, `ProtectedPermissionsConfigPage`.
+  - Ưu tiên **tính quen thuộc đáng tin cậy, khả năng quét nhanh dữ liệu, mật độ thông tin hợp lý và độ chính xác khi thao tác**.
+  - Tránh trang trí thừa, tránh chữ hiển thị quá khổ kiểu trang quảng bá, tránh làm người dùng phải chờ hiệu ứng mở màn.
+- **Read Mode (~10% bề mặt):** Trình đọc PDF có đóng dấu watermark (`DynamicWatermark`), chi tiết nội dung văn bản, phòng học `LiveSessionRoom`, luồng trả lời kèm trích dẫn trang của Trợ lý AI (`AIChatDrawer`).
+  - Ưu tiên **độ tương phản chữ cao, khoảng thở đọc thoải mái và đường dẫn trích dẫn minh bạch**.
 
-#### Bước 1: Kích hoạt Taste-Skill v2 (`SKILL.md` / `.agents/skills/design-taste-frontend/`)
-- Mở và đọc ngay [SKILL.md](./SKILL.md) và tài liệu kèm theo tại `../../.agents/skills/design-taste-frontend/`.
-- Xác định rõ loại màn hình đang làm việc:
-  - **App Screen** (Dashboard tổng quan, bảng danh sách văn bản, bộ lọc đa năng, cây đơn vị, log kiểm toán SOC, trình xem văn bản PDF): Tuân thủ nghiêm ngặt các quy tắc trong `references/app-screens.md` (viền tĩnh mỏng `border-white/10`, nhãn nhỏ rõ ràng, phân lớp surface có chiều sâu, tuyệt đối tránh dùng gradient cầu vồng, card bo tròn lòe loẹt hay icon đặt trong ô vuông màu bóng bẩy kiểu AI-slop).
-  - **Hero / Banner**: Giữ sự uy nghiêm, vững chãi, nhịp thở trang trọng của cơ quan quân sự.
-- Kiểm soát chuyển động vật lý: Sử dụng lò xo `cubic-bezier(.34, 1.45, .64, 1)` hoặc `cubic-bezier(.3, 1.25, .5, 1)`, triệt tiêu hoàn toàn chuyển động tuyến tính cứng nhắc.
-
-#### Bước 2: Tra cứu & Đối chiếu từ Awesome Design Systems & Kho Thư Viện Mở
-Trước khi tự sáng chế layout, hãy tra cứu các hệ sinh thái thiết kế hàng đầu thế giới từ [Awesome Design Systems](https://github.com/alexpate/awesome-design-systems) theo từng bài toán cụ thể:
-1. **IBM Carbon Design System (`carbondesignsystem.com`):**
-   - Áp dụng cho: Bảng dữ liệu mật độ cao (Data Tables), cấu trúc bộ lọc đa tiêu chí (Multi-criteria filters), phân trang tinh gọn và biểu đồ đo lường tài nguyên.
-2. **GitHub Primer Design System (`primer.style`):**
-   - Áp dụng cho: Nhật ký kiểm toán an ninh (Audit Logs), hiển thị Timeline hoạt động, huy hiệu trạng thái (Status Badges), phân cấp vai trò người dùng (Roles & Clearances).
-3. **Shopify Polaris (`polaris.shopify.com`):**
-   - Áp dụng cho: Bộ lọc kết hợp tìm kiếm (Index Filters), bố cục nhóm hành động hàng loạt (Bulk Actions), thanh tóm tắt chỉ số KPI.
-4. **Atlassian Design System (`atlassian.design`):**
-   - Áp dụng cho: Cây phân cấp tổ chức (Organization Tree View), điều hướng phân nhánh đơn vị, hộp thoại xác nhận bảo mật và modal phê duyệt vân tay.
-5. **Vercel Geist Design System (`vercel.com/geist`):**
-   - Áp dụng cho: Thẩm mỹ Dark Mode sâu thẳm, viền mạ hợp kim quang học mờ (`rgba(255,255,255,0.08)`), phân cấp chỉ số `tabular-nums` sắc nét.
-6. **U.S. Web Design System - USWDS (`designsystem.digital.gov`):**
-   - Áp dụng cho: Chuẩn mực cổng thông tin chính phủ & quân sự, quy chuẩn trợ năng (WCAG AA/AAA Accessibility), form hành chính công vụ nghiêm ngặt.
-
-**Kết hợp với kho Micro-interactions mã nguồn mở của dự án:**
-- **Lucian UX/UI Prompts (`github.com/Seokwoooo/lucian-uxui-prompt`):**
-  - Prompt #098: Cuộn số đồng hồ cơ khí Odometer (`RollingNumber`) cho KPI và bảng thống kê.
-  - Prompt #004: Nút tải tệp PDF biến hình thành thanh tiến trình (`CompactDownloadButton`).
-  - Prompt #025: Khung nhập liệu nhãn bay vào khe viền (`NotchedInput`).
-  - Prompt #219: Hiệu ứng vòng tròn lan tỏa quét sáng khi đổi theme (`ThemeToggle`).
-  - Prompt #058: Thanh trượt vệt sáng bám dính khi chuyển tab (`Header Glider`).
-  - Prompt #449: Thanh phân trang chuẩn toàn hệ thống (`PaginationBar` — `.u449`, viên thuốc nảy lò xo + cuộn chữ số cố định 7 ô). **BẮT BUỘC dùng `PaginationBar` cho mọi bảng/danh sách có phân trang mới.**
-  - Prompt #406: Ô nhập mã xác minh / PIN 6 chữ số (`VerificationCodeInput` — `.u406`, pop chữ số lò xo + dán toàn bộ + rung báo lỗi + gộp 6 ô thành dấu tích khi thành công).
-- **JolyUI Animated Toast (`jolyui.dev`):** Toàn bộ thông báo nảy lò xo, đếm ngược tự đóng và xếp tầng thông minh.
-- **Awesome DESIGN.md (`github.com/VoltAgent/awesome-design-md`):** Chuẩn cấu trúc tài liệu kiến trúc giao diện.
-- **AI Website Cloner Template (`github.com/JCodesMore/ai-website-cloner-template`):** Phương pháp bóc tách 4 tầng (Layout -> Typography -> Surface -> Physics).
-
-#### Bước 3: Bản Địa Hóa Sang Bản Sắc Quân Đội Nhân Dân Việt Nam
-Toàn bộ pattern tiếp thu từ bên ngoài bắt buộc phải "khoác áo" ngôn ngữ thiết kế của Trường Quân Sự Quân Khu 7:
-- **Màu chủ đạo (Primary):** Xanh Lục Quân (`#166534` Light • `#10b981` Dark • Emerald palette).
-- **Màu tôn quý (Secondary):** Vàng Kim Quân Hiệu & Đồng Cổ (`#d97706` Light • `#fbbf24` Dark • Amber palette).
-- **Màu điểm xuyết & Cảnh báo (Accent/Danger):** Đỏ Quân Kỳ (`#b91c1c` Light • `#f87171` Dark • Rose/Red palette).
-- Bề mặt kính mờ quang học phản chiếu nhẹ vân hoa văn Trống đồng Đông Sơn.
-- Hoạt động mượt mà, sắc nét trên cả Light Mode và Dark Mode.
+**Mặc định giao diện:** Khởi động ở **Light Mode** cho công tác hành chính ban ngày (`ThemeContext.tsx` với key `qk7_theme_default_light_v1`). **Dark Mode** (`#090e17` / `#111827`) phục vụ phòng trực ban và giám sát an ninh SOC dài giờ. Mọi component mới bắt buộc hoạt động hoàn chỉnh ở cả hai chế độ.
 
 ---
 
-## 1. TÔN CHỈ THIẾT KẾ: BẢN SẮC TRUNG TÂM CHỈ HUY QUÂN KHU HIỆN ĐẠI
-*(Modern Military Tactical & Command Center Aesthetic)*
+## 2. Hệ Màu & Mã Hóa 5 Cấp Độ Mật (Color System & Clearance Encoding)
 
-Mục tiêu tối thượng của giao diện **TRƯỜNG QUÂN SỰ QUÂN KHU 7 DATAHUB** là: **Có chiều sâu, có hồn, mang cá tính thiết kế thủ công tinh xảo (Human-crafted & Bespoke UI), tuyệt đối không mang dáng dấp công nghiệp, vô hồn hay rập khuôn do AI tạo ra.**
+### 2.1. Bảng màu Triad Quân đội & Bề mặt Trung tính
 
-### 1.1. Bản Sắc Quân Đội & Truyền Thống Dân Tộc
-- **Biểu tượng Trống đồng Đông Sơn & Bản đồ chữ S:** Họa tiết trống đồng ngàn năm lịch sử kết hợp cùng dải đất hình chữ S Việt Nam và quần đảo Hoàng Sa - Trường Sa, chuyển động quay chậm tự nhiên theo chiều kim đồng hồ (120s/vòng), thể hiện sự vững chãi, chủ quyền bất khả xâm phạm và dòng chảy thông tin dữ liệu số liên tục.
-- **Không khí Trung tâm Chỉ huy Tác chiến Điện tử (Command Center):** Không sử dụng các bảng phẳng đơn điệu hay màu tím/xanh AI chung chung. Thay vào đó, giao diện mô phỏng một bảng điều khiển chỉ huy quân sự cấp chiến dịch:
-  - Màn hình tối sâu (`#090e17`) tượng trưng cho phòng điều hành tác chiến đêm.
-  - Các khối bề mặt phân lớp (`#111827`) với viền mạ hợp kim quang học có độ trong suốt (`border-emerald-500/20` hoặc `border-white/10`).
-  - Ánh sáng viền chiến thuật (Tactical Glow) khi tập trung vào các tài liệu mật hoặc cảnh báo an ninh.
-
-### 1.2. Hệ Màu Chủ Đạo (Triad Military Color System)
-1. **Xanh Lục Quân (Army Green / `#166534` Light • `#10b981` Dark):**
-   - Màu sắc căn bản của Quân đội Nhân dân Việt Nam.
-   - Ứng dụng: Nút hành động chính (Primary Action), trạng thái Xác thực thành công, Cấp độ 1-2 Công khai & Nội bộ, luồng điều hướng hoạt động bình thường.
-2. **Vàng Kim Quân Hiệu (Insignia Gold / `#d97706` Light • `#fbbf24` Dark / Accent `#d4af37`):**
-   - Ánh kim của sao vàng, quân hàm, cấp bậc và huy hiệu danh dự.
-   - Ứng dụng: Điểm nhấn viền tab trượt (Sliding Pill Highlight #058), thông báo lưu ý/kiểm duyệt, Cấp độ 3 Mật, số liệu đo lường trọng yếu.
-3. **Đỏ Quân Kỳ (Flag Red / `#b91c1c` Light • `#f87171` Dark):**
-   - Màu đỏ của Quốc kỳ và Quân kỳ Quyết thắng.
-   - Ứng dụng: Cảnh báo an ninh SOC khẩn cấp, xâm nhập trái phép, Cấp độ 4-5 Tối Mật & Tuyệt Mật, nút xóa hoặc thu hồi quyền.
-
----
-
-## 2. NĂM QUY TẮC "BẤT KHẢ XÂM PHẠM" CHỐNG THẨM MỸ AI ĐẠI TRÀ
-*(Anti-AI-Slop Taste Skill Directives)*
-
-Mọi kỹ sư hoặc AI Agent khi tham gia xây dựng/sửa đổi UI trên dự án **BẮT BUỘC** tuân thủ 5 điều sau:
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                   5 NGUYÊN TẮC VÀNG CHỐNG "AI-SLOP"                     │
-├────┬───────────────────────┬────────────────────────┬───────────────────┤
-│ STT│ QUY TẮC CẤM (AI-SLOP) │ GIẢI PHÁP THỦ CÔNG     │ ĐẶC TẢ KỸ THUẬT   │
-├────┼───────────────────────┼────────────────────────┼───────────────────┤
-│ 1  │ Chuyển động tuyến tính│ Đường cong vật lý      │ cubic-bezier      │
-│    │ vô hồn (linear, ease) │ nảy lò xo (Spring)     │ (.34, 1.45, .64, 1│
-├────┼───────────────────────┼────────────────────────┼───────────────────┤
-│ 2  │ Nền & viền phẳng lì   │ Đa tầng bề mặt (Depth) │ backdrop-blur-md  │
-│    │ không có độ sâu       │ & viền trong suốt mảnh │ border-white/10   │
-├────┼───────────────────────┼────────────────────────┼───────────────────┤
-│ 3  │ Alert/Toast mặc định  │ JolyUI Animated Toast  │ Dynamic Icon,     │
-│    │ của trình duyệt       │ xếp chồng có spring    │ Countdown Bar     │
-├────┼───────────────────────┼────────────────────────┼───────────────────┤
-│ 4  │ Typography đồng dạng, │ Phân cấp dứt khoát:    │ font-mono         │
-│    │ số liệu xộc xệch      │ telemetry & mã quân sự │ tabular-nums      │
-├────┼───────────────────────┼────────────────────────┼───────────────────┤
-│ 5  │ Nút bấm & ô nhập      │ Tương tác có sự sống   │ Active scale(0.97)│
-│    │ tĩnh lặng, đơ cứng    │ (Stateful feedback)    │ Notched Inputs #25│
-└────┴───────────────────────┴────────────────────────┴───────────────────┘
-```
-
-### Chi tiết 5 quy tắc:
-
-#### Quy tắc 1: Không dùng chuyển động tuyến tính vô hồn (`linear` / `ease` mặc định)
-- **Cấm:** `transition: all 0.3s ease;` hoặc `animation: fadeIn 0.2s linear;`.
-- **Bắt buộc:** Mọi chuyển động bung mở modal, dropdown, trượt tab glider, toast thông báo phải áp dụng vật lý có độ nảy tự nhiên:
-  - `--ux-spring: cubic-bezier(.34, 1.45, .64, 1)` cho các thành phần bung mở, popover, toast nảy vào.
-  - `--ux-smooth: cubic-bezier(.2, .8, .2, 1)` cho trượt chuyển tab và co giãn kích thước.
-  - Framer Motion config: `{ type: "spring", stiffness: 380, damping: 26, mass: 0.8 }`.
-
-#### Quy tắc 2: Không dùng viền và nền phẳng lì (Layered Surfaces & Depth)
-- **Cấm:** Hộp xám phẳng viền đen `bg-gray-100 border-gray-300` hoặc thẻ trắng bóng đổ nhợt nhạt `shadow-md`.
-- **Bắt buộc:** Áp dụng kiến trúc phân tầng 3 lớp:
-  - *Lớp Base:* Nền sâu `#090e17` (Dark) hoặc `#f8fafc` (Light) kết hợp radial vignette.
-  - *Lớp Surface:* Kính mờ quang học `background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(16px);`.
-  - *Lớp Border:* Viền siêu mảnh có độ trong suốt cao `border: 1px solid rgba(255, 255, 255, 0.08)` trên nền tối, hoặc `border: 1px solid rgba(16, 185, 129, 0.2)` trên các khối dữ liệu quân sự trọng yếu.
-
-#### Quy tắc 3: Toàn bộ phản hồi hệ thống dùng `Stacking Toasts` (chuẩn Lucian #070 · `.u070`)
-- **Cấm:** Dùng `window.alert()`, modal xác nhận thô kệch cho các phản hồi tức thì, hoặc toast phẳng biến mất đột ngột không báo trước.
-- **Bắt buộc:** Dùng `ToastProvider` tích hợp sẵn (`frontend/src/components/common/Toast.tsx` + `Toast.css`):
-  - Thông báo mới trồi lên từ đáy ra trước (`.u070-t.enter` → `0.5s var(--ux-spring)`), thông báo cũ xếp lùi gọn phía sau và thu nhỏ (`--y: -14px * i`, `--s: 1 - 0.06 * i`).
-  - Rê chuột / focus / chạm lên chồng thông báo sẽ xòe quạt thành danh sách dọc và tự động tạm dừng đếm ngược (Hover/Focus Pause).
-  - Vuốt ngang (`|dx| > 90px`) hoặc bấm nút `×` để đóng riêng từng thẻ; hỗ trợ trạng thái `toast.loading()` xoay vòng rồi chuyển mượt sang `success`/`error` qua `toast.update()`.
-  - Thanh tiến trình đếm ngược dưới đáy (`.u070-bar`) chạy mượt bằng `requestAnimationFrame` ở thẻ trên cùng.
-
-#### Quy tắc 4: Typography có phân cấp sắc bén (Sharply Defined Telemetry Hierarchy)
-- **Văn bản mô tả & Tiêu đề:** Dùng font tiếng Việt chuẩn quân đội `Be Vietnam Pro` (weights: 400 Regular, 600 SemiBold, 700 Bold, 800 ExtraBold).
-- **Số liệu & Mã quân sự:** Bắt buộc áp dụng `font-mono tabular-nums` (sử dụng font `JetBrains Mono` kết hợp `tabular-nums`) cho:
-  - Con số thống kê (KPIs, tổng văn bản, lượt truy cập).
-  - Mã đơn vị (`QK7`, `SD309`, `TRGQS-QK7`).
-  - Mã định danh quân nhân (`USR-001`, `AD-01`).
-  - Địa chỉ IP mạng tác chiến (`127.0.0.1`, `10.7.0.45`).
-  - Thời gian kiểm toán và dấu thời gian (`2026-10-24 16:08:59`).
-  - Mã băm kiểm tra toàn vẹn tài liệu (SHA-256).
-
-#### Quy tắc 5: Mọi nút bấm và ô nhập liệu đều có "Sự sống" (Stateful Micro-interactions)
-- **Nút bấm (Buttons):**
-  - Hover: Lực hút nhẹ kèm viền sáng nâng nhẹ (`translate-y-[-1px]`, `box-shadow` phát quang nhẹ).
-  - Active: Độ lún vật lý chân thật (`transform: scale(0.97)`).
-  - Nút tải tệp: Biến hình thành thanh tiến trình nạp (Lucian #004 Compact Progress Button).
-- **Ô nhập liệu (Inputs):**
-  - Áp dụng Notched Floating Label (Lucian #025): Khi focus hoặc có ký tự, nhãn bay nhịp nhàng vào khe viền trên của khung nhập, viền chuyển sắc sang Xanh Lục Quân hoặc Vàng Kim.
-  - Khi có lỗi nhập: Lắc nhẹ viền đỏ (Shake error physics `cubic-bezier(.36,.07,.19,.97)`).
-
----
-
-## 3. PHƯƠNG PHÁP BÓC TÁCH TỪNG LỚP KHI THIẾT KẾ & TÁI TẠO UI
-*(Theo AI Website Cloner Template & Taste-Skill Workflow)*
-
-Mỗi khi thiết kế hoặc refactor bất kỳ trang/thành phần nào trong hệ thống, thực hiện theo thứ tự 4 tầng sau:
-
-```
-┌────────────────────────────────────────────────────────┐
-│ TẦNG 4: MICRO-MOTION & TƯƠNG TÁC VẬT LÝ (Spring Motion)│
-├────────────────────────────────────────────────────────┤
-│ TẦNG 3: CHIỀU SÂU BỀ MẶT (Layered Depth & Glassmorphism│
-├────────────────────────────────────────────────────────┤
-│ TẦNG 2: PHÂN CẤP TYPOGRAPHY & CHỈ SỐ TELEMETRY        │
-├────────────────────────────────────────────────────────┤
-│ TẦNG 1: BỐ CỤC KHÔNG GIAN & NHỊP ĐIỆU (Spatial Layout) │
-└────────────────────────────────────────────────────────┘
-```
-
-1. **Tầng 1 — Layout & Spatial Rhythm:**
-   - Đảm bảo cơ chế Dual-Platform: Desktop PC Widescreen (chuột phím, tối ưu thông tin, không độ trễ) và iPad Air M4 Touch UI (vùng chạm ≥44px, cử chỉ vuốt, Segmented Pill Glider).
-   - Header co giãn thông minh 3 tầng (`≥1536px` / `1280–1535px` / `<1280px`), các cụm phím điều khiển trọng yếu luôn giữ `shrink-0 whitespace-nowrap`.
-2. **Tầng 2 — Typography & Information Density:**
-   - Tách bạch dứt khoát giữa ngữ nghĩa đọc (`Be Vietnam Pro`) và thông số máy móc (`JetBrains Mono tabular-nums`).
-   - Cắt ngắn thông minh (smart truncation) kèm tooltip đầy đủ, không để tràn vỡ layout.
-3. **Tầng 3 — Surface Depth & Tactility:**
-   - Tạo độ nổi bằng viền quang học bán trong suốt thay vì bóng đổ mờ đục.
-   - Sử dụng `glass-panel` với độ mờ `backdrop-blur-md` để hiển thị nền Trống đồng Đông Sơn lấp lánh nhẹ phía sau.
-4. **Tầng 4 — Micro-motion & Physics:**
-   - Gắn lò xo vào mọi phản hồi người dùng. Tốc độ tương tác phản ánh sự nhanh nhạy, kỷ luật của môi trường quân đội.
-
----
-
-## 4. BẢNG TRA CỨU COMPONENT & NGUỒN CẢM HỨNG
-
-| Thành phần | Nguồn tham chiếu | Mô tả tương tác | Trạng thái tích hợp |
+| Vai trò | Light Mode (Mặc định) | Dark Mode (Trực ban / SOC) | Phạm vi áp dụng |
 | :--- | :--- | :--- | :--- |
-| **Rolling Number (Odometer)** | Lucian Prompt #098 | Cuộn số đồng hồ cơ khí độc lập từng chữ số, nảy lò xo, diff thông minh | Đã tích hợp (`RollingNumber` trên 4 thẻ KPI, biểu đồ phân bố & Dashboard) |
-| **Stacking Toasts** | Lucian Prompt #070 (`.u070`) | Xếp chồng thông minh ở góc dưới phải, hover xòe quạt & tạm dừng, vuốt ngang đóng từng thẻ, trạng thái `loading` xoay rồi chuyển hoàn tất | Đã tích hợp toàn hệ thống (`Toast.tsx`, `Toast.css`) |
-| **Stretching Pagination & Page Stage** | Lucian Prompt #449 + #043 (`.u449`, `.u043`) | Thanh phân trang 7 khe cố định màu Xanh Lục Quân, viên thuốc kéo giãn từ mép trước (`go-r`/`go-l`) kết hợp lưới/hàng nội dung đuổi nhau theo hướng chuyển trang | Đã tích hợp toàn bộ 12 bảng/lưới phân trang (`PaginationBar`, `PageTransitionStage`) |
-| **2-Tier Approval Stepper** | Lucian Prompt #444 (`.u444`) | Tiến trình duyệt bài giảng 2 tầng (Soạn thảo → Khoa duyệt → BGH duyệt → Xuất bản), nối dây `scaleX`, tick xanh bật nảy, vòng thở mềm cho bước hiện tại | Đã tích hợp (`ApprovalStepper` trên `LectureCard` & `LectureDetailModal`) |
-| **Verification Code Input (6-Digit PIN)** | Lucian Prompt #406 (`.u406`) | Ô nhập mã PIN 6 số bảo vệ văn bản Cấp 4–5, bật nảy lò xo từng ô, hỗ trợ dán và lắc lỗi | Đã tích hợp (`VerificationCodeInput` trên `PinVerifyModal`) |
-| **Circular Reveal Theme** | Lucian Prompt #219 | Chuyển đổi Dark/Light mode bằng đường tròn quét từ tâm nút bấm | Đã tích hợp (`ThemeToggle`) |
-| **Sliding Pill Nav** | Lucian Prompt #058 | Vệt sáng trượt bám dính theo tab đang chọn, chuyển động 2 chiều | Đã tích hợp (`Header`, `DeviceModeSwitch`) |
-| **Compact Progress Button** | Lucian Prompt #004 | Nút tải tệp PDF biến hình thành thanh tiến trình phần trăm | Đã tích hợp (`CompactDownloadButton`) |
-| **Notched Input Field** | Lucian Prompt #025 | Nhãn bay vào khe viền khi focus, hiệu ứng rung lắc khi lỗi | Đã tích hợp (`NotchedInput`, `LoginForm`) |
-| **Telemetry StatCard** | Tactical Dashboard + Taste Skill | Chỉ số font mono căn thẳng hàng tuyệt đối, viền phát quang theo cấp độ | Đã chuẩn hóa (`StatCard`, `UnitOverviewStrip`) |
-| **High-Density Data Table** | IBM Carbon Design System | Bảng dữ liệu mật độ cao, hover hàng sáng nhẹ, phân trang inline | Đang áp dụng cho danh sách văn bản & log |
-| **Security Audit Timeline** | GitHub Primer Design System | Cột mốc thời gian dọc, huy hiệu cấp độ bảo mật (Clearance Badges) | Đang áp dụng cho SOC Audit Log |
-| **Government Form & A11y** | U.S. Web Design System (USWDS) | Chuẩn trợ năng tương phản cao, focus ring chiến thuật, nhãn rõ ràng | Đang áp dụng cho các modal & form nhập liệu |
-| **Unit Organization Tree** | Atlassian Design System | Cây thư mục tổ chức đa cấp, phân nhánh mượt mà, quản lý đơn vị mồ côi | Đang áp dụng cho Bộ lọc Đơn vị & Cây tổ chức |
-| **Tactical Trash Bin** | IBM Carbon + Military Safety | Bảng dữ liệu xóa mềm, batch selection, khôi phục tức thì, modal xóa vĩnh viễn 2 bước màu Đỏ Quân Kỳ | Đã tích hợp (`TrashPage`, Thùng rác tài liệu) |
-| **Active Sessions Telemetry** | Command Center + Carbon | Thăm dò 15s (`LIVE 15s`), User-Agent parsed thông minh, cân giữa 100% cột, font mono tabular-nums | Đã tích hợp (`SessionsPage`, Phiên đang trực tuyến) |
-| **Permission Drag-and-Drop** | Atlassian DnD + 4-Tone Risk | Tay cầm `GripVertical`, cập nhật tức thì, lưới 2 cột, fieldset subgroup hổ phách, loại bỏ `Sort order tổng` | Đã tích hợp (`AdminDashboardPage` - Tab Quyền) |
-| **Header AI Slide-Over Drawer** | Lucian Prompt #058 + Spring | Ngăn kéo trượt đỉnh 380px, lò xo nảy vật lý, kính mờ `backdrop-blur-md`, câu hỏi gợi ý tác chiến | Đã tích hợp (`Header` & `AIChatWidget`) |
-| **System Discovery Guided Tour** | Tactical Spotlight + Compass | Tự động kích hoạt cho khách vãng lai, nút La bàn trên `SecurityBanner`, loại bỏ nút Header thừa | Đã tích hợp (`PortalPage`, Tour khám phá) |
+| **Primary (Xanh Lục Quân)** | `#166534` (Hover `#14532d`, Active `#15803d`) | `#10b981` (Hover `#059669`, Text `#34d399`) | Nút hành động chính, mục đang chọn, liên kết chính, trạng thái hợp lệ/duyệt xong. |
+| **Secondary (Vàng Kim Quân Hiệu)** | `#d97706` (Light text `#b45309`, Accent `#d4af37`) | `#fbbf24` (Hover `#f59e0b`) | Cảnh báo chú ý, chờ duyệt, Cấp 3 Mật, điểm nhấn tab chọn trên iPad. |
+| **Danger (Đỏ Quân Kỳ)** | `#b91c1c` / `#dc2626` | `#f87171` | Cảnh báo an ninh `CRITICAL`, xóa vĩnh viễn, Cấp 5 Tuyệt Mật, lỗi xác thực/lệch giờ. |
+| **Canvas (Nền tổng thể)** | `#e2e8f0` (Layout AntD `#f8fafc`) | `#090e17` | Lớp nền dưới cùng chứa toàn trang. |
+| **Surface (Thẻ / Bảng / Modal)** | `#ffffff` (Header bảng `#f8fafc`) | `#111827` (Header bảng `#0f172a`, Elevated `#1e293b`) | Vùng chứa nội dung chính, bảng dữ liệu, khung nhập. |
+| **Border (Viền phân tách)** | `#e2e8f0` (Control `#cbd5e1`, Row `#f1f5f9`) | `rgba(255, 255, 255, 0.08)` / `rgba(16, 185, 129, 0.2)` | Phân cách cấu trúc bảng, thẻ, ô nhập liệu. |
+| **Text Primary / Muted** | `#0f172a` / `#64748b` | `#f1f5f9` / `#94a3b8` | Nội dung chính phải đạt tối thiểu tương phản **4.5:1** (WCAG AA). |
+
+### 2.2. Bảng Mã hóa Màu Bắt buộc cho 5 Cấp Độ Mật
+
+Không dùng màu tím AI (`#722ED1`, violet, indigo) hay màu pastel ngẫu nhiên cho huy hiệu độ mật. Toàn hệ thống thống nhất 5 bậc phân biệt rõ bằng cả **màu sắc + nhãn chữ + biểu tượng**:
+
+| Cấp độ | Tên gọi chuẩn | Nhóm màu | Yêu cầu xác thực UX bắt buộc |
+| :---: | :--- | :--- | :--- |
+| **Cấp 1** | Công khai | Xám đá (`Slate`) | Mở xem/tải trực tiếp qua `/api/files/:fileId/view`. |
+| **Cấp 2** | Nội bộ | Xanh Lục Quân (`Emerald` / `#166534`) | Yêu cầu đăng nhập & thuộc đơn vị/quyền hợp lệ. |
+| **Cấp 3** | Mật | Vàng Kim (`Amber` / `#d97706`) | Bắt buộc biểu tượng khóa/vân tay + mở hộp thoại quét **ZKTeco ZK9500** (`X-Fingerprint-Token` 5 phút). |
+| **Cấp 4** | Tối Mật | Cam đậm (`Orange` / `#ea580c`) | Bắt buộc quét vân tay 2FA + đóng dấu `DynamicWatermark` dày đặc; hỗ trợ `VerificationCodeInput` khi cấu hình PIN. |
+| **Cấp 5** | Tuyệt Mật | Đỏ Quân Kỳ (`Red` / `#b91c1c`) | Bắt buộc quét vân tay 2FA + giới hạn quyền tối cao + cảnh báo rõ trên SOC `ACCESS_LOG`. |
 
 ---
 
-## 5. BẢNG TIÊU CHUẨN ĐÁNH GIÁ (DO'S & DON'TS MATRIX)
+## 3. Typography & Mật độ Thông tin
 
-| Tiêu chí | CẤM (AI-Slop & Cẩu thả) | BẮT BUỘC (Bespoke & Military-Crafted) |
+- **Hai họ font duy nhất (khai báo cục bộ trong `frontend/src/fonts.css`, không gọi Google Fonts CDN):**
+  1. **`Be Vietnam Pro`** (`400`, `500`, `600`, `700`): Toàn bộ tiêu đề, điều hướng, nhãn nút, bảng dữ liệu và văn bản hành chính tiếng Việt.
+  2. **`JetBrains Mono`** (`tabular-nums`): Chỉ áp dụng cho **số liệu thống kê KPI, mã văn bản, mã đơn vị (`QK7`, `TRGQS-QK7`), mã quân nhân (`USR-001`), địa chỉ IP, dấu thời gian kiểm toán và mã băm SHA-256**. Không dùng monospace làm tiêu đề trang trí hoặc nhãn văn bản thường.
+- **Thang kích thước cố định cho Operate Mode (`rem`, tỷ lệ 1.15–1.2):**
+  - Tiêu đề trang (`h1`): `1.375rem`–`1.5rem` (`22px`–`24px`, `font-weight: 700`, tối đa 1–2 dòng).
+  - Tiêu đề phân khu (`h2` / Card title): `1rem`–`1.125rem` (`16px`–`18px`, `font-weight: 600`).
+  - Văn bản bảng & form (`body`): `0.875rem` (`14px`, `line-height: 1.5`).
+  - Nhãn phụ & chú thích (`caption`): `0.75rem` (`12px`). Tránh chữ nhỏ hơn `12px` ở dữ liệu nghiệp vụ quan trọng.
+- **Cắt ngắn có kiểm soát:** Tên văn bản dài dùng `truncate` / `line-clamp-2` kèm tooltip đầy đủ khi hover/focus để giữ hàng bảng đều nhau.
+
+---
+
+## 4. Bố cục & Công thái học Đa Nền tảng (Layout & Dual-Platform)
+
+Hệ thống hỗ trợ song song hai chế độ qua `DeviceModeContext` (`frontend/src/contexts/DeviceModeContext.tsx`):
+
+1. **Desktop PC Widescreen (`deviceMode === 'pc'`):**
+   - Tối ưu thao tác chuột và phím, mật độ cột bảng cao, phản hồi tức thì (`0ms` độ trễ thao tác chọn chế độ, không ép hiệu ứng trượt rườm rà lên nút công cụ PC).
+   - Độ rộng đọc văn bản tối đa `65–75ch`; bảng dữ liệu mở rộng theo khung màn hình rộng.
+2. **iPad Air M4 Touch UI (`deviceMode === 'ipad'`):**
+   - Hỗ trợ chuẩn hai hướng: **Landscape (`1210×802`)** và **Portrait (`834×1178`)**, chịu được mức thu phóng trình duyệt **`100%`, `125–150%`, `175–200%`** mà không vỡ lưới hay mất nút.
+   - Mọi mục tiêu chạm (nút, tab, checkbox, hàng bảng bấm được) phải đạt kích thước vùng chạm tối thiểu **`44×44px`**.
+   - Điều hướng sử dụng cụm trượt dạng viên thuốc (Segmented Pill Glider) cho thao tác ngón tay.
+3. **Kỷ luật Header co giãn 3 tầng (`Header.tsx`) & Sidebar thông minh (`Sidebar.tsx`):**
+   - Bảo toàn 3 ngưỡng hiển thị (`≥1536px` / `1280–1535px` / `<1280px`).
+   - Cụm điều khiển trọng yếu (`DeviceModeSwitch`, `ThemeToggle`, User Profile) **luôn giữ `shrink-0 whitespace-nowrap`** để không bao giờ bị ép xuống dòng hoặc cắt mất nút đăng xuất.
+   - `Sidebar` tự động ẩn hoàn toàn khi người dùng ở các trang không có menu con khả dụng.
+
+---
+
+## 5. Phân tầng Bề mặt & Độ sâu (Elevation & Depth)
+
+- **Nguyên tắc cốt lõi — Solid Tonal Layering First:**
+  - Phân biệt các lớp giao diện bằng bước chuyển sắc độ nền (`Canvas → Surface → Header/Elevated`) kết hợp viền mảnh `1px` sắc nét thay vì đổ bóng mờ đục lớn hoặc phủ kính mờ tràn lan.
+- **Phạm vi được phép dùng `backdrop-filter: blur(...)`:**
+  - Chỉ dùng cho các lớp thực sự nổi lên trên nội dung nền: hộp thoại quét vân tay 2FA (`TouchIDFingerprint` render qua React Portal), ngăn kéo AI (`AIChatDrawer`), popover/menu nổi hoặc modal xác nhận.
+  - **Không dùng** glassmorphism trên toàn bộ card danh sách, bảng dữ liệu hay khu vực đọc tài liệu (gây giảm tương phản và tốn GPU trên iPad khi cuộn danh sách dài).
+- **Họa tiết bản sắc (Trống đồng & Chữ S):** Giữ ở tầng nền trang đăng nhập hoặc khu vực trang trí tĩnh với độ mờ thấp, không chồng lên vùng chữ hay số liệu bảng.
+
+---
+
+## 6. Hình khối, Viền & Kỷ luật Chuyển động (Shapes & Motion)
+
+- **Thống nhất bo góc (từ `App.tsx` ConfigProvider):**
+  - Control nhỏ (`Tag`, checkbox, badge): `6px` (`borderRadiusSM`).
+  - Nút bấm, ô nhập liệu, hộp chọn, bảng (`Button`, `Input`, `Select`, `Table`): `8px` (`borderRadius`).
+  - Thẻ lớn, hộp thoại, cây chọn (`Card`, `Modal`, `TreeSelect`): `12px` (`borderRadiusLG`).
+  - Viên thuốc (`pill` `9999px`): chỉ dùng cho badge trạng thái nhỏ hoặc thanh chuyển tab iPad.
+- **Kỷ luật chuyển động (Motion Budget):**
+  - Tương tác thường ngày (hover nút, đóng mở menu, chuyển trạng thái input): **`150–250ms`** dùng `--ux-tactile` (`cubic-bezier(0.16, 1, 0.3, 1)`) hoặc `--ux-smooth` (`cubic-bezier(0.2, 0.8, 0.2, 1)`).
+  - Phản hồi có tính nhịp điệu (Toast xếp tầng `Toast.tsx`, bước duyệt `ApprovalStepper.tsx`, cuộn số `RollingNumber.tsx`, chuyển trang bảng `PageTransitionStage.tsx`): dùng `--ux-spring` (`cubic-bezier(0.34, 1.45, 0.64, 1)`).
+  - **Cấm:** Chạy animation tự động dài hơi cản trở thao tác khi vào màn hình làm việc; cấm `transition: all ... linear`.
+  - **Bắt buộc:** Mọi keyframe và transition mới phải hỗ trợ `@media (prefers-reduced-motion: reduce)`.
+
+---
+
+## 7. Danh mục Thành phần Thực tế trong Mã nguồn (`frontend/src/components/common/`)
+
+Kỹ sư bắt buộc tái sử dụng các thành phần đã chuẩn hóa dưới đây trước khi viết mới:
+
+| Thành phần | Tệp mã nguồn | Vai trò thực tế |
 | :--- | :--- | :--- |
-| **Bảng dữ liệu** | Bảng phẳng lì viền đặc, chữ nhỏ dính sát mép, không có hover state rõ ràng. | Phân cách hàng tinh tế, hover sáng nhẹ `emerald/5`, mã số dùng `font-mono tabular-nums`. |
-| **Huy hiệu cấp mật** | Dùng các màu pastel tím/hồng nhạt vô nghĩa. | 5 Cấp độ mật chuẩn quân sự: Cấp 1 (Xanh xám), Cấp 2 (Xanh lục), Cấp 3 (Vàng kim), Cấp 4 (Cam đậm), Cấp 5 (Đỏ quân kỳ). |
-| **Nút bấm** | Nút bấm phẳng lì, rê chuột không đổi sắc độ, bấm không có cảm giác cơ học. | Lực hút hover nhẹ, bấm lún `scale(0.97)`, bóng phản xạ ánh sáng kim loại. |
-| **Thông báo** | Dùng alert trình duyệt giật cục hoặc notification AntD mặc định che khuất nội dung. | `AnimatedToast` góc dưới bên phải, có thanh đếm ngược, nảy lò xo mượt mà, xếp tầng thông minh. |
-| **Thời gian & IP** | Hiển thị chữ thường co giãn khiến số nhảy lung tung khi cập nhật. | `font-mono tabular-nums` căn đều từng ký tự như máy đo radar quân sự. |
-| **Sắp xếp thứ tự danh mục** | Bắt người dùng nhập số thứ tự thủ công trong form (gây xung đột và nhầm lẫn). | Kéo - thả trực quan (HTML5 Drag & Drop với tay cầm `GripVertical`), cập nhật tức thì (Optimistic UI). |
-| **Hành động phá hủy (Purge)** | Dùng 1 cú click hoặc alert đơn giản của trình duyệt. | Hộp thoại an toàn màu Đỏ Quân Kỳ (`#b91c1c`), cảnh báo rủi ro tối cao và yêu cầu nhập mã xác nhận 2 bước. |
-| **Giám sát phiên làm việc** | Hiển thị chuỗi User-Agent thô dài dòng, cột bảng bị xô lệch bên trái bên phải. | Phân tích thành `HĐH • Trình duyệt` kèm icon thiết bị, cân giữa 100% cột (`text-center`), chỉ báo trực tuyến nhấp nháy. |
-| **Bản sắc màu sắc Quân đội** | Để sót màu tím AI mặc định ở tab sidebar hoặc nút tác chiến. | Đồng bộ 100% hệ màu Quân đội: Xanh Lục Quân (`#166534`), Vàng Kim (`#fbbf24`), Đỏ Quân Kỳ (`#b91c1c`). |
+| **Điều hướng & Khung** | `Layout.tsx`, `Header.tsx`, `Sidebar.tsx`, `MainNavBar.tsx` | Khung ứng dụng 3 tầng responsive, tự ẩn sidebar khi rỗng. |
+| **Bảng & Phân trang** | `DataTable.tsx`, `PaginationBar.tsx`, `PageTransitionStage.tsx`, `DateRangePicker.tsx` | Bảng mật độ cao, phân trang 7 khe thống nhất, bộ lọc ngày. |
+| **Phản hồi & Hộp thoại** | `Toast.tsx`, `ConfirmDialog.tsx`, `TacticalEmptyState.tsx`, `LoadingSpinner.tsx` | Thông báo xếp tầng có đếm ngược & throttle 403, modal xác nhận 2 bước, trạng thái trống có hướng dẫn. |
+| **Nghiệp vụ & Số liệu** | `ApprovalStepper.tsx`, `RollingNumber.tsx`, `CompactDownloadButton.tsx`, `DocumentReadingRing.tsx` | Tiến trình duyệt 2 tầng, số liệu đồng hồ `tabular-nums`, nút tải tiến trình, vòng đọc tài liệu. |
+| **Bảo mật & Sinh trắc** | `TouchIDFingerprint.tsx`, `VerificationCodeInput.tsx`, `DynamicWatermark.tsx`, `SecurityScreenShield.tsx`, `ProtectedRoute.tsx` | Modal quét ZK9500 (React Portal), mã PIN 6 số, watermark 45° không italic, lá chắn chống lệch giờ. |
+| **Chế độ Nền tảng** | `DeviceModeSwitch.tsx`, `ThemeToggle.tsx` | Chuyển đổi PC/iPad và Light/Dark với hiệu ứng View Transitions có fallback. |
+
+**Yêu cầu bắt buộc:** Mọi thành phần tương tác mới (hoặc chuyển hóa từ `uiverse-galaxy`) phải có đủ **7 trạng thái**: `default`, `hover`, `focus-visible`, `active`, `disabled`, `loading`, `error`.
 
 ---
-*Ghi chú cho AI Coding Agent: Trước khi bắt tay vào viết bất kỳ component hay chỉnh sửa giao diện nào trong thư mục `frontend/`, hãy đọc lại tài liệu này để đảm bảo giữ trọn vẹn bản sắc thiết kế thủ công tinh xảo của Trung Tâm Dữ Liệu Số — Quân Khu 7.*
+
+## 8. Quy chuẩn Nên & Không Nên (Engineering Do's & Don'ts)
+
+| Hạng mục | KHÔNG NÊN (Dấu hiệu AI-Slop / Lỗi kỹ thuật) | NÊN LÀM (Chuẩn Kỹ sư QK7 DataHub) |
+| :--- | :--- | :--- |
+| **Bảng màu** | Sót màu tím AI mặc định (`#722ED1`), dùng gradient cầu vồng hoặc glow neon trên thẻ dữ liệu. | Tuân thủ Triad Quân đội (`#166534` / `#10b981`, `#d97706` / `#fbbf24`, `#b91c1c` / `#f87171`) và bề mặt trung tính sạch. |
+| **Bề mặt & Viền** | Phủ `backdrop-blur` lên mọi card trong bảng dài; đổ bóng nặng ở trạng thái nghỉ. | Phân tầng bằng sắc độ nền + viền `1px`; chỉ đổ bóng/mờ cho thành phần thực sự nổi (modal, drawer, menu). |
+| **Typography** | Dùng `font-mono` cho tiêu đề; hiển thị số KPI/IP/ngày giờ bằng chữ thường bị nhảy cột khi cập nhật. | `Be Vietnam Pro` cho văn bản; `JetBrains Mono` + `tabular-nums` cho số liệu, mã hiệu, IP, timestamp, SHA-256. |
+| **Phân trang & Cột** | Tự viết nút chuyển trang riêng lẻ ở từng màn hình; để chuỗi `User-Agent` thô làm lệch bảng. | Dùng `PaginationBar` thống nhất; tóm gọn `HĐH • Trình duyệt` kèm icon và căn cột rõ ràng. |
+| **Thông báo & Lỗi** | Dùng `window.alert()`, toast đứng yên che nút bấm, hoặc để toast lỗi `403` bắn liên tục. | Dùng `ToastProvider` (`Toast.tsx`) với throttle 2s cho lỗi `403`; thông báo lỗi form đặt ngay dưới ô nhập. |
+| **Hành động nguy hiểm** | Xóa vĩnh viễn chỉ bằng 1 cú click hoặc xác nhận sơ sài. | Hộp thoại `ConfirmDialog` màu Đỏ Quân Kỳ, nêu rõ hậu quả và yêu cầu xác nhận 2 bước. |
+| **Sắp xếp thứ tự** | Bắt người dùng gõ số thứ tự thủ công gây trùng lặp. | Kéo-thả trực quan với tay cầm `GripVertical` và cập nhật tức thì (như tab Cấu hình Quyền). |
+| **Tài liệu mật Cấp 3–5** | Hiển thị link trực tiếp tới `uploads/` hoặc để modal 2FA nằm trong container `overflow: hidden`. | Stream qua `/api/files/:fileId/view` kèm `X-Fingerprint-Token`; render modal 2FA qua React Portal vào `document.body`. |

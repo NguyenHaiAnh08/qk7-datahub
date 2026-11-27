@@ -20,11 +20,13 @@ import {
 } from 'lucide-react';
 import { TreeSelect } from 'antd';
 import { Dropzone } from './Dropzone';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { DocumentItem, DocumentType, Unit, SecurityLevel } from '../../types';
 import { documentService, ParseDocumentResult, CheckDuplicateResult } from '../../services/documentService';
 import { buildUnitTree } from '../../utils/unitTree';
 import { PdfPagesViewer } from './PdfPagesViewer';
 import { DynamicWatermark } from '../common/DynamicWatermark';
+import { SingleDatePicker } from '../common/SingleDatePicker';
 import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
 import { formatUserDisplayName, formatWatermarkDateTime } from '../../hooks/useFloatingWatermark';
 import { fileService } from '../../services/fileService';
@@ -799,30 +801,16 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
               {/* Mobile Controls (Chỉ hiển thị trên màn hình nhỏ < lg) */}
               <div className="lg:hidden flex items-center space-x-1.5 shrink-0">
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setActiveMobileTab('form')}
-                    className={`px-2 py-1 text-[11px] font-bold rounded-md transition cursor-pointer ${
-                      activeMobileTab === 'form'
-                        ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-                        : 'text-slate-500 dark:text-slate-400'
-                    }`}
-                  >
-                    Biểu mẫu
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveMobileTab('preview')}
-                    className={`px-2 py-1 text-[11px] font-bold rounded-md transition cursor-pointer ${
-                      activeMobileTab === 'preview'
-                        ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-                        : 'text-slate-500 dark:text-slate-400'
-                    }`}
-                  >
-                    Xem PDF {selectedFile || isEdit ? '•' : ''}
-                  </button>
-                </div>
+                <SegmentedTabs
+                  ariaLabel="Chuyển giữa biểu mẫu và xem PDF"
+                  size="xs"
+                  value={activeMobileTab}
+                  onChange={setActiveMobileTab}
+                  items={[
+                    { value: 'form', label: 'Biểu mẫu', activeTone: 'emerald-text' },
+                    { value: 'preview', label: `Xem PDF${selectedFile || isEdit ? ' •' : ''}`, activeTone: 'emerald-text' },
+                  ]}
+                />
 
                 <button
                   type="button"
@@ -1121,16 +1109,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               {/* Ngày ban hành & Tóm tắt ghi chú */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  <label
+                    htmlFor="doc-issue-date-picker"
+                    className="block text-slate-700 dark:text-slate-300 font-semibold mb-1"
+                  >
                     Ngày ban hành <span className="text-rose-500 font-bold">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <SingleDatePicker
+                    id="doc-issue-date-picker"
                     value={issueDate}
-                    onChange={(e) => setIssueDate(e.target.value)}
-                    className={`w-full px-3 py-2 bg-slate-50/70 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20 transition-colors shadow-2xs ${
-                      issueDate ? 'text-slate-900 dark:text-slate-100 font-medium' : 'text-slate-400 dark:text-slate-500'
-                    }`}
+                    onChange={setIssueDate}
+                    placeholder="Chọn ngày ban hành"
+                    ariaLabel="Chọn ngày ban hành văn bản"
                   />
                 </div>
 

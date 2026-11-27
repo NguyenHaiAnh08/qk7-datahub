@@ -11,6 +11,7 @@ import {
 import { User } from '../../types/user';
 import { LoginForm } from './LoginForm';
 import { TrainingLoginForm } from './TrainingLoginForm';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 
 export interface DualGatewayPortalProps {
   activePortal: 'datahub' | 'training';
@@ -33,33 +34,28 @@ export const DualGatewayPortal: React.FC<DualGatewayPortalProps> = ({
           1. MORPHING PILL SELECTOR CHO MOBILE & MÀN HÌNH NHỎ (< 768px)
           ══════════════════════════════════════════════════════════════════ */}
       <div className="md:hidden w-full max-w-sm mb-3">
-        <div className="p-1 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur-md flex items-center">
-          <button
-            type="button"
-            onClick={() => onPortalChange('datahub')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activePortal === 'datahub'
-                ? 'bg-gradient-to-r from-[#14532d] to-[#166534] text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Dữ Liệu Số</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onPortalChange('training')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activePortal === 'training'
-                ? 'bg-gradient-to-r from-[#1E3A8A] to-[#2563EB] text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
-            <span>Quản Lý Đào Tạo</span>
-          </button>
-        </div>
+        <SegmentedTabs
+          ariaLabel="Chọn cổng đăng nhập"
+          size="md"
+          surface="card"
+          fullWidth
+          value={activePortal}
+          onChange={onPortalChange}
+          items={[
+            {
+              value: 'datahub',
+              label: 'Dữ Liệu Số',
+              icon: <ShieldCheck className="w-3.5 h-3.5" />,
+              activeTone: 'emerald',
+            },
+            {
+              value: 'training',
+              label: 'Quản Lý Đào Tạo',
+              icon: <GraduationCap className="w-3.5 h-3.5" />,
+              activeTone: 'navy',
+            },
+          ]}
+        />
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════

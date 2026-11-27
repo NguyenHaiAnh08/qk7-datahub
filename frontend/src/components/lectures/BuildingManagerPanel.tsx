@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { Tooltip } from 'antd';
 import { lectureService } from '../../services/lectureService';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { ClassroomBuilding } from '../../types/lecture';
 import { toast } from '../common/Toast';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -424,72 +425,45 @@ export const BuildingManagerPanel: React.FC<Props> = ({ canManage = true, onChan
           </div>
 
           {/* Chips Lọc Trạng Thái */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shrink-0">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                statusFilter === 'all'
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs border border-slate-200 dark:border-slate-700'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Tất cả ({kpis.total})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('active')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                statusFilter === 'active'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Đang dùng ({kpis.activeCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('inactive')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                statusFilter === 'inactive'
-                  ? 'bg-amber-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Đã tắt ({kpis.inactiveCount})
-            </button>
-          </div>
+          <SegmentedTabs
+            ariaLabel="Lọc theo trạng thái khu giảng đường"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            className="shrink-0"
+            items={[
+              { value: 'all', label: 'Tất cả', count: kpis.total, activeTone: 'neutral' },
+              { value: 'active', label: 'Đang dùng', count: kpis.activeCount, activeTone: 'emerald' },
+              { value: 'inactive', label: 'Đã tắt', count: kpis.inactiveCount, activeTone: 'amber' },
+            ]}
+          />
         </div>
 
         {/* Nút View Mode, Làm mới, Thêm khu */}
         <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
           {/* View mode toggle */}
-          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              title="Dạng bảng chi tiết"
-              className={`p-1.5 rounded-lg transition cursor-pointer ${
-                viewMode === 'table'
-                  ? 'bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              title="Dạng thẻ khu trực quan"
-              className={`p-1.5 rounded-lg transition cursor-pointer ${
-                viewMode === 'grid'
-                  ? 'bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-          </div>
+          <SegmentedTabs
+            ariaLabel="Chế độ hiển thị khu giảng đường"
+            size="xs"
+            iconOnly
+            value={viewMode}
+            onChange={setViewMode}
+            items={[
+              {
+                value: 'table',
+                icon: <List className="w-4 h-4" />,
+                title: 'Dạng bảng chi tiết',
+                ariaLabel: 'Hiển thị dạng bảng chi tiết',
+                activeTone: 'emerald-text',
+              },
+              {
+                value: 'grid',
+                icon: <LayoutGrid className="w-4 h-4" />,
+                title: 'Dạng thẻ khu trực quan',
+                ariaLabel: 'Hiển thị dạng thẻ khu trực quan',
+                activeTone: 'emerald-text',
+              },
+            ]}
+          />
 
           <button
             type="button"

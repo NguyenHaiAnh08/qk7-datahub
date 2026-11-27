@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PinManageModal } from '../components/users/PinManageModal';
 import { LectureCatalogsPage } from './LectureCatalogsPage';
 import { LectureBuildingsPage } from './LectureBuildingsPage';
+import { SegmentedTabs } from '../components/common/SegmentedTabs';
 
 
 import {
@@ -46,6 +47,7 @@ import {
   Database,
   Fingerprint,
   Sparkles,
+  ArrowUpDown,
 } from 'lucide-react';
 
 import { TrashPage } from './TrashPage';
@@ -56,6 +58,9 @@ import { Header } from '../components/common/Header';
 import { Sidebar, ADMIN_NAV_GROUPS } from '../components/common/Sidebar';
 import { Toast, ToastState } from '../components/common/Toast';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { PaginationBar } from '../components/common/PaginationBar';
+import { usePageTransition } from '../components/common/PageTransitionStage';
+import { TacticalEmptyState } from '../components/common/TacticalEmptyState';
 import { StatCard } from '../components/dashboard/StatCard';
 import { DistributionChart } from '../components/dashboard/DistributionChart';
 import { UnitTreeTable, getUnitCategory } from '../components/dashboard/UnitTreeTable';
@@ -407,6 +412,55 @@ const pinPendingCount = useMemo(
   [usersList]
 );
 
+  // Search, Filter, Sort & Pagination state cho Danh Mục Thể Loại Văn Bản
+  const [docTypeSearch, setDocTypeSearch] = useState('');
+  const [docTypeDescFilter, setDocTypeDescFilter] = useState<'all' | 'has_desc' | 'no_desc'>('all');
+  const [docTypeSort, setDocTypeSort] = useState<'name_asc' | 'name_desc' | 'id_asc'>('name_asc');
+  const [docTypePage, setDocTypePage] = useState(1);
+  const [docTypesLoading, setDocTypesLoading] = useState(false);
+  const DOCTYPES_PAGE_SIZE = 30;
+
+  const filteredDocTypes = useMemo(() => {
+    let result = [...docTypesList];
+    if (docTypeSearch.trim()) {
+      const q = docTypeSearch.toLowerCase().trim();
+      result = result.filter(
+        (dt) =>
+          (dt.type_id || '').toLowerCase().includes(q) ||
+          (dt.name || '').toLowerCase().includes(q) ||
+          (dt.description || '').toLowerCase().includes(q)
+      );
+    }
+    if (docTypeDescFilter === 'has_desc') {
+      result = result.filter((dt) => Boolean(dt.description && dt.description.trim()));
+    } else if (docTypeDescFilter === 'no_desc') {
+      result = result.filter((dt) => !dt.description || !dt.description.trim());
+    }
+    result.sort((a, b) => {
+      if (docTypeSort === 'id_asc') return (a.type_id || '').localeCompare(b.type_id || '', 'vi');
+      if (docTypeSort === 'name_desc') return (b.name || '').localeCompare(a.name || '', 'vi');
+      return (a.name || '').localeCompare(b.name || '', 'vi');
+    });
+    return result;
+  }, [docTypesList, docTypeSearch, docTypeDescFilter, docTypeSort]);
+
+  const docTypeTotalPages = Math.max(1, Math.ceil(filteredDocTypes.length / DOCTYPES_PAGE_SIZE));
+  const safeDocTypePage = Math.min(docTypePage, docTypeTotalPages);
+  const pagedDocTypes = useMemo(() => {
+    const start = (safeDocTypePage - 1) * DOCTYPES_PAGE_SIZE;
+    return filteredDocTypes.slice(start, start + DOCTYPES_PAGE_SIZE);
+  }, [filteredDocTypes, safeDocTypePage]);
+  const docTypeTbodyRef = usePageTransition<HTMLTableSectionElement>(safeDocTypePage, { mode: 'row' });
+
+  const docTypeWithDescCount = useMemo(
+    () => docTypesList.filter((dt) => Boolean(dt.description && dt.description.trim())).length,
+    [docTypesList]
+  );
+
+  useEffect(() => {
+    setDocTypePage(1);
+  }, [docTypeSearch, docTypeDescFilter, docTypeSort]);
+
   // Search & Filter state cho Ranks và Positions
   const [rankSearch, setRankSearch] = useState('');
   const [rankStatusFilter, setRankStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -711,11 +765,14 @@ const pinPendingCount = useMemo(
   };
 
   const loadDocTypes = async () => {
+    setDocTypesLoading(true);
     try {
       const data = await dashboardApi.getDocumentTypes();
       setDocTypesList(data.items || []);
     } catch (err: any) {
       showToast('Lỗi tải loại văn bản: ' + err.message, 'error');
+    } finally {
+      setDocTypesLoading(false);
     }
   };
 
@@ -919,10 +976,20 @@ const pinPendingCount = useMemo(
   };
 
   const handleGenericDelete = (type: string, id: string | number, name: string) => {
+    const typeLabelMap: Record<string, string> = {
+      roles: 'vai trò',
+      permissions: 'quyền',
+      units: 'đơn vị',
+      doctypes: 'loại văn bản',
+      levels: 'mức bảo mật',
+      ranks: 'cấp bậc',
+      positions: 'chức vụ',
+    };
+    const typeLabel = typeLabelMap[type] || type;
     setDeleteConfirm({
       open: true,
-      title: `Xóa ${type}`,
-      message: `Đồng chí có chắc chắn muốn xóa bản ghi "${name}" (${id})?`,
+      title: `Xóa ${typeLabel}`,
+      message: `Đồng chí có chắc chắn muốn xóa ${typeLabel} "${name}" (${id})?`,
       onConfirm: async () => {
         try {
           let res: any = null;
@@ -949,7 +1016,7 @@ const pinPendingCount = useMemo(
           } else if (type === 'positions' && res?.soft_deleted) {
             showToast(`Đã ẩn chức vụ "${name}" khỏi dropdown`, 'info');
           } else {
-            showToast(`Đã xóa ${type} ${id}`);
+            showToast(`Đã xóa ${typeLabel} "${name}" (${id})`);
           }
         } catch (err: any) {
           showToast('Lỗi: ' + err.message, 'error');
@@ -2059,65 +2126,264 @@ const pinPendingCount = useMemo(
 
           {activeTab === 'doctypes' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-amber-500 dark:text-amber-400" /> Danh Mục Thể Loại Văn Bản
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Quy định các loại văn bản lưu hành trong quân khu</p>
+              {/* ── 1. HEADER & ACTION CONTROLS (TRIAD MILITARY COMMAND SURFACE) ── */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 border-l-4 border-l-[#166534] dark:border-l-emerald-500 shadow-xs">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200/80 dark:border-emerald-500/30 flex items-center justify-center shrink-0 text-[#166534] dark:text-emerald-400">
+                      <FileText className="w-5 h-5 stroke-[2]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                          Danh Mục Thể Loại Văn Bản
+                        </h2>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold font-mono tabular-nums bg-emerald-50 dark:bg-emerald-500/15 text-[#166534] dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-500/30">
+                          {docTypesList.length} thể loại
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                        Quy định mã ký hiệu và tên gọi chuẩn hóa cho các thể loại văn bản hành chính – quân sự lưu hành trong Quân khu.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-stretch sm:self-start lg:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => loadDocTypes()}
+                      disabled={docTypesLoading}
+                      className="min-h-[38px] px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors duration-150 cursor-pointer active:scale-[0.98] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534] dark:focus-visible:ring-emerald-400"
+                      title="Đồng bộ lại danh mục loại văn bản"
+                    >
+                      <RotateCw className={`w-3.5 h-3.5 ${docTypesLoading ? 'animate-spin text-[#166534] dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
+                      <span>Đồng bộ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGenericFormData({ type_id: '', name: '', description: '' });
+                        setGenericModal({ open: true, type: 'doctypes', item: null });
+                      }}
+                      className="min-h-[38px] flex-1 sm:flex-none px-4 py-2 bg-[#166534] hover:bg-[#14532d] dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors duration-150 cursor-pointer active:scale-[0.98] shadow-xs shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534] focus-visible:ring-offset-2 dark:focus-visible:ring-emerald-400 dark:focus-visible:ring-offset-[#111827]"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Thêm loại văn bản</span>
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setGenericFormData({ type_id: '', name: '', description: '' });
-                    setGenericModal({ open: true, type: 'doctypes', item: null });
-                  }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                >
-                  <Plus className="w-4 h-4" /> Thêm loại văn bản
-                </button>
               </div>
 
-              <div className="bg-white dark:bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+              {/* ── 2. SEARCH, FILTER & SORT TOOLBAR ── */}
+              <div className="p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+                {/* Ô tìm kiếm */}
+                <div className="relative flex-1 min-w-0">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={docTypeSearch}
+                    onChange={(e) => setDocTypeSearch(e.target.value)}
+                    placeholder="Tìm theo mã loại (BC, CV, QD...), tên loại văn bản hoặc mô tả..."
+                    aria-label="Tìm kiếm thể loại văn bản"
+                    className="w-full min-h-[38px] pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-[#166534] dark:focus:border-emerald-500 focus:ring-2 focus:ring-[#166534]/15 dark:focus:ring-emerald-500/20 transition-colors"
+                  />
+                  {docTypeSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDocTypeSearch('')}
+                      aria-label="Xóa từ khóa tìm kiếm"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-md cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Bộ lọc mô tả + Sắp xếp */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <SegmentedTabs
+                    ariaLabel="Lọc theo trạng thái mô tả"
+                    value={docTypeDescFilter}
+                    onChange={setDocTypeDescFilter}
+                    items={[
+                      { value: 'all', label: 'Tất cả', count: docTypesList.length, activeTone: 'neutral' },
+                      { value: 'has_desc', label: 'Có mô tả', count: docTypeWithDescCount, activeTone: 'emerald' },
+                      { value: 'no_desc', label: 'Chưa mô tả', count: docTypesList.length - docTypeWithDescCount, activeTone: 'amber' },
+                    ]}
+                  />
+
+                  <div className="relative flex items-center">
+                    <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                    <select
+                      value={docTypeSort}
+                      onChange={(e) => setDocTypeSort(e.target.value as 'name_asc' | 'name_desc' | 'id_asc')}
+                      aria-label="Sắp xếp danh mục loại văn bản"
+                      className="min-h-[34px] pl-8 pr-3 py-1.5 text-[11px] font-semibold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:border-[#166534] dark:focus:border-emerald-500 cursor-pointer"
+                    >
+                      <option value="name_asc">Tên: A → Z</option>
+                      <option value="name_desc">Tên: Z → A</option>
+                      <option value="id_asc">Mã loại: A → Z</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 3. TACTICAL DATA TABLE ── */}
+              <div className="bg-white dark:bg-[#111827] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[560px]">
-                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 min-w-[660px]">
+                    <thead className="bg-slate-50 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 uppercase text-[11px] border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider select-none">
                       <tr>
-                        <th className="py-3 px-4">Mã Loại</th>
-                        <th className="py-3 px-4">Tên loại văn bản</th>
-                        <th className="py-3 px-4">Mô tả</th>
-                        <th className="py-3 px-4 text-right">Thao tác</th>
+                        <th className="py-3.5 px-4 w-16 text-center whitespace-nowrap">STT</th>
+                        <th className="py-3.5 px-4 w-36 whitespace-nowrap">Mã loại</th>
+                        <th className="py-3.5 px-4 w-64 sm:w-72 whitespace-nowrap">Tên loại văn bản</th>
+                        <th className="py-3.5 px-4 whitespace-nowrap">Mô tả chi tiết</th>
+                        <th className="py-3.5 px-4 w-28 text-right whitespace-nowrap">Thao tác</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                      {docTypesList.map((dt) => (
-                        <tr key={dt.type_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold">{dt.type_id}</td>
-                          <td className="py-3 px-4 text-slate-900 dark:text-white font-semibold">{dt.name}</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{dt.description || '—'}</td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => {
-                                setGenericFormData({ ...dt });
-                                setGenericModal({ open: true, type: 'doctypes', item: dt });
-                              }}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent rounded-lg mr-1.5 transition-all cursor-pointer btn-tactile active:scale-95"
-                              title="Sửa loại văn bản"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleGenericDelete('doctypes', dt.type_id, dt.name)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-transparent rounded-lg transition-all cursor-pointer btn-tactile active:scale-95"
-                              title="Xóa loại văn bản"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                    <tbody ref={docTypeTbodyRef} className="divide-y divide-slate-100 dark:divide-slate-800/70 font-medium">
+                      {docTypesLoading && docTypesList.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-16 text-center text-slate-500 dark:text-slate-400">
+                            <div className="flex flex-col items-center justify-center gap-2.5">
+                              <RotateCw className="w-6 h-6 animate-spin text-[#166534] dark:text-emerald-400" />
+                              <span className="text-xs font-semibold">Đang đồng bộ danh mục thể loại văn bản...</span>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                      ) : filteredDocTypes.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 px-4">
+                            <TacticalEmptyState
+                              title={docTypeSearch || docTypeDescFilter !== 'all' ? 'Không tìm thấy thể loại văn bản phù hợp' : 'Chưa có thể loại văn bản nào'}
+                              description={
+                                docTypeSearch || docTypeDescFilter !== 'all'
+                                  ? 'Thử đổi từ khóa tìm kiếm hoặc đặt lại bộ lọc để xem toàn bộ danh mục.'
+                                  : 'Bấm nút "Thêm loại văn bản" ở góc trên bên phải để khai báo thể loại đầu tiên.'
+                              }
+                              icon={<FileText className="w-8 h-8 text-slate-400" />}
+                              onClearFilters={
+                                docTypeSearch || docTypeDescFilter !== 'all'
+                                  ? () => {
+                                      setDocTypeSearch('');
+                                      setDocTypeDescFilter('all');
+                                    }
+                                  : undefined
+                              }
+                              compact
+                            />
+                          </td>
+                        </tr>
+                      ) : (
+                        pagedDocTypes.map((dt, idx) => {
+                          const rowNumber = (safeDocTypePage - 1) * DOCTYPES_PAGE_SIZE + idx + 1;
+                          const hasDesc = Boolean(dt.description && dt.description.trim());
+                          return (
+                            <tr
+                              key={dt.type_id}
+                              className="group hover:bg-emerald-50/40 dark:hover:bg-emerald-500/[0.06] transition-colors duration-150"
+                            >
+                              <td className="py-3.5 px-4 text-center font-mono tabular-nums text-[11px] text-slate-400 dark:text-slate-500">
+                                {String(rowNumber).padStart(2, '0')}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-md font-mono tabular-nums text-xs font-bold tracking-wide bg-emerald-50 dark:bg-emerald-500/15 text-[#166534] dark:text-emerald-300 border border-emerald-200/90 dark:border-emerald-500/30">
+                                  {dt.type_id}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-[#166534] dark:group-hover:text-emerald-400 shrink-0 transition-colors" />
+                                  <span className="text-[13px] font-bold text-slate-900 dark:text-white truncate">
+                                    {dt.name}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4">
+                                {hasDesc ? (
+                                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2" title={dt.description}>
+                                    {dt.description}
+                                  </p>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-slate-400 dark:text-slate-500">
+                                      Chưa cập nhật mô tả
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setGenericFormData({ ...dt });
+                                        setGenericModal({ open: true, type: 'doctypes', item: dt });
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 px-2 py-0.5 rounded-md text-[11px] font-semibold text-[#166534] dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200/80 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 transition-all cursor-pointer"
+                                    >
+                                      + Bổ sung
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                <div className="inline-flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setGenericFormData({ ...dt });
+                                      setGenericModal({ open: true, type: 'doctypes', item: dt });
+                                    }}
+                                    className="min-w-[34px] min-h-[34px] inline-flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700 transition-colors cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534] dark:focus-visible:ring-emerald-400"
+                                    title={`Chỉnh sửa loại văn bản "${dt.name}"`}
+                                    aria-label={`Chỉnh sửa loại văn bản ${dt.name}`}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleGenericDelete('doctypes', dt.type_id, dt.name)}
+                                    className="min-w-[34px] min-h-[34px] inline-flex items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-[#b91c1c] dark:bg-rose-950/50 dark:hover:bg-rose-900/70 dark:text-rose-400 dark:border-rose-800/50 transition-colors cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b91c1c] dark:focus-visible:ring-rose-400"
+                                    title={`Xóa loại văn bản "${dt.name}"`}
+                                    aria-label={`Xóa loại văn bản ${dt.name}`}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
+
+                {/* ── FOOTER SUMMARY & PAGINATION (30 BẢN GHI / TRANG) ── */}
+                {filteredDocTypes.length > 0 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 text-xs text-slate-600 dark:text-slate-400 bg-slate-50/70 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-800">
+                    <div>
+                      Hiển thị{' '}
+                      <strong className="font-mono tabular-nums font-bold text-slate-900 dark:text-white">
+                        {(safeDocTypePage - 1) * DOCTYPES_PAGE_SIZE + 1}–{Math.min(safeDocTypePage * DOCTYPES_PAGE_SIZE, filteredDocTypes.length)}
+                      </strong>{' '}
+                      trên tổng số{' '}
+                      <strong className="font-mono tabular-nums font-bold text-[#166534] dark:text-emerald-400">
+                        {filteredDocTypes.length}
+                      </strong>{' '}
+                      thể loại văn bản
+                      {docTypeTotalPages > 1 && (
+                        <span className="ml-1.5 text-slate-500 dark:text-slate-400">
+                          (Trang <span className="font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200">{safeDocTypePage}/{docTypeTotalPages}</span>)
+                        </span>
+                      )}
+                    </div>
+                    {docTypeTotalPages > 1 && (
+                      <PaginationBar
+                        currentPage={safeDocTypePage}
+                        totalPages={docTypeTotalPages}
+                        onPageChange={(p) => setDocTypePage(p)}
+                        ariaLabel="Phân trang danh mục thể loại văn bản"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -2869,26 +3135,65 @@ const pinPendingCount = useMemo(
                   )}
 
                   {genericModal.type === 'doctypes' && (
-                    <>
+                    <div className="space-y-3.5">
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mã Loại *</label>
-                        <input type="text" disabled={Boolean(genericModal.item)} value={genericFormData.type_id || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, type_id: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">
+                          Mã Loại <span className="text-[#b91c1c] dark:text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          disabled={Boolean(genericModal.item)}
+                          value={genericFormData.type_id || ''}
+                          onChange={(e) =>
+                            setGenericFormData({
+                              ...genericFormData,
+                              type_id: e.target.value.toUpperCase().replace(/\s+/g, ''),
+                            })
+                          }
+                          placeholder="VD: CV, BC, QD, KH, NQ..."
+                          maxLength={20}
+                          required
+                          className="w-full min-h-[38px] px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-mono text-sm uppercase tracking-wide disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:border-[#166534] focus:ring-2 focus:ring-[#166534]/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                          {genericModal.item
+                            ? 'Mã ký hiệu là khóa định danh cố định, không thể thay đổi sau khi tạo.'
+                            : 'Ký hiệu viết tắt viết hoa, không dấu và không chứa khoảng trắng.'}
+                        </p>
                       </div>
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Tên Loại Văn Bản *</label>
-                        <input type="text" value={genericFormData.name || ''}
-                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })} required
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">
+                          Tên Loại Văn Bản <span className="text-[#b91c1c] dark:text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={genericFormData.name || ''}
+                          onChange={(e) => setGenericFormData({ ...genericFormData, name: e.target.value })}
+                          placeholder="VD: Công văn, Báo cáo, Quyết định, Kế hoạch..."
+                          maxLength={120}
+                          required
+                          className="w-full min-h-[38px] px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm font-medium focus:outline-none focus:border-[#166534] focus:ring-2 focus:ring-[#166534]/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
                       <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mô Tả</label>
-                        <input type="text" value={genericFormData.description || ''}
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-slate-700 dark:text-slate-300 font-semibold text-xs">
+                            Mô Tả Chi Tiết
+                          </label>
+                          <span className="text-[10.5px] font-mono tabular-nums text-slate-400">
+                            {(genericFormData.description || '').length}/300
+                          </span>
+                        </div>
+                        <textarea
+                          rows={3}
+                          maxLength={300}
+                          value={genericFormData.description || ''}
                           onChange={(e) => setGenericFormData({ ...genericFormData, description: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20" />
+                          placeholder="Nhập phạm vi áp dụng hoặc quy định ngắn gọn cho thể loại văn bản này..."
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-xs leading-relaxed resize-none focus:outline-none focus:border-[#166534] focus:ring-2 focus:ring-[#166534]/20 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
+                        />
                       </div>
-                    </>
+                    </div>
                   )}
 
                   {genericModal.type === 'levels' && (

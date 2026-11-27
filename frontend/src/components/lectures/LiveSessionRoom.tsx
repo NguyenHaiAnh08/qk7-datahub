@@ -7,6 +7,7 @@ import { Lecture, TeachingSchedule } from '../../types/lecture';
 import { http, getAuthHeaders } from '../../services/http';
 import { PdfPagesViewer } from '../document-desk/PdfPagesViewer';
 import { DocumentReadingRing, ReadingProgress } from '../common/DocumentReadingRing';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { useAuth } from '../../hooks/useAuth';
 import { formatUserDisplayName, formatWatermarkDateTime } from '../../hooks/useFloatingWatermark';
 import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
@@ -673,28 +674,21 @@ export const LiveSessionRoom: React.FC<Props> = ({ open, session, lecture, onEnd
 
         {/* Cụm chuyển đổi chế độ bài giảng đa tương tác (ActivePresenter: Demo / Hướng dẫn / Luyện tập / Kiểm tra) */}
         {modes.length > 1 && (
-          <div className="hidden xl:flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-xl border border-slate-200 dark:border-white/10 gap-1 shadow-inner shrink-0">
-            {modes.map((m) => {
-              const isActive = (selectedFile || (modes[0] && modes[0].file)) === m.file;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedFile(m.file);
-                    setIframeLoaded(false);
-                  }}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-emerald-600 text-white shadow-md font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-800/60'
-                  }`}
-                >
-                  {m.title}
-                </button>
-              );
-            })}
-          </div>
+          <SegmentedTabs
+            ariaLabel="Chế độ tương tác bài giảng"
+            size="sm"
+            className="hidden xl:inline-flex shrink-0"
+            value={selectedFile || (modes[0] && modes[0].file) || ''}
+            onChange={(file) => {
+              setSelectedFile(file);
+              setIframeLoaded(false);
+            }}
+            items={modes.map((m) => ({
+              value: m.file,
+              label: m.title,
+              activeTone: 'emerald',
+            }))}
+          />
         )}
 
         {/* Cụm điều khiển thời lượng, tiến độ giảng dạy & kết thúc */}

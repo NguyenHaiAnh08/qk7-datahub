@@ -4,6 +4,20 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.20-ui-system-fonts-segmented-tabs-and-date-picker-polish] — 2026-11-27
+
+### 1. Chuẩn Hóa Font Hệ Thống & Thành Phần Điều Hướng UI/UX (`SegmentedTabs`, `SingleDatePicker`)
+- **Chuyển đổi sang System Font Stack & Tabular Numerals ([`frontend/src/fonts.css`](../frontend/src/fonts.css), [`frontend/tailwind.config.js`](../frontend/tailwind.config.js), [`backend/src/ca-portal.js`](../backend/src/ca-portal.js)):**
+  - Loại bỏ 24 tệp font `.woff2` tĩnh dư thừa trong `frontend/public/fonts/` và `backend/public/fonts/`, sử dụng system font stack hiệu năng cao kèm `tabular-nums` cho các bảng số liệu, mã đơn vị và thông số giám sát.
+- **Bổ sung & hoàn thiện các component dùng chung ([`SegmentedTabs.tsx`](../frontend/src/components/common/SegmentedTabs.tsx), [`SingleDatePicker.tsx`](../frontend/src/components/common/SingleDatePicker.tsx), [`DateRangePicker.tsx`](../frontend/src/components/common/DateRangePicker.tsx), [`PaginationBar.tsx`](../frontend/src/components/common/PaginationBar.tsx)):**
+  - Tích hợp `SegmentedTabs` và `SingleDatePicker` đồng nhất trên toàn bộ các trang quản trị, bài giảng, kho lưu trữ (`AdminDashboardPage`, `TrashPage`, `MyUnitPage`, `PortalPage`, `LecturesPage`, `LectureCatalogsPage`, `ProtectedPermissionsConfigPage`, `SecurityAuditLog`, `DualGatewayPortal`).
+- **Đồng bộ tài liệu thiết kế (`docs/design/*`, `docs/architecture/SYSTEM_ARCHITECTURE.md`):**
+  - Cập nhật đặc tả font chữ, token và danh mục component trong `DESIGN.md`, `TOKENS.md`, `COMPONENTS_AND_PATTERNS.md`, `REVIEW_CHECKLIST.md`.
+- **Dọn dẹp tệp PDF mẫu cũ (`backend/uploads/2026/11/*.pdf`):**
+  - Xóa các tệp PDF kiểm thử cũ đã lưu trong lịch sử tracking của thư mục `uploads/`.
+
+---
+
 ## [v1.8.19-pdf-preview-jpeg2000-csp] — 2026-11-27
 
 ### 1. Sửa Lỗi Trình Xem PDF Mất Ảnh Trang Scan JPEG 2000

@@ -388,7 +388,8 @@ function buildPortalHtml({ hostname, serverIp, fingerprint, hasCert, cspNonce })
       flex-wrap: wrap;
       gap: 10px;
       font-size: 13px;
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-variant-numeric: tabular-nums;
     }
     .pill {
       background: rgba(15,23,42,0.7);
@@ -480,7 +481,8 @@ function buildPortalHtml({ hostname, serverIp, fingerprint, hasCert, cspNonce })
       background: rgba(15,23,42,0.75);
       border: 1px solid var(--border);
       border-radius: 10px;
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-variant-numeric: tabular-nums;
       font-size: 11.5px;
       color: var(--muted);
       word-break: break-all;

@@ -28,6 +28,23 @@ function buildWindow(cur: number, total: number): SlotValue[] {
   return [1, '', cur - 1, cur, cur + 1, '', total];
 }
 
+function findActiveScrollContainer(el: HTMLElement | null): HTMLElement | Window {
+  if (typeof window === 'undefined' || !el) return window;
+  let parent = el.parentElement;
+  while (parent && parent !== document.body && parent !== document.documentElement) {
+    const style = window.getComputedStyle(parent);
+    const overflowY = style.overflowY;
+    if (
+      (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
+      parent.scrollHeight > parent.clientHeight + 1
+    ) {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+  return window;
+}
+
 export const PaginationBar: React.FC<PaginationBarProps> = ({
   currentPage,
   totalPages,
@@ -48,6 +65,9 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
     typeof window !== 'undefined' ? window.innerWidth <= 380 : false
   );
 
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const scrollAnchorRef = useRef<{ top: number; expiresAt: number } | null>(null);
+  const anchorCleanupRef = useRef<(() => void) | null>(null);
   const prevPageRef = useRef<number>(safeCurrent);
   const prevTotalRef = useRef<number>(safeTotal);
   const prevActiveIdxRef = useRef<number>(Math.max(0, windowValues.indexOf(safeCurrent)));
@@ -55,6 +75,38 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const pillRef = useRef<HTMLSpanElement | null>(null);
   const timersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  // Giữ thanh phân trang neo đúng vị trí con trỏ khi chuyển giữa trang ngắn (trang cuối) và trang đầy
+  const clearScrollAnchor = useCallback(() => {
+    scrollAnchorRef.current = null;
+    if (anchorCleanupRef.current) {
+      anchorCleanupRef.current();
+      anchorCleanupRef.current = null;
+    }
+  }, []);
+
+  const restoreScrollAnchor = useCallback(() => {
+    const anchor = scrollAnchorRef.current;
+    const el = rootRef.current;
+    if (!anchor || !el || typeof window === 'undefined') return;
+    if (Date.now() > anchor.expiresAt) {
+      clearScrollAnchor();
+      return;
+    }
+
+    const currentTop = el.getBoundingClientRect().top;
+    const deltaY = currentTop - anchor.top;
+    if (Math.abs(deltaY) < 2) return;
+
+    const scrollParent = findActiveScrollContainer(el);
+    if (scrollParent === window) {
+      const nextY = Math.max(0, window.scrollY + deltaY);
+      window.scrollTo({ top: nextY, left: window.scrollX, behavior: 'instant' as ScrollBehavior });
+    } else {
+      const container = scrollParent as HTMLElement;
+      container.scrollTop = Math.max(0, container.scrollTop + deltaY);
+    }
+  }, [clearScrollAnchor]);
 
   const activeIndex = Math.max(0, windowValues.indexOf(safeCurrent));
   const needsWideSlot = safeTotal >= 100 && !isNarrowMobile;
@@ -121,13 +173,24 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
     return () => ro.disconnect();
   }, [placeIndicator]);
 
-  // Dọn dẹp toàn bộ timeout khi unmount
+  // Dọn dẹp toàn bộ timeout & scroll anchor khi unmount
   useEffect(() => {
     return () => {
       Object.values(timersRef.current).forEach((t) => clearTimeout(t));
       timersRef.current = {};
+      clearScrollAnchor();
     };
-  }, []);
+  }, [clearScrollAnchor]);
+
+  // Đồng bộ neo cuộn ngay trước khi trình duyệt paint khung hình trang mới (chống nhảy lên đầu danh sách)
+  useLayoutEffect(() => {
+    if (!scrollAnchorRef.current) return;
+    restoreScrollAnchor();
+    const rafId = window.requestAnimationFrame(() => {
+      restoreScrollAnchor();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [safeCurrent, safeTotal, restoreScrollAnchor]);
 
   // Đồng bộ chuyển động cuộn chữ số (#449) + kéo giãn viên thuốc mép trước (#043)
   useLayoutEffect(() => {
@@ -210,6 +273,43 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
   const go = (target: number) => {
     const clamped = Math.max(1, Math.min(safeTotal, target));
     if (clamped === safeCurrent) return;
+
+    // Neo tọa độ Y của thanh phân trang trên màn hình trước khi đổi trang
+    // (đặc biệt khi từ trang cuối ít dòng quay về trang trước nhiều dòng, tránh bị nhảy lên gần đầu danh sách)
+    const el = rootRef.current;
+    if (el && typeof window !== 'undefined') {
+      clearScrollAnchor();
+      scrollAnchorRef.current = {
+        top: el.getBoundingClientRect().top,
+        expiresAt: Date.now() + 650,
+      };
+
+      const onUserScroll = () => clearScrollAnchor();
+      window.addEventListener('wheel', onUserScroll, { passive: true, once: true });
+      window.addEventListener('touchmove', onUserScroll, { passive: true, once: true });
+
+      let ro: ResizeObserver | null = null;
+      if (typeof ResizeObserver !== 'undefined') {
+        const observed =
+          el.parentElement?.parentElement || el.parentElement || document.body;
+        ro = new ResizeObserver(() => {
+          restoreScrollAnchor();
+        });
+        ro.observe(observed);
+      }
+
+      const timeoutId = setTimeout(() => {
+        clearScrollAnchor();
+      }, 650);
+
+      anchorCleanupRef.current = () => {
+        clearTimeout(timeoutId);
+        window.removeEventListener('wheel', onUserScroll);
+        window.removeEventListener('touchmove', onUserScroll);
+        if (ro) ro.disconnect();
+      };
+    }
+
     onPageChange(clamped);
   };
 
@@ -217,6 +317,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
 
   return (
     <div
+      ref={rootRef}
       className={`u449 ${className}`}
       style={
         needsWideSlot

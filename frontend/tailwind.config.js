@@ -49,8 +49,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        mono: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
       },
       transitionTimingFunction: {
         'spring': 'cubic-bezier(0.34, 1.45, 0.64, 1)',

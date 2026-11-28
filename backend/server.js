@@ -603,6 +603,12 @@ console.log(`[Session] ⏰ Idle timeout: ${SESSION_IDLE_TIMEOUT_MINUTES} phút (
 // ═══════════════════════════════════════════════════════════════
 // ✅ GUEST SESSION (cho Đại biểu tham quan Thư viện số) — P1-2
 // ═══════════════════════════════════════════════════════════════
+// Đại biểu (không đăng nhập) được xem và tải văn bản đến Cấp 2 – Nội bộ. Bài giảng vẫn chỉ Cấp 1
+// (các route bài giảng tự kiểm tra; tệp bài giảng lưu dạng DOC-LEC-… cũng giữ Cấp 1 ở dưới).
+const GUEST_CLEARANCE_LEVEL = 2;
+const guestAwareClearance = (user, fileId) => (
+  user?.is_guest && String(fileId || '').toUpperCase().startsWith('DOC-LEC-') ? 1 : (user?.clearance_level_id || 1)
+);
 const GUEST_SESSION_TTL_MINUTES = parseInt(process.env.GUEST_SESSION_TTL_MINUTES || '120', 10);
 const GUEST_SESSION_MAX_PER_IP = parseInt(process.env.GUEST_SESSION_MAX_PER_IP || '5', 10);
 const guestSessions = new Map();  // guestToken → { expiresAt, ip, createdAt }
@@ -690,11 +696,11 @@ function requireGuestOrAuth(req, res, next) {
     });
   }
 
-  // Gán quyền Guest — CHỈ Cấp 1, KHÔNG download
+  // Gán quyền Guest — đến Cấp 2, KHÔNG download
   req.user = {
     user_id: 'GUEST',
     full_name: 'Đại biểu',
-    clearance_level_id: 1,          // ✅ CHỈ Cấp 1
+    clearance_level_id: GUEST_CLEARANCE_LEVEL,
     roles: ['DELEGATE'],
     permissions: ['DOC_VIEW'],      // ✅ KHÔNG DOC_DOWNLOAD
     is_authenticated: false,
@@ -744,12 +750,12 @@ app.use('/api', async function xacThucPhien(req, res, next) {
     }
   }
 
-  // Helper gán người dùng Khách / Đại biểu vãng lai an toàn (chỉ Cấp 1 Công khai)
+  // Helper gán người dùng Khách / Đại biểu vãng lai an toàn (Công khai và Nội bộ)
   const assignGuestUser = () => {
     req.user = {
       user_id: 'GUEST',
       full_name: 'Đại biểu',
-      clearance_level_id: 1,
+      clearance_level_id: GUEST_CLEARANCE_LEVEL,
       roles: ['DELEGATE'],
       permissions: ['DOC_VIEW', 'DOC_DOWNLOAD', 'LECTURE_VIEW', 'LIB_VIEW', 'LIB_DOWNLOAD'],
       is_authenticated: false,
@@ -2520,8 +2526,7 @@ app.get('/api/documents/:fileId', async (req, res) => {
     if (r.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
 
     const doc = r.recordset[0];
-    const clearance = req.user?.clearance_level_id || (req.user?.user_id === 'GUEST' ? 2 : 1);
-    if (doc.security_level_id > clearance) {
+    if (doc.security_level_id > guestAwareClearance(req.user, doc.file_id)) {
       return res.status(403).json({ error: 'Không đủ cấp độ bảo mật để xem tài liệu này' });
     }
 
@@ -4063,7 +4068,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     req.user = {
       user_id: 'GUEST',
       full_name: 'Đại biểu',
-      clearance_level_id: 1, // Đại biểu chỉ được duy nhất là công khai (Cấp 1)
+      clearance_level_id: GUEST_CLEARANCE_LEVEL,
       roles: ['DELEGATE'],
       permissions: ['DOC_VIEW', 'DOC_DOWNLOAD'],
       is_authenticated: false,
@@ -4146,7 +4151,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
       }
     }
 
-    if (doc.security_level_id > req.user.clearance_level_id) {
+    if (doc.security_level_id > guestAwareClearance(req.user, canonicalFileId)) {
       await writeAccessLog({
         userId: req.user.user_id,
         fileId: canonicalFileId,

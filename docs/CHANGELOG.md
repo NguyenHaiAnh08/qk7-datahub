@@ -4,6 +4,26 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.28-cong-tac-chup-man-hinh-chi-admin] — 2026-11-28
+
+### 1. Công Tắc Cho Phép Chụp Màn Hình Chỉ Dành Cho Quản Trị Viên
+- **Trước:** Chỉ huy, Nhân viên IT… cũng thấy công tắc; ai cũng tự bật được bằng `localStorage` hoặc `window.__QK7_ALLOW_SCREENSHOT__`.
+- **Nay:** công tắc chỉ hiện và chỉ có hiệu lực khi `/api/auth/me` xác nhận tài khoản có vai trò `ROL-01` ([`screenshotSwitch.ts`](../frontend/src/utils/screenshotSwitch.ts)). Lựa chọn lưu theo từng tài khoản quản trị; đăng xuất là hết hiệu lực. Bỏ cờ toàn cục `window` và khóa lưu trữ cũ.
+- **Giới hạn:** chống chụp màn hình là lớp bảo vệ phía trình duyệt, không ngăn được người cố tình sửa mã đang chạy hoặc chụp bằng thiết bị ngoài.
+- **Triển khai:** chỉ giao diện; build lại và tải lại trang.
+
+---
+
+## [v1.8.27-dai-bieu-xem-noi-bo] — 2026-11-28
+
+### 1. Đại Biểu Xem Được Văn Bản Nội Bộ
+- Đại biểu (không đăng nhập) xem, tìm kiếm và tải văn bản **Công khai và Nội bộ** (trước đây chỉ Công khai), đúng bảng phân quyền mục 9–10.
+- **Không đổi:** văn bản Mật trở lên vẫn bị chặn; bài giảng cho Đại biểu vẫn chỉ Công khai (kể cả tệp lưu dạng `DOC-LEC-…`).
+- **Lưu ý:** hệ thống không phân biệt Đại biểu với người chưa đăng nhập, nên bất kỳ máy nào truy cập được máy chủ đều đọc được văn bản Nội bộ.
+- **Triển khai:** build giao diện, khởi động lại backend; Đại biểu đang mở trang chỉ cần tải lại.
+
+---
+
 ## [v1.8.26-xem-lai-pin-bang-van-tay] — 2026-11-28
 
 ### 1. Đổi Cơ Chế Mã PIN: Xem Lại Được Bằng Vân Tay

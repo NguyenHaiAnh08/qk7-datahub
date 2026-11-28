@@ -372,8 +372,8 @@ export const authService = {
       return {
         user_id: 'GUEST',
         full_name: 'Đại biểu',
-        clearance_level_id: 1,
-        clearance_name: 'Công khai',
+        clearance_level_id: 2, // Công khai và Nội bộ
+        clearance_name: 'Nội bộ',
         roles: ['DELEGATE'],
         role_names: ['Đại biểu'],
         permissions: ['DOC_VIEW', 'DOC_DOWNLOAD', 'LECTURE_VIEW'],

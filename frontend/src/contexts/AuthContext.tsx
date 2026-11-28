@@ -4,6 +4,7 @@ import { User } from '../types/user';
 import { authService } from '../services/authService';
 import { http } from '../services/http';
 import { ROUTE_PATHS } from '../routes/routePaths';
+import { setScreenshotAdmin } from '../utils/screenshotSwitch';
 
 interface AuthContextType {
   user: User | null;
@@ -178,6 +179,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     throw new Error('Đăng nhập thất bại');
   }, [saveUserSession]);
 
+  // Công tắc cho phép chụp màn hình: chỉ mở khi MÁY CHỦ xác nhận đúng tài khoản này là Quản trị viên
+  const sessionUserId = user?.user_id;
+  useEffect(() => {
+    setScreenshotAdmin(null);
+    if (!sessionUserId || sessionUserId === 'GUEST') return undefined;
+    let cancelled = false;
+    authService.getMe()
+      .then((me) => {
+        if (!cancelled && me.user_id === sessionUserId && me.roles?.includes('ROL-01')) {
+          setScreenshotAdmin(me.user_id);
+        }
+      })
+      .catch(() => {}); // không xác nhận được thì giữ trạng thái bảo vệ
+    return () => {
+      cancelled = true;
+      setScreenshotAdmin(null);
+    };
+  }, [sessionUserId]);
+
   const logout = useCallback(async () => {
     try {
       await authService.logout();
@@ -214,8 +234,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const guest: User = {
       user_id: 'GUEST',
       full_name: 'Đại biểu',
-      clearance_level_id: 1,
-      clearance_name: 'Công khai',
+      clearance_level_id: 2, // Công khai và Nội bộ
+      clearance_name: 'Nội bộ',
       roles: ['DELEGATE'],
       role_names: ['Đại biểu'],
       permissions: ['DOC_VIEW', 'DOC_DOWNLOAD', 'LECTURE_VIEW'],

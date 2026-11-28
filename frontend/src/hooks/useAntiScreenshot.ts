@@ -2,31 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { http } from '../services/http';
 import { DocumentItem } from '../types';
 import { toast } from '../components/common/Toast';
-
-// =========================================================================
-// 🛠️ DEVELOPER BYPASS TOGGLE (Dành cho Lập trình viên / Tester)
-// =========================================================================
-export const DEV_ALLOW_SCREENSHOT = false;
-
-export function isScreenshotAllowed(): boolean {
-  if (DEV_ALLOW_SCREENSHOT) return true;
-  if (typeof window !== 'undefined') {
-    if (localStorage.getItem('qk7_dev_allow_screenshot') === 'true') return true;
-    if ((window as any).__QK7_ALLOW_SCREENSHOT__ === true) return true;
-  }
-  return false;
-}
-
-export function setDevScreenshotAllowed(allowed: boolean): void {
-  if (typeof window !== 'undefined') {
-    if (allowed) {
-      localStorage.setItem('qk7_dev_allow_screenshot', 'true');
-    } else {
-      localStorage.removeItem('qk7_dev_allow_screenshot');
-    }
-    window.dispatchEvent(new CustomEvent('qk7_dev_screenshot_changed', { detail: { allowed } }));
-  }
-}
+import { isScreenshotAllowed } from '../utils/screenshotSwitch';
 
 let isWipingClipboard = false;
 

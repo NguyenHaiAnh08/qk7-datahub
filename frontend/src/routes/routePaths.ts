@@ -18,6 +18,7 @@ export const ROUTE_PATHS = {
   CLASSROOMS: '/classrooms',
   MATERIALS: '/materials',
   LIBRARY: '/library',
+  LIBRARY_READING: '/library/reading',
   ERROR_400: '/400',
   ERROR_401: '/401',
   ERROR_403: '/403',

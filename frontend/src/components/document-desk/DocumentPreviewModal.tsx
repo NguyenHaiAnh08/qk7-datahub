@@ -33,6 +33,7 @@ import {
 import { stampWatermarkOnPdf } from '../../utils/pdfWatermark';
 
 import { useAntiScreenshot } from '../../hooks/useAntiScreenshot';
+import { useLibraryReading } from '../../hooks/useLibraryReading';
 import { SecurityScreenShield } from '../common/SecurityScreenShield';
 
 export interface DocumentPreviewModalProps {
@@ -98,6 +99,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const canView = !document || docLevel <= clearanceLevel;
   const canDownload = !document || (docLevel <= 2 && docLevel <= clearanceLevel);
   const isSecretLevel = docLevel >= 3;
+
+  // 📚 Thư viện số: mở lại đúng trang đang đọc và lưu tiến độ (chỉ với tài khoản đăng nhập)
+  const isLibraryDoc = /^LIB-/i.test(document?.file_id || '');
+  const libraryReading = useLibraryReading(
+    open ? document?.file_id : undefined,
+    isLibraryDoc && Boolean(user) && user?.user_id !== 'GUEST',
+  );
 
   // 🖥️ Tự động kích hoạt chế độ Toàn màn hình (Fullscreen) đồng nhất cho toàn hệ thống
   useEffect(() => {
@@ -481,14 +489,19 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                     <Building className="w-3 h-3 text-slate-400" />
                     {document.unit_name || '—'}
                   </span>
-                  <span className="flex items-center gap-1 shrink-0">
-                    <Calendar className="w-3 h-3 text-slate-400" />
-                    {formatDate(document.issued_date || document.issue_date)}
-                  </span>
-                  <span className="flex items-center gap-1 shrink-0">
-                    <Shield className="w-3 h-3 text-amber-500" />
-                    {document.security_name || document.security_level_name || `Cấp ${document.security_level_id}`}
-                  </span>
+                  {/* Thư viện số không có ngày ban hành và không phân cấp mật */}
+                  {!isLibraryDoc && (
+                    <>
+                      <span className="flex items-center gap-1 shrink-0">
+                        <Calendar className="w-3 h-3 text-slate-400" />
+                        {formatDate(document.issued_date || document.issue_date)}
+                      </span>
+                      <span className="flex items-center gap-1 shrink-0">
+                        <Shield className="w-3 h-3 text-amber-500" />
+                        {document.security_name || document.security_level_name || `Cấp ${document.security_level_id}`}
+                      </span>
+                    </>
+                  )}
                   {isSecretLevel ? (
                     <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap">
                       Chỉ xem trực tiếp (Mật)
@@ -671,20 +684,30 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               </div>
             )}
 
-            {!loading && !error && blobUrl && (
+            {!loading && !error && blobUrl && !libraryReading.ready && (
+              <div className="flex flex-col items-center space-y-3 text-slate-600 dark:text-slate-300">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600 dark:text-emerald-400" />
+                <p className="text-sm font-medium">Đang tìm trang đang đọc dở…</p>
+              </div>
+            )}
+
+            {!loading && !error && blobUrl && libraryReading.ready && (
               <div className="relative overflow-hidden w-full h-full flex flex-col items-center">
                 {/* 📄 Bộ hiển thị trang PDF chuẩn + Bút dạ quang ĂN CỨNG THEO TÀI LIỆU (giống Watermark) */}
                 <PdfPagesViewer
                   blobUrl={blobUrl}
                   fileId={document.file_id}
-                  initialPage={page}
+                  initialPage={isAiCitation || page > 1 ? page : libraryReading.resumePage || page}
                   isAiCitation={isAiCitation}
                   securityLevel={docLevel}
                   isHighlighterActive={isHighlighterActive}
                   highlighterColor={highlighterColor}
                   onStrokeCountChange={(count) => setStrokeCount(count)}
                   highlighterRef={highlighterRef}
-                  onReadingProgressChange={(prog) => setReadingProgress(prog)}
+                  onReadingProgressChange={(prog) => {
+                    setReadingProgress(prog);
+                    libraryReading.report(prog);
+                  }}
                   viewerRef={viewerRef}
                   showFloatingProgressRing={true}
                   fallbackWatermarkText={!isBlobWatermarked ? watermarkText : undefined}

@@ -28,11 +28,15 @@ import {
   BookOpen,
   Laptop,
   Settings,
+  MonitorPlay,
+  Library,
+  Gauge,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { approvalService } from '../services/approvalService';
 import { permissionService } from '../services/permissionService';
 import { toast } from '../components/common/Toast';
+import { orderPermissionGroups } from '../constants/permissionGroups';
 
 // ─── ĐẶC TẢ PHÂN KHU TÁC CHIẾN (GROUP METADATA) ─────────────────────────
 const GROUP_META: Record<string, { label: string; icon: any; badgeColor: string; desc: string }> = {
@@ -47,6 +51,24 @@ const GROUP_META: Record<string, { label: string; icon: any; badgeColor: string;
     icon: FileText,
     badgeColor: 'emerald',
     desc: 'Kiểm soát quyền tải PDF, đăng tải, chỉnh sửa, xóa và hủy vĩnh viễn tài liệu',
+  },
+  LECTURE: {
+    label: 'Phân Hệ Bài Giảng Số',
+    icon: MonitorPlay,
+    badgeColor: 'cyan',
+    desc: 'Kiểm soát quyền soạn, duyệt, xóa bài giảng và tổ chức ca giảng dạy',
+  },
+  LIBRARY: {
+    label: 'Phân Hệ Thư Viện Số',
+    icon: Library,
+    badgeColor: 'teal',
+    desc: 'Kiểm soát quyền đăng tải, chỉnh sửa, xóa, khôi phục tài liệu và danh mục thể loại thư viện',
+  },
+  COMMAND: {
+    label: 'Phân Hệ Chỉ Huy & Giám Sát',
+    icon: Gauge,
+    badgeColor: 'emerald',
+    desc: 'Kiểm soát quyền xem bảng tổng quan giám sát toàn hệ thống',
   },
   USER: {
     label: 'Phân Hệ Quân Nhân & Người Dùng',
@@ -329,7 +351,7 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
-  const groupKeys = useMemo(() => Object.keys(rawGrouped), [rawGrouped]);
+  const groupKeys = useMemo(() => orderPermissionGroups(Object.keys(rawGrouped)), [rawGrouped]);
   const allNavOptions = useMemo(() => ['all', ...groupKeys], [groupKeys]);
 
   const checkScrollability = useCallback(() => {
@@ -727,7 +749,8 @@ export const ProtectedPermissionsConfigPage: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {(Object.entries(filteredGrouped) as [string, any[]][]).map(([groupCode, list]) => {
+          {orderPermissionGroups(Object.keys(filteredGrouped)).map((groupCode) => {
+            const list: any[] = filteredGrouped[groupCode];
             const meta = GROUP_META[groupCode] || {
               label: `Phân Hệ ${groupCode}`,
               icon: Shield,

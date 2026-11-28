@@ -24,6 +24,8 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { isUserAdmin } from '../../contexts/AuthContext';
 import { toast } from '../common/Toast';
+import { LibraryCover } from '../library/LibraryCover';
+import { libraryService } from '../../services/libraryService';
 
 export interface DiffProposalData {
   proposal_id: string;
@@ -43,6 +45,19 @@ export interface DiffProposalData {
   current_signer?: string;
   current_security_level_id: number;
   current_security_name?: string;
+  // Chỉ có ở đề xuất của Thư viện số (file_id 'LIB-…')
+  library_category_name?: string;
+  current_library_category_name?: string;
+  publisher?: string | null;
+  current_publisher?: string | null;
+  publish_year?: number | null;
+  current_publish_year?: number | null;
+  library_media?: {
+    page_count?: number | null;
+    current_page_count?: number | null;
+    cover_version?: string | null;
+    current_cover_version?: string | null;
+  };
   current_unit_name?: string;
   current_issued_date?: string;
   document_issuing_unit_id?: string;
@@ -295,7 +310,17 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
     activeProposal.note?.toLowerCase().includes('dang t?i')
   );
 
-  const diffFields = [
+  // Thư viện số: đổi nhãn, so thêm thể loại / nhà xuất bản / năm; bỏ "Ngày ban hành" và độ mật
+  const isLibrary = /^LIB-/i.test(activeProposal.file_id || '');
+  const libraryRow = (label: string, before: unknown, after: unknown) => ({
+    label,
+    oldValue: isNewUpload ? '(Chưa có)' : String(before ?? '—'),
+    newValue: String(after ?? '—'),
+    hasChanged: isNewUpload || (before ?? null) !== (after ?? null),
+    isMono: false,
+  });
+
+  const baseFields = [
     {
       label: 'Số hiệu / Ký hiệu văn bản',
       oldValue: isNewUpload ? '(Văn bản mới)' : (activeProposal.current_document_code || '—'),
@@ -363,6 +388,28 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
     },
   ];
 
+  const libraryLabels: Record<string, string> = {
+    'Số hiệu / Ký hiệu văn bản': 'Mã tài liệu thư viện',
+    'Trích yếu nội dung văn bản': 'Tên tài liệu thư viện',
+    'Đơn vị ban hành': 'Đơn vị quản lý',
+    'Người ký ban hành': 'Tác giả',
+  };
+  const diffFields = !isLibrary ? baseFields : [
+    ...baseFields
+      .filter((f) => f.label !== 'Ngày ban hành' && f.label !== 'Cấp độ bảo mật (Độ mật)')
+      .map((f) => ({
+        ...f,
+        label: libraryLabels[f.label] || f.label,
+        oldValue: f.oldValue === '(Văn bản mới)' ? '(Tài liệu mới)' : f.oldValue,
+      })),
+    libraryRow('Thể loại thư viện', activeProposal.current_library_category_name, activeProposal.library_category_name),
+    libraryRow('Nhà xuất bản', activeProposal.current_publisher, activeProposal.publisher),
+    libraryRow('Năm xuất bản', activeProposal.current_publish_year, activeProposal.publish_year),
+    ...(activeProposal.library_media?.page_count
+      ? [libraryRow('Số trang', activeProposal.library_media.current_page_count, activeProposal.library_media.page_count)]
+      : []),
+  ];
+
   const changedCount = diffFields.filter((f) => f.hasChanged).length;
   const visibleFields = onlyChanged ? diffFields.filter((f) => f.hasChanged) : diffFields;
 
@@ -403,7 +450,9 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                      {isNewUpload ? 'Phê Duyệt Đăng Tải Văn Bản Mới' : 'Kiểm Duyệt Yêu Cầu Chỉnh Sửa'}
+                      {isNewUpload
+                        ? (isLibrary ? 'Phê Duyệt Tài Liệu Thư Viện Mới' : 'Phê Duyệt Đăng Tải Văn Bản Mới')
+                        : (isLibrary ? 'Kiểm Duyệt Chỉnh Sửa Thư Viện' : 'Kiểm Duyệt Yêu Cầu Chỉnh Sửa')}
                     </h2>
                     <span className="font-mono text-xs px-2.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-700">
                       {activeProposal.proposal_id}
@@ -531,6 +580,38 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
                   </span>
                 </div>
               </div>
+
+              {/* Ảnh bìa tài liệu thư viện: người duyệt xem trước khi duyệt */}
+              {isLibrary && activeProposal.library_media?.cover_version && (() => {
+                const media = activeProposal.library_media!;
+                const changed = !isNewUpload && media.cover_version !== media.current_cover_version;
+                return (
+                  <div className="flex items-end gap-5 flex-wrap rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+                    {changed && (
+                      <figure className="space-y-1.5">
+                        <LibraryCover
+                          url={libraryService.coverUrl(activeProposal.file_id, media.current_cover_version)}
+                          authenticated
+                          alt="Bìa hiện tại"
+                          className="w-[96px] h-[136px]"
+                        />
+                        <figcaption className="text-xs text-slate-500 text-center">Bìa hiện tại</figcaption>
+                      </figure>
+                    )}
+                    <figure className="space-y-1.5">
+                      <LibraryCover
+                        url={libraryService.proposalCoverUrl(activeProposal.proposal_id, media.cover_version)}
+                        authenticated
+                        alt="Bìa đề xuất"
+                        className="w-[96px] h-[136px]"
+                      />
+                      <figcaption className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 text-center">
+                        {changed ? 'Bìa mới' : 'Ảnh bìa'}
+                      </figcaption>
+                    </figure>
+                  </div>
+                );
+              })()}
 
               {/* 2. THANH TIÊU ĐỀ BẢNG ĐỐI CHIẾU */}
               <div className="space-y-3">
@@ -832,7 +913,7 @@ export const ApprovalDiffModal: React.FC<ApprovalDiffModalProps> = ({
                             <Check className="w-4 h-4 stroke-[2.5]" />
                           )}
                           <span>
-                            {!isFinalApprover ? 'Thẩm định (chờ Chỉ huy xác nhận)' : isNewUpload ? 'Phê duyệt & Tiếp nhận văn bản' : 'Phê duyệt & Cập nhật'}
+                            {!isFinalApprover ? 'Thẩm định (chờ Chỉ huy xác nhận)' : isNewUpload ? `Phê duyệt & Tiếp nhận ${isLibrary ? 'tài liệu' : 'văn bản'}` : 'Phê duyệt & Cập nhật'}
                           </span>
                         </button>
                       </>

@@ -62,7 +62,7 @@ module.exports = function createCommandRoutes({ requirePermission }) {
                      ISNULL(SUM(CASE WHEN d.created_at >= DATEADD(day,-7,GETDATE())  THEN 1 ELSE 0 END),0) AS new_7d,
                      ISNULL(SUM(CASE WHEN d.created_at >= DATEADD(day,-30,GETDATE()) THEN 1 ELSE 0 END),0) AS new_30d
               FROM DOCUMENT d
-              WHERE d.deleted_at IS NULL AND d.file_id NOT LIKE 'DOC-LEC-%'
+              WHERE d.deleted_at IS NULL AND d.file_id NOT LIKE 'DOC-LEC-%' AND d.file_id NOT LIKE 'LIB-%'
                 AND d.security_level_id <= @cl ${f}`);
             return out.recordset[0];
           }, { total: 0, new_7d: 0, new_30d: 0 }),
@@ -74,7 +74,7 @@ module.exports = function createCommandRoutes({ requirePermission }) {
               SELECT sl.level_id AS level_id, sl.name AS name, COUNT(d.file_id) AS n
               FROM SECURITY_LEVEL sl
               LEFT JOIN DOCUMENT d ON d.security_level_id = sl.level_id
-                   AND d.deleted_at IS NULL AND d.file_id NOT LIKE 'DOC-LEC-%' ${f}
+                   AND d.deleted_at IS NULL AND d.file_id NOT LIKE 'DOC-LEC-%' AND d.file_id NOT LIKE 'LIB-%' ${f}
               WHERE sl.level_id <= @cl
               GROUP BY sl.level_id, sl.name ORDER BY sl.level_id`);
             return out.recordset;
@@ -86,7 +86,7 @@ module.exports = function createCommandRoutes({ requirePermission }) {
             const out = await r.query(`
               SELECT TOP 10 u.unit_id AS unit_id, u.name AS name, COUNT(d.file_id) AS n
               FROM DOCUMENT d JOIN UNIT u ON u.unit_id = d.issuing_unit_id
-              WHERE d.deleted_at IS NULL AND d.file_id NOT LIKE 'DOC-LEC-%'
+              WHERE d.deleted_at IS NULL AND d.file_id NOT LIKE 'DOC-LEC-%' AND d.file_id NOT LIKE 'LIB-%'
                 AND d.security_level_id <= @cl ${f}
               GROUP BY u.unit_id, u.name ORDER BY n DESC`);
             return out.recordset;
@@ -98,7 +98,7 @@ module.exports = function createCommandRoutes({ requirePermission }) {
             const out = await r.query(`
               SELECT TOP 10 dt.type_id AS type_id, dt.name AS name, COUNT(d.file_id) AS n
               FROM DOCUMENT d JOIN DOCUMENT_TYPE dt ON dt.type_id = d.doc_type_id
-              WHERE d.deleted_at IS NULL AND d.file_id NOT LIKE 'DOC-LEC-%'
+              WHERE d.deleted_at IS NULL AND d.file_id NOT LIKE 'DOC-LEC-%' AND d.file_id NOT LIKE 'LIB-%'
                 AND d.security_level_id <= @cl ${f}
               GROUP BY dt.type_id, dt.name ORDER BY n DESC`);
             return out.recordset;

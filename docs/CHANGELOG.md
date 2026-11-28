@@ -4,6 +4,72 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.25-thu-vien-anh-bia-so-trang] — 2026-11-28
+
+### 1. Ảnh Bìa và Số Trang Cho Tài Liệu Thư Viện
+- **Số trang:** máy chủ tự đếm khi đăng tải và khi thay tệp.
+- **Ảnh bìa:** tự lấy trang 1; người đăng chọn được ảnh khác (JPG, PNG, WebP, tối đa 5 MB) hoặc quay về bìa tự động. Bìa tự chọn được giữ khi thay tệp. Mọi ảnh được mã hóa lại thành JPEG thu nhỏ (tối đa 360×510).
+- **Vẽ trang PDF** ở luồng phụ, lần lượt từng tệp ([`backend/src/library-media.js`](../backend/src/library-media.js)), khai báo wasm cục bộ để giải được ảnh scan JBIG2 / JPEG 2000.
+- **Tài liệu đã đăng trước đó** được đếm trang và tạo bìa tự động (chạy nền một lần sau khi khởi động).
+- **Phê duyệt:** người duyệt thấy bìa hiện tại, bìa mới và số trang trước khi duyệt.
+- **API:** trường `cover`, `cover_auto` khi đăng/sửa; `GET /api/library/:id/cover`, `GET /api/library/proposals/:proposalId/cover`.
+- **Triển khai:** chạy lại `backend/migrations/create_library_module.sql` (thêm 6 cột), build giao diện, khởi động lại backend. Chưa chạy SQL thì thư viện vẫn hoạt động, chỉ chưa có bìa.
+
+---
+
+## [v1.8.24-dong-bo-nhom-quyen] — 2026-11-28
+
+### 1. Đồng Bộ Nhóm Quyền Giữa Các Màn Hình Phân Quyền
+- **Lỗi:** hộp "Phân quyền cho vai trò" chỉ hiện nhóm khai báo sẵn nên 10 quyền Thư viện số bị ẩn.
+- **Khắc phục:** danh sách nhóm quyền chuyển về một nguồn duy nhất [`permissionGroups.ts`](../frontend/src/constants/permissionGroups.ts), dùng cho phân quyền vai trò, cấp quyền riêng và bảng Quyền hạn (cùng tên, cùng thứ tự). Nhóm chưa khai báo vẫn hiện ở cuối.
+- Trang Khóa bảo vệ bổ sung tên và mô tả cho nhóm Bài giảng, Thư viện số, Chỉ huy; các trang yêu cầu phê duyệt hiện tên tiếng Việt của quyền `LIB_*`.
+- **Triển khai:** chỉ giao diện; build lại và tải lại trang.
+
+---
+
+## [v1.8.23-thu-vien-mo-thong-ke-tien-do-doc] — 2026-11-28
+
+### 1. Thư Viện Số Mở Cho Mọi Người
+- Bỏ phân cấp mật: tài liệu thư viện luôn là Cấp 1; Đại biểu và mọi tài khoản đều xem, tải được. Quyền `LIB_VIEW`, `LIB_DOWNLOAD` không còn tác dụng. Đăng tải, sửa, xóa vẫn theo quyền và quy trình duyệt cũ.
+- Chặn đưa vào thư viện tệp trùng nội dung với tài liệu có độ mật từ Cấp 2 (`409 CLASSIFIED_DUPLICATE`).
+
+### 2. Bảng Thống Kê
+- `GET /api/library/stats` và [`LibraryOverview.tsx`](../frontend/src/components/library/LibraryOverview.tsx): 4 thẻ chỉ số, phân bổ theo đơn vị, cơ cấu theo thể loại và năm xuất bản; bấm để lọc.
+
+### 3. Lưu Tiến Độ Đọc
+- Bảng mới `LIBRARY_READING`; API `/api/library/reading`, `/api/library/:id/reading`.
+- Trang [`/library/reading`](../frontend/src/pages/LibraryReadingPage.tsx) "Sách đã đọc"; trình xem tự mở lại trang đang đọc ([`useLibraryReading.ts`](../frontend/src/hooks/useLibraryReading.ts)). Đại biểu không được lưu.
+- **Triển khai:** chạy lại `backend/migrations/create_library_module.sql` (hoặc `.cjs`), build giao diện, khởi động lại backend.
+
+---
+
+## [v1.8.22-va-vong-doi-van-ban] — 2026-11-28
+
+### 1. Vá Hai Lỗi Đưa Văn Bản Vào Lưu Hành Mà Không Qua Duyệt
+- **Hiện tượng:** văn bản chờ duyệt hiện trong thùng rác nên có thể bị "Khôi phục" (lưu hành không qua duyệt) hoặc "Dọn rỗng" (mất hẳn); phê duyệt một đề xuất cũ làm văn bản đã xóa hiện lại.
+- **Nguyên nhân:** "chờ duyệt" và "đã xóa" cùng đặt `deleted_at`, nhiều chỗ không xét `deleted_reason`.
+- **Khắc phục ([`backend/src/document-lifecycle.js`](../backend/src/document-lifecycle.js), [`backend/server.js`](../backend/server.js)):**
+  - Thùng rác và thống kê thùng rác không gồm văn bản chờ duyệt; khôi phục, xóa vĩnh viễn văn bản chờ duyệt trả `409`.
+  - Văn bản bị từ chối duyệt chỉ `ROL-01`, `ROL-02` được khôi phục.
+  - Xóa mềm đóng luôn đề xuất đang chờ (`REJECTED` kèm lý do) trong cùng giao dịch.
+  - Phê duyệt đề xuất của tài liệu đã xóa trả `409`; sửa văn bản đang chờ duyệt hoặc đã xóa trả `409`.
+- **Phạm vi:** Văn bản số và Thư viện số. Không đổi cơ sở dữ liệu, không cần build lại giao diện; khởi động lại backend.
+
+---
+
+## [v1.8.21-thu-vien-so] — 2026-11-28
+
+### 1. Phân Hệ Thư Viện Số: API CRUD và Giao Diện
+- **Cơ sở dữ liệu ([`backend/migrations/create_library_module.cjs`](../backend/migrations/create_library_module.cjs)):** thêm bảng `LIBRARY_CATEGORY`, `LIBRARY_ITEM`, `LIBRARY_PROPOSAL`, 7 thể loại mẫu và 10 quyền `LIB_*` (nhóm `LIBRARY`). Không sửa bảng cũ. Tài liệu thư viện là dòng `DOCUMENT` có `file_id` bắt đầu bằng `LIB-`.
+- **API `/api/library` ([`backend/src/library-routes.js`](../backend/src/library-routes.js)):** danh sách có tìm kiếm, lọc, phân trang; chi tiết; đăng tải; sửa; xóa mềm; thùng rác; khôi phục; xóa vĩnh viễn; dọn thùng rác; CRUD thể loại; đọc PDF điền gợi ý.
+- **Dùng lại:** xem/tải qua `/api/files/:fileId/view` (độ mật, vân tay, mã PIN, watermark); đề xuất chỉnh sửa qua hàng chờ hiện có.
+- **Quy tắc duyệt:** chỉ `ROL-01` hoặc `ROL-02` (khi quyền không bị khóa) được lưu thẳng; người khác, kể cả người đăng gốc, phải gửi đề xuất.
+- **Tách biệt với Văn bản số:** `/api/documents/LIB-*` trả 404; danh sách, thùng rác, thống kê văn bản không tính tài liệu thư viện.
+- **Giao diện ([`frontend/src/pages/LibraryPage.tsx`](../frontend/src/pages/LibraryPage.tsx)):** thay trang "đang phát triển" bằng kho thư viện, thùng rác, form đăng tải/sửa, quản lý thể loại, duyệt đề xuất.
+- **Triển khai:** chạy `node backend/migrations/create_library_module.cjs`, build frontend, khởi động lại backend, đăng nhập lại.
+
+---
+
 ## [v1.8.20-ui-system-fonts-segmented-tabs-and-date-picker-polish] — 2026-11-27
 
 ### 1. Chuẩn Hóa Font Hệ Thống & Thành Phần Điều Hướng UI/UX (`SegmentedTabs`, `SingleDatePicker`)

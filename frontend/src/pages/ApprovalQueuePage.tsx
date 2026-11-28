@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { LIBRARY_PERMISSION_NAMES } from '../constants/permissionGroups';
 import { createPortal } from 'react-dom';
 import {
   ShieldCheck,
@@ -87,6 +88,7 @@ const formatRequestAction = (method: string, path: string): string => {
 
 // Helper: Dịch Mã Quyền
 const PERMISSION_NAMES: Record<string, string> = {
+  ...LIBRARY_PERMISSION_NAMES,
   DOC_EDIT: 'Sửa văn bản',
   USER_DELETE: 'Xóa tài khoản',
   USER_ROLE_ASSIGN: 'Gán vai trò',
@@ -154,6 +156,13 @@ export const ApprovalQueuePage: React.FC = () => {
       .map((item) => {
         const base = item.proposal_data || {};
         return {
+          library_media: base.library_media,
+          library_category_name: base.library_category_name,
+          current_library_category_name: base.current_library_category_name,
+          publisher: base.publisher,
+          current_publisher: base.current_publisher,
+          publish_year: base.publish_year,
+          current_publish_year: base.current_publish_year,
           proposal_id: item.request_id,
           file_id: base.file_id || item.http_path?.replace('/api/documents/', '') || '',
           document_code: base.document_code || item.document_code,
@@ -425,6 +434,13 @@ export const ApprovalQueuePage: React.FC = () => {
     if (!selected || !selected.request_id.startsWith('PROP-')) return null;
     const base = selected.proposal_data || {};
     return {
+      library_media: base.library_media,
+      library_category_name: base.library_category_name,
+      current_library_category_name: base.current_library_category_name,
+      publisher: base.publisher,
+      current_publisher: base.current_publisher,
+      publish_year: base.publish_year,
+      current_publish_year: base.current_publish_year,
       proposal_id: selected.request_id,
       file_id: base.file_id || selected.http_path?.replace('/api/documents/', '') || '',
       document_code: base.document_code || selected.document_code,

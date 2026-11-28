@@ -3771,6 +3771,67 @@ ScormTracking: {
   },
 };
 
+// ─── Thư viện số ───
+swaggerSpec.tags.push({ name: 'Library', description: 'Thư viện số — CRUD, thùng rác, thể loại (duyệt đề xuất dùng /api/documents/proposals)' });
+{
+  const idParam = [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }];
+  const op = (summary, permission, extra = {}) => ({
+    tags: ['Library'], summary, description: `**Yêu cầu permission:** \`${permission}\`.`,
+    security: [{ BearerAuth: [] }], responses: { 200: { description: 'OK' }, 403: { description: 'Thiếu quyền hoặc vượt cấp mật' } }, ...extra,
+  });
+  const anyone = (summary, extra = {}) => ({
+    tags: ['Library'], summary, description: 'Mở cho mọi người.', responses: { 200: { description: 'OK' } }, ...extra,
+  });
+  const signedIn = (summary, extra = {}) => ({ ...anyone(summary, extra), description: 'Cần đăng nhập.', security: [{ BearerAuth: [] }] });
+  const itemForm = (required) => ({ requestBody: { required: true, content: { 'multipart/form-data': { schema: { type: 'object', required,
+    properties: {
+      file: { type: 'string', format: 'binary' }, title: { type: 'string' }, category_id: { type: 'string' },
+      document_code: { type: 'string' }, author: { type: 'string' },
+      publisher: { type: 'string' }, publish_year: { type: 'integer' }, issuing_unit_id: { type: 'string' },
+      summary: { type: 'string' }, note: { type: 'string' }, force_upload: { type: 'string', enum: ['1'] },
+      cover: { type: 'string', format: 'binary', description: 'Ảnh bìa JPG/PNG/WebP; bỏ trống thì lấy trang 1' },
+      cover_auto: { type: 'string', enum: ['1'], description: 'Khi sửa: quay về bìa lấy từ trang 1' },
+    } } } } } });
+  const jsonBody = (properties) => ({ requestBody: { content: { 'application/json': { schema: { type: 'object', properties } } } } });
+  const category = jsonBody({ name: { type: 'string' }, description: { type: 'string' }, sort_order: { type: 'integer' }, active: { type: 'boolean' } });
+  Object.assign(swaggerSpec.paths, {
+    '/api/library': {
+      get: anyone('Danh sách, tìm kiếm, lọc, phân trang', { parameters: ['q', 'category', 'unit', 'include_children', 'year', 'page', 'page_size']
+        .map((name) => ({ in: 'query', name, schema: { type: 'string' } })) }),
+      post: op('Đăng tải tài liệu', 'LIB_UPLOAD', itemForm(['file', 'title', 'category_id'])),
+    },
+    '/api/library/{id}': {
+      get: anyone('Chi tiết', { parameters: idParam }),
+      put: op('Sửa hoặc gửi đề xuất sửa', 'LIB_EDIT', { parameters: idParam, ...itemForm([]) }),
+      delete: op('Xóa vào thùng rác', 'LIB_DELETE', { parameters: idParam, ...jsonBody({ reason: { type: 'string' } }) }),
+    },
+    '/api/library/trash': {
+      get: op('Thùng rác thư viện', 'LIB_TRASH_VIEW'),
+      delete: op('Dọn thùng rác', 'LIB_PURGE', jsonBody({ confirm: { type: 'string', example: 'DON-SACH-THUNG-RAC' } })),
+    },
+    '/api/library/{id}/restore': { post: op('Khôi phục', 'LIB_RESTORE', { parameters: idParam }) },
+    '/api/library/{id}/purge': { delete: op('Xóa vĩnh viễn', 'LIB_PURGE', { parameters: idParam, ...jsonBody({ confirm: { type: 'string' } }) }) },
+    '/api/library/parse': { post: op('Đọc PDF để điền gợi ý (không lưu)', 'LIB_PARSE', itemForm(['file'])) },
+    '/api/library/categories': {
+      get: anyone('Danh sách thể loại'),
+      post: op('Thêm thể loại', 'LIB_CATEGORY_MANAGE', category),
+    },
+    '/api/library/{id}/cover': { get: anyone('Ảnh bìa', { parameters: idParam }) },
+    '/api/library/proposals/{id}/cover': { get: signedIn('Ảnh bìa của đề xuất', { parameters: idParam }) },
+    '/api/library/stats': { get: anyone('Số liệu bảng thống kê') },
+    '/api/library/reading': { get: signedIn('Lịch sử đọc của tôi') },
+    '/api/library/{id}/reading': {
+      get: signedIn('Trang đang đọc của tôi', { parameters: idParam }),
+      put: signedIn('Lưu tiến độ đọc', { parameters: idParam, ...jsonBody({ page: { type: 'integer' }, total_pages: { type: 'integer' }, completed: { type: 'boolean' } }) }),
+      delete: signedIn('Xóa khỏi lịch sử đọc', { parameters: idParam }),
+    },
+    '/api/library/categories/{id}': {
+      put: op('Sửa thể loại', 'LIB_CATEGORY_MANAGE', { parameters: idParam, ...category }),
+      delete: op('Xóa thể loại chưa dùng', 'LIB_CATEGORY_MANAGE', { parameters: idParam }),
+    },
+  });
+}
+
 // ─── Debug log — DYNAMIC, KHÔNG HARDCODE ───
 const swaggerPaths  = Object.keys(swaggerSpec.paths);
 const swaggerOps    = Object.values(swaggerSpec.paths)

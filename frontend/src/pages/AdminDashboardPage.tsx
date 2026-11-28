@@ -76,6 +76,7 @@ import { ApprovalQueuePage } from './ApprovalQueuePage';
 import { ProtectedPermissionsConfigPage } from './ProtectedPermissionsConfigPage';
 import { isApprovalRequired } from '../utils/approvalUtils';
 import { useApprovalContext } from '../contexts/ApprovalContext';
+import { PERMISSION_GROUP_CODES, getPermissionGroup, orderPermissionGroups } from '../constants/permissionGroups';
 import { useSearchParams } from 'react-router-dom';
 import { Tooltip } from 'antd';
 
@@ -199,20 +200,10 @@ const LEVEL_CONFIGS: Record<number, {
 const ADMIN_NAV_TABS: Array<{ id: string; label: string; icon: any; permission?: string }> =
   ADMIN_NAV_GROUPS.flatMap((g) => g.items);
 
-const PERMISSION_GROUPS = [
-  { value: 'DOCUMENT',    label: '📄 Văn bản' },
-  { value: 'USER',        label: '👤 Người dùng' },
-  { value: 'ROLE',        label: '🔑 Vai trò' },
-  { value: 'PERMISSION',  label: '🛡️ Quyền' },
-  { value: 'CATALOG',     label: '📚 Danh mục' },
-  { value: 'FINGERPRINT', label: '🔒 Sinh trắc' },
-  { value: 'AUDIT',       label: '📊 Kiểm toán' },
-  { value: 'AI',          label: '🤖 Trợ lý AI' },
-  { value: 'SYSTEM',      label: '⚙️ Hệ thống' },
-  { value: 'SESSION',     label: '🖥️ Phiên' },
-  { value: 'LECTURE',     label: '🎓 Bài giảng' },
-  { value: 'COMMAND',     label: '📊 Chỉ huy' },
-];
+const PERMISSION_GROUPS = PERMISSION_GROUP_CODES.map((value) => ({
+  value,
+  label: `${getPermissionGroup(value).emoji} ${getPermissionGroup(value).label}`,
+}));
 
 const PERMISSION_TONES = [
   { value: 'read',     label: '🟢 Read — Xem / tra cứu (an toàn)' },
@@ -224,7 +215,7 @@ const PERMISSION_TONES = [
 // Helper ánh xạ màu sắc chuẩn quân đội cho Group Badge
 const getPermissionGroupBadge = (groupCode?: string) => {
   const g = (groupCode || '').toUpperCase();
-  if (g === 'DOCUMENT') {
+  if (g === 'DOCUMENT' || g === 'LIBRARY') {
     return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30';
   }
   if (g === 'SYSTEM' || g === 'SYSTEM_STATS') {
@@ -552,7 +543,7 @@ const pinPendingCount = useMemo(
       const g = (p.group_code || 'SYSTEM').toUpperCase();
       if (g) groups.add(g);
     });
-    return Array.from(groups).sort();
+    return orderPermissionGroups(groups);
   }, [permsList]);
 
   // === MODALS ===
@@ -1944,7 +1935,7 @@ const pinPendingCount = useMemo(
                             : 'bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60'
                         }`}
                       >
-                        {grp} ({count})
+                        {getPermissionGroup(grp).label} ({count})
                       </button>
                     );
                   })}
@@ -2051,7 +2042,7 @@ const pinPendingCount = useMemo(
                                   )}`}
                                 >
                                   <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-                                  {(p as any).group_code || 'SYSTEM'}
+                                  {getPermissionGroup((p as any).group_code).label}
                                 </span>
                               </td>
 

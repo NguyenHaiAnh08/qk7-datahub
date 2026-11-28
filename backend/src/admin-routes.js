@@ -1,6 +1,7 @@
 // src/admin-routes.js
 const bcrypt = require('./bcrypt-lib');
 const { createApprovalAuthority, delegatedReady } = require('./approval-authority');
+const { isLibraryId, enrichLibraryProposals } = require('./library-routes');
 const { AUTO_PERMISSIONS, getAutoRequiredPermission } = require('./route-permissions');
 let invalidateCatalogCache;
 try {
@@ -122,14 +123,16 @@ module.exports = (app, deps) => {
 
         const proposalMine = (propResult.recordset || []).map((p) => {
           const docCodeDisplay = p.document_code || p.current_document_code || p.file_id;
+          const isLib = isLibraryId(p.file_id);
+          const noun = isLib ? 'tài liệu thư viện' : 'văn bản';
           return {
             request_id: p.proposal_id,
             requester_id: p.requester_id,
             requester_name: p.requester_name,
-            required_permission: 'DOC_EDIT',
+            required_permission: isLib ? 'LIB_EDIT' : 'DOC_EDIT',
             http_method: 'PUT',
-            http_path: `/api/documents/${p.file_id}`,
-            target_summary: `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
+            http_path: isLib ? `/api/library/${p.file_id}` : `/api/documents/${p.file_id}`,
+            target_summary: `Đề xuất chỉnh sửa ${noun} [${docCodeDisplay}]: ${p.title}`,
             status: p.status === 'PENDING_OWNER' ? 'PENDING' : p.status,
             stage: p.status === 'PENDING_OWNER' ? 'WAITING_OWNER' : undefined,
             reviewed_by: p.reviewed_by,
@@ -315,12 +318,12 @@ module.exports = (app, deps) => {
             const pool = await getPool();
             const [u, d, byLv, byType, byUnit, logs24, trash] = await Promise.all([
                 pool.request().query(`SELECT COUNT(*) AS n FROM [USER]`),
-                pool.request().query(`SELECT COUNT(*) AS n, ISNULL(SUM(file_size),0) AS size FROM DOCUMENT WHERE deleted_at IS NULL`),
-                pool.request().query(`SELECT sl.level_id AS lv, sl.name AS lvName, COUNT(d.file_id) AS n FROM SECURITY_LEVEL sl LEFT JOIN DOCUMENT d ON d.security_level_id = sl.level_id AND d.deleted_at IS NULL GROUP BY sl.level_id, sl.name ORDER BY sl.level_id`),
-                pool.request().query(`SELECT dt.type_id AS id, dt.name, COUNT(d.file_id) AS n FROM DOCUMENT_TYPE dt LEFT JOIN DOCUMENT d ON d.doc_type_id = dt.type_id AND d.deleted_at IS NULL GROUP BY dt.type_id, dt.name ORDER BY n DESC`),
-                pool.request().query(`SELECT u.unit_id AS id, u.name, COUNT(d.file_id) AS n FROM UNIT u LEFT JOIN DOCUMENT d ON d.issuing_unit_id = u.unit_id AND d.deleted_at IS NULL GROUP BY u.unit_id, u.name ORDER BY n DESC`),
+                pool.request().query(`SELECT COUNT(*) AS n, ISNULL(SUM(file_size),0) AS size FROM DOCUMENT WHERE deleted_at IS NULL AND file_id NOT LIKE 'LIB-%'`),
+                pool.request().query(`SELECT sl.level_id AS lv, sl.name AS lvName, COUNT(d.file_id) AS n FROM SECURITY_LEVEL sl LEFT JOIN DOCUMENT d ON d.security_level_id = sl.level_id AND d.deleted_at IS NULL AND d.file_id NOT LIKE 'LIB-%' GROUP BY sl.level_id, sl.name ORDER BY sl.level_id`),
+                pool.request().query(`SELECT dt.type_id AS id, dt.name, COUNT(d.file_id) AS n FROM DOCUMENT_TYPE dt LEFT JOIN DOCUMENT d ON d.doc_type_id = dt.type_id AND d.deleted_at IS NULL AND d.file_id NOT LIKE 'LIB-%' GROUP BY dt.type_id, dt.name ORDER BY n DESC`),
+                pool.request().query(`SELECT u.unit_id AS id, u.name, COUNT(d.file_id) AS n FROM UNIT u LEFT JOIN DOCUMENT d ON d.issuing_unit_id = u.unit_id AND d.deleted_at IS NULL AND d.file_id NOT LIKE 'LIB-%' GROUP BY u.unit_id, u.name ORDER BY n DESC`),
                 pool.request().query(`SELECT COUNT(*) AS n FROM ACCESS_LOG WHERE [timestamp] >= DATEADD(day,-1,GETDATE())`),
-                pool.request().query(`SELECT COUNT(*) AS n FROM DOCUMENT WHERE deleted_at IS NOT NULL`),
+                pool.request().query(`SELECT COUNT(*) AS n FROM DOCUMENT WHERE deleted_at IS NOT NULL AND ISNULL(deleted_reason, '') <> 'PENDING_APPROVAL' AND file_id NOT LIKE 'LIB-%'`),
             ]);
             res.json({
                 users: u.recordset[0].n,
@@ -2086,10 +2089,13 @@ module.exports = (app, deps) => {
             }
             propQuery += ` ORDER BY p.created_at DESC`;
             const propRes = await propRequest.query(propQuery);
+            await enrichLibraryProposals(propRes.recordset);
 
             const proposalItems = (propRes.recordset || []).map((p) => {
               const docCodeDisplay = p.document_code || p.current_document_code || p.file_id;
               const isNewUpload = (p.deleted_reason === 'PENDING_APPROVAL' || (p.note && p.note.includes('Đăng tải')));
+              const isLib = isLibraryId(p.file_id);
+              const noun = isLib ? 'tài liệu thư viện' : 'văn bản';
               return {
                 request_id: p.proposal_id,
                 requester_id: p.requester_id,
@@ -2100,9 +2106,11 @@ module.exports = (app, deps) => {
                 requester_unit_name: p.requester_unit_name,
                 document_issuing_unit_id: p.document_issuing_unit_id,
                 document_issuing_unit_name: p.current_unit_name,
-                required_permission: isNewUpload ? 'DOC_UPLOAD' : 'DOC_EDIT',
+                required_permission: `${isLib ? 'LIB' : 'DOC'}_${isNewUpload ? 'UPLOAD' : 'EDIT'}`,
                 http_method: isNewUpload ? 'POST' : 'PUT',
-                http_path: isNewUpload ? `/api/documents/upload` : `/api/documents/${p.file_id}`,
+                http_path: isLib
+                  ? (isNewUpload ? '/api/library' : `/api/library/${p.file_id}`)
+                  : (isNewUpload ? `/api/documents/upload` : `/api/documents/${p.file_id}`),
                 http_body: JSON.stringify({
                   file_id: p.file_id,
                   document_code: p.document_code,
@@ -2113,8 +2121,8 @@ module.exports = (app, deps) => {
                   note: p.note,
                 }),
                 target_summary: isNewUpload
-                  ? `Đăng tải văn bản mới [${docCodeDisplay}]: ${p.title}`
-                  : `Đề xuất chỉnh sửa văn bản [${docCodeDisplay}]: ${p.title}`,
+                  ? `Đăng tải ${noun} mới [${docCodeDisplay}]: ${p.title}`
+                  : `Đề xuất chỉnh sửa ${noun} [${docCodeDisplay}]: ${p.title}`,
                 status: p.status,
                 validated_by: p.validated_by,
                 validated_by_name: p.validated_by_name,
@@ -2126,8 +2134,15 @@ module.exports = (app, deps) => {
                 reviewed_at: p.reviewed_at,
                 review_note: p.review_note,
                 created_at: p.created_at,
-                request_reason: p.note || (isNewUpload ? 'Đăng tải văn bản mới chờ Chỉ huy duyệt' : 'Đề xuất chuẩn hóa thông tin văn bản'),
+                request_reason: p.note || (isNewUpload ? `Đăng tải ${noun} mới chờ Chỉ huy duyệt` : `Đề xuất chuẩn hóa thông tin ${noun}`),
                 proposal_data: {
+                  library_media: p.library_media,
+                  library_category_name: p.library_category_name,
+                  current_library_category_name: p.current_library_category_name,
+                  publisher: p.publisher,
+                  current_publisher: p.current_publisher,
+                  publish_year: p.publish_year,
+                  current_publish_year: p.current_publish_year,
                   proposal_id: p.proposal_id,
                   file_id: p.file_id,
                   document_code: p.document_code || p.current_document_code,
@@ -2197,15 +2212,16 @@ module.exports = (app, deps) => {
                   WHERE p.proposal_id = @pid
                 `);
               if (propRes.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
+              await enrichLibraryProposals(propRes.recordset);
               const p = propRes.recordset[0];
               return res.json({
                 request_id: p.proposal_id,
                 requester_id: p.requester_id,
                 requester_name: p.requester_name,
                 requester_rank: p.requester_rank,
-                required_permission: 'DOC_EDIT',
+                required_permission: isLibraryId(p.file_id) ? 'LIB_EDIT' : 'DOC_EDIT',
                 http_method: 'PUT',
-                http_path: `/api/documents/${p.file_id}`,
+                http_path: isLibraryId(p.file_id) ? `/api/library/${p.file_id}` : `/api/documents/${p.file_id}`,
                 target_summary: `Đề xuất chỉnh sửa: ${p.document_code || p.file_id} - ${p.title}`,
                 status: p.status,
                 created_at: p.created_at,
@@ -2292,7 +2308,7 @@ module.exports = (app, deps) => {
             if (r.recordset[0].n === 0) return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
             await log(req, 'APPROVAL_APPROVED', `Duyệt yêu cầu ${id}`);
             res.json({ success: true, request_id: id });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
     });
 
     app.post('/api/admin/approval-requests/:id/reject', async (req, res) => {

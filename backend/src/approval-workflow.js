@@ -39,12 +39,18 @@ const EXCLUDED_PATHS = [
   /^\/api\/documents\/upload$/,
   /^\/api\/documents\/parse$/,
   /^\/api\/documents\/proposals(\/|$)/,
+  // Thư viện: đăng tải / đọc PDF có luồng đề xuất riêng (xóa, khôi phục, danh mục vẫn qua bộ chặn)
+  /^\/api\/library$/,
+  /^\/api\/library\/parse$/,
+  // Lưu tiến độ đọc của chính mình: thao tác cá nhân, không cần duyệt
+  /^\/api\/library\/[^/]+\/reading$/,
 ];
 
-// PUT /api/documents/:id (sửa văn bản) có luồng đề xuất riêng → miễn
+// PUT /api/documents/:id và /api/library/:id (sửa) có luồng đề xuất riêng → miễn
 const isExcludedWrite = (method, fullPath) =>
   EXCLUDED_PATHS.some((rx) => rx.test(fullPath))
-  || (method === 'PUT' && /^\/api\/documents\/[^/]+$/.test(fullPath));
+  || (method === 'PUT' && /^\/api\/documents\/[^/]+$/.test(fullPath))
+  || (method === 'PUT' && /^\/api\/library\/(?!categories$)[^/]+$/.test(fullPath));
 
 // Route không bao giờ bị khóa xem: trang duyệt phải luôn mở được, nếu không người duyệt bị khóa vòng
 const VIEW_GATE_EXCLUDED = [

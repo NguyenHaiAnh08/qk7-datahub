@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { LIBRARY_PERMISSION_NAMES } from '../constants/permissionGroups';
 import { Header } from '../components/common/Header';
 import { approvalService, ApprovalRequest } from '../services/approvalService';
 import { toast } from '../components/common/Toast';
@@ -65,6 +66,7 @@ const formatRequestAction = (method: string, path: string): string => {
 // Helper: Dịch Mã Quyền
 // ============================================================
 const PERMISSION_NAMES: Record<string, string> = {
+  ...LIBRARY_PERMISSION_NAMES,
   DOC_EDIT: 'Sửa văn bản',
   USER_DELETE:            'Xóa tài khoản',
   USER_ROLE_ASSIGN:       'Gán vai trò',

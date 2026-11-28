@@ -70,7 +70,8 @@ const canUpload = hasPermission('DOC_UPLOAD');
   const loadPendingProposals = useCallback(async () => {
     try {
       const res = await documentsApi.getPendingProposals();
-      setPendingProposals(res.items || []);
+      // Đề xuất của Thư viện số xử lý ở trang Thư viện (và Hàng chờ phê duyệt)
+      setPendingProposals((res.items || []).filter((p) => !/^LIB-/i.test(p.file_id)));
     } catch (e) {
       console.error('[loadPendingProposals]', e);
     }

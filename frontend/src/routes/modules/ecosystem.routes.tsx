@@ -8,6 +8,7 @@ const LecturesPage = lazyWithRetry(() => import('../../pages/LecturesPage').then
 const ClassroomsPage = lazyWithRetry(() => import('../../pages/ClassroomsPage').then((m) => ({ default: m.ClassroomsPage })));
 const MaterialsPage = lazyWithRetry(() => import('../../pages/MaterialsPage').then((m) => ({ default: m.MaterialsPage })));
 const LibraryPage = lazyWithRetry(() => import('../../pages/LibraryPage').then((m) => ({ default: m.LibraryPage })));
+const LibraryReadingPage = lazyWithRetry(() => import('../../pages/LibraryReadingPage').then((m) => ({ default: m.LibraryReadingPage })));
 
 export interface RouteModuleExport {
   group?: string;
@@ -59,6 +60,15 @@ const ecosystemRoutes: RouteModuleExport = {
     {
       path: ROUTE_PATHS.LIBRARY,
       element: <LibraryPage />,
+    },
+    {
+      // Lịch sử đọc gắn với tài khoản nên bắt buộc đăng nhập
+      path: ROUTE_PATHS.LIBRARY_READING,
+      element: (
+        <ProtectedRoute>
+          <LibraryReadingPage />
+        </ProtectedRoute>
+      ),
     },
 
     {

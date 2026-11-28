@@ -3,8 +3,6 @@ import { Modal, Input, Spin, Empty, Alert, Tooltip } from 'antd';
 import {
   Shield, Lock, Search, CheckCircle2, AlertTriangle, ChevronDown,
   ChevronRight, Zap, Calendar, X, Minus,
-  FileText, Users, KeyRound, ShieldAlert, BookOpen, Fingerprint,
-  Activity, Bot, Settings, Monitor, Gauge, MonitorPlay,
 } from 'lucide-react';
 
 import { permissionService } from '../../services/permissionService';
@@ -24,108 +22,11 @@ import {
   TONE_PRIORITY,
   getSubGroupFromPermission,
 } from '../../constants/permissionSubGroups';
-
-// ═══════════════════════════════════════════════════════════
-// GROUP CONFIG — icon/màu theo group_code (10 nhóm)
-// ═══════════════════════════════════════════════════════════
-const GROUP_CONFIG: Record<
-  string,
-  {
-    label: string;
-    icon: React.ElementType;
-    color: string;
-    bg: string;
-    border: string;
-    description: string;
-  }
-> = {
-  DOCUMENT: {
-    label: 'Văn bản', icon: FileText,
-    color: 'text-emerald-700 dark:text-emerald-400',
-    bg: 'bg-emerald-50 dark:bg-emerald-500/10',
-    border: 'border-emerald-200 dark:border-emerald-500/30',
-    description: 'Tra cứu, đăng tải, tải về tài liệu',
-  },
-  USER: {
-    label: 'Người dùng', icon: Users,
-    color: 'text-sky-700 dark:text-sky-400',
-    bg: 'bg-sky-50 dark:bg-sky-500/10',
-    border: 'border-sky-200 dark:border-sky-500/30',
-    description: 'Quản lý tài khoản quân nhân',
-  },
-  ROLE: {
-    label: 'Vai trò', icon: KeyRound,
-    color: 'text-amber-700 dark:text-amber-400',
-    bg: 'bg-amber-50 dark:bg-amber-500/10',
-    border: 'border-amber-200 dark:border-amber-500/30',
-    description: 'CRUD vai trò hệ thống',
-  },
-  PERMISSION: {
-    label: 'Quyền', icon: ShieldAlert,
-    color: 'text-rose-700 dark:text-rose-400',
-    bg: 'bg-rose-50 dark:bg-rose-500/10',
-    border: 'border-rose-200 dark:border-rose-500/30',
-    description: 'Quản lý danh mục quyền',
-  },
-  CATALOG: {
-    label: 'Danh mục', icon: BookOpen,
-    color: 'text-purple-700 dark:text-purple-400',
-    bg: 'bg-purple-50 dark:bg-purple-500/10',
-    border: 'border-purple-200 dark:border-purple-500/30',
-    description: 'Đơn vị, loại VB, cấp bậc, chức vụ',
-  },
-  FINGERPRINT: {
-    label: 'Sinh trắc', icon: Fingerprint,
-    color: 'text-cyan-700 dark:text-cyan-400',
-    bg: 'bg-cyan-50 dark:bg-cyan-500/10',
-    border: 'border-cyan-200 dark:border-cyan-500/30',
-    description: 'Vân tay ZKTeco ZK9500',
-  },
-  AUDIT: {
-    label: 'Kiểm toán', icon: Activity,
-    color: 'text-indigo-700 dark:text-indigo-400',
-    bg: 'bg-indigo-50 dark:bg-indigo-500/10',
-    border: 'border-indigo-200 dark:border-indigo-500/30',
-    description: 'Nhật ký SOC và xuất Excel',
-  },
-  AI: {
-    label: 'Trợ lý AI', icon: Bot,
-    color: 'text-teal-700 dark:text-teal-400',
-    bg: 'bg-teal-50 dark:bg-teal-500/10',
-    border: 'border-teal-200 dark:border-teal-500/30',
-    description: 'Hỏi đáp RAG, study-book',
-  },
-  SYSTEM: {
-    label: 'Hệ thống', icon: Settings,
-    color: 'text-slate-700 dark:text-slate-400',
-    bg: 'bg-slate-100 dark:bg-slate-700/40',
-    border: 'border-slate-300 dark:border-slate-600/40',
-    description: 'Dashboard, health check',
-  },
-  LECTURE: {
-    label: 'Bài giảng', icon: MonitorPlay,
-    color: 'text-cyan-700 dark:text-cyan-400',
-    bg: 'bg-cyan-50 dark:bg-cyan-500/10',
-    border: 'border-cyan-200 dark:border-cyan-500/30',
-    description: 'Xem, soạn, duyệt, xóa bài giảng số',
-  },
-  COMMAND: {
-    label: 'Chỉ huy', icon: Gauge,
-    color: 'text-emerald-700 dark:text-emerald-400',
-    bg: 'bg-emerald-50 dark:bg-emerald-500/10',
-    border: 'border-emerald-200 dark:border-emerald-500/30',
-    description: 'Xem tổng quan giám sát toàn hệ thống (chỉ đọc)',
-  },
-  SESSION: {
-    label: 'Phiên', icon: Monitor,
-    color: 'text-lime-700 dark:text-lime-400',
-    bg: 'bg-lime-50 dark:bg-lime-500/10',
-    border: 'border-lime-200 dark:border-lime-500/30',
-    description: 'Quản lý phiên đăng nhập',
-  },
-};
-
-const DANGEROUS_CODES = new Set(['DOC_PURGE', 'PERMISSION_DELETE', 'ROLE_DELETE', 'USER_DELETE']);
+import {
+  DANGEROUS_PERMISSION_CODES as DANGEROUS_CODES,
+  getPermissionGroup,
+  orderPermissionGroups,
+} from '../../constants/permissionGroups';
 
 // ═══════════════════════════════════════════════════════════
 // PROPS
@@ -262,8 +163,7 @@ export const GrantPermissionModal: React.FC<GrantPermissionModalProps> = ({
       byGroup.get(g)!.push(r);
     }
 
-    return Object.keys(GROUP_CONFIG)
-      .filter((g) => byGroup.has(g))
+    return orderPermissionGroups(byGroup.keys())
       .map((group_code) => {
         const rowsInGroup = byGroup.get(group_code)!;
 
@@ -517,7 +417,7 @@ export const GrantPermissionModal: React.FC<GrantPermissionModalProps> = ({
             {/* Group pills nav */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
               {groupedData.map(({ group_code, total }) => {
-                const cfg = GROUP_CONFIG[group_code] || GROUP_CONFIG.SYSTEM;
+                const cfg = getPermissionGroup(group_code);
                 const Icon = cfg.icon;
                 return (
                   <button
@@ -541,7 +441,7 @@ export const GrantPermissionModal: React.FC<GrantPermissionModalProps> = ({
                 </div>
               ) : (
                 groupedData.map(({ group_code, subgroups }) => {
-                  const cfg = GROUP_CONFIG[group_code] || GROUP_CONFIG.SYSTEM;
+                  const cfg = getPermissionGroup(group_code);
                   const Icon = cfg.icon;
                   const isExpanded = expandedGroups.has(group_code);
 

@@ -24,6 +24,10 @@ const { getAutoRequiredPermission } = require('./src/route-permissions');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { createSecurityHeadersMiddleware } = require('./src/security-headers');
 const { handleCaPortalRequest, handleDohRequest } = require('./src/ca-portal');
+const {
+  createLibraryRouter, isLibraryId, enrichLibraryProposals, applyLibraryProposal,
+} = require('./src/library-routes');
+const lifecycle = require('./src/document-lifecycle');
 
 require('dotenv').config({
   path: [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')],
@@ -742,7 +746,7 @@ app.use('/api', async function xacThucPhien(req, res, next) {
       full_name: 'Đại biểu',
       clearance_level_id: 1,
       roles: ['DELEGATE'],
-      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD', 'LECTURE_VIEW'],
+      permissions: ['DOC_VIEW', 'DOC_DOWNLOAD', 'LECTURE_VIEW', 'LIB_VIEW', 'LIB_DOWNLOAD'],
       is_authenticated: false,
       is_guest: true,
       is_anonymous: true,
@@ -869,6 +873,17 @@ async function docViewGate(req, res, code) {
   if (!held.includes(code)) return true;
   return enforceViewGate(req, res, [code]);
 }
+
+// Tài liệu thư viện (file_id 'LIB-…') chỉ thao tác qua /api/library với quyền LIB_*.
+// Chặn đường vòng dùng quyền DOC_* trên /api/documents/:fileId. Đặt TRƯỚC bộ chặn duyệt.
+app.use('/api/documents', (req, res, next) => {
+  let first = req.path.split('/')[1] || '';
+  try { first = decodeURIComponent(first); } catch (_) {}
+  if (isLibraryId(first)) {
+    return res.status(404).json({ error: 'Không tìm thấy tài liệu. Tài liệu thư viện dùng API /api/library.', code: 'USE_LIBRARY_API' });
+  }
+  next();
+});
 
 app.use('/api', approvalInterceptor);
 
@@ -2419,6 +2434,7 @@ app.get('/api/documents', async (req, res) => {
       WHERE d.security_level_id <= @clearance
         AND d.deleted_at IS NULL
         AND d.file_id NOT LIKE 'DOC-LEC-%'
+        AND d.file_id NOT LIKE 'LIB-%'
     `;
     r.input('clearance', sql.Int, req.user.clearance_level_id);
     if (req.query.q) {
@@ -2500,6 +2516,7 @@ app.get('/api/documents/my-unit', requireAuth, requirePermission('DOC_VIEW'), as
         AND d.issuing_unit_id IN (${unitParams})
         AND d.deleted_at IS NULL
         AND d.file_id NOT LIKE 'DOC-LEC-%'
+        AND d.file_id NOT LIKE 'LIB-%'
     `;
     r.input('clearance', sql.Int, req.user.clearance_level_id);
     if (req.query.q) {
@@ -2561,7 +2578,8 @@ app.get('/api/documents/trash', requireAuth, requirePermission('DOC_TRASH_VIEW')
         LEFT JOIN SECURITY_LEVEL sl ON sl.level_id = d.security_level_id
         LEFT JOIN [USER] u ON u.user_id = d.deleted_by
         LEFT JOIN UNIT un ON un.unit_id = d.issuing_unit_id
-        WHERE d.deleted_at IS NOT NULL AND d.security_level_id <= @clearance
+        WHERE ${lifecycle.trashCondition('d')} AND d.security_level_id <= @clearance
+          AND d.file_id NOT LIKE 'LIB-%'
         ORDER BY d.deleted_at DESC
       `);
     res.json({ total: r.recordset.length, items: r.recordset });
@@ -2607,7 +2625,10 @@ app.get('/api/documents/:fileId', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // DOCUMENT PARSE / UPLOAD / UPDATE / DELETE / RESTORE / PURGE
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), validateUploadedPdf, async (req, res) => {
+app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('DOC_PARSE'), upload.single('file'), validateUploadedPdf, handleParsePdf);
+
+// Dùng chung cho Văn bản số và Thư viện số (/api/library/parse)
+async function handleParsePdf(req, res) {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'Thiếu file PDF' });
 
@@ -2823,7 +2844,7 @@ app.post('/api/documents/parse', parseLimiter, requireAuth, requirePermission('D
     console.error('[POST /api/documents/parse]', err);
     res.status(500).json({ success: false, error: err.message });
   }
-});
+}
 
 function buildStoredPath({ docTypeId, documentCode, fallbackId }) {
   const now = new Date();
@@ -3151,9 +3172,18 @@ app.put('/api/documents/:fileId', requireAuth, requirePermission('DOC_EDIT'), up
     const pool = await getPool();
     const exist = await pool.request()
       .input('fid', sql.VarChar(50), fileId)
-      .query(`SELECT stored_path, original_name, sha256, uploaded_by, issuing_unit_id FROM DOCUMENT WHERE file_id = @fid`);
+      .query(`SELECT stored_path, original_name, sha256, uploaded_by, issuing_unit_id, deleted_at, deleted_reason FROM DOCUMENT WHERE file_id = @fid`);
     if (exist.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
     const oldDoc = exist.recordset[0];
+    // Sửa lúc này sẽ làm người duyệt xét một nội dung khác với bản được lưu, hoặc làm bản đã xóa sống lại
+    if (oldDoc.deleted_at) {
+      return res.status(409).json({
+        error: lifecycle.isPending(oldDoc)
+          ? 'Văn bản đang chờ duyệt, chưa thể chỉnh sửa.'
+          : 'Văn bản đã bị xóa. Hãy khôi phục trước khi chỉnh sửa.',
+        code: 'DOCUMENT_NOT_EDITABLE',
+      });
+    }
 
     const {
       document_code, title, doc_type_id, issued_date, issuing_unit_id,
@@ -3506,6 +3536,7 @@ app.get('/api/documents/proposals/awaiting-owner', requireAuth, async (req, res)
         LEFT JOIN UNIT ru ON ru.unit_id = u.unit_id
         WHERE p.status = 'PENDING_OWNER' AND p.owner_id = @me
         ORDER BY p.created_at DESC`);
+    await enrichLibraryProposals(r.recordset);
     res.json({ total: r.recordset.length, items: r.recordset, enabled: true });
   } catch (err) {
     console.error('[GET proposals awaiting-owner]', err);
@@ -3676,6 +3707,7 @@ app.get('/api/documents/proposals/pending', requireAuth, requirePermission('DOC_
 
     query += ` ORDER BY p.created_at DESC`;
     const result = await r.query(query);
+    await enrichLibraryProposals(result.recordset);
     res.json({ total: result.recordset.length, items: result.recordset });
   } catch (err) {
     console.error('[GET proposals pending]', err);
@@ -3688,7 +3720,8 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
   const propRes = await pool.request()
     .input('pid', sql.VarChar(50), proposalId)
     .query(`
-      SELECT p.*, d.stored_path AS old_stored_path, d.issuing_unit_id AS doc_unit_id
+      SELECT p.*, d.stored_path AS old_stored_path, d.issuing_unit_id AS doc_unit_id,
+             d.deleted_at AS doc_deleted_at, d.deleted_reason AS doc_deleted_reason
       FROM DOCUMENT_REVISION_PROPOSAL p
       JOIN DOCUMENT d ON d.file_id = p.file_id
       WHERE p.proposal_id = @pid
@@ -3696,6 +3729,11 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
   if (propRes.recordset.length === 0) throw new Error('Không tìm thấy đề xuất');
   const prop = propRes.recordset[0];
   if (prop.status !== 'PENDING') throw new Error(`Đề xuất đã ở trạng thái ${prop.status}`);
+  // Chặn TRƯỚC khi đụng tới tệp: duyệt đề xuất không được làm bản đã xóa sống lại
+  const deletedError = () => Object.assign(
+    new Error('Tài liệu đã bị xóa nên không thể phê duyệt đề xuất này. Hãy bấm Từ chối để đóng đề xuất.'),
+    { status: 409 });
+  if (lifecycle.isDeleted({ deleted_at: prop.doc_deleted_at, deleted_reason: prop.doc_deleted_reason })) throw deletedError();
 
   let finalStoredPath = prop.old_stored_path;
   let finalOriginalName = null;
@@ -3704,7 +3742,18 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
   let finalSha256 = null;
   let replacedFile = false;
 
-  if (prop.new_stored_path) {
+  const isLib = isLibraryId(prop.file_id);
+  if (isLib && prop.new_stored_path) {
+    // Thư viện: tệp đề xuất đã nằm sẵn trong uploads/thu-vien-so với tên duy nhất
+    const abs = safePathJoin(ROOT_DIR, prop.new_stored_path);
+    if (!abs || !fs.existsSync(abs)) throw new Error('Không tìm thấy tệp PDF của đề xuất, chưa thể phê duyệt');
+    finalStoredPath = prop.new_stored_path;
+    finalOriginalName = prop.new_original_name;
+    finalMimeType = prop.new_mime_type;
+    finalFileSize = prop.new_file_size;
+    finalSha256 = prop.new_sha256;
+    replacedFile = true;
+  } else if (prop.new_stored_path) {
     const { getModuleUploadPath: getModPath, MODULES: modConsts } = require('./src/storage-helper');
     const { yyyymmdd, typeSafe, codeSafe } = buildStoredPath({
       docTypeId: prop.doc_type_id, documentCode: prop.document_code, fallbackId: prop.file_id,
@@ -3765,8 +3814,12 @@ async function approveProposalCore({ proposalId, reviewerUser, reviewNote, clien
     reqUpdate.input('size', sql.BigInt, finalFileSize);
     reqUpdate.input('sha', sql.Char(64), finalSha256);
   }
-  sqlUpdate += ` WHERE file_id = @fid`;
-  await reqUpdate.query(sqlUpdate);
+  // Điều kiện lặp lại trong câu lệnh để chặn trường hợp bị xóa ngay trong lúc đang duyệt
+  sqlUpdate += ` WHERE file_id = @fid AND (deleted_at IS NULL OR deleted_reason = 'PENDING_APPROVAL');
+    SELECT @@ROWCOUNT AS n;`;
+  const applied = await reqUpdate.query(sqlUpdate);
+  if (!applied.recordset[0].n) throw deletedError();
+  if (isLib) await applyLibraryProposal(proposalId, prop.file_id);
 
   await pool.request()
     .input('pid', sql.VarChar(50), proposalId)
@@ -3914,7 +3967,7 @@ app.post('/api/documents/proposals/:proposalId/approve', requireAuth, requirePro
     res.json(result);
   } catch (err) {
     console.error('[POST proposals approve]', err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -3945,22 +3998,20 @@ app.delete('/api/documents/:fileId', requireAuth, requirePermission('DOC_DELETE'
     if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
     if (check.recordset[0].deleted_at) return res.status(400).json({ error: 'Tài liệu đã được xóa trước đó' });
 
-    await pool.request()
-      .input('fid', sql.VarChar(50), fileId)
-      .input('uid', sql.VarChar(50), req.user.user_id)
-      .input('reason', sql.NVarChar(500), reason || null)
-      .query(`UPDATE DOCUMENT SET deleted_at = GETDATE(), deleted_by = @uid, deleted_reason = @reason, updated_at = GETDATE() WHERE file_id = @fid`);
+    const result = await lifecycle.softDeleteDocument({ pool, sql, fileId, userId: req.user.user_id, reason });
+    if (!result.deleted) return res.status(400).json({ error: 'Tài liệu đã được xóa trước đó' });
 
     await writeAccessLog({
       userId: req.user.user_id, fileId, action: 'DELETE_SOFT',
       ip: getClientIp(req),
-      note: `Xóa mềm: ${check.recordset[0].title}${reason ? ` — Lý do: ${reason}` : ''}`,
+      note: `Xóa mềm: ${check.recordset[0].title}${reason ? ` — Lý do: ${reason}` : ''}`
+        + (result.closed ? ` (đóng ${result.closed} đề xuất đang chờ)` : ''),
     });
 
     // Đồng bộ gỡ khỏi kho Vector
     syncToAI('delete', { file_id: fileId });
 
-    res.json({ success: true, file_id: fileId, soft_deleted: true });
+    res.json({ success: true, file_id: fileId, soft_deleted: true, closed_proposals: result.closed });
   } catch (err) {
     console.error('[DELETE soft]', err);
     res.status(500).json({ error: err.message });
@@ -3973,13 +4024,22 @@ app.post('/api/documents/:fileId/restore', requireAuth, requirePermission('DOC_R
     const pool = await getPool();
     const check = await pool.request()
       .input('fid', sql.VarChar(50), fileId)
-      .query(`SELECT deleted_at, title FROM DOCUMENT WHERE file_id = @fid`);
+      .query(`SELECT deleted_at, deleted_reason, title FROM DOCUMENT WHERE file_id = @fid`);
     if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
-    if (!check.recordset[0].deleted_at) return res.status(400).json({ error: 'Tài liệu không ở trong thùng rác' });
+    const target = check.recordset[0];
+    if (!target.deleted_at) return res.status(400).json({ error: 'Tài liệu không ở trong thùng rác' });
+    if (lifecycle.isPending(target)) {
+      return res.status(409).json({ error: 'Văn bản đang chờ duyệt, chỉ được đưa vào lưu hành bằng Phê duyệt.', code: 'PENDING_APPROVAL' });
+    }
+    if (target.deleted_reason === lifecycle.REJECTED
+        && !lifecycle.mayRestoreRejected(req.user.user_id, await resolveUserRoles(req.user))) {
+      return res.status(403).json({ error: 'Văn bản đã bị từ chối duyệt, chỉ Chỉ huy / Quản trị viên được khôi phục.', code: 'REJECTED_ITEM' });
+    }
 
     await pool.request()
       .input('fid', sql.VarChar(50), fileId)
-      .query(`UPDATE DOCUMENT SET deleted_at = NULL, deleted_by = NULL, deleted_reason = NULL, updated_at = GETDATE() WHERE file_id = @fid`);
+      .query(`UPDATE DOCUMENT SET deleted_at = NULL, deleted_by = NULL, deleted_reason = NULL, updated_at = GETDATE()
+              WHERE file_id = @fid AND ${lifecycle.trashCondition('DOCUMENT')}`);
 
     await writeAccessLog({
       userId: req.user.user_id, fileId, action: 'DOC_RESTORE',
@@ -4013,10 +4073,13 @@ app.delete('/api/documents/:fileId/purge', requireAuth, requirePermission('DOC_P
     const pool = await getPool();
     const check = await pool.request()
       .input('fid', sql.VarChar(50), fileId)
-      .query(`SELECT stored_path, original_name, title, deleted_at FROM DOCUMENT WHERE file_id = @fid`);
+      .query(`SELECT stored_path, original_name, title, deleted_at, deleted_reason FROM DOCUMENT WHERE file_id = @fid`);
     if (check.recordset.length === 0) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
     const doc = check.recordset[0];
     if (!doc.deleted_at) return res.status(400).json({ error: 'Tài liệu chưa xóa mềm. Xóa mềm trước khi purge.' });
+    if (lifecycle.isPending(doc)) {
+      return res.status(409).json({ error: 'Văn bản đang chờ duyệt, không thể xóa vĩnh viễn. Hãy Từ chối trước.', code: 'PENDING_APPROVAL' });
+    }
 
     if (validateStoredPath(doc.stored_path)) {
       const abs = safePathJoin(ROOT_DIR, doc.stored_path);
@@ -4094,7 +4157,6 @@ app.get('/api/files/:fileId/view', async (req, res) => {
   }
 
   // Tầng 2: quyền xem/tải bị khóa bảo vệ → cần duyệt cho đúng tài liệu này
-  if (!(await docViewGate(req, res, isDownload ? 'DOC_DOWNLOAD' : 'DOC_VIEW'))) return;
 
   try {
     const pool = await getPool();
@@ -4145,6 +4207,10 @@ app.get('/api/files/:fileId/view', async (req, res) => {
     }
     const doc = result.recordset[0];
     const canonicalFileId = doc.file_id || fileId;
+    const isLibDoc = isLibraryId(canonicalFileId);
+    // Thư viện mở cho mọi người. Văn bản: quyền xem/tải đang bị khóa bảo vệ → cần duyệt cho đúng tài liệu này.
+    // Xét theo tài liệu THỰC SỰ tìm được (không theo chuỗi người dùng gửi lên).
+    if (!isLibDoc && !(await docViewGate(req, res, isDownload ? 'DOC_DOWNLOAD' : 'DOC_VIEW'))) return;
 
     if (doc.deleted_at) {
       const isPendingApproval = (doc.deleted_reason === 'PENDING_APPROVAL');
@@ -4157,7 +4223,7 @@ app.get('/api/files/:fileId/view', async (req, res) => {
         (req.user?.roles || []).includes('ROL-02') ||
         (req.user?.role_names || []).some((r) => String(r).toLowerCase().includes('chỉ huy') || String(r).toLowerCase().includes('admin'));
       const isOwner = (doc.uploaded_by && doc.uploaded_by === req.user.user_id);
-      const canViewTrash = (req.user.permissions || []).includes('DOC_TRASH_VIEW')
+      const canViewTrash = (req.user.permissions || []).includes(isLibDoc ? 'LIB_TRASH_VIEW' : 'DOC_TRASH_VIEW')
                           || (req.user.roles || []).includes('ROL-01');
       if (!canViewTrash && !(isPendingApproval && (isApprover || isOwner))) {
         await writeAccessLog({ userId: req.user.user_id, fileId: canonicalFileId, action: 'DENIED', ip, note: 'Tài liệu đã xóa hoặc chưa được duyệt' });
@@ -4673,6 +4739,12 @@ app.use('/api/ai', requireAuth, aiLimiter, require('./src/ai-routes')({
 
 // Gắn lecture-extended-routes TRƯỚC lecture-routes để route tĩnh /schedules/monitor
 // không bị route động /schedules/:id chặn (Route Shadowing).
+app.use('/api/library', createLibraryRouter({
+  upload, validateUploadedPdf, validateStoredPath, safePathJoin, rootDir: ROOT_DIR,
+  requireAuth, requirePermission, getUserPermissions, resolveUserRoles,
+  writeAccessLog, getClientIp, isPermissionLocked, ownerFlowReady, syncToAI, unitExists,
+  parseHandler: handleParsePdf, parseLimiter,
+}));
 app.use('/api/lectures', require('./src/lecture-extended-routes')({
   requireAuth, requirePermission, writeAccessLog, getClientIp,
 }));

@@ -49,6 +49,11 @@ export const ROUTE_ACCESS: Record<string, RouteAccessConfig> = {
     requiresAuth: false,
     description: 'Phân hệ Thư viện số',
   },
+  [ROUTE_PATHS.LIBRARY_READING]: {
+    path: ROUTE_PATHS.LIBRARY_READING,
+    requiresAuth: true,
+    description: 'Thư viện số — Sách đã đọc',
+  },
 
   // Protected - Trung tâm văn bản
   [ROUTE_PATHS.DESK]: {

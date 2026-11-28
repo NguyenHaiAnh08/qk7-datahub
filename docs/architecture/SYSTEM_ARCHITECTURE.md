@@ -1681,3 +1681,41 @@ PerfMonitorPopup (chỉ ROL-01)             perf-system.js: lấy mẫu CPU/RAM/
 - CPU và bộ nhớ của một bước là mức thay đổi của **cả tiến trình** trong lúc bước chạy; khi nhiều request chạy cùng lúc thì lẫn phần của nhau. Trên Windows, thời gian CPU có độ mịn khoảng 15 ms.
 - Chi phí đo trên máy phát triển (6000 request thử): thêm khoảng 0,1–0,25 ms mỗi request và khoảng 40–50 MB bộ nhớ.
 - Dịch vụ AI, OCR và agent vân tay chỉ được đo từ phía Gateway (thời gian gọi, trạng thái kết nối), chưa đo từng bước bên trong.
+
+## 37. Kiến Trúc Phân Hệ Thư Viện Số (v1.8.21)
+
+```text
+DOCUMENT (file_id 'LIB-…', luôn Cấp 1)  ── 1:1 ──  LIBRARY_ITEM (thể loại, nhà xuất bản, năm)  ── n:1 ──  LIBRARY_CATEGORY
+   ├─ LIBRARY_READING (người dùng × tài liệu: trang đang đọc, trang xa nhất, đã xong)
+   └─ DOCUMENT_REVISION_PROPOSAL  ── 1:1 ──  LIBRARY_PROPOSAL
+Tệp: backend/uploads/thu-vien-so/YYYY/MM/   |   Xem/tải: /api/files/:fileId/view   |   CRUD: /api/library
+```
+
+| Phương thức và đường dẫn | Quyền | Ghi chú |
+| --- | --- | --- |
+| `GET /api/library` | Mở cho mọi người | `q`, `category`, `unit`, `include_children`, `year`, `page`, `page_size` (tối đa 100) |
+| `GET /api/library/:id/cover` | Mở cho mọi người | Ảnh bìa JPEG; bản chờ duyệt, thùng rác cần quyền |
+| `GET /api/library/proposals/:proposalId/cover` | Người gửi, người đăng, người duyệt | Bìa của đề xuất |
+| `GET /api/library/stats` | Mở cho mọi người | Số liệu bảng thống kê; `my_reading` khi đã đăng nhập |
+| `GET /api/library/reading` | Đăng nhập | Lịch sử đọc của chính mình |
+| `GET`, `PUT`, `DELETE /api/library/:id/reading` | Đăng nhập | `PUT`: `{ page, total_pages, completed }`; miễn bộ chặn duyệt |
+| `GET /api/library/:id` | Mở cho mọi người | Bản chờ duyệt chỉ người đăng, chỉ huy, quản trị thấy |
+| `POST /api/library` | `LIB_UPLOAD` | multipart: `file`, `title`, `category_id`, tùy chọn `cover` (ảnh), `cover_auto`, `document_code`, `author`, `publisher`, `publish_year`, `issuing_unit_id`, `summary`, `note`, `force_upload` |
+| `PUT /api/library/:id` | `LIB_EDIT` | Lưu thẳng hoặc tạo đề xuất; trường không gửi được giữ nguyên |
+| `DELETE /api/library/:id` | `LIB_DELETE` | Xóa mềm, đóng đề xuất đang chờ |
+| `GET /api/library/trash` | `LIB_TRASH_VIEW` | Không gồm bản chờ duyệt |
+| `POST /api/library/:id/restore` | `LIB_RESTORE` | Bản bị từ chối: chỉ chỉ huy, quản trị |
+| `DELETE /api/library/:id/purge` | `LIB_PURGE` | `{ "confirm": "<id>" }` |
+| `DELETE /api/library/trash` | `LIB_PURGE` | `{ "confirm": "DON-SACH-THUNG-RAC" }` |
+| `POST /api/library/parse` | `LIB_PARSE` | Dùng chung bộ đọc PDF của văn bản, không lưu |
+| `GET /api/library/categories` | Mở cho mọi người | Kèm số tài liệu |
+| `POST`, `PUT`, `DELETE /api/library/categories[/:id]` | `LIB_CATEGORY_MANAGE` | Thể loại đang dùng không xóa được |
+
+- Tên cột dùng lại: `DOCUMENT.signer` chứa **tác giả**.
+- Vòng đời (chờ duyệt, từ chối, xóa, khôi phục) theo [`document-lifecycle.js`](../../backend/src/document-lifecycle.js), dùng chung với Văn bản số.
+- Duyệt, từ chối, thẩm định, người đăng xem trước: `/api/documents/proposals/*` (cùng quyền `APPROVAL_VALIDATE`).
+- Tài liệu thư viện được nạp vào kho AI như văn bản.
+- Số trang, ảnh bìa: `LIBRARY_ITEM.page_count / cover_path / cover_custom` (đề xuất dùng cột cùng tên ở `LIBRARY_PROPOSAL`, để trống là giữ nguyên). Bìa nằm cạnh tệp PDF trong `uploads/thu-vien-so`; API chỉ trả `cover_version`, không trả đường dẫn.
+- Không phân cấp mật. Tệp trùng nội dung với tài liệu Cấp 2 trở lên bị chặn (`CLASSIFIED_DUPLICATE`).
+- Chưa có `LIBRARY_READING`: các API tiến độ trả `503 READING_NOT_INITIALIZED`, phần còn lại vẫn chạy.
+- Máy chưa chạy migration: `/api/library` trả `503 LIBRARY_NOT_INITIALIZED`, các phân hệ khác không đổi.

@@ -167,6 +167,24 @@ export const MainNavBar: React.FC<MainNavBarProps> = ({ activeNav: explicitActiv
         icon: Library,
         to: ROUTE_PATHS.LIBRARY,
         visible: true,
+        children: [
+          {
+            key: 'library-all',
+            label: 'Kho thư viện',
+            description: 'Giáo trình, sách, tạp chí, công trình nghiên cứu',
+            to: ROUTE_PATHS.LIBRARY,
+            visible: true,
+            isActive: (p) => p === ROUTE_PATHS.LIBRARY,
+          },
+          {
+            key: 'library-reading',
+            label: 'Sách đã đọc',
+            description: 'Đọc tiếp từ trang đang dở',
+            to: ROUTE_PATHS.LIBRARY_READING,
+            visible: !isGuest,
+            isActive: (p) => p.startsWith(ROUTE_PATHS.LIBRARY_READING),
+          },
+        ],
       },
       {
         key: 'admin',

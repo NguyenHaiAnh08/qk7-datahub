@@ -550,6 +550,11 @@ const perms = createPermissionsModule({
   sql, getPool, writeAccessLog, getClientIp,
   getViewGate: () => viewGateRef,
 });
+
+const pinVault = require('./src/pin-vault')({
+  sql, getPool, getUserPermissions: perms.getUserPermissions,
+  secret: process.env.FP_ENC_KEY, protectedAdminId: PROTECTED_ADMIN_USER_ID,
+});
 const {
   getUserPermissions,
   invalidateCache,
@@ -1730,6 +1735,10 @@ app.post('/api/auth/pin/verify', requireAuth, pinLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Mã PIN không đúng. Vui lòng kiểm tra lại.', code: 'PIN_INVALID' });
     }
 
+    // PIN cấp theo cơ chế cũ chỉ có hash: nhập đúng một lần là xem lại được về sau (lỗi không chặn mở tài liệu)
+    pinVault.rememberPin(req.user.user_id, pinStr, pinHash)
+      .catch((e) => console.warn('[pin] không lưu được bản mã PIN:', e.message));
+
     // FP + PIN đều OK → cấp final token
     const fpToken = jwt.sign(
       {
@@ -2197,106 +2206,12 @@ app.post('/api/admin/fingerprint/enroll/:userId', requireAuth, requirePermission
 
 
 // ═══════════════════════════════════════════════════════════════
-// [v5.1] ADMIN TẠO MÃ PIN 6 SỐ (Lưu vào PIN_DELIVERY để User xem 1 lần)
+// MÃ PIN: cấp / đổi (Admin hoặc người có quyền) — chính chủ xem lần đầu, xem lại bằng vân tay
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/admin/users/:userId/pin/generate', requireAuth, async (req, res) => {
-  try {
-    if (!(req.user?.roles || []).includes('ROL-01')) {
-      return res.status(403).json({ error: 'Chỉ Quản trị viên tối cao (ROL-01) được cấp mã PIN.' });
-    }
-
-    const targetUserId = req.params.userId;
-    const pool = await getPool();
-    const uRes = await pool.request()
-      .input('uid', sql.VarChar(50), targetUserId)
-      .query(`SELECT user_id, full_name, clearance_level_id FROM [USER] WHERE user_id = @uid`);
-    if (uRes.recordset.length === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy quân nhân' });
-    }
-    const target = uRes.recordset[0];
-
-    // 1. Tạo mã PIN 6 số ngẫu nhiên
-    const pin = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-    const hash = await bcrypt.hash(pin, 10);
-
-    // 2. Cập nhật hash vào bảng USER (để verify sau này)
-    await pool.request()
-      .input('uid', sql.VarChar(50), targetUserId)
-      .input('hash', sql.VarChar(255), hash)
-      .query(`UPDATE [USER] SET pin_hash = @hash, updated_at = GETDATE() WHERE user_id = @uid`);
-
-    // 3. Đánh dấu yêu cầu PENDING đã được duyệt
-    await pool.request()
-      .input('uid', sql.VarChar(50), targetUserId)
-      .query(`UPDATE APPROVAL_REQUEST SET status = 'EXECUTED' WHERE requester_id = @uid AND required_permission = 'PERM-USR-08' AND status = 'PENDING'`);
-
-    // 4. Lưu PIN thô vào bảng PIN_DELIVERY (để user xem)
-    await pool.request()
-      .input('uid', sql.VarChar(50), targetUserId)
-      .input('pin', sql.VarChar(10), pin)
-      .query(`
-          INSERT INTO PIN_DELIVERY (user_id, pin_code, expires_at) 
-          VALUES (@uid, @pin, DATEADD(HOUR, 24, GETDATE()))
-      `);
-
-    await writeAccessLog({
-      userId: req.user.user_id, fileId: null, action: 'PIN_GENERATED',
-      ip: getClientIp(req),
-      note: `Cấp PIN mới cho ${targetUserId} (${target.full_name}). Đã gửi vào PIN_DELIVERY.`,
-    });
-
-    res.json({
-      success: true,
-      user_id: targetUserId,
-      full_name: target.full_name,
-      pin, // Trả về cho Admin copy nếu muốn
-    });
-  } catch (err) {
-    console.error('[POST /api/admin/users/:userId/pin/generate]', err);
-    res.status(500).json({ error: err.message });
-  }
+require('./src/pin-routes')(app, {
+  sql, getPool, requireAuth, pinLimiter, pinVault, writeAccessLog, getClientIp,
+  decryptTemplate, requestScan, isAgentOnline,
 });
-
-
-
-// ═══════════════════════════════════════════════════════════════
-// [MỚI] API CHO USER LẤY MÃ PIN (CHỈ XEM 1 LẦN)
-// ═══════════════════════════════════════════════════════════════
-
-// 1. Kiểm tra xem User có PIN chưa xem không (để hiện chấm đỏ)
-app.get('/api/user/check-new-pin', requireAuth, async (req, res) => {
-    try {
-        const pool = await getPool();
-        const r = await pool.request()
-            .input('uid', sql.VarChar(50), req.user.user_id)
-            .query(`SELECT COUNT(*) AS count FROM PIN_DELIVERY WHERE user_id = @uid AND is_read = 0 AND expires_at > GETDATE()`);
-        res.json({ has_new_pin: r.recordset[0].count > 0 });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// 2. Lấy PIN thô (Xem xong là xóa luôn khỏi DB)
-app.get('/api/user/my-pin', requireAuth, async (req, res) => {
-    try {
-        const pool = await getPool();
-        const r = await pool.request()
-            .input('uid', sql.VarChar(50), req.user.user_id)
-            .query(`SELECT TOP 1 id, pin_code FROM PIN_DELIVERY WHERE user_id = @uid AND is_read = 0 AND expires_at > GETDATE() ORDER BY created_at DESC`);
-
-        if (r.recordset.length === 0) {
-            return res.status(404).json({ error: 'Không có mã PIN nào đang chờ.' });
-        }
-
-        const pinData = r.recordset[0];
-
-        // XÓA NGAY LẬP TỨC ĐỂ CHỈ XEM ĐƯỢC 1 LẦN
-        await pool.request()
-            .input('id', sql.Int, pinData.id)
-            .query(`DELETE FROM PIN_DELIVERY WHERE id = @id`);
-
-        res.json({ success: true, pin: pinData.pin_code });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 
 app.get('/api/admin/fingerprint/enroll-status', requireAuth, requirePermission('FP_ENROLL'), (req, res) => {
   const deviceId = req.query.deviceId || req.headers['x-device-fp'];
@@ -4728,6 +4643,7 @@ require('./src/admin-routes')(app, {
   sessionIdleTimeoutMinutes: SESSION_IDLE_TIMEOUT_MINUTES,
   approveProposalCore,
   rejectProposalCore,
+  pinVault,
 });
 
 app.use('/api/ai', requireAuth, aiLimiter, require('./src/ai-routes')({

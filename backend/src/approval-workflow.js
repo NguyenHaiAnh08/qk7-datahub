@@ -42,6 +42,11 @@ const EXCLUDED_PATHS = [
   // Thư viện: đăng tải / đọc PDF có luồng đề xuất riêng (xóa, khôi phục, danh mục vẫn qua bộ chặn)
   /^\/api\/library$/,
   /^\/api\/library\/parse$/,
+  // Mã PIN: gửi yêu cầu và xem lại PIN của chính mình; cấp PIN do Admin / người có quyền làm trực tiếp
+  // (handler tự kiểm tra thẩm quyền)
+  /^\/api\/pin\/request$/,
+  /^\/api\/user\/my-pin\/reveal$/,
+  /^\/api\/admin\/users\/[^/]+\/pin\/generate$/,
   // Lưu tiến độ đọc của chính mình: thao tác cá nhân, không cần duyệt
   /^\/api\/library\/[^/]+\/reading$/,
 ];

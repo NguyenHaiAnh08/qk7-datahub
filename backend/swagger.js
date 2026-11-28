@@ -428,7 +428,7 @@ const swaggerSpec = {
     '/api/user/check-new-pin': {
       get: {
         tags: ['Auth'],
-        summary: 'Kiểm tra user có PIN mới chưa đọc (dùng cho notification đỏ)',
+        summary: 'Có thông báo mã PIN cho tôi không (chấm đỏ ở nút chuông)',
         responses: {
           200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
             has_new_pin: { type: 'boolean' },
@@ -437,16 +437,53 @@ const swaggerSpec = {
       },
     },
 
+    '/api/user/pin-status': {
+      get: {
+        tags: ['Auth'],
+        summary: 'Tình trạng mã PIN của chính mình (không chứa mã PIN)',
+        responses: {
+          200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+            ready:           { type: 'boolean', description: 'false: chưa chạy add_pin_view_again.sql' },
+            has_pin:         { type: 'boolean' },
+            viewable:        { type: 'boolean', description: 'false: PIN cấp theo cơ chế cũ, chưa xem lại được' },
+            has_fingerprint: { type: 'boolean' },
+            request_pending: { type: 'boolean' },
+            notice:          { type: 'string', nullable: true, enum: ['NEW', 'ROTATE', 'REVIEW'] },
+          } } } } },
+        },
+      },
+    },
+
     '/api/user/my-pin': {
       get: {
         tags: ['Auth'],
-        summary: 'Lấy PIN mới — CHỈ XEM ĐƯỢC 1 LẦN (xóa khỏi PIN_DELIVERY ngay sau khi trả về)',
+        summary: 'Xem PIN lần đầu (không cần vân tay) — chỉ người vừa được cấp PIN lần đầu, một lần, trong 24 giờ',
         responses: {
           200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
             success: { type: 'boolean' },
             pin:     { type: 'string', example: '583920' },
           } } } } },
-          404: { description: 'Không có PIN chờ' },
+          404: { description: '`PIN_NO_FIRST_VIEW` — không có lượt xem đầu đang chờ' },
+        },
+      },
+    },
+
+    '/api/user/my-pin/reveal': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Xem lại mã PIN đang dùng sau khi quét đúng vân tay của chính mình',
+        parameters: [{ in: 'header', name: 'x-device-fp', required: true, schema: { type: 'string' }, description: 'Đầu đọc vân tay đang dùng (không tự chuyển sang đầu đọc khác)' }],
+        responses: {
+          200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
+            success: { type: 'boolean' },
+            pin:     { type: 'string', example: '583920' },
+          } } } } },
+          403: { description: 'Vân tay không khớp hoặc chưa đăng ký vân tay' },
+          404: { description: '`PIN_NOT_SET`' },
+          408: { description: 'Hết thời gian chờ quét' },
+          409: { description: '`PIN_NOT_VIEWABLE` hoặc yêu cầu quét bị hủy' },
+          429: { description: 'Thử quá nhiều lần' },
+          503: { description: 'Máy quét chưa sẵn sàng, hoặc `PIN_VAULT_NOT_INITIALIZED`' },
         },
       },
     },
@@ -1570,24 +1607,28 @@ const swaggerSpec = {
     '/api/admin/users/{userId}/pin/generate': {
       post: {
         tags: ['Admin'],
-        summary: '⚠️ Chỉ ROL-01 — Tạo PIN 6 số cho user',
+        summary: 'Cấp / đổi mã PIN — Admin hoặc người có quyền USER_PIN_GENERATE (không qua khóa bảo vệ)',
         description:
-          '**Yêu cầu:** ROL-01 (inline check `roles.includes("ROL-01")`). Route này **không có** rule trong `route-permissions.js` → non-ROL-01 sẽ bị `NO_RULE` từ middleware.\n\n' +
-          '**Cơ chế:**\n' +
-          '1. Random 6 số → hash bcrypt → lưu `USER.pin_hash`\n' +
-          '2. Đánh dấu các `APPROVAL_REQUEST` PENDING có `required_permission = "PERM-USR-08"` của user này → `EXECUTED`\n' +
-          '3. Lưu PIN plaintext vào `PIN_DELIVERY` (hạn 24h) để user xem 1 lần qua `/api/user/my-pin`\n\n' +
-          '**⚠️ Response trả cả PIN plaintext** để Admin copy nếu cần.',
+          '- Chưa có PIN: sinh PIN mới (`NEW`), chính chủ xem lần đầu qua `/api/user/my-pin`.\n' +
+          '- Đã có PIN: giữ nguyên, mời xem lại bằng vân tay (`REVIEW`).\n' +
+          '- `rotate: true`: đổi PIN mới (`ROTATE`), cần quân nhân đã đăng ký vân tay.\n\n' +
+          '**Phản hồi không chứa mã PIN.** Người không phải Admin không được cấp cho chính mình hoặc cho tài khoản Admin.',
         parameters: [{ in: 'path', name: 'userId', required: true, schema: { type: 'string' } }],
+        requestBody: { required: false, content: { 'application/json': { schema: { type: 'object', properties: {
+          rotate: { type: 'boolean', default: false },
+        } } } } },
         responses: {
           200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: {
             success:   { type: 'boolean' },
             user_id:   { type: 'string' },
             full_name: { type: 'string' },
-            pin:       { type: 'string', example: '583920', description: 'PIN plaintext — admin copy gửi user' },
+            mode:      { type: 'string', enum: ['NEW', 'ROTATE', 'REVIEW'] },
+            message:   { type: 'string' },
           } } } } },
-          403: { description: 'Không phải ROL-01' },
+          403: { description: '`PIN_ISSUE_DENIED`, `PIN_SELF_ISSUE`, `ADMIN_ROLE_LOCKED`, `PROTECTED_ADMIN_TARGET`' },
           404: { description: 'Không tìm thấy user' },
+          409: { description: '`TARGET_NO_FINGERPRINT`, `PIN_NOT_VIEWABLE`' },
+          503: { description: '`PIN_VAULT_NOT_INITIALIZED`' },
         },
       },
     },

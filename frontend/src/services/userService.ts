@@ -89,11 +89,16 @@ export const userService = {
     });
   },
 
-  // [v5.1] Admin random PIN 6 số — chỉ ROL-01, không cho nhập tay
-  generatePin: async (userId: string): Promise<GeneratePinResult> => {
+  // Cấp mã PIN (rotate = đổi mã mới). Người cấp không nhận được mã PIN.
+  generatePin: async (userId: string, rotate = false): Promise<GeneratePinResult> => {
     return http<GeneratePinResult>(
       `/api/admin/users/${encodeURIComponent(userId)}/pin/generate`,
-      { method: 'POST' }
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rotate }),
+        skipErrorNotification: true,
+      }
     );
   },
 

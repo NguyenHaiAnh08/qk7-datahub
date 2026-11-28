@@ -1719,3 +1719,11 @@ Tệp: backend/uploads/thu-vien-so/YYYY/MM/   |   Xem/tải: /api/files/:fileId/
 - Không phân cấp mật. Tệp trùng nội dung với tài liệu Cấp 2 trở lên bị chặn (`CLASSIFIED_DUPLICATE`).
 - Chưa có `LIBRARY_READING`: các API tiến độ trả `503 READING_NOT_INITIALIZED`, phần còn lại vẫn chạy.
 - Máy chưa chạy migration: `/api/library` trả `503 LIBRARY_NOT_INITIALIZED`, các phân hệ khác không đổi.
+
+---
+
+## 38. Kiến Trúc Mã PIN Xem Lại Bằng Vân Tay (v1.8.26)
+- **Mã nguồn:** [`pin-vault.js`](../../backend/src/pin-vault.js) (lưu, cấp, đổi), [`pin-routes.js`](../../backend/src/pin-routes.js) (API).
+- **Lưu trữ:** `USER.pin_hash` (bcrypt) dùng để kiểm tra; `USER.pin_enc` (AES-256-GCM, khóa `scrypt(FP_ENC_KEY, 'qk7-pin-salt')`, AAD = `user_id`) dùng để xem lại. `PIN_DELIVERY.pin_code` chỉ ghi loại thông báo `NEW` / `ROTATE` / `REVIEW`.
+- **Nguyên tắc:** mã PIN chỉ trả cho chính chủ: lượt xem đầu của người mới được cấp, hoặc sau khi máy chủ xác minh vân tay. Người cấp không nhận mã.
+- **Lưu ý bảo mật:** vì PIN xem lại được bằng vân tay, người có phiên đăng nhập và vân tay của chính chủ sẽ lấy được PIN; hai yếu tố "vân tay + PIN" của tài liệu Cấp 4-5 không còn độc lập hoàn toàn.

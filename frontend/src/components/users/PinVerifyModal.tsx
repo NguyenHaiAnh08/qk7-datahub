@@ -246,6 +246,9 @@ export const PinVerifyModal: React.FC<PinVerifyModalProps> = ({
           {/* ✅ Khi có lỗi → hiện khu vực "Quên PIN + Hotline" */}
           {error && (
             <div className="flex flex-col gap-2 mt-1 mb-4 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <p className="text-center text-xs text-slate-600 dark:text-slate-300">
+                Quên mã? Đóng bảng này, bấm <strong>nút chuông</strong> ở thanh trên cùng và quét vân tay để xem lại.
+              </p>
               <button
                 type="button"
                 onClick={handleForgotPin}

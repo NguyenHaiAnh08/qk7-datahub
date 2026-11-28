@@ -44,7 +44,7 @@ export const DEFAULT_GUEST_STEPS: SpotlightTourStep[] = [
     target: '#tour-security-banner',
     title: 'Phạm vi an ninh & 5 Cấp độ mật quân sự',
     badge: 'Bước 04 / 13 · Cấp độ an ninh',
-    description: 'Hệ thống phân cấp nghiêm ngặt: Cấp 1 Công khai, Cấp 2 Nội bộ, Cấp 3 Mật, Cấp 4 Tối Mật, Cấp 5 Tuyệt Mật. Phiên Đại biểu được cấp quyền khai thác Cấp 1 (Công khai). Mọi tài liệu từ Cấp 3 trở lên bắt buộc phải xác thực vân tay 2FA qua thiết bị ZKTeco.',
+    description: 'Hệ thống phân cấp nghiêm ngặt: Cấp 1 Công khai, Cấp 2 Nội bộ, Cấp 3 Mật, Cấp 4 Tối Mật, Cấp 5 Tuyệt Mật. Phiên Đại biểu được khai thác văn bản Cấp 1 (Công khai) và Cấp 2 (Nội bộ). Mọi tài liệu từ Cấp 3 trở lên bắt buộc phải xác thực vân tay 2FA qua thiết bị ZKTeco.',
     placement: 'bottom',
   },
   {

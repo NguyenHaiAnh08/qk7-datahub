@@ -23,7 +23,9 @@ import {
   Camera,
   CameraOff,
 } from 'lucide-react';
-import { isScreenshotAllowed, setDevScreenshotAllowed } from '../../hooks/useAntiScreenshot';
+import {
+  SCREENSHOT_SWITCH_EVENT, canUseScreenshotSwitch, isScreenshotAllowed, setScreenshotAllowed,
+} from '../../utils/screenshotSwitch';
 import { http } from '../../services/http';
 import { toast } from './Toast';
 import { useAuth } from '../../hooks/useAuth';
@@ -161,8 +163,10 @@ export const Header: React.FC<HeaderProps> = ({
     return () => clearInterval(timer);
   }, [showClock]);
 
-  // 🛡️ Dev mode toggle
-  const [isDevScreenshotAllowed, setIsDevScreenshotAllowed] = useState<boolean>(isScreenshotAllowed());
+  // 🛡️ Công tắc cho phép chụp màn hình (chỉ Quản trị viên)
+  const [screenshotSwitch, setScreenshotSwitch] = useState(() => ({
+    visible: canUseScreenshotSwitch(), on: isScreenshotAllowed(),
+  }));
 
   // 🔔 PIN notification state
   const [hasNewPin, setHasNewPin] = useState<boolean>(false);
@@ -185,13 +189,10 @@ export const Header: React.FC<HeaderProps> = ({
   const canAccessSessions = hasPermission('SESSION_VIEW');
 
   useEffect(() => {
-    const handleDevChanged = () => {
-      setIsDevScreenshotAllowed(isScreenshotAllowed());
-    };
-    window.addEventListener('qk7_dev_screenshot_changed', handleDevChanged);
-    return () => {
-      window.removeEventListener('qk7_dev_screenshot_changed', handleDevChanged);
-    };
+    const sync = () => setScreenshotSwitch({ visible: canUseScreenshotSwitch(), on: isScreenshotAllowed() });
+    sync();
+    window.addEventListener(SCREENSHOT_SWITCH_EVENT, sync);
+    return () => window.removeEventListener(SCREENSHOT_SWITCH_EVENT, sync);
   }, []);
 
   // 🔔 Polling kiểm tra PIN mới từ Admin (mỗi 30s, tạm dừng khi tab ẩn)
@@ -498,42 +499,44 @@ export const Header: React.FC<HeaderProps> = ({
         )}
       </div>
 
-      {/* Developer Screenshot Bypass Switch */}
-      {canAccessAdmin && (
+      {/* Công tắc cho phép chụp màn hình — chỉ Quản trị viên */}
+      {screenshotSwitch.visible && (
         <div className="px-3 py-2 my-1 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-1">
           <div className="flex items-center justify-between text-xs">
             <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
               <Camera className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Cơ chế dành cho Dev: Cho phép chụp ảnh</span>
+              <span>Cho phép chụp màn hình (kiểm thử)</span>
             </span>
             <button
               type="button"
+              role="switch"
+              aria-checked={screenshotSwitch.on}
+              aria-label="Cho phép chụp màn hình"
               onClick={(e) => {
                 e.stopPropagation();
-                const nextState = !isDevScreenshotAllowed;
-                setDevScreenshotAllowed(nextState);
-                setIsDevScreenshotAllowed(nextState);
+                const nextState = !screenshotSwitch.on;
+                setScreenshotAllowed(nextState);
                 toast.info(
                   nextState
-                    ? 'Đã BẬT chế độ chụp ảnh màn hình (Dành cho Lập trình viên / Báo cáo).'
-                    : 'Đã TẮT chế độ dev, khôi phục bảo vệ chống chụp màn hình nghiêm ngặt.',
-                  { title: 'CHẾ ĐỘ LẬP TRÌNH', badge: nextState ? 'DEV-BYPASS' : 'SECURE' }
+                    ? 'Đã BẬT cho phép chụp màn hình trên tài khoản Quản trị của bạn.'
+                    : 'Đã TẮT, khôi phục bảo vệ chống chụp màn hình.',
+                  { title: 'CHỤP MÀN HÌNH', badge: nextState ? 'ĐANG CHO PHÉP' : 'ĐANG BẢO VỆ' }
                 );
               }}
-              className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                isDevScreenshotAllowed ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
+              className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                screenshotSwitch.on ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
               }`}
-              title="Bật/Tắt cờ cho phép chụp ảnh màn hình"
+              title="Bật/Tắt cho phép chụp màn hình"
             >
               <span
                 className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  isDevScreenshotAllowed ? 'translate-x-4' : 'translate-x-0'
+                  screenshotSwitch.on ? 'translate-x-4' : 'translate-x-0'
                 }`}
               />
             </button>
           </div>
           <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
-            Cơ chế này dành cho Dev để lập trình và kiểm thử giao diện
+            Chỉ Quản trị viên. Áp dụng cho tài khoản của bạn trên trình duyệt này.
           </p>
         </div>
       )}

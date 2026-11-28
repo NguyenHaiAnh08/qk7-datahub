@@ -11,9 +11,7 @@ import {
   Loader2,
   FileText,
   KeyRound,
-  Copy,
   CheckCircle2,
-  AlertTriangle,
   Building,
   User,
   Shield,
@@ -119,8 +117,6 @@ export const ApprovalQueuePage: React.FC = () => {
   const [actionInputMode, setActionInputMode] = useState<'idle' | 'reject' | 'explain'>('idle');
 
   // Modal hiển thị PIN sau khi duyệt
-  const [generatedPinResult, setGeneratedPinResult] = useState<{ pin: string; userId: string } | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -327,6 +323,15 @@ export const ApprovalQueuePage: React.FC = () => {
         return;
       }
 
+      // Yêu cầu cấp mã PIN: máy chủ đã cấp ngay khi duyệt, người duyệt không nhận mã PIN
+      if (sRes?.pin_issued) {
+        toast.success(sRes.message, { title: 'ĐÃ CẤP MÃ PIN', badge: 'APPROVED' });
+        setSelected(null);
+        await load(true);
+        await refreshApprovalCount();
+        return;
+      }
+
       // Yêu cầu XEM: duyệt xong là người dùng tự xem được (cấp quyền theo thời hạn), không chạy lại API
       if (String(selected.http_method).toUpperCase() === 'GET') {
         toast.success(`Đã cho phép xem (${selected.request_id})`, {
@@ -339,10 +344,8 @@ export const ApprovalQueuePage: React.FC = () => {
         return;
       }
 
-      const isPinRequest = selected.http_path.includes('/pin') || selected.required_permission === 'PIN_GENERATE';
-
-      if (isPinRequest) {
-        const res: any = await http(selected.http_path, {
+      try {
+        await http(selected.http_path, {
           method: selected.http_method,
           headers: {
             'Content-Type': 'application/json',
@@ -350,37 +353,15 @@ export const ApprovalQueuePage: React.FC = () => {
           },
           body: selected.http_body || undefined,
         });
-
         await approvalService.markExecuted(selected.request_id);
-
-        const newPin = res.pin || res.data?.pin;
-        if (newPin) {
-          setSelected(null);
-          setGeneratedPinResult({ pin: newPin, userId: selected.requester_id });
-        } else {
-          toast.success('Đã cấp PIN thành công');
-          setSelected(null);
-        }
-      } else {
-        try {
-          await http(selected.http_path, {
-            method: selected.http_method,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Approval-Override': selected.request_id,
-            },
-            body: selected.http_body || undefined,
-          });
-          await approvalService.markExecuted(selected.request_id);
-          toast.success(`Đã duyệt & thực thi thành công ${selected.request_id}`, {
-            title: 'PHÊ DUYỆT HOÀN TẤT',
-            badge: 'APPROVED',
-          });
-        } catch (execErr: any) {
-          toast.error(`Đã duyệt nhưng thực thi thất bại: ${execErr.message}`);
-        }
-        setSelected(null);
+        toast.success(`Đã duyệt & thực thi thành công ${selected.request_id}`, {
+          title: 'PHÊ DUYỆT HOÀN TẤT',
+          badge: 'APPROVED',
+        });
+      } catch (execErr: any) {
+        toast.error(`Đã duyệt nhưng thực thi thất bại: ${execErr.message}`);
       }
+      setSelected(null);
 
       await load(true);
       await refreshApprovalCount();
@@ -417,13 +398,6 @@ export const ApprovalQueuePage: React.FC = () => {
     } finally {
       setProcessing(false);
     }
-  };
-
-  const handleCopyPin = () => {
-    if (!generatedPinResult) return;
-    navigator.clipboard.writeText(generatedPinResult.pin);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const isSelfRequest = selected?.requester_id === user?.user_id;
@@ -883,59 +857,6 @@ export const ApprovalQueuePage: React.FC = () => {
                   </button>
                 </>
               )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* ========================================================= */}
-      {/* MODAL HIỂN THỊ MÃ PIN SAU KHI DUYỆT THÀNH CÔNG           */}
-      {/* ========================================================= */}
-      {generatedPinResult && createPortal(
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-emerald-500/30 text-center animate-in zoom-in-95">
-            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-            </div>
-
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-              Cấp Mã PIN Thành Công!
-            </h3>
-            <p className="text-xs text-slate-500 mb-6">
-              Quân nhân: <strong className="text-slate-800 dark:text-slate-200">{generatedPinResult.userId}</strong>
-            </p>
-
-            <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-950/30 mb-4">
-              <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 mb-2 uppercase tracking-widest">
-                Mã PIN mới
-              </div>
-              <div className="text-4xl font-mono font-bold tracking-[0.3em] text-emerald-900 dark:text-white">
-                {generatedPinResult.pin}
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2 text-[11px] text-left p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 mb-6">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                Vui lòng <strong>Copy</strong> mã PIN này và gửi cho quân nhân. Mã PIN chỉ hiển thị 1 lần duy nhất.
-              </span>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleCopyPin}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer"
-              >
-                {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Đã Copy' : 'Copy PIN'}
-              </button>
-              <button
-                onClick={() => setGeneratedPinResult(null)}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-md cursor-pointer"
-              >
-                Đóng
-              </button>
             </div>
           </div>
         </div>,

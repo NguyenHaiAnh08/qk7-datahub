@@ -4,6 +4,25 @@ Tài liệu ghi nhận toàn bộ các điều chỉnh, cải tiến, bản vá 
 
 ---
 
+## [v1.8.26-xem-lai-pin-bang-van-tay] — 2026-11-28
+
+### 1. Đổi Cơ Chế Mã PIN: Xem Lại Được Bằng Vân Tay
+- **Bỏ** cơ chế chỉ xem một lần rồi mất vĩnh viễn.
+- **Cấp lần đầu:** quân nhân xem ở nút chuông (không cần quét, một lần, trong 24 giờ).
+- **Đã có PIN:** quét vân tay của chính mình để xem lại bất cứ lúc nào, chỉ trên đầu đọc của máy đang dùng.
+- **Người cấp** (Admin hoặc người có quyền `USER_PIN_GENERATE`) không còn nhìn thấy mã PIN. Với người đã có PIN: mặc định giữ mã cũ; nút riêng "Đổi PIN mới" (yêu cầu quân nhân đã đăng ký vân tay).
+- **Cấp trực tiếp:** việc cấp PIN không đi qua khóa bảo vệ. Người không phải Admin không được cấp cho chính mình hoặc tài khoản Admin; tài khoản Quản trị tối cao chỉ chính chủ thao tác.
+- **Hàng chờ duyệt:** yêu cầu PIN chỉ Admin hoặc người có quyền cấp PIN xử lý; duyệt là cấp ngay.
+- **Lưu trữ:** thêm `USER.pin_enc` (AES-256-GCM, khóa dẫn xuất từ `FP_ENC_KEY`); `PIN_DELIVERY` không còn chứa mã PIN. PIN cấp theo cơ chế cũ được lưu bản mã sau lần nhập đúng đầu tiên.
+- **API:** thêm `GET /api/user/pin-status`, `POST /api/user/my-pin/reveal`; `pin/generate` nhận `rotate`, trả `mode` và `message` thay cho `pin`.
+- **Triển khai:** chạy `backend/migrations/add_pin_view_again.sql`, build giao diện, khởi động lại backend. Đổi `FP_ENC_KEY` sẽ làm mất khả năng xem lại PIN (cũng như mẫu vân tay).
+
+### 2. Sửa Lỗi
+- Người không phải Admin gửi yêu cầu cấp PIN bị chặn `ROUTE_NOT_REGISTERED` khi bật `STRICT_APPROVAL`.
+- Bấm nút chuông khi không có PIN chờ hiện hai thông báo lỗi "Không có mã PIN nào đang chờ".
+
+---
+
 ## [v1.8.25-thu-vien-anh-bia-so-trang] — 2026-11-28
 
 ### 1. Ảnh Bìa và Số Trang Cho Tài Liệu Thư Viện

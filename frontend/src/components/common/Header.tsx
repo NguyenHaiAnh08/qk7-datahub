@@ -568,8 +568,8 @@ export const Header: React.FC<HeaderProps> = ({
               ? 'bg-amber-500/15 border-amber-500/50 text-amber-600 dark:text-amber-400 shadow-sm ring-2 ring-amber-500/20'
               : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-500/40'
           }`}
-          title={hasNewPin ? 'Có mã PIN mới từ Quản trị viên' : 'Thông báo từ Quản trị viên'}
-          aria-label={hasNewPin ? 'Có mã PIN mới từ Quản trị viên' : 'Thông báo từ Quản trị viên'}
+          title={hasNewPin ? 'Có thông báo về mã PIN của bạn' : 'Mã PIN của tôi'}
+          aria-label={hasNewPin ? 'Có thông báo về mã PIN của bạn' : 'Mã PIN của tôi'}
         >
           <Bell
             className={`w-4 h-4 transition-transform duration-200 ${

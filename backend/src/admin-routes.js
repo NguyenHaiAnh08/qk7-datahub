@@ -376,10 +376,17 @@ module.exports = (app, deps) => {
                 (rolesByUser[row.user_id] ||= []).push(row.role_id);
                 (roleNamesByUser[row.user_id] ||= []).push(row.name);
             }
+            // Chỉ cho biết CÓ bản mã hay chưa, không bao giờ trả bản mã
+            const viewable = new Set();
+            if (await deps.pinVault.ready()) {
+                const enc = await pool.request().query(`SELECT user_id FROM [USER] WHERE pin_enc IS NOT NULL`);
+                enc.recordset.forEach((x) => viewable.add(x.user_id));
+            }
             const items = r.recordset.map(u => ({
                 ...u,
                 has_fingerprint: u.has_fingerprint === 1,
                 has_pin: u.has_pin === 1,
+                pin_viewable: viewable.has(u.user_id),
                 pin_requested: u.pin_requested === 1, // ✅ THÊM DÒNG NÀY ĐỂ MAP SANG BOOLEAN
                 roles: rolesByUser[u.user_id] || [],
                 role_names: roleNamesByUser[u.user_id] || [],
@@ -2239,6 +2246,19 @@ module.exports = (app, deps) => {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+    // Yêu cầu cấp mã PIN: chỉ Admin hoặc người có quyền "Cấp mã PIN" xử lý (quyền duyệt chung không đủ)
+    const findPinRequest = async (id) => {
+        const r = await (await getPool()).request()
+            .input('rid', sql.VarChar(50), id)
+            .query(`SELECT requester_id FROM APPROVAL_REQUEST
+                    WHERE request_id = @rid AND status = 'PENDING' AND required_permission = 'PERM-USR-08'`);
+        return r.recordset[0] || null;
+    };
+    const denyPinHandling = (res) => res.status(403).json({
+        error: 'Yêu cầu cấp mã PIN chỉ Quản trị viên hoặc người có quyền "Cấp mã PIN" được xử lý.',
+        code: 'PIN_ISSUE_DENIED',
+    });
+
     app.post('/api/admin/approval-requests/:id/approve', async (req, res) => {
         try {
             const id = req.params.id;
@@ -2278,6 +2298,15 @@ module.exports = (app, deps) => {
                 return res.status(500).json({ error: 'approveProposalCore chưa được wire' });
             }
 
+            // ─── [PIN] Duyệt = cấp ngay; cấp không được thì yêu cầu vẫn chờ ───
+            const pinReq = await findPinRequest(id);
+            if (pinReq) {
+                if (!(await deps.pinVault.canIssue(req.user))) return denyPinHandling(res);
+                const issued = await deps.pinVault.issue({ actor: req.user, targetUserId: pinReq.requester_id });
+                await log(req, 'APPROVAL_APPROVED', `Duyệt yêu cầu ${id} — cấp PIN (${issued.mode}) cho ${issued.user_id}`);
+                return res.json({ success: true, request_id: id, pin_issued: true, mode: issued.mode, message: issued.message });
+            }
+
             // ─── [STANDARD] Kiểm tra đơn vị người yêu cầu ───
             const checkReq = await pool.request()
                 .input('rid', sql.VarChar(50), id)
@@ -2308,7 +2337,7 @@ module.exports = (app, deps) => {
             if (r.recordset[0].n === 0) return res.status(400).json({ error: 'Yêu cầu không ở trạng thái PENDING' });
             await log(req, 'APPROVAL_APPROVED', `Duyệt yêu cầu ${id}`);
             res.json({ success: true, request_id: id });
-        } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+        } catch (e) { res.status(e.status || 500).json({ error: e.message, code: e.status ? e.code : undefined }); }
     });
 
     app.post('/api/admin/approval-requests/:id/reject', async (req, res) => {
@@ -2350,6 +2379,20 @@ module.exports = (app, deps) => {
                     return res.json(result);
                 }
                 return res.status(500).json({ error: 'rejectProposalCore chưa được wire' });
+            }
+
+            // ─── [PIN] ───
+            if (await findPinRequest(id)) {
+                if (!(await deps.pinVault.canIssue(req.user))) return denyPinHandling(res);
+                await pool.request()
+                    .input('rid', sql.VarChar(50), id)
+                    .input('by', sql.VarChar(50), req.user.user_id)
+                    .input('note', sql.NVarChar(500), note.trim())
+                    .query(`UPDATE APPROVAL_REQUEST SET status='REJECTED', reviewed_by=@by,
+                            reviewed_at=GETDATE(), review_note=@note
+                            WHERE request_id=@rid AND status='PENDING'`);
+                await log(req, 'APPROVAL_REJECTED', `Từ chối ${id} — ${note}`);
+                return res.json({ success: true, request_id: id });
             }
 
             // ─── [STANDARD] ───

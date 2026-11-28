@@ -39,6 +39,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   const { user, hasPermission } = useAuth();
   const isAdminUser = (user?.roles || []).includes('ROL-01');
   const canDeleteUser = hasPermission('USER_DELETE');
+  const canIssuePin = hasPermission('USER_PIN_GENERATE'); // Admin luôn có
 
   const [currentPage, setCurrentPage] = useState<number>(1);
 
@@ -103,10 +104,10 @@ export const UserTable: React.FC<UserTableProps> = ({
                       <span>{u.full_name}</span>
 
                       {/* ✅ BADGE CẢNH BÁO USER ĐANG XIN CẤP PIN */}
-                      {u.pin_requested && !u.has_pin && (
+                      {u.pin_requested && (
                         <span className="inline-flex items-center gap-1 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse shadow-sm">
                           <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                          Chờ cấp PIN
+                          {u.has_pin ? 'Quên PIN' : 'Chờ cấp PIN'}
                         </span>
                       )}
                     </div>
@@ -230,12 +231,12 @@ export const UserTable: React.FC<UserTableProps> = ({
                     )}
 
                     {/* 2. Nút Quản lý PIN — chỉ hiện cho quân nhân Cấp ≥ 4 */}
-                    {onManagePin && (u.clearance_level_id || 1) >= 4 && (
+                    {onManagePin && canIssuePin && (u.clearance_level_id || 1) >= 4 && (
                       <Tooltip
                         title={
                           u.has_pin
-                            ? '🔑 Quản lý PIN (Đã cấp) — click để random lại'
-                            : '🔑 Quản lý PIN (Chưa cấp) — click để random PIN 6 số'
+                            ? '🔑 Quản lý PIN (đã cấp) — cho xem lại hoặc đổi mã'
+                            : '🔑 Quản lý PIN (chưa cấp) — cấp mã PIN'
                         }
                         placement="top"
                       >

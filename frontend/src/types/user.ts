@@ -15,6 +15,8 @@ export interface User {
   role_names?: string[];
   has_fingerprint?: boolean;
   has_pin?: boolean;
+  /** Mã PIN đang dùng đã có bản mã hóa để chính chủ xem lại bằng vân tay */
+  pin_viewable?: boolean;
   permissions?: string[];       
   created_at?: string;
   updated_at?: string;
@@ -198,6 +200,7 @@ export interface GeneratePinResult {
   success: boolean;
   user_id: string;
   full_name: string;
-  pin: string;
+  /** NEW: cấp lần đầu · REVIEW: giữ mã cũ, mời xem lại · ROTATE: đổi mã mới. Không trả về mã PIN. */
+  mode: 'NEW' | 'REVIEW' | 'ROTATE';
   message: string;
 }
